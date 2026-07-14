@@ -1,0 +1,38 @@
+# Melos drives multi-package tasks across the Insolvia workspace.
+# Workspace membership itself is declared in the root pubspec.yaml
+# (`workspace:`); Melos 6+ reads that and layers scripts on top.
+#
+#   dart pub global activate melos     # one-time
+#   melos bootstrap                    # resolve all packages
+#   melos run analyze                  # analyze everything
+#   melos run test                     # test everything
+name: insolvia
+
+command:
+  bootstrap:
+    # Keep a single lockfile at the workspace root.
+    runPubGetInParallel: false
+
+scripts:
+  analyze:
+    description: Static-analyze every package.
+    run: dart analyze --fatal-infos
+    exec:
+      concurrency: 1
+
+  format:
+    description: Format all Dart sources (fails if anything changes).
+    run: dart format --output=none --set-exit-if-changed .
+
+  test:
+    description: Run the Flutter test suite in every package that has one.
+    run: flutter test
+    packageFilters:
+      dirExists: test
+
+  ci:
+    description: The exact gate CI runs — format check, analyze, test.
+    steps:
+      - format
+      - analyze
+      - test

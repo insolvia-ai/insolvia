@@ -1,0 +1,40 @@
+name: Infra · Terraform apply · Shared
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/envs/shared/**"
+      - "infra/modules/**"
+      - ".github/workflows/shared-infra-deploy.yml"
+  workflow_dispatch:
+
+# Gated off until insolvia.ai DNS is live (DEPLOY_ENABLED repo variable).
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-shared-infra
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Apply shared
+        run: |
+          terraform -chdir=infra/envs/shared init
+          terraform -chdir=infra/envs/shared apply -auto-approve

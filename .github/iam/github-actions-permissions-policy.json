@@ -1,0 +1,30 @@
+{
+  "__comment": "Reference copy of the permissions policy for the github-actions-insolvia role. Authoritative definition lives in infra/envs/shared/main.tf.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TerraformState",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::insolvia-terraform-state",
+        "arn:aws:s3:::insolvia-terraform-state/*"
+      ]
+    },
+    {
+      "Sid": "WebHostingBuckets",
+      "Effect": "Allow",
+      "Action": ["s3:*"],
+      "Resource": [
+        "arn:aws:s3:::insolvia-web-*",
+        "arn:aws:s3:::insolvia-web-*/*"
+      ]
+    },
+    {
+      "Sid": "EdgeAndDns",
+      "Effect": "Allow",
+      "Action": ["cloudfront:*", "route53:*", "acm:*"],
+      "Resource": "*"
+    }
+  ]
+}

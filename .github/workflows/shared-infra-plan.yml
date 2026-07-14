@@ -1,0 +1,43 @@
+name: Infra · Terraform plan · PR
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".tflint.hcl"
+      - ".github/workflows/shared-infra-plan.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [shared, staging, prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.62.0
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      - name: TFLint
+        run: |
+          tflint --init
+          tflint --chdir=infra/envs/${{ matrix.env }} --recursive
+
+      # Offline validation — no AWS credentials needed (backend disabled).
+      - name: Validate ${{ matrix.env }}
+        run: |
+          terraform -chdir=infra/envs/${{ matrix.env }} init -backend=false
+          terraform -chdir=infra/envs/${{ matrix.env }} validate

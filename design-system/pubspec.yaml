@@ -1,0 +1,39 @@
+name: insolvia_design_system
+description: >-
+  Insolvia's shared design system — color/typography/spacing tokens, light &
+  dark themes, and reusable Flutter components used by every Insolvia surface
+  (desktop, web, and future marketing site).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+# Part of the Insolvia pub workspace (root pubspec.yaml).
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+# ── Brand fonts (roadmap) ───────────────────────────────────────
+# Insolvia's brand type pairing (a professional serif display + a
+# neutral sans body) will be bundled here as variable fonts and wired
+# via FontVariation weight axes. Until the brand is finalized (O4), the
+# theme uses the platform default family with a full custom type scale.
+# flutter:
+#   fonts:
+#     - family: InsolviaSerif
+#       fonts:
+#         - asset: fonts/InsolviaSerif-Variable.ttf
+#     - family: InsolviaSans
+#       fonts:
+#         - asset: fonts/InsolviaSans-Variable.ttf
+flutter:
+  uses-material-design: true
