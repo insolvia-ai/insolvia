@@ -30,4 +30,4 @@ fvm flutter build web   --dart-define=INSOLVIA_ENV=staging
 fvm flutter build macos --dart-define=INSOLVIA_ENV=staging
 ```
 
-See the repo [`README.md`](../README.md) for the unsigned-macOS install step.
+See the repo [`README.md`](../../README.md) for the unsigned-macOS install step.

@@ -1,0 +1,2 @@
+# Inherit the workspace-wide lints.
+include: ../../analysis_options.yaml

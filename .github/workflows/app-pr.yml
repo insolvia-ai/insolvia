@@ -3,8 +3,8 @@ name: App · PR
 on:
   pull_request:
     paths:
-      - "app/**"
-      - "design-system/**"
+      - "apps/**"
+      - "packages/**"
       - "pubspec.yaml"
       - "melos.yaml"
       - "analysis_options.yaml"
@@ -23,15 +23,15 @@ jobs:
           channel: stable
       - run: flutter pub get
       - name: Format check
-        run: dart format --output=none --set-exit-if-changed app
+        run: dart format --output=none --set-exit-if-changed apps/insolvia_app
       - name: Analyze
-        run: dart analyze app
+        run: dart analyze apps/insolvia_app
       - name: Test
         run: flutter test
-        working-directory: app
+        working-directory: apps/insolvia_app
       - name: Build web (verify)
         run: flutter build web --dart-define=INSOLVIA_ENV=staging
-        working-directory: app
+        working-directory: apps/insolvia_app
 
   build-macos:
     runs-on: macos-latest
@@ -43,4 +43,4 @@ jobs:
       - run: flutter pub get
       - name: Build macOS (verify)
         run: flutter build macos --dart-define=INSOLVIA_ENV=staging
-        working-directory: app
+        working-directory: apps/insolvia_app
