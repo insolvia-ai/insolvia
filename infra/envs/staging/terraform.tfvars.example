@@ -1,0 +1,3 @@
+aws_region  = "us-east-1"
+domain_name = "insolvia.ai"
+subdomain   = "staging.insolvia.ai"

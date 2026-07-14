@@ -1,0 +1,52 @@
+# ── Dart / Flutter ──────────────────────────────────────────────
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+# The root workspace pubspec.lock IS committed (reproducible app builds).
+*.iml
+*.ipr
+*.iws
+.idea/
+doc/api/
+coverage/
+*.log
+
+# FVM
+.fvm/flutter_sdk
+
+# ── macOS build / Xcode ─────────────────────────────────────────
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+**/Podfile.lock
+*.dSYM/
+DerivedData/
+xcuserdata/
+
+# ── Web ─────────────────────────────────────────────────────────
+app/web/flutter_service_worker.js
+
+# ── Terraform ───────────────────────────────────────────────────
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars                # real vars are secret; *.tfvars.example IS committed
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# .terraform.lock.hcl intentionally ignored for now (locks were generated with
+# -backend=false during bootstrap). Commit proper multi-platform locks later:
+#   terraform providers lock -platform=linux_amd64 -platform=darwin_arm64
+.terraform.lock.hcl
+.terraformrc
+terraform.rc
+
+# ── OS / editor ─────────────────────────────────────────────────
+.DS_Store
+*.swp
+*~

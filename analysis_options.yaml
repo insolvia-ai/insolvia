@@ -1,0 +1,27 @@
+# Shared static-analysis config for the whole Insolvia workspace.
+# Individual packages may layer their own analysis_options.yaml that
+# `include:` this file if they need extra rules.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  errors:
+    # Treat missing return types / unused imports as errors in CI.
+    always_declare_return_types: error
+    unused_import: error
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/build/**"
+
+linter:
+  rules:
+    # NOTE: `require_trailing_commas` is intentionally omitted — it conflicts
+    # with Dart 3.12+'s "tall" formatter, which manages comma placement itself.
+    - prefer_single_quotes
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_final_locals
+    - sort_child_properties_last

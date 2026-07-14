@@ -1,0 +1,106 @@
+name: App · Deploy · Staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "design-system/**"
+      - "infra/envs/staging/**"
+      - "infra/modules/**"
+      - ".github/workflows/app-staging.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-app-staging
+  cancel-in-progress: false
+
+jobs:
+  # ── Always build + publish artifacts (no domain needed) ────────
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build web (staging)
+        run: flutter build web --dart-define=INSOLVIA_ENV=staging
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insolvia-web-staging
+          path: app/build/web
+          retention-days: 14
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build macOS (staging, unsigned)
+        run: flutter build macos --dart-define=INSOLVIA_ENV=staging
+        working-directory: app
+      - name: Zip .app
+        run: |
+          cd app/build/macos/Build/Products/Release
+          zip -r -y "$GITHUB_WORKSPACE/insolvia_app-staging.zip" insolvia_app.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insolvia-macos-staging
+          path: insolvia_app-staging.zip
+          retention-days: 14
+
+  # ── Deploy: gated OFF until insolvia.ai DNS is live ────────────
+  deploy:
+    needs: build-web
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Apply staging infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          terraform -chdir=infra/envs/staging apply -auto-approve
+          echo "bucket=$(terraform -chdir=infra/envs/staging output -raw bucket_name)" >> "$GITHUB_OUTPUT"
+          echo "dist=$(terraform -chdir=infra/envs/staging output -raw distribution_id)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: insolvia-web-staging
+          path: web
+
+      - name: Sync to S3 + invalidate
+        env:
+          BUCKET: ${{ steps.tf.outputs.bucket }}
+          DIST: ${{ steps.tf.outputs.dist }}
+        run: |
+          # Hashed assets: cache forever, immutable (everything except HTML).
+          aws s3 sync web "s3://$BUCKET" --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html"
+          # HTML: never cache, so new deploys are picked up immediately.
+          aws s3 sync web "s3://$BUCKET" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --exclude "*" --include "*.html"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"

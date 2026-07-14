@@ -1,0 +1,19 @@
+# Root of the Insolvia Dart pub workspace.
+#
+# This is NOT a shippable package — it exists only to declare the
+# workspace members and pin the tooling (Melos) used to drive them.
+# Each member package sets `resolution: workspace` so a single
+# `pub get` at the root resolves every package together.
+name: insolvia_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+# Workspace members (see melos.yaml for the task runner on top).
+workspace:
+  - design-system
+  - app
+
+dev_dependencies:
+  melos: ^6.3.0

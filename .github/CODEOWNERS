@@ -1,0 +1,4 @@
+# Every change requires review from the founding owner.
+# @ansavva is an owner/admin of the Insolvia-AI org with write access, so
+# CODEOWNERS review is enforceable via branch protection on main.
+* @ansavva

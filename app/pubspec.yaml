@@ -1,0 +1,28 @@
+name: insolvia_app
+description: >-
+  The Insolvia app — cross-platform (desktop + web) bankruptcy case preparation.
+  Currently a themed hello-world that imports the Insolvia design system.
+version: 0.1.0+1
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+# Part of the Insolvia pub workspace (root pubspec.yaml).
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # The shared design system, resolved by path within the monorepo.
+  insolvia_design_system:
+    path: ../design-system
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

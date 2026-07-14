@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and adjust as needed. Defaults are usually fine.
+aws_region  = "us-east-1"
+domain_name = "insolvia.ai"
+github_repo = "Insolvia-AI/insolvia"

@@ -1,0 +1,60 @@
+name: App · Deploy · Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-app-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter pub get
+
+      - name: Build web (production)
+        run: flutter build web --dart-define=INSOLVIA_ENV=production
+        working-directory: app
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Apply prod infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init
+          terraform -chdir=infra/envs/prod apply -auto-approve
+          echo "bucket=$(terraform -chdir=infra/envs/prod output -raw bucket_name)" >> "$GITHUB_OUTPUT"
+          echo "dist=$(terraform -chdir=infra/envs/prod output -raw distribution_id)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync to S3 + invalidate
+        env:
+          BUCKET: ${{ steps.tf.outputs.bucket }}
+          DIST: ${{ steps.tf.outputs.dist }}
+        run: |
+          aws s3 sync app/build/web "s3://$BUCKET" --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html"
+          aws s3 sync app/build/web "s3://$BUCKET" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --exclude "*" --include "*.html"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"

@@ -1,0 +1,46 @@
+name: App · PR
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "design-system/**"
+      - "pubspec.yaml"
+      - "melos.yaml"
+      - "analysis_options.yaml"
+      - ".github/workflows/app-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Format check
+        run: dart format --output=none --set-exit-if-changed app
+      - name: Analyze
+        run: dart analyze app
+      - name: Test
+        run: flutter test
+        working-directory: app
+      - name: Build web (verify)
+        run: flutter build web --dart-define=INSOLVIA_ENV=staging
+        working-directory: app
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build macOS (verify)
+        run: flutter build macos --dart-define=INSOLVIA_ENV=staging
+        working-directory: app
