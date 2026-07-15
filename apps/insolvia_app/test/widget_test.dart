@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
-import 'package:insolvia_app/config/environment.dart';
-import 'package:insolvia_app/main.dart';
+import 'package:insolvia_app/src/app.dart';
+import 'package:insolvia_app/src/config/environment.dart';
 
 void main() {
   testWidgets('renders the themed hello screen with brand chrome',

@@ -11,9 +11,11 @@ environment:
   sdk: ^3.6.0
 
 # Workspace members (see melos.yaml for the task runner on top).
+#   apps/     → runnable applications
+#   packages/ → shared libraries (apps depend on packages, never the reverse)
 workspace:
-  - design-system
-  - app
+  - packages/insolvia_design_system
+  - apps/insolvia_app
 
 dev_dependencies:
   melos: ^6.3.0

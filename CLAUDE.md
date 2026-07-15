@@ -13,10 +13,14 @@ design system. It intentionally mirrors the conventions of the
 `andreas-services` repo (infra layout, OIDC to AWS, Route53 + ACM + CloudFront,
 `<project>-<thing>-<env>` naming), adapted from Python/React to Dart/Flutter.
 
-| Package | Purpose | Stack |
+The layout follows the standard Flutter monorepo split: runnable apps in
+`apps/`, shared libraries in `packages/` (apps depend on packages, never the
+reverse).
+
+| Path | Purpose | Stack |
 |---|---|---|
-| `design-system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
-| `app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
+| `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
+| `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
 
@@ -49,13 +53,14 @@ is exactly one per account.)
 
 ## Patterns Every Package Follows
 
-### Flutter app (`app/`)
-- Depends on the design system by **path**: `insolvia_design_system: { path: ../design-system }`.
+### Flutter app (`apps/insolvia_app/`)
+- Depends on the design system by **path**: `insolvia_design_system: { path: ../../packages/insolvia_design_system }`.
+- **Feature-first** layout under `lib/src/`: `features/<feature>/{data,domain,presentation}`, plus shared `routing/` (go_router) and `config/`. `main.dart` stays thin (`runApp(InsolviaApp())`); the app shell lives in `src/app.dart`.
 - No hard-coded colors/spacing/fonts — pull everything from the design system's theme and `ThemeExtension`s.
-- Environment config lives in `lib/config/environment.dart`, read from `--dart-define=INSOLVIA_ENV`.
+- Environment config lives in `lib/src/config/environment.dart`, read from `--dart-define=INSOLVIA_ENV`.
 - Targets checked in: `web/`, `macos/`. Others added as needed.
 
-### Design system (`design-system/`)
+### Design system (`packages/insolvia_design_system/`)
 - Structure: `lib/src/{tokens,theme,components}/`, one barrel export `lib/insolvia_design_system.dart`.
 - Tokens are the single source of truth. Brand-specific values Material lacks go in a `ThemeExtension` (`InsolviaColors`, `InsolviaSpacing`), read via `Theme.of(context).extension<...>()`.
 - Every exported component has at least one widget test.
@@ -90,7 +95,7 @@ CLI profile / SSO. In CI, rely on the assumed OIDC role. If a tool needs
 credentials it does not have, **stop and ask** — do not invent a workaround.
 
 ## Adding a New Package
-1. Create `<name>/` with its own `pubspec.yaml` (`resolution: workspace`) or `infra/`.
+1. Create it under `packages/<name>/` (shared library) or `apps/<name>/` (runnable app), with its own `pubspec.yaml` (`resolution: workspace`).
 2. Add it to the root `pubspec.yaml` `workspace:` list.
 3. If it deploys, add `<name>-pr.yml` + `<name>-<env>.yml` workflows and an `infra/envs/*` entry.
 4. Document it in this table and in `docs/`.

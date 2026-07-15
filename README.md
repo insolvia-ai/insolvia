@@ -10,10 +10,13 @@ desktop-loyal attorneys where they are.
 
 ## Layout
 
+Standard Flutter monorepo split — runnable apps in `apps/`, shared libraries in
+`packages/`:
+
 | Path | What |
 |---|---|
-| [`design-system/`](design-system/) | Shared Flutter UI package (`insolvia_design_system`): tokens, theme, components. |
-| [`app/`](app/) | The Insolvia app (`insolvia_app`) — desktop + web. Currently a themed hello-world. |
+| [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app (`insolvia_app`) — desktop + web. Currently a themed, feature-first hello-world. |
+| [`packages/insolvia_design_system/`](packages/insolvia_design_system/) | Shared Flutter UI package: tokens, theme, components. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `shared`, `staging`, `prod`. |
 | [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
 
@@ -31,7 +34,7 @@ melos bootstrap             # resolve all workspace packages
 melos run ci                # format-check + analyze + test everything
 
 # Run the app locally
-cd app
+cd apps/insolvia_app
 fvm flutter run -d chrome   --dart-define=INSOLVIA_ENV=local   # web
 fvm flutter run -d macos    --dart-define=INSOLVIA_ENV=local   # desktop
 ```
@@ -39,7 +42,7 @@ fvm flutter run -d macos    --dart-define=INSOLVIA_ENV=local   # desktop
 ## Builds
 
 ```bash
-cd app
+cd apps/insolvia_app
 fvm flutter build web   --dart-define=INSOLVIA_ENV=staging     # -> build/web
 fvm flutter build macos --dart-define=INSOLVIA_ENV=staging     # -> build/macos/Build/Products/Release/insolvia_app.app
 ```

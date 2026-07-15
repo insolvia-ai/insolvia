@@ -25,7 +25,7 @@ DerivedData/
 xcuserdata/
 
 # ── Web ─────────────────────────────────────────────────────────
-app/web/flutter_service_worker.js
+apps/insolvia_app/web/flutter_service_worker.js
 
 # ── Terraform ───────────────────────────────────────────────────
 **/.terraform/

@@ -4,15 +4,29 @@
 
 ```
 insolvia/
-├── design-system/     insolvia_design_system  (Flutter package) — tokens, theme, components
-├── app/               insolvia_app            (Flutter app)     — desktop + web
-├── infra/             Terraform               — shared / staging / prod
-└── docs/              business plan + runbooks
+├── apps/
+│   └── insolvia_app/                  Flutter app — desktop + web (feature-first)
+│       └── lib/
+│           ├── main.dart              runApp(InsolviaApp())
+│           └── src/
+│               ├── app.dart           app shell (MaterialApp.router + themes)
+│               ├── routing/           go_router config
+│               ├── config/            environment.dart (--dart-define)
+│               └── features/
+│                   └── home/presentation/   home_screen.dart + widgets/
+├── packages/
+│   └── insolvia_design_system/        shared UI — tokens, theme, components
+├── infra/                             Terraform — shared / staging / prod
+└── docs/                              business plan + runbooks
 ```
+
+Layout follows the standard Flutter monorepo split (`apps/` + `packages/`) and a
+**feature-first** app: code is grouped by feature under `lib/src/features/`, with
+shared concerns (`routing/`, `config/`) alongside — not by technical layer.
 
 - **Workspace resolution:** pub workspaces (root `pubspec.yaml` `workspace:`) so
   one resolve covers every package; the app depends on the design system by
-  **path** (`../design-system`).
+  **path** (`../../packages/insolvia_design_system`).
 - **Task runner:** Melos (`melos.yaml`) — `melos bootstrap`, `melos run ci`.
 - **Flutter version:** pinned via FVM (`.fvmrc`).
 
@@ -25,7 +39,7 @@ codepaths. Selection is via a compile-time define:
 fvm flutter build web --dart-define=INSOLVIA_ENV=staging      # or production, or local (default)
 ```
 
-`app/lib/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed
+`apps/insolvia_app/lib/src/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed
 `AppEnvironment` (label, `isProduction`, future API base URLs, etc.). The
 hello-world screen renders the active environment so staging vs prod is visually
 obvious.

@@ -27,7 +27,7 @@ jobs:
 
       - name: Build web (production)
         run: flutter build web --dart-define=INSOLVIA_ENV=production
-        working-directory: app
+        working-directory: apps/insolvia_app
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -51,10 +51,10 @@ jobs:
           BUCKET: ${{ steps.tf.outputs.bucket }}
           DIST: ${{ steps.tf.outputs.dist }}
         run: |
-          aws s3 sync app/build/web "s3://$BUCKET" --delete \
+          aws s3 sync apps/insolvia_app/build/web "s3://$BUCKET" --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "*.html"
-          aws s3 sync app/build/web "s3://$BUCKET" \
+          aws s3 sync apps/insolvia_app/build/web "s3://$BUCKET" \
             --cache-control "no-cache,no-store,must-revalidate" \
             --exclude "*" --include "*.html"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
