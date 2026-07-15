@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Insolvia regulatory source register — authoritative source of truth per feature.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+<style>html,body{margin:0;padding:0}body{background:#eef0f4}@media(prefers-color-scheme:dark){body{background:#10131a}}</style>
+</head>
+<body>
+<title>Insolvia — Regulatory Source Register</title>
+<style>
+  :root {
+    --paper: #eef0f4;
+    --surface: #ffffff;
+    --surface-2: #f5f6f9;
+    --ink: #1b2436;
+    --ink-soft: #47516640;
+    --ink-soft: #475166;
+    --ink-faint: #6d7688;
+    --line: #d9dde5;
+    --line-strong: #c3c9d4;
+    --accent: #9a6b2f;
+    --accent-ink: #7c531f;
+    --accent-wash: #f2e8d8;
+
+    --tag-form-bg: #f2e6d1;   --tag-form-fg: #855316;
+    --tag-data-bg: #dcebf7;   --tag-data-fg: #1c5688;
+    --tag-logic-bg: #e7ddf5;  --tag-logic-fg: #573a94;
+    --tag-intg-bg: #d5ebe4;   --tag-intg-fg: #1a6353;
+    --tag-flow-bg: #e3e7ee;   --tag-flow-fg: #505b6c;
+
+    --risk-hi: #b23b3b;
+    --risk-md: #b5852a;
+    --risk-lo: #3f8c5c;
+
+    --shadow: 0 1px 2px rgba(27,36,54,.06), 0 8px 24px rgba(27,36,54,.05);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #10131a;
+      --surface: #171b24;
+      --surface-2: #1c212c;
+      --ink: #e7eaf1;
+      --ink-soft: #aab3c3;
+      --ink-faint: #7c out;
+      --ink-faint: #808a9b;
+      --line: #2a3040;
+      --line-strong: #363d4f;
+      --accent: #cd9c60;
+      --accent-ink: #d9ad74;
+      --accent-wash: #2a2318;
+
+      --tag-form-bg: #3a2e1a; --tag-form-fg: #e0b878;
+      --tag-data-bg: #16324a; --tag-data-fg: #8fc3ec;
+      --tag-logic-bg: #2c2447; --tag-logic-fg: #bfa8ee;
+      --tag-intg-bg: #143830; --tag-intg-fg: #7fd0bc;
+      --tag-flow-bg: #242a36; --tag-flow-fg: #a2adbe;
+
+      --risk-hi: #e07a7a;
+      --risk-md: #dab364;
+      --risk-lo: #77c495;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #eef0f4; --surface: #ffffff; --surface-2: #f5f6f9;
+    --ink: #1b2436; --ink-soft: #475166; --ink-faint: #6d7688;
+    --line: #d9dde5; --line-strong: #c3c9d4;
+    --accent: #9a6b2f; --accent-ink: #7c531f; --accent-wash: #f2e8d8;
+    --tag-form-bg: #f2e6d1; --tag-form-fg: #855316;
+    --tag-data-bg: #dcebf7; --tag-data-fg: #1c5688;
+    --tag-logic-bg: #e7ddf5; --tag-logic-fg: #573a94;
+    --tag-intg-bg: #d5ebe4; --tag-intg-fg: #1a6353;
+    --tag-flow-bg: #e3e7ee; --tag-flow-fg: #505b6c;
+    --risk-hi: #b23b3b; --risk-md: #b5852a; --risk-lo: #3f8c5c;
+  }
+  :root[data-theme="dark"] {
+    --paper: #10131a; --surface: #171b24; --surface-2: #1c212c;
+    --ink: #e7eaf1; --ink-soft: #aab3c3; --ink-faint: #808a9b;
+    --line: #2a3040; --line-strong: #363d4f;
+    --accent: #cd9c60; --accent-ink: #d9ad74; --accent-wash: #2a2318;
+    --tag-form-bg: #3a2e1a; --tag-form-fg: #e0b878;
+    --tag-data-bg: #16324a; --tag-data-fg: #8fc3ec;
+    --tag-logic-bg: #2c2447; --tag-logic-fg: #bfa8ee;
+    --tag-intg-bg: #143830; --tag-intg-fg: #7fd0bc;
+    --tag-flow-bg: #242a36; --tag-flow-fg: #a2adbe;
+    --risk-hi: #e07a7a; --risk-md: #dab364; --risk-lo: #77c495;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+
+  .wrap {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(20px, 4vw, 56px) clamp(16px, 4vw, 40px) 80px;
+  }
+  .inner { max-width: 1140px; margin: 0 auto; }
+
+  /* ---- Masthead ---- */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(30px, 5vw, 48px);
+    line-height: 1.05; letter-spacing: -.01em;
+    margin: 0 0 14px; text-wrap: balance;
+  }
+  .standfirst {
+    font-size: clamp(16px, 2vw, 19px);
+    color: var(--ink-soft);
+    max-width: 65ch; margin: 0;
+  }
+  .standfirst b { color: var(--ink); font-weight: 600; }
+
+  .metabar {
+    display: flex; flex-wrap: wrap; gap: 8px 26px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+    margin-top: 20px;
+  }
+  .metabar span b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---- Section headings ---- */
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(21px, 3vw, 27px);
+    margin: 52px 0 6px; letter-spacing: -.01em;
+  }
+  .sec-note { color: var(--ink-faint); font-size: 14px; margin: 0 0 18px; max-width: 70ch; }
+
+  h3 { font-family: var(--sans); font-weight: 700; font-size: 13px;
+       letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint);
+       margin: 34px 0 12px; }
+
+  a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px; margin: 22px 0 8px;
+  }
+  .legend-card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 15px; box-shadow: var(--shadow);
+  }
+  .legend-card .tag { margin-bottom: 8px; }
+  .legend-card p { margin: 0; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono);
+    font-size: 11px; font-weight: 600; letter-spacing: .04em;
+    padding: 3px 8px; border-radius: 5px; white-space: nowrap;
+  }
+  .tag.form { background: var(--tag-form-bg); color: var(--tag-form-fg); }
+  .tag.data { background: var(--tag-data-bg); color: var(--tag-data-fg); }
+  .tag.logic { background: var(--tag-logic-bg); color: var(--tag-logic-fg); }
+  .tag.intg { background: var(--tag-intg-bg); color: var(--tag-intg-fg); }
+  .tag.flow { background: var(--tag-flow-bg); color: var(--tag-flow-fg); }
+
+  /* ---- Cadence callout ---- */
+  .cadence {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 20px 22px; margin: 22px 0 0;
+    box-shadow: var(--shadow);
+  }
+  .cadence h3 { margin-top: 0; color: var(--accent-ink); }
+  .cadence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: 16px 26px; }
+  .cadence-item { display: flex; gap: 12px; align-items: baseline; }
+  .cadence-when {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+    color: var(--ink); white-space: nowrap; min-width: 84px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cadence-what { font-size: 13.5px; color: var(--ink-soft); }
+  .cadence-what b { color: var(--ink); font-weight: 600; }
+
+  /* ---- Tables ---- */
+  .tablecard {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); margin-top: 4px;
+  }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 780px; }
+  thead th {
+    text-align: left; font-family: var(--mono); font-weight: 600;
+    font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-faint); background: var(--surface-2);
+    padding: 12px 16px; border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody td { padding: 15px 16px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  .feat { font-weight: 600; color: var(--ink); }
+  .feat small { display: block; font-weight: 400; color: var(--ink-faint); font-size: 12px; margin-top: 3px; font-family: var(--mono); }
+  .tags-cell { display: flex; flex-wrap: wrap; gap: 5px; }
+  .auth { color: var(--ink-soft); font-size: 13.5px; }
+  .auth b { color: var(--ink); font-weight: 600; }
+  .src { font-size: 13px; }
+  .cad { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .risk { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .risk::before { content: ""; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .risk.hi { color: var(--risk-hi); } .risk.hi::before { background: var(--risk-hi); }
+  .risk.md { color: var(--risk-md); } .risk.md::before { background: var(--risk-md); }
+  .risk.lo { color: var(--risk-lo); } .risk.lo::before { background: var(--risk-lo); }
+  .risk small { display:block; font-weight: 400; color: var(--ink-faint); font-size: 11.5px; margin-top: 2px; }
+
+  /* row + its plain-English explainer read as one unit */
+  tr.has-desc td { border-bottom: none; }
+  tr.desc-row td { padding: 0 16px 16px; border-bottom: 1px solid var(--line-strong); background: var(--surface-2); }
+  tr.desc-row:hover td { background: var(--surface-2); }
+  tr.desc-row:last-child td { border-bottom: none; }
+  .plain {
+    font-size: 13.5px; color: var(--ink-soft); line-height: 1.6;
+    max-width: 96ch; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    padding: 2px 0 2px 14px;
+  }
+  .plain b { color: var(--ink); font-weight: 600; }
+  .plain .lbl {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent-ink); display: block; margin-bottom: 4px;
+  }
+
+  /* ---- Closing notes ---- */
+  .notes { margin-top: 54px; border-top: 1px solid var(--line-strong); padding-top: 8px; }
+  .note-item {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; margin-top: 14px; box-shadow: var(--shadow);
+  }
+  .note-item h4 { margin: 0 0 6px; font-size: 15px; font-family: var(--serif); font-weight: 600; }
+  .note-item p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+  .pill { display:inline-block; font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.05em; padding:3px 8px; border-radius:5px; white-space:nowrap; }
+  .pill.verified { background: var(--tag-intg-bg); color: var(--tag-intg-fg); }
+  .pill.context  { background: var(--tag-flow-bg); color: var(--tag-flow-fg); }
+  .pill.check    { background: var(--tag-form-bg); color: var(--tag-form-fg); }
+  .used { color: var(--ink-soft); font-size: 13px; }
+  .used b { color: var(--ink); font-weight: 600; }
+
+  .footer { margin-top: 46px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); line-height: 1.7; }
+  .footer b { color: var(--ink-soft); }
+</style>
+
+<div class="wrap">
+<div class="inner">
+
+  <header class="masthead">
+    <p class="eyebrow">Insolvia · Requirements Track A</p>
+    <h1>Regulatory Source Register</h1>
+    <p class="standfirst">The non-negotiable half of the feature list. For each feature, this maps the <b>single authoritative source of truth</b> — the statute, court rule, official form, dataset, or third-party interface that dictates correct behavior — so you know, before writing code, whether you're facing a <b>data problem</b>, an <b>integration problem</b>, or a <b>form-replication problem</b>.</p>
+    <div class="metabar">
+      <span><b>Scope</b> U.S. consumer &amp; business bankruptcy</span>
+      <span><b>Compiled</b> 2026-07-15</span>
+      <span><b>Verify before build</b> — sources change on fixed cycles</span>
+    </div>
+  </header>
+
+  <h2>How to read this</h2>
+  <p class="sec-note">Every feature is tagged by the <em>kind</em> of engineering problem the regulation creates. This is the most useful first cut: it tells you which team owns it, where the risk sits, and what "done" means. Most of the hard features carry more than one tag.</p>
+
+  <div class="legend">
+    <div class="legend-card"><span class="tag form">FORM</span><p>Replicate an official Judicial Conference form field-for-field. "Done" = matches the published PDF exactly. Breaks whenever the form is revised.</p></div>
+    <div class="legend-card"><span class="tag data">DATA</span><p>Maintain a government dataset that changes on a fixed calendar. Correctness is legal, not cosmetic. Needs a refresh pipeline, not just a one-time load.</p></div>
+    <div class="legend-card"><span class="tag logic">LOGIC</span><p>Implement a calculation or rule defined in statute. "Done" = produces the legally correct number. Needs test cases drawn from real filings.</p></div>
+    <div class="legend-card"><span class="tag intg">INTEGRATION</span><p>Build to a third party's API/contract you don't control (courts, bureaus, course providers). Their spec is your requirement; get their docs first.</p></div>
+    <div class="legend-card"><span class="tag flow">WORKFLOW</span><p>Mostly user-defined behavior with light regulatory constraint. Belongs to Track B (user/workflow requirements), listed here only for completeness.</p></div>
+  </div>
+
+  <div class="cadence">
+    <h3>⏱ The maintenance calendar — the biggest ongoing obligation</h3>
+    <p class="sec-note" style="margin-bottom:16px;">Several datasets are only valid on the day you pull them. A filing computed with stale figures can be rejected or expose a client. Build these as scheduled refreshes with an effective-date field, and treat each update as a release.</p>
+    <div class="cadence-grid">
+      <div class="cadence-item"><span class="cadence-when">Apr 1 · 3-yr</span><span class="cadence-what"><b>§522 / §104 dollar amounts</b> — federal exemptions &amp; other Code amounts adjust for inflation every 3 years. Last: Apr 1 2025 (+13.2%). Next: <b>Apr 1 2028</b>.</span></div>
+      <div class="cadence-item"><span class="cadence-when">~2–4×/yr</span><span class="cadence-what"><b>Census median family income</b> — updated several times a year with a stated effective date (e.g. cases filed on/after Apr 1 2026).</span></div>
+      <div class="cadence-item"><span class="cadence-when">Periodic</span><span class="cadence-what"><b>IRS National &amp; Local Standards</b> — expense allowances for the means test; reissued by the UST on its own cycle.</span></div>
+      <div class="cadence-item"><span class="cadence-when">Dec 1</span><span class="cadence-what"><b>Official Forms</b> — the standard Rules Enabling Act cycle; interim amendments also occur. Re-diff every form each cycle.</span></div>
+      <div class="cadence-item"><span class="cadence-when">Ongoing</span><span class="cadence-what"><b>Approved course-provider lists (§111)</b> — providers added/removed continuously; a certificate from a de-listed provider is invalid.</span></div>
+      <div class="cadence-item"><span class="cadence-when">Ongoing</span><span class="cadence-what"><b>State exemption statutes</b> — 50 states amend independently; no central feed. The heaviest research burden here.</span></div>
+    </div>
+  </div>
+
+  <!-- CASE PREPARATION -->
+  <h2>Case Preparation</h2>
+  <p class="sec-note">The regulatory core of the product. Almost everything here is dictated by official forms, statutory calculations, and government datasets — very little is yours to invent.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Feature</th><th>Type</th><th>Governing authority</th><th>Canonical source</th><th>Update cadence</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">Form Editor &amp; Preview<small>B101, B106A–J, B107…</small></td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span></div></td>
+        <td class="auth"><b>Official Forms</b> approved by the Judicial Conference; issued under <b>FRBP 9009</b>. Mandatory, nationwide.</td>
+        <td class="src"><a href="https://www.uscourts.gov/forms-rules/forms/bankruptcy-forms">uscourts.gov — Bankruptcy Forms</a></td>
+        <td class="cad">Revised ~Dec 1 cycle + interim</td>
+        <td><span class="risk md">Medium<small>correctness = exact match</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A bankruptcy case is filed on a fixed set of government forms: the <b>petition</b> (the request to open the case), the <b>schedules</b> (itemized lists of everything the debtor owns and everyone they owe), and <b>statements</b> (written financial disclosures, like recent income and money transfers). This feature lets staff fill those in and check them before filing. Because the forms are standardized for every court in the country, your job is to reproduce them exactly — an off-spec form gets bounced by the court.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Common Creditor List</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Internal reusable data. No governing authority — but feeds the creditor matrix, so <b>address format</b> must satisfy court noticing.</td>
+        <td class="src">Internal · matrix format per local court rules</td>
+        <td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A <b>creditor</b> is anyone the debtor owes money to. The same banks, credit-card companies, and collection agencies show up case after case, so a shared list saves re-typing them every time. It's mostly a convenience feature. The one outside constraint: these names and addresses feed the <b>creditor matrix</b> (the mailing list the court uses to notify everyone), so addresses have to be formatted the way the court expects.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Exemption Analyzer</td>
+        <td><div class="tags-cell"><span class="tag data">DATA</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. §522</b> (federal set) <em>plus</em> all 50 states' schemes &amp; opt-out rules. Amounts adjust under <b>§104(b)</b>.</td>
+        <td class="src"><a href="https://www.law.cornell.edu/uscode/text/11/522">11 U.S.C. §522</a> · <a href="https://www.federalregister.gov/documents/2025/02/04/2025-02207/adjustment-of-certain-dollar-amounts-applicable-to-bankruptcy-cases">Fed. Register §104 notice</a></td>
+        <td class="cad">Fed: Apr 1 / 3 yrs · State: ad hoc</td>
+        <td><span class="risk hi">High<small>wrong = client loses assets</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span><b>Exemptions</b> are the legal protections that let a debtor <em>keep</em> certain property — a home, a car, work tools — instead of it being sold to pay creditors. Every state has its own list of what's protected and up to what dollar value, and there's a federal list too; often the debtor must choose one set or the other. This is high-stakes: choosing wrong can cost a client their house. On top of that, the dollar limits rise for inflation every three years, so the figures must be kept current.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Means Test Calculator<small>B122A-1, B122A-2</small></td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag data">DATA</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. §707(b)</b>. Uses IRS Standards + Census median income. Legally required eligibility test.</td>
+        <td class="src"><a href="https://www.justice.gov/ust/means-testing">justice.gov/ust — Means Testing</a></td>
+        <td class="cad">Data 2–4×/yr · Form Dec 1</td>
+        <td><span class="risk hi">High<small>wrong = rejected filing</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>The <b>means test</b> is a required calculation that decides whether someone earns too much to use the simpler <b>Chapter 7</b> (debts wiped out in a few months) and must instead use <b>Chapter 13</b> (a multi-year repayment plan). It compares the debtor's income against their state's median income, then subtracts standardized living-expense allowances published by the IRS. It's legally required and easy to get wrong — a miscalculation can disqualify the filing or draw a challenge from the trustee.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Paycheck Calculator</td>
+        <td><div class="tags-cell"><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth">Feeds Current Monthly Income (§101(10A)). Net-pay math from federal/state withholding &amp; payroll deductions.</td>
+        <td class="src">IRS Pub. 15 (withholding) · state tax tables</td>
+        <td class="cad">Annual (tax year)</td>
+        <td><span class="risk md">Medium</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>This works out a debtor's real take-home pay from their pay stub — gross wages minus taxes and payroll deductions — and feeds that figure into the means test and the income schedules. Income is the number everything else keys off: it decides both whether someone qualifies for Chapter 7 and how much a Chapter 13 debtor has to repay, so it needs to be right.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Informational Charts</td>
+        <td><div class="tags-cell"><span class="tag data">DATA</span></div></td>
+        <td class="auth">Reference views (exemption caps, median-income tables). Derived from the same authoritative datasets — must cite an effective date.</td>
+        <td class="src">Derived from §522 &amp; UST data feeds</td>
+        <td class="cad">Follows source data</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Built-in reference tables — things like exemption limits and income thresholds — so staff can look up a number without leaving the app or hunting through a government website. They're only as trustworthy as the day they were last updated, so each chart should clearly show the <b>date it took effect</b>.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">IRS &amp; Census Data</td>
+        <td><div class="tags-cell"><span class="tag data">DATA</span></div></td>
+        <td class="auth">The pipeline itself. <b>IRS National/Local Standards</b> (via BLS CES) + <b>Census</b> median family income, republished by the UST as XLS/XLSX.</td>
+        <td class="src"><a href="https://www.justice.gov/ust/means-testing">justice.gov/ust — Means Testing</a> (download files)</td>
+        <td class="cad">Effective-dated releases</td>
+        <td><span class="risk hi">High<small>everything downstream</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>These are the behind-the-scenes datasets the means test relies on: <b>IRS "standards"</b> for how much a household is allowed for living expenses (food, housing, transportation), and <b>Census figures</b> for median income by state and household size. The government reissues them on a set schedule, and this feature is the pipeline that keeps your copy up to date. If it goes stale, every means test computed from it is wrong — which is why it's marked high-risk.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Chapter 7 Cases</td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. ch. 7</b> — liquidation. Core consumer case; drives means test + Schedule C exemptions.</td>
+        <td class="src"><a href="https://uscode.house.gov/browse/prelim@title11">Title 11, U.S. Code</a></td>
+        <td class="cad">Statutory (rare)</td>
+        <td><span class="risk md">Medium</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>The most common consumer bankruptcy, called <b>"liquidation."</b> Eligible debts are erased within a few months in exchange for giving up any property that isn't protected by an exemption. This is core functionality — it ties directly to the means test (who qualifies) and the exemptions (what they keep).</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Chapter 11 Business Cases</td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. ch. 11</b> — reorganization. Non-individual form set (B201 etc.); Subchapter V variant for small business.</td>
+        <td class="src"><a href="https://www.uscourts.gov/forms-rules/forms/bankruptcy-forms">Non-individual forms (B2xx)</a></td>
+        <td class="cad">Statutory (rare)</td>
+        <td><span class="risk md">Medium</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Business <b>reorganization</b> — a company keeps operating while it restructures its debts, rather than shutting down. It uses a different set of forms than consumer cases (the "non-individual" forms). There's also a streamlined version called <b>Subchapter V</b> aimed at small businesses. Only needed by firms that handle business clients, not just individuals.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Chapter 13 Plan Calculator<small>B122C-1/2, B113</small></td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. ch. 13</b>. National plan form B113 <em>or</em> a district's local plan; disposable-income math must reconcile.</td>
+        <td class="src"><a href="https://www.uscourts.gov/forms-rules/forms/bankruptcy-forms">Form B113</a> + local plan forms</td>
+        <td class="cad">Form Dec 1 · local forms vary</td>
+        <td><span class="risk hi">High<small>wrong = plan rejected</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span><b>Chapter 13</b> is for individuals who repay their debts over three to five years instead of liquidating. The <b>plan</b> lays out the monthly payment, and the math has to reconcile income, expenses, and debts across the whole plan period — if it doesn't add up, the court rejects the plan and it has to be redone. Watch out: many court districts require <em>their own</em> local plan form rather than the national one.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Chapters 9 &amp; 12</td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>ch. 9</b> municipal · <b>ch. 12</b> family farmer/fisherman. Niche; ch. 12 has its own plan &amp; discharge (B3180F).</td>
+        <td class="src"><a href="https://uscode.house.gov/browse/prelim@title11">Title 11, U.S. Code</a></td>
+        <td class="cad">Statutory (rare)</td>
+        <td><span class="risk lo">Low<small>defer unless targeted</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Two specialized case types: <b>Chapter 9</b> is for municipalities (cities, towns, school districts) that can't pay their debts, and <b>Chapter 12</b> is a repayment plan built specifically for family farmers and fishermen. Both are low-volume and only matter if you serve those clients — safe to postpone unless you're deliberately targeting them.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Case Templates</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Firm-defined presets over the official form sets. No external authority beyond the forms they pre-fill.</td>
+        <td class="src">Internal</td>
+        <td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Pre-filled starting points for common situations (say, "single filer, no property, Chapter 7"), so staff don't build every new case from a blank slate. Purely an internal time-saver layered on top of the official forms — no outside rules apply.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Chapter 15<small>marked "upcoming"</small></td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth"><b>11 U.S.C. ch. 15</b> — cross-border insolvency (UNCITRAL Model Law). Specialized; low volume.</td>
+        <td class="src"><a href="https://uscode.house.gov/browse/prelim@title11">Title 11, U.S. Code</a></td>
+        <td class="cad">Statutory (rare)</td>
+        <td><span class="risk lo">Low<small>defer</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>For <b>cross-border</b> cases where the debtor, or their assets, sit in more than one country — for example a foreign company with U.S. creditors. Specialized and rare, which is why it's flagged "upcoming" and reasonable to defer.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <!-- ELECTRONIC FILING -->
+  <h2>Electronic Filing</h2>
+  <p class="sec-note">Pure integration work, and the one place where an external party's spec can constrain your whole data model. Get the CM/ECF developer docs and IEPD packages <em>before</em> finalizing how you store case data — you must emit their XML shape.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Feature</th><th>Type</th><th>Governing authority</th><th>Canonical source</th><th>Update cadence</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">OneTouch Initial Filing</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span></div></td>
+        <td class="auth"><b>NextGen CM/ECF</b>. Submit petition as <b>XML (IEPD)</b> + PDF (PDF is the official record). Auth via <b>PACER Authentication API</b>. Per-court variation.</td>
+        <td class="src"><a href="https://pacer.uscourts.gov/file-case/developer-resources">PACER Developer Resources</a> (IEPD 1.7)</td>
+        <td class="cad">Per IEPD release (~yearly)</td>
+        <td><span class="risk hi">High<small>external dependency</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Bankruptcy cases are filed electronically through the federal courts' system, called <b>CM/ECF</b> (accessed via <b>PACER</b>, the courts' login/records portal). This feature submits the opening petition in essentially one step. The catch is that you're building to the court's rules, not your own: they expect the case data in their specific XML format <em>plus</em> a PDF (the PDF is the official record), login runs through PACER, and each court can differ slightly. That external dependency is why it's high-risk.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Post-Petition Filing</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span></div></td>
+        <td class="auth">Same CM/ECF web services for amendments, motions, schedules after case opening. Event/docket codes differ by court.</td>
+        <td class="src"><a href="https://pacer.uscourts.gov/file-case/developer-resources">PACER Developer Resources</a></td>
+        <td class="cad">Per IEPD release</td>
+        <td><span class="risk md">Medium</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A case keeps generating documents after it opens — corrections (<b>amendments</b>), requests to the court (<b>motions</b>), and extra schedules. This files those through the same court system, so the entire case stays electronic instead of just the opening petition. Each court labels these filings with its own event codes, which is the main wrinkle.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <!-- CLIENT & CASE MANAGEMENT -->
+  <h2>Client &amp; Case Management</h2>
+  <p class="sec-note">A mix: deadline/claims/noticing features carry real procedural rules; the rest is workflow. Note the compliance overlay on billing and the client portal even where the core feature is user-defined.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Feature</th><th>Type</th><th>Governing authority</th><th>Canonical source</th><th>Update cadence</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">Court Notices &amp; Calendar</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth">Ingest court notices (NEF). Deadline math governed by <b>FRBP 9006</b> time computation + rule-driven bar dates.</td>
+        <td class="src">CM/ECF NEF · <a href="https://www.uscourts.gov/forms-rules/current-rules-practice-procedure/federal-rules-bankruptcy-procedure">Fed. Rules of Bankruptcy Procedure</a></td>
+        <td class="cad">Rules ~Dec 1</td>
+        <td><span class="risk hi">High<small>missed deadline = malpractice</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Throughout a case the court sends out notices and sets deadlines (for hearings, objections, filing documents). Missing one can seriously hurt a client — it can even be malpractice — which is why this is high-risk. The feature pulls in those court notices automatically and calculates the resulting deadlines. It's not a plain calendar: the rules for <em>counting the days</em> are set by formal court procedure, so the date math has to follow them precisely.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Claim Tracker<small>B410, B410A</small></td>
+        <td><div class="tags-cell"><span class="tag form">FORM</span><span class="tag intg">INTEGRATION</span></div></td>
+        <td class="auth"><b>Proof of Claim</b> (Official Form 410) &amp; the court's claims register. Reconcile filed claims against schedules.</td>
+        <td class="src"><a href="https://www.uscourts.gov/forms-rules/forms/bankruptcy-forms">Form B410</a> · CM/ECF claims register</td>
+        <td class="cad">Form Dec 1</td>
+        <td><span class="risk md">Medium</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Once a case opens, creditors file a <b>"proof of claim"</b> — a formal statement of exactly what they say they're owed. This feature tracks those claims and lets the attorney or trustee compare them against what the debtor listed on their schedules, so mismatches (a creditor claiming more than the debtor recorded) get caught. The proof-of-claim document is itself a standardized official form.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Task Management</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Internal staff workflow. No external authority.</td>
+        <td class="src">Internal</td>
+        <td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Internal to-do and assignment tracking for the firm's staff — who's doing what, and by when. Purely about running a busy practice; no bankruptcy rules touch it, so you have a free hand to design it however works best.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Client Portal / Doc Sharing</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">User-defined — but holds SSNs &amp; financials, so <b>GLBA Safeguards</b> + state data-security law set a compliance floor.</td>
+        <td class="src">FTC Safeguards Rule · state privacy statutes</td>
+        <td class="cad">Regulatory (watch)</td>
+        <td><span class="risk md">Medium<small>data-security duty</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A secure online space where clients upload sensitive documents like pay stubs and tax returns. How it looks and works is up to you — but because it holds <b>Social Security numbers and financial records</b>, federal and state data-security laws set a minimum bar for how you protect that data. So the feature itself is workflow, with a compliance obligation sitting underneath it.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Case Intake (Questionnaire)</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Firm-defined intake that <em>feeds</em> official forms. Field coverage should map to schedule/SOFA requirements.</td>
+        <td class="src">Internal · mapped to B106/B107</td>
+        <td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A structured form the client fills out at the start, so you collect their full financial picture once instead of chasing details later. You design the questions — but design them so they map onto everything the official schedules and statements will eventually need. Do that well and the forms almost fill themselves; miss fields and staff spend the case circling back for more info.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Legal Noticing Services</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span></div></td>
+        <td class="auth">Required creditor notice under <b>FRBP 2002</b>. The courts' <b>Bankruptcy Noticing Center (BNC)</b> is the standard channel.</td>
+        <td class="src"><a href="https://www.uscourts.gov/forms-rules/current-rules-practice-procedure/federal-rules-bankruptcy-procedure">FRBP 2002</a> · BNC (ebn.uscourts.gov)</td>
+        <td class="cad">Rules ~Dec 1</td>
+        <td><span class="risk md">Medium<small>due-process notice</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>The law requires that creditors and other affected parties be formally <b>notified</b> of the case and its key events — it's a due-process requirement, so everyone owed money gets a fair chance to respond. This feature handles that mailing. A court rule spells out what notice is required, and the courts run a standard mailing service (the <b>Bankruptcy Noticing Center</b>) that most filers plug into rather than mailing everything themselves.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Invoices &amp; Payments<small>marked "upcoming"</small></td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth">Attorney-fee <b>disclosure is regulated</b>: <b>§329</b> &amp; <b>FRBP 2016(b)</b> require disclosing compensation. Billing UI is otherwise yours.</td>
+        <td class="src"><a href="https://www.law.cornell.edu/uscode/text/11/329">11 U.S.C. §329</a> · FRBP 2016</td>
+        <td class="cad">Statutory (rare)</td>
+        <td><span class="risk md">Medium<small>fee disclosure</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Built-in billing so a firm can collect its fees without separate software. Most of the billing screen is yours to design — but there's a bankruptcy-specific wrinkle: attorneys are legally required to <b>disclose to the court what they were paid</b> for the case. So the billing side needs to support producing that disclosure, which is why it carries a compliance note.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <!-- CREDIT REPORT & COURSE -->
+  <h2>Credit Report &amp; Course Integration</h2>
+  <p class="sec-note">Both are third-party integrations, but of different kinds: one is a commercial data feed with heavy consumer-protection compliance, the other is a government-maintained approved-provider requirement.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Feature</th><th>Type</th><th>Governing authority</th><th>Canonical source</th><th>Update cadence</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">Credit Report Integration</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span><span class="tag logic">LOGIC</span></div></td>
+        <td class="auth">Tri-merge (Experian/Equifax/TransUnion), usually via a reseller. Governed by <b>FCRA</b> permissible-purpose &amp; <b>GLBA</b>. Parse into Schedules D/E/F + matrix.</td>
+        <td class="src">Bureau/reseller API contract · <a href="https://www.ftc.gov/legal-library/browse/statutes/fair-credit-reporting-act">FCRA (15 U.S.C. §1681)</a></td>
+        <td class="cad">Per vendor contract</td>
+        <td><span class="risk hi">High<small>FCRA compliance + vendor</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Pulls the debtor's credit report — ideally a <b>"tri-merge"</b> that combines all three big credit bureaus (Experian, Equifax, TransUnion) — to auto-fill the list of debts and creditors instead of typing each one by hand. Two things make it high-risk: credit data is tightly regulated (you need a legitimate legal purpose to pull it and must meet consumer-protection and privacy rules), and you access it through a <b>contract with a bureau or reseller</b>, so you're depending on an outside vendor's system and terms.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Bankruptcy Course Integration</td>
+        <td><div class="tags-cell"><span class="tag intg">INTEGRATION</span></div></td>
+        <td class="auth">Pre-filing credit counseling &amp; pre-discharge debtor education. Providers must be <b>§111-approved</b> by the UST (BA in AL &amp; NC). Certificate is a filing requirement.</td>
+        <td class="src"><a href="https://www.justice.gov/ust/credit-counseling-debtor-education-information">justice.gov/ust — Approved providers</a></td>
+        <td class="cad">List changes continuously</td>
+        <td><span class="risk md">Medium<small>invalid cert blocks discharge</small></span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>The law makes debtors take two short courses: <b>credit counseling</b> before they file, and a <b>financial-management course</b> before their debts are wiped out. Each course issues a completion certificate that must be filed, and only <b>government-approved providers</b> count. This feature connects to those providers so a certificate never gets missed — and it matters that the approved-provider list changes constantly, because a certificate from a since-removed provider won't be accepted and can block the debtor's discharge.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <!-- DOCUMENT MANAGEMENT -->
+  <h2>Document Management</h2>
+  <p class="sec-note">Almost entirely Track B. No governing authority beyond the firm's own templates and the general data-security duty that applies to any store of client financial records.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Feature</th><th>Type</th><th>Governing authority</th><th>Canonical source</th><th>Update cadence</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">Custom Documents</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Firm-specific templates. No external authority (distinct from Official Forms).</td>
+        <td class="src">Internal</td><td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Templates for the firm's <em>own</em> documents — engagement letters, internal checklists, cover pages — as opposed to the mandatory court forms. Entirely yours to define, with no outside rules. (Don't confuse these with the official Official Forms in Case Preparation, which must match the government spec.)</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Mail Templates</td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Routine correspondence. User-defined.</td>
+        <td class="src">Internal</td><td class="cad">n/a</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>Reusable templates for everyday letters — document-request letters to clients, status updates, standard notices to creditors — so staff aren't rewriting the same message each time. A convenience feature with no external rules attached.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">Documents Library<small>marked "upcoming"</small></td>
+        <td><div class="tags-cell"><span class="tag flow">WORKFLOW</span></div></td>
+        <td class="auth">Central repository. User-defined, with the same GLBA/state data-security floor as the portal.</td>
+        <td class="src">Internal · FTC Safeguards Rule</td><td class="cad">Regulatory (watch)</td>
+        <td><span class="risk lo">Low</span></td>
+      </tr>
+      <tr class="desc-row"><td colspan="6"><div class="plain"><span class="lbl">In plain terms</span>A central filing cabinet for storing and organizing all of a case's documents in one place. It's yours to design, but — like the client portal — it holds sensitive client financial records, so the same <b>data-security duty</b> applies to how you store and protect them.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <!-- CLOSING NOTES -->
+  <section class="notes">
+    <h2 style="margin-top:20px;">What this changes about how you plan</h2>
+    <div class="note-item">
+      <h4>The register replaces guesswork with reading</h4>
+      <p>For every FORM / DATA / LOGIC row, there is no "gathering requirements from users" step — the requirement is published. The work is disciplined desk research: open the canonical source, extract the fields/formula/dataset, and record its effective date. Assign an owner to build out each row into the exact field list or algorithm.</p>
+    </div>
+    <div class="note-item">
+      <h4>Your real product risk is staleness, not features</h4>
+      <p>The high-risk rows (means test, exemptions, deadlines, e-filing) are dangerous mainly because they go out of date on a schedule you don't control. Design an <b>effective-date model and a scheduled-refresh process</b> from day one — retrofitting it later is painful, and a filing computed on stale data is the failure mode that hurts clients.</p>
+    </div>
+    <div class="note-item">
+      <h4>State exemptions &amp; local court variation are the hidden iceberg</h4>
+      <p>Two rows quietly hide enormous scope: <b>50-state exemption schemes</b> and <b>per-district local rules/forms</b> (e.g. local Chapter 13 plans, event codes). Neither has a single feed. Decide early which states/districts you support at launch and stage the rest — this is where a subject-matter expert earns their fee.</p>
+    </div>
+    <div class="note-item">
+      <h4>Get the CM/ECF and bureau specs before you model data</h4>
+      <p>The two INTEGRATION-heavy areas — court e-filing (IEPD XML) and credit bureaus — impose data shapes on you. Request their developer documentation and, for the bureaus, the reseller/FCRA compliance requirements <b>before</b> finalizing your case schema, so you're not re-shaping storage to fit their payloads later.</p>
+    </div>
+  </section>
+
+  <!-- SOURCES & METHODOLOGY -->
+  <section class="notes">
+    <h2 style="margin-top:20px;">Sources &amp; methodology</h2>
+    <p class="sec-note">Two different kinds of link appear in this document. The <b>"Canonical source"</b> column in each table points to where you'd pull the live, authoritative data or spec <em>at build time</em>. This section is different: it's the <b>research trail</b> — the pages actually consulted to decide how each feature was classified, what it's governed by, and how risky it is. Provenance and honesty about confidence matter here, so each source is marked <span class="pill verified">Primary · verified</span> (official government source read this session), <span class="pill context">Secondary · context</span> (industry/commercial source used for how-it-works context, not legal fact), or, further down, <span class="pill check">Verify</span> for claims drawn from general knowledge that were <em>not</em> independently confirmed this session.</p>
+
+    <h3>Where the feature list itself came from</h3>
+    <p class="sec-note" style="margin-top:-4px;">Important for provenance: <b>the ~30 features were not chosen by me.</b> They come from your business partner's analysis of a bankruptcy-software vendor's <b>desktop-vs-cloud comparison grid</b> (checkmarks per feature per platform; several items flagged "Upcoming Feature," apparently tied to the cloud edition). My work was to <em>classify</em> those given features, identify what governs each, and rate the risk — not to invent the list. The raw grid's per-platform checkmark availability was not fully preserved in that analysis, so desktop-vs-cloud availability per feature is still an open item to confirm from the vendor page.</p>
+
+    <h3>Primary sources — official, read this session</h3>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Source</th><th>Confidence</th><th>What it established &amp; which rows rely on it</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="used"><a href="https://www.uscourts.gov/forms-rules/forms/bankruptcy-forms">uscourts.gov — Bankruptcy Forms</a><br><a href="https://www.uscourts.gov/forms-rules/forms/required-lists-schedules-statements-and-fees">— Required Lists, Schedules &amp; Statements</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">The official form inventory and that forms are Judicial Conference–approved under <b>Rule 9009</b>: petition (B101/201), schedules (B106A–J), statement of affairs (B107), means-test forms (B122A/C), Chapter 13 plan (B113), proof of claim (B410), discharges (B318/3180). → <b>Form Editor, Means Test, Ch 13 Plan, Claim Tracker, all Chapter rows.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.justice.gov/ust/means-testing">justice.gov/ust — Means Testing</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">That the means test draws on <b>IRS National/Local Standards</b> (from the BLS Consumer Expenditure Survey) plus <b>Census median family income</b>, republished by the U.S. Trustee as downloadable XLS/XLSX with stated effective dates, updated several times a year. → <b>Means Test, IRS &amp; Census Data, Informational Charts, Paycheck, the maintenance calendar.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.justice.gov/ust/means-testing">— Census median-income table</a> (dated release)</td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">Concrete cadence evidence, e.g. median-income data updated 3/18/2026 applied to cases filed on/after 4/1/2026 — the basis for the "2–4×/yr, effective-dated" claims. → <b>maintenance calendar, DATA rows.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://pacer.uscourts.gov/file-case/developer-resources">pacer.uscourts.gov — Developer Resources</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">That e-filing runs through <b>NextGen CM/ECF</b>, requiring <b>XML per the IEPD spec</b> (v1.7) alongside a PDF (the PDF is the official record), with the <b>PACER Authentication</b> and <b>Case Locator</b> APIs and per-court variation. → <b>OneTouch, Post-Petition;</b> informed <b>Court Notices</b> (NEF) and <b>Claim Tracker</b> (claims register).</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.justice.gov/ust/credit-counseling-debtor-education-information">justice.gov/ust — Credit Counseling &amp; Debtor Education</a><br><a href="https://www.justice.gov/ust/list-credit-counseling-agencies-approved-pursuant-11-usc-111">— Approved counseling agencies (§111)</a><br><a href="https://www.justice.gov/ust/list-approved-providers-personal-financial-management-instructional-courses-debtor-education">— Approved debtor-education providers</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">Two required courses (pre-filing counseling, pre-discharge education); providers must be <b>§111-approved</b>; certificates are a filing requirement; <b>Alabama &amp; North Carolina</b> use a Bankruptcy Administrator instead; the list changes continuously and has no public API. → <b>Bankruptcy Course Integration.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.law.cornell.edu/uscode/text/11/522">11 U.S.C. §522</a> · <a href="https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title11-section104&num=0&edition=prelim">§104</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">The federal exemption framework (§522) and the mechanism that adjusts dollar amounts for inflation every three years (§104(b)). → <b>Exemption Analyzer, maintenance calendar.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.federalregister.gov/documents/2025/02/04/2025-02207/adjustment-of-certain-dollar-amounts-applicable-to-bankruptcy-cases">Federal Register — 2025 dollar-amount adjustment</a></td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">Confirmed the most recent triennial adjustment took effect <b>April 1, 2025</b> (a 13.2004% increase) with specific new figures — hence "next: April 1, 2028." → <b>maintenance calendar, Exemption row.</b></td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://uscode.house.gov/browse/prelim@title11">Title 11, U.S. Code</a> (chapter browse)</td>
+          <td><span class="pill verified">Primary · verified</span></td>
+          <td class="used">The statutory definition and scope of each case type — Ch 7, 9, 11, 12, 13, 15. → <b>all Chapter rows.</b></td>
+        </tr>
+      </tbody>
+    </table></div></div>
+
+    <h3>Secondary sources — industry context, not legal fact</h3>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Source</th><th>Confidence</th><th>What it was used for</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="used">NextChapter — credit-report import &amp; integrations pages (nextchapterlegal.com)</td>
+          <td><span class="pill context">Secondary · context</span></td>
+          <td class="used">How bankruptcy software actually performs credit-report import in practice: a <b>tri-merge</b> report from all three bureaus pulled by SSN, auto-populating the schedules/creditor matrix. Shaped the <em>description</em> of Credit Report Integration — not the legal/compliance claims.</td>
+        </tr>
+        <tr>
+          <td class="used">glade.ai — "AI Credit Report Tools for Bankruptcy"; Salesforce AppExchange credit-bureau integration listing</td>
+          <td><span class="pill context">Secondary · context</span></td>
+          <td class="used">Corroborated the tri-merge → Schedules D/E/F pattern and typical bureau/reseller integration mechanics (soft vs. hard pull; Experian/Equifax/TransUnion via resellers). Market context only.</td>
+        </tr>
+      </tbody>
+    </table></div></div>
+
+    <h3>Claims drawn from general knowledge — please verify</h3>
+    <p class="sec-note" style="margin-top:-4px;">In the interest of honesty: the items below were included from general legal knowledge and were <em>not</em> independently confirmed against primary text in this session. They're standard and almost certainly correct, but a subject-matter expert should confirm the exact rule text and current numbers before you rely on them in the product.</p>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Claim in the register</th><th>Status</th><th>Where it appears</th></tr></thead>
+      <tbody>
+        <tr><td class="used"><b>FRBP 9006</b> governs how deadline days are counted</td><td><span class="pill check">Verify</span></td><td class="used">Court Notices &amp; Calendar</td></tr>
+        <tr><td class="used"><b>FRBP 2002</b> sets required creditor notice; the <b>Bankruptcy Noticing Center</b> is the standard channel</td><td><span class="pill check">Verify</span></td><td class="used">Legal Noticing Services</td></tr>
+        <tr><td class="used"><b>11 U.S.C. §329</b> &amp; <b>FRBP 2016(b)</b> require attorney-fee disclosure</td><td><span class="pill check">Verify</span></td><td class="used">Invoices &amp; Payments</td></tr>
+        <tr><td class="used"><b>§707(b)</b> as the means-test statute; <b>§101(10A)</b> "current monthly income" definition</td><td><span class="pill check">Verify</span></td><td class="used">Means Test, Paycheck (strongly supported by the UST page, but the section text wasn't opened)</td></tr>
+        <tr><td class="used"><b>Official Forms revise on the ~Dec 1</b> Rules-Enabling-Act cycle; tax tables update annually</td><td><span class="pill check">Verify</span></td><td class="used">Form cadence columns, maintenance calendar</td></tr>
+        <tr><td class="used"><b>FCRA</b> permissible-purpose &amp; <b>GLBA / FTC Safeguards Rule</b> as the compliance floor for credit data and stored client financials</td><td><span class="pill check">Verify</span></td><td class="used">Credit Report Integration, Client Portal, Documents Library</td></tr>
+        <tr><td class="used"><b>Subchapter V</b> small-business variant of Chapter 11; <b>Chapter 15</b> reflects the UNCITRAL Model Law</td><td><span class="pill check">Verify</span></td><td class="used">Chapter 11, Chapter 15</td></tr>
+      </tbody>
+    </table></div></div>
+
+    <h3>What is analysis, not citation</h3>
+    <p class="sec-note" style="margin-top:-4px;">Finally, several parts of this document are <b>my judgment</b>, synthesized from the above rather than quoted from any one source — you should weigh them as opinion: the <b>FORM / DATA / LOGIC / INTEGRATION / WORKFLOW</b> classification scheme; the <b>High / Medium / Low risk</b> ratings; the <b>data-vs-integration-vs-form</b> framing; and the planning recommendations (MVP sequencing, the "staleness is your real risk" argument, staging states/districts). These are reasoning aids, not established facts.</p>
+  </section>
+
+  <p class="footer">
+    <b>Sources are official/primary where possible</b> — uscourts.gov (forms &amp; rules), justice.gov/ust (means testing, approved providers), pacer.uscourts.gov (e-filing developer resources), Title 11 U.S. Code, and the Federal Register (§104 adjustments). Commercial and compliance references (FCRA, FTC Safeguards, credit bureaus) are named where a government source does not exist.<br><br>
+    <b>Not legal advice.</b> Confirm every figure, form revision, and effective date against the live source at build time and before each release — this register is a map to the sources, not a substitute for them. Statutory citations are to the U.S. Code as of compilation; verify current text.
+  </p>
+
+</div>
+</div>
+
+</body>
+</html>

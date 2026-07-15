@@ -15,7 +15,7 @@ desktop-loyal attorneys where they are.
 | [`design-system/`](design-system/) | Shared Flutter UI package (`insolvia_design_system`): tokens, theme, components. |
 | [`app/`](app/) | The Insolvia app (`insolvia_app`) — desktop + web. Currently a themed hello-world. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `shared`, `staging`, `prod`. |
-| [`docs/`](docs/) | [Business plan](docs/business-plan.md) + engineering runbooks. |
+| [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
 
 ## Prerequisites
 
