@@ -15,9 +15,11 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  # Declarative routing (Flutter-recommended router).
+  go_router: ^17.3.0
   # The shared design system, resolved by path within the monorepo.
   insolvia_design_system:
-    path: ../design-system
+    path: ../../packages/insolvia_design_system
 
 dev_dependencies:
   flutter_test:

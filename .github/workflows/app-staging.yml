@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "app/**"
-      - "design-system/**"
+      - "apps/**"
+      - "packages/**"
       - "infra/envs/staging/**"
       - "infra/modules/**"
       - ".github/workflows/app-staging.yml"
@@ -31,11 +31,11 @@ jobs:
       - run: flutter pub get
       - name: Build web (staging)
         run: flutter build web --dart-define=INSOLVIA_ENV=staging
-        working-directory: app
+        working-directory: apps/insolvia_app
       - uses: actions/upload-artifact@v4
         with:
           name: insolvia-web-staging
-          path: app/build/web
+          path: apps/insolvia_app/build/web
           retention-days: 14
 
   build-macos:
@@ -48,10 +48,10 @@ jobs:
       - run: flutter pub get
       - name: Build macOS (staging, unsigned)
         run: flutter build macos --dart-define=INSOLVIA_ENV=staging
-        working-directory: app
+        working-directory: apps/insolvia_app
       - name: Zip .app
         run: |
-          cd app/build/macos/Build/Products/Release
+          cd apps/insolvia_app/build/macos/Build/Products/Release
           zip -r -y "$GITHUB_WORKSPACE/insolvia_app-staging.zip" insolvia_app.app
       - uses: actions/upload-artifact@v4
         with:

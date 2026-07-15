@@ -3,7 +3,7 @@ name: Design system · PR
 on:
   pull_request:
     paths:
-      - "design-system/**"
+      - "packages/**"
       - "pubspec.yaml"
       - "melos.yaml"
       - "analysis_options.yaml"
@@ -26,11 +26,11 @@ jobs:
         run: flutter pub get
 
       - name: Format check
-        run: dart format --output=none --set-exit-if-changed design-system
+        run: dart format --output=none --set-exit-if-changed packages/insolvia_design_system
 
       - name: Analyze
-        run: dart analyze design-system
+        run: dart analyze packages/insolvia_design_system
 
       - name: Test
         run: flutter test
-        working-directory: design-system
+        working-directory: packages/insolvia_design_system
