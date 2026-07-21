@@ -2,6 +2,7 @@
 #   • Route53 hosted zone for insolvia.ai
 #   • wildcard ACM cert *.insolvia.ai (+ apex SAN), DNS-validated, us-east-1
 #   • the account-level GitHub OIDC provider + insolvia-github-actions role
+#   • the SES domain identity for insolvia.ai + all mail DNS (see `email` below)
 #
 # Insolvia has its own dedicated AWS account (521762924626), so this config
 # creates the GitHub OIDC provider itself (see below).
@@ -354,3 +355,15 @@ resource "aws_iam_role_policy" "github_permissions" {
   role   = aws_iam_role.github_actions.id
   policy = data.aws_iam_policy_document.github_permissions.json
 }
+
+# ── Email: SES identity, DKIM, MAIL FROM, mail DNS (#19, #20) ───
+# Lives in `shared` because the SES identity is per-domain, not per-environment:
+# staging and prod both send as insolvia.ai.
+module "email" {
+  source = "../../modules/email"
+
+  aws_region      = var.aws_region
+  domain_name     = var.domain_name
+  route53_zone_id = aws_route53_zone.main.zone_id
+}
+# ── end email ──────────────────────────────────────────────────

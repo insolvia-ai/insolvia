@@ -17,3 +17,20 @@ output "github_actions_role_arn" {
   description = "Set this as the AWS_ROLE_ARN GitHub secret."
   value       = aws_iam_role.github_actions.arn
 }
+
+# ── Email (#19, #20) ───────────────────────────────────────────
+output "ses_identity_arn" {
+  description = "ARN of the insolvia.ai SES domain identity."
+  value       = module.email.identity_arn
+}
+
+output "ses_from_address" {
+  description = "Default transactional From address."
+  value       = module.email.from_address
+}
+
+output "ses_mail_from_domain" {
+  description = "Custom SES MAIL FROM (Return-Path) domain."
+  value       = module.email.mail_from_domain
+}
+# ── end email ──────────────────────────────────────────────────
