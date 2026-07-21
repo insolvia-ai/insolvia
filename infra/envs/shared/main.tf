@@ -154,13 +154,28 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
   }
 
+  # READ-ONLY on the pipeline's own role, and deliberately so.
+  #
+  # This environment manages the OIDC provider, this role, and this policy —
+  # the three things that authorize CI in the first place. Terraform must be
+  # able to REFRESH them or no plan can complete (that is what these actions
+  # buy). It must NOT be able to MODIFY them: iam:PutRolePolicy here would let
+  # any change to this file grant the pipeline admin, applied by the pipeline
+  # itself, with a code diff as the only control.
+  #
+  # Consequence, and it is intended: a change to the deploy role, its policy,
+  # or the OIDC provider makes the CI apply fail with AccessDenied. Privilege
+  # changes require a human running apply with their own credentials. Everything
+  # else in `shared` — zone, cert, DNS, email — still applies from CI normally.
   statement {
-    sid = "DeployRoleManagement"
+    sid = "DeployRoleSelfRead"
     actions = [
       "iam:GetRole",
       "iam:PassRole",
       "iam:ListRolePolicies",
       "iam:GetRolePolicy",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListRoleTags",
     ]
     resources = [aws_iam_role.github_actions.arn]
   }
@@ -176,8 +191,7 @@ data "aws_iam_policy_document" "github_permissions" {
     actions = [
       "iam:GetOpenIDConnectProvider",
       "iam:ListOpenIDConnectProviders",
-      "iam:TagOpenIDConnectProvider",
-      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:ListOpenIDConnectProviderTags",
     ]
     resources = [aws_iam_openid_connect_provider.github.arn]
   }
