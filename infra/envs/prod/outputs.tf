@@ -71,3 +71,28 @@ output "auth_issuer_url" {
   description = "OIDC issuer the API will validate production JWTs against (wired up with the first authenticated endpoint)."
   value       = module.auth.issuer_url
 }
+
+# ── Marketing site (www.insolvia.ai) — read by the deploy workflow ──
+output "marketing_distribution_id" {
+  description = "Marketing CloudFront distribution ID (cache invalidation)."
+  value       = module.marketing_site.distribution_id
+}
+
+output "marketing_assets_bucket_name" {
+  description = "S3 bucket the marketing client build is synced to."
+  value       = module.marketing_site.assets_bucket_name
+}
+
+output "marketing_ecr_repository_url" {
+  description = "ECR repository URL for the marketing SSR image."
+  value       = module.marketing_site.ecr_repository_url
+}
+
+output "marketing_ssr_function_name" {
+  description = "Marketing SSR Lambda function name."
+  value       = module.marketing_site.ssr_function_name
+}
+
+output "marketing_url" {
+  value = module.marketing_site.url
+}

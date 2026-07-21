@@ -2,3 +2,6 @@ aws_region    = "us-east-1"
 domain_name   = "insolvia.ai"
 subdomain     = "app.insolvia.ai"
 api_subdomain = "api.insolvia.ai"
+
+# Marketing SSR image tag; only consulted when the Lambda is first created.
+marketing_image_tag = "latest"
