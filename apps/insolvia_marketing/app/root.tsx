@@ -5,23 +5,52 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  data,
   isRouteErrorResponse,
+  useRouteLoaderData,
   type LinksFunction,
 } from "react-router";
 import { Button, Footer, NavBar } from "@insolvia/design-system";
 
+import { ORGANIZATION_JSONLD, isProductionHost } from "./lib/seo";
 import stylesheet from "./styles/app.css?url";
+import type { Route } from "./+types/root";
 
 export const links: LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
+// Issue #48: every non-production host (staging, PR previews, direct
+// CloudFront/API-Gateway URLs, localhost) is noindexed — via the X-Robots-Tag
+// response header here and the <meta name="robots"> in <head> below.
+export function loader({ request }: Route.LoaderArgs) {
+  const noindex = !isProductionHost(request);
+  return data(
+    { noindex },
+    noindex ? { headers: { "X-Robots-Tag": "noindex, nofollow" } } : undefined,
+  );
+}
+
+// Forward the loader's X-Robots-Tag to the document response. Routes without
+// their own `headers` export inherit this one (deepest export wins).
+export function headers({ loaderHeaders }: Route.HeadersArgs) {
+  return loaderHeaders;
+}
+
 export function Layout({ children }: { children: ReactNode }) {
+  const rootData = useRouteLoaderData<typeof loader>("root");
+  // Fail closed: if the root loader didn't run (e.g. an error page), noindex.
+  const noindex = rootData?.noindex ?? true;
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {noindex ? <meta name="robots" content="noindex, nofollow" /> : null}
         <Meta />
         <Links />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: ORGANIZATION_JSONLD }}
+        />
       </head>
       <body className="min-h-screen bg-bg font-body text-ink antialiased">
         {children}
