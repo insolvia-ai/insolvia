@@ -47,7 +47,7 @@ The app selects its environment at build time via
 `infra/envs/shared/` owns account-wide, environment-independent resources:
 Route53 hosted zone for `insolvia.ai`, the wildcard ACM cert `*.insolvia.ai`
 (us-east-1, DNS-validated), the account-level **GitHub OIDC provider**, and the
-`github-actions-insolvia` IAM deploy role. (Insolvia has its own dedicated AWS
+`insolvia-github-actions` IAM deploy role. (Insolvia has its own dedicated AWS
 account — `521762924626` — so `shared` creates the OIDC provider itself; there
 is exactly one per account.)
 

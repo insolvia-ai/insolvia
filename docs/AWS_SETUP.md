@@ -78,7 +78,7 @@ applying.
 ```bash
 cd infra/envs/shared
 terraform apply    # adopts the imported insolvia.ai zone, creates the
-                   # *.insolvia.ai ACM cert, and the github-actions-insolvia
+                   # *.insolvia.ai ACM cert, and the insolvia-github-actions
                    # IAM role trusting repo:insolvia-ai/insolvia:*
 terraform output github_actions_role_arn
 ```
@@ -88,7 +88,7 @@ certificate should reach `ISSUED` without any registrar work.
 ## 5. Wire the GitHub repo
 ```bash
 # Deploy role ARN from step 4:
-gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/github-actions-insolvia"
+gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/insolvia-github-actions"
 
 # Keep deploys off until the cert is ISSUED:
 gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "false"

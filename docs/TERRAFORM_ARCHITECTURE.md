@@ -13,7 +13,7 @@ infra/
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
     │                         #   • ACM wildcard cert    *.insolvia.ai (us-east-1)
-    │                         #   • IAM role             github-actions-insolvia (OIDC)
+    │                         #   • IAM role             insolvia-github-actions (OIDC)
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     └── prod/                 # web_hosting -> app.insolvia.ai
 ```
