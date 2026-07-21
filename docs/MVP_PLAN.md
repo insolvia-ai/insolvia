@@ -263,12 +263,27 @@ relationship is precisely the kind the plan warns about depending on — it move
 with the person. That's issue 0.7, and it's the one item here worth doing
 properly rather than informally.
 
+**The API is publicly documented**, which changes how this milestone runs:
+
+> https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started
+
+Most of the open questions — whether write endpoints exist, what the data model
+looks like, rate limits, pagination, webhook vs. polling — are answerable from
+the documentation **before we hold a single credential**. So the milestone runs
+docs-first (issue 0.0), and the credentialed work becomes confirmation of what
+we already expect rather than discovery.
+
+That makes this milestone both cheap and completely unblocked: it can start
+whenever, in parallel with anything, with no dependency on AWS, DNS, or MyCase
+procurement.
+
 **Outcome:** the integration's technical shape documented well enough for the
 intake milestone to be designed against it.
 
 | # | Issue | Notes |
 |---|---|---|
-| 0.1 | Obtain MyCase API access | Requires the **Advanced tier (~$89/mo)** per business-plan §3. Procurement lead time — start immediately. |
+| 0.0 | **Documentation spike — answer everything answerable without credentials** | Read the [public API docs](https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started). Covers auth model, available endpoints, write coverage, data model, rate limits, pagination, webhooks. **Do this first** — it's free, unblocked, and turns 0.2–0.5 into confirmation rather than discovery. |
+| 0.1 | Obtain MyCase API credentials | Requires the **Advanced tier (~$89/mo)** per business-plan §3. Not a blocker — partner relationship. |
 | 0.2 | Authenticate and complete one read round-trip | Pull a real case/contact record. Proves credentials, scopes, and rate limits. |
 | 0.3 | Complete one **write** round-trip | The riskier half. Many practice-management APIs are generous on read and thin on write; the no-double-entry promise dies without write. |
 | 0.4 | Map MyCase's data model → bankruptcy intake fields | Where does a debtor's income, creditors, and asset data actually live? Gaps here shape the whole intake milestone. |
