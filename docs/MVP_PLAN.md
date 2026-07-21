@@ -316,7 +316,7 @@ port, not a design exercise.
 | 1.0 | **Create the Terraform state bucket** — `insolvia-terraform-state` | Bootstrap step 1 of `docs/AWS_SETUP.md`, **not yet done**. `terraform init` cannot run without it — every `backend.tf` in the repo points at this bucket. This is now the first action in the whole plan. |
 | 1.1b | **⚠️ `terraform import` the existing hosted zone before the first apply** | **Critical — see the trap below.** `terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW`. Skipping this silently breaks DNS *and* hangs the certificate. |
 | 1.2 | Verify the destination Gmail address as an SES identity | Sandbox requires it. Enough to make inbound forwarding fully testable — see the sandbox note below. **SES production access is deliberately deferred to issue 6.8.** |
-| 1.3 | Apply `infra/envs/shared` — wildcard ACM, OIDC provider, deploy role | Confirmed **not applied**: no state bucket, no OIDC provider, no `github-actions-insolvia` role, no ACM certificate. Only the zone exists. Blocked by 1.0 + 1.1b. |
+| 1.3 | Apply `infra/envs/shared` — wildcard ACM, OIDC provider, deploy role | Confirmed **not applied**: no state bucket, no OIDC provider, no `insolvia-github-actions` role, no ACM certificate. Only the zone exists. Blocked by 1.0 + 1.1b. |
 | 1.3b | Confirm the wildcard ACM cert reaches `ISSUED` | `infra/envs/staging/main.tf` looks the cert up with `statuses = ["ISSUED"]`, so every downstream env fails at plan time with a misleading "no matching certificate" error until this is true. |
 | 1.3c | Wire `AWS_ROLE_ARN` secret + `DEPLOY_ENABLED` variable | Step 4 of `AWS_SETUP.md`, not yet done. |
 | 1.3d | Update `docs/AWS_SETUP.md` | Its status banner still says the domain is the current blocker. It isn't. Add the state-bucket and zone-import steps while you're there. |
@@ -367,7 +367,7 @@ That's an acceptable trade while there's no inbound volume — but it means
 | Gandi NS delegation | ✅ Points at that zone |
 | S3 bucket `insolvia-terraform-state` | ❌ **Does not exist** |
 | GitHub OIDC provider | ❌ Absent |
-| IAM role `github-actions-insolvia` | ❌ Absent |
+| IAM role `insolvia-github-actions` | ❌ Absent |
 | ACM certificate | ❌ None in us-east-1 |
 
 So the zone was created **outside Terraform** — there is no state bucket, so no

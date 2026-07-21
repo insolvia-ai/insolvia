@@ -1,7 +1,7 @@
 # Account-wide, environment-independent resources for Insolvia:
 #   • Route53 hosted zone for insolvia.ai
 #   • wildcard ACM cert *.insolvia.ai (+ apex SAN), DNS-validated, us-east-1
-#   • the account-level GitHub OIDC provider + github-actions-insolvia role
+#   • the account-level GitHub OIDC provider + insolvia-github-actions role
 #
 # Insolvia has its own dedicated AWS account (521762924626), so this config
 # creates the GitHub OIDC provider itself (see below).
@@ -111,7 +111,7 @@ data "aws_iam_policy_document" "github_assume" {
 }
 
 resource "aws_iam_role" "github_actions" {
-  name               = "github-actions-insolvia"
+  name               = "insolvia-github-actions"
   assume_role_policy = data.aws_iam_policy_document.github_assume.json
   tags               = local.common_tags
 }
@@ -281,6 +281,50 @@ data "aws_iam_policy_document" "github_permissions" {
       "iam:ListInstanceProfilesForRole",
     ]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/insolvia-*"]
+  }
+
+  # ── The guard that makes all of the above safe ─────────────────
+  # An EXPLICIT deny on mutating the pipeline's own identity. Explicit deny
+  # beats every allow in IAM, including any added later.
+  #
+  # This is not belt-and-braces. The role is named `insolvia-github-actions`,
+  # which MATCHES the `role/insolvia-*` resource pattern in
+  # ServiceRoleManagement above — so without this statement the pipeline would
+  # hold iam:PutRolePolicy and iam:DeleteRole over itself, and any change to
+  # this file could grant it admin, applied by itself, reviewed only as a diff.
+  #
+  # Relying on the role's name NOT matching a prefix is not a control: it is
+  # invisible, undocumented, and silently undone by a rename. This is the
+  # control. Verified with `aws iam simulate-custom-policy`.
+  statement {
+    sid    = "DenySelfPrivilegeEscalation"
+    effect = "Deny"
+    actions = [
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:UpdateRole",
+      "iam:DeleteRole",
+      "iam:CreateRole",
+      "iam:TagRole",
+      "iam:UntagRole",
+    ]
+    resources = [aws_iam_role.github_actions.arn]
+  }
+
+  # Likewise for the trust anchor: CI may read it, never change or remove it.
+  statement {
+    sid    = "DenyTrustAnchorMutation"
+    effect = "Deny"
+    actions = [
+      "iam:DeleteOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+      "iam:AddClientIDToOpenIDConnectProvider",
+      "iam:RemoveClientIDFromOpenIDConnectProvider",
+    ]
+    resources = [aws_iam_openid_connect_provider.github.arn]
   }
 
   # Attaching AWS-managed policies is constrained to the single policy the
