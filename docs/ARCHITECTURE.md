@@ -61,7 +61,7 @@ Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.h
 - `app.insolvia.ai` → prod distribution/bucket
 
 No Lambda/API Gateway/DynamoDB yet — those arrive with the intake/forms phases
-(see `docs/business-plan.md`).
+(see `docs/business-plan.html`).
 
 ## Desktop distribution
 

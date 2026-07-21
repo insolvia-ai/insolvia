@@ -18,7 +18,7 @@ Standard Flutter monorepo split — runnable apps in `apps/`, shared libraries i
 | [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app (`insolvia_app`) — desktop + web. Currently a themed, feature-first hello-world. |
 | [`packages/insolvia_design_system/`](packages/insolvia_design_system/) | Shared Flutter UI package: tokens, theme, components. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `shared`, `staging`, `prod`. |
-| [`docs/`](docs/) | [Business plan](docs/business-plan.md) + engineering runbooks. |
+| [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
 
 ## Prerequisites
 
