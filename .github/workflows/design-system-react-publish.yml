@@ -1,0 +1,109 @@
+name: Design system React · Publish · Shared
+
+# Trigger: push to main (+ manual dispatch as an escape hatch).
+#
+# Push, not dispatch-only, because the consumer is the marketing site's CI: a
+# version bump merged to main must be installable without a human remembering
+# to go press a button. The job is a no-op on every push that does not change
+# the version (see the guard below), so "publish on push" costs one cheap
+# registry lookup and never a red X.
+#
+# `workflow_dispatch` stays for re-publishing after a transient registry
+# failure, and for the very first publish of a package version that landed on
+# main before this workflow existed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/insolvia_design_system_react/**"
+      - ".github/workflows/design-system-react-publish.yml"
+  workflow_dispatch:
+
+# `packages: write` is the whole privilege set this job needs — it publishes to
+# GitHub Packages, not to AWS. No `id-token: write`: there is no OIDC role here.
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: insolvia-design-system-react-publish
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: packages/insolvia_design_system_react
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Deliberately NOT gated on `vars.DEPLOY_ENABLED`. That gate exists for the
+    # AWS/DNS path — shared infra applied (#15) and the *.insolvia.ai ACM cert
+    # reaching ISSUED (#16) — and publishing an npm package to GitHub Packages
+    # touches none of it: no AWS account, no Route53, no CloudFront, no OIDC
+    # role. Gating it would block the marketing-site work on an unrelated
+    # certificate. See docs/PACKAGE_PUBLISHING.md.
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the package's `engines.node` (">=24"). No `registry-url:` here:
+      # that would make setup-node write its own .npmrc into RUNNER_TEMP, and
+      # the committed package-level .npmrc is the single source of truth for
+      # scope→registry mapping and auth.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: packages/insolvia_design_system_react/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Idempotency guard. A publish job that red-Xes on every unrelated push to
+      # main trains people to ignore CI, so an already-published version is a
+      # clean skip, not a failure.
+      #
+      # `npm view` exits non-zero when the version does not exist (E404) — which
+      # is the normal "please publish" case — so the exit code is swallowed and
+      # the decision is made on whether stdout came back empty. stderr is
+      # discarded: on auth trouble npm can echo the request headers.
+      - name: Check whether this version is already published
+        id: check
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "Resolved package: $NAME@$VERSION"
+
+          PUBLISHED="$(npm view "$NAME@$VERSION" version 2>/dev/null || true)"
+
+          if [ -n "$PUBLISHED" ]; then
+            echo "$NAME@$VERSION is already in the registry — nothing to do."
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$NAME@$VERSION is not in the registry — will publish."
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        if: steps.check.outputs.should-publish == 'true'
+        run: npm run build
+
+      # `files: ["dist"]` in package.json, so the build above IS the artifact.
+      # --provenance is not set: it requires `id-token: write`, and GitHub
+      # Packages does not consume provenance attestations the way npmjs does.
+      - name: Publish to GitHub Packages
+        if: steps.check.outputs.should-publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.should-publish }}" = "true" ]; then
+            echo "Published @insolvia/design-system@${{ steps.check.outputs.version }}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Skipped: @insolvia/design-system@${{ steps.check.outputs.version }} was already published." >> "$GITHUB_STEP_SUMMARY"
+          fi
