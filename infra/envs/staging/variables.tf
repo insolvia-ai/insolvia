@@ -10,8 +10,11 @@ variable "domain_name" {
   default     = "insolvia.ai"
 }
 
+# Flat `staging-app`, not nested `app.staging`: an ACM wildcard covers exactly
+# one label, so `*.insolvia.ai` matches `staging-app.insolvia.ai` but not
+# `app.staging.insolvia.ai` — nesting would force a second wildcard cert.
 variable "subdomain" {
   description = "Hostname this environment serves."
   type        = string
-  default     = "staging.insolvia.ai"
+  default     = "staging-app.insolvia.ai"
 }

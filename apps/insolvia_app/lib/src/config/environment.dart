@@ -32,7 +32,7 @@ enum AppEnvironment {
   /// The public host this environment serves from (informational for now).
   String get host => switch (this) {
         AppEnvironment.local => 'localhost',
-        AppEnvironment.staging => 'staging.insolvia.ai',
+        AppEnvironment.staging => 'staging-app.insolvia.ai',
         AppEnvironment.production => 'app.insolvia.ai',
       };
 }

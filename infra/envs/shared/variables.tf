@@ -17,5 +17,5 @@ variable "github_repo" {
     case-sensitive) — i.e. the org's exact login casing.
   EOT
   type        = string
-  default     = "Insolvia-AI/insolvia"
+  default     = "insolvia-ai/insolvia"
 }

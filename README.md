@@ -60,5 +60,5 @@ the `insolvia.ai` domain/DNS is live — see [`docs/AWS_SETUP.md`](docs/AWS_SETU
 and [`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md). Until then,
 CI builds and uploads web + macOS artifacts without publishing.
 
-- **staging** → `staging.insolvia.ai` (auto, on merge to `main`)
+- **staging** → `staging-app.insolvia.ai` (auto, on merge to `main`)
 - **production** → `app.insolvia.ai` (manual, gated)

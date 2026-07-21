@@ -10,7 +10,7 @@ variable "environment" {
 }
 
 variable "domain_name" {
-  description = "Fully-qualified hostname to serve (e.g. staging.insolvia.ai)."
+  description = "Fully-qualified hostname to serve (e.g. staging-app.insolvia.ai)."
   type        = string
 }
 
