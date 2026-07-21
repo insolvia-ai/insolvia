@@ -21,7 +21,7 @@ reverse).
 |---|---|---|
 | `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
-| `packages/insolvia_design_system_react/` | Marketing-site UI only: six components (`Button`, `Card`, `NavBar`, `Footer`, `Accordion`, `Field`) on Base UI + Tailwind v4, published as `@insolvia/design-system`. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
+| `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
@@ -53,6 +53,76 @@ Route53 hosted zone for `insolvia.ai`, the wildcard ACM cert `*.insolvia.ai`
 account — `521762924626` — so `shared` creates the OIDC provider itself; there
 is exactly one per account.)
 
+## Dual-target parity discipline
+
+The design system is **dual-target** (decision D4 in `docs/MVP_PLAN.md`): one
+token source of truth, rendered into a Flutter package and a React package.
+Tokens are the *only* thing the two targets share. A Flutter widget and a React
+component cannot share a line of code, so anything implemented in both is
+implemented twice and will drift — silently, because nothing compiles across the
+boundary to tell you it has.
+
+Two rules contain that. They are rules, not preferences.
+
+**Rule 1 — the React package stays scoped to what the marketing site actually
+renders.** `app.insolvia.ai` and the macOS/Windows desktop app are Flutter and
+**stay Flutter**; the React package exists solely to serve
+`www.insolvia.ai`. The surface today is **six components — `Button`, `Card`,
+`NavBar`, `Footer`, `Accordion`, `Field`** — exported from
+`packages/insolvia_design_system_react/src/index.ts`. That barrel is the answer
+to "has it grown?"; read it rather than counting directories. This package is
+deliberately *not* a port of the ~40 Base UI wrappers in `andreas-services`.
+Every component here that the marketing site does not render is a second
+implementation of something the Flutter design system already owns, and it is a
+permanent parity liability. The marketing site's needs are the ceiling, not the
+floor.
+
+**Rule 2 — generated token files are never hand-edited.** Five files are
+generated from `packages/insolvia_tokens/tokens.json` by
+`packages/insolvia_tokens/tool/generate_tokens.dart`:
+`packages/insolvia_design_system/lib/src/tokens/{colors,spacing,radii,semantics}.dart`
+and `packages/insolvia_design_system_react/src/styles/theme.css`. Each opens
+with a `DO NOT EDIT` banner. To change a color, radius, spacing step, or font:
+edit `tokens.json`, then `melos run tokens`. A hand-edit is not a shortcut — it
+is a divergence between the two targets' brand values, which is exactly the
+drift the shared token source exists to prevent.
+
+### How each rule is actually enforced — and the asymmetry
+
+Be clear-eyed about this; a rule readers believe is machine-enforced when it is
+not is worse than no rule at all.
+
+- **Rule 2 is machine-enforced.** `melos run tokens:check` runs the generator
+  with `--check`, which regenerates all five outputs in memory and exits
+  non-zero on any drift. CI runs it as the **`Token drift check`** step of
+  `.github/workflows/design-system-pr.yml`. Note that this gate's `paths:`
+  filter names packages individually rather than globbing `packages/**`, and
+  one of the entries is the single file
+  `packages/insolvia_design_system_react/src/styles/theme.css` — the generated
+  CSS lives in the React package but is an output of the *Dart* generator, so
+  the gate that can check it has to be triggered by it. Drop that line and a PR
+  hand-editing only `theme.css` runs no drift check at all: the React gate
+  doesn't have one, and this gate would never fire.
+- **Rule 1 has no automated check whatsoever.** Nothing counts components,
+  diffs the barrel, or fails a build when a seventh appears. It depends entirely
+  on review. A reviewer seeing a new directory under
+  `packages/insolvia_design_system_react/src/components/` is the whole
+  mechanism.
+
+### Changing the rules
+
+A rule with no legitimate escape hatch gets quietly broken instead of amended.
+If a seventh React component is genuinely warranted — the marketing site needs
+a surface none of the six can express — that is a scope decision, not a
+judgement call inside a feature PR. Make it explicitly: in the same PR that adds
+the component, name the marketing page that renders it, update the component
+list in this section, in
+`packages/insolvia_design_system_react/README.md`, and in the package table
+above, and note the decision against D4 in `docs/MVP_PLAN.md`. The component
+carries the same behavioural-test rule as the other six. A PR that grows the
+surface without touching this section is the failure mode, and the reviewer's
+job is to reject it — the count in this file is the contract.
+
 ## Patterns Every Package Follows
 
 ### Flutter app (`apps/insolvia_app/`)
@@ -64,8 +134,8 @@ is exactly one per account.)
 
 ### Design tokens (`packages/insolvia_tokens/`)
 - `tokens.json` is the **single source of truth** for every color, spacing, radius, shadow, and font value. It is pure data — no Flutter, no CSS.
-- `tool/generate_tokens.dart` (plain Dart, zero deps) renders it into `packages/insolvia_design_system/lib/src/tokens/{colors,spacing,radii,semantics}.dart` **and** `packages/insolvia_design_system_react/src/styles/theme.css` (Tailwind v4 `@theme`).
-- **Never hand-edit a generated file** — each opens with a `DO NOT EDIT` banner. Edit `tokens.json`, then `melos run tokens`. `melos run tokens:check` (also a step in `design-system-pr.yml`) fails the PR on drift.
+- `tool/generate_tokens.dart` (plain Dart, zero deps) renders it into four Dart files for the Flutter package **and** the React package's `theme.css` (Tailwind v4 `@theme`) — the five outputs are listed under *Dual-target parity discipline*.
+- **Never hand-edit a generated file** — see *Dual-target parity discipline* above for the rule and how CI enforces it.
 - Raw palette names (`ink`/`brass`/`paper`) are an implementation detail. Consumers speak only the **semantic** layer (`primary`, `accent`, `bg`, `ink`, `muted`, `line`, `card`, `danger`, …), so a re-brand is a one-file change.
 
 ### Design system (`packages/insolvia_design_system/`)
@@ -75,8 +145,8 @@ is exactly one per account.)
 
 ### React design system (`packages/insolvia_design_system_react/`)
 - npm package `@insolvia/design-system`. **Not a pub workspace member** — do not add it to the root `pubspec.yaml`; it has no `pubspec.yaml` of its own.
-- **Hard scope limit: six components** (`Button`, `Card`, `NavBar`, `Footer`, `Accordion`, `Field`). This package serves the marketing site only. `app.insolvia.ai` and the desktop app are Flutter and stay Flutter, so nothing here can ever be shared with them — every extra React component is a parity-drift liability. Adding a seventh needs an explicit scope decision.
-- `src/styles/theme.css` is **generated** by `packages/insolvia_tokens/tool/generate_tokens.dart`. Never hand-edit it; `tsup` copies it verbatim to `dist/` via `publicDir` and never writes back.
+- **Hard scope limit: six components**, and `src/styles/theme.css` is **generated** — both rules, their reasoning, and their enforcement live in *Dual-target parity discipline* above. Read it before adding anything here.
+- `tsup` copies `theme.css` verbatim to `dist/` via `publicDir` and never writes back, so `dist/` is not a second place to edit it either.
 - Components style themselves from **semantic** Tailwind tokens (`bg-bg`, `text-ink`, `border-line`, `bg-primary`, …) — never a hard-coded hex.
 - Every exported component has at least one **behavioural** test (Vitest + Testing Library), mirroring the Flutter package's rule. No snapshot tests.
 
