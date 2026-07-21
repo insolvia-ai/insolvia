@@ -164,7 +164,132 @@ data "aws_iam_policy_document" "github_permissions" {
     ]
     resources = [aws_iam_role.github_actions.arn]
   }
+
+  # `infra/envs/shared` MANAGES the OIDC provider, so every apply must refresh
+  # it. Without this, a CI apply dies on:
+  #   AccessDenied: ... not authorized to perform: iam:GetOpenIDConnectProvider
+  # Read and tag only — deliberately NOT DeleteOpenIDConnectProvider. This
+  # provider is what lets CI authenticate at all; a pipeline that can delete its
+  # own trust anchor can lock everyone out with no way back in via CI.
+  statement {
+    sid = "OidcProviderRead"
+    actions = [
+      "iam:GetOpenIDConnectProvider",
+      "iam:ListOpenIDConnectProviders",
+      "iam:TagOpenIDConnectProvider",
+      "iam:UpdateOpenIDConnectProviderThumbprint",
+    ]
+    resources = [aws_iam_openid_connect_provider.github.arn]
+  }
+
+  # ── Email stack (issues 1.5–1.11) ──────────────────────────────
+  # SES identity/DKIM/MAIL FROM and receipt rules are account-and-region scoped;
+  # most SES actions do not support resource-level ARNs, so this is "*" by
+  # necessity rather than by laziness.
+  statement {
+    sid       = "SimpleEmailService"
+    actions   = ["ses:*"]
+    resources = ["*"]
+  }
+
+  # The inbound-mail bucket does not match the insolvia-web-* prefix above.
+  statement {
+    sid     = "InboundMailBucket"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-inbound-mail-*",
+      "arn:aws:s3:::insolvia-inbound-mail-*/*",
+    ]
+  }
+
+  statement {
+    sid       = "ForwarderCompute"
+    actions   = ["lambda:*"]
+    resources = ["arn:aws:lambda:*:${data.aws_caller_identity.current.account_id}:function:insolvia-*"]
+  }
+
+  statement {
+    sid       = "ForwarderQueues"
+    actions   = ["sqs:*"]
+    resources = ["arn:aws:sqs:*:${data.aws_caller_identity.current.account_id}:insolvia-*"]
+  }
+
+  statement {
+    sid       = "AlertTopics"
+    actions   = ["sns:*"]
+    resources = ["arn:aws:sns:*:${data.aws_caller_identity.current.account_id}:insolvia-*"]
+  }
+
+  # CloudWatch alarm APIs do not support resource-level permissions.
+  statement {
+    sid = "Alarms"
+    actions = [
+      "cloudwatch:PutMetricAlarm",
+      "cloudwatch:DeleteAlarms",
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:ListTagsForResource",
+      "cloudwatch:TagResource",
+      "cloudwatch:UntagResource",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "LambdaLogGroups"
+    actions   = ["logs:*"]
+    resources = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/insolvia-*"]
+  }
+
+  # The forward-to destination lives here as a SecureString. Terraform creates
+  # the parameter but never owns its value (lifecycle ignore_changes).
+  statement {
+    sid       = "Parameters"
+    actions   = ["ssm:*"]
+    resources = ["arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/insolvia/*"]
+  }
+
+  # The forwarder Lambda needs its own execution role, so the pipeline must be
+  # able to create roles — scoped to the insolvia-* name prefix.
+  statement {
+    sid = "ServiceRoleManagement"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:PassRole",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/insolvia-*"]
+  }
+
+  # Attaching AWS-managed policies is constrained to the single policy the
+  # forwarder actually uses. Without this condition the pipeline could attach
+  # AdministratorAccess to a role it creates and then pass it to a Lambda —
+  # a straightforward privilege-escalation path out of a scoped deploy role.
+  statement {
+    sid = "ServiceRolePolicyAttachment"
+    actions = [
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/insolvia-*"]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+    }
+  }
 }
+
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role_policy" "github_permissions" {
   name   = "insolvia-deploy"
