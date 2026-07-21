@@ -1,5 +1,8 @@
 node_modules
 .react-router
+.lighthouseci
+lighthouserc.json
+scripts
 app
 public
 .git

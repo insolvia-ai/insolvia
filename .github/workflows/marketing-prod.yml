@@ -1,0 +1,139 @@
+name: Marketing · Deploy · Production
+
+# Deploys www.insolvia.ai: SSR Lambda image + hashed client assets on S3, both
+# behind one CloudFront distribution (infra/modules/marketing_site).
+#
+# There is no marketing staging deploy, by decision (issue #45): production +
+# PR previews only, and PR previews are not built yet.
+#
+# FIRST-EVER DEPLOY (bootstrap — manual, once): the SSR Lambda cannot be
+# created until an image exists in the ECR repository, and this workflow's
+# full `terraform apply` creates both. Bootstrap from a merged main checkout
+# (see infra/modules/marketing_site/main.tf):
+#
+#   terraform -chdir=infra/envs/prod apply \
+#     -target=module.marketing_site.aws_ecr_repository.ssr
+#   # build the app, docker build, push <marketing_ecr_repository_url>:<tag>
+#   terraform -chdir=infra/envs/prod apply
+#
+# After that the Lambda's image_uri is lifecycle-ignored and this workflow owns
+# the running image via `aws lambda update-function-code`.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-marketing-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
+    # that don't declare the environment — they resolve silently to "".
+    environment: insolvia-production
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. Build the app ──────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            apps/insolvia_marketing/package-lock.json
+            packages/insolvia_design_system_react/package-lock.json
+
+      # The design system's dist/ is gitignored; the app's prebuild compiles it
+      # via --prefix, which needs that package's node_modules installed first.
+      - name: Install design system
+        run: npm ci
+        working-directory: packages/insolvia_design_system_react
+
+      - name: Install
+        run: npm ci
+        working-directory: apps/insolvia_marketing
+
+      - name: Build
+        run: npm run build
+        working-directory: apps/insolvia_marketing
+
+      # ── 2. Infra: apply + read outputs ────────────────────────────
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+          # The wrapper interleaves its own stdout, which corrupts
+          # `$(terraform output -raw ...)` capture below.
+          terraform_wrapper: false
+
+      - name: Apply prod infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          terraform -chdir=infra/envs/prod apply -auto-approve -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "ecr=$(tf marketing_ecr_repository_url)"
+            echo "lambda=$(tf marketing_ssr_function_name)"
+            echo "bucket=$(tf marketing_assets_bucket_name)"
+            echo "dist=$(tf marketing_distribution_id)"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 3. SSR image → ECR ────────────────────────────────────────
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker build + push
+        env:
+          IMAGE: ${{ steps.tf.outputs.ecr }}
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+        working-directory: apps/insolvia_marketing
+
+      # ── 4. Point the Lambda at the new image ──────────────────────
+      - name: Update Lambda function code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.lambda }}
+          IMAGE: ${{ steps.tf.outputs.ecr }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE:${{ github.sha }}" \
+            --query '{FunctionName:FunctionName,CodeSize:CodeSize}' --output table
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # ── 5. Client assets → S3, then invalidate ────────────────────
+      # Everything in build/client is content-hashed; HTML is SSR'd by the
+      # Lambda, so unlike app-prod.yml there is no second no-cache HTML pass.
+      - name: Sync assets to S3 + invalidate
+        env:
+          BUCKET: ${{ steps.tf.outputs.bucket }}
+          DIST: ${{ steps.tf.outputs.dist }}
+        run: |
+          aws s3 sync apps/insolvia_marketing/build/client "s3://$BUCKET" --delete \
+            --cache-control "public,max-age=31536000,immutable"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      # ── 6. Smoke check ────────────────────────────────────────────
+      - name: Smoke check
+        run: |
+          # www serves a 200 with the SSR'd page.
+          curl -sSf -o /dev/null --retry 5 --retry-delay 5 --retry-all-errors \
+            https://www.insolvia.ai/
+          # The apex 301s to www (CloudFront viewer-request function).
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://insolvia.ai/)
+          if [ "$code" != "301" ]; then
+            echo "::error::Expected apex 301 → www, got HTTP $code"
+            exit 1
+          fi
