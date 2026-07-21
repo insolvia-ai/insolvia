@@ -1,6 +1,8 @@
 node_modules
 /build
 /.react-router
+# Lighthouse CI working dir + reports (lighthouserc.json upload target).
+/.lighthouseci
 *.local
 .env
 .DS_Store

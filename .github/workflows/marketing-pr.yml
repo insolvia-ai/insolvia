@@ -1,0 +1,119 @@
+name: Marketing · PR
+
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/insolvia_marketing
+
+jobs:
+  marketing:
+    name: Marketing site
+    runs-on: ubuntu-latest
+    steps:
+      # `actions/checkout` ignores `defaults.run.working-directory` (it is not a
+      # `run` step), so it still clones into the workspace root as intended.
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      # Likewise a composite action, not a `run` step, so its git commands
+      # execute at the repo root regardless of the `defaults` above.
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            apps/insolvia_marketing/**
+            # The design system is a file: path dep whose dist/ is built (not
+            # committed) — the app bundles it, so its changes are app changes.
+            packages/insolvia_design_system_react/**
+            # Token changes regenerate the design system's theme.css, which the
+            # app's Tailwind build consumes.
+            packages/insolvia_tokens/**
+            .github/workflows/marketing-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      # Must match the app's `engines.node` (">=24").
+      - uses: actions/setup-node@v4
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            apps/insolvia_marketing/package-lock.json
+            packages/insolvia_design_system_react/package-lock.json
+
+      # The design system's dist/ is gitignored; the app's prebuild runs tsup
+      # there via --prefix, which needs that package's own node_modules first.
+      # `ci`, never `install`: the lockfiles are committed precisely so CI
+      # resolves the same tree twice running, and `ci` fails loudly when
+      # package.json and the lockfile have drifted apart.
+      - name: Install design system
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        working-directory: packages/insolvia_design_system_react
+
+      # Typecheck imports the design system's dist/index.d.ts through the
+      # file: symlink, so dist/ must exist before typecheck — the app's
+      # prebuild only rebuilds it for `npm run build`, which runs later.
+      - name: Build design system
+        if: steps.filter.outputs.run == 'true'
+        run: npm run build
+        working-directory: packages/insolvia_design_system_react
+
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+
+      - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
+        run: npm run typecheck
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: npm run lint
+
+      # prebuild compiles the design system first, then react-router build
+      # emits build/client (hashed static assets) + build/server (SSR bundle).
+      - name: Build
+        if: steps.filter.outputs.run == 'true'
+        run: npm run build
+
+      # Core Web Vitals budget (issue #46). Being dramatically lighter and
+      # faster than a Flutter-web build is the entire reason this site is React
+      # and not Flutter — this step is what keeps that reasoning true. Budgets,
+      # thresholds, and their rationale live in lighthouserc.json; it serves
+      # the production build via scripts/lhci-serve.mjs and audits / and
+      # /waitlist on Lighthouse's throttled mobile preset. ubuntu-latest ships
+      # Chrome preinstalled.
+      - name: Lighthouse budget
+        if: steps.filter.outputs.run == 'true'
+        run: npx --yes @lhci/cli@0.15.x autorun
+
+      # The HTML reports make a budget failure debuggable without re-running
+      # locally. Not a `run` step, so the path is from the repo root.
+      - name: Upload Lighthouse reports
+        if: failure() && steps.filter.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: apps/insolvia_marketing/.lighthouseci/reports
+          retention-days: 7
+
+      # Packaging check: the prod deploy ships this image, so catch Dockerfile
+      # regressions here instead of at deploy time. Needs build/ from the Build
+      # step above.
+      - name: Docker build (packaging check)
+        if: steps.filter.outputs.run == 'true'
+        run: docker build -t insolvia-marketing:ci .
