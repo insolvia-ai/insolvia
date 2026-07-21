@@ -263,6 +263,31 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/insolvia/*"]
   }
 
+  # Enumeration APIs that do NOT support resource-level permissions. AWS
+  # evaluates these against `arn:aws:<service>:<region>:<account>:*`, so a
+  # prefix-scoped resource never matches and the call is denied no matter how
+  # the parameter itself is scoped. Terraform calls them on every refresh —
+  # ssm:DescribeParameters is what broke the first email apply:
+  #
+  #   AccessDeniedException: ... not authorized to perform:
+  #   ssm:DescribeParameters on resource: arn:aws:ssm:us-east-1:...:*
+  #
+  # All are read-only listings that expose names and metadata, never contents:
+  # reading a SecureString's value still requires ssm:GetParameter, which stays
+  # scoped to parameter/insolvia/* above.
+  statement {
+    sid = "EnumerationApis"
+    actions = [
+      "ssm:DescribeParameters",
+      "logs:DescribeLogGroups",
+      "sqs:ListQueues",
+      "sns:ListTopics",
+      "lambda:ListFunctions",
+      "lambda:GetAccountSettings",
+    ]
+    resources = ["*"]
+  }
+
   # The forwarder Lambda needs its own execution role, so the pipeline must be
   # able to create roles — scoped to the insolvia-* name prefix.
   statement {
