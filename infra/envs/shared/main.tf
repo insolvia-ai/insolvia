@@ -35,21 +35,32 @@ resource "aws_acm_certificate" "wildcard" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.wildcard.domain_validation_options :
-    dvo.domain_name => {
-      name   = dvo.resource_record_name
-      type   = dvo.resource_record_type
-      record = dvo.resource_record_value
-    }
-  }
+# The names the certificate covers, derived from the variable rather than from
+# the certificate resource. This is load-bearing: `for_each` KEYS must be known
+# at plan time, and `domain_validation_options` does not exist until the cert
+# has been created. Keying off it means a fresh state cannot plan at all —
+# "Invalid for_each argument ... known only after apply" — which blocks both the
+# first apply and `terraform import`. Keys static, values resolved at apply.
+locals {
+  cert_domain_names = toset(["*.${var.domain_name}", var.domain_name])
 
-  zone_id         = aws_route53_zone.main.zone_id
-  name            = each.value.name
-  type            = each.value.type
-  records         = [each.value.record]
-  ttl             = 60
+  cert_validation = {
+    for dvo in aws_acm_certificate.wildcard.domain_validation_options :
+    dvo.domain_name => dvo
+  }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = local.cert_domain_names
+
+  zone_id = aws_route53_zone.main.zone_id
+  name    = local.cert_validation[each.key].resource_record_name
+  type    = local.cert_validation[each.key].resource_record_type
+  records = [local.cert_validation[each.key].resource_record_value]
+  ttl     = 60
+
+  # A wildcard cert and its apex SAN validate through the SAME DNS record, so
+  # both instances UPSERT identical content. Overwrite is required, not lax.
   allow_overwrite = true
 }
 
