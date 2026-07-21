@@ -44,14 +44,74 @@ jobs:
             .github/workflows/design-system-pr.yml
             .github/actions/changed-paths/action.yml
 
+      # Version-bump gate. Every merge to main that changes this package must
+      # bump `version` in pubspec.yaml, because the publish workflow
+      # (design-system-publish.yml) is idempotent by version: it skips cleanly
+      # when the tag `insolvia_design_system-v<version>` already exists. An
+      # unbumped package change therefore merges green, tags nothing, and
+      # silently rots the published surface — the app consumes the tag-pinned
+      # git dependency, never the source by path, so it would keep building
+      # against a stale artifact with no error anywhere.
+      #
+      # The `steps.filter` guard above also matches tokens/workflow paths that
+      # don't touch the package, so this step re-diffs against the PR base and
+      # only demands a bump when something under the package directory actually
+      # changed. Checkout uses `fetch-depth: 0`, so the base commit is present.
+      # Mirrors the changed-paths action's fail-loud philosophy: if the base
+      # pubspec.yaml (or its `version:` line) cannot be read, that is a hard
+      # error, never a silent pass.
+      - name: Require a version bump when the package changed
+        if: steps.filter.outputs.run == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          PKG="packages/insolvia_design_system"
+
+          if git diff --quiet "$BASE_SHA" HEAD -- "$PKG"; then
+            echo "No changes under $PKG/ — no version bump required."
+            exit 0
+          fi
+
+          # `git show` exits non-zero if the base commit or the file is
+          # missing; with `set -e` that fails the step loudly instead of
+          # letting a broken guard wave the PR through.
+          BASE_PUBSPEC="$(git show "$BASE_SHA:$PKG/pubspec.yaml")"
+          BASE_VERSION="$(printf '%s\n' "$BASE_PUBSPEC" | sed -n 's/^version:[[:space:]]*//p' | head -n1)"
+          HEAD_VERSION="$(sed -n 's/^version:[[:space:]]*//p' "$PKG/pubspec.yaml" | head -n1)"
+
+          if [ -z "$BASE_VERSION" ] || [ -z "$HEAD_VERSION" ]; then
+            echo "::error file=packages/insolvia_design_system/pubspec.yaml::Could not parse a \`version:\` line from the base or head pubspec.yaml — refusing to guess."
+            exit 1
+          fi
+
+          if [ "$HEAD_VERSION" = "$BASE_VERSION" ]; then
+            echo "::error file=packages/insolvia_design_system/pubspec.yaml::This PR changes $PKG/ but leaves version at $BASE_VERSION. This package tags insolvia_design_system-v<version> on every merge to main; bump \`version\` in pubspec.yaml — consumers pin the published tag."
+            exit 1
+          fi
+
+          echo "Version bumped: $BASE_VERSION -> $HEAD_VERSION."
+
       - uses: subosito/flutter-action@v2
         if: steps.filter.outputs.run == 'true'
         with:
           channel: stable
 
+      # Resolves the pub workspace: insolvia_tokens + the app. The design
+      # system is NOT a workspace member (see the root pubspec.yaml) and gets
+      # its own resolve below.
       - name: Resolve workspace
         if: steps.filter.outputs.run == 'true'
         run: flutter pub get
+
+      # The design system resolves standalone, outside the workspace — melos
+      # exec scripts no longer cover it, so this workflow runs the same
+      # commands directly inside the package.
+      - name: Resolve design system (standalone)
+        if: steps.filter.outputs.run == 'true'
+        run: flutter pub get
+        working-directory: packages/insolvia_design_system
 
       # Must run before the format/analyze steps: if someone hand-edited a
       # generated file, the honest failure is "you edited the wrong file",
@@ -64,9 +124,14 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: dart format --output=none --set-exit-if-changed packages/insolvia_tokens packages/insolvia_design_system
 
-      - name: Analyze
+      - name: Analyze tokens
         if: steps.filter.outputs.run == 'true'
-        run: dart analyze packages/insolvia_tokens packages/insolvia_design_system
+        run: dart analyze packages/insolvia_tokens
+
+      - name: Analyze design system
+        if: steps.filter.outputs.run == 'true'
+        run: flutter analyze --fatal-infos
+        working-directory: packages/insolvia_design_system
 
       - name: Test
         if: steps.filter.outputs.run == 'true'

@@ -5,6 +5,12 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 # The root workspace pubspec.lock IS committed (reproducible app builds).
+# The design system resolves OUTSIDE the workspace (see root pubspec.yaml) and
+# is a library — its own lockfile is never committed.
+packages/insolvia_design_system/pubspec.lock
+# Local design-system debugging overrides (path override while hacking live,
+# see docs/PACKAGE_PUBLISHING.md) — never committed.
+pubspec_overrides.yaml
 *.iml
 *.ipr
 *.iws

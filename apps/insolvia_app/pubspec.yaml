@@ -17,9 +17,16 @@ dependencies:
     sdk: flutter
   # Declarative routing (Flutter-recommended router).
   go_router: ^17.3.0
-  # The shared design system, resolved by path within the monorepo.
+  # The shared design system, consumed as a published, versioned artifact — a
+  # git dependency pinned to a version tag — never the source by path. Upgrading
+  # means bumping `ref` to the new tag. To hack on the design system live, use
+  # the uncommitted pubspec_overrides.yaml recipe in docs/PACKAGE_PUBLISHING.md
+  # (also under CLAUDE.md → "Flutter app"); delete it before committing.
   insolvia_design_system:
-    path: ../../packages/insolvia_design_system
+    git:
+      url: https://github.com/insolvia-ai/insolvia.git
+      path: packages/insolvia_design_system
+      ref: insolvia_design_system-v0.1.1
 
 dev_dependencies:
   flutter_test:

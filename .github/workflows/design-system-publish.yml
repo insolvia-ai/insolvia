@@ -1,0 +1,104 @@
+name: Design system · Publish · Shared
+
+# Trigger: push to main (+ manual dispatch as an escape hatch).
+#
+# Push, not dispatch-only, because the consumer is the app's pub resolution: a
+# version bump merged to main must be installable without a human remembering
+# to go press a button. The job is a no-op on every push that does not change
+# the version (see the guard below), so "publish on push" costs one cheap
+# `git ls-remote` and never a red X.
+#
+# `workflow_dispatch` stays for re-tagging after a transient failure, and for
+# the very first publish of a package version that landed on main before this
+# workflow existed.
+#
+# "Publishing" here is not a registry upload: the Flutter design system is not
+# on pub.dev. The published artifact is an annotated git tag
+# `insolvia_design_system-v<version>` in this (public) repo, which consumers
+# pin as a `git:` dependency. See docs/PACKAGE_PUBLISHING.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/insolvia_design_system/**"
+      - ".github/workflows/design-system-publish.yml"
+  workflow_dispatch:
+
+# `contents: write` is the whole privilege set this job needs — it pushes a tag
+# to this repo, not to AWS or any registry. No `id-token: write`: there is no
+# OIDC role here.
+permissions:
+  contents: write
+
+concurrency:
+  group: insolvia-design-system-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Deliberately NOT gated on `vars.DEPLOY_ENABLED`. That gate exists for the
+    # AWS/DNS path — shared infra applied (#15) and the *.insolvia.ai ACM cert
+    # reaching ISSUED (#16) — and pushing a git tag to this repo touches none
+    # of it: no AWS account, no Route53, no CloudFront, no OIDC role. Gating it
+    # would block app work on an unrelated certificate. See
+    # docs/PACKAGE_PUBLISHING.md.
+    steps:
+      # Default shallow checkout is enough: the tag points at HEAD, and
+      # `persist-credentials` (on by default) lets the push below authenticate
+      # with the job's GITHUB_TOKEN.
+      - uses: actions/checkout@v4
+
+      # Idempotency guard. A publish job that red-Xes on every unrelated push
+      # to main trains people to ignore CI, so an already-existing tag is a
+      # clean skip, not a failure.
+      #
+      # The skip path should be rare for pushes that touch the package: the PR
+      # gate (design-system-pr.yml) fails any PR that changes this package
+      # without bumping `version`, precisely so a merge to main never lands
+      # here with a stale version and silently tags nothing.
+      - name: Check whether this version is already tagged
+        id: check
+        run: |
+          set -euo pipefail
+
+          VERSION="$(sed -n 's/^version:[[:space:]]*//p' packages/insolvia_design_system/pubspec.yaml | head -n1)"
+          if [ -z "$VERSION" ]; then
+            echo "::error file=packages/insolvia_design_system/pubspec.yaml::Could not parse a \`version:\` line — refusing to guess a tag name."
+            exit 1
+          fi
+          TAG="insolvia_design_system-v$VERSION"
+          echo "Resolved tag: $TAG"
+
+          if git ls-remote --tags --exit-code origin "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG already exists on origin — nothing to do."
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$TAG does not exist on origin — will tag HEAD."
+            echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # An annotated tag at HEAD (the merge commit on main) IS the artifact —
+      # consumers' `pub get` fetches this repo at the tag and takes
+      # packages/insolvia_design_system/ from it.
+      - name: Create and push tag
+        if: steps.check.outputs.should-publish == 'true'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "insolvia_design_system $VERSION"
+          git push origin "refs/tags/$TAG"
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check.outputs.should-publish }}" = "true" ]; then
+            echo "Pushed tag ${{ steps.check.outputs.tag }} (insolvia_design_system ${{ steps.check.outputs.version }})." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Skipped: tag ${{ steps.check.outputs.tag }} already exists." >> "$GITHUB_STEP_SUMMARY"
+          fi

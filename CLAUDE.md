@@ -20,9 +20,9 @@ reverse).
 | Path | Purpose | Stack |
 |---|---|---|
 | `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
-| `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
+| `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. Published as the git tag `insolvia_design_system-v<version>` on merge to main; **outside the pub workspace** so consumers can pin the tag (pub rewrites deps on workspace members back to the local path). | Flutter package (`insolvia_design_system`) |
 | `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
-| `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
+| `apps/insolvia_app/` | The Insolvia application (hello-world today). Consumes the design system as a tag-pinned git dependency, never by path. | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
 
@@ -126,8 +126,31 @@ job is to reject it — the count in this file is the contract.
 
 ## Patterns Every Package Follows
 
+**Both design systems publish on merge to main, and consumers install the
+published, versioned artifact — the GitHub Packages npm registry for React,
+version git tags for Flutter — never the source by path.** Each PR gate
+machine-enforces the matching version bump (a package change without one fails
+the PR). The full flows live in `docs/PACKAGE_PUBLISHING.md`.
+
 ### Flutter app (`apps/insolvia_app/`)
-- Depends on the design system by **path**: `insolvia_design_system: { path: ../../packages/insolvia_design_system }`.
+- Depends on the design system as a **git dependency pinned to a version tag**
+  — never by path:
+  ```yaml
+  insolvia_design_system:
+    git:
+      url: https://github.com/insolvia-ai/insolvia.git
+      path: packages/insolvia_design_system
+      ref: insolvia_design_system-v<version>
+  ```
+  Upgrading is a `ref` bump (plus the regenerated root `pubspec.lock`). To hack
+  on the design system live, create an **uncommitted**
+  `apps/insolvia_app/pubspec_overrides.yaml` (gitignored):
+  ```yaml
+  dependency_overrides:
+    insolvia_design_system:
+      path: ../../packages/insolvia_design_system
+  ```
+  and delete it before committing. See `docs/PACKAGE_PUBLISHING.md`.
 - **Feature-first** layout under `lib/src/`: `features/<feature>/{data,domain,presentation}`, plus shared `routing/` (go_router) and `config/`. `main.dart` stays thin (`runApp(InsolviaApp())`); the app shell lives in `src/app.dart`.
 - No hard-coded colors/spacing/fonts — pull everything from the design system's theme and `ThemeExtension`s.
 - Environment config lives in `lib/src/config/environment.dart`, read from `--dart-define=INSOLVIA_ENV`.
@@ -140,6 +163,27 @@ job is to reject it — the count in this file is the contract.
 - Raw palette names (`ink`/`brass`/`paper`) are an implementation detail. Consumers speak only the **semantic** layer (`primary`, `accent`, `bg`, `ink`, `muted`, `line`, `card`, `danger`, …), so a re-brand is a one-file change.
 
 ### Design system (`packages/insolvia_design_system/`)
+- **Outside the pub workspace**, deliberately: pub silently rewrites any
+  dependency on a workspace member back to the local path, which would defeat
+  the app's tag pin. It resolves standalone — `flutter pub get` inside the
+  package; its own `pubspec.lock` is a library lockfile and is **not**
+  committed (the root *workspace* lock still is). Consequence: `melos
+  bootstrap` and the melos `analyze`/`format`/`test`/`ci` scripts do not cover
+  it — `design-system-pr.yml` runs the equivalent commands directly inside the
+  package instead. (The `tokens`/`tokens:check` scripts still reach it: the
+  generator writes by file path.)
+- **Every change to this package must bump `version` in `pubspec.yaml`.** Merge
+  to `main` publishes the annotated git tag `insolvia_design_system-v<version>`
+  (`design-system-publish.yml`), and that publish is idempotent by version — an
+  unbumped merge tags nothing and the published surface silently goes stale.
+  Consumers (the app) pin the tag as a git dependency, **never** a committed
+  path dependency; a local path override is a legitimate *uncommitted*
+  debugging aid (`pubspec_overrides.yaml`), nothing more. This rule is
+  **machine-enforced**: the *Require a version bump when the package changed*
+  step in `design-system-pr.yml` diffs the package against the PR base and
+  fails when it changed with an unchanged version. The no-path-dep half is
+  review-enforced only — nothing scans consumer pubspecs for a committed
+  `path:`. See `docs/PACKAGE_PUBLISHING.md`.
 - Structure: `lib/src/{tokens,theme,components}/`, one barrel export `lib/insolvia_design_system.dart`. Everything under `tokens/` except `typography.dart` is generated (see above).
 - Themes and components read `InsolviaSemanticColors`, never `InsolviaPalette`. Brand-specific values Material lacks go in a `ThemeExtension` (`InsolviaColors`, `InsolviaSpacing`), read via `Theme.of(context).extension<...>()`.
 - Every exported component has at least one widget test.

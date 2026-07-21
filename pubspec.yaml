@@ -13,9 +13,15 @@ environment:
 # Workspace members (see melos.yaml for the task runner on top).
 #   apps/     → runnable applications
 #   packages/ → shared libraries (apps depend on packages, never the reverse)
+#
+# packages/insolvia_design_system is deliberately NOT a member. Pub silently
+# rewrites any dependency on a workspace member back to the local path, which
+# would defeat the app's tag-pinned git dependency on it (see
+# docs/PACKAGE_PUBLISHING.md). It resolves standalone: `flutter pub get`
+# inside the package. `melos bootstrap` and the melos scripts therefore do not
+# cover it — design-system-pr.yml gates it directly.
 workspace:
   - packages/insolvia_tokens
-  - packages/insolvia_design_system
   - apps/insolvia_app
 
 dev_dependencies:

@@ -3,15 +3,23 @@ description: >-
   Insolvia's shared design system — color/typography/spacing tokens, light &
   dark themes, and reusable Flutter components used by every Insolvia surface
   (desktop, web, and future marketing site).
-version: 0.1.0
+# Every change to this package bumps this version in the same PR — the
+# "Require a version bump" step in design-system-pr.yml enforces it. Merging to
+# main pushes the annotated tag `insolvia_design_system-v<version>`
+# (design-system-publish.yml); consumers pin that tag as a git dependency.
+# See docs/PACKAGE_PUBLISHING.md.
+version: 0.1.1
 publish_to: none
 
 environment:
   sdk: ^3.6.0
   flutter: ">=3.24.0"
 
-# Part of the Insolvia pub workspace (root pubspec.yaml).
-resolution: workspace
+# Deliberately NOT `resolution: workspace`: this package resolves standalone so
+# the app can consume it as a tag-pinned git dependency (pub would silently
+# rewrite a dependency on a workspace member back to the local path). Run
+# `flutter pub get` in this directory; its pubspec.lock is not committed
+# (library — see .gitignore).
 
 dependencies:
   flutter:
