@@ -17,7 +17,7 @@ project + environment.
 ## 0. Prerequisites
 - AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account (the `insolvia` profile).
 - `terraform` `~> 1.5`, `tflint`.
-- Admin access to the `Insolvia-AI/insolvia` GitHub repo (to add secrets + branch protection).
+- Admin access to the `insolvia-ai/insolvia` GitHub repo (to add secrets + branch protection).
 
 ## 1. Terraform state bucket — the first action in the entire plan
 Every `backend.tf` in the repo points at this bucket, so `terraform init` cannot
@@ -79,7 +79,7 @@ applying.
 cd infra/envs/shared
 terraform apply    # adopts the imported insolvia.ai zone, creates the
                    # *.insolvia.ai ACM cert, and the github-actions-insolvia
-                   # IAM role trusting repo:Insolvia-AI/insolvia:*
+                   # IAM role trusting repo:insolvia-ai/insolvia:*
 terraform output github_actions_role_arn
 ```
 Because delegation is already in place, DNS validation should resolve and the
@@ -88,10 +88,10 @@ certificate should reach `ISSUED` without any registrar work.
 ## 5. Wire the GitHub repo
 ```bash
 # Deploy role ARN from step 4:
-gh secret set AWS_ROLE_ARN --repo Insolvia-AI/insolvia --body "arn:aws:iam::521762924626:role/github-actions-insolvia"
+gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/github-actions-insolvia"
 
 # Keep deploys off until the cert is ISSUED:
-gh variable set DEPLOY_ENABLED --repo Insolvia-AI/insolvia --body "false"
+gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "false"
 ```
 Repo lockdown (private, branch protection, environments) is documented in the
 plan §2e and applied once `@ansavva` has admin on the repo.
@@ -105,7 +105,7 @@ dig +short NS insolvia.ai
 ```
 Once those agree and the ACM cert reports `ISSUED`, flip deploys on:
 ```bash
-gh variable set DEPLOY_ENABLED --repo Insolvia-AI/insolvia --body "true"
+gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "true"
 ```
 Then `staging` deploys automatically on merge to `main`; `prod` is dispatched
 manually.
