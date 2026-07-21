@@ -1,36 +1,56 @@
 name: Inbound forwarder · PR
 
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
 on:
   pull_request:
-    paths:
-      - "services/inbound_forwarder/**"
-      - "ruff.toml"
-      - ".github/workflows/inbound-forwarder-pr.yml"
 
 permissions:
   contents: read
 
 jobs:
-  checks:
+  inbound-forwarder:
+    name: Inbound forwarder
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: services/inbound_forwarder
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            services/inbound_forwarder/**
+            ruff.toml
+            .github/workflows/inbound-forwarder-pr.yml
+            .github/actions/changed-paths/action.yml
 
       - uses: actions/setup-python@v5
+        if: steps.filter.outputs.run == 'true'
         with:
           python-version: "3.11"
 
       - name: Install tooling
+        if: steps.filter.outputs.run == 'true'
         run: pip install ruff pytest
 
       - name: Lint
+        if: steps.filter.outputs.run == 'true'
         run: ruff check .
 
       - name: Format check
+        if: steps.filter.outputs.run == 'true'
         run: ruff format --check .
 
       - name: Test
+        if: steps.filter.outputs.run == 'true'
         run: pytest

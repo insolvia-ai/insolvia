@@ -1,52 +1,74 @@
 name: Design system · PR
 
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
 on:
   pull_request:
-    paths:
-      # Named per package rather than `packages/**` — that glob also matched
-      # packages/insolvia_design_system_react/, firing the Flutter gate on
-      # React-only PRs. A new Dart package adds its own line here.
-      - "packages/insolvia_design_system/**"
-      - "packages/insolvia_tokens/**"
-      # The generated Tailwind theme lives in the React package, but it is an
-      # output of the Dart generator — so the drift check that guards it has to
-      # fire here. Without this line, a PR hand-editing only theme.css runs no
-      # drift check at all: the React gate doesn't have one, and this gate
-      # wouldn't trigger.
-      - "packages/insolvia_design_system_react/src/styles/theme.css"
-      - "pubspec.yaml"
-      - "melos.yaml"
-      - "analysis_options.yaml"
-      - ".github/workflows/design-system-pr.yml"
 
 permissions:
   contents: read
 
 jobs:
-  checks:
+  flutter-design-system:
+    name: Flutter design system
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            # Named per package rather than `packages/**` — that glob also
+            # matches packages/insolvia_design_system_react/, firing the
+            # Flutter gate on React-only PRs. A new Dart package adds its own
+            # line here.
+            packages/insolvia_design_system/**
+            packages/insolvia_tokens/**
+            # The generated Tailwind theme lives in the React package, but it is
+            # an output of the Dart generator — so the drift check that guards
+            # it has to fire here. Without this line, a PR hand-editing only
+            # theme.css runs no drift check at all: the React gate doesn't have
+            # one, and this gate would do nothing.
+            packages/insolvia_design_system_react/src/styles/theme.css
+            pubspec.yaml
+            melos.yaml
+            analysis_options.yaml
+            .github/workflows/design-system-pr.yml
+            .github/actions/changed-paths/action.yml
 
       - uses: subosito/flutter-action@v2
+        if: steps.filter.outputs.run == 'true'
         with:
           channel: stable
 
       - name: Resolve workspace
+        if: steps.filter.outputs.run == 'true'
         run: flutter pub get
 
       # Must run before the format/analyze steps: if someone hand-edited a
       # generated file, the honest failure is "you edited the wrong file",
       # not a downstream lint complaint about the edit.
       - name: Token drift check
+        if: steps.filter.outputs.run == 'true'
         run: dart run packages/insolvia_tokens/tool/generate_tokens.dart --check
 
       - name: Format check
+        if: steps.filter.outputs.run == 'true'
         run: dart format --output=none --set-exit-if-changed packages/insolvia_tokens packages/insolvia_design_system
 
       - name: Analyze
+        if: steps.filter.outputs.run == 'true'
         run: dart analyze packages/insolvia_tokens packages/insolvia_design_system
 
       - name: Test
+        if: steps.filter.outputs.run == 'true'
         run: flutter test
         working-directory: packages/insolvia_design_system

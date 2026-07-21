@@ -1,18 +1,23 @@
 name: Infra · Terraform plan · PR
 
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
 on:
   pull_request:
-    paths:
-      - "infra/**"
-      - ".tflint.hcl"
-      - ".github/workflows/shared-infra-plan.yml"
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  validate:
+  terraform-validate:
+    # Matrixed, so this reports three separate checks — "Terraform validate
+    # (shared)", "(staging)" and "(prod)". All three are required by name.
+    name: Terraform validate
     runs-on: ubuntu-latest
     strategy:
       # One environment failing should not cancel the others. With fail-fast on,
@@ -23,19 +28,35 @@ jobs:
         env: [shared, staging, prod]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            infra/**
+            .tflint.hcl
+            .github/workflows/shared-infra-plan.yml
+            .github/actions/changed-paths/action.yml
 
       - uses: hashicorp/setup-terraform@v3
+        if: steps.filter.outputs.run == 'true'
         with:
           terraform_version: "~1.5"
 
       - uses: terraform-linters/setup-tflint@v4
+        if: steps.filter.outputs.run == 'true'
         with:
           tflint_version: v0.62.0
 
       - name: Format check
+        if: steps.filter.outputs.run == 'true'
         run: terraform fmt -check -recursive
 
       - name: TFLint
+        if: steps.filter.outputs.run == 'true'
         # `tflint --init` pulls the AWS ruleset from the GitHub API. Without a
         # token that request is anonymous, and GitHub-hosted runners share
         # outbound IPs — so the 60/hr anonymous quota is routinely exhausted by
@@ -51,6 +72,7 @@ jobs:
 
       # Offline validation — no AWS credentials needed (backend disabled).
       - name: Validate ${{ matrix.env }}
+        if: steps.filter.outputs.run == 'true'
         run: |
           terraform -chdir=infra/envs/${{ matrix.env }} init -backend=false
           terraform -chdir=infra/envs/${{ matrix.env }} validate

@@ -1,11 +1,13 @@
 name: Design system React · PR
 
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
 on:
   pull_request:
-    paths:
-      - "packages/insolvia_design_system_react/**"
-      - "packages/insolvia_tokens/**"
-      - ".github/workflows/design-system-react-pr.yml"
 
 permissions:
   contents: read
@@ -15,13 +17,31 @@ defaults:
     working-directory: packages/insolvia_design_system_react
 
 jobs:
-  checks:
+  react-design-system:
+    name: React design system
     runs-on: ubuntu-latest
     steps:
+      # `actions/checkout` ignores `defaults.run.working-directory` (it is not a
+      # `run` step), so it still clones into the workspace root as intended.
       - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      # Likewise a composite action, not a `run` step, so its git commands
+      # execute at the repo root regardless of the `defaults` above.
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            packages/insolvia_design_system_react/**
+            packages/insolvia_tokens/**
+            .github/workflows/design-system-react-pr.yml
+            .github/actions/changed-paths/action.yml
 
       # Must match the package's `engines.node` (">=24").
       - uses: actions/setup-node@v4
+        if: steps.filter.outputs.run == 'true'
         with:
           node-version: "24"
           cache: npm
@@ -31,18 +51,23 @@ jobs:
       # resolves the same tree twice running, and `ci` fails loudly when
       # package.json and the lockfile have drifted apart.
       - name: Install
+        if: steps.filter.outputs.run == 'true'
         run: npm ci
 
       - name: Lint
+        if: steps.filter.outputs.run == 'true'
         run: npm run lint
 
       - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
         run: npm run typecheck
 
       - name: Test
+        if: steps.filter.outputs.run == 'true'
         run: npm run test
 
       - name: Build
+        if: steps.filter.outputs.run == 'true'
         run: npm run build
 
       # Kept in the gate. `tsc` already covers the stories (tsconfig includes
@@ -52,4 +77,5 @@ jobs:
       # `.storybook/`. Neither `tsup` nor `vitest` touches that path, and it is
       # where the real breakage showed up during development. Costs ~4s.
       - name: Build Storybook
+        if: steps.filter.outputs.run == 'true'
         run: npm run build-storybook
