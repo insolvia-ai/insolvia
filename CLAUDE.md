@@ -23,6 +23,7 @@ reverse).
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
 | `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
+| `apps/insolvia_marketing/` | The marketing site for `www.insolvia.ai` — React Router v7 framework mode, SSR. Consumes `@insolvia/design-system` as a `file:` path dep. **Outside the pub workspace** (npm, not pub). | React/TypeScript (`@insolvia/marketing`) |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
 
