@@ -200,8 +200,13 @@ Procurement status — two items remain:
 | Item | Lead time | Blocks | Status |
 |---|---|---|---|
 | `.ai` registration | — | everything with a hostname | ✅ **Done** — Gandi, NS delegated to Route53 |
-| MyCase Advanced tier (~$89/mo) | days | M0 | ⏳ **Only outstanding blocker — start today** |
+| MyCase API access | low | M0 | ✅ **De-risked** — founder's business partner works at MyCase |
 | SES production access | ~24h+ | replying as `@insolvia.ai` | 🔜 **Deliberately deferred to issue 6.8** — submitted last, with the site and bounce handling already in place |
+
+**There is no external queue left.** Every remaining blocker is engineering we
+control, which makes the AWS bootstrap block in Milestone 1 (issues 1.0 → 1.3b)
+unambiguously the place to start — nothing else can proceed until the wildcard
+certificate is issued.
 
 **Deferred by D8:** Windows code-signing certificate and Apple Developer
 account. These were the two longest lead times in the plan; deprioritising
@@ -230,20 +235,36 @@ engineering time goes while the queues clear.
 
 ## Milestone 0 · MyCase API spike
 
-**Why this is first.** The business plan's entire go-to-market rests on one
-untested assumption: that the MyCase API can carry the integration we're
-promising. §3 calls distribution "the plan's keystone"; §7 lists native
-integration as the wedge Best Case "structurally cannot copy"; §10 names
-platform dependency as a *High* risk. If the API can't read and write what we
-need, the wedge evaporates — and that is worth knowing before five milestones of
-foundation get built around it, not after.
+**Access is not a risk — a founder's business partner works at MyCase.** An
+earlier revision of this plan treated MyCase access as the largest open
+assumption and put this milestone on the critical path. That was wrong, and the
+milestone is **not urgent**.
 
-It is also cheap and fully parallel: a throwaway script against someone else's
-API, with no dependency on our DNS, our infra, or our design system. It fills
-the dead time while `.ai` registration and SES production access are pending.
+What the relationship does and doesn't cover is still worth separating:
 
-**Outcome:** a written go/no-go on the integration thesis, backed by a real
-authenticated round-trip.
+- **Covered:** obtaining credentials, App Bar navigation, rate limits, sync
+  mechanics, and fast answers generally. Issues 0.5–0.7 likely close in a
+  conversation rather than an investigation.
+- **Not covered:** what the API can technically *do*. Whether write endpoints
+  exist for the fields bankruptcy intake needs is a property of the API surface,
+  not of who you know. An insider gets the answer in an afternoon instead of a
+  fortnight — but the answer could still be "that endpoint doesn't exist."
+
+So 0.3 (write round-trip) and 0.4 (data-model mapping) keep their value: they
+feed directly into the intake milestone's design, and 0.5's push-vs-poll answer
+is an architectural fork. They're now cheap and fast rather than slow and
+uncertain.
+
+**One thing the relationship makes *more* important, not less.** Business-plan
+§10 names platform dependency a *High* risk, and its own closing note says the
+MyCase relationship "should be confirmed (formal partnership / App Bar listing
+vs. warm introductions) before the channel is leaned on in a raise." A personal
+relationship is precisely the kind the plan warns about depending on — it moves
+with the person. That's issue 0.7, and it's the one item here worth doing
+properly rather than informally.
+
+**Outcome:** the integration's technical shape documented well enough for the
+intake milestone to be designed against it.
 
 | # | Issue | Notes |
 |---|---|---|
@@ -586,22 +607,28 @@ Not questions — just the things most likely to bite, in order:
 1. **The duplicate-hosted-zone trap (M1).** Highest-probability concrete failure
    in the plan, because the natural next action — `terraform apply` on shared —
    triggers it. See the boxed section in Milestone 1. Import first.
-2. **MyCase write access (M0).** The single largest unknown. Read access is
-   likely; write is what the no-double-entry promise depends on.
-3. **Desktop bit-rot (D8).** Unpromoted targets break silently. If the Windows
+2. **MyCase write coverage (M0)** — *downgraded.* Access itself is not a risk
+   (partner relationship). What remains is narrower: whether the API exposes
+   write endpoints for the fields intake needs. Cheap to answer now, and it
+   shapes the intake milestone rather than the whole thesis.
+3. **Channel formality (0.7).** The warm channel currently rests on a personal
+   relationship, which moves with the person. Business-plan §10 already flags
+   this and recommends a formal partnership plus a second channel (direct/NACBA)
+   before the channel is leaned on in a raise.
+4. **Desktop bit-rot (D8).** Unpromoted targets break silently. If the Windows
    and macOS builds fall out of CI, they'll be broken at the exact moment a
    prospect demands desktop — destroying the optionality this decision was
    meant to preserve. Issue 4.8 is the guard; don't let it get trimmed.
-4. **Web-first is a bet on attorney behaviour.** The business plan describes
+5. **Web-first is a bet on attorney behaviour.** The business plan describes
    this market as desktop-loyal. Pushing web is right, but it's an assumption
    worth testing explicitly with the design-partner firm rather than
    discovering late — and it's cheap to test, because the desktop build exists.
-5. **SES production access deferred too long (6.8).** Deferring it is correct —
+6. **SES production access deferred too long (6.8).** Deferring it is correct —
    the request is stronger with a live site and real bounce handling. The risk is
    the opposite one: while it's outstanding we can receive mail at
    `@insolvia.ai` but cannot reply from it, so the mailbox is half-built. Set a
    date rather than leaving it open-ended.
-6. **Design-system parity drift.** Contained by the six-component scope limit in
+7. **Design-system parity drift.** Contained by the six-component scope limit in
    D4 — which only holds if issue 2.9 actually writes it into CLAUDE.md.
 
 ---
