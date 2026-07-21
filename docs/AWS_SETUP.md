@@ -1,14 +1,15 @@
 # AWS & GitHub bootstrap
 
 One-time setup so CI can deploy Insolvia to AWS with **no long-lived keys**.
-Insolvia reuses the **shared AWS account** (also home to `andreas-services`) and
-is namespaced by the `insolvia` project + environment.
+Insolvia runs in its **own dedicated AWS account** (`521762924626`), separate
+from `andreas-services`. Resources are still namespaced by the `insolvia`
+project + environment.
 
 > ⚠️ **Status:** deploys are **gated off** until `insolvia.ai` DNS is live. You
 > can complete steps 1–4 now; step 5 (domain) is the current blocker.
 
 ## 0. Prerequisites
-- AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the shared account.
+- AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account (the `insolvia` profile).
 - `terraform` `~> 1.5`, `tflint`.
 - Admin access to the `Insolvia-AI/insolvia` GitHub repo (to add secrets + branch protection).
 
@@ -27,10 +28,9 @@ aws s3api put-public-access-block --bucket insolvia-terraform-state \
 State keys: `insolvia/{shared,staging,prod}/terraform.tfstate`.
 
 ## 2. GitHub OIDC provider (created by `shared`)
-Insolvia runs in its own dedicated AWS account (`521762924626`), which has no
-GitHub OIDC provider yet — so `infra/envs/shared` **creates** it (step 3). There
-is exactly one such provider per account. Confirm it is absent before first
-apply (empty list is expected):
+The Insolvia account has no GitHub OIDC provider yet — so `infra/envs/shared`
+**creates** it (step 3). There is exactly one such provider per account.
+Confirm it is absent before first apply (empty list is expected):
 ```bash
 aws iam list-open-id-connect-providers --profile insolvia
 ```
@@ -50,7 +50,7 @@ terraform output github_actions_role_arn
 ## 4. Wire the GitHub repo
 ```bash
 # Deploy role ARN from step 3:
-gh secret set AWS_ROLE_ARN --repo Insolvia-AI/insolvia --body "arn:aws:iam::<acct>:role/github-actions-insolvia"
+gh secret set AWS_ROLE_ARN --repo Insolvia-AI/insolvia --body "arn:aws:iam::521762924626:role/github-actions-insolvia"
 
 # Keep deploys off until DNS is live:
 gh variable set DEPLOY_ENABLED --repo Insolvia-AI/insolvia --body "false"
