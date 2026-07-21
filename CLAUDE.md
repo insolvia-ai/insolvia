@@ -21,6 +21,7 @@ reverse).
 |---|---|---|
 | `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
+| `packages/insolvia_design_system_react/` | Marketing-site UI only: six components (`Button`, `Card`, `NavBar`, `Footer`, `Accordion`, `Field`) on Base UI + Tailwind v4, published as `@insolvia/design-system`. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
@@ -71,6 +72,13 @@ is exactly one per account.)
 - Structure: `lib/src/{tokens,theme,components}/`, one barrel export `lib/insolvia_design_system.dart`. Everything under `tokens/` except `typography.dart` is generated (see above).
 - Themes and components read `InsolviaSemanticColors`, never `InsolviaPalette`. Brand-specific values Material lacks go in a `ThemeExtension` (`InsolviaColors`, `InsolviaSpacing`), read via `Theme.of(context).extension<...>()`.
 - Every exported component has at least one widget test.
+
+### React design system (`packages/insolvia_design_system_react/`)
+- npm package `@insolvia/design-system`. **Not a pub workspace member** — do not add it to the root `pubspec.yaml`; it has no `pubspec.yaml` of its own.
+- **Hard scope limit: six components** (`Button`, `Card`, `NavBar`, `Footer`, `Accordion`, `Field`). This package serves the marketing site only. `app.insolvia.ai` and the desktop app are Flutter and stay Flutter, so nothing here can ever be shared with them — every extra React component is a parity-drift liability. Adding a seventh needs an explicit scope decision.
+- `src/styles/theme.css` is **generated** by `packages/insolvia_tokens/tool/generate_tokens.dart`. Never hand-edit it; `tsup` copies it verbatim to `dist/` via `publicDir` and never writes back.
+- Components style themselves from **semantic** Tailwind tokens (`bg-bg`, `text-ink`, `border-line`, `bg-primary`, …) — never a hard-coded hex.
+- Every exported component has at least one **behavioural** test (Vitest + Testing Library), mirroring the Flutter package's rule. No snapshot tests.
 
 ### Infrastructure
 - Terraform `~> 1.5`, AWS provider `~> 5.0`. Region `us-east-1` everywhere (CloudFront ACM requirement).

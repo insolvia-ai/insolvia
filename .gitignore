@@ -57,6 +57,15 @@ __pycache__/
 venv/
 *.egg-info/
 
+# ── Node (packages/insolvia_design_system_react) ────────────────
+# package-lock.json IS committed (reproducible npm installs in CI).
+node_modules/
+storybook-static/
+# Build output is anchored per package rather than a bare `dist/`, which would
+# silently swallow any future build directory anywhere in the repo. Each new
+# Node package adds its own line.
+/packages/insolvia_design_system_react/dist/
+
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store
 *.swp
