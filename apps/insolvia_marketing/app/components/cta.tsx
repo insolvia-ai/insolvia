@@ -1,7 +1,6 @@
+import { Link } from "react-router";
 import { Button } from "@insolvia/design-system";
 
-// The /waitlist route lands in a later PR of this stack; until then this is a
-// plain link that 404s gracefully rather than anything that breaks the build.
 export function Cta() {
   return (
     <section className="mx-auto w-full max-w-5xl px-lg py-xxl">
@@ -19,7 +18,7 @@ export function Cta() {
           intent="secondary"
           size="lg"
           nativeButton={false}
-          render={<a href="/waitlist" />}
+          render={<Link to="/waitlist" />}
         >
           Join the early-access list
         </Button>
