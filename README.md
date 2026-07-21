@@ -55,10 +55,12 @@ is a one-time step per download. Signing/notarization is on the roadmap.
 
 ## Deployment
 
-Deploys run through GitHub Actions (AWS via OIDC). They are **gated off** until
-the `insolvia.ai` domain/DNS is live — see [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md)
-and [`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md). Until then,
-CI builds and uploads web + macOS artifacts without publishing.
+Deploys run through GitHub Actions (AWS via OIDC). They are **gated off** by the
+`DEPLOY_ENABLED` repo variable — see [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) and
+[`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md). DNS is live;
+the gate now waits on shared infra being applied and the `*.insolvia.ai` ACM cert
+reaching `ISSUED`. Until then, CI builds and uploads web + macOS artifacts without
+publishing.
 
 - **staging** → `staging-app.insolvia.ai` (auto, on merge to `main`)
 - **production** → `app.insolvia.ai` (manual, gated)

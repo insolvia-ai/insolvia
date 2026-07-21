@@ -327,9 +327,9 @@ port, not a design exercise.
 | 1.9 | SSM SecureString for the private forward-to destination | Value injected once via `TF_VAR_`, then `ignore_changes`. Never committed. |
 | 1.10 | DLQ + CloudWatch alarm on the forwarder | Misconfiguration must surface on an alarm, not silently drop a client's mail. |
 | 1.11 | Address map — **confirmed** | `hello@` (general), `support@` (product), `no-reply@` (transactional sender), `security@` (disclosure). All forward to Gmail for now; `no-reply@` is send-only and should be excluded from the forwarder's allowed-recipient list. |
-| 1.12 | SES SMTP credentials + Gmail "Send mail as" runbook | Write as `docs/email-setup.md`. This is the "reply from the address" half. Port `humbugg/docs/support-forwarding.md`. |
-| 1.13 | Un-gate the deploy workflows | CLAUDE.md notes deploys are gated OFF pending DNS. This is the flip. |
-| 1.14 | Document the Google Workspace migration path | When you move to Workspace, MX flips to Google and inbound forwarding must be retired in the same change or mail bounces. Write it down now while the context is fresh. |
+| ~~1.12~~ | ~~SES SMTP credentials + Gmail "Send mail as" runbook~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md`](EMAIL_SETUP.md), ported from `humbugg/docs/support-forwarding.md`. Creating the credentials and adding the Gmail alias remain human steps; replies stay broken until 6.8. |
+| 1.13 | Un-gate the deploy workflows | Docs now say the gate waits on 1.3 + 1.3b, not on DNS. The flip itself (`gh variable set DEPLOY_ENABLED … "true"`) is a human action once both hold. |
+| ~~1.14~~ | ~~Document the Google Workspace migration path~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md` § Migrating to Google Workspace](EMAIL_SETUP.md#migrating-to-google-workspace) — ordered cutover checklist plus what to verify after. |
 | 1.15 | Rename the staging host → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, `environment.dart`. Free now, annoying once anything is deployed. See D2. |
 
 ### Working in the SES sandbox — what does and doesn't function
