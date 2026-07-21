@@ -367,3 +367,37 @@ module "email" {
   route53_zone_id = aws_route53_zone.main.zone_id
 }
 # ── end email ──────────────────────────────────────────────────
+
+# ── Inbound forwarding (#21, #23, #24, #25) ────────────────────
+# SES receipt rules + the forwarder Lambda that delivers hello@ / support@ /
+# security@ to a private mailbox. Lives in `shared` for the same reason `email`
+# does: SES inbound is per-domain and per-region, and only one receipt rule set
+# can be active per account.
+#
+# The apex MX that makes any of this reachable is owned by `module.email`.
+#
+# The destination address is a human secret and is deliberately absent from
+# terraform.tfvars. Supply it once at apply time:
+#
+#   TF_VAR_inbound_forward_to='someone@example.com' terraform apply
+#
+# after which the module ignores changes to the SSM value and the address is
+# owned outside Terraform.
+module "inbound_forwarding" {
+  source = "../../modules/inbound_forwarding"
+
+  environment = "shared"
+  aws_region  = var.aws_region
+  domain_name = var.domain_name
+
+  from_address     = module.email.from_address
+  ses_identity_arn = module.email.identity_arn
+
+  inbound_forward_to = var.inbound_forward_to
+
+  # Python source for the Lambda, provided by the inbound_forwarder service (#22).
+  lambda_source_dir = "${path.module}/../../../services/inbound_forwarder/src"
+
+  tags = local.common_tags
+}
+# ── end inbound forwarding ─────────────────────────────────────

@@ -45,6 +45,8 @@ override.tf.json
 .terraform.lock.hcl
 .terraformrc
 terraform.rc
+# Lambda zips built by archive_file at plan time.
+infra/modules/*/.build/
 
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store

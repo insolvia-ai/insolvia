@@ -2,3 +2,16 @@
 aws_region  = "us-east-1"
 domain_name = "insolvia.ai"
 github_repo = "insolvia-ai/insolvia"
+
+# ── Inbound forwarding (#21, #23, #25) ─────────────────────────
+# The address map and all other knobs have working defaults in
+# infra/modules/inbound_forwarding/variables.tf — override there or here only if
+# the confirmed set of addresses changes.
+#
+# The forward-to destination is a HUMAN SECRET and must never be written here.
+# Supply it once at apply time via the environment instead:
+#
+#   TF_VAR_inbound_forward_to='someone@example.com' terraform apply
+#
+# After the first apply the SSM SecureString is owned outside Terraform
+# (lifecycle ignore_changes), so later applies do not need it set.

@@ -34,3 +34,25 @@ output "ses_mail_from_domain" {
   value       = module.email.mail_from_domain
 }
 # ── end email ──────────────────────────────────────────────────
+
+# ── Inbound forwarding (#21, #24, #25) ─────────────────────────
+output "inbound_forwarded_recipients" {
+  description = "Addresses SES accepts and forwards. no-reply@ is excluded by design (send-only)."
+  value       = module.inbound_forwarding.forwarded_recipients
+}
+
+output "inbound_forwarder_alerts_topic_arn" {
+  description = "SNS topic for the forwarder DLQ/error alarms. Subscribe to this by hand and confirm the subscription email."
+  value       = module.inbound_forwarding.alerts_topic_arn
+}
+
+output "inbound_forwarder_dlq_url" {
+  description = "DLQ holding inbound mail that failed every delivery retry."
+  value       = module.inbound_forwarding.dlq_url
+}
+
+output "inbound_forward_to_ssm_parameter" {
+  description = "SSM SecureString path holding the private forward destination."
+  value       = module.inbound_forwarding.forward_to_ssm_parameter
+}
+# ── end inbound forwarding ─────────────────────────────────────
