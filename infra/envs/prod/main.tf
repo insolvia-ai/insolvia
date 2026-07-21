@@ -1,6 +1,7 @@
 # Production environment:
-#   • web hosting  -> app.insolvia.ai
-#   • backend API  -> api.insolvia.ai
+#   • app.insolvia.ai — Flutter web app (static, module.web_hosting)
+#   • www.insolvia.ai + apex — marketing site (SSR, module.marketing_site)
+#   • api.insolvia.ai — backend API (module.api_service)
 # References the shared zone + wildcard cert by name (not by remote state).
 
 locals {
@@ -74,4 +75,23 @@ module "auth" {
   deletion_protection = true
 
   tags = local.common_tags
+}
+
+# ── Marketing site: www.insolvia.ai + apex 301 (issues #43, #47) ─
+# The marketing site has NO staging environment (decision D2), so this module
+# is instantiated here only. The wildcard cert looked up above carries the
+# apex as a SAN (see infra/envs/shared), so one cert covers both aliases.
+module "marketing_site" {
+  source = "../../modules/marketing_site"
+
+  project             = "insolvia"
+  environment         = local.environment
+  www_domain          = "www.${var.domain_name}"
+  apex_domain         = var.domain_name
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  image_tag           = var.marketing_image_tag
+  # The SSR waitlist action brokers through the API (docs/adr/0001).
+  api_base_url = "https://${module.api_service.domain_name}"
+  tags         = local.common_tags
 }
