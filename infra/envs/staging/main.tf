@@ -1,4 +1,4 @@
-# Staging web hosting -> staging.insolvia.ai
+# Staging web hosting -> staging-app.insolvia.ai
 # References the shared zone + wildcard cert by name (not by remote state).
 
 locals {

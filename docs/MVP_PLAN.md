@@ -63,9 +63,9 @@ second DNS validation cycle, and more moving parts in the shared env. The flat
 scheme means the cert already authored in `infra/envs/shared/main.tf` covers
 every host in the table above with zero changes.
 
-**This renames the existing staging host.** `staging.insolvia.ai` is currently
-hardcoded in three places that must change together, or staging deploys to a
-host with no certificate route:
+**This renamed the original staging host.** The old flat `staging` host was
+hardcoded in three places that had to change together, or staging would deploy
+to a host with no certificate route:
 
 - `infra/envs/staging/variables.tf` — the `subdomain` default
 - `infra/envs/staging/terraform.tfvars.example`
@@ -330,7 +330,7 @@ port, not a design exercise.
 | 1.12 | SES SMTP credentials + Gmail "Send mail as" runbook | Write as `docs/email-setup.md`. This is the "reply from the address" half. Port `humbugg/docs/support-forwarding.md`. |
 | 1.13 | Un-gate the deploy workflows | CLAUDE.md notes deploys are gated OFF pending DNS. This is the flip. |
 | 1.14 | Document the Google Workspace migration path | When you move to Workspace, MX flips to Google and inbound forwarding must be retired in the same change or mail bounces. Write it down now while the context is fresh. |
-| 1.15 | Rename `staging.insolvia.ai` → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, `environment.dart`. Free now, annoying once anything is deployed. See D2. |
+| 1.15 | Rename the staging host → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, `environment.dart`. Free now, annoying once anything is deployed. See D2. |
 
 ### Working in the SES sandbox — what does and doesn't function
 

@@ -57,7 +57,7 @@ compute-free:
 Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.html on 403/404)  →  S3 (private, OAC)
 ```
 
-- `staging.insolvia.ai` → staging distribution/bucket
+- `staging-app.insolvia.ai` → staging distribution/bucket
 - `app.insolvia.ai` → prod distribution/bucket
 
 No Lambda/API Gateway/DynamoDB yet — those arrive with the intake/forms phases
