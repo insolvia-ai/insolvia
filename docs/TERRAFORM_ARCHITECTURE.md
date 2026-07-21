@@ -11,12 +11,14 @@ infra/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
 │   ├── api_service/          # reusable: ECR + Docker Lambda + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
-│   └── auth/                 # reusable: Cognito user pool + hosted domain
-│                             #   + web (SPA) and desktop (loopback) PKCE app clients
+│   ├── auth/                 # reusable: Cognito user pool + hosted domain
+│   │                         #   + web (SPA) and desktop (loopback) PKCE app clients
+│   └── marketing_site/       # SSR marketing site: ECR + Lambda + HTTP API + S3 +
+│                             # CloudFront (www + apex) + DynamoDB waitlist table
 └── envs/
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
-    │                         #   • ACM wildcard cert    *.insolvia.ai (us-east-1)
+    │                         #   • ACM wildcard cert    *.insolvia.ai + apex SAN (us-east-1)
     │                         #   • IAM role             insolvia-github-actions (OIDC)
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
@@ -24,13 +26,14 @@ infra/
     └── prod/                 # web_hosting -> app.insolvia.ai
                               # api_service -> api.insolvia.ai
                               # auth        -> insolvia-users-prod
+                              # marketing_site -> www.insolvia.ai (+ apex 301)
 ```
 
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
 |---|---|---|
 | shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, deploy role |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
-| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`) |
+| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -131,6 +134,38 @@ against prod. Each owns, per env:
 The API does **not** verify tokens yet — the env outputs expose
 `auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
 into `services/api` with the first authenticated endpoint.
+
+## Marketing site (`modules/marketing_site`, prod only)
+
+The marketing site (`apps/insolvia_marketing`) is server-side rendered, so
+`web_hosting` cannot host it. `marketing_site` is its own single-concern
+module, instantiated **only in `envs/prod`** — the marketing site has no
+staging environment (decision D2):
+
+```
+viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  → S3 (private, OAC)
+                                                      └─ everything → HTTP API → SSR Lambda (Docker image from ECR)
+```
+
+- **Apex 301**: one distribution carries both aliases; a viewer-request
+  CloudFront Function 301s `insolvia.ai/*` → `https://www.insolvia.ai/*`
+  (path + query preserved). No second distribution.
+- **X-Forwarded-Host** (app contract): the same function copies the viewer
+  Host into `X-Forwarded-Host`, which the origin request policy forwards to
+  the Lambda. The app's noindex logic and waitlist records depend on it —
+  without it every production page ships `noindex`.
+- **Waitlist**: the SSR action POSTs to the API's `/v1/waitlist`
+  (`INSOLVIA_API_BASE_URL` on the Lambda); the table and its grant live with
+  `api_service`, and the marketing Lambda holds no AWS data-plane access
+  (docs/adr/0001).
+- **Image lifecycle**: Terraform creates the Lambda from
+  `<ecr>:{var.marketing_image_tag}` and then ignores `image_uri`; CI rolls
+  images forward with `aws lambda update-function-code`. **First apply** needs
+  the image to exist: `terraform apply -target=module.marketing_site.aws_ecr_repository.ssr`,
+  push the image, then a full apply.
+
+Names: `insolvia-marketing-prod` (ECR), `insolvia-marketing-ssr-prod`
+(Lambda + HTTP API + role), `insolvia-marketing-assets-prod` (S3).
 
 ## Providers
 

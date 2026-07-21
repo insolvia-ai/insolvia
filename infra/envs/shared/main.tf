@@ -155,6 +155,86 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
   }
 
+  # ── Marketing site (issues #43, #47) ───────────────────────────
+  # The marketing stack in infra/envs/prod adds four resource kinds the
+  # statements above don't cover: its assets bucket (does not match the
+  # insolvia-web-* prefix), the SSR image's ECR repository, the waitlist
+  # DynamoDB table, and the HTTP API fronting the Lambda. The Lambda itself,
+  # its log group, its execution role, CloudFront, and Route53 are already
+  # covered by ForwarderCompute / LambdaLogGroups / ServiceRoleManagement /
+  # EdgeAndDns.
+  statement {
+    sid     = "MarketingAssetsBucket"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-marketing-*",
+      "arn:aws:s3:::insolvia-marketing-*/*",
+    ]
+  }
+
+  # Terraform manages the repository and lifecycle policy; the deploy workflow
+  # pushes images. Both need the full CRUD + push/pull surface, so ecr:* —
+  # scoped to insolvia-* repositories.
+  statement {
+    sid       = "MarketingEcr"
+    actions   = ["ecr:*"]
+    resources = ["arn:aws:ecr:*:${data.aws_caller_identity.current.account_id}:repository/insolvia-*"]
+  }
+
+  # `docker login` needs an auth token, and ecr:GetAuthorizationToken does not
+  # support resource-level permissions (same class of API as EnumerationApis
+  # below). The token only authenticates; per-repository access is still
+  # gated by MarketingEcr above.
+  statement {
+    sid       = "EcrAuthToken"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  # Control-plane only, deliberately enumerated: the waitlist table holds
+  # contact details (PII-adjacent), and the pipeline has no business reading
+  # or writing items — dynamodb:* would silently grant it the data plane.
+  # This list is what `aws_dynamodb_table` with PITR needs to create, refresh,
+  # update, tag, and (on teardown) delete the table.
+  statement {
+    sid = "MarketingTables"
+    actions = [
+      "dynamodb:CreateTable",
+      "dynamodb:DeleteTable",
+      "dynamodb:DescribeTable",
+      "dynamodb:UpdateTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:UpdateContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:UpdateTimeToLive",
+      "dynamodb:ListTagsOfResource",
+      "dynamodb:TagResource",
+      "dynamodb:UntagResource",
+    ]
+    resources = ["arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-*"]
+  }
+
+  # API Gateway v2 (the HTTP API fronting the SSR Lambda). Its ARNs are
+  # path-based (arn:aws:apigateway:<region>::/apis/<id>) with no name in the
+  # path, so this cannot be scoped to insolvia-* the way the others are —
+  # the /apis subtree is the tightest available scope.
+  statement {
+    sid = "MarketingHttpApi"
+    actions = [
+      "apigateway:GET",
+      "apigateway:POST",
+      "apigateway:PUT",
+      "apigateway:PATCH",
+      "apigateway:DELETE",
+    ]
+    resources = [
+      "arn:aws:apigateway:*::/apis",
+      "arn:aws:apigateway:*::/apis/*",
+      "arn:aws:apigateway:*::/tags/*",
+    ]
+  }
+  # ── end marketing site ─────────────────────────────────────────
+
   # READ-ONLY on the pipeline's own role, and deliberately so.
   #
   # This environment manages the OIDC provider, this role, and this policy —

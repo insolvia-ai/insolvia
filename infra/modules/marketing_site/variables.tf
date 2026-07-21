@@ -1,0 +1,55 @@
+variable "project" {
+  description = "Project slug used in resource names (insolvia)."
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment suffix for resource names (marketing is prod-only — decision D2)."
+  type        = string
+}
+
+variable "www_domain" {
+  description = "Canonical host the site serves (e.g. www.insolvia.ai)."
+  type        = string
+}
+
+variable "apex_domain" {
+  description = "Apex host that 301-redirects to www (e.g. insolvia.ai)."
+  type        = string
+}
+
+variable "hosted_zone_id" {
+  description = "Route53 hosted zone ID for the domain."
+  type        = string
+}
+
+variable "acm_certificate_arn" {
+  description = "us-east-1 ACM cert covering BOTH www (via the wildcard) and the apex (via its SAN)."
+  type        = string
+}
+
+variable "api_base_url" {
+  description = <<-EOT
+    Origin of the Insolvia API the SSR waitlist action POSTs to
+    (e.g. https://api.insolvia.ai). Set on the Lambda as
+    INSOLVIA_API_BASE_URL — the switch that makes the waitlist real
+    (unset means "log instead of submit"). See docs/adr/0001.
+  EOT
+  type        = string
+}
+
+variable "image_tag" {
+  description = <<-EOT
+    ECR image tag the SSR Lambda is created from. Only consulted at creation:
+    after that the deploy workflow owns the running image
+    (lifecycle ignore_changes on image_uri).
+  EOT
+  type        = string
+  default     = "latest"
+}
+
+variable "tags" {
+  description = "Tags applied to all resources."
+  type        = map(string)
+  default     = {}
+}

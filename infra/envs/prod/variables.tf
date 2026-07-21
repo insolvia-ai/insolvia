@@ -21,3 +21,9 @@ variable "api_subdomain" {
   type        = string
   default     = "api.insolvia.ai"
 }
+
+variable "marketing_image_tag" {
+  description = "ECR image tag the marketing SSR Lambda is created from (creation-time only; CI owns it afterwards)."
+  type        = string
+  default     = "latest"
+}
