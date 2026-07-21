@@ -15,6 +15,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     strategy:
+      # One environment failing should not cancel the others. With fail-fast on,
+      # a flake in `prod` hides whether `shared` and `staging` actually pass, so
+      # a re-run is the only way to learn anything.
+      fail-fast: false
       matrix:
         env: [shared, staging, prod]
     steps:
@@ -32,6 +36,15 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: TFLint
+        # `tflint --init` pulls the AWS ruleset from the GitHub API. Without a
+        # token that request is anonymous, and GitHub-hosted runners share
+        # outbound IPs — so the 60/hr anonymous quota is routinely exhausted by
+        # other tenants and the job dies on an unrelated 403:
+        #   Failed to download tflint-ruleset-aws...: 403 API rate limit exceeded
+        # The default GITHUB_TOKEN authenticates the download and removes the
+        # whole failure class. It needs no extra permissions.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tflint --init
           tflint --chdir=infra/envs/${{ matrix.env }} --recursive
