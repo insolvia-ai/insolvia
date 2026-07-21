@@ -7,7 +7,10 @@
 library;
 
 // Tokens
+// (colors/spacing/radii/semantics are generated from
+// packages/insolvia_tokens/tokens.json — see that package's README.)
 export 'src/tokens/colors.dart';
+export 'src/tokens/semantics.dart';
 export 'src/tokens/spacing.dart';
 export 'src/tokens/radii.dart';
 export 'src/tokens/typography.dart';

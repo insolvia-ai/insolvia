@@ -30,9 +30,22 @@ scripts:
     packageFilters:
       dirExists: test
 
+  tokens:
+    description: >-
+      Regenerate the Dart tokens and Tailwind theme.css from
+      packages/insolvia_tokens/tokens.json.
+    run: dart run packages/insolvia_tokens/tool/generate_tokens.dart
+
+  tokens:check:
+    description: >-
+      Fail if any generated token file has drifted from tokens.json (i.e.
+      someone hand-edited a generated file instead of the source of truth).
+    run: dart run packages/insolvia_tokens/tool/generate_tokens.dart --check
+
   ci:
-    description: The exact gate CI runs — format check, analyze, test.
+    description: The exact gate CI runs — token drift, format check, analyze, test.
     steps:
+      - tokens:check
       - format
       - analyze
       - test

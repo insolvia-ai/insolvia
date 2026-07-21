@@ -14,6 +14,7 @@ environment:
 #   apps/     → runnable applications
 #   packages/ → shared libraries (apps depend on packages, never the reverse)
 workspace:
+  - packages/insolvia_tokens
   - packages/insolvia_design_system
   - apps/insolvia_app
 
