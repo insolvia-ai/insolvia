@@ -1,0 +1,36 @@
+name: Inbound forwarder · PR
+
+on:
+  pull_request:
+    paths:
+      - "services/inbound_forwarder/**"
+      - "ruff.toml"
+      - ".github/workflows/inbound-forwarder-pr.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/inbound_forwarder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: pip install ruff pytest
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format check
+        run: ruff format --check .
+
+      - name: Test
+        run: pytest

@@ -1,0 +1,13 @@
+# Shared ruff config for every Python service in the monorepo.
+# Mirrors the per-service CI `ruff check` / `ruff format --check` steps.
+target-version = "py311"
+# 88 (not andreas-services' 100) so `ruff format` reproduces the wrapping the
+# ported upstream source already uses — the two repos stay diffable. The lint
+# rules below exclude E501, so this only drives the formatter.
+line-length = 88
+
+[lint]
+# ruff's default rule set: pyflakes (F) + the pycodestyle error subset
+# (E4 imports, E7 statements, E9 syntax/runtime). Keeps the baseline
+# meaningful without the noise of full pycodestyle/line-length churn.
+select = ["E4", "E7", "E9", "F"]

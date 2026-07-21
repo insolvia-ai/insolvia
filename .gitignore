@@ -45,6 +45,17 @@ override.tf.json
 .terraform.lock.hcl
 .terraformrc
 terraform.rc
+# Lambda zips built by archive_file at plan time.
+infra/modules/*/.build/
+
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
 
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store
