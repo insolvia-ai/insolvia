@@ -21,7 +21,7 @@ reverse).
 |---|---|---|
 | `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
-| `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
+| `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
@@ -145,7 +145,25 @@ job is to reject it — the count in this file is the contract.
 - Every exported component has at least one widget test.
 
 ### React design system (`packages/insolvia_design_system_react/`)
-- npm package `@insolvia/design-system`. **Not a pub workspace member** — do not add it to the root `pubspec.yaml`; it has no `pubspec.yaml` of its own.
+- npm package `@insolvia-ai/design-system`, published to **GitHub Packages**.
+  The scope is a contract with the registry: GitHub Packages only accepts a
+  scope equal to the owning org's login (`insolvia-ai`), and rejects anything
+  else with a misleading "installation does not exist" 403 — same family of
+  trap as the lowercase-org-login OIDC note under *Environment access*. Keep it
+  `@insolvia-ai`. **Not a pub workspace member** — do not add it to the root
+  `pubspec.yaml`; it has no `pubspec.yaml` of its own.
+- **Every change to this package must bump `version` in `package.json`.** Merge
+  to `main` auto-publishes to GitHub Packages
+  (`design-system-react-publish.yml`), and that publish is idempotent by
+  version — an unbumped merge publishes nothing and the registry silently goes
+  stale. Consumers (the marketing site) install the published
+  `@insolvia-ai/design-system`, **never** a committed `file:`/path dependency;
+  a local `file:` override is a legitimate *uncommitted* debugging aid, nothing
+  more. This rule is **machine-enforced**: the *Require a version bump when the
+  package changed* step in `design-system-react-pr.yml` diffs the package
+  against the PR base and fails when it changed with an unchanged version. The
+  no-path-dep half is review-enforced only — nothing scans consumer
+  `package.json`s for a committed `file:`. See `docs/PACKAGE_PUBLISHING.md`.
 - **Hard scope limit: six components**, and `src/styles/theme.css` is **generated** — both rules, their reasoning, and their enforcement live in *Dual-target parity discipline* above. Read it before adding anything here.
 - `tsup` copies `theme.css` verbatim to `dist/` via `publicDir` and never writes back, so `dist/` is not a second place to edit it either.
 - Components style themselves from **semantic** Tailwind tokens (`bg-bg`, `text-ink`, `border-line`, `bg-primary`, …) — never a hard-coded hex.

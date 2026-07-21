@@ -1,4 +1,4 @@
-# `@insolvia/design-system`
+# `@insolvia-ai/design-system`
 
 The React design system for Insolvia's **marketing site**. Built on
 [Base UI](https://base-ui.com/react) and Tailwind v4, styled entirely from the
@@ -57,18 +57,18 @@ marketing site's runtime Lambda image free of any registry credential.
 
 ```sh
 export NODE_AUTH_TOKEN=…        # PAT with read:packages
-npm install @insolvia/design-system
+npm install @insolvia-ai/design-system
 ```
 
 From the app's Tailwind v4 CSS entrypoint:
 
 ```css
 @import 'tailwindcss';
-@import '@insolvia/design-system/theme.css';
+@import '@insolvia-ai/design-system/theme.css';
 ```
 
 ```tsx
-import { Button, Card, Field } from '@insolvia/design-system';
+import { Button, Card, Field } from '@insolvia-ai/design-system';
 ```
 
 `react` and `react-dom` are peer dependencies (18 or 19).

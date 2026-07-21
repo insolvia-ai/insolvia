@@ -426,10 +426,10 @@ directly.
 | 2.1 | Extract tokens to a neutral `packages/insolvia_tokens/tokens.json` | Carries descriptions so generated Dart keeps its doc comments. |
 | 2.2 | Generator: `tokens.json` → Dart token files **+** Tailwind v4 `@theme` CSS | Both outputs committed; CI check fails on drift. A small script beats pulling in Style Dictionary for this token count. |
 | 2.3 | Map the Insolvia palette onto semantic tokens | `ink`/`brass`/`paper` → `--color-primary`/`--color-accent`/`--color-bg`, etc. Follow the semantic-indirection pattern from `@ansavva/design-system`, including `[data-theme='dark']`. |
-| 2.4 | Scaffold `packages/insolvia_design_system_react/` as `@insolvia/design-system` | tsup → ESM + CJS + `.d.ts`, `theme.css` copied verbatim to `dist/`. Tailwind v4 + Base UI + `cn()`. Excluded from the pub workspace. |
+| 2.4 | Scaffold `packages/insolvia_design_system_react/` as `@insolvia-ai/design-system` | tsup → ESM + CJS + `.d.ts`, `theme.css` copied verbatim to `dist/`. Tailwind v4 + Base UI + `cn()`. Excluded from the pub workspace. |
 | 2.5 | Build **only** the marketing components | Button, Card, NavBar, Footer, Accordion, Input/Field. Explicitly *not* a port of all 40 wrappers. |
 | 2.6 | Storybook + Vitest/Testing Library | Mirrors the Flutter package's "every exported component has a widget test" rule. |
-| 2.7 | Publish to GitHub Packages under the `@insolvia` scope | `.npmrc` with `${NODE_AUTH_TOKEN}`; CI uses `secrets.GITHUB_TOKEN`. Note the `website/` trick of bundling the design system into the SSR build via `ssr.noExternal` so the runtime Lambda needs no registry token. |
+| 2.7 | Publish to GitHub Packages under the `@insolvia-ai` scope | `.npmrc` with `${NODE_AUTH_TOKEN}`; CI uses `secrets.GITHUB_TOKEN`. Note the `website/` trick of bundling the design system into the SSR build via `ssr.noExternal` so the runtime Lambda needs no registry token. |
 | 2.8 | Workflow `design-system-react-pr.yml` | Alongside the existing `design-system-pr.yml`. |
 | 2.9 | Write the parity discipline into CLAUDE.md | The scope limit in D4, plus: tokens are never hand-edited in either generated file. |
 
@@ -445,7 +445,7 @@ with the apex redirecting to it.
 | # | Issue | Notes |
 |---|---|---|
 | 3.1 | Scaffold `apps/insolvia_marketing/` — React Router v7 framework mode | Copy the shape of `andreas-services/website/frontend/`. Own `package.json`; excluded from the pub workspace. |
-| 3.2 | Wire the design system + Tailwind entrypoint | `@import "tailwindcss"` → `@import "@insolvia/design-system/theme.css"` → `@source` the dist. Missing the `@source` line is the classic "why are my styles gone" bug. |
+| 3.2 | Wire the design system + Tailwind entrypoint | `@import "tailwindcss"` → `@import "@insolvia-ai/design-system/theme.css"` → `@source` the dist. Missing the `@source` line is the classic "why are my styles gone" bug. |
 | 3.3 | Content pass — positioning, JTBD, competitive framing | Source from `business-plan.html` §6 (jobs-to-be-done) and §7 (positioning). Do not invent new claims; the plan's figures are sourced and shouldn't drift. |
 | 3.4 | SEO baseline | Per-route `<title>`/meta/OG, `sitemap.xml`, `robots.txt`, JSON-LD `Organization`. Explicitly allow GPTBot/ClaudeBot/PerplexityBot — inbound increasingly arrives through them. |
 | 3.5 | Infra: `www` + apex hosting | CloudFront + S3 assets + SSR Lambda, following `website/infra/modules/{hosting,compute}`. Apex → `www` 301. |
@@ -612,7 +612,7 @@ All open questions from rev 2 are answered and folded into the plan above.
 | Pull the MyCase spike forward? | **Yes** | New Milestone 0, running parallel to the DNS/SES wait |
 | Windows at MVP, or macOS only? | **Both** | Milestone 4 issues 4.6–4.8 + the code-signing warning |
 | Address map | **Confirmed** | Issue 1.11 |
-| npm scope `@insolvia`? | **Yes** | Issue 2.7 |
+| npm scope `@insolvia`? | **Overturned — it's `@insolvia-ai`.** GitHub Packages requires the scope to equal the owning org's login (`insolvia-ai`) and rejects `@insolvia` with a misleading "installation does not exist" 403 | Issue 2.7; `docs/PACKAGE_PUBLISHING.md` |
 | Staging for marketing? | **No** | D2 table; PR previews only |
 
 ## Remaining risks worth watching
