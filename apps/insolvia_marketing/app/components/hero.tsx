@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Button } from "@insolvia/design-system";
 
 // Every claim here traces to docs/business-plan.html §1 (the wedge is
@@ -25,7 +26,7 @@ export function Hero() {
           intent="primary"
           size="lg"
           nativeButton={false}
-          render={<a href="/waitlist" />}
+          render={<Link to="/waitlist" />}
         >
           Join the early-access list
         </Button>
