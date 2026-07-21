@@ -31,6 +31,12 @@ jobs:
   apply:
     if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
+    # `shared` holds account-wide production infrastructure — the hosted zone,
+    # the wildcard cert, the OIDC trust anchor, and now inbound mail. Declaring
+    # the environment gates applies behind its branch policy AND is what makes
+    # environment-scoped secrets visible to this job: without an `environment:`
+    # key, `secrets.INBOUND_FORWARD_TO` resolves to an empty string.
+    environment: insolvia-production
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +49,23 @@ jobs:
         with:
           terraform_version: "~1.5"
 
+      # Fail loudly rather than silently writing the placeholder. If this secret
+      # is empty, Terraform still succeeds and stores "TODO-set-via-secret" in
+      # the SSM SecureString — then every forwarded mail fails as transient and
+      # piles onto the DLQ, with a green pipeline and no error to point at.
+      - name: Check the forward-to secret is present
+        env:
+          INBOUND_FORWARD_TO: ${{ secrets.INBOUND_FORWARD_TO }}
+        run: |
+          if [ -z "$INBOUND_FORWARD_TO" ]; then
+            echo "::error::INBOUND_FORWARD_TO is empty. Set it on the insolvia-production environment (Settings > Environments), not at repo level, or this job cannot see it. Refusing to apply and write a placeholder into SSM."
+            exit 1
+          fi
+          echo "INBOUND_FORWARD_TO is set (${#INBOUND_FORWARD_TO} chars)."
+
       - name: Apply shared
+        env:
+          TF_VAR_inbound_forward_to: ${{ secrets.INBOUND_FORWARD_TO }}
         run: |
           terraform -chdir=infra/envs/shared init
           terraform -chdir=infra/envs/shared apply -auto-approve
