@@ -1,0 +1,54 @@
+{
+  "name": "@insolvia/marketing",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "//": [
+    "build:deps exists because @insolvia/design-system is a file: path dep on",
+    "packages/insolvia_design_system_react, whose dist/ is gitignored — a fresh",
+    "checkout has the package but not its compiled output. predev/prebuild run",
+    "it so `npm run dev` and `npm run build` always see a current dist/ instead",
+    "of failing (or silently serving a stale one). It assumes the design",
+    "system's own node_modules are installed (npm ci there first in CI)."
+  ],
+  "scripts": {
+    "build:deps": "npm run build --prefix ../../packages/insolvia_design_system_react",
+    "predev": "npm run build:deps",
+    "dev": "react-router dev",
+    "prebuild": "npm run build:deps",
+    "build": "react-router build",
+    "start": "react-router-serve ./build/server/index.js",
+    "typecheck": "react-router typegen && tsc",
+    "lint": "eslint app server"
+  },
+  "dependencies": {
+    "@react-router/architect": "^7.18.1",
+    "@react-router/node": "^7.18.1",
+    "isbot": "^5.1.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^7.18.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@insolvia/design-system": "file:../../packages/insolvia_design_system_react",
+    "@react-router/dev": "^7.18.1",
+    "@react-router/fs-routes": "^7.18.1",
+    "@react-router/serve": "^7.18.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.19.0",
+    "vite": "^8.1.3"
+  }
+}

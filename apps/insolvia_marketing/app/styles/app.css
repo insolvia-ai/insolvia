@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "@insolvia/design-system/theme.css";
+
+/* Required: let Tailwind v4 scan the design system's compiled output for the
+   utility classes its components use. Tailwind only generates classes it sees
+   in scanned sources, and node_modules is excluded from scanning by default —
+   omitting this line silently drops every component's styles. */
+@source "../../node_modules/@insolvia/design-system/dist";
