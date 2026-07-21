@@ -76,3 +76,27 @@ deploys, a `*-<env>.yml`. Deploy steps are gated behind the `DEPLOY_ENABLED`
 repo variable (currently `false`); builds/artifacts run regardless. DNS is live;
 the gate now waits on shared infra being applied (#15) and the ACM cert reaching
 `ISSUED` (#16).
+
+### PR gates have no `paths:` filter — on purpose
+
+Every `*-pr.yml` triggers on **every** pull request, and each job guards its own
+work with `.github/actions/changed-paths` (a local composite action: `git diff`
+against the PR base, output `run=true|false`) plus a step-level
+`if: steps.filter.outputs.run == 'true'` on each real step.
+
+The reason is that these jobs are meant to be **required status checks**. A
+ruleset waits for a check *by name*. A `paths:`-filtered workflow simply does not
+run on a PR that misses its filter, so its check is never reported — GitHub then
+parks the PR on "Expected — waiting for status to be reported" forever, and a
+docs-only PR can never merge. A job-level `if:` is not a fix either: it reports
+`skipped`, and we do not want the merge gate resting on whether GitHub counts
+`skipped` as satisfied. So the jobs always run and always report; on an
+irrelevant PR they succeed in a few seconds having done nothing.
+
+**Restoring a `paths:` filter here would silently re-break the merge gate.** If
+you find yourself "cleaning that up", read
+`.github/actions/changed-paths/action.yml` first.
+
+Required-check names, and the fact that enabling them is a manual repo-settings
+step, are documented in the root `CLAUDE.md` under *PR gates, required status
+checks, and why no `paths:` filter*.

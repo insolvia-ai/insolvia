@@ -95,14 +95,15 @@ not is worse than no rule at all.
 - **Rule 2 is machine-enforced.** `melos run tokens:check` runs the generator
   with `--check`, which regenerates all five outputs in memory and exits
   non-zero on any drift. CI runs it as the **`Token drift check`** step of
-  `.github/workflows/design-system-pr.yml`. Note that this gate's `paths:`
-  filter names packages individually rather than globbing `packages/**`, and
-  one of the entries is the single file
-  `packages/insolvia_design_system_react/src/styles/theme.css` — the generated
-  CSS lives in the React package but is an output of the *Dart* generator, so
-  the gate that can check it has to be triggered by it. Drop that line and a PR
-  hand-editing only `theme.css` runs no drift check at all: the React gate
-  doesn't have one, and this gate would never fire.
+  `.github/workflows/design-system-pr.yml`. That gate runs on every PR but only
+  does real work when its `steps.filter` guard matches (see *PR gates, required
+  status checks, and why no `paths:` filter* below). The guard's path list names
+  packages individually rather than globbing `packages/**`, and one entry is the
+  single file `packages/insolvia_design_system_react/src/styles/theme.css` — the
+  generated CSS lives in the React package but is an output of the *Dart*
+  generator, so the gate that can check it has to be woken by it. Drop that line
+  and a PR hand-editing only `theme.css` runs no drift check at all: the React
+  gate doesn't have one, and this one would no-op.
 - **Rule 1 has no automated check whatsoever.** Nothing counts components,
   diffs the barrel, or fails a build when a seventh appears. It depends entirely
   on review. A reviewer seeing a new directory under
@@ -177,6 +178,73 @@ infra/
   - The gate now stays until **`infra/envs/shared` is applied** (issue #15 / 1.3) **and** the `*.insolvia.ai` **ACM cert reaches `ISSUED`** (issue #16 / 1.3b). Every downstream env looks the cert up with `statuses = ["ISSUED"]`, so flipping early fails at plan time with a misleading "no matching certificate" error.
   - Once both hold, flip it: `gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "true"`. Nothing in the workflows needs to change.
 
+### PR gates, required status checks, and why no `paths:` filter
+
+Every `*-pr.yml` workflow triggers on **every** pull request. None of them has an
+`on.pull_request.paths:` filter. This is deliberate and load-bearing — do not
+"tidy it up" by putting the filters back.
+
+A branch ruleset requires a status check **by name**, and then waits for it. A
+`paths:`-filtered workflow does not run on a PR that misses its filter, so its
+check is never *reported* — not failed, never reported. GitHub parks the PR on
+"Expected — waiting for status to be reported" and it can never merge. With
+required checks on, a `paths:` filter on the Flutter gate makes every docs-only
+PR permanently unmergeable. The failure looks like a GitHub bug rather than a
+config mistake, which is what makes it worth writing down.
+
+So instead each job **always runs** and guards its own work:
+
+- `.github/actions/changed-paths` (local composite action, plain `git` + bash)
+  diffs the PR against `github.event.pull_request.base.sha` and outputs
+  `run=true|false`. Checkout uses `fetch-depth: 0` so the base commit is
+  present. Every failure inside it is a hard error — it never falls back to
+  `false`, because a guard that silently answers "nothing changed" would turn
+  every gate in the repo green without running it.
+- Each real step carries `if: steps.filter.outputs.run == 'true'`.
+- **Step-level `if:`, never job-level.** A skipped job reports conclusion
+  `skipped`, and whether that satisfies a required status check is a subtlety
+  this design refuses to rest on. Always-runs-and-reports-`success` is
+  unambiguous.
+
+The path list lives in the `with: paths:` block of the guard step, in the same
+syntax the old `paths:` filter used (blank lines and `#` comments are ignored,
+so the reasoning for each entry stays next to it). Each workflow still lists
+itself, plus the shared action, so changing a gate re-runs it.
+
+Cost of the design: an irrelevant PR runs each job for a few seconds
+(checkout + diff) instead of not at all. That is the price of a check that can
+be required.
+
+### Required status checks — pending manual step
+
+`protect-main` currently has **no required status checks**, so red CI cannot
+block a merge. The workflows above are now shaped to allow turning them on. The
+remaining step is a **repo-settings change that must be made by a human in the
+GitHub UI or API** — nothing in this repo can grant itself branch protection.
+
+In `protect-main` → *Require status checks to pass*, add exactly these eight,
+which are the job `name:` values (matrix legs get a `(leg)` suffix):
+
+| Check name | Workflow |
+|---|---|
+| `Flutter app` | `app-pr.yml` |
+| `macOS build` | `app-pr.yml` |
+| `Flutter design system` | `design-system-pr.yml` |
+| `React design system` | `design-system-react-pr.yml` |
+| `Inbound forwarder` | `inbound-forwarder-pr.yml` |
+| `Terraform validate (shared)` | `shared-infra-plan.yml` |
+| `Terraform validate (staging)` | `shared-infra-plan.yml` |
+| `Terraform validate (prod)` | `shared-infra-plan.yml` |
+
+These strings are a **contract with the ruleset**. Renaming a job `name:`, or
+renaming a matrix leg, silently orphans the required check — the ruleset waits
+forever for a name nobody reports. Change one only alongside the ruleset.
+
+Also enable *Require branches to be up to date before merging*, and set
+`required_approving_review_count` to 1 with `require_code_owner_review: true`
+if CODEOWNER review is wanted (`.github/CODEOWNERS` already assigns `@ansavva`,
+but the ruleset does not currently enforce it — see *Branch Conventions*).
+
 ## AWS Credentials — Critical Rule
 
 Never hard-code, echo, or commit AWS credentials. Locally, rely on your own AWS
@@ -192,4 +260,17 @@ credentials it does not have, **stop and ask** — do not invent a workaround.
 ## Branch Conventions
 - Feature branches: `claude/<feature-name>-<id>`.
 - `staging` deploys from `main`; `prod` is manually dispatched from `main`.
-- `main` is protected: PR + CODEOWNER review + green `*-pr` checks required.
+- `main` is protected by the `protect-main` ruleset. **What it actually enforces
+  today** (verify, don't assume: `gh api repos/insolvia-ai/insolvia/rulesets/18947945 --jq .rules`):
+  - a pull request is required — no direct pushes;
+  - linear history; no force-push; no branch deletion;
+  - squash or rebase merges only;
+  - review threads must be resolved, and pushes dismiss stale reviews.
+- **Not** enforced today, despite `.github/CODEOWNERS` existing:
+  `required_approving_review_count` is `0` and `require_code_owner_review` is
+  `false`, so a PR can be merged with **no approval at all**; and there are **no
+  required status checks**, so a PR with red CI can be merged. CODEOWNERS only
+  requests @ansavva's review, it does not gate the merge.
+- Turning the status checks on is a manual repo-settings step — the check names
+  to require and the reason the workflows are shaped the way they are live under
+  *PR gates, required status checks, and why no `paths:` filter*.

@@ -1,0 +1,110 @@
+name: Changed paths
+description: >-
+  Report whether this pull request touches any of the given paths, so a gate can
+  guard its own work with a step-level `if:` instead of an
+  `on.pull_request.paths:` filter.
+
+# WHY THIS EXISTS
+#
+# Every `*-pr.yml` gate in this repo is a *required status check* on the
+# `protect-main` ruleset (see CLAUDE.md → "Required status checks"). A ruleset
+# waits for a check by name, forever, and two obvious-looking designs both
+# deadlock it:
+#
+#   1. `on.pull_request.paths:` — the workflow never triggers on an unrelated
+#      PR, so its check is never *reported*. GitHub parks the PR on
+#      "Expected — waiting for status to be reported" and it can never merge.
+#      A docs-only PR would be unmergeable.
+#   2. A job-level `if:` — the job reports conclusion `skipped`. Whether a
+#      skipped job satisfies a required check is a subtlety this repo
+#      deliberately refuses to rest on.
+#
+# So each gate triggers on *every* PR, always runs its job, and uses this action
+# to decide whether to do real work. On an irrelevant PR the job reports a
+# genuine `success` in a few seconds. Always-runs-and-reports-success is
+# unambiguous in a way that `skipped` is not.
+
+inputs:
+  paths:
+    description: >-
+      Newline-separated glob patterns, using the same syntax as
+      `on.pull_request.paths` (`**` matches across directory separators). Blank
+      lines and `#` comment lines are ignored, so a path list keeps the comments
+      that explain why each entry is there.
+    required: true
+
+outputs:
+  run:
+    description: >-
+      'true' when at least one file changed by this PR matches `paths`,
+      otherwise 'false'.
+    value: ${{ steps.match.outputs.run }}
+
+runs:
+  using: composite
+  steps:
+    - id: match
+      shell: bash
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PATTERNS: ${{ inputs.paths }}
+      run: |
+        set -euo pipefail
+
+        # Every failure below is a hard error, never a fallback to
+        # `run=false`. A guard that silently answers "nothing changed" would
+        # turn every gate in the repo green without running it — strictly worse
+        # than the never-reported-check problem this design fixes.
+        if [ -z "${BASE_SHA}" ]; then
+          echo "::error::No pull_request base SHA in the event payload." >&2
+          exit 1
+        fi
+
+        # `actions/checkout` checks out refs/pull/N/merge, whose first parent is
+        # exactly this base SHA, so `fetch-depth: 0` on the checkout step
+        # guarantees it is present. Fetch it explicitly if it somehow is not.
+        if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+          git fetch --no-tags --quiet origin "${BASE_SHA}"
+        fi
+        if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+          echo "::error::Base commit ${BASE_SHA} unreachable; cannot diff." >&2
+          exit 1
+        fi
+
+        # HEAD is the merge commit, so a two-dot diff against the base commit is
+        # exactly the PR's changed-file set.
+        changed="$(git diff --name-only "${BASE_SHA}" HEAD)"
+
+        echo "Base: ${BASE_SHA}"
+        echo "Changed files:"
+        echo "${changed}" | sed 's/^/  /'
+
+        run=false
+        matched=""
+        while IFS= read -r file; do
+          [ -n "${file}" ] || continue
+          while IFS= read -r pattern; do
+            # Trim surrounding whitespace, then drop blanks and `#` comments.
+            pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+            pattern="${pattern%"${pattern##*[![:space:]]}"}"
+            [ -n "${pattern}" ] || continue
+            case "${pattern}" in \#*) continue ;; esac
+            # `case` globs already cross `/`, so `**` and `*` mean the same
+            # thing here; normalise so patterns can be copied verbatim from an
+            # `on.pull_request.paths:` list.
+            case "${file}" in
+              ${pattern//\*\*/\*})
+                run=true
+                matched="${file}"
+                break 2
+                ;;
+            esac
+          done <<< "${PATTERNS}"
+        done <<< "${changed}"
+
+        if [ "${run}" = true ]; then
+          echo "Relevant change detected (${matched}) — running this gate."
+        else
+          echo "No relevant paths changed — this gate will report success without doing work."
+        fi
+        echo "run=${run}" >> "${GITHUB_OUTPUT}"
