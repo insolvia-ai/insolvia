@@ -31,12 +31,16 @@ jobs:
   apply:
     if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
-    # `shared` holds account-wide production infrastructure — the hosted zone,
-    # the wildcard cert, the OIDC trust anchor, and now inbound mail. Declaring
-    # the environment gates applies behind its branch policy AND is what makes
-    # environment-scoped secrets visible to this job: without an `environment:`
-    # key, `secrets.INBOUND_FORWARD_TO` resolves to an empty string.
-    environment: insolvia-production
+    # Mirrors the third Terraform environment: `shared` owns account-wide
+    # resources (hosted zone, wildcard cert, OIDC trust anchor, inbound mail)
+    # and has its own state key, so it gets its own GitHub environment rather
+    # than borrowing production's. That keeps the blast radii separate — this
+    # job must not be able to read production's secrets as they accumulate.
+    #
+    # Declaring an environment is also what makes environment-scoped secrets
+    # visible at all: with no `environment:` key, `secrets.INBOUND_FORWARD_TO`
+    # silently resolves to an empty string.
+    environment: insolvia-shared
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +62,7 @@ jobs:
           INBOUND_FORWARD_TO: ${{ secrets.INBOUND_FORWARD_TO }}
         run: |
           if [ -z "$INBOUND_FORWARD_TO" ]; then
-            echo "::error::INBOUND_FORWARD_TO is empty. Set it on the insolvia-production environment (Settings > Environments), not at repo level, or this job cannot see it. Refusing to apply and write a placeholder into SSM."
+            echo "::error::INBOUND_FORWARD_TO is empty. Set it on the insolvia-shared environment (Settings > Environments), not at repo level, or this job cannot see it. Refusing to apply and write a placeholder into SSM."
             exit 1
           fi
           echo "INBOUND_FORWARD_TO is set (${#INBOUND_FORWARD_TO} chars)."
