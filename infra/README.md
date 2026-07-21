@@ -6,7 +6,8 @@ model and [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) for one-time bootstrap.
 
 ```
 modules/web_hosting/   S3 (private+OAC) + CloudFront + Route53 alias for a Flutter-web SPA
-envs/shared/           Route53 zone insolvia.ai, *.insolvia.ai ACM cert, insolvia-github-actions role
+modules/email/         SES domain identity, DKIM, custom MAIL FROM, apex MX/SPF/DMARC
+envs/shared/           Route53 zone insolvia.ai, *.insolvia.ai ACM cert, insolvia-github-actions role, email
 envs/staging/          web_hosting -> staging-app.insolvia.ai
 envs/prod/             web_hosting -> app.insolvia.ai
 ```
