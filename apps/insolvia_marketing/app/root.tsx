@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Link,
   Links,
   Meta,
   Outlet,
@@ -72,7 +73,7 @@ export default function App() {
           <NavBar.Link href="/#faq">FAQ</NavBar.Link>
         </NavBar.Links>
         <NavBar.Actions>
-          <Button intent="primary" size="sm" nativeButton={false} render={<a href="/waitlist" />}>
+          <Button intent="primary" size="sm" nativeButton={false} render={<Link to="/waitlist" />}>
             Early access
           </Button>
         </NavBar.Actions>
