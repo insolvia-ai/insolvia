@@ -1,4 +1,4 @@
-import { Accordion } from "@insolvia/design-system";
+import { Accordion } from "@insolvia-ai/design-system";
 
 // Answers trace to docs/business-plan.html: the deterministic-core AI posture
 // (§4), the MyCase integration wedge (§1/§7), Best Case migration (§7/§9),

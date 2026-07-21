@@ -1,5 +1,5 @@
 import { Form, Link, data, useNavigation } from "react-router";
-import { Button, Field } from "@insolvia/design-system";
+import { Button, Field } from "@insolvia-ai/design-system";
 
 import { seo } from "../lib/seo";
 import {

@@ -25,6 +25,9 @@ on:
 permissions:
   id-token: write
   contents: read
+  # The app installs @insolvia-ai/design-system from GitHub Packages; the
+  # job's GITHUB_TOKEN needs read access to pull it.
+  packages: read
 
 concurrency:
   group: insolvia-marketing-prod
@@ -45,19 +48,16 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: |
-            apps/insolvia_marketing/package-lock.json
-            packages/insolvia_design_system_react/package-lock.json
+          cache-dependency-path: apps/insolvia_marketing/package-lock.json
 
-      # The design system's dist/ is gitignored; the app's prebuild compiles it
-      # via --prefix, which needs that package's node_modules installed first.
-      - name: Install design system
-        run: npm ci
-        working-directory: packages/insolvia_design_system_react
-
+      # The only step that touches the network: the lockfile pins
+      # @insolvia-ai/design-system to GitHub Packages, which requires a token
+      # even for public packages (the app's .npmrc expands NODE_AUTH_TOKEN).
       - name: Install
         run: npm ci
         working-directory: apps/insolvia_marketing
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: npm run build

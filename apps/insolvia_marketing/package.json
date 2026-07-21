@@ -9,18 +9,16 @@
     "node": ">=24"
   },
   "//": [
-    "build:deps exists because @insolvia/design-system is a file: path dep on",
-    "packages/insolvia_design_system_react, whose dist/ is gitignored — a fresh",
-    "checkout has the package but not its compiled output. predev/prebuild run",
-    "it so `npm run dev` and `npm run build` always see a current dist/ instead",
-    "of failing (or silently serving a stale one). It assumes the design",
-    "system's own node_modules are installed (npm ci there first in CI)."
+    "@insolvia-ai/design-system lives in devDependencies on purpose: it is",
+    "bundled into the SSR build at build time (vite.config.ts ssr.noExternal),",
+    "so the runtime never imports it — and keeping it out of `dependencies` is",
+    "what lets the Docker image's `npm ci --omit=dev` skip it and stay free of",
+    "GitHub Packages registry auth. Installing it here DOES need auth (see",
+    ".npmrc). A file: path override for local design-system hacking is fine,",
+    "but never commit it — the committed dep is the published package."
   ],
   "scripts": {
-    "build:deps": "npm run build --prefix ../../packages/insolvia_design_system_react",
-    "predev": "npm run build:deps",
     "dev": "react-router dev",
-    "prebuild": "npm run build:deps",
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
@@ -36,7 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia/design-system": "file:../../packages/insolvia_design_system_react",
+    "@insolvia-ai/design-system": "^0.1.1",
     "@react-router/dev": "^7.18.1",
     "@react-router/fs-routes": "^7.18.1",
     "@react-router/serve": "^7.18.1",

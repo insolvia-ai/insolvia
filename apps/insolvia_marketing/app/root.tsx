@@ -11,7 +11,7 @@ import {
   useRouteLoaderData,
   type LinksFunction,
 } from "react-router";
-import { Button, Footer, NavBar } from "@insolvia/design-system";
+import { Button, Footer, NavBar } from "@insolvia-ai/design-system";
 
 import { ORGANIZATION_JSONLD, isProductionHost } from "./lib/seo";
 import stylesheet from "./styles/app.css?url";
