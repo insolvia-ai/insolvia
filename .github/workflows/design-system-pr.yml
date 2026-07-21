@@ -3,8 +3,17 @@ name: Design system · PR
 on:
   pull_request:
     paths:
-      - "packages/**"
+      # Named per package rather than `packages/**` — that glob also matched
+      # packages/insolvia_design_system_react/, firing the Flutter gate on
+      # React-only PRs. A new Dart package adds its own line here.
+      - "packages/insolvia_design_system/**"
       - "packages/insolvia_tokens/**"
+      # The generated Tailwind theme lives in the React package, but it is an
+      # output of the Dart generator — so the drift check that guards it has to
+      # fire here. Without this line, a PR hand-editing only theme.css runs no
+      # drift check at all: the React gate doesn't have one, and this gate
+      # wouldn't trigger.
+      - "packages/insolvia_design_system_react/src/styles/theme.css"
       - "pubspec.yaml"
       - "melos.yaml"
       - "analysis_options.yaml"

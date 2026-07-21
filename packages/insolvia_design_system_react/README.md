@@ -49,7 +49,14 @@ source is theme-aware.
 
 ## Consuming it
 
+Published to **GitHub Packages**, not npmjs.org, so an install needs a token
+with `read:packages` — there is no anonymous install. See
+[`docs/PACKAGE_PUBLISHING.md`](../../docs/PACKAGE_PUBLISHING.md) for consumer
+auth, how to cut a release, and the Vite `ssr.noExternal` trick that keeps the
+marketing site's runtime Lambda image free of any registry credential.
+
 ```sh
+export NODE_AUTH_TOKEN=…        # PAT with read:packages
 npm install @insolvia/design-system
 ```
 

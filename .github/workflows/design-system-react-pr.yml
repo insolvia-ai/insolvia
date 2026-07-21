@@ -1,0 +1,55 @@
+name: Design system React · PR
+
+on:
+  pull_request:
+    paths:
+      - "packages/insolvia_design_system_react/**"
+      - "packages/insolvia_tokens/**"
+      - ".github/workflows/design-system-react-pr.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: packages/insolvia_design_system_react
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Must match the package's `engines.node` (">=24").
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: packages/insolvia_design_system_react/package-lock.json
+
+      # `ci`, never `install`: the lockfile is committed precisely so CI
+      # resolves the same tree twice running, and `ci` fails loudly when
+      # package.json and the lockfile have drifted apart.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      # Kept in the gate. `tsc` already covers the stories (tsconfig includes
+      # `src` and `.storybook`), but only Storybook exercises the Vite +
+      # Tailwind-v4 pipeline: the `@tailwindcss/vite` plugin actually compiling
+      # the generated `theme.css`, and the addon/framework wiring in
+      # `.storybook/`. Neither `tsup` nor `vitest` touches that path, and it is
+      # where the real breakage showed up during development. Costs ~4s.
+      - name: Build Storybook
+        run: npm run build-storybook
