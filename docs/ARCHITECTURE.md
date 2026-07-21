@@ -73,4 +73,6 @@ Signing + notarization is deferred (needs an Apple Developer account).
 
 See `.github/workflows/`. Each area has a `*-pr.yml` (checks) and, where it
 deploys, a `*-<env>.yml`. Deploy steps are gated behind the `DEPLOY_ENABLED`
-repo variable until DNS is live; builds/artifacts run regardless.
+repo variable (currently `false`); builds/artifacts run regardless. DNS is live;
+the gate now waits on shared infra being applied (#15) and the ACM cert reaching
+`ISSUED` (#16).

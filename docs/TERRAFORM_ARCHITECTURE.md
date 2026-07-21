@@ -59,8 +59,11 @@ match convention and stay portable if the default region ever changes).
 shared  →  staging  →  prod
 ```
 `shared` must exist first (zone + cert + role). CI applies `staging` on merge to
-`main`; `prod` is `workflow_dispatch`-gated. **All applies are gated off until
-`insolvia.ai` DNS is live** (`DEPLOY_ENABLED` repo variable).
+`main`; `prod` is `workflow_dispatch`-gated. **All applies are gated off**
+(`DEPLOY_ENABLED` repo variable, currently `false`). DNS is live; the gate now
+waits on `shared` being applied (#15) and the ACM cert reaching `ISSUED` (#16).
+The first `shared` apply must be preceded by a manual
+`terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13).
 
 ## Destruction safety
 

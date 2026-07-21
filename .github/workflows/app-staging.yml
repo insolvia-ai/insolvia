@@ -59,7 +59,9 @@ jobs:
           path: insolvia_app-staging.zip
           retention-days: 14
 
-  # ── Deploy: gated OFF until insolvia.ai DNS is live ────────────
+  # ── Deploy: gated behind the DEPLOY_ENABLED repo variable ──────
+  # Currently 'false'. DNS is live; the gate now waits on shared infra
+  # being applied (#15) and the ACM cert reaching ISSUED (#16).
   deploy:
     needs: build-web
     if: ${{ vars.DEPLOY_ENABLED == 'true' }}

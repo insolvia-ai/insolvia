@@ -9,7 +9,16 @@ on:
       - ".github/workflows/shared-infra-deploy.yml"
   workflow_dispatch:
 
-# Gated off until insolvia.ai DNS is live (DEPLOY_ENABLED repo variable).
+# Gated behind the DEPLOY_ENABLED repo variable, currently 'false'.
+# DNS is live; the gate waits on shared infra being applied (#15) and the
+# ACM cert reaching ISSUED (#16).
+#
+# ⚠️ The FIRST apply of infra/envs/shared must be done by a human, locally,
+# and must `terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW`
+# first (#13 / 1.1b). The insolvia.ai hosted zone was created outside
+# Terraform; applying with empty state creates a SECOND zone, Gandi keeps
+# delegating to the original, and ACM validation silently hangs. Do not
+# enable this workflow until that import has landed in state.
 permissions:
   id-token: write
   contents: read

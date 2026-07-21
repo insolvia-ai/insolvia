@@ -5,14 +5,15 @@ Insolvia runs in its **own dedicated AWS account** (`521762924626`), separate
 from `andreas-services`. Resources are still namespaced by the `insolvia`
 project + environment.
 
-> ⚠️ **Status (2026-07-21):** deploys are **gated off**, but the domain is no
-> longer the blocker. `insolvia.ai` is registered, and Gandi already delegates to
-> the existing Route53 hosted zone `Z01038711J6IZ68FD6ZDW`. What remains: the
-> Terraform state bucket does not exist yet (step 1), `infra/envs/shared` has
-> never been applied, and the `*.insolvia.ai` ACM certificate is therefore not
-> issued. Work steps 1 → 6 in order; **step 3 (importing the hosted zone) is not
-> optional** — skipping it breaks certificate validation in a way that is hard to
-> diagnose.
+> ⚠️ **Status (2026-07-21):** deploys are **gated off**
+> (`DEPLOY_ENABLED = false`), but the domain is no longer the blocker.
+> `insolvia.ai` is registered, and Gandi already delegates to the existing
+> Route53 hosted zone `Z01038711J6IZ68FD6ZDW`. What remains: the Terraform state
+> bucket does not exist yet (step 1, #12), `infra/envs/shared` has never been
+> applied (#15), and the `*.insolvia.ai` ACM certificate is therefore not issued
+> (#16). Work steps 1 → 6 in order; **step 3 (importing the hosted zone, #13) is
+> not optional** — skipping it breaks certificate validation in a way that is
+> hard to diagnose.
 
 ## 0. Prerequisites
 - AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account (the `insolvia` profile).
