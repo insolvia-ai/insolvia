@@ -69,7 +69,18 @@ variable "from_address" {
 }
 
 variable "ses_identity_arn" {
-  description = "ARN of the verified SES domain identity used to send the forward"
+  description = <<-EOT
+    ARN of the verified SES domain identity used to send the forward.
+
+    No longer referenced in the IAM policy — SES authorizes SendRawEmail
+    against the destination identity too, so that statement covers
+    identity/* in this account (see the SendForward comment in main.tf).
+
+    Kept deliberately: passing `module.email.identity_arn` is what creates the
+    dependency edge that orders identity creation before the receipt rule. Drop
+    this input and Terraform is free to build the rule against a domain SES has
+    not verified yet.
+  EOT
   type        = string
 }
 
