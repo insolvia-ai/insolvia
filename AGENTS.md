@@ -28,7 +28,7 @@ Workspace tooling: **pub workspaces** (root `pubspec.yaml`) + **Melos** (`melos.
 
 ## Environment access
 
-- **AWS:** reuse the shared account (also home to `andreas-services`); everything Insolvia is namespaced by the `insolvia` project and by environment.
+- **AWS:** Insolvia runs in its **own dedicated AWS account** (`521762924626`), separate from `andreas-services`. Resources are still namespaced by the `insolvia` project and by environment. (This is why `infra/envs/shared` **creates** the GitHub OIDC provider rather than reading it as a `data` source — there is exactly one per account.)
 - **GitHub:** `insolvia-ai/insolvia` — **public** (verified: `gh api repos/insolvia-ai/insolvia --jq .visibility`). Treat everything committed here as world-readable: no secrets, no real mailbox addresses, no customer or case data. Secrets belong in SSM SecureString or GitHub secrets and are injected at deploy time, never committed. Deploys authenticate to AWS via GitHub OIDC — **no long-lived AWS keys anywhere**. The org login is **lowercase** (`gh api orgs/insolvia-ai --jq .login`); the display name "Insolvia AI" is not the login. GitHub emits the stored casing in the OIDC `sub`, and the IAM `StringLike` condition is case-sensitive — a mismatch fails `AssumeRoleWithWebIdentity` with an error that names nothing useful. Keep it lowercase everywhere.
 - **Domain:** `insolvia.ai` (staging → `staging-app.insolvia.ai`, prod → `app.insolvia.ai`).
 
