@@ -19,6 +19,7 @@ reverse).
 
 | Path | Purpose | Stack |
 |---|---|---|
+| `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. | Flutter package (`insolvia_design_system`) |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). | Flutter app (`insolvia_app`), desktop + web |
 | `infra/` | All AWS infrastructure. | Terraform |
@@ -60,9 +61,15 @@ is exactly one per account.)
 - Environment config lives in `lib/src/config/environment.dart`, read from `--dart-define=INSOLVIA_ENV`.
 - Targets checked in: `web/`, `macos/`. Others added as needed.
 
+### Design tokens (`packages/insolvia_tokens/`)
+- `tokens.json` is the **single source of truth** for every color, spacing, radius, shadow, and font value. It is pure data — no Flutter, no CSS.
+- `tool/generate_tokens.dart` (plain Dart, zero deps) renders it into `packages/insolvia_design_system/lib/src/tokens/{colors,spacing,radii,semantics}.dart` **and** `packages/insolvia_design_system_react/src/styles/theme.css` (Tailwind v4 `@theme`).
+- **Never hand-edit a generated file** — each opens with a `DO NOT EDIT` banner. Edit `tokens.json`, then `melos run tokens`. `melos run tokens:check` (also a step in `design-system-pr.yml`) fails the PR on drift.
+- Raw palette names (`ink`/`brass`/`paper`) are an implementation detail. Consumers speak only the **semantic** layer (`primary`, `accent`, `bg`, `ink`, `muted`, `line`, `card`, `danger`, …), so a re-brand is a one-file change.
+
 ### Design system (`packages/insolvia_design_system/`)
-- Structure: `lib/src/{tokens,theme,components}/`, one barrel export `lib/insolvia_design_system.dart`.
-- Tokens are the single source of truth. Brand-specific values Material lacks go in a `ThemeExtension` (`InsolviaColors`, `InsolviaSpacing`), read via `Theme.of(context).extension<...>()`.
+- Structure: `lib/src/{tokens,theme,components}/`, one barrel export `lib/insolvia_design_system.dart`. Everything under `tokens/` except `typography.dart` is generated (see above).
+- Themes and components read `InsolviaSemanticColors`, never `InsolviaPalette`. Brand-specific values Material lacks go in a `ThemeExtension` (`InsolviaColors`, `InsolviaSpacing`), read via `Theme.of(context).extension<...>()`.
 - Every exported component has at least one widget test.
 
 ### Infrastructure

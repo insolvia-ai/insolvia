@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "packages/**"
+      - "packages/insolvia_tokens/**"
       - "pubspec.yaml"
       - "melos.yaml"
       - "analysis_options.yaml"
@@ -25,11 +26,17 @@ jobs:
       - name: Resolve workspace
         run: flutter pub get
 
+      # Must run before the format/analyze steps: if someone hand-edited a
+      # generated file, the honest failure is "you edited the wrong file",
+      # not a downstream lint complaint about the edit.
+      - name: Token drift check
+        run: dart run packages/insolvia_tokens/tool/generate_tokens.dart --check
+
       - name: Format check
-        run: dart format --output=none --set-exit-if-changed packages/insolvia_design_system
+        run: dart format --output=none --set-exit-if-changed packages/insolvia_tokens packages/insolvia_design_system
 
       - name: Analyze
-        run: dart analyze packages/insolvia_design_system
+        run: dart analyze packages/insolvia_tokens packages/insolvia_design_system
 
       - name: Test
         run: flutter test

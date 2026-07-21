@@ -1,0 +1,19 @@
+name: insolvia_tokens
+description: >-
+  The stack-agnostic source of truth for Insolvia's design tokens. `tokens.json`
+  holds every color, spacing, radius, shadow, and font value; the generator in
+  `tool/` renders it into the Flutter design system's Dart tokens and a Tailwind
+  v4 `@theme` stylesheet, so both stacks can never drift.
+version: 0.1.0
+publish_to: none
+
+# Deliberately pure Dart — NO flutter dependency. This package is consumed by
+# the build, not by the app, and must stay runnable with plain `dart run`.
+environment:
+  sdk: ^3.6.0
+
+# Part of the Insolvia pub workspace (root pubspec.yaml).
+resolution: workspace
+
+dev_dependencies:
+  lints: ^5.0.0
