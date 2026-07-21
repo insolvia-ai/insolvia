@@ -46,6 +46,15 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store
 *.swp
