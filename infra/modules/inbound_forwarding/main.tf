@@ -212,10 +212,26 @@ resource "aws_iam_role_policy" "lambda" {
       },
       {
         # Send only the forward, only from the verified sender identity.
+        #
+        # Resource covers every identity in THIS account, not just the sending
+        # domain, because SES authorizes SendRawEmail against the destination
+        # identity as well as the sender. Scoping this to the domain identity
+        # alone fails in the sandbox, where the recipient must itself be a
+        # verified identity:
+        #
+        #   AccessDenied: not authorized to perform `ses:SendRawEmail'
+        #   on resource `.../identity/<forward-to address>'
+        #
+        # The FromAddress condition below is the actual control and is
+        # unchanged: whatever identity is named, this role can only ever send
+        # AS no-reply@insolvia.ai. Naming the destination identity explicitly
+        # would be tighter, but its value comes from a secret that is empty on
+        # every apply after the first (lifecycle ignore_changes), which would
+        # silently produce a malformed ARN and break sending again.
         Sid      = "SendForward"
         Effect   = "Allow"
         Action   = ["ses:SendRawEmail"]
-        Resource = var.ses_identity_arn
+        Resource = "arn:aws:ses:${var.aws_region}:${local.account_id}:identity/*"
         Condition = {
           StringEquals = { "ses:FromAddress" = var.from_address }
         }
