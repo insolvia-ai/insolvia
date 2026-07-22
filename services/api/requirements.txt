@@ -1,0 +1,4 @@
+Flask==3.1.2
+gunicorn==23.0.0
+mangum==0.17.0
+asgiref==3.8.1

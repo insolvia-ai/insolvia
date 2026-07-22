@@ -15,7 +15,8 @@ design system. It intentionally mirrors the conventions of the
 
 The layout follows the standard Flutter monorepo split: runnable apps in
 `apps/`, shared libraries in `packages/` (apps depend on packages, never the
-reverse).
+reverse), plus backend services in `services/` — mirroring how `mailer/` sits
+in `andreas-services`.
 
 | Path | Purpose | Stack |
 |---|---|---|
@@ -24,6 +25,7 @@ reverse).
 | `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). Consumes the design system as a tag-pinned git dependency, never by path. | Flutter app (`insolvia_app`), desktop + web |
 | `apps/insolvia_marketing/` | The marketing site for `www.insolvia.ai` — React Router v7 framework mode, SSR. Consumes `@insolvia/design-system` as a `file:` path dep. **Outside the pub workspace** (npm, not pub). | React/TypeScript (`@insolvia/marketing`) |
+| `services/api/` | The backend API — Flask + Mangum on Lambda (decision D6 in `docs/MVP_PLAN.md`). Layered `core/api/adapters/entrypoints` mirroring `andreas-services/mailer`, with the dependency direction machine-enforced by `tests/test_architecture.py`. Brokers **all** AWS access for every client — see `docs/adr/0001-client-stays-dumb-trust-boundary.md`. **Not a pub workspace member** (Python, not Dart). | Python (`insolvia_api`) |
 | `infra/` | All AWS infrastructure. | Terraform |
 | `docs/` | Business plan + engineering runbooks. | Markdown |
 
@@ -319,6 +321,11 @@ credentials it does not have, **stop and ask** — do not invent a workaround.
 2. Add it to the root `pubspec.yaml` `workspace:` list.
 3. If it deploys, add `<name>-pr.yml` + `<name>-<env>.yml` workflows and an `infra/envs/*` entry.
 4. Document it in this table and in `docs/`.
+
+Python services are the exception: they live under `services/<name>/`, are
+**not** pub workspace members (no `pubspec.yaml`, no root `workspace:` entry),
+and follow the mailer-style `src/` layout with per-service `pyproject.toml`
+(pytest) plus the shared root `ruff.toml`. Steps 3–4 still apply.
 
 ## Branch Conventions
 - Feature branches: `claude/<feature-name>-<id>`.
