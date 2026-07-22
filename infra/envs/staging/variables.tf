@@ -18,3 +18,11 @@ variable "subdomain" {
   type        = string
   default     = "staging-app.insolvia.ai"
 }
+
+# Same flat-label reasoning as `subdomain`: `*.insolvia.ai` covers
+# `staging-api.insolvia.ai`, but would not cover a nested `api.staging.…`.
+variable "api_subdomain" {
+  description = "Hostname the backend API serves in this environment."
+  type        = string
+  default     = "staging-api.insolvia.ai"
+}
