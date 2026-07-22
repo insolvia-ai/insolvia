@@ -15,3 +15,9 @@ variable "subdomain" {
   type        = string
   default     = "app.insolvia.ai"
 }
+
+variable "api_subdomain" {
+  description = "Hostname the backend API serves in this environment."
+  type        = string
+  default     = "api.insolvia.ai"
+}

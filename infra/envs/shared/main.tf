@@ -255,6 +255,81 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/insolvia-*"]
   }
 
+  # ── Backend API stack (#62, #63, #69, #70) ─────────────────────
+  # The API deploy builds a Docker image, pushes it to insolvia-api-<env>,
+  # applies the env stacks, and points the Lambda at the new image. Most of
+  # what it needs is already granted above: Lambda create/update on
+  # function:insolvia-* (ForwarderCompute), the alarm SNS topic (AlertTopics),
+  # CloudWatch alarm management (Alarms), Lambda log groups (LambdaLogGroups),
+  # SSM under /insolvia/* (Parameters), Route53/ACM for the custom domain
+  # (EdgeAndDns), and the execution role (ServiceRoleManagement, whose
+  # AttachRolePolicy condition already allows exactly the
+  # AWSLambdaBasicExecutionRole the API role attaches). The four statements
+  # below are only what was missing.
+
+  # Docker login. GetAuthorizationToken has no resource-level support and is
+  # evaluated against "*"; the token alone grants nothing — every push and
+  # pull is still checked against the repository statement below.
+  statement {
+    sid       = "EcrAuthToken"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "EcrRepositories"
+    actions   = ["ecr:*"]
+    resources = ["arn:aws:ecr:*:${data.aws_caller_identity.current.account_id}:repository/insolvia-*"]
+  }
+
+  # Deliberately NOT dynamodb:* despite the service:* style above: the
+  # waitlist table holds signup PII, and per docs/adr/0001 the API's execution
+  # role is the only application principal that touches rows. The deploy role
+  # manages tables, never their contents — control-plane actions only, no
+  # PutItem/GetItem/Query/Scan.
+  statement {
+    sid = "WaitlistTableManagement"
+    actions = [
+      "dynamodb:CreateTable",
+      "dynamodb:DeleteTable",
+      "dynamodb:DescribeTable",
+      "dynamodb:UpdateTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:UpdateContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:UpdateTimeToLive",
+      "dynamodb:TagResource",
+      "dynamodb:UntagResource",
+      "dynamodb:ListTagsOfResource",
+    ]
+    resources = ["arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-*"]
+  }
+
+  # API Gateway v2 IAM is path-based on generated API ids — there is no
+  # insolvia-* name scoping like lambda/sqs/sns above. Constrained instead to
+  # the resource paths Terraform manages (APIs, custom domains, tags); this
+  # dedicated account runs nothing but Insolvia.
+  statement {
+    sid     = "HttpApis"
+    actions = ["apigateway:*"]
+    resources = [
+      "arn:aws:apigateway:*::/apis",
+      "arn:aws:apigateway:*::/apis/*",
+      "arn:aws:apigateway:*::/domainnames",
+      "arn:aws:apigateway:*::/domainnames/*",
+      "arn:aws:apigateway:*::/tags/*",
+    ]
+  }
+
+  # HTTP API access logs live under /aws/apigateway/…, which the
+  # /aws/lambda/insolvia-* statement above does not match.
+  statement {
+    sid       = "ApiAccessLogGroups"
+    actions   = ["logs:*"]
+    resources = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/insolvia-*"]
+  }
+  # ── end backend API stack ──────────────────────────────────────
+
   # The forward-to destination lives here as a SecureString. Terraform creates
   # the parameter but never owns its value (lifecycle ignore_changes).
   statement {
