@@ -1,4 +1,5 @@
 from insolvia_api import __version__
+from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
@@ -18,7 +19,12 @@ def test_health_reports_service_identity(client):
 
 
 def test_health_reports_the_configured_environment():
-    app = create_app(ApiDependencies(config=load_config({"INSOLVIA_ENV": "staging"})))
+    app = create_app(
+        ApiDependencies(
+            config=load_config({"INSOLVIA_ENV": "staging"}),
+            waitlist_store=MemoryWaitlistStore(),
+        )
+    )
 
     response = app.test_client().get("/health")
 
