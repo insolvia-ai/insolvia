@@ -1,3 +1,4 @@
-aws_region  = "us-east-1"
-domain_name = "insolvia.ai"
-subdomain   = "staging-app.insolvia.ai"
+aws_region    = "us-east-1"
+domain_name   = "insolvia.ai"
+subdomain     = "staging-app.insolvia.ai"
+api_subdomain = "staging-api.insolvia.ai"
