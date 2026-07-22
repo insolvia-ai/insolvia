@@ -1,0 +1,16 @@
+# Local dev for services/api — `docker compose up --build`, then
+# `curl http://127.0.0.1:8080/health`.
+#
+# Mirrors andreas-services/mailer/docker-compose.yml, trimmed to what exists
+# today: mailer also runs Mailpit as its local backing service; this API has
+# no AWS emulation to run yet — the waitlist endpoint adds amazon/dynamodb-local
+# in that slot.
+services:
+  api:
+    build:
+      context: .
+      target: development
+    environment:
+      INSOLVIA_ENV: local
+    ports:
+      - "127.0.0.1:8080:8080"

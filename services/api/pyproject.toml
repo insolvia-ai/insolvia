@@ -1,0 +1,13 @@
+[project]
+name = "insolvia-api"
+version = "0.1.0"
+description = "The Insolvia backend API — Flask + Mangum on Lambda (decision D6)"
+requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt, mailer-style; the
+# Docker image and CI install from there rather than from this metadata.
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
