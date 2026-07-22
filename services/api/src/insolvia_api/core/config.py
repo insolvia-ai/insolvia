@@ -10,24 +10,52 @@ SERVICE_NAME = "insolvia-api"
 
 ENVIRONMENTS = ("local", "staging", "production")
 
+# Per-environment CORS allowlist (issue #68). Exact origins only — NO
+# wildcard, ever:
+#   - The desktop app is a native client and sends no Origin header at all.
+#     "No Origin" must never become a reason to widen this list or answer
+#     with `*` — CORS simply does not apply to that client, and the browser
+#     clients CORS does protect get the tightest possible policy.
+#   - www.insolvia.ai deliberately does NOT appear here: the marketing site's
+#     waitlist action calls POST /v1/waitlist server-to-server from its SSR
+#     Lambda (no browser, no Origin header), so CORS is not in play for it
+#     (docs/adr/0001).
+# Localhost dev origins are handled separately (cors_allow_localhost) because
+# `flutter run -d chrome` picks an arbitrary port; the response still echoes
+# the one matched origin, never a wildcard.
+_CORS_ALLOWED_ORIGINS: dict[str, tuple[str, ...]] = {
+    "production": ("https://app.insolvia.ai",),
+    "staging": ("https://staging-app.insolvia.ai",),
+    "local": (),
+}
+
 
 @dataclass(frozen=True)
 class AppConfig:
     """The service configuration, parsed and validated once at composition time.
 
-    Per-environment values land here as plain fields — the waitlist table
-    name, allowed CORS origins, and so on arrive with the endpoints that need
-    them. Everything is read in load_config; nothing else in the package
-    touches os.environ.
+    load_config is the only real constructor — the field defaults exist so
+    tests can build a local config tersely, and they match INSOLVIA_ENV=local.
+    Everything is read in load_config; nothing else in the package touches
+    os.environ.
     """
 
     environment: str
+    waitlist_table_name: str | None = None
+    # Local-only override pointing boto3 at dynamodb-local (docker-compose).
+    dynamodb_endpoint_url: str | None = None
+    cors_allowed_origins: tuple[str, ...] = ()
+    cors_allow_localhost: bool = True
 
 
 def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
-    """Build the configuration from INSOLVIA_ENV (local|staging|production).
+    """Build the configuration from the environment.
 
-    Defaults to "local", mirroring the app's --dart-define=INSOLVIA_ENV.
+    INSOLVIA_ENV (local|staging|production) defaults to "local", mirroring the
+    app's --dart-define=INSOLVIA_ENV. WAITLIST_TABLE_NAME names the DynamoDB
+    table behind POST /v1/waitlist. DYNAMODB_ENDPOINT_URL points the AWS
+    adapter at dynamodb-local and is rejected outside "local", so the emulator
+    override can never leak into a deployed environment.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -36,4 +64,16 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
             f"INSOLVIA_ENV must be one of {', '.join(ENVIRONMENTS)}, "
             f"got {environment!r}"
         )
-    return AppConfig(environment=environment)
+    dynamodb_endpoint_url = source.get("DYNAMODB_ENDPOINT_URL") or None
+    if dynamodb_endpoint_url and environment != "local":
+        raise ValidationError(
+            "DYNAMODB_ENDPOINT_URL is a local-only override for dynamodb-local "
+            f"and must not be set when INSOLVIA_ENV={environment}"
+        )
+    return AppConfig(
+        environment=environment,
+        waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
+        dynamodb_endpoint_url=dynamodb_endpoint_url,
+        cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
+        cors_allow_localhost=environment != "production",
+    )
