@@ -194,6 +194,7 @@ infra/
 - `staging` deploys on push to `main`; `prod` is `workflow_dispatch`-gated behind the `insolvia-production` GitHub Environment.
 - GitHub Environments mirror the Terraform envs one-for-one: `insolvia-shared`, `insolvia-staging`, `insolvia-production`. A deploy job **must** declare `environment:` — environment-scoped secrets are invisible to jobs that don't, resolving silently to empty strings rather than erroring. Never borrow another environment's name to reach its secrets; that hands the job every secret that environment holds.
 - Static web deploy: `s3 sync` hashed assets `Cache-Control: public,max-age=31536000,immutable` (exclude `*.html`), then HTML `no-cache`, then CloudFront `/*` invalidation.
+- API deploy (`api-<env>.yml`): terraform apply the env, read the `api_*` outputs, push the `services/api` Lambda image to ECR (`:sha` + `:latest`), `update-function-code`, re-derive the Lambda environment from `/insolvia/<env>/api/*`, smoke-test `/health`. The very first deploy per env needs the image-before-apply bootstrap documented atop `infra/modules/api_service/main.tf`.
 - **Deploys are currently gated OFF** via the `DEPLOY_ENABLED` repo variable (`false`). CI still builds and uploads web + macOS artifacts; only the deploy/apply jobs are skipped.
   - DNS is **live** as of 2026-07-21 (`insolvia.ai` registered at Gandi, NS delegated to Route53 zone `Z01038711J6IZ68FD6ZDW`) — the domain is no longer the blocker.
   - The gate now stays until **`infra/envs/shared` is applied** (issue #15 / 1.3) **and** the `*.insolvia.ai` **ACM cert reaches `ISSUED`** (issue #16 / 1.3b). Every downstream env looks the cert up with `statuses = ["ISSUED"]`, so flipping early fails at plan time with a misleading "no matching certificate" error.
@@ -243,7 +244,7 @@ block a merge. The workflows above are now shaped to allow turning them on. The
 remaining step is a **repo-settings change that must be made by a human in the
 GitHub UI or API** — nothing in this repo can grant itself branch protection.
 
-In `protect-main` → *Require status checks to pass*, add exactly these eight,
+In `protect-main` → *Require status checks to pass*, add exactly these nine,
 which are the job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
@@ -253,6 +254,7 @@ which are the job `name:` values (matrix legs get a `(leg)` suffix):
 | `Flutter design system` | `design-system-pr.yml` |
 | `React design system` | `design-system-react-pr.yml` |
 | `Inbound forwarder` | `inbound-forwarder-pr.yml` |
+| `API service` | `api-pr.yml` |
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
