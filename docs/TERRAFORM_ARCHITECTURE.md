@@ -9,8 +9,10 @@ each with its own isolated S3 state — never Terraform workspaces.
 infra/
 ├── modules/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
-│   └── api_service/          # reusable: ECR + Docker Lambda + HTTP API + custom domain
-│                             #   + waitlist DynamoDB + SSM config namespace + alarms
+│   ├── api_service/          # reusable: ECR + Docker Lambda + HTTP API + custom domain
+│   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
+│   └── auth/                 # reusable: Cognito user pool + hosted domain
+│                             #   + web (SPA) and desktop (loopback) PKCE app clients
 └── envs/
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
@@ -18,15 +20,17 @@ infra/
     │                         #   • IAM role             insolvia-github-actions (OIDC)
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
+    │                         # auth        -> insolvia-users-staging
     └── prod/                 # web_hosting -> app.insolvia.ai
                               # api_service -> api.insolvia.ai
+                              # auth        -> insolvia-users-prod
 ```
 
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
 |---|---|---|
 | shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, deploy role |
-| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-staging`, alarms) |
-| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms) |
+| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
+| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`) |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -98,6 +102,35 @@ terraform apply
 Steady state is workflow-driven: push image → `aws lambda
 update-function-code` → resolve `/insolvia/<env>/api/*` →
 `update-function-configuration`. Terraform never notices.
+
+## Auth (`infra/modules/auth/`)
+
+One Cognito user pool per environment (issue #65): `insolvia-users-staging`
+and `insolvia-users-prod`, fully separate — a staging token can never verify
+against prod. Each owns, per env:
+
+- **User pool** `insolvia-users-<env>` — email as username, **self-signup
+  disabled** (attorneys are provisioned via `admin-create-user`), 12+ char
+  password policy, optional TOTP MFA, ESSENTIALS plan (threat protection is a
+  PLUS-plan upsell, deferred). `deletion_protection` is ACTIVE on prod only.
+- **Hosted domain** — Cognito-provided prefix
+  `insolvia-<env>.auth.us-east-1.amazoncognito.com`; a custom
+  `auth.insolvia.ai` domain is deferred (vanity only, needs its own cert).
+- **Two public PKCE app clients**, both authorization-code, no secret,
+  refresh-token rotation enabled:
+  - `insolvia-web-<env>` — the SPA; callbacks at
+    `<origin>/auth/callback`, sign-out to the origin. Staging also registers
+    `http://localhost:3000` (dev must run `flutter run --web-port 3000`);
+    prod registers no dev origins.
+  - `insolvia-desktop-<env>` — loopback redirect per RFC 8252: Cognito
+    permits plain-HTTP callbacks only on `localhost`/`127.0.0.1`/`[::1]`
+    and matches them **exactly** (no wildcard ports), so a fixed four-port
+    set `http://127.0.0.1:{41539..41542}/callback` is registered and the
+    desktop app must bind one of exactly those ports.
+
+The API does **not** verify tokens yet — the env outputs expose
+`auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
+into `services/api` with the first authenticated endpoint.
 
 ## Providers
 
