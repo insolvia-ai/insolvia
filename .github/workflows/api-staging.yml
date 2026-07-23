@@ -29,8 +29,14 @@ permissions:
   id-token: write
   contents: read
 
+# Shared with every workflow that `terraform apply`s infra/envs/staging
+# (app-staging.yml). The S3 backend has no state locking (use_lockfile needs
+# Terraform >= 1.10; CI pins ~1.5), so two applies of the same env racing on
+# one push to main corrupt each other — seen as "Stage already exists" /
+# "domain name already exists" when both ran concurrently. One group per env
+# state file serializes them.
 concurrency:
-  group: insolvia-api-staging
+  group: insolvia-terraform-staging
   cancel-in-progress: false
 
 jobs:

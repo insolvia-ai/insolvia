@@ -15,8 +15,11 @@ permissions:
   id-token: write
   contents: read
 
+# Shared with every workflow that `terraform apply`s infra/envs/staging
+# (api-staging.yml) — the backend has no state locking, so concurrent applies
+# of one env race. See the matching comment in api-staging.yml.
 concurrency:
-  group: insolvia-app-staging
+  group: insolvia-terraform-staging
   cancel-in-progress: false
 
 jobs:
