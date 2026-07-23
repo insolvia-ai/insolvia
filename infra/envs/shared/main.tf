@@ -346,6 +346,48 @@ data "aws_iam_policy_document" "github_permissions" {
     actions   = ["logs:*"]
     resources = ["arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:log-group:/aws/apigateway/insolvia-*"]
   }
+
+  # Enabling access logging on an API GW v2 stage makes API Gateway register a
+  # CloudWatch Logs *log delivery* on the CALLER's permissions, and the
+  # delivery APIs are account-level — evaluated against "*", so the log-group-
+  # scoped statement above never matches them (same family as EnumerationApis
+  # below). Without this, CreateStage fails with "Insufficient permissions to
+  # enable logging … not authorized to perform: logs:CreateLogDelivery" —
+  # found by the first staging apply; validate can't see it.
+  statement {
+    sid = "LogDeliveries"
+    actions = [
+      "logs:CreateLogDelivery",
+      "logs:GetLogDelivery",
+      "logs:UpdateLogDelivery",
+      "logs:DeleteLogDelivery",
+      "logs:ListLogDeliveries",
+      "logs:PutResourcePolicy",
+      "logs:DescribeResourcePolicies",
+    ]
+    resources = ["*"]
+  }
+
+  # The account's FIRST API GW custom domain makes API Gateway create its
+  # service-linked role (AWSServiceRoleForAPIGateway) on the caller's
+  # permissions; without this, CreateDomainName fails with "Caller does not
+  # have permissions to create a Service Linked Role" — also found by the
+  # first staging apply. Locked to exactly that SLR three ways: the action,
+  # the aws-service-role ARN path, and the service-name condition. Once the
+  # role exists this statement is dormant (SLRs are one-per-account).
+  statement {
+    sid     = "ApiGatewayServiceLinkedRole"
+    actions = ["iam:CreateServiceLinkedRole"]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway",
+    ]
+
+    condition {
+      test     = "StringLike"
+      variable = "iam:AWSServiceName"
+      values   = ["ops.apigateway.amazonaws.com"]
+    }
+  }
   # ── end backend API stack ──────────────────────────────────────
 
   # ── Auth stack (#65) ───────────────────────────────────────────
