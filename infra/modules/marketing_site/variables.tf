@@ -48,6 +48,18 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "site_enabled" {
+  description = <<-EOT
+    Whether the CloudFront distribution serves traffic. Set false to take the
+    site offline without destroying anything: the Lambda, S3 assets, ECR
+    images, DNS records and cert all stay exactly as they are, and CloudFront
+    simply stops serving (viewers get a CloudFront 403). Flip back to true and
+    apply to bring the site back — no rebuild, no ECR bootstrap.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags applied to all resources."
   type        = map(string)

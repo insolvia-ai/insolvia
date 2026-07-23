@@ -281,7 +281,7 @@ resource "aws_cloudfront_function" "viewer_request" {
 
 # ── CloudFront distribution ─────────────────────────────────────
 resource "aws_cloudfront_distribution" "site" {
-  enabled         = true
+  enabled         = var.site_enabled
   is_ipv6_enabled = true
   comment         = "${var.project} ${var.environment} marketing (SSR + assets)"
   price_class     = "PriceClass_100"
