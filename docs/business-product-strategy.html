@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Insolvia business & product strategy — market, moat, financial model, positioning, product roadmap, and MVP strategy, isolated from engineering execution detail.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
+<title>Insolvia — Business & Product Strategy</title>
+<style>
+  :root {
+    --paper: #f5f2eb; --surface: #fffdf9; --surface-2: #efeade;
+    --ink: #0b2a4a; --ink-soft: #3e4c5a; --ink-faint: #6e7885;
+    --line: #e2dccf; --line-strong: #cfc7b6;
+    --accent: #8f6428; --accent-bright: #b8863b; --accent-wash: #f1e7d3;
+    --pos: #3f8c5c; --neg: #b23b3b; --warn: #b5852a;
+    --risk-hi: #b23b3b; --risk-md: #b5852a; --risk-lo: #3f8c5c;
+    --blue: #2b6a9c;
+    --shadow: 0 1px 2px rgba(11,42,74,.06), 0 10px 28px rgba(11,42,74,.06);
+    --shadow-lg: 0 2px 6px rgba(11,42,74,.08), 0 22px 48px rgba(11,42,74,.10);
+    --serif: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono: ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0a1523; --surface: #10233b; --surface-2: #172c47;
+      --ink: #eaf1f8; --ink-soft: #b3c0d0; --ink-faint: #7d8ca0;
+      --line: #223347; --line-strong: #30435d;
+      --accent: #d7ac5e; --accent-bright: #e4bd7c; --accent-wash: #241d10;
+      --pos: #6fc091; --neg: #e58080; --warn: #dab364;
+      --risk-hi: #e58080; --risk-md: #dab364; --risk-lo: #6fc091;
+      --blue: #8fc3ec;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.4);
+      --shadow-lg: 0 2px 8px rgba(0,0,0,.4), 0 26px 56px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#f5f2eb;--surface:#fffdf9;--surface-2:#efeade;--ink:#0b2a4a;--ink-soft:#3e4c5a;--ink-faint:#6e7885;
+    --line:#e2dccf;--line-strong:#cfc7b6;--accent:#8f6428;--accent-bright:#b8863b;--accent-wash:#f1e7d3;
+    --pos:#3f8c5c;--neg:#b23b3b;--warn:#b5852a;--risk-hi:#b23b3b;--risk-md:#b5852a;--risk-lo:#3f8c5c;--blue:#2b6a9c;
+    --shadow:0 1px 2px rgba(11,42,74,.06),0 10px 28px rgba(11,42,74,.06);--shadow-lg:0 2px 6px rgba(11,42,74,.08),0 22px 48px rgba(11,42,74,.10);
+  }
+  :root[data-theme="dark"] {
+    --paper:#0a1523;--surface:#10233b;--surface-2:#172c47;--ink:#eaf1f8;--ink-soft:#b3c0d0;--ink-faint:#7d8ca0;
+    --line:#223347;--line-strong:#30435d;--accent:#d7ac5e;--accent-bright:#e4bd7c;--accent-wash:#241d10;
+    --pos:#6fc091;--neg:#e58080;--warn:#dab364;--risk-hi:#e58080;--risk-md:#dab364;--risk-lo:#6fc091;--blue:#8fc3ec;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.4);--shadow-lg:0 2px 8px rgba(0,0,0,.4),0 26px 56px rgba(0,0,0,.5);
+  }
+  * { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  body { background: var(--paper); }
+
+  .wrap { background: var(--paper); color: var(--ink-soft); font-family: var(--sans);
+    line-height: 1.65; -webkit-font-smoothing: antialiased;
+    padding: clamp(22px,4vw,60px) clamp(16px,4vw,44px) 96px; }
+  .inner { max-width: 1160px; margin: 0 auto; }
+
+  /* Masthead */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 26px; margin-bottom: 10px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing:.18em; text-transform:uppercase; color: var(--accent); margin:0 0 16px; }
+  h1 { font-family: var(--serif); font-weight:600; color: var(--ink); font-size: clamp(34px,6.2vw,60px);
+    line-height:1.02; letter-spacing:-.015em; margin:0 0 18px; text-wrap: balance; }
+  .standfirst { font-size: clamp(16px,2.1vw,20px); color: var(--ink-soft); max-width: 70ch; margin:0; }
+  .standfirst b { color: var(--ink); font-weight:600; }
+  .metabar { display:flex; flex-wrap:wrap; gap:8px 28px; font-family: var(--mono); font-size:12px; color: var(--ink-faint); margin-top:24px; }
+  .metabar span b { color: var(--ink-soft); font-weight:600; }
+  .metabar a { color: var(--accent); border:none; }
+
+  /* Sections */
+  .sec { margin-top: 60px; scroll-margin-top: 20px; }
+  .sec-head { display:flex; align-items:baseline; gap:16px; margin-bottom:6px; }
+  .sec-num { font-family: var(--mono); font-size:13px; font-weight:600; color: var(--accent-bright); letter-spacing:.04em;
+    border:1px solid var(--line-strong); border-radius:6px; padding:3px 9px; flex:0 0 auto; margin-top:4px; font-variant-numeric: tabular-nums; }
+  h2 { font-family: var(--serif); font-weight:600; color: var(--ink); font-size: clamp(23px,3.4vw,31px);
+    margin:0; letter-spacing:-.012em; text-wrap: balance; }
+  .sec-note { color: var(--ink-faint); font-size:14.5px; margin:4px 0 22px; max-width:76ch; }
+  h3 { font-family: var(--sans); font-weight:700; font-size:12.5px; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-faint); margin:34px 0 14px; }
+  p { margin:0 0 15px; }
+  .prose { max-width: 76ch; }
+  .prose b { color: var(--ink); font-weight:600; }
+  a { color: var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent-bright) 42%, transparent); }
+  a:hover { border-bottom-color: var(--accent-bright); }
+  a:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; border-radius:2px; }
+
+  /* Derivation / method note */
+  .method { background: var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--blue);
+    border-radius:8px; padding:12px 16px; margin:12px 0 4px; font-size:13px; color: var(--ink-soft); max-width:90ch; line-height:1.7; }
+  .method .mlabel { font-family: var(--mono); font-size:10px; letter-spacing:.11em; text-transform:uppercase; color: var(--blue); display:block; margin-bottom:5px; }
+  .method .calc { font-family: var(--mono); font-size:12.5px; color: var(--ink); background: color-mix(in srgb, var(--blue) 12%, transparent); padding:1px 5px; border-radius:4px; }
+  .method b { color: var(--ink); }
+
+  /* Executive summary */
+  .exec { display:grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: clamp(24px,4vw,56px); align-items:start; }
+  @media (max-width:760px){ .exec { grid-template-columns:1fr; gap:26px; } }
+  .exec-side { display:flex; flex-direction:column; gap:14px; }
+  .thesis { background: var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent-bright);
+    border-radius:12px; padding:20px 22px; box-shadow: var(--shadow); }
+  .thesis .lbl { font-family: var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color: var(--accent); margin:0 0 8px; display:block; }
+  .thesis p { margin:0; font-size:15px; color: var(--ink-soft); }
+  .thesis p b { color: var(--ink); }
+
+  /* Stat tiles */
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(178px,1fr)); gap:14px; margin:4px 0 6px; }
+  .stat { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 18px 16px; box-shadow: var(--shadow); }
+  .stat .fig { font-family: var(--serif); font-weight:600; color: var(--ink); font-size: clamp(28px,3.6vw,36px); line-height:1; letter-spacing:-.02em; font-variant-numeric: tabular-nums; }
+  .stat .fig .unit { font-size:.5em; color: var(--accent); font-weight:600; margin-left:2px; }
+  .stat .lab { font-size:13px; color: var(--ink-soft); margin-top:9px; line-height:1.4; }
+  .stat .sub { font-family: var(--mono); font-size:11px; color: var(--ink-faint); margin-top:6px; }
+  .stat .delta { color: var(--pos); font-weight:600; }
+
+  /* Cards / callouts */
+  .card { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow: var(--shadow); margin-top:4px; }
+  .card h4 { margin:0 0 8px; font-family: var(--serif); font-weight:600; font-size:17px; color: var(--ink); }
+  .card p:last-child { margin-bottom:0; }
+  .grid-2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:16px; margin-top:4px; }
+  .callout { background: var(--accent-wash); border:1px solid color-mix(in srgb, var(--accent-bright) 34%, var(--line)); border-left:3px solid var(--accent-bright);
+    border-radius:12px; padding:20px 24px; margin-top:22px; box-shadow: var(--shadow); }
+  .callout .lbl { font-family: var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color: var(--accent); display:block; margin-bottom:8px; }
+  .callout p { margin:0; color: var(--ink); font-size:15.5px; }
+  .callout p b { font-weight:700; }
+
+  .diff { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; box-shadow: var(--shadow); display:flex; flex-direction:column; gap:8px; }
+  .diff .n { font-family: var(--mono); font-size:11px; color: var(--accent-bright); font-weight:600; letter-spacing:.06em; }
+  .diff h4 { margin:0; font-family: var(--serif); font-weight:600; font-size:17px; color: var(--ink); }
+  .diff p { margin:0; font-size:13.5px; color: var(--ink-soft); }
+
+  /* JTBD */
+  .jobs { list-style:none; padding:0; margin:6px 0 0; display:flex; flex-direction:column; gap:2px; }
+  .jobs li { display:flex; gap:14px; align-items:baseline; padding:12px 0; border-bottom:1px solid var(--line); }
+  .jobs li:last-child { border-bottom:none; }
+  .jobs .jn { font-family: var(--mono); font-size:12px; font-weight:600; color: var(--accent-bright); min-width:22px; font-variant-numeric: tabular-nums; }
+  .jobs .jt { font-size:14.5px; color: var(--ink-soft); }
+  .jobs .jt b { color: var(--ink); font-weight:600; }
+  .jobs .hot { color: var(--neg); font-family: var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-left:8px; white-space:nowrap; }
+
+  /* Tables */
+  .tablecard { background: var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow: var(--shadow); margin-top:6px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:660px; }
+  thead th { text-align:left; font-family: var(--mono); font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color: var(--ink-faint); background: var(--surface-2); padding:13px 16px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+  tbody td { padding:14px 16px; border-bottom:1px solid var(--line); vertical-align:top; font-size:14px; color: var(--ink-soft); }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+  td .name { font-weight:600; color: var(--ink); }
+  td .name small { display:block; font-weight:400; color: var(--ink-faint); font-size:12px; margin-top:2px; font-family: var(--mono); }
+  tr.us td { background: color-mix(in srgb, var(--accent-wash) 60%, transparent); }
+  tr.us:hover td { background: color-mix(in srgb, var(--accent-wash) 80%, transparent); }
+  tr.us td .name { color: var(--accent); }
+  .badge { display:inline-block; font-family: var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.04em; padding:3px 8px; border-radius:5px; white-space:nowrap; }
+  .badge.desk { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
+  .badge.cloud { background: color-mix(in srgb, var(--blue) 18%, transparent); color: var(--blue); }
+  .badge.both { background: var(--accent-wash); color: var(--accent); }
+
+  /* Channel funnel (MyCase) */
+  .chan { display:grid; grid-template-columns: repeat(3,1fr); gap:0; margin-top:8px; }
+  @media (max-width:720px){ .chan { grid-template-columns:1fr; } }
+  .chan-step { background: var(--surface); border:1px solid var(--line); padding:20px; box-shadow: var(--shadow); }
+  .chan-step:first-child { border-radius:12px 0 0 12px; }
+  .chan-step:last-child { border-radius:0 12px 12px 0; }
+  @media (max-width:720px){ .chan-step { border-radius:12px !important; margin-bottom:10px; } }
+  .chan-step .cn { font-family: var(--mono); font-size:11px; color: var(--accent); font-weight:700; letter-spacing:.08em; }
+  .chan-step .cbig { font-family: var(--serif); font-weight:600; font-size: clamp(24px,3.2vw,32px); color: var(--ink); margin:8px 0 2px; font-variant-numeric: tabular-nums; line-height:1.05; }
+  .chan-step .cd { font-size:13px; color: var(--ink-soft); }
+  .chan-step.focus { border-color: var(--accent-bright); box-shadow: var(--shadow-lg); }
+
+  /* TAM/SAM/SOM */
+  .funnel { display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-top:6px; }
+  @media (max-width:680px){ .funnel { grid-template-columns:1fr; } }
+  .fcard { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow: var(--shadow); position:relative; overflow:hidden; }
+  .fcard::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--accent-bright); opacity:.35; }
+  .fcard.sam::before { opacity:.65; } .fcard.som::before { opacity:1; }
+  .fcard .tag3 { font-family: var(--mono); font-size:11px; font-weight:700; letter-spacing:.1em; color: var(--accent); }
+  .fcard .amt { font-family: var(--serif); font-weight:600; font-size: clamp(26px,3.4vw,34px); color: var(--ink); margin:8px 0 2px; letter-spacing:-.02em; font-variant-numeric: tabular-nums; }
+  .fcard .amt small { font-size:.5em; color: var(--ink-faint); font-weight:500; font-family: var(--mono); letter-spacing:0; }
+  .fcard .desc { font-size:13px; color: var(--ink-soft); margin-top:6px; line-height:1.5; }
+
+  /* Revenue chart */
+  .chartcard { background: var(--surface); border:1px solid var(--line); border-radius:14px; padding:24px clamp(18px,3vw,28px) 20px; box-shadow: var(--shadow-lg); margin-top:6px; }
+  .chart-top { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:22px; }
+  .chart-top h4 { margin:0; font-family: var(--serif); font-weight:600; font-size:18px; color: var(--ink); }
+  .chart-top .cap { font-family: var(--mono); font-size:11px; color: var(--ink-faint); }
+  .chart { display:grid; grid-template-columns: repeat(5,1fr); gap: clamp(10px,2.5vw,26px); align-items:end; height:260px; padding-top:10px; border-bottom:2px solid var(--line-strong); }
+  .col { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:8px; }
+  .col .val { font-family: var(--mono); font-size:12.5px; font-weight:600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar { width:100%; max-width:78px; border-radius:7px 7px 0 0; background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+    box-shadow: inset 0 1px 0 color-mix(in srgb,#fff 30%, transparent); animation: rise .9s cubic-bezier(.2,.7,.3,1) both; min-height:6px; }
+  .col.peak .bar { background: linear-gradient(180deg, var(--ink), #17406e); }
+  .xrow { display:grid; grid-template-columns: repeat(5,1fr); gap: clamp(10px,2.5vw,26px); margin-top:12px; }
+  .xrow .x { text-align:center; }
+  .xrow .yr { font-family: var(--mono); font-size:12px; font-weight:600; color: var(--ink-soft); }
+  .xrow .seats { font-family: var(--mono); font-size:11px; color: var(--ink-faint); margin-top:2px; }
+  @keyframes rise { from { transform: scaleY(0); transform-origin:bottom; opacity:.4; } to { transform: scaleY(1); opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .bar { animation:none; } }
+  .assump { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:10px 22px; margin-top:20px; padding-top:18px; border-top:1px dashed var(--line-strong); }
+  .assump .a { font-size:12.5px; color: var(--ink-soft); display:flex; gap:8px; }
+  .assump .a .k { color: var(--ink-faint); font-family: var(--mono); font-size:11px; white-space:nowrap; }
+  .assump .a b { color: var(--ink); }
+
+  /* Roadmap */
+  .phases { display:flex; flex-direction:column; }
+  .phase { display:grid; grid-template-columns: 96px 1fr; gap:18px; padding:18px 0; border-bottom:1px solid var(--line); }
+  .phase:last-child { border-bottom:none; }
+  .phase .pid { font-family: var(--mono); font-weight:700; font-size:14px; color: var(--accent-bright); letter-spacing:.04em; }
+  .phase .pid small { display:block; font-weight:400; font-size:10.5px; color: var(--ink-faint); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
+  .phase .pbody h4 { margin:0 0 4px; font-family: var(--serif); font-weight:600; font-size:16.5px; color: var(--ink); }
+  .phase .pbody .mods { font-size:13.5px; color: var(--ink-soft); }
+  .phase .pbody .out { font-size:13px; color: var(--ink-faint); margin-top:5px; }
+  .phase .pbody .out b { color: var(--pos); font-weight:600; }
+  .phase.now .pid { color: var(--pos); }
+  .phase.now .pbody h4::after { content:"IN BUILD"; font-family: var(--mono); font-size:9.5px; font-weight:700; letter-spacing:.08em; color: var(--pos); background: color-mix(in srgb, var(--pos) 15%, transparent); padding:2px 7px; border-radius:4px; margin-left:10px; vertical-align:middle; }
+  .phase.done .pbody h4::after { content:"SHIPPED"; font-family: var(--mono); font-size:9.5px; font-weight:700; letter-spacing:.08em; color: var(--accent); background: var(--accent-wash); padding:2px 7px; border-radius:4px; margin-left:10px; vertical-align:middle; }
+
+  /* GTM */
+  .gtm { display:grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap:16px; margin-top:4px; }
+  .gcard { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; box-shadow: var(--shadow); }
+  .gcard .gt { font-family: var(--serif); font-weight:600; font-size:16px; color: var(--ink); margin:0 0 6px; }
+  .gcard p { margin:0; font-size:13.5px; color: var(--ink-soft); }
+
+  /* Risks */
+  .risk-row { display:grid; grid-template-columns: 178px 1fr; gap:16px; padding:16px 0; border-bottom:1px solid var(--line); }
+  .risk-row:last-child { border-bottom:none; }
+  @media (max-width:600px){ .risk-row { grid-template-columns:1fr; gap:8px; } }
+  .risk-lvl { display:flex; align-items:baseline; gap:8px; }
+  .risk-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; transform: translateY(1px); }
+  .risk-name { font-weight:600; color: var(--ink); font-size:14px; }
+  .risk-hi .risk-dot { background: var(--risk-hi); } .risk-hi .risk-tag { color: var(--risk-hi); }
+  .risk-md .risk-dot { background: var(--risk-md); } .risk-md .risk-tag { color: var(--risk-md); }
+  .risk-tag { font-family: var(--mono); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-top:2px; }
+  .risk-body { font-size:13.5px; color: var(--ink-soft); }
+  .risk-body b { color: var(--ink); font-weight:600; }
+  .risk-body .mit { display:block; margin-top:6px; color: var(--ink-faint); font-size:12.5px; }
+  .risk-body .mit b { color: var(--accent); }
+
+  /* Milestones */
+  .miles { position:relative; margin:8px 0 0; padding-left:26px; }
+  .miles::before { content:""; position:absolute; left:6px; top:6px; bottom:10px; width:2px; background: var(--line-strong); }
+  .mile { position:relative; padding:0 0 22px 4px; }
+  .mile:last-child { padding-bottom:0; }
+  .mile::before { content:""; position:absolute; left:-26px; top:4px; width:12px; height:12px; border-radius:50%; background: var(--surface); border:2px solid var(--accent-bright); }
+  .mile.done::before { background: var(--accent-bright); }
+  .mile .mk { font-family: var(--mono); font-size:11.5px; font-weight:700; color: var(--accent); letter-spacing:.04em; }
+  .mile .mt { font-weight:600; color: var(--ink); font-size:14.5px; margin:2px 0 3px; }
+  .mile .md { font-size:13.5px; color: var(--ink-soft); }
+  code { font-family: var(--mono); font-size:.88em; background: var(--surface-2); padding:1px 5px; border-radius:4px; color: var(--ink-soft); }
+
+  /* Footer */
+  .footer { margin-top:66px; border-top:1px solid var(--line-strong); padding-top:26px; }
+  .footer h3 { margin-top:0; }
+  .maplist { list-style:none; margin:0; padding:0; font-size:13.5px; }
+  .maplist li { padding:11px 0; border-bottom:1px solid var(--line); color: var(--ink-soft); }
+  .maplist li:last-child { border-bottom:none; }
+  .maplist li b { color: var(--ink); font-weight:600; }
+  .maplist li .tag { font-family: var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-right:10px; white-space:nowrap; }
+  .maplist li .tag.biz { background: var(--accent-wash); color: var(--accent); }
+  .maplist li .tag.tech { background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue); }
+  .disclaimer { margin-top:24px; font-family: var(--mono); font-size:11.5px; line-height:1.7; color: var(--ink-faint); max-width:94ch; }
+  .disclaimer b { color: var(--ink-soft); }
+  .colophon { margin-top:20px; font-family: var(--mono); font-size:11px; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="inner">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <p class="eyebrow">Insolvia · Business &amp; Product Strategy</p>
+    <h1>Where the business case meets the build.</h1>
+    <p class="standfirst">One place for Insolvia's <b>business and product context</b> — market, moat, financial model, positioning, the product roadmap, and the <b>MVP strategy</b> — deliberately isolated from the engineering-execution detail. This is the strategy companion to the fully-sourced <a href="business-plan.html">business plan</a>; the technical delivery now lives in <b>GitHub milestones &amp; issues</b>.</p>
+    <div class="metabar">
+      <span><b>Status</b> Working draft</span>
+      <span><b>Updated</b> 2026-07-23</span>
+      <span><b>Sourced figures</b> <a href="business-plan.html">business-plan.html</a></span>
+      <span><b>Execution</b> GitHub milestones &amp; issues</span>
+    </div>
+  </header>
+
+  <!-- 1. THESIS -->
+  <section class="sec" id="thesis">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Strategic thesis</h2></div>
+    <div class="exec">
+      <div class="prose">
+        <p><b>Insolvia</b> prepares, assembles, and e-files consumer bankruptcy cases — Chapters 7, 11, and 13 — for the solo and small firms that file the overwhelming majority of the <b>~574,000</b> U.S. bankruptcy cases filed each year, a non-discretionary market that grew <b>~11%</b> in 2025 and was still climbing through Q1 2026.</p>
+        <p>Three things make this more than "another petition tool":</p>
+        <p><b>1 — A warm channel, not a cold start.</b> We target firms already on <b>MyCase</b>, the cloud practice-management platform used by <b>19,000+ law firms</b> where bankruptcy is a named practice area, reached through direct relationships and MyCase's public API and "App Bar" marketplace. Cold-start distribution is the single biggest killer of vertical software; we largely skip it.</p>
+        <p><b>2 — Integration is the wedge.</b> Best Case is a Stretto walled garden that will never sync cleanly with a rival's practice-management system. By living <em>inside</em> the firm's MyCase workflow, Insolvia ends the double data-entry between practice management and a disconnected petition silo. A native desktop option remains for offline, keyboard-driven drafting — but the wedge is <em>seamlessness</em>, not desktop.</p>
+        <p><b>3 — AI where it is safe, deterministic where it must be.</b> Claude extracts data from credit reports, pay stubs, and bank statements and reviews petitions for errors; the forms and means-test math stay <b>rule-based and deterministic</b>, so the numbers that get filed are never AI-generated. That directly answers the malpractice/hallucination fear slowing AI adoption in law.</p>
+        <p>We enter a <b>~$40M</b> serviceable U.S. market for consumer petition-prep and e-filing, land first in the <b>~850-firm</b> MyCase bankruptcy niche, and model a path to <b>~$5M ARR by Year 5</b>. Every figure is built up and cited in the <a href="business-plan.html">business plan</a>.</p>
+      </div>
+      <aside class="exec-side">
+        <div class="thesis">
+          <span class="lbl">The one-line thesis</span>
+          <p><b>Distribution × integration × safe AI.</b> Reach firms through MyCase, live inside their workflow, and let Claude kill the data-entry — a corner the desktop incumbent and the cloud-only challengers can't occupy at once.</p>
+        </div>
+        <div class="thesis" style="border-left-color:var(--pos);">
+          <span class="lbl" style="color:var(--pos);">Why now</span>
+          <p>Filings are rising double digits, the incumbent has pointed its AI at the corporate side, and MyCase's open API plus frontier AI make a MyCase-native, AI-assisted product genuinely shippable today.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 2. MARKET -->
+  <section class="sec" id="market">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Market at a glance</h2></div>
+    <p class="sec-note">A large, non-discretionary, counter-cyclical market with rising volume, a dominant but AI-slow incumbent, and one genuinely AI-native challenger. Full derivations and sources: <a href="business-plan.html">business plan §2</a>.</p>
+    <div class="stats">
+      <div class="stat"><div class="fig">574<span class="unit">K</span></div><div class="lab">U.S. bankruptcy cases filed, CY2025</div><div class="sub"><span class="delta">▲ 11%</span> vs. 517K in 2024</div></div>
+      <div class="stat"><div class="fig">534<span class="unit">K</span></div><div class="lab">Consumer (non-business) filings, CY2025</div><div class="sub"><span class="delta">▲ 11.5%</span> YoY</div></div>
+      <div class="stat"><div class="fig">~80<span class="unit">%</span></div><div class="lab">Of filings prepared on Best Case by Stretto</div><div class="sub">Incumbent to displace</div></div>
+      <div class="stat"><div class="fig">19<span class="unit">K</span></div><div class="lab">Law firms on MyCase — our distribution channel</div><div class="sub">Bankruptcy is a named vertical</div></div>
+    </div>
+    <p class="prose" style="margin-top:22px;">Bankruptcy is one of the rare software markets that <b>grows when the economy weakens</b>. Demand is legally mandated and recurring, which suits per-seat SaaS. The incumbent, <b>Best Case by Stretto</b>, prepares ~80% of U.S. filings but remains primarily form-automation software — its parent is pouring AI investment into the <em>corporate</em> Chapter 11 side, leaving the consumer petition-prep base (our target) behind on AI.</p>
+
+    <h3>Competitive landscape</h3>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Player</th><th>Model</th><th>AI posture</th><th>Ruthless read</th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">Best Case by Stretto</span></td><td><span class="badge desk">Desktop</span> <span class="badge cloud">Cloud</span></td><td>Form-automation; AI aimed at corporate</td><td>Sticky incumbent to harvest; slow on consumer AI; won't integrate with rival PMs.</td></tr>
+        <tr><td><span class="name">Glade AI <small>the real threat</small></span></td><td><span class="badge cloud">Cloud</span></td><td>AI-native: credit reports → Schedules D/E/F, pay stubs → means test</td><td>Ahead on pure AI, but cloud-only and chasing 50+ case/mo volume firms — not our solo/small warm base.</td></tr>
+        <tr><td><span class="name">NextChapter</span></td><td><span class="badge cloud">Cloud</span></td><td>AI stops at form-fill; no financial analysis</td><td>Modern UX, weak AI, no deep PM integration. Not the threat.</td></tr>
+        <tr><td><span class="name">CINcompass <small>also Stretto</small></span></td><td><span class="badge cloud">Cloud</span></td><td>Limited</td><td>Stretto's own cloud petition-prep; unlimited users.</td></tr>
+        <tr><td><span class="name">Caseway <small>via MyCase</small></span></td><td><span class="badge cloud">Cloud</span></td><td>AI court-form automation, partnered into MyCase</td><td>Generic court forms, not bankruptcy-deep — but proof MyCase partners rather than builds verticals, and a signal to move fast in-channel.</td></tr>
+        <tr class="us"><td><span class="name">Insolvia</span></td><td><span class="badge both">MyCase-native + Desktop</span></td><td>Claude for extraction/review; deterministic filing core</td><td>Only player combining warm MyCase distribution, deep PM integration, and bankruptcy-specialized safe AI.</td></tr>
+      </tbody>
+    </table></div></div>
+    <div class="callout">
+      <span class="lbl">Strategic read</span>
+      <p>The dangerous competitor isn't the slow incumbent — it's <b>Glade AI</b>, which is AI-native but cloud-only and aimed at high-volume firms. We win a different segment (MyCase solo/small firms) through a channel and integration Glade doesn't have, and we neutralise its AI edge with context-aware Claude plus a deterministic compliance core.</p>
+    </div>
+  </section>
+
+  <!-- 3. THE MOAT -->
+  <section class="sec" id="moat">
+    <div class="sec-head"><span class="sec-num">03</span><h2>The moat — distribution × integration × safe AI</h2></div>
+    <p class="sec-note">No single layer is defensible alone — but no competitor occupies all three at once. Out-AI the incumbent; out-distribute and out-integrate the AI-native startup.</p>
+
+    <h3>Distribution — the MyCase channel</h3>
+    <div class="chan">
+      <div class="chan-step focus"><div class="cn">THE PLATFORM</div><div class="cbig">19,000+</div><div class="cd">law firms on MyCase (parent 8am / AffiniPay; 245,000+ legal &amp; accounting professionals; also owns LawPay).</div></div>
+      <div class="chan-step"><div class="cn">OUR BEACHHEAD</div><div class="cbig">~850</div><div class="cd">estimated MyCase firms focused on consumer bankruptcy — the warm, addressable niche we land first. Estimate to validate.</div></div>
+      <div class="chan-step"><div class="cn">THE SURFACE</div><div class="cbig">API + App Bar</div><div class="cd">MyCase's open API and marketplace let us integrate and be discovered in-product; API needs the Advanced tier ($89/mo).</div></div>
+    </div>
+    <p class="prose" style="margin-top:20px;">Vertical SaaS lives or dies on customer-acquisition cost. Warm introductions plus an in-product marketplace collapse CAC and shorten sales cycles versus cold-selling bankruptcy software firm by firm. And once petition data flows automatically between MyCase and Insolvia, <b>ripping us out means re-introducing double data-entry</b> — the deeper the integration, the higher the retention, a moat Best Case structurally can't build into a rival's PM.</p>
+
+    <h3>Safe AI — deterministic where it must be</h3>
+    <div class="grid-2">
+      <div class="card"><h4>Deterministic filing core</h4><p>Forms and the means-test calculation stay rule-based. Claude does extraction and review; it never generates a number or legal text that gets filed. "AI does the typing; the law does the math" — the direct answer to hallucination-driven sanctions.</p></div>
+      <div class="card"><h4>MyCase-context-aware AI</h4><p>Because we integrate, Claude sees the firm's actual case and client data from MyCase — richer extraction and pre-filing review than a standalone tool like Glade can manage.</p></div>
+      <div class="card"><h4>Enterprise data handling</h4><p>Claude runs via Anthropic's API, which does not train on API data and offers zero-retention terms for qualifying use. We position that plainly — not a false "data never leaves the office" claim.</p></div>
+      <div class="card"><h4>Malpractice insurance, reframed</h4><p>A review agent cross-checks schedules vs. means test vs. SOFA, flags missing creditors, exemption errors, and undisclosed transfers against the district's local rules — sold as "a second set of eyes on every petition."</p></div>
+    </div>
+  </section>
+
+  <!-- 4. FINANCIAL MODEL -->
+  <section class="sec" id="model">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Financial model</h2></div>
+    <p class="sec-note">Built bottom-up from public data — an illustrative model, not audited projections. Every figure's derivation and source is in the <a href="business-plan.html">business plan §5</a>; the load-bearing assumptions are listed under the chart.</p>
+    <div class="funnel">
+      <div class="fcard tam"><div class="tag3">TAM</div><div class="amt">~$130M<small> / yr</small></div><div class="desc">All U.S. bankruptcy case-prep &amp; e-filing software, every chapter and firm size, plus practice-management adjacencies on our roadmap. The broadest envelope at full maturity.</div></div>
+      <div class="fcard sam"><div class="tag3">SAM</div><div class="amt">~$40M<small> / yr</small></div><div class="desc">Consumer petition-prep + e-filing for solo &amp; small firms — our product today. ~22,250 seats × ~$1,700.</div></div>
+      <div class="fcard som"><div class="tag3">SOM · BEACHHEAD</div><div class="amt">~$3.3M<small> ARR</small></div><div class="desc">The MyCase consumer-bankruptcy niche at full penetration: ~850 firms × 2.5 seats × $1,548. Our warm entry point.</div></div>
+    </div>
+
+    <div class="chartcard" style="margin-top:20px;">
+      <div class="chart-top"><h4>Modeled ARR — land in MyCase, then expand</h4><span class="cap">seat-based · ~$1,550–1,610 / seat / yr</span></div>
+      <div class="chart">
+        <div class="col"><span class="val">$0.14M</span><div class="bar" style="height:3%"></div></div>
+        <div class="col"><span class="val">$0.52M</span><div class="bar" style="height:10%"></div></div>
+        <div class="col"><span class="val">$1.4M</span><div class="bar" style="height:28%"></div></div>
+        <div class="col"><span class="val">$2.9M</span><div class="bar" style="height:58%"></div></div>
+        <div class="col peak"><span class="val">$5.0M</span><div class="bar" style="height:100%"></div></div>
+      </div>
+      <div class="xrow">
+        <div class="x"><div class="yr">Year 1</div><div class="seats">~35 firms · 90 seats</div></div>
+        <div class="x"><div class="yr">Year 2</div><div class="seats">~130 firms · 330 seats</div></div>
+        <div class="x"><div class="yr">Year 3</div><div class="seats">~350 firms · 890 seats</div></div>
+        <div class="x"><div class="yr">Year 4</div><div class="seats">~680 firms · 1,800 seats</div></div>
+        <div class="x"><div class="yr">Year 5</div><div class="seats">~1,150 firms · 3,100 seats</div></div>
+      </div>
+      <div class="assump">
+        <div class="a"><span class="k">Y1–Y3</span> <span>Saturate the ~850-firm MyCase niche</span></div>
+        <div class="a"><span class="k">Y4–Y5</span> <span>Expand to non-MyCase firms in the SAM</span></div>
+        <div class="a"><span class="k">Price</span> <span><b>$129/seat/mo</b>, desktop included</span></div>
+        <div class="a"><span class="k">Y5 vs SAM</span> <span>~$5.0M ≈ <b>~13%</b> of the $40M SAM</span></div>
+      </div>
+    </div>
+    <div class="method"><span class="mlabel">Load-bearing assumptions</span> <b>~60</b> consumer cases/firm/yr, <b>~2.5</b> preparer seats/firm, <b>~$1,700</b> blended willingness-to-pay, and the <b>~4.5%</b> bankruptcy share of MyCase firms (range 3–6%, which moves the beachhead between ~$2.2M and ~$4.4M). Vendor/market claims should be independently verified before external or fundraising use — see the disclaimer in the business plan.</div>
+  </section>
+
+  <!-- 5. CUSTOMER & POSITIONING -->
+  <section class="sec" id="customer">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Customer &amp; positioning</h2></div>
+    <p class="sec-note">Beachhead: solo and small (2–15 seat) consumer-bankruptcy firms already running MyCase, currently bolting a disconnected Best Case onto their practice and re-keying data between the two.</p>
+
+    <h3>Jobs to be done</h3>
+    <ul class="jobs">
+      <li><span class="jn">1</span><span class="jt">Intake a client's full financial picture quickly and accurately, without re-typing what's already in MyCase.</span></li>
+      <li><span class="jn">2</span><span class="jt">Produce compliant petitions, schedules, and the means test with minimal re-keying.<span class="hot">hair-on-fire</span></span></li>
+      <li><span class="jn">3</span><span class="jt">E-file to the court (CM/ECF) and retrieve case numbers and receipts.<span class="hot">hair-on-fire</span></span></li>
+      <li><span class="jn">4</span><span class="jt">Track deadlines, court notices (PACER), and Proof-of-Claim events.</span></li>
+      <li><span class="jn">5</span><span class="jt">Bill, manage trust accounting, and keep matters organised — ideally without leaving MyCase.</span></li>
+    </ul>
+    <p class="prose" style="margin-top:16px;">The urgent job is <b>#2 + #3 with confidence in compliance</b> — a wrong or stale form is a filed error that risks money and sanctions. Insolvia owns that job first (AI extraction + deterministic forms + a review agent), then expands outward into notices and practice management.</p>
+
+    <h3>Five reasons a MyCase bankruptcy firm switches</h3>
+    <div class="grid-2">
+      <div class="diff"><span class="n">01 · the channel</span><h4>Warm MyCase distribution</h4><p>Reached through relationships and an in-product marketplace, not cold outbound. The hardest-to-copy advantage.</p></div>
+      <div class="diff"><span class="n">02 · the wedge</span><h4>Native integration, no double-entry</h4><p>Petition data flows with the MyCase practice. Best Case, a Stretto silo, can't offer this into a rival PM.</p></div>
+      <div class="diff"><span class="n">03 · safe AI</span><h4>Deterministic core + context-aware Claude</h4><p>AI kills data-entry; the filed numbers stay rule-based. Faster than the incumbent, safer than a generative bolt-on.</p></div>
+      <div class="diff"><span class="n">04</span><h4>Compliance-forward forms engine</h4><p>Versioned federal + local forms with a visible update cadence and change log, so attorneys trust what they file.</p></div>
+      <div class="diff"><span class="n">05 · the lever</span><h4>Painless, AI-assisted migration</h4><p>Claude parses Best Case exports on day one — turning the incumbent's data lock-in into our onboarding path.</p></div>
+    </div>
+  </section>
+
+  <!-- 6. PRODUCT ROADMAP -->
+  <section class="sec" id="roadmap">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Product scope &amp; module roadmap</h2></div>
+    <p class="sec-note">Phased from MVP to v1. Each phase is independently valuable, so we ship, learn, and monetise before the platform is "complete."</p>
+    <div class="phases">
+      <div class="phase done"><div class="pid">P0<small>Foundation</small></div><div class="pbody"><h4>Foundation</h4><div class="mods">Monorepo, design system, cross-platform app shell, CI/CD, AWS infra (staging + prod).</div><div class="out"><b>Outcome:</b> Deployable skeleton — desktop + web proven end-to-end.</div></div></div>
+      <div class="phase now"><div class="pid">P1<small>MyCase</small></div><div class="pbody"><h4>MyCase integration &amp; intake</h4><div class="mods">MyCase API sync, App Bar presence, secure intake, AI extraction (credit reports, pay stubs).</div><div class="out"><b>Outcome:</b> Data flows from MyCase; no double entry.</div></div></div>
+      <div class="phase"><div class="pid">P2<small>Forms</small></div><div class="pbody"><h4>Forms &amp; petition engine</h4><div class="mods">Versioned templates, schedules, deterministic petition assembly, PDF generation, AI review agent.</div><div class="out"><b>Outcome:</b> Compliant petition packet from intake data.</div></div></div>
+      <div class="phase"><div class="pid">P3<small>Means test</small></div><div class="pbody"><h4>Means test</h4><div class="mods">Chapter 7 means test with IRS / Census data (rule-based).</div><div class="out"><b>Outcome:</b> Automated eligibility calculation.</div></div></div>
+      <div class="phase"><div class="pid">P4<small>E-filing</small></div><div class="pbody"><h4>E-filing</h4><div class="mods">CM/ECF integration, receipts / case numbers, post-petition automation.</div><div class="out"><b>Outcome:</b> File to the court from within Insolvia.</div></div></div>
+      <div class="phase"><div class="pid">P5<small>Notices</small></div><div class="pbody"><h4>Notices &amp; calendar</h4><div class="mods">PACER pull, deadline tracking, Proof-of-Claim, calendar sync.</div><div class="out"><b>Outcome:</b> Never miss a court event.</div></div></div>
+      <div class="phase"><div class="pid">P6<small>Practice</small></div><div class="pbody"><h4>Practice management</h4><div class="mods">Billing / invoicing, time &amp; expense, trust accounting (or deepen MyCase sync).</div><div class="out"><b>Outcome:</b> Run the practice, not just the filing.</div></div></div>
+    </div>
+  </section>
+
+  <!-- 7. COMPLIANCE / STALENESS -->
+  <section class="sec" id="compliance">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Product compliance &amp; the staleness obligation</h2></div>
+    <p class="sec-note">A product truth, not a legal appendix: for a filing product the real risk is not missing features — it is shipping <em>stale</em> ones. Drawn from the <a href="regulatory-source-register.html">regulatory source register</a>.</p>
+    <div class="grid-2">
+      <div class="card"><h4>The real product risk is staleness, not features</h4><p>The feature list for a bankruptcy tool is knowable by reading the statutes and court specs. The hard part is that the inputs move: dollar thresholds, income tables, and expense standards change on fixed schedules. A correct product that goes unmaintained becomes a wrong one on a known date.</p></div>
+      <div class="card"><h4>State exemptions &amp; local court variation are the hidden iceberg</h4><p>Federal forms are only half the surface. Exemptions vary by state and local rules vary by district (94 federal jurisdictions), and both must be versioned and auditable — this is why the forms engine is "compliance-forward" with a published update cadence, not a static template pack.</p></div>
+    </div>
+    <div class="callout">
+      <span class="lbl">The maintenance calendar — an ongoing obligation, not a one-time load</span>
+      <p>Three inputs refresh on <b>scheduled cadences with effective-date fields</b>: the <b>§522 dollar amounts</b> (adjusted every 3 years), <b>Census median-income figures</b> (2–4× per year), and the <b>IRS expense standards</b> (periodically). These are recurring data pipelines the means-test and forms engines depend on — infrastructure of their own, and a commitment to attorneys that what they file is current.</p>
+    </div>
+  </section>
+
+  <!-- 8. MVP STRATEGY -->
+  <section class="sec" id="mvp">
+    <div class="sec-head"><span class="sec-num">08</span><h2>MVP strategy</h2></div>
+    <p class="sec-note">The business/product logic of the MVP — what we build first and why. The granular technical execution (infra, CI, per-issue work) lives in the <b>GitHub milestones &amp; issues</b>; this section is the reasoning behind the sequence, not the ticket list.</p>
+
+    <h3>How the MVP maps to company milestones</h3>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Company milestone</th><th>What it delivers</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">M0 · Foundation repo</span></td><td>Design system, cross-platform app shell, CI/CD, and AWS infra authored.</td><td>Shipped</td></tr>
+        <tr><td><span class="name">M1 · Live staging + MyCase spike</span></td><td>Domain live, staging deploying, and the first authenticated MyCase read/write proving the integration is real.</td><td>In build</td></tr>
+        <tr><td><span class="name">M2 · MyCase-native intake + AI extraction</span></td><td>Intake behind auth, data syncing from MyCase, Claude extracting credit reports &amp; pay stubs — with a design-partner firm.</td><td>Next</td></tr>
+        <tr><td><span class="name">M3 · Compliant Chapter 7 packet</span></td><td>Deterministic forms &amp; petition engine producing a compliant Chapter 7 packet end-to-end, with the AI review agent.</td><td>Planned</td></tr>
+      </tbody>
+    </table></div></div>
+
+    <h3>The product decisions that shape the MVP</h3>
+    <div class="grid-2">
+      <div class="card"><h4>The MyCase spike is the go/no-go on the whole thesis</h4><p>The entire GTM rests on the channel being real. So the first milestone proves it: one authenticated read <em>and</em> one write round-trip against MyCase. Access is de-risked — a founder's business partner works at MyCase — so this is fast, but the answer still matters: if write endpoints for the fields intake needs don't exist, the wedge changes shape. Far better discovered now than after building around it.</p></div>
+      <div class="card"><h4>Web-first; desktop is built but not promoted</h4><p>We push customers to the web app. Both desktop targets stay built on one Flutter codebase and installable, but they are not led with — no code-signing procurement yet. Desktop is the answer <em>if</em> attorneys refuse to leave the desktop habit: held ready, not the pitch. This removes the longest procurement lead time and preserves the Flutter optionality at almost no cost.</p></div>
+      <div class="card"><h4>Safe AI is a compliance stance, not just a feature</h4><p>Confining Claude to extraction and review — never generating a filed number or legal value — is the product's answer to the malpractice fear that slows legal-AI adoption. It is also why a server-side trust boundary is non-negotiable: we handle SSNs and full financials under GLBA Safeguards, so no client ever holds credentials or talks to a data service directly.</p></div>
+      <div class="card"><h4>Migration is an onboarding lever, not an afterthought</h4><p>Claude parsing Best Case exports on day one turns the incumbent's data lock-in into our fastest path in. Timed to renewal cycles, it lowers the switching cost that otherwise protects an 80%-share incumbent.</p></div>
+    </div>
+
+    <div class="callout">
+      <span class="lbl">What the foundation MVP is really proving</span>
+      <p>The foundation isn't the product — it's the <b>proof the delivery pipeline and the channel both work</b>: infrastructure live end-to-end on web (and desktop kept green in CI), and the MyCase integration demonstrated read-and-write. Everything customer-facing — intake, extraction, the forms engine — is deliberately staged behind that proof.</p>
+    </div>
+  </section>
+
+  <!-- 9. GO-TO-MARKET -->
+  <section class="sec" id="gtm">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Go-to-market</h2></div>
+    <p class="sec-note">Channel-led: use the MyCase relationship and marketplace to land the warm niche, then expand outward.</p>
+    <div class="gtm">
+      <div class="gcard"><div class="gt">Land via MyCase</div><p>Warm introductions to MyCase consumer-bankruptcy firms; get listed in the App Bar so we're discoverable in-product.</p></div>
+      <div class="gcard"><div class="gt">Integration is the demo</div><p>Lead every demo with data flowing automatically from MyCase — the one thing Best Case can't do.</p></div>
+      <div class="gcard"><div class="gt">Diversify the channel early</div><p>Stand up a second acquisition path (direct + NACBA) so we're not solely dependent on MyCase.</p></div>
+      <div class="gcard"><div class="gt">Migrate off Best Case</div><p>AI-assisted import turns the incumbent's exports into onboarding, timed to renewal cycles.</p></div>
+    </div>
+  </section>
+
+  <!-- 10. STRATEGIC RISKS -->
+  <section class="sec" id="risks">
+    <div class="sec-head"><span class="sec-num">10</span><h2>Strategic risks</h2></div>
+    <p class="sec-note">The business and product risks most likely to bite — named honestly, with mitigations. Engineering-execution risks live with their issues; these are the ones that shape the strategy.</p>
+    <div class="risk-row risk-hi">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">Platform dependency (MyCase)</div><div class="risk-tag">High</div></div></div>
+      <div class="risk-body">We'd be a tenant on MyCase's land — API terms, pricing, and partner favouritism are theirs; they could pick another bankruptcy partner or build it. The warm channel currently rests on a personal relationship, which moves with the person.<span class="mit"><b>Mitigation:</b> deep integration + a <b>formal partnership</b> (not just warm intros), and a second channel (direct/NACBA) from day one so no single platform is existential. Confirm the relationship's nature before leaning on it in a raise.</span></div>
+    </div>
+    <div class="risk-row risk-hi">
+      <div class="risk-lvl"><span class="risk-dot" style="background:var(--neg)"></span><div><div class="risk-name">Forms accuracy</div><div class="risk-tag" style="color:var(--neg)">Existential</div></div></div>
+      <div class="risk-body">A wrong or stale form is a filed error. This is the staleness obligation in §7, seen as a risk.<span class="mit"><b>Mitigation:</b> versioned, auditable, deterministic forms pipeline with a published update SLA — never AI-generated filing values.</span></div>
+    </div>
+    <div class="risk-row risk-hi">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">AI hallucination / UPL</div><div class="risk-tag">High</div></div></div>
+      <div class="risk-body">Generative legal AI hallucinates on ~1 in 6 queries; courts are sanctioning AI-fabricated content.<span class="mit"><b>Mitigation:</b> confine Claude to extraction/review; deterministic core for anything filed; no legal-advice surfaces.</span></div>
+    </div>
+    <div class="risk-row risk-hi">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">Data security &amp; PII</div><div class="risk-tag">High</div></div></div>
+      <div class="risk-body">We handle SSNs and full financials under GLBA Safeguards and state law; AI adds a processor.<span class="mit"><b>Mitigation:</b> server-side trust boundary, encryption in transit/at rest, least-privilege, audit logging; Anthropic API with no-training + zero-retention terms.</span></div>
+    </div>
+    <div class="risk-row risk-md">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">MyCase write coverage</div><div class="risk-tag">Medium</div></div></div>
+      <div class="risk-body">Access is de-risked, but whether the API exposes <em>write</em> endpoints for the fields intake needs is a property of the surface, not the relationship. Practice-management APIs are often generous on read and thin on write.<span class="mit"><b>Mitigation:</b> answer it first, cheaply — the documentation spike and a write round-trip in the MyCase milestone, before intake is designed around it.</span></div>
+    </div>
+    <div class="risk-row risk-md">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">Web-first is a bet on attorney behaviour</div><div class="risk-tag">Medium</div></div></div>
+      <div class="risk-body">The market is described as desktop-loyal. Pushing web is right, but it's an assumption worth testing explicitly rather than discovering late.<span class="mit"><b>Mitigation:</b> cheap to test with the design-partner firm — the desktop build exists and is kept green in CI, so reversing is a marketing + certificate decision, not a rebuild.</span></div>
+    </div>
+    <div class="risk-row risk-md">
+      <div class="risk-lvl"><span class="risk-dot"></span><div><div class="risk-name">Incumbent + AI-native rivals</div><div class="risk-tag">Medium</div></div></div>
+      <div class="risk-body">Stretto's data/court relationships are real; Glade is ahead on pure AI.<span class="mit"><b>Mitigation:</b> compete on the intersection — channel, integration, and safe AI — not any single axis.</span></div>
+    </div>
+  </section>
+
+  <!-- 11. MILESTONES -->
+  <section class="sec" id="milestones">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Milestones &amp; where we are</h2></div>
+    <p class="sec-note">Company milestones tied to engineering delivery — the plan is real because the repo is real. Detailed tasks are tracked as GitHub issues.</p>
+    <div class="miles">
+      <div class="mile done"><div class="mk">M0 · SHIPPED</div><div class="mt">Foundation repo</div><div class="md">Design system + cross-platform app shell + CI/CD + AWS infra authored.</div></div>
+      <div class="mile"><div class="mk">M1 · IN BUILD</div><div class="mt">Live staging + MyCase API spike</div><div class="md">insolvia.ai DNS live → staging deploy; first authenticated MyCase API read/write proving the integration.</div></div>
+      <div class="mile"><div class="mk">M2 · NEXT</div><div class="mt">MyCase-native intake + AI extraction</div><div class="md">Intake behind auth, data syncing from MyCase, Claude extracting credit reports &amp; pay stubs, with a design-partner firm.</div></div>
+      <div class="mile"><div class="mk">M3 · PLANNED</div><div class="mt">Compliant Chapter 7 packet</div><div class="md">Deterministic forms &amp; petition engine producing a compliant Chapter 7 packet end-to-end, with the AI review agent.</div></div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <h3>How the documentation is organised now</h3>
+    <ul class="maplist">
+      <li><span class="tag biz">Business</span> <b>This document</b> — the consolidated business &amp; product strategy (market, moat, model, positioning, roadmap, MVP strategy, strategic risks).</li>
+      <li><span class="tag biz">Business</span> <b>business-plan.html</b> — the fully-sourced company business plan; every market/financial figure with its derivation and citation.</li>
+      <li><span class="tag biz">Business</span> <b>regulatory-source-register.html</b> — the product/compliance surface and the maintenance calendar.</li>
+      <li><span class="tag tech">Technical</span> <b>GitHub milestones &amp; issues</b> — the engineering execution: infra, CI, per-issue delivery work. This is where the technical detail that used to live in the MVP plan now lives.</li>
+      <li><span class="tag tech">Technical</span> <b>MVP_PLAN.md</b> — now a thin index: the decision log (D1–D8) and a milestone map pointing to the issues.</li>
+      <li><span class="tag tech">Technical</span> <b>ARCHITECTURE.md · AWS_SETUP.md · EMAIL_SETUP.md · TERRAFORM_ARCHITECTURE.md · PACKAGE_PUBLISHING.md · adr/</b> — engineering runbooks and architecture-decision records.</li>
+    </ul>
+    <p class="disclaimer"><b>On the figures.</b> Market-size, firm-count, seat, and revenue numbers are an illustrative model derived from public sources using the assumptions shown — <b>not audited projections</b>, and reproduced here from the business plan without change. The single copy of record for the figures and their citations is <a href="business-plan.html">business-plan.html</a>; do not let the two drift. Vendor/market claims — "~80% of filings," competitor pricing, "19,000+ firms" — are as reported by their sources and should be independently verified before external or fundraising use. The MyCase relationship should be confirmed (formal partnership / App Bar listing vs. warm introductions) before the channel is leaned on in a raise.</p>
+    <p class="colophon">Insolvia · Business &amp; Product Strategy · Working draft · 2026-07-23 · Consolidated from the business plan, the non-technical portions of the MVP plan, and the regulatory source register.</p>
+  </footer>
+
+</div>
+</div>
+</body>
+</html>

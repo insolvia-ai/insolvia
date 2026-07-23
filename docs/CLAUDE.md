@@ -3,8 +3,9 @@
 These are Insolvia's docs. The root [`../CLAUDE.md`](../CLAUDE.md) is the source
 of truth for conventions — read it first.
 
-- [`business-plan.html`](business-plan.html) — what we're building and why (Best Case competitor).
-- [`MVP_PLAN.md`](MVP_PLAN.md) — foundation milestone/issue breakdown; the source for the GitHub MVP project board.
+- [`business-plan.html`](business-plan.html) — what we're building and why (Best Case competitor); the fully-sourced company business plan.
+- [`business-product-strategy.html`](business-product-strategy.html) — consolidated **business & product strategy**: market, moat, financial model, positioning, product roadmap, MVP strategy, and strategic risks — the business/product context isolated from technical execution.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — now a thin **index**: the decision log (D1–D8) and a foundation milestone map. The per-issue technical detail lives in the GitHub milestones/issues; the business/product context moved to `business-product-strategy.html`.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — one-time AWS/GitHub bootstrap runbook.
 - [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — `insolvia.ai` mail: address map, inbound forwarding, the Gmail "Send mail as" runbook, and the Google Workspace migration path.
 - [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — infra state model.
