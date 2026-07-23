@@ -5,8 +5,14 @@
 #   • DKIM signing (3 CNAMEs) so outbound mail is signed
 #   • a custom MAIL FROM subdomain (mail.insolvia.ai) so the Return-Path
 #     aligns with our domain instead of amazonses.com
-#   • apex MX / SPF / DMARC so we can RECEIVE mail and so receivers know which
-#     senders are legitimate
+#   • apex MX pointing inbound mail at Google Workspace, plus SPF / DMARC so
+#     receivers know which senders are legitimate
+#
+# Sending and receiving are deliberately split across two providers: SES sends
+# transactional mail as no-reply@, Google Workspace holds the human mailboxes.
+# Nothing here receives mail into AWS any more — the SES inbound forwarder that
+# used to own hello@ / support@ / security@ was removed when the Workspace
+# mailboxes replaced it.
 #
 # Ported from andreas-services/humbugg/infra/modules/email.
 
@@ -14,11 +20,12 @@ locals {
   mail_from_domain = "mail.${var.domain_name}"
   from_address     = "no-reply@${var.domain_name}"
 
-  # SPF authorising SES to send as insolvia.ai. Note this is the APEX SPF and is
-  # separate from the MAIL FROM subdomain's SPF below — receivers check SPF
-  # against the Return-Path (MAIL FROM) domain, while DMARC alignment checks it
-  # against the From: header domain, so both records need to exist.
-  apex_spf_record = "v=spf1 include:amazonses.com -all"
+  # SPF authorising our senders to send as insolvia.ai — see `var.spf_includes`
+  # for who and why. Note this is the APEX SPF and is separate from the MAIL FROM
+  # subdomain's SPF below — receivers check SPF against the Return-Path (MAIL
+  # FROM) domain, while DMARC alignment checks it against the From: header
+  # domain, so both records need to exist.
+  apex_spf_record = "v=spf1 ${join(" ", [for host in var.spf_includes : "include:${host}"])} -all"
 
   # Route53 allows exactly ONE TXT record set per name, so every apex TXT value
   # (SPF today; a domain-ownership token or similar tomorrow) must live in this
@@ -96,20 +103,19 @@ resource "aws_route53_record" "mail_from_spf" {
 }
 
 # ── Apex mail DNS ───────────────────────────────────────────────
-# MX for the APEX. This is the INBOUND endpoint: it points mail addressed to
-# @insolvia.ai at SES receiving, which is what lets us accept mail at all.
+# MX for the APEX. This is the INBOUND endpoint: it decides who receives mail
+# addressed to @insolvia.ai — Google Workspace, as of the move to real mailboxes.
+# See `var.apex_mx_records` for why this is an exclusive choice.
+#
 # Distinct from `mail_from_mx` above, which only handles bounce/complaint
 # feedback for the MAIL FROM subdomain. Getting these two backwards silently
 # breaks inbound mail, so they are deliberately kept apart.
-#
-# The hostname is region-specific and SES receiving is only offered in a subset
-# of regions; us-east-1 (our region everywhere) is one of them.
 resource "aws_route53_record" "apex_mx" {
   zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "MX"
   ttl     = 300
-  records = ["10 inbound-smtp.${var.aws_region}.amazonaws.com"]
+  records = var.apex_mx_records
 }
 
 # Single apex TXT record set — see `local.apex_txt_records`.

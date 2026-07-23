@@ -297,7 +297,7 @@ block a merge. The workflows above are now shaped to allow turning them on. The
 remaining step is a **repo-settings change that must be made by a human in the
 GitHub UI or API** — nothing in this repo can grant itself branch protection.
 
-In `protect-main` → *Require status checks to pass*, add exactly these eleven,
+In `protect-main` → *Require status checks to pass*, add exactly these ten,
 which are the job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
@@ -307,7 +307,6 @@ which are the job `name:` values (matrix legs get a `(leg)` suffix):
 | `Flutter design system` | `design-system-pr.yml` |
 | `React design system` | `design-system-react-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
-| `Inbound forwarder` | `inbound-forwarder-pr.yml` |
 | `API service` | `api-pr.yml` |
 | `Dart API client` | `api-client-pr.yml` |
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |

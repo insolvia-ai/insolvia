@@ -39,7 +39,7 @@ naming convention.
 | D4 | The **design system becomes dual-target**: Flutter package + React package, over one shared token source | Consequence of D3. If we're adding a framework, the design system serves both rather than fragmenting the brand. See D4 below. |
 | D5 | **The API is required for MVP**, not deferred | The desktop app is a fat client on an attorney's machine. It cannot hold AWS credentials. Per `docs/regulatory-source-register.html`, we handle SSNs and full financials under GLBA Safeguards — the trust boundary has to live server-side. |
 | D6 | Backend stack is **Python + Flask + Mangum on Lambda** | Confirmed against `andreas-services/mailer/requirements.txt` (Flask 3.1.2, Mangum 0.17, gunicorn) — the established house pattern, used by mailer, storybook, and website. |
-| D7 | Human email and product email are **separate milestones** | Inbound forwarding to Gmail is cheap, urgent, and has no app dependency. The mailer service depends on the API. Bundling them would block the urgent thing behind the slow thing. |
+| D7 | Human email and product email are **separate milestones, and now separate providers** | Human mailboxes were urgent and have no app dependency; the mailer service depends on the API. Bundling them would block the urgent thing behind the slow thing. Originally SES→Gmail forwarding; superseded by **Google Workspace for inbound, SES for outbound `no-reply@`** — only one apex MX set exists, so this is exclusive, not additive. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md). |
 | D8 | **Web is the promoted path. Desktop is built but not promoted** — unsigned, no certificate procurement yet | See D8 below. |
 
 ### D2 — the subdomain map
@@ -315,18 +315,18 @@ port, not a design exercise.
 | ~~1.4~~ | ~~Delegate registrar NS → Route53~~ — ✅ **DONE** | Gandi delegates to zone `Z01038711J6IZ68FD6ZDW`. |
 | 1.0 | **Create the Terraform state bucket** — `insolvia-terraform-state` | Bootstrap step 1 of `docs/AWS_SETUP.md`, **not yet done**. `terraform init` cannot run without it — every `backend.tf` in the repo points at this bucket. This is now the first action in the whole plan. |
 | 1.1b | **⚠️ `terraform import` the existing hosted zone before the first apply** | **Critical — see the trap below.** `terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW`. Skipping this silently breaks DNS *and* hangs the certificate. |
-| 1.2 | Verify the destination Gmail address as an SES identity | Sandbox requires it. Enough to make inbound forwarding fully testable — see the sandbox note below. **SES production access is deliberately deferred to issue 6.8.** |
+| ~~1.2~~ | ~~Verify the destination Gmail address as an SES identity~~ — ❌ **SUPERSEDED** | Only existed to make SES→Gmail forwarding testable in the sandbox. Inbound is Google Workspace now; there is no forwarding destination to verify. **SES production access is still deferred to issue 6.8.** |
 | 1.3 | Apply `infra/envs/shared` — wildcard ACM, OIDC provider, deploy role | Confirmed **not applied**: no state bucket, no OIDC provider, no `insolvia-github-actions` role, no ACM certificate. Only the zone exists. Blocked by 1.0 + 1.1b. |
 | 1.3b | Confirm the wildcard ACM cert reaches `ISSUED` | `infra/envs/staging/main.tf` looks the cert up with `statuses = ["ISSUED"]`, so every downstream env fails at plan time with a misleading "no matching certificate" error until this is true. |
 | ~~1.3c~~ | ~~Wire the `AWS_ROLE_ARN` secret~~ — ✅ **DONE** | Step 5 of `AWS_SETUP.md`; deploys authenticate through it. |
 | 1.3d | Update `docs/AWS_SETUP.md` | Its status banner still says the domain is the current blocker. It isn't. Add the state-bucket and zone-import steps while you're there. |
 | 1.5 | New `infra/modules/email`: SES domain identity, DKIM, custom MAIL FROM | Port from `humbugg/infra/modules/email/`. |
-| 1.6 | SPF, DMARC, and MX records for `insolvia.ai` | MX → `inbound-smtp.us-east-1.amazonaws.com`. Start DMARC at `p=none`, tighten later. |
-| 1.7 | Port `support_forwarding` → `infra/modules/inbound_forwarding` | Rule set, S3 inbound bucket w/ lifecycle expiry, Lambda, IAM. |
-| 1.8 | Port forwarder Lambda source → `services/inbound_forwarder/` | Rename the `X-Humbugg-Forwarded` loop marker → `X-Insolvia-Forwarded`. Keep the safety gates (spam/virus verdict, loop detection, allowed-recipient check) and the rebuild-the-message-from-scratch approach — do not relay untrusted headers. |
-| 1.9 | SSM SecureString for the private forward-to destination | Value injected once via `TF_VAR_`, then `ignore_changes`. Never committed. |
-| 1.10 | DLQ + CloudWatch alarm on the forwarder | Misconfiguration must surface on an alarm, not silently drop a client's mail. |
-| 1.11 | Address map — **confirmed** | `hello@` (general), `support@` (product), `no-reply@` (transactional sender), `security@` (disclosure). All forward to Gmail for now; `no-reply@` is send-only and should be excluded from the forwarder's allowed-recipient list. |
+| 1.6 | SPF, DMARC, and MX records for `insolvia.ai` | MX → `1 smtp.google.com` (Google Workspace). Apex SPF must include **both** `amazonses.com` and `_spf.google.com`. Start DMARC at `p=none`, tighten once Google DKIM is live. |
+| ~~1.7~~ | ~~Port `support_forwarding` → `infra/modules/inbound_forwarding`~~ — ❌ **SUPERSEDED, then removed** | Built, then torn out when Google Workspace took over inbound. Only one apex MX set can exist, so SES receiving and Workspace are mutually exclusive. |
+| ~~1.8~~ | ~~Port forwarder Lambda source → `services/inbound_forwarder/`~~ — ❌ **SUPERSEDED, then removed** | Same reason as 1.7. |
+| ~~1.9~~ | ~~SSM SecureString for the private forward-to destination~~ — ❌ **SUPERSEDED, then removed** | No forwarding destination exists. Delete the `INBOUND_FORWARD_TO` GitHub environment secret by hand. |
+| ~~1.10~~ | ~~DLQ + CloudWatch alarm on the forwarder~~ — ❌ **SUPERSEDED, then removed** | Same reason as 1.7. |
+| 1.11 | Address map — **confirmed** | `hello@` (general), `support@` (product), `security@` (disclosure) are real Google Workspace mailboxes. `no-reply@` is an SES send-only transactional sender with no inbox. |
 | ~~1.12~~ | ~~SES SMTP credentials + Gmail "Send mail as" runbook~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md`](EMAIL_SETUP.md), ported from `humbugg/docs/support-forwarding.md`. Creating the credentials and adding the Gmail alias remain human steps; replies stay broken until 6.8. |
 | ~~1.13~~ | ~~Un-gate the deploy workflows~~ — ✅ **DONE** | 1.3 + 1.3b hold, deploys run for real, and the temporary deploy gate has been removed from the workflows entirely. |
 | ~~1.14~~ | ~~Document the Google Workspace migration path~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md` § Migrating to Google Workspace](EMAIL_SETUP.md#migrating-to-google-workspace) — ordered cutover checklist plus what to verify after. |
@@ -343,19 +343,20 @@ What that means in practice:
 
 | Capability | In sandbox |
 |---|---|
-| Inbound receipt rules (SES → S3 → Lambda) | ✅ Unaffected — sandbox is an *outbound* restriction |
-| Forwarding inbound mail to your Gmail | ✅ Works, once that Gmail address is a verified SES identity (issue 1.2) |
-| Sending to any other address | ❌ Blocked unless that exact address is verified |
-| **Replying as `hello@insolvia.ai` via SES SMTP** | ❌ **Blocked** — the recipient isn't verified |
+| Receiving mail at `@insolvia.ai` | ✅ Unaffected — inbound is Google Workspace, not SES |
+| Humans replying from their Workspace mailboxes | ✅ Unaffected — sends via Google, not SES |
+| **The app sending transactional mail as `no-reply@`** | ❌ **Blocked** unless the recipient is itself a verified SES identity |
 | Sending volume | 200/day, 1 msg/sec |
 
-**The catch to plan around:** M1's outcome is "mail lands in Gmail **and** you can
-reply as that address." Sandbox delivers the first half only. Inbound works and
-is fully testable; the reply-from-our-domain half stays dark until 6.8 lands.
-Until then, replies go from your own Gmail address.
+**The catch to plan around:** the sandbox no longer touches human mail at all —
+Google Workspace handles inbound and human replies end to end. What stays dark
+until 6.8 is the **application's** outbound: waitlist confirmations, password
+resets, and anything else sent as `no-reply@insolvia.ai` can only reach verified
+identities.
 
-That's an acceptable trade while there's no inbound volume — but it means
-**issue 6.8 should not slip indefinitely**, or the mailbox stays half-built.
+That's fine while there are no users — but it means **issue 6.8 gates the first
+real product email**, so it should not slip past the point where the app needs
+to mail a stranger.
 
 ### ⚠️ The duplicate-hosted-zone trap — read before running `terraform apply`
 

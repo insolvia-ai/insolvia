@@ -37,9 +37,8 @@ locals {
   # insolvia-api-<env> — the repo/Lambda/API/alarm name stem.
   name = "${var.project}-api-${var.environment}"
 
-  # The per-environment API config namespace (#70). Same shape as the
-  # inbound-forwarding parameter (/insolvia/shared/...): /<project>/<env>/...,
-  # with an /api segment so later services can claim sibling namespaces.
+  # The per-environment API config namespace (#70): /<project>/<env>/..., with
+  # an /api segment so later services can claim sibling namespaces.
   ssm_prefix = "/${var.project}/${var.environment}/api"
 }
 
@@ -328,9 +327,8 @@ resource "aws_route53_record" "api" {
 #   waitlist-table-name  -> WAITLIST_TABLE_NAME
 #
 # Future secrets (#65/#70 consumers) slot in as SecureString siblings with
-# `lifecycle { ignore_changes = [value] }`, exactly like the
-# /insolvia/shared/inbound-forward-to parameter — Terraform creates the slot,
-# a human or CI owns the value, and nothing secret is ever committed.
+# `lifecycle { ignore_changes = [value] }` — Terraform creates the slot, a human
+# or CI owns the value, and nothing secret is ever committed.
 
 resource "aws_ssm_parameter" "config" {
   for_each = {
