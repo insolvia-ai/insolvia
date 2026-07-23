@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Button } from "@insolvia/design-system";
+import { Button } from "@insolvia-ai/design-system";
 
 // Every claim here traces to docs/business-plan.html §1 (the wedge is
 // seamlessness: MyCase-native, no double entry; AI kills data entry while the

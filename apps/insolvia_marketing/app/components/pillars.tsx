@@ -1,4 +1,4 @@
-import { Card } from "@insolvia/design-system";
+import { Card } from "@insolvia-ai/design-system";
 
 // The four customer-facing pillars, translated from docs/business-plan.html §7.
 // §7 lists five; the first ("warm MyCase distribution") is internal go-to-market
