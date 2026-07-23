@@ -15,6 +15,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
+| `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--yes`, `--no-watch` |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Flutter app | Shared base → workspace `fvm flutter pub get` at the repo root; `dev-up.sh` runs `fvm flutter run` |
 | `packages/insolvia_design_system/scripts/dev-setup.sh` | Flutter design system | Shared base → **standalone** `fvm flutter pub get` in the package (it is outside the pub workspace, on purpose) |
@@ -149,6 +150,50 @@ How it works:
   match this machine's expected names, require a typed `RESET` (or `--yes`),
   and support `--dry-run`. CI never touches `infra/envs/dev` beyond offline
   `terraform validate`.
+
+## Production deploys (`prod-deploy.sh`)
+
+Every production workflow is `workflow_dispatch`-only — nothing reaches prod on
+a push to `main`. (The one auto-apply on `main` is `shared-infra-deploy.yml`,
+and it applies `infra/envs/shared` only.) `prod-deploy.sh` is that dispatch
+button on the command line.
+
+```bash
+# What ran last against each production target, and how it went:
+./scripts/prod-deploy.sh --list
+
+# Deploy — prompts for confirmation, then follows the run to completion:
+./scripts/prod-deploy.sh api
+
+# Fire and forget:
+./scripts/prod-deploy.sh --yes --no-watch app
+```
+
+Targets are `api`, `app`, `marketing`, and `shared-infra`.
+
+It needs a `gh` login and **no AWS credentials** — every deploy authenticates
+to AWS inside the workflow via OIDC. The script only dispatches; it never
+applies anything locally.
+
+What it adds over clicking *Run workflow* in the UI:
+
+- **Shows the commit GitHub will actually build**, resolved from the remote ref
+  rather than your checkout, and warns when your local `HEAD` differs from it
+  or you have uncommitted changes. Dispatching while the change is still
+  unpushed is the usual way to be surprised by a deploy.
+- **Warns on a non-`main` `--ref`**, since infra applies are meant to run from
+  merged `main`.
+- **Warns before the known red herring**: `marketing-prod.yml` ends by
+  smoke-testing `https://www.insolvia.ai/`, so while the site is parked
+  (`site_enabled = false` in `infra/envs/prod`) that run goes red even though
+  its apply succeeded. Dispatch `api` when you want prod infra applied without
+  that noise — it applies the same `infra/envs/prod` and smoke-tests `/health`.
+- **Exits non-zero on a failed run**, so it chains with `&&`.
+
+Note that `api`, `app`, and `marketing` each `terraform apply` the *whole*
+`infra/envs/prod` env with `-auto-approve`, so any accumulated drift in that
+env is reconciled by whichever one you dispatch. For a change you want to eyeball
+first, run `terraform -chdir=infra/envs/prod plan` locally from merged `main`.
 
 ## Adding a new package
 
