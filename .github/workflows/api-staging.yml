@@ -1,0 +1,131 @@
+name: API · Deploy · Staging
+
+# Steady-state deploy: apply the env, push a fresh image, point the Lambda at
+# it, re-derive its environment from SSM, smoke-test /health.
+#
+# The FIRST deploy in a fresh environment cannot run through this workflow: an
+# Image-package Lambda refuses to be created before its image exists, so the
+# apply below deadlocks. Bootstrap once by hand, per
+# infra/modules/api_service/main.tf:
+#   1. terraform apply -target=module.api_service.aws_ecr_repository.api
+#   2. docker build --target lambda services/api, tag <repo-url>:latest, push
+#   3. terraform apply   (full)
+# After that, every deploy is this workflow.
+#
+# Deploy workflows are not required status checks, so — unlike the *-pr.yml
+# gates — a `paths:` filter here is safe (same as app-staging.yml).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - "infra/envs/staging/**"
+      - "infra/modules/api_service/**"
+      - ".github/workflows/api-staging.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-api-staging
+  cancel-in-progress: false
+
+jobs:
+  # ── Deploy: gated behind the DEPLOY_ENABLED repo variable ──────
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Apply staging infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          terraform -chdir=infra/envs/staging apply -auto-approve
+          {
+            echo "repo=$(terraform -chdir=infra/envs/staging output -raw api_ecr_repository_url)"
+            echo "function=$(terraform -chdir=infra/envs/staging output -raw api_lambda_function_name)"
+            echo "domain=$(terraform -chdir=infra/envs/staging output -raw api_domain)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # The registry host is everything before the first `/` of the repo URL.
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      - name: Build and push image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # `:sha` is the immutable deploy reference; `:latest` exists only so
+          # a from-scratch `terraform apply` (whose Lambda seed points at
+          # `:latest`) finds an image.
+          docker build --target lambda \
+            -t "$REPO:${{ github.sha }}" \
+            -t "$REPO:latest" \
+            services/api
+          docker push "$REPO:${{ github.sha }}"
+          docker push "$REPO:latest"
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$REPO:${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive Lambda environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          # /insolvia/staging/api/<kebab-key> -> KEBAB_KEY:
+          #   insolvia-env        -> INSOLVIA_ENV
+          #   waitlist-table-name -> WAITLIST_TABLE_NAME
+          # Terraform ignores `environment` drift on the Lambda (see
+          # infra/modules/api_service/main.tf) — this step owns it.
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/staging/api \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          # Refuse to ship nonsense: an empty or half-applied namespace would
+          # otherwise silently wipe every variable the service reads.
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Smoke test
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          curl -sSf "https://$DOMAIN/health" | tee health.json
+          jq -e '.environment == "staging"' health.json > /dev/null
