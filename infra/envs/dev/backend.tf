@@ -11,5 +11,9 @@ terraform {
     bucket  = "insolvia-terraform-state"
     region  = "us-east-1"
     encrypt = true
+
+    # Native S3 state locking (Terraform >= 1.10) — see the shared backend for
+    # the rationale. Locks a <injected-key>.tflock object per machine.
+    use_lockfile = true
   }
 }

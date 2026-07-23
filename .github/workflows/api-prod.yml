@@ -41,7 +41,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~1.5"
+          terraform_version: "~1.10"
           # The wrapper interposes on stdout, which corrupts the
           # `terraform output -raw` command substitutions below.
           terraform_wrapper: false

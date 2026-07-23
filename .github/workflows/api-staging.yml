@@ -30,11 +30,13 @@ permissions:
   contents: read
 
 # Shared with every workflow that `terraform apply`s infra/envs/staging
-# (app-staging.yml). The S3 backend has no state locking (use_lockfile needs
-# Terraform >= 1.10; CI pins ~1.5), so two applies of the same env racing on
-# one push to main corrupt each other — seen as "Stage already exists" /
-# "domain name already exists" when both ran concurrently. One group per env
-# state file serializes them.
+# (app-staging.yml). Two applies of the same env racing on one push to main
+# once corrupted each other — seen as "Stage already exists" / "domain name
+# already exists" when both ran concurrently. One group per env state file
+# serializes them so they queue cleanly. The S3 backend also holds a native
+# state lock now (use_lockfile, Terraform >= 1.10), which fails-fast on any
+# apply that slips past the group (a local run alongside CI); the group is
+# what turns "one fails" into "one waits".
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
@@ -53,7 +55,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~1.5"
+          terraform_version: "~1.10"
           # The wrapper interposes on stdout, which corrupts the
           # `terraform output -raw` command substitutions below.
           terraform_wrapper: false
