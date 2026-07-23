@@ -35,7 +35,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
     # that don't declare the environment — they resolve silently to "".

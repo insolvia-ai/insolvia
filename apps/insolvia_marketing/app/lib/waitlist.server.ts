@@ -93,8 +93,8 @@ export class WaitlistValidationError extends Error {
  * production (set on the SSR Lambda by infra). When it is unset (local dev
  * without the API running), the submission is logged server-side and treated
  * as accepted rather than crashing the form. For a real local round-trip,
- * `services/api/docker-compose.yml` serves the API at http://localhost:8080
- * backed by dynamodb-local:
+ * `services/api/scripts/dev-up.sh` serves the API at http://localhost:8080,
+ * backed by this machine's real AWS dev table (./scripts/dev-aws-setup.sh):
  *
  *   INSOLVIA_API_BASE_URL=http://localhost:8080 npm run dev
  *

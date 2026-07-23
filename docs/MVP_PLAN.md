@@ -318,7 +318,7 @@ port, not a design exercise.
 | 1.2 | Verify the destination Gmail address as an SES identity | Sandbox requires it. Enough to make inbound forwarding fully testable — see the sandbox note below. **SES production access is deliberately deferred to issue 6.8.** |
 | 1.3 | Apply `infra/envs/shared` — wildcard ACM, OIDC provider, deploy role | Confirmed **not applied**: no state bucket, no OIDC provider, no `insolvia-github-actions` role, no ACM certificate. Only the zone exists. Blocked by 1.0 + 1.1b. |
 | 1.3b | Confirm the wildcard ACM cert reaches `ISSUED` | `infra/envs/staging/main.tf` looks the cert up with `statuses = ["ISSUED"]`, so every downstream env fails at plan time with a misleading "no matching certificate" error until this is true. |
-| 1.3c | Wire `AWS_ROLE_ARN` secret + `DEPLOY_ENABLED` variable | Step 4 of `AWS_SETUP.md`, not yet done. |
+| ~~1.3c~~ | ~~Wire the `AWS_ROLE_ARN` secret~~ — ✅ **DONE** | Step 5 of `AWS_SETUP.md`; deploys authenticate through it. |
 | 1.3d | Update `docs/AWS_SETUP.md` | Its status banner still says the domain is the current blocker. It isn't. Add the state-bucket and zone-import steps while you're there. |
 | 1.5 | New `infra/modules/email`: SES domain identity, DKIM, custom MAIL FROM | Port from `humbugg/infra/modules/email/`. |
 | 1.6 | SPF, DMARC, and MX records for `insolvia.ai` | MX → `inbound-smtp.us-east-1.amazonaws.com`. Start DMARC at `p=none`, tighten later. |
@@ -328,7 +328,7 @@ port, not a design exercise.
 | 1.10 | DLQ + CloudWatch alarm on the forwarder | Misconfiguration must surface on an alarm, not silently drop a client's mail. |
 | 1.11 | Address map — **confirmed** | `hello@` (general), `support@` (product), `no-reply@` (transactional sender), `security@` (disclosure). All forward to Gmail for now; `no-reply@` is send-only and should be excluded from the forwarder's allowed-recipient list. |
 | ~~1.12~~ | ~~SES SMTP credentials + Gmail "Send mail as" runbook~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md`](EMAIL_SETUP.md), ported from `humbugg/docs/support-forwarding.md`. Creating the credentials and adding the Gmail alias remain human steps; replies stay broken until 6.8. |
-| 1.13 | Un-gate the deploy workflows | Docs now say the gate waits on 1.3 + 1.3b, not on DNS. The flip itself (`gh variable set DEPLOY_ENABLED … "true"`) is a human action once both hold. |
+| ~~1.13~~ | ~~Un-gate the deploy workflows~~ — ✅ **DONE** | 1.3 + 1.3b hold, deploys run for real, and the temporary deploy gate has been removed from the workflows entirely. |
 | ~~1.14~~ | ~~Document the Google Workspace migration path~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md` § Migrating to Google Workspace](EMAIL_SETUP.md#migrating-to-google-workspace) — ordered cutover checklist plus what to verify after. |
 | 1.15 | Rename the staging host → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, `environment.dart`. Free now, annoying once anything is deployed. See D2. |
 

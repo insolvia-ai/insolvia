@@ -24,28 +24,12 @@ def test_defaults_to_process_environment(monkeypatch):
 
 
 def test_waitlist_table_name_defaults_to_none():
-    config = load_config({})
-    assert config.waitlist_table_name is None
-    assert config.dynamodb_endpoint_url is None
+    assert load_config({}).waitlist_table_name is None
 
 
 def test_waitlist_table_name_is_read():
     config = load_config({"WAITLIST_TABLE_NAME": "insolvia-waitlist-staging"})
     assert config.waitlist_table_name == "insolvia-waitlist-staging"
-
-
-def test_dynamodb_endpoint_override_is_local_only():
-    config = load_config({"DYNAMODB_ENDPOINT_URL": "http://localhost:8000"})
-    assert config.dynamodb_endpoint_url == "http://localhost:8000"
-
-    for environment in ("staging", "production"):
-        with pytest.raises(ValidationError, match="DYNAMODB_ENDPOINT_URL"):
-            load_config(
-                {
-                    "INSOLVIA_ENV": environment,
-                    "DYNAMODB_ENDPOINT_URL": "http://localhost:8000",
-                }
-            )
 
 
 def test_cors_allowlist_per_environment():

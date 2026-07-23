@@ -5,15 +5,13 @@ Insolvia runs in its **own dedicated AWS account** (`521762924626`), separate
 from `andreas-services`. Resources are still namespaced by the `insolvia`
 project + environment.
 
-> ⚠️ **Status (2026-07-21):** deploys are **gated off**
-> (`DEPLOY_ENABLED = false`), but the domain is no longer the blocker.
-> `insolvia.ai` is registered, and Gandi already delegates to the existing
-> Route53 hosted zone `Z01038711J6IZ68FD6ZDW`. What remains: the Terraform state
-> bucket does not exist yet (step 1, #12), `infra/envs/shared` has never been
-> applied (#15), and the `*.insolvia.ai` ACM certificate is therefore not issued
-> (#16). Work steps 1 → 6 in order; **step 3 (importing the hosted zone, #13) is
-> not optional** — skipping it breaks certificate validation in a way that is
-> hard to diagnose.
+> **Status (2026-07-23): bootstrap is complete and deploys are live.**
+> `insolvia.ai` is registered, Gandi delegates to Route53 hosted zone
+> `Z01038711J6IZ68FD6ZDW`, the state bucket exists, `infra/envs/shared` is
+> applied, and the `*.insolvia.ai` ACM certificate is `ISSUED`. What follows is
+> the runbook for standing this up again in a fresh account. Work steps 1 → 6
+> in order; **step 3 (importing the hosted zone, #13) is not optional** —
+> skipping it breaks certificate validation in a way that is hard to diagnose.
 
 ## 0. Prerequisites
 - AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account (the `insolvia` profile).
@@ -90,28 +88,24 @@ certificate should reach `ISSUED` without any registrar work.
 ```bash
 # Deploy role ARN from step 4:
 gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/insolvia-github-actions"
-
-# Keep deploys off until the cert is ISSUED:
-gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "false"
 ```
 Repo lockdown (private, branch protection, environments) is documented in the
 plan §2e and applied once `@ansavva` has admin on the repo.
 
-## 6. Confirm delegation, then un-gate deploys
+## 6. Confirm delegation and the certificate
 `insolvia.ai` is registered and Gandi already points at the imported zone. Verify
 the registrar's nameservers still match the zone Terraform now manages:
 ```bash
 terraform -chdir=infra/envs/shared output route53_name_servers
 dig +short NS insolvia.ai
 ```
-Once those agree and the ACM cert reports `ISSUED`, flip deploys on:
-```bash
-gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "true"
-```
-Then `staging` deploys automatically on merge to `main`; `prod` is dispatched
-manually.
+Once those agree and the ACM cert reports `ISSUED`, the env pipelines work:
+`staging` deploys automatically on merge to `main`; `prod` is dispatched
+manually. (Before the cert issues, every env-level `terraform plan` fails —
+each env looks the cert up with `statuses = ["ISSUED"]` — so there is nothing
+to switch on; the ordering itself is the gate.)
 
 ## Order of operations
 1 (state bucket) → 2 (confirm no OIDC provider) → **3 (import the hosted zone)**
-→ 4 (apply `shared`) → 5 (secrets) → 6 (verify delegation, enable deploys) →
+→ 4 (apply `shared`) → 5 (secrets) → 6 (verify delegation + cert) →
 apply `staging` / `prod` envs.

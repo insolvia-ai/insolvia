@@ -8,7 +8,7 @@ description: >-
 # main pushes the annotated tag `insolvia_design_system-v<version>`
 # (design-system-publish.yml); consumers pin that tag as a git dependency.
 # See docs/PACKAGE_PUBLISHING.md.
-version: 0.1.1
+version: 0.1.2
 publish_to: none
 
 environment:

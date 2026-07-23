@@ -14,16 +14,14 @@ if config.environment != "local":
 
 configure_logging()
 
-# Adapter composition, mirroring mailer's development server. The plain dev
-# server defaults to the in-memory store (echo=True logs each submission so
-# local marketing-site dev can see them arrive); docker-compose sets
-# WAITLIST_TABLE_NAME + DYNAMODB_ENDPOINT_URL to exercise the real DynamoDB
-# adapter against dynamodb-local instead.
+# Adapter composition, mirroring mailer's development server. With
+# WAITLIST_TABLE_NAME set (the compose stack / dev-aws layer — this machine's
+# real per-developer table) the real DynamoDB adapter runs; unset, the bare
+# dev server falls back to the in-memory store (echo=True logs each
+# submission so local marketing-site dev can see them arrive).
 waitlist_store: WaitlistStore
 if config.waitlist_table_name:
-    waitlist_store = DynamoDbWaitlistStore(
-        config.waitlist_table_name, endpoint_url=config.dynamodb_endpoint_url
-    )
+    waitlist_store = DynamoDbWaitlistStore(config.waitlist_table_name)
 else:
     waitlist_store = MemoryWaitlistStore(echo=True)
 

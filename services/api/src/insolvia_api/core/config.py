@@ -42,8 +42,6 @@ class AppConfig:
 
     environment: str
     waitlist_table_name: str | None = None
-    # Local-only override pointing boto3 at dynamodb-local (docker-compose).
-    dynamodb_endpoint_url: str | None = None
     cors_allowed_origins: tuple[str, ...] = ()
     cors_allow_localhost: bool = True
 
@@ -53,9 +51,9 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
 
     INSOLVIA_ENV (local|staging|production) defaults to "local", mirroring the
     app's --dart-define=INSOLVIA_ENV. WAITLIST_TABLE_NAME names the DynamoDB
-    table behind POST /v1/waitlist. DYNAMODB_ENDPOINT_URL points the AWS
-    adapter at dynamodb-local and is rejected outside "local", so the emulator
-    override can never leak into a deployed environment.
+    table behind POST /v1/waitlist — in local dev that is this machine's real
+    per-developer table (scripts/dev-aws-setup.sh); unset means the in-memory
+    store, which only unit tests and the bare development server use.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -64,16 +62,9 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
             f"INSOLVIA_ENV must be one of {', '.join(ENVIRONMENTS)}, "
             f"got {environment!r}"
         )
-    dynamodb_endpoint_url = source.get("DYNAMODB_ENDPOINT_URL") or None
-    if dynamodb_endpoint_url and environment != "local":
-        raise ValidationError(
-            "DYNAMODB_ENDPOINT_URL is a local-only override for dynamodb-local "
-            f"and must not be set when INSOLVIA_ENV={environment}"
-        )
     return AppConfig(
         environment=environment,
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
-        dynamodb_endpoint_url=dynamodb_endpoint_url,
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",
     )

@@ -9,14 +9,13 @@ class DynamoDbWaitlistStore:
     """WaitlistStore backed by DynamoDB PutItem.
 
     Credentials come from the runtime's default provider chain — the Lambda
-    execution role in AWS, the local AWS profile or docker-compose dummy
-    credentials in dev. endpoint_url is the local-only dynamodb-local
-    override (config rejects it outside INSOLVIA_ENV=local).
+    execution role in AWS, or in local dev the short-lived credentials
+    scripts/dev-up.sh exports from the developer's AWS profile.
     """
 
-    def __init__(self, table_name: str, *, endpoint_url: str | None = None) -> None:
+    def __init__(self, table_name: str) -> None:
         self.table_name = table_name
-        self.client = boto3.client("dynamodb", endpoint_url=endpoint_url)
+        self.client = boto3.client("dynamodb")
 
     def add(self, record: WaitlistRecord) -> None:
         item = {key: {"S": value} for key, value in record_item(record).items()}
