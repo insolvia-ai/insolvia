@@ -8,6 +8,13 @@
 # provisions). Running the development server WITHOUT compose still works:
 # with WAITLIST_TABLE_NAME unset it falls back to the in-memory store and
 # logs each submission instead of persisting it.
+#
+# The `environment:` values below are ${VAR:-default} substitutions rather
+# than literals so the OPT-IN per-machine AWS layer (scripts/dev-aws-setup.sh)
+# can retarget the stack at a real per-developer DynamoDB table. Compose reads
+# ./.env (gitignored, written by that script) for substitution — that is the
+# whole mechanism; nothing here requires it, and with no .env every default
+# below reproduces the zero-AWS dynamodb-local stack exactly.
 services:
   api:
     build:
@@ -15,14 +22,22 @@ services:
       target: development
     environment:
       INSOLVIA_ENV: local
-      WAITLIST_TABLE_NAME: insolvia-waitlist-local
+      WAITLIST_TABLE_NAME: ${WAITLIST_TABLE_NAME:-insolvia-waitlist-local}
       # Local-only override; load_config rejects it outside INSOLVIA_ENV=local.
-      DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
+      # Colon-LESS default on purpose: an absent variable falls back to
+      # dynamodb-local, while the empty DYNAMODB_ENDPOINT_URL= line
+      # dev-aws-setup.sh writes means "no endpoint override — real AWS"
+      # (load_config turns "" into None).
+      DYNAMODB_ENDPOINT_URL: ${DYNAMODB_ENDPOINT_URL-http://dynamodb-local:8000}
       # dynamodb-local accepts any credentials, but boto3 requires *some* —
-      # these dummies never touch real AWS.
-      AWS_ACCESS_KEY_ID: local
-      AWS_SECRET_ACCESS_KEY: local
-      AWS_DEFAULT_REGION: us-east-1
+      # these dummies never touch real AWS. In AWS mode, scripts/dev-up.sh
+      # exports real short-lived credentials into the shell before `up`
+      # (shell env beats .env in compose substitution); they are never
+      # written to a file.
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

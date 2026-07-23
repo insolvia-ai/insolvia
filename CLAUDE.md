@@ -241,10 +241,7 @@ infra/
 - GitHub Environments mirror the Terraform envs one-for-one: `insolvia-shared`, `insolvia-staging`, `insolvia-production`. A deploy job **must** declare `environment:` — environment-scoped secrets are invisible to jobs that don't, resolving silently to empty strings rather than erroring. Never borrow another environment's name to reach its secrets; that hands the job every secret that environment holds.
 - Static web deploy: `s3 sync` hashed assets `Cache-Control: public,max-age=31536000,immutable` (exclude `*.html`), then HTML `no-cache`, then CloudFront `/*` invalidation.
 - API deploy (`api-<env>.yml`): terraform apply the env, read the `api_*` outputs, push the `services/api` Lambda image to ECR (`:sha` + `:latest`), `update-function-code`, re-derive the Lambda environment from `/insolvia/<env>/api/*`, smoke-test `/health`. The very first deploy per env needs the image-before-apply bootstrap documented atop `infra/modules/api_service/main.tf`.
-- **Deploys are currently gated OFF** via the `DEPLOY_ENABLED` repo variable (`false`). CI still builds and uploads web + macOS artifacts; only the deploy/apply jobs are skipped.
-  - DNS is **live** as of 2026-07-21 (`insolvia.ai` registered at Gandi, NS delegated to Route53 zone `Z01038711J6IZ68FD6ZDW`) — the domain is no longer the blocker.
-  - The gate now stays until **`infra/envs/shared` is applied** (issue #15 / 1.3) **and** the `*.insolvia.ai` **ACM cert reaches `ISSUED`** (issue #16 / 1.3b). Every downstream env looks the cert up with `statuses = ["ISSUED"]`, so flipping early fails at plan time with a misleading "no matching certificate" error.
-  - Once both hold, flip it: `gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "true"`. Nothing in the workflows needs to change.
+- **Deploys are live.** DNS is delegated (`insolvia.ai` registered at Gandi, NS → Route53 zone `Z01038711J6IZ68FD6ZDW`), `infra/envs/shared` is applied, and the `*.insolvia.ai` ACM cert is `ISSUED`. The ordering still matters when bootstrapping a fresh account: every downstream env looks the cert up with `statuses = ["ISSUED"]`, so an env-level apply before the cert issues fails at plan time with a misleading "no matching certificate" error — `shared` first, always (see `docs/AWS_SETUP.md`).
 
 ### PR gates, required status checks, and why no `paths:` filter
 
@@ -321,6 +318,12 @@ but the ruleset does not currently enforce it — see *Branch Conventions*).
 Never hard-code, echo, or commit AWS credentials. Locally, rely on your own AWS
 CLI profile / SSO. In CI, rely on the assumed OIDC role. If a tool needs
 credentials it does not have, **stop and ask** — do not invent a workaround.
+
+## Developer setup
+
+`./scripts/dev-setup.sh` installs the shared toolchain (idempotent; `--check`
+reports without installing); packages with real setup needs layer a thin
+`<pkg>/scripts/dev-setup.sh` on top — see `scripts/README.md`.
 
 ## Adding a New Package
 1. Create it under `packages/<name>/` (shared library) or `apps/<name>/` (runnable app), with its own `pubspec.yaml` (`resolution: workspace`).

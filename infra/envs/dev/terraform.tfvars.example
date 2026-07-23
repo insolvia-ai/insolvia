@@ -1,0 +1,8 @@
+# Values are supplied by scripts/dev-aws-setup.sh (via scripts/dev-aws-common.sh).
+# Do not create or commit a real tfvars file; the machine UUID belongs in the
+# user's config home (~/.config/insolvia/machine-id), never in the repo.
+aws_region        = "us-east-1"
+aws_principal_arn = "arn:aws:iam::123456789012:user/example"
+machine_id        = "00000000-0000-4000-8000-000000000000"
+machine_short_id  = "000000000000"
+machine_name      = "developer-machine"

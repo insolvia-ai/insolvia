@@ -36,12 +36,10 @@ defaults:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Deliberately NOT gated on `vars.DEPLOY_ENABLED`. That gate exists for the
-    # AWS/DNS path — shared infra applied (#15) and the *.insolvia.ai ACM cert
-    # reaching ISSUED (#16) — and publishing an npm package to GitHub Packages
-    # touches none of it: no AWS account, no Route53, no CloudFront, no OIDC
-    # role. Gating it would block the marketing-site work on an unrelated
-    # certificate. See docs/PACKAGE_PUBLISHING.md.
+    # No `environment:` and no deploy-style gating: publishing an npm package
+    # to GitHub Packages touches no AWS at all — no account, no Route53, no
+    # CloudFront, no OIDC role — so this job never belongs behind the infra
+    # deploy machinery. See docs/PACKAGE_PUBLISHING.md.
     steps:
       - uses: actions/checkout@v4
 

@@ -75,10 +75,9 @@ Signing + notarization is deferred (needs an Apple Developer account).
 ## CI/CD
 
 See `.github/workflows/`. Each area has a `*-pr.yml` (checks) and, where it
-deploys, a `*-<env>.yml`. Deploy steps are gated behind the `DEPLOY_ENABLED`
-repo variable (currently `false`); builds/artifacts run regardless. DNS is live;
-the gate now waits on shared infra being applied (#15) and the ACM cert reaching
-`ISSUED` (#16).
+deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
+`*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
+real (prod is dispatched manually).
 
 ### PR gates have no `paths:` filter — on purpose
 

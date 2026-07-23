@@ -23,10 +23,12 @@ infra/
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
     │                         # auth        -> insolvia-users-staging
-    └── prod/                 # web_hosting -> app.insolvia.ai
-                              # api_service -> api.insolvia.ai
-                              # auth        -> insolvia-users-prod
-                              # marketing_site -> www.insolvia.ai (+ apex 301)
+    ├── prod/                 # web_hosting -> app.insolvia.ai
+    │                         # api_service -> api.insolvia.ai
+    │                         # auth        -> insolvia-users-prod
+    │                         # marketing_site -> www.insolvia.ai (+ apex 301)
+    └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
+                              # table + auth pool, env suffix dev-<short-id>
 ```
 
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
@@ -34,6 +36,7 @@ infra/
 | shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, deploy role |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
+| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-waitlist-dev-<short-id>` table and `insolvia-users-dev-<short-id>` pool |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -135,6 +138,43 @@ The API does **not** verify tokens yet — the env outputs expose
 `auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
 into `services/api` with the first authenticated endpoint.
 
+## Per-machine development environment (`infra/envs/dev/`)
+
+One instance of this env exists **per developer machine** — humbugg's dev-aws
+pattern, adapted. A UUID generated once into `~/.config/insolvia/machine-id`
+drives everything: its first 12 hex chars become the environment name
+`dev-<short-id>` baked into every resource name, and the machine keeps its own
+state key —
+
+```
+insolvia/dev/<account-id>/<machine-id>/terraform.tfstate
+```
+
+— injected at init time with `-backend-config="key=..."` (the backend block
+declares no `key`), so two developers can never collide on names or state.
+
+What it owns is deliberately only what local dev consumes today:
+
+- **DynamoDB** `insolvia-waitlist-dev-<short-id>` — same PK/SK schema as
+  `api_service`'s table so the API's adapter behaves identically, but PITR is
+  **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
+- **Auth** via the same `modules/auth` as staging/prod —
+  `insolvia-users-dev-<short-id>`, hosted-domain prefix
+  `insolvia-dev-<short-id>` (Cognito domain prefixes are globally unique
+  across AWS; the short id is what makes a per-developer pool creatable at
+  all), localhost-only web origin, deletion protection off. Outputs only —
+  preps local auth work, nothing consumes it yet.
+
+No ECR/Lambda/API Gateway/S3 (local dev runs the API via compose, not
+Lambda), and no IAM — the developer's own credentials are the principal.
+
+**CI never touches this env.** It is applied, reset, and destroyed only by
+`scripts/dev-aws-{setup,reset,destroy}.sh` (see `scripts/README.md`) with the
+developer's own profile; the PR gate only runs the same offline
+`terraform validate -backend=false` it runs everywhere, and the deploy role
+grants it nothing. Tags add `DeveloperMachineId`/`DeveloperPrincipal`/
+`MachineName` to the standard set so an orphaned resource names its owner.
+
 ## Marketing site (`modules/marketing_site`, prod only)
 
 The marketing site (`apps/insolvia_marketing`) is server-side rendered, so
@@ -184,11 +224,13 @@ match convention and stay portable if the default region ever changes).
 shared  →  staging  →  prod
 ```
 `shared` must exist first (zone + cert + role). CI applies `staging` on merge to
-`main`; `prod` is `workflow_dispatch`-gated. **All applies are gated off**
-(`DEPLOY_ENABLED` repo variable, currently `false`). DNS is live; the gate now
-waits on `shared` being applied (#15) and the ACM cert reaching `ISSUED` (#16).
-The first `shared` apply must be preceded by a manual
-`terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13).
+`main`; `prod` is `workflow_dispatch`-gated. `shared` is applied and the ACM
+cert is `ISSUED`, so both env pipelines run for real. The ordering is not
+ceremonial: every env looks the cert up with `statuses = ["ISSUED"]`, so in a
+fresh account nothing downstream can even plan until `shared` has applied and
+the cert has issued. The first `shared` apply must be preceded by a manual
+`terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13) — that
+import is done in this account.
 
 ## Destruction safety
 

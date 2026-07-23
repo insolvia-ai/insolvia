@@ -54,6 +54,10 @@ terraform.rc
 # Lambda zips built by archive_file at plan time.
 infra/modules/*/.build/
 
+# Per-machine local wiring written by scripts/dev-aws-setup.sh (table name,
+# profile name — no secrets, but machine-specific and never committed).
+/services/api/.env
+
 # ── Python ──────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

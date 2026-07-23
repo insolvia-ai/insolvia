@@ -37,12 +37,10 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Deliberately NOT gated on `vars.DEPLOY_ENABLED`. That gate exists for the
-    # AWS/DNS path — shared infra applied (#15) and the *.insolvia.ai ACM cert
-    # reaching ISSUED (#16) — and pushing a git tag to this repo touches none
-    # of it: no AWS account, no Route53, no CloudFront, no OIDC role. Gating it
-    # would block app work on an unrelated certificate. See
-    # docs/PACKAGE_PUBLISHING.md.
+    # No `environment:` and no deploy-style gating: pushing a git tag to this
+    # repo touches no AWS at all — no account, no Route53, no CloudFront, no
+    # OIDC role — so this job never belongs behind the infra deploy machinery.
+    # See docs/PACKAGE_PUBLISHING.md.
     steps:
       # Default shallow checkout is enough: the tag points at HEAD, and
       # `persist-credentials` (on by default) lets the push below authenticate

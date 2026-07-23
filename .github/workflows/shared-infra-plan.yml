@@ -25,7 +25,11 @@ jobs:
       # a re-run is the only way to learn anything.
       fail-fast: false
       matrix:
-        env: [shared, staging, prod]
+        # `dev` is the per-developer-machine env (infra/envs/dev) — validated
+        # offline here like the others, but never applied by CI, and its
+        # "Terraform validate (dev)" check is NOT part of the required-checks
+        # contract in CLAUDE.md (the ruleset requires shared/staging/prod).
+        env: [shared, staging, prod, dev]
     steps:
       - uses: actions/checkout@v4
         with:

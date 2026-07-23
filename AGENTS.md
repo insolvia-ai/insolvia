@@ -87,10 +87,7 @@ infra/
 - `staging` deploys on push to `main`; `prod` is `workflow_dispatch`-gated behind the `insolvia-production` GitHub Environment.
 - GitHub Environments mirror the Terraform envs one-for-one: `insolvia-shared`, `insolvia-staging`, `insolvia-production`. A deploy job **must** declare `environment:` — environment-scoped secrets are invisible to jobs that don't, resolving silently to empty strings rather than erroring. Never borrow another environment's name to reach its secrets; that hands the job every secret that environment holds.
 - Static web deploy: `s3 sync` hashed assets `Cache-Control: public,max-age=31536000,immutable` (exclude `*.html`), then HTML `no-cache`, then CloudFront `/*` invalidation.
-- **Deploys are currently gated OFF** via the `DEPLOY_ENABLED` repo variable (`false`). CI still builds and uploads web + macOS artifacts; only the deploy/apply jobs are skipped.
-  - DNS is **live** as of 2026-07-21 (`insolvia.ai` registered at Gandi, NS delegated to Route53 zone `Z01038711J6IZ68FD6ZDW`) — the domain is no longer the blocker.
-  - The gate now stays until **`infra/envs/shared` is applied** (issue #15 / 1.3) **and** the `*.insolvia.ai` **ACM cert reaches `ISSUED`** (issue #16 / 1.3b). Every downstream env looks the cert up with `statuses = ["ISSUED"]`, so flipping early fails at plan time with a misleading "no matching certificate" error.
-  - Once both hold, flip it: `gh variable set DEPLOY_ENABLED --repo insolvia-ai/insolvia --body "true"`. Nothing in the workflows needs to change.
+- **Deploys are live.** DNS is delegated (`insolvia.ai` registered at Gandi, NS → Route53 zone `Z01038711J6IZ68FD6ZDW`), `infra/envs/shared` is applied, and the `*.insolvia.ai` ACM cert is `ISSUED`. The ordering still matters when bootstrapping a fresh account: every downstream env looks the cert up with `statuses = ["ISSUED"]`, so an env-level apply before the cert issues fails at plan time with a misleading "no matching certificate" error — `shared` first, always (see `docs/AWS_SETUP.md`).
 
 ## AWS Credentials — Critical Rule
 

@@ -91,17 +91,14 @@ Auth is `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` with
 `permissions: { contents: read, packages: write }`. There is no PAT, no
 long-lived secret, and no repository secret to rotate.
 
-#### Not gated on `DEPLOY_ENABLED`
+#### Publishing is not a deploy
 
-`CLAUDE.md` documents the `DEPLOY_ENABLED` repo variable (currently `false`)
-gating deploy/apply jobs. **Publishing is deliberately outside that gate.** The
-gate exists for the AWS path — shared infra being applied (#15) and the
-`*.insolvia.ai` ACM cert reaching `ISSUED` (#16), because every downstream env
-looks that cert up with `statuses = ["ISSUED"]` and fails at plan time
-otherwise. Publishing an npm package touches no AWS account, no Route53 zone,
-no CloudFront distribution and no OIDC role, so nothing in that gate can make
-a publish fail or make a published package wrong. Gating it would block the
-marketing site on an unrelated certificate.
+Publishing is deliberately outside the deploy machinery — no `environment:`,
+no OIDC role, no infra preconditions. Publishing an npm package touches no AWS
+account, no Route53 zone and no CloudFront distribution, so nothing on the
+AWS side can make a publish fail or make a published package wrong, and no
+infra outage should ever block the marketing site from installing a new
+design-system version.
 
 ### Consuming it (authenticating to install)
 
@@ -276,8 +273,8 @@ first tag of a version that landed before the workflow existed). It:
 else. As on the npm side, any change under the package without a version bump
 fails the PR gate (the *Require a version bump when the package changed* step
 in `design-system-pr.yml` — same diff-against-base, same
-hard-error-on-unreadable-base behaviour). And publishing is **not** gated on
-`DEPLOY_ENABLED`, for the same reason as the npm publish (see above): pushing
+hard-error-on-unreadable-base behaviour). And publishing sits outside the
+deploy machinery, for the same reason as the npm publish (see above): pushing
 a git tag touches no AWS resource.
 
 ### Consuming it

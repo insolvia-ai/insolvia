@@ -34,9 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── Deploy: gated behind the DEPLOY_ENABLED repo variable ──────
   deploy:
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment: insolvia-staging
     steps:
