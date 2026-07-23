@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Button } from "@insolvia/design-system";
+import { Button } from "@insolvia-ai/design-system";
 
 export function Cta() {
   return (

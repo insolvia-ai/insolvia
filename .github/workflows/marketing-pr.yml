@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+  # The app installs @insolvia-ai/design-system from GitHub Packages; the
+  # job's GITHUB_TOKEN needs read access to pull it.
+  packages: read
 
 defaults:
   run:
@@ -34,13 +37,12 @@ jobs:
         uses: ./.github/actions/changed-paths
         with:
           paths: |
+            # The app consumes the *published* @insolvia-ai/design-system,
+            # pinned by its lockfile — design-system (or token) source changes
+            # cannot affect this gate. It re-runs when the app bumps the
+            # dependency, because that edits package.json/package-lock.json
+            # under apps/insolvia_marketing/**.
             apps/insolvia_marketing/**
-            # The design system is a file: path dep whose dist/ is built (not
-            # committed) — the app bundles it, so its changes are app changes.
-            packages/insolvia_design_system_react/**
-            # Token changes regenerate the design system's theme.css, which the
-            # app's Tailwind build consumes.
-            packages/insolvia_tokens/**
             .github/workflows/marketing-pr.yml
             .github/actions/changed-paths/action.yml
 
@@ -50,31 +52,19 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: |
-            apps/insolvia_marketing/package-lock.json
-            packages/insolvia_design_system_react/package-lock.json
+          cache-dependency-path: apps/insolvia_marketing/package-lock.json
 
-      # The design system's dist/ is gitignored; the app's prebuild runs tsup
-      # there via --prefix, which needs that package's own node_modules first.
-      # `ci`, never `install`: the lockfiles are committed precisely so CI
+      # `ci`, never `install`: the lockfile is committed precisely so CI
       # resolves the same tree twice running, and `ci` fails loudly when
-      # package.json and the lockfile have drifted apart.
-      - name: Install design system
-        if: steps.filter.outputs.run == 'true'
-        run: npm ci
-        working-directory: packages/insolvia_design_system_react
-
-      # Typecheck imports the design system's dist/index.d.ts through the
-      # file: symlink, so dist/ must exist before typecheck — the app's
-      # prebuild only rebuilds it for `npm run build`, which runs later.
-      - name: Build design system
-        if: steps.filter.outputs.run == 'true'
-        run: npm run build
-        working-directory: packages/insolvia_design_system_react
-
+      # package.json and the lockfile have drifted apart. The install is the
+      # only step that touches the network — the lockfile pins
+      # @insolvia-ai/design-system to GitHub Packages, which requires a token
+      # even for public packages (the app's .npmrc expands NODE_AUTH_TOKEN).
       - name: Install
         if: steps.filter.outputs.run == 'true'
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Typecheck
         if: steps.filter.outputs.run == 'true'
@@ -84,8 +74,9 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm run lint
 
-      # prebuild compiles the design system first, then react-router build
-      # emits build/client (hashed static assets) + build/server (SSR bundle).
+      # react-router build emits build/client (hashed static assets) +
+      # build/server (SSR bundle). The design system arrives prebuilt from the
+      # registry — there is no prebuild step anymore.
       - name: Build
         if: steps.filter.outputs.run == 'true'
         run: npm run build
