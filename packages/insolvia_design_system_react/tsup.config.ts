@@ -9,7 +9,7 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   // Copies src/styles/* verbatim into dist/ — this is how the GENERATED
-  // theme.css reaches consumers as `@insolvia/design-system/theme.css`.
+  // theme.css reaches consumers as `@insolvia-ai/design-system/theme.css`.
   // It is a one-way copy: nothing here ever writes back into src/styles.
   publicDir: 'src/styles',
   external: ['react', 'react-dom', '@base-ui/react'],

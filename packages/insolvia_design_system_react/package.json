@@ -1,6 +1,6 @@
 {
-  "name": "@insolvia/design-system",
-  "version": "0.1.0",
+  "name": "@insolvia-ai/design-system",
+  "version": "0.1.1",
   "description": "React design system for Insolvia's marketing site, built on Base UI (https://base-ui.com/react) and the shared insolvia_tokens design tokens.",
   "type": "module",
   "license": "UNLICENSED",

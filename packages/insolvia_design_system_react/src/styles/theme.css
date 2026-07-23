@@ -7,7 +7,7 @@
  * Consuming apps import this from their Tailwind v4 CSS entrypoint:
  *
  *   @import "tailwindcss";
- *   @import "@insolvia/design-system/theme.css";
+ *   @import "@insolvia-ai/design-system/theme.css";
  *
  * Dark mode is toggled by setting `data-theme="dark"` on a root element
  * (e.g. <html data-theme="dark">) — every component reads the SEMANTIC

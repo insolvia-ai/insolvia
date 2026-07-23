@@ -66,6 +66,13 @@ storybook-static/
 # Node package adds its own line.
 /packages/insolvia_design_system_react/dist/
 
+# Tool-run artifacts that may sit on disk while a branch that does not track
+# their package is checked out (the per-app .gitignore only exists on branches
+# where the app does). Ignoring them at the root keeps a `git add -A` from a
+# different branch from sweeping them into an unrelated commit.
+.lighthouseci/
+.react-router/
+
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store
 *.swp

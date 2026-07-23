@@ -47,6 +47,49 @@ jobs:
           cache: npm
           cache-dependency-path: packages/insolvia_design_system_react/package-lock.json
 
+      # Version-bump gate. Every merge to main that changes this package must
+      # bump `version` in package.json, because the publish workflow
+      # (design-system-react-publish.yml) is idempotent by version: it skips
+      # cleanly when package.json's version already exists in the registry. An
+      # unbumped package change therefore merges green, publishes nothing, and
+      # silently rots the registry — consumers (the marketing site) install the
+      # published package, never the source by path, so they would keep
+      # building against a stale artifact with no error anywhere.
+      #
+      # The `steps.filter` guard above also matches tokens/workflow paths that
+      # don't touch the package, so this step re-diffs against the PR base and
+      # only demands a bump when something under the package directory actually
+      # changed. Checkout uses `fetch-depth: 0`, so the base commit is present.
+      # Mirrors the changed-paths action's fail-loud philosophy: if the base
+      # package.json cannot be read, that is a hard error, never a silent pass.
+      - name: Require a version bump when the package changed
+        if: steps.filter.outputs.run == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Only changes inside the package itself require a bump. `-- .` is
+          # relative to the working-directory default, i.e. this package.
+          if git diff --quiet "$BASE_SHA" HEAD -- .; then
+            echo "No changes under packages/insolvia_design_system_react/ — no version bump required."
+            exit 0
+          fi
+
+          # `git show` exits non-zero if the base commit or the file is
+          # missing; with `set -e` that fails the step loudly instead of
+          # letting a broken guard wave the PR through.
+          BASE_PKG="$(git show "$BASE_SHA:packages/insolvia_design_system_react/package.json")"
+          BASE_VERSION="$(node -p 'JSON.parse(process.argv[1]).version' "$BASE_PKG")"
+          HEAD_VERSION="$(node -p "require('./package.json').version")"
+
+          if [ "$HEAD_VERSION" = "$BASE_VERSION" ]; then
+            echo "::error file=packages/insolvia_design_system_react/package.json::This PR changes packages/insolvia_design_system_react/ but leaves version at $BASE_VERSION. This package publishes on every merge to main; bump \`version\` in package.json — consumers install the published package."
+            exit 1
+          fi
+
+          echo "Version bumped: $BASE_VERSION -> $HEAD_VERSION."
+
       # `ci`, never `install`: the lockfile is committed precisely so CI
       # resolves the same tree twice running, and `ci` fails loudly when
       # package.json and the lockfile have drifted apart.

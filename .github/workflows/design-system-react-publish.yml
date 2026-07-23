@@ -62,6 +62,11 @@ jobs:
       # main trains people to ignore CI, so an already-published version is a
       # clean skip, not a failure.
       #
+      # The skip path should be rare for pushes that touch the package: the PR
+      # gate (design-system-react-pr.yml) fails any PR that changes this
+      # package without bumping `version`, precisely so a merge to main never
+      # lands here with a stale version and silently publishes nothing.
+      #
       # `npm view` exits non-zero when the version does not exist (E404) — which
       # is the normal "please publish" case — so the exit code is swallowed and
       # the decision is made on whether stdout came back empty. stderr is
@@ -103,7 +108,7 @@ jobs:
       - name: Summary
         run: |
           if [ "${{ steps.check.outputs.should-publish }}" = "true" ]; then
-            echo "Published @insolvia/design-system@${{ steps.check.outputs.version }}." >> "$GITHUB_STEP_SUMMARY"
+            echo "Published @insolvia-ai/design-system@${{ steps.check.outputs.version }}." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Skipped: @insolvia/design-system@${{ steps.check.outputs.version }} was already published." >> "$GITHUB_STEP_SUMMARY"
+            echo "Skipped: @insolvia-ai/design-system@${{ steps.check.outputs.version }} was already published." >> "$GITHUB_STEP_SUMMARY"
           fi
