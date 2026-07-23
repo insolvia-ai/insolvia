@@ -16,8 +16,6 @@ if not config.waitlist_table_name:
     raise RuntimeError("WAITLIST_TABLE_NAME must be set for the Lambda entrypoint")
 
 # AWS adapters are composed here, mirroring mailer's api_lambda entrypoint.
-# (dynamodb_endpoint_url is always None here — load_config rejects the
-# dynamodb-local override outside INSOLVIA_ENV=local.)
 app = create_app(
     ApiDependencies(
         config=config,

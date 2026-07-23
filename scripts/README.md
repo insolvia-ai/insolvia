@@ -11,15 +11,15 @@ Two layers — a shared base plus thin per-package scripts:
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), FVM + the `.fvmrc`-pinned Flutter, Melos, Python 3.12 (+ Docker check) |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
-| `scripts/dev-aws-setup.sh` | Optional AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
-| `scripts/dev-aws-reset.sh` | Optional AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
-| `scripts/dev-aws-destroy.sh` | Optional AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
-| `scripts/dev-aws-common.sh` | Optional AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above |
+| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
+| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
+| `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
+| `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Flutter app | Shared base → workspace `fvm flutter pub get` at the repo root; `dev-up.sh` runs `fvm flutter run` |
 | `packages/insolvia_design_system/scripts/dev-setup.sh` | Flutter design system | Shared base → **standalone** `fvm flutter pub get` in the package (it is outside the pub workspace, on purpose) |
 | `packages/insolvia_design_system_react/scripts/dev-setup.sh` | React design system | Shared base → `npm ci`; `dev-up.sh` runs Storybook |
-| `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps; `dev-up.sh` runs the compose stack (API + dynamodb-local), `dev-test.sh` runs ruff + pytest exactly as CI does |
+| `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
 `packages/insolvia_tokens` and `packages/insolvia_api_client` have no scripts,
 deliberately: they are pub workspace members with no setup beyond the workspace
@@ -102,23 +102,29 @@ and the `.npmrc` uses the `${NODE_AUTH_TOKEN}` env indirection. The only
 non-scriptable step is creating a token with the scope in the first place (a
 GitHub UI / `gh` action); the script does everything after that.
 
-## Per-machine AWS development resources (opt-in)
+## Per-machine AWS development resources
 
-Local dev needs **zero AWS** by default — `services/api`'s compose stack runs
-against dynamodb-local. The `dev-aws-*` scripts add an optional layer for
-developing against real AWS: each developer machine gets its **own** isolated
+The `dev-aws-*` scripts provision **local development's database** — there is
+no local emulator (humbugg pattern; `services/api`'s compose stack talks
+straight to real AWS). Each developer machine gets its **own** isolated
 resources (a waitlist DynamoDB table and a Cognito pool from
 `infra/envs/dev/`), named with a persistent per-machine id so two developers
-can never collide. It is deliberately **not** chained into any `dev-setup.sh`
-— run it only when you want it:
+can never collide. `services/api/scripts/dev-setup.sh` chains into setup
+unconditionally, so the usual flow is just that script; the layer's own
+commands are:
 
 ```bash
 ./scripts/dev-aws-setup.sh --profile insolvia   # provision + wire services/api/.env
 ./scripts/dev-aws-setup.sh --check              # verify state, resources, env file
-./services/api/scripts/dev-up.sh                # compose now hits YOUR real table
+./services/api/scripts/dev-up.sh                # compose against YOUR real table
 ./scripts/dev-aws-reset.sh                      # wipe the data, keep the resources
 ./scripts/dev-aws-destroy.sh                    # tear it all down (machine id kept)
 ```
+
+The in-memory waitlist store still exists in code — it is what unit tests and
+the bare `development_server` use when `WAITLIST_TABLE_NAME` is unset — but it
+is a test seam, not the dev path: `dev-up.sh` refuses to start until setup has
+written `services/api/.env`.
 
 How it works:
 
@@ -136,9 +142,9 @@ How it works:
   never written to a file.
 - **Wiring** — setup upserts `services/api/.env` (gitignored), which docker
   compose reads for `${VAR:-default}` substitution in
-  `services/api/docker-compose.yml`; `dev-up.sh` sees `AWS_PROFILE` in it and
-  switches the container from dynamodb-local to the real table. Destroy
-  removes those keys, restoring the zero-AWS default.
+  `services/api/docker-compose.yml`; `dev-up.sh` reads `AWS_PROFILE` from it
+  to export credentials and requires `WAITLIST_TABLE_NAME` to be present.
+  Destroy removes those keys, so `dev-up.sh` fails fast until the next setup.
 - **Safety** — reset/destroy refuse to touch anything whose name does not
   match this machine's expected names, require a typed `RESET` (or `--yes`),
   and support `--dry-run`. CI never touches `infra/envs/dev` beyond offline

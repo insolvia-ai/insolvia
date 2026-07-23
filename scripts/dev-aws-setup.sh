@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
 # Provision this machine's isolated Insolvia development resources in AWS and
-# wire services/api at them. Opt-in: the compose stack's dynamodb-local
-# default needs zero AWS — run this only when you want local dev against a
-# real per-machine table (and a Cognito pool for upcoming auth work).
+# wire services/api at them. This IS local development's database (humbugg
+# pattern — no local emulator): the compose stack's API talks to the real
+# per-machine waitlist table this script creates (plus a Cognito pool for
+# upcoming auth work). services/api/scripts/dev-setup.sh chains into this
+# script unconditionally.
 #
 #   ./scripts/dev-aws-setup.sh --profile insolvia
 #   ./scripts/dev-aws-setup.sh --check       # verify, change nothing
@@ -82,15 +84,12 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 # compose auto-reads services/api/.env for VARIABLE SUBSTITUTION — not
 # container env — and the compose file's `environment:` block is written as
 # ${VAR:-default} substitutions for exactly the keys below. So:
-#   • WAITLIST_TABLE_NAME here overrides the insolvia-waitlist-local default.
-#   • DYNAMODB_ENDPOINT_URL is upserted to EMPTY rather than removed, because
-#     the compose file uses the colon-less ${DYNAMODB_ENDPOINT_URL-...} form:
-#     an ABSENT key falls back to dynamodb-local, an EMPTY one means "no
-#     endpoint override — real AWS" (load_config turns "" into None).
-#   • AWS_PROFILE is not read by compose at all — it is the marker (and the
-#     profile name) services/api/scripts/dev-up.sh uses to export short-lived
-#     credentials into the container at `compose up` time. Credentials are
-#     never written to this file.
+#   • WAITLIST_TABLE_NAME here points the stack at this machine's table
+#     (dev-up.sh refuses to start without it).
+#   • AWS_PROFILE is not read by compose at all — it is the profile name
+#     services/api/scripts/dev-up.sh uses to export short-lived credentials
+#     into the container at `compose up` time. Credentials are never written
+#     to this file.
 #   • INSOLVIA_ENV/AWS_DEFAULT_REGION also serve anyone running the plain
 #     dev server off this file: `set -a; source services/api/.env; set +a`.
 
@@ -99,7 +98,6 @@ upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
-upsert_env "$api_env" DYNAMODB_ENDPOINT_URL ""
 
 ok "AWS development resources are ready and services/api/.env was updated."
 

@@ -45,22 +45,30 @@ rather than empty) — see `core/waitlist.py::record_item`.
 
 ## Local development
 
-Plain dev server (in-memory store; each submission is logged so local
-marketing dev can see it):
+Local dev runs against **this machine's real AWS dev table** — there is no
+local DynamoDB emulator (humbugg pattern). The per-machine layer
+(`infra/envs/dev`: an isolated waitlist table + Cognito pool per developer
+machine) is the dev database:
+
+```sh
+./scripts/dev-setup.sh --profile insolvia   # venv + per-machine AWS resources
+./scripts/dev-up.sh                         # compose stack on :8080, real table
+curl http://127.0.0.1:8080/health
+```
+
+`dev-up.sh` exports short-lived credentials from your AWS profile into the
+container at `up` time and refuses to start until `dev-aws-setup.sh` has
+written `services/api/.env` (see `scripts/README.md` at the repo root).
+
+The bare dev server still runs with zero AWS — with `WAITLIST_TABLE_NAME`
+unset it falls back to the in-memory store (each submission is logged so
+local marketing dev can see it). That fallback is the unit-test seam, not the
+dev path:
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 INSOLVIA_ENV=local PYTHONPATH=src .venv/bin/gunicorn --bind 127.0.0.1:8080 \
   insolvia_api.entrypoints.development_server:app
-```
-
-Full stack against dynamodb-local (real DynamoDB adapter, table auto-created):
-
-```sh
-docker compose up --build
-# then inspect writes:
-AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local aws dynamodb scan \
-  --endpoint-url http://127.0.0.1:8000 --table-name insolvia-waitlist-local
 ```
 
 Checks: `ruff check .`, `ruff format --check .`, `pytest` (from this
@@ -71,8 +79,7 @@ directory; ruff config is the repo-root `ruff.toml`).
 | Variable | Meaning |
 |---|---|
 | `INSOLVIA_ENV` | `local` (default) \| `staging` \| `production`; also selects the CORS allowlist (`core/config.py`) |
-| `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint, optional locally (unset → in-memory store) |
-| `DYNAMODB_ENDPOINT_URL` | dynamodb-local override; **rejected outside `INSOLVIA_ENV=local`** |
+| `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
 
 CORS (issue #68) is an exact-origin allowlist — production:
 `https://app.insolvia.ai`; staging: `https://staging-app.insolvia.ai` plus

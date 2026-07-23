@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
 # Destroy this machine's isolated Insolvia development resources in AWS and
-# unwind the services/api/.env wiring, returning local dev to the zero-AWS
-# dynamodb-local default. The machine ID is retained so a later
-# dev-aws-setup.sh recreates the SAME per-machine names and state key.
+# unwind the services/api/.env wiring. There is no local fallback database —
+# after this, dev-up.sh refuses to start until dev-aws-setup.sh runs again.
+# The machine ID is retained so a later dev-aws-setup.sh recreates the SAME
+# per-machine names and state key.
 #
 set -euo pipefail
 
@@ -44,13 +45,12 @@ destroy_args=(destroy -input=false "${TF_VARS[@]}")
 terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 
 # Unwind the setup script's wiring — a services/api/.env still naming the
-# destroyed table would break the previously-working compose default. Removing
-# DYNAMODB_ENDPOINT_URL entirely restores the dynamodb-local fallback (the
-# compose file's ${DYNAMODB_ENDPOINT_URL-...} default fires only when the key
-# is ABSENT), and removing AWS_PROFILE stops dev-up.sh exporting credentials.
+# destroyed table would send dev-up.sh at a table that no longer exists.
+# Removing WAITLIST_TABLE_NAME makes dev-up.sh fail fast with "run
+# dev-aws-setup.sh first" instead, and removing AWS_PROFILE stops it
+# exporting credentials.
 api_env="$API_DIR/.env"
 remove_env "$api_env" WAITLIST_TABLE_NAME
 remove_env "$api_env" AWS_PROFILE
-remove_env "$api_env" DYNAMODB_ENDPOINT_URL
 
 ok "This machine's Insolvia development resources were destroyed and services/api/.env was unwound. The machine ID was retained for safe reuse."

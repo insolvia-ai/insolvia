@@ -211,7 +211,7 @@ if have node; then
 fi
 
 # Docker is a daemon/GUI concern — check only, never auto-install. services/api
-# local dev (docker compose + dynamodb-local) and its Lambda image build need it.
+# local dev (docker compose) and its Lambda image build need it.
 if have docker; then skip docker "$(command -v docker)"; else
   if [[ "$PLATFORM" == "macos" ]]; then
     warn "docker not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/"

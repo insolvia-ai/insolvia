@@ -13,8 +13,8 @@
 #
 # Scope is deliberately tiny — only what local development actually consumes
 # today (see docs/TERRAFORM_ARCHITECTURE.md):
-#   • the waitlist DynamoDB table, so the compose stack can exercise the real
-#     AWS adapter against a real table instead of dynamodb-local;
+#   • the waitlist DynamoDB table — local dev's actual database (there is no
+#     local emulator; the compose stack's API talks straight to this table);
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet).
 # No ECR/Lambda/API Gateway/S3: local dev runs the API via compose or the
