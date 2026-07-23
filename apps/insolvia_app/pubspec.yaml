@@ -27,6 +27,13 @@ dependencies:
       url: https://github.com/insolvia-ai/insolvia.git
       path: packages/insolvia_design_system
       ref: insolvia_design_system-v0.1.1
+  # The typed Insolvia API client, a workspace member resolved by path within
+  # the monorepo (unlike the design system it has no published artifact yet).
+  # No feature consumes it — it is wired here alongside apiBaseUrl
+  # (lib/src/config/environment.dart) so the first API-backed feature only
+  # has to import it.
+  insolvia_api_client:
+    path: ../../packages/insolvia_api_client
 
 dev_dependencies:
   flutter_test:

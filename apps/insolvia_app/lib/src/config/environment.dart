@@ -35,4 +35,20 @@ enum AppEnvironment {
         AppEnvironment.staging => 'staging-app.insolvia.ai',
         AppEnvironment.production => 'app.insolvia.ai',
       };
+
+  /// The base URL of the Insolvia API this build talks to.
+  ///
+  /// Exhaustive switch with no default arm, like [host] — the compiler
+  /// forces a new environment to declare its API explicitly. Combined with
+  /// [resolve] falling back to [local] for any unrecognised `INSOLVIA_ENV`,
+  /// no build can *silently* end up pointing at the production API: only
+  /// an explicit `INSOLVIA_ENV=production` define reaches it (issue #64).
+  ///
+  /// Local is the `services/api` docker-compose port (see
+  /// services/api/docker-compose.yml — `127.0.0.1:8080`).
+  String get apiBaseUrl => switch (this) {
+        AppEnvironment.local => 'http://localhost:8080',
+        AppEnvironment.staging => 'https://staging-api.insolvia.ai',
+        AppEnvironment.production => 'https://api.insolvia.ai',
+      };
 }

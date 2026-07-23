@@ -23,6 +23,7 @@ in `andreas-services`.
 | `packages/insolvia_tokens/` | Stack-agnostic design tokens (`tokens.json`) + the generator that renders them into Dart and Tailwind CSS. | Pure Dart (`insolvia_tokens`) |
 | `packages/insolvia_design_system/` | Shared UI: tokens, theme, components. The one deliberately shared package. Published as the git tag `insolvia_design_system-v<version>` on merge to main; **outside the pub workspace** so consumers can pin the tag (pub rewrites deps on workspace members back to the local path). | Flutter package (`insolvia_design_system`) |
 | `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
+| `packages/insolvia_api_client/` | Hand-written, typed Dart client for `services/api` (health + waitlist). Deliberately pure Dart so any Dart context can use it; the JSON contract is pinned by its tests, not by OpenAPI codegen — the package README records that decision (issue #66). | Pure Dart (`insolvia_api_client`) |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). Consumes the design system as a tag-pinned git dependency, never by path. | Flutter app (`insolvia_app`), desktop + web |
 | `apps/insolvia_marketing/` | The marketing site for `www.insolvia.ai` — React Router v7 framework mode, SSR. Consumes `@insolvia/design-system` as a `file:` path dep. **Outside the pub workspace** (npm, not pub). | React/TypeScript (`@insolvia/marketing`) |
 | `services/api/` | The backend API — Flask + Mangum on Lambda (decision D6 in `docs/MVP_PLAN.md`). Layered `core/api/adapters/entrypoints` mirroring `andreas-services/mailer`, with the dependency direction machine-enforced by `tests/test_architecture.py`. Brokers **all** AWS access for every client — see `docs/adr/0001-client-stays-dumb-trust-boundary.md`. **Not a pub workspace member** (Python, not Dart). | Python (`insolvia_api`) |
@@ -288,7 +289,7 @@ block a merge. The workflows above are now shaped to allow turning them on. The
 remaining step is a **repo-settings change that must be made by a human in the
 GitHub UI or API** — nothing in this repo can grant itself branch protection.
 
-In `protect-main` → *Require status checks to pass*, add exactly these nine,
+In `protect-main` → *Require status checks to pass*, add exactly these ten,
 which are the job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
@@ -299,6 +300,7 @@ which are the job `name:` values (matrix legs get a `(leg)` suffix):
 | `React design system` | `design-system-react-pr.yml` |
 | `Inbound forwarder` | `inbound-forwarder-pr.yml` |
 | `API service` | `api-pr.yml` |
+| `Dart API client` | `api-client-pr.yml` |
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |

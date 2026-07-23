@@ -22,6 +22,7 @@ environment:
 # cover it — design-system-pr.yml gates it directly.
 workspace:
   - packages/insolvia_tokens
+  - packages/insolvia_api_client
   - apps/insolvia_app
 
 dev_dependencies:
