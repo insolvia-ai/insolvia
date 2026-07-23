@@ -2,6 +2,14 @@
 # Workspace membership itself is declared in the root pubspec.yaml
 # (`workspace:`); Melos 6+ reads that and layers scripts on top.
 #
+# NOTE: packages/insolvia_design_system is NOT a workspace member (see the root
+# pubspec.yaml for why), so the exec-style scripts below (`analyze`, `format`,
+# `test`, and therefore `ci`) do not touch it. Its equivalent gate runs
+# directly inside the package in design-system-pr.yml; locally, run the same
+# commands from packages/insolvia_design_system/ after `flutter pub get` there.
+# The `tokens`/`tokens:check` scripts still cover it: the generator writes into
+# it by file path, no pub resolution involved.
+#
 #   dart pub global activate melos     # one-time
 #   melos bootstrap                    # resolve all packages
 #   melos run analyze                  # analyze everything
@@ -43,7 +51,10 @@ scripts:
     run: dart run packages/insolvia_tokens/tool/generate_tokens.dart --check
 
   ci:
-    description: The exact gate CI runs — token drift, format check, analyze, test.
+    description: >-
+      Token drift, format check, analyze, test — workspace packages only; the
+      design system's equivalent gate runs inside the package (see the note at
+      the top of this file).
     steps:
       - tokens:check
       - format

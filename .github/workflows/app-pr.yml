@@ -27,8 +27,20 @@ jobs:
         with:
           paths: |
             apps/**
-            packages/**
+            # Deliberately NOT packages/insolvia_design_system/** — the app is
+            # insulated behind its tag-pinned git dependency (see
+            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
+            # this build until the app bumps `ref` in its own pubspec.yaml /
+            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
+            # exactly that PR.
+            #
+            # insolvia_tokens stays: it is a pub workspace member co-resolved
+            # with the app by the root `flutter pub get`.
+            packages/insolvia_tokens/**
             pubspec.yaml
+            # The root workspace lockfile pins the app's resolved deps —
+            # including the design-system tag's resolved commit.
+            pubspec.lock
             melos.yaml
             analysis_options.yaml
             .github/workflows/app-pr.yml
@@ -68,8 +80,20 @@ jobs:
         with:
           paths: |
             apps/**
-            packages/**
+            # Deliberately NOT packages/insolvia_design_system/** — the app is
+            # insulated behind its tag-pinned git dependency (see
+            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
+            # this build until the app bumps `ref` in its own pubspec.yaml /
+            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
+            # exactly that PR.
+            #
+            # insolvia_tokens stays: it is a pub workspace member co-resolved
+            # with the app by the root `flutter pub get`.
+            packages/insolvia_tokens/**
             pubspec.yaml
+            # The root workspace lockfile pins the app's resolved deps —
+            # including the design-system tag's resolved commit.
+            pubspec.lock
             melos.yaml
             analysis_options.yaml
             .github/workflows/app-pr.yml

@@ -176,6 +176,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
+  insolvia_design_system:
+    dependency: transitive
+    description:
+      path: "packages/insolvia_design_system"
+      ref: "insolvia_design_system-v0.1.1"
+      resolved-ref: e4c2716685b4c5c9ca805760ec98bf77ddd88e78
+      url: "https://github.com/insolvia-ai/insolvia.git"
+    source: git
+    version: "0.1.1"
   io:
     dependency: transitive
     description:

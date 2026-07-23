@@ -30,8 +30,14 @@ Standard Flutter monorepo split — runnable apps in `apps/`, shared libraries i
 
 ```bash
 fvm install                 # install the pinned Flutter
-melos bootstrap             # resolve all workspace packages
-melos run ci                # format-check + analyze + test everything
+melos bootstrap             # resolve the workspace packages (tokens + app)
+melos run ci                # token drift + format-check + analyze + test the workspace
+
+# The design system resolves OUTSIDE the workspace (consumers pin its git tag
+# — see docs/PACKAGE_PUBLISHING.md), so melos does not cover it:
+cd packages/insolvia_design_system
+fvm flutter pub get && fvm flutter analyze && fvm flutter test
+cd ../..
 
 # Run the app locally
 cd apps/insolvia_app

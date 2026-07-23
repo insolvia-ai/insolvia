@@ -24,9 +24,12 @@ Layout follows the standard Flutter monorepo split (`apps/` + `packages/`) and a
 **feature-first** app: code is grouped by feature under `lib/src/features/`, with
 shared concerns (`routing/`, `config/`) alongside — not by technical layer.
 
-- **Workspace resolution:** pub workspaces (root `pubspec.yaml` `workspace:`) so
-  one resolve covers every package; the app depends on the design system by
-  **path** (`../../packages/insolvia_design_system`).
+- **Workspace resolution:** pub workspaces (root `pubspec.yaml` `workspace:`)
+  cover `insolvia_tokens` + the app. The design system is deliberately
+  **outside** the workspace and resolves standalone; the app consumes it as a
+  **git dependency pinned to a version tag**
+  (`insolvia_design_system-v<version>`), never by path — see
+  `docs/PACKAGE_PUBLISHING.md`.
 - **Task runner:** Melos (`melos.yaml`) — `melos bootstrap`, `melos run ci`.
 - **Flutter version:** pinned via FVM (`.fvmrc`).
 
