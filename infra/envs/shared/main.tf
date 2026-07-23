@@ -330,6 +330,38 @@ data "aws_iam_policy_document" "github_permissions" {
   }
   # ── end backend API stack ──────────────────────────────────────
 
+  # ── Auth stack (#65) ───────────────────────────────────────────
+  # The env stacks each manage a Cognito user pool, its hosted domain, and
+  # two app clients. Everything that CAN be resource-scoped is: pool ARNs are
+  # arn:…:userpool/<opaque-id> — Cognito offers no name-based ARN shape like
+  # lambda/sqs/sns's insolvia-* prefix, so userpool/* is the tightest scope
+  # the service supports (and this dedicated account runs nothing but
+  # Insolvia). Clients and domains are sub-resources of the pool and are
+  # authorized against the pool ARN, so this one statement covers them.
+  statement {
+    sid       = "CognitoUserPools"
+    actions   = ["cognito-idp:*"]
+    resources = ["arn:aws:cognito-idp:*:${data.aws_caller_identity.current.account_id}:userpool/*"]
+  }
+
+  # The handful of cognito-idp actions with NO resource type, evaluated
+  # against "*" (same family as EcrAuthToken/EnumerationApis above): a
+  # userpool/*-scoped statement never matches them, so the very first CI
+  # apply would die on CreateUserPool. DescribeUserPoolDomain's request
+  # carries only the domain prefix — no pool ARN to scope against — and
+  # Terraform calls it on every refresh of aws_cognito_user_pool_domain.
+  # ListUserPools is a read-only listing (names and ids, never contents).
+  statement {
+    sid = "CognitoAccountApis"
+    actions = [
+      "cognito-idp:CreateUserPool",
+      "cognito-idp:DescribeUserPoolDomain",
+      "cognito-idp:ListUserPools",
+    ]
+    resources = ["*"]
+  }
+  # ── end auth stack ─────────────────────────────────────────────
+
   # The forward-to destination lives here as a SecureString. Terraform creates
   # the parameter but never owns its value (lifecycle ignore_changes).
   statement {

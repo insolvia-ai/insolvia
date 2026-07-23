@@ -53,3 +53,31 @@ module "api_service" {
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   tags                = local.common_tags
 }
+
+# Auth (#65): staging Cognito user pool + web/desktop app clients.
+#
+# web_origins carries a localhost dev origin ON STAGING ONLY: Cognito callback
+# URLs are exact-match (no wildcard host or port), so local Flutter web dev
+# against staging auth must pin its port —
+#
+#   flutter run -d chrome --web-port 3000
+#
+# http://localhost is one of Cognito's three permitted plain-HTTP loopback
+# hosts. Prod registers no dev origins — nothing running on a laptop should be
+# able to complete a prod sign-in.
+module "auth" {
+  source = "../../modules/auth"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  web_origins = [
+    "https://${var.subdomain}",
+    "http://localhost:3000",
+  ]
+
+  # Staging pool holds only test accounts; keep it destroyable.
+  deletion_protection = false
+
+  tags = local.common_tags
+}
