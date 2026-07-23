@@ -33,6 +33,25 @@ locals {
   # would silently clobber this one. New values go through
   # `var.additional_apex_txt_records` instead.
   apex_txt_records = concat([local.apex_spf_record], var.additional_apex_txt_records)
+
+  # A single DNS TXT character-string is capped at 255 bytes. A 1024-bit DKIM
+  # value fits (232 bytes); a 2048-bit one does not (~394), and Route53 rejects
+  # the record outright rather than splitting it for you.
+  #
+  # The fix is to emit several character-strings in one record — resolvers
+  # concatenate them back into one value. The AWS provider wraps each element of
+  # `records` in quotes and passes the contents through verbatim, so embedding
+  # the `" "` separator inside one element produces `"chunk1" "chunk2"`, which
+  # is exactly the wire format wanted.
+  #
+  # Chunking unconditionally rather than only when long: a value under 255 bytes
+  # yields a single chunk and the join is a no-op, so swapping a 1024-bit key
+  # for a 2048-bit one is a value change and nothing else.
+  google_dkim_chunks = [
+    for offset in range(0, length(var.google_dkim_value), 255) :
+    substr(var.google_dkim_value, offset, min(255, length(var.google_dkim_value) - offset))
+  ]
+  google_dkim_record = join("\" \"", local.google_dkim_chunks)
 }
 
 # ── Domain identity + verification ──────────────────────────────
@@ -100,6 +119,23 @@ resource "aws_route53_record" "mail_from_spf" {
   type    = "TXT"
   ttl     = 300
   records = ["v=spf1 include:amazonses.com -all"]
+}
+
+# ── Google Workspace DKIM ───────────────────────────────────────
+# Signs mail humans send from their Workspace mailboxes. Published only once
+# Google has generated the key — see `var.google_dkim_value`.
+#
+# Publishing the record is not the last step: DKIM signing stays off until
+# "Start authentication" is clicked in the Admin console, and Google checks DNS
+# at that moment. Apply, let the record propagate, then click it.
+resource "aws_route53_record" "google_dkim" {
+  count = var.google_dkim_value != "" ? 1 : 0
+
+  zone_id = var.route53_zone_id
+  name    = "google._domainkey.${var.domain_name}"
+  type    = "TXT"
+  ttl     = 300
+  records = [local.google_dkim_record]
 }
 
 # ── Apex mail DNS ───────────────────────────────────────────────

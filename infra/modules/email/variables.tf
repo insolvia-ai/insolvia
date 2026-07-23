@@ -63,6 +63,29 @@ variable "spf_includes" {
   default     = ["amazonses.com", "_spf.google.com"]
 }
 
+variable "google_dkim_value" {
+  description = <<-EOT
+    The full TXT value Google Workspace generates for `google._domainkey`,
+    verbatim from Admin console → Apps → Google Workspace → Gmail →
+    Authenticate email — i.e. `v=DKIM1;k=rsa;p=<base64>`.
+
+    Empty means "not set up yet" and publishes no record; Gmail then relies on
+    SPF alone for our human mail, which fails DMARC alignment for any forwarded
+    message. Treat empty as a temporary state.
+
+    Google's key-length dropdown offers 1024 and 2048. Prefer 2048 — RFC 8301
+    deprecated 1024-bit signing keys and receivers increasingly discount them.
+    The 1024-only DNS hosts that dropdown exists for are ones that cannot take a
+    record over 255 bytes; Route53 can, and the chunking in main.tf handles it,
+    so the reason to pick 1024 does not apply to us.
+
+    Unrelated to the SES DKIM CNAMEs, which live at `<ses-token>._domainkey` —
+    different names, no collision. Both senders sign independently.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "additional_apex_txt_records" {
   description = <<-EOT
     Extra TXT values to publish at the apex alongside the SES SPF record. Route53

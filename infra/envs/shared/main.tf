@@ -569,6 +569,13 @@ module "email" {
   additional_apex_txt_records = [
     "google-site-verification=0zLxT_6T4BpPh5oSYJEEUN5EjdGe56DylP9yvnxFaqk",
   ]
+
+  # Google Workspace's DKIM public key, from Admin console → Gmail →
+  # Authenticate email. Public by definition — the private half never leaves
+  # Google. Currently a 1024-bit key (Google's shorter option); see
+  # `var.google_dkim_value` for why 2048 is preferable and why nothing here has
+  # to change to switch.
+  google_dkim_value = "v=DKIM1;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCh00xKEHBfQhVsuK0hNrNB6jsPiyFwUH1o2xcIUhX885biq4dp5af9qBwzKTjWSw8/DexMf2XnqiyHZyhZ0IP6Ie6ddSgHw9gx8upC4bLrz6MNbJPpqK4app0Bw+ewlVQ9KWfI5riE0Ltc8QGVMGM5CSHbBs8ce2g6ngrS/UgpXwIDAQAB"
 }
 # ── end email ──────────────────────────────────────────────────
 

@@ -53,6 +53,7 @@ all are managed by `infra/modules/email`.
 | `insolvia.ai` | MX | `1 smtp.google.com` | **Who receives our mail.** Points inbound at Google Workspace. |
 | `insolvia.ai` | TXT | `v=spf1 include:amazonses.com include:_spf.google.com -all` | **Who may send as us.** Both senders must be listed. |
 | `insolvia.ai` | TXT | `google-site-verification=…` | Proves to Google we control the zone. |
+| `google._domainkey.insolvia.ai` | TXT | `v=DKIM1;k=rsa;p=…` | Signs mail **Google** sends. |
 | `_dmarc.insolvia.ai` | TXT | `v=DMARC1; p=none; …` | Alignment policy. Starts permissive — see below. |
 | `_amazonses.insolvia.ai` | TXT | *(SES token)* | SES domain-identity verification. |
 | `<token>._domainkey.insolvia.ai` | CNAME ×3 | *(SES DKIM)* | Signs mail SES sends. |
@@ -89,30 +90,34 @@ outright (see [What was removed](#what-was-removed-and-why)).
 
 ## Remaining setup steps
 
-### Google DKIM — not done yet
+### Google DKIM — record published, needs one console click
 
-Google Workspace generates its own DKIM key **after** the domain is verified,
-and the value is not knowable in advance, so it is not in Terraform yet.
-
-1. Google Admin console → **Apps** → **Google Workspace** → **Gmail** →
-   **Authenticate email**. Generate a 2048-bit key for `insolvia.ai`.
-2. It gives you a TXT record at `google._domainkey.insolvia.ai`.
-3. Add it to `infra/modules/email` as its own `aws_route53_record` — unlike the
-   apex TXT, `google._domainkey` is its own name, so there is no clobbering
-   hazard and it does not need to go through `additional_apex_txt_records`.
-   Then apply.
-4. Return to the Admin console and click **Start authentication**.
+The key at `google._domainkey.insolvia.ai` is in Terraform
+(`var.google_dkim_value`) and live in DNS. **Publishing the record does not turn
+signing on.** Google Admin console → **Apps** → **Google Workspace** → **Gmail**
+→ **Authenticate email** → **Start authentication**. Google checks DNS at that
+moment; until it is clicked, Workspace mail goes out unsigned.
 
 This does not collide with the SES DKIM CNAMEs: those live at
-`<ses-token>._domainkey`, a different name.
+`<ses-token>._domainkey`, a different name. Both senders sign independently.
 
-### DMARC stays at `p=none` until Google DKIM is live
+> **The current key is 1024-bit.** Google's key-length dropdown offers 1024 and
+> 2048; RFC 8301 deprecated 1024-bit signing keys and receivers increasingly
+> discount them. The dropdown exists for DNS hosts that cannot store a record
+> over 255 bytes — Route53 can, and `local.google_dkim_chunks` in
+> `infra/modules/email/main.tf` already splits long values into multiple
+> character-strings. So there is no reason to stay on 1024: regenerate at 2048
+> in the Admin console, paste the new value into `google_dkim_value`, apply, and
+> re-click **Start authentication**. Nothing else changes.
+
+### DMARC stays at `p=none` until Google DKIM is authenticating
 
 `_dmarc` is deliberately `p=none`. Tightening to `p=quarantine` or `p=reject`
 before **both** senders sign correctly means receivers start dropping our own
-legitimate mail — and with `p=none` there are no aggregate reports configured
-yet either, so you would be tightening blind. Order: finish Google DKIM, confirm
-both senders pass alignment on real messages, then tighten.
+legitimate mail — and no `rua=` aggregate-report address is configured yet
+either, so you would be tightening blind. Order: click **Start authentication**,
+confirm both senders pass alignment on real messages (read the headers), add a
+`rua=` address, then tighten.
 
 ### SES production access
 
