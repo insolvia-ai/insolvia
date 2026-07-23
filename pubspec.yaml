@@ -16,6 +16,7 @@ environment:
 workspace:
   - packages/insolvia_tokens
   - packages/insolvia_design_system
+  - packages/insolvia_api_client
   - apps/insolvia_app
 
 dev_dependencies:

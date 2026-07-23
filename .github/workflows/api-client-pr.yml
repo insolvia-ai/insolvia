@@ -1,0 +1,60 @@
+name: API client · PR
+
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is intended as a
+# required status check on `protect-main`, so it must trigger and report on
+# *every* PR; the `steps.filter` guard below is what keeps an unrelated PR
+# cheap. Re-adding a `paths:` filter would silently deadlock every PR that
+# does not touch these paths.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dart-api-client:
+    name: Dart API client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            packages/insolvia_api_client/**
+            pubspec.yaml
+            melos.yaml
+            .github/workflows/api-client-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      # Flutter (not plain Dart) because `pub get` resolves the whole pub
+      # workspace from the root, and other members depend on the Flutter SDK.
+      # The package itself stays pure Dart — analyze/test run with `dart`.
+      - uses: subosito/flutter-action@v2
+        if: steps.filter.outputs.run == 'true'
+        with:
+          channel: stable
+
+      - name: Resolve workspace
+        if: steps.filter.outputs.run == 'true'
+        run: flutter pub get
+
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: dart format --output=none --set-exit-if-changed packages/insolvia_api_client
+
+      - name: Analyze
+        if: steps.filter.outputs.run == 'true'
+        run: dart analyze --fatal-infos packages/insolvia_api_client
+
+      # The contract pin for services/api — see the header comment in
+      # packages/insolvia_api_client/test/insolvia_api_client_test.dart.
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: dart test
+        working-directory: packages/insolvia_api_client

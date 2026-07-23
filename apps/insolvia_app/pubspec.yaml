@@ -20,6 +20,12 @@ dependencies:
   # The shared design system, resolved by path within the monorepo.
   insolvia_design_system:
     path: ../../packages/insolvia_design_system
+  # The typed Insolvia API client, resolved by path within the monorepo.
+  # No feature consumes it yet — it is wired here alongside apiBaseUrl
+  # (lib/src/config/environment.dart) so the first API-backed feature only
+  # has to import it.
+  insolvia_api_client:
+    path: ../../packages/insolvia_api_client
 
 dev_dependencies:
   flutter_test:
