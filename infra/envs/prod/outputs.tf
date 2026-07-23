@@ -41,3 +41,33 @@ output "api_alarms_topic_arn" {
   description = "SNS topic for production API alarms — subscribe by hand (Terraform manages no subscriptions)."
   value       = module.api_service.alarms_topic_arn
 }
+
+output "auth_user_pool_id" {
+  description = "Production Cognito user pool ID."
+  value       = module.auth.user_pool_id
+}
+
+output "auth_user_pool_arn" {
+  description = "Production Cognito user pool ARN."
+  value       = module.auth.user_pool_arn
+}
+
+output "auth_web_client_id" {
+  description = "Production web SPA app client ID (authorization-code + PKCE)."
+  value       = module.auth.web_client_id
+}
+
+output "auth_desktop_client_id" {
+  description = "Production desktop app client ID (loopback-redirect PKCE)."
+  value       = module.auth.desktop_client_id
+}
+
+output "auth_domain" {
+  description = "Production hosted auth domain (Cognito-provided)."
+  value       = module.auth.domain
+}
+
+output "auth_issuer_url" {
+  description = "OIDC issuer the API will validate production JWTs against (wired up with the first authenticated endpoint)."
+  value       = module.auth.issuer_url
+}

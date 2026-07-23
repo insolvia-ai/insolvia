@@ -57,3 +57,21 @@ module "api_service" {
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   tags                = local.common_tags
 }
+
+# Auth (#65): production Cognito user pool + web/desktop app clients.
+# Production registers ONLY the real app origin — no localhost dev callbacks
+# (those live on staging), so nothing running on a laptop can complete a prod
+# sign-in. deletion_protection is the point of the variable: this pool holds
+# the real attorney accounts.
+module "auth" {
+  source = "../../modules/auth"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  web_origins = ["https://${var.subdomain}"]
+
+  deletion_protection = true
+
+  tags = local.common_tags
+}

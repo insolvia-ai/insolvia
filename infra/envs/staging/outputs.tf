@@ -41,3 +41,33 @@ output "api_alarms_topic_arn" {
   description = "SNS topic for staging API alarms — subscribe by hand (Terraform manages no subscriptions)."
   value       = module.api_service.alarms_topic_arn
 }
+
+output "auth_user_pool_id" {
+  description = "Staging Cognito user pool ID."
+  value       = module.auth.user_pool_id
+}
+
+output "auth_user_pool_arn" {
+  description = "Staging Cognito user pool ARN."
+  value       = module.auth.user_pool_arn
+}
+
+output "auth_web_client_id" {
+  description = "Staging web SPA app client ID (authorization-code + PKCE)."
+  value       = module.auth.web_client_id
+}
+
+output "auth_desktop_client_id" {
+  description = "Staging desktop app client ID (loopback-redirect PKCE)."
+  value       = module.auth.desktop_client_id
+}
+
+output "auth_domain" {
+  description = "Staging hosted auth domain (Cognito-provided)."
+  value       = module.auth.domain
+}
+
+output "auth_issuer_url" {
+  description = "OIDC issuer the API will validate staging JWTs against (wired up with the first authenticated endpoint)."
+  value       = module.auth.issuer_url
+}
