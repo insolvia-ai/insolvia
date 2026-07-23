@@ -218,7 +218,7 @@ the PR). The full flows live in `docs/PACKAGE_PUBLISHING.md`.
 - Every exported component has at least one **behavioural** test (Vitest + Testing Library), mirroring the Flutter package's rule. No snapshot tests.
 
 ### Infrastructure
-- Terraform `~> 1.5`, AWS provider `~> 5.0`. Region `us-east-1` everywhere (CloudFront ACM requirement).
+- Terraform `>= 1.10` (needed for native S3 state locking — `use_lockfile` in every `backend.tf`; no DynamoDB lock table), AWS provider `~> 5.0`. Region `us-east-1` everywhere (CloudFront ACM requirement).
 - Resources named `insolvia-<thing>-<env>`; tags `{ Project = "insolvia", Environment, ManagedBy = "terraform" }`.
 - Sensitive variables declared `sensitive = true`, never committed. Commit `terraform.tfvars.example`, never real `*.tfvars`.
 
