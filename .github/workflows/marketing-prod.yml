@@ -29,8 +29,12 @@ permissions:
   # job's GITHUB_TOKEN needs read access to pull it.
   packages: read
 
+# Shared with every workflow that `terraform apply`s infra/envs/prod
+# (api-prod.yml, app-prod.yml) — the backend has no state locking, so
+# concurrent applies of one env race. See the matching comment in
+# api-staging.yml for the incident that proved it.
 concurrency:
-  group: insolvia-marketing-prod
+  group: insolvia-terraform-prod
   cancel-in-progress: false
 
 jobs:

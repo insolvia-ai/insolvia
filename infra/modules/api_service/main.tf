@@ -19,8 +19,15 @@
 # created yet. Break the cycle in three steps, once per environment:
 #
 #   1. terraform apply -target=module.api_service.aws_ecr_repository.api
-#   2. build services/api (`docker build --target lambda`), tag it
-#      <repo-url>:latest, and push it
+#   2. build services/api
+#      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
+#      tag it <repo-url>:latest, and push it. Both flags matter when building
+#      locally: the Lambda is x86_64, so an Apple Silicon default build ships
+#      an arm64 image; and Docker Desktop's provenance attestations produce an
+#      OCI index that CreateFunction rejects with "The image manifest, config
+#      or layer media type ... is not supported". (CI's plain BuildKit on
+#      amd64 runners emits neither, which is why the workflow build needs no
+#      flags.)
 #   3. terraform apply   (full)
 #
 # Every later deploy is just push-then-update-function-code; Terraform ignores

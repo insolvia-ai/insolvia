@@ -19,8 +19,12 @@ permissions:
   id-token: write
   contents: read
 
+# Shared with every workflow that `terraform apply`s infra/envs/prod
+# (app-prod.yml, marketing-prod.yml) — the backend has no state locking, so
+# concurrent applies of one env race. See the matching comment in
+# api-staging.yml for the incident that proved it.
 concurrency:
-  group: insolvia-api-prod
+  group: insolvia-terraform-prod
   cancel-in-progress: false
 
 jobs:
