@@ -91,6 +91,12 @@ module "marketing_site" {
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   image_tag           = var.marketing_image_tag
+
+  # OFFLINE, deliberately: the site is parked until we have an engaged MyCase.
+  # Nothing is destroyed — CloudFront just stops serving. Set back to true and
+  # re-apply this env to bring www.insolvia.ai back; no rebuild is needed.
+  site_enabled = false
+
   # The SSR waitlist action brokers through the API (docs/adr/0001).
   api_base_url = "https://${module.api_service.domain_name}"
   tags         = local.common_tags
