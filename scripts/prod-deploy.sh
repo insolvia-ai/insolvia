@@ -31,6 +31,7 @@ require_command() {
 # dispatchable, so it belongs on the same dashboard as the prod deploys.
 targets() {
   cat <<'EOF'
+prod-infra|infra-prod.yml|Infra · Terraform apply · Production
 api|api-prod.yml|API · Deploy · Production
 app|app-prod.yml|App · Deploy · Production
 marketing|marketing-prod.yml|Marketing · Deploy · Production
@@ -53,6 +54,7 @@ $(targets | awk -F'|' '{ printf "  %-14s %-34s (%s)\n", $1, $3, $2 }')
 
 Options:
   --ref REF      Git ref to deploy from (default: main)
+  --input K=V    Pass a workflow_dispatch input (repeatable)
   --yes, -y      Skip the confirmation prompt
   --no-watch     Dispatch and return instead of following the run
   --list, -l     Show every target's most recent run, then exit
@@ -60,8 +62,15 @@ Options:
 
 Examples:
   ${0##*/} --list                 # what ran last, and how it went
+  ${0##*/} prod-infra             # plan prod infra (read-only; the default)
+  ${0##*/} prod-infra --input mode=apply
   ${0##*/} api                    # deploy the API to production from main
   ${0##*/} --yes --no-watch app   # fire and forget
+
+To change prod infrastructure, use 'prod-infra' — it applies infra/envs/prod
+and nothing else. The service targets each apply that same env as their first
+step and then redeploy their own code, so reaching for one of those to carry an
+infra change redeploys a service you did not mean to touch.
 EOF
 }
 
@@ -70,10 +79,17 @@ REF="main"
 AUTO_APPROVE=0
 WATCH=1
 LIST_ONLY=0
+INPUTS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref) [[ $# -ge 2 ]] || die "--ref requires a value."; REF="$2"; shift ;;
+    --input)
+      [[ $# -ge 2 ]] || die "--input requires KEY=VALUE."
+      [[ "$2" == *=* ]] || die "--input expects KEY=VALUE, got '$2'."
+      INPUTS+=(-f "$2")
+      shift
+      ;;
     --yes|-y) AUTO_APPROVE=1 ;;
     --no-watch) WATCH=0 ;;
     --list|-l) LIST_ONLY=1 ;;
@@ -124,6 +140,12 @@ log "Repository:  $REPO"
 log "Workflow:    $DISPLAY_NAME ($WORKFLOW)"
 log "Ref:         $REF"
 log "Commit:      ${REMOTE_SHA:0:7}  $REMOTE_SUBJECT"
+# The empty-array guard matters: under `set -u`, "${ARR[@]}" on an empty array
+# is an unbound-variable error in bash 3.2, which is what /bin/bash still is on
+# macOS.
+if [[ ${#INPUTS[@]} -gt 0 ]]; then
+  log "Inputs:      $(printf '%s ' ${INPUTS[@]+"${INPUTS[@]}"} | sed 's/-f //g')"
+fi
 
 if [[ "$REF" != "main" ]]; then
   warn "Deploying from '$REF', not main. Infra applies are supposed to run from merged main."
@@ -148,7 +170,7 @@ if [[ "$TARGET" == "marketing" ]] &&
    grep -qE '^\s*site_enabled\s*=\s*false' "$REPO_ROOT/infra/envs/prod/main.tf" 2>/dev/null; then
   warn "The marketing site is parked offline (site_enabled = false in infra/envs/prod)."
   warn "This workflow's smoke check asserts the site is UP, so the run will go red"
-  warn "even though the apply itself succeeds. Deploy 'api' instead to apply prod infra."
+  warn "even though the apply itself succeeds. Use 'prod-infra' to apply prod infra."
 fi
 
 if [[ "$AUTO_APPROVE" -ne 1 ]]; then
@@ -168,7 +190,7 @@ latest_run_id() {
 # the run whenever the two clocks disagree by even a second.
 PREVIOUS_RUN_ID="$(latest_run_id)"
 
-gh workflow run "$WORKFLOW" --repo "$REPO" --ref "$REF"
+gh workflow run "$WORKFLOW" --repo "$REPO" --ref "$REF" ${INPUTS[@]+"${INPUTS[@]}"}
 ok "Dispatched $DISPLAY_NAME on $REF."
 
 # `gh workflow run` does not report the run it created, and the run takes a

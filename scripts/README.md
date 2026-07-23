@@ -162,14 +162,30 @@ button on the command line.
 # What ran last against each production target, and how it went:
 ./scripts/prod-deploy.sh --list
 
-# Deploy — prompts for confirmation, then follows the run to completion:
+# Infrastructure only — plan is the default, and it is read-only:
+./scripts/prod-deploy.sh prod-infra
+./scripts/prod-deploy.sh prod-infra --input mode=apply
+
+# Deploy a service — prompts, then follows the run to completion:
 ./scripts/prod-deploy.sh api
 
 # Fire and forget:
 ./scripts/prod-deploy.sh --yes --no-watch app
 ```
 
-Targets are `api`, `app`, `marketing`, and `shared-infra`.
+Targets are `prod-infra`, `api`, `app`, `marketing`, and `shared-infra`.
+
+**Use `prod-infra` for infrastructure changes.** `infra/envs/prod` is a single
+root module with a single state, so `terraform apply` there reconciles *all* of
+it — and `api`, `app` and `marketing` each begin by doing exactly that before
+deploying their own code. That makes any of them capable of carrying an
+infra-only change, at the cost of redeploying a service you never meant to
+touch. `infra-prod.yml` does the apply and stops.
+
+It defaults to `mode: plan`, which is read-only and writes the plan to the run's
+job summary. That is the only way to see a plan against real prod state:
+`shared-infra-plan.yml` validates every env offline (`init -backend=false`, no
+credentials), so PR CI can never produce one.
 
 It needs a `gh` login and **no AWS credentials** — every deploy authenticates
 to AWS inside the workflow via OIDC. The script only dispatches; it never
@@ -186,14 +202,12 @@ What it adds over clicking *Run workflow* in the UI:
 - **Warns before the known red herring**: `marketing-prod.yml` ends by
   smoke-testing `https://www.insolvia.ai/`, so while the site is parked
   (`site_enabled = false` in `infra/envs/prod`) that run goes red even though
-  its apply succeeded. Dispatch `api` when you want prod infra applied without
-  that noise — it applies the same `infra/envs/prod` and smoke-tests `/health`.
+  its apply succeeded.
 - **Exits non-zero on a failed run**, so it chains with `&&`.
 
-Note that `api`, `app`, and `marketing` each `terraform apply` the *whole*
-`infra/envs/prod` env with `-auto-approve`, so any accumulated drift in that
-env is reconciled by whichever one you dispatch. For a change you want to eyeball
-first, run `terraform -chdir=infra/envs/prod plan` locally from merged `main`.
+Whichever target you pick, the apply is `-auto-approve` and covers the whole
+env, so accumulated drift is reconciled along with your change. Run
+`prod-infra` in its default plan mode first if that matters.
 
 ## Adding a new package
 

@@ -1,0 +1,94 @@
+name: Infra · Terraform apply · Production
+
+# Terraform for infra/envs/prod, on its own, with nothing else attached.
+#
+# The three prod deploy workflows (api-prod, app-prod, marketing-prod) each
+# begin by applying this same env, because infra/envs/prod is one root module
+# with one state and `terraform apply` reconciles all of it. That means an
+# infra-only change — flipping a toggle, resizing something, adding a record —
+# used to require dispatching a *service* deploy to carry it, rebuilding and
+# redeploying that service's Lambda as a side effect. This workflow is the way
+# to apply prod infra without pretending to deploy anything.
+#
+# It also fills a real gap: shared-infra-plan.yml validates every env offline
+# (`init -backend=false`, no credentials), so nothing in CI could ever show a
+# *plan* against real prod state. `mode: plan` does, and writes it to the job
+# summary — which is why plan, not apply, is the default.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan (read-only, writes the plan to the job summary) or apply"
+        type: choice
+        options: [plan, apply]
+        default: plan
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+# MUST match the group used by api-prod.yml, app-prod.yml and
+# marketing-prod.yml: all four apply the same root module, and two concurrent
+# applies of one env race each other. Native S3 state locking (use_lockfile,
+# enabled in #117) turns that race into a hard lock error rather than corrupt
+# state — this group is what stops it happening at all.
+concurrency:
+  group: insolvia-terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    # Environment-scoped secrets are invisible to a job that does not declare
+    # an environment — AWS_ROLE_ARN would resolve to an empty string and the
+    # OIDC step would fail with an unhelpful error.
+    environment: insolvia-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform -chdir=infra/envs/prod init -input=false
+
+      - name: Plan
+        if: inputs.mode == 'plan'
+        run: |
+          set -o pipefail
+          terraform -chdir=infra/envs/prod plan -input=false -no-color \
+            | tee plan.txt
+          {
+            echo '## Terraform plan — infra/envs/prod'
+            echo
+            echo '```terraform'
+            # The summary has a 1 MiB cap; a plan large enough to hit it is
+            # already a plan nobody should be reading in a browser.
+            head -c 900000 plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        if: inputs.mode == 'apply'
+        run: terraform -chdir=infra/envs/prod apply -auto-approve -input=false
+
+      - name: Outputs
+        if: inputs.mode == 'apply'
+        run: |
+          {
+            echo '## Outputs — infra/envs/prod'
+            echo
+            echo '```'
+            terraform -chdir=infra/envs/prod output
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
