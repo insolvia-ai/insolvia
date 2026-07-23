@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="How Insolvia's competitors make money — monetization models, pricing, and the payments layer across bankruptcy petition-prep and practice-management software. Every figure sourced.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
+<title>Insolvia — Competitor Monetization</title>
+<style>
+  :root {
+    --paper: #f5f2eb; --surface: #fffdf9; --surface-2: #efeade;
+    --ink: #0b2a4a; --ink-soft: #3e4c5a; --ink-faint: #6e7885;
+    --line: #e2dccf; --line-strong: #cfc7b6;
+    --accent: #8f6428; --accent-bright: #b8863b; --accent-wash: #f1e7d3;
+    --pos: #3f8c5c; --neg: #b23b3b; --warn: #b5852a;
+    --risk-hi: #b23b3b; --risk-md: #b5852a; --risk-lo: #3f8c5c;
+    --blue: #2b6a9c;
+    --shadow: 0 1px 2px rgba(11,42,74,.06), 0 10px 28px rgba(11,42,74,.06);
+    --shadow-lg: 0 2px 6px rgba(11,42,74,.08), 0 22px 48px rgba(11,42,74,.10);
+    --serif: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono: ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0a1523; --surface: #10233b; --surface-2: #172c47;
+      --ink: #eaf1f8; --ink-soft: #b3c0d0; --ink-faint: #7d8ca0;
+      --line: #223347; --line-strong: #30435d;
+      --accent: #d7ac5e; --accent-bright: #e4bd7c; --accent-wash: #241d10;
+      --pos: #6fc091; --neg: #e58080; --warn: #dab364;
+      --risk-hi: #e58080; --risk-md: #dab364; --risk-lo: #6fc091;
+      --blue: #8fc3ec;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 12px 30px rgba(0,0,0,.4);
+      --shadow-lg: 0 2px 8px rgba(0,0,0,.4), 0 26px 56px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper:#f5f2eb;--surface:#fffdf9;--surface-2:#efeade;--ink:#0b2a4a;--ink-soft:#3e4c5a;--ink-faint:#6e7885;
+    --line:#e2dccf;--line-strong:#cfc7b6;--accent:#8f6428;--accent-bright:#b8863b;--accent-wash:#f1e7d3;
+    --pos:#3f8c5c;--neg:#b23b3b;--warn:#b5852a;--risk-hi:#b23b3b;--risk-md:#b5852a;--risk-lo:#3f8c5c;--blue:#2b6a9c;
+    --shadow:0 1px 2px rgba(11,42,74,.06),0 10px 28px rgba(11,42,74,.06);--shadow-lg:0 2px 6px rgba(11,42,74,.08),0 22px 48px rgba(11,42,74,.10);
+  }
+  :root[data-theme="dark"] {
+    --paper:#0a1523;--surface:#10233b;--surface-2:#172c47;--ink:#eaf1f8;--ink-soft:#b3c0d0;--ink-faint:#7d8ca0;
+    --line:#223347;--line-strong:#30435d;--accent:#d7ac5e;--accent-bright:#e4bd7c;--accent-wash:#241d10;
+    --pos:#6fc091;--neg:#e58080;--warn:#dab364;--risk-hi:#e58080;--risk-md:#dab364;--risk-lo:#6fc091;--blue:#8fc3ec;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.4);--shadow-lg:0 2px 8px rgba(0,0,0,.4),0 26px 56px rgba(0,0,0,.5);
+  }
+  * { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  body { background: var(--paper); }
+
+  .wrap { background: var(--paper); color: var(--ink-soft); font-family: var(--sans);
+    line-height: 1.65; -webkit-font-smoothing: antialiased;
+    padding: clamp(22px,4vw,60px) clamp(16px,4vw,44px) 96px; }
+  .inner { max-width: 1160px; margin: 0 auto; }
+
+  /* Masthead */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 26px; margin-bottom: 10px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing:.18em; text-transform:uppercase; color: var(--accent); margin:0 0 16px; }
+  h1 { font-family: var(--serif); font-weight:600; color: var(--ink); font-size: clamp(34px,6.2vw,60px);
+    line-height:1.02; letter-spacing:-.015em; margin:0 0 18px; text-wrap: balance; }
+  .standfirst { font-size: clamp(16px,2.1vw,20px); color: var(--ink-soft); max-width: 72ch; margin:0; }
+  .standfirst b { color: var(--ink); font-weight:600; }
+  .metabar { display:flex; flex-wrap:wrap; gap:8px 28px; font-family: var(--mono); font-size:12px; color: var(--ink-faint); margin-top:24px; }
+  .metabar span b { color: var(--ink-soft); font-weight:600; }
+  .metabar a { color: var(--accent); border:none; }
+
+  /* Sections */
+  .sec { margin-top: 60px; scroll-margin-top: 20px; }
+  .sec-head { display:flex; align-items:baseline; gap:16px; margin-bottom:6px; }
+  .sec-num { font-family: var(--mono); font-size:13px; font-weight:600; color: var(--accent-bright); letter-spacing:.04em;
+    border:1px solid var(--line-strong); border-radius:6px; padding:3px 9px; flex:0 0 auto; margin-top:4px; font-variant-numeric: tabular-nums; }
+  h2 { font-family: var(--serif); font-weight:600; color: var(--ink); font-size: clamp(23px,3.4vw,31px);
+    margin:0; letter-spacing:-.012em; text-wrap: balance; }
+  .sec-note { color: var(--ink-faint); font-size:14.5px; margin:4px 0 22px; max-width:80ch; }
+  h3 { font-family: var(--sans); font-weight:700; font-size:12.5px; letter-spacing:.09em; text-transform:uppercase; color: var(--ink-faint); margin:34px 0 14px; }
+  p { margin:0 0 15px; }
+  .prose { max-width: 78ch; }
+  .prose b { color: var(--ink); font-weight:600; }
+  a { color: var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent-bright) 42%, transparent); }
+  a:hover { border-bottom-color: var(--accent-bright); }
+  a:focus-visible { outline:2px solid var(--accent-bright); outline-offset:2px; border-radius:2px; }
+
+  /* Citation superscripts */
+  sup.cite { font-size: 10px; line-height: 0; vertical-align: super; margin-left: 1px; font-family: var(--mono); }
+  sup.cite a { border:none; color: var(--accent); font-weight:600; }
+  sup.cite a::before { content:"["; } sup.cite a::after { content:"]"; }
+
+  /* Method / analysis note */
+  .method { background: var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--blue);
+    border-radius:8px; padding:12px 16px; margin:12px 0 4px; font-size:13px; color: var(--ink-soft); max-width:92ch; line-height:1.7; }
+  .method .mlabel { font-family: var(--mono); font-size:10px; letter-spacing:.11em; text-transform:uppercase; color: var(--blue); display:block; margin-bottom:5px; }
+  .method b { color: var(--ink); }
+
+  /* Cards / callouts */
+  .card { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow: var(--shadow); margin-top:4px; }
+  .card h4 { margin:0 0 8px; font-family: var(--serif); font-weight:600; font-size:17px; color: var(--ink); }
+  .card p:last-child { margin-bottom:0; }
+  .grid-2 { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:16px; margin-top:4px; }
+  .callout { background: var(--accent-wash); border:1px solid color-mix(in srgb, var(--accent-bright) 34%, var(--line)); border-left:3px solid var(--accent-bright);
+    border-radius:12px; padding:20px 24px; margin-top:22px; box-shadow: var(--shadow); }
+  .callout .lbl { font-family: var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color: var(--accent); display:block; margin-bottom:8px; }
+  .callout p { margin:0 0 12px; color: var(--ink); font-size:15px; }
+  .callout p:last-child { margin-bottom:0; }
+  .callout p b { font-weight:700; }
+
+  /* Model tiles */
+  .models { display:grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top:6px; }
+  .model { background: var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; box-shadow: var(--shadow); }
+  .model .mh { font-family: var(--serif); font-weight:600; font-size:16px; color: var(--ink); margin:0 0 4px; }
+  .model .mtag { font-family: var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color: var(--accent); font-weight:700; }
+  .model p { margin:8px 0 0; font-size:13px; color: var(--ink-soft); }
+  .model .who { display:block; margin-top:8px; font-size:12px; color: var(--ink-faint); }
+  .model .who b { color: var(--ink-soft); }
+
+  /* Tables */
+  .tablecard { background: var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow: var(--shadow); margin-top:6px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:760px; }
+  thead th { text-align:left; font-family: var(--mono); font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color: var(--ink-faint); background: var(--surface-2); padding:13px 16px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+  tbody td { padding:14px 16px; border-bottom:1px solid var(--line); vertical-align:top; font-size:14px; color: var(--ink-soft); }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+  td .name { font-weight:600; color: var(--ink); }
+  td .name small { display:block; font-weight:400; color: var(--ink-faint); font-size:12px; margin-top:2px; font-family: var(--mono); }
+  tr.us td { background: color-mix(in srgb, var(--accent-wash) 60%, transparent); }
+  tr.us:hover td { background: color-mix(in srgb, var(--accent-wash) 80%, transparent); }
+  tr.us td .name { color: var(--accent); }
+  td.num { font-family: var(--mono); font-size:13px; color: var(--ink); font-variant-numeric: tabular-nums; white-space:nowrap; }
+  .badge { display:inline-block; font-family: var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.04em; padding:3px 8px; border-radius:5px; white-space:nowrap; }
+  .badge.seat { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
+  .badge.vol { background: color-mix(in srgb, var(--blue) 18%, transparent); color: var(--blue); }
+  .badge.flat { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+  .badge.both { background: var(--accent-wash); color: var(--accent); }
+  .badge.open { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+  .badge.closed { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
+
+  /* Competitor detail cards */
+  .comp { background: var(--surface); border:1px solid var(--line); border-radius:14px; padding:22px 24px; box-shadow: var(--shadow); margin-top:16px; }
+  .comp.threat { border-left:3px solid var(--neg); }
+  .comp.incumbent { border-left:3px solid var(--accent-bright); }
+  .comp.channel { border-left:3px solid var(--blue); }
+  .comp .ch { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 14px; margin-bottom:4px; }
+  .comp .ch h4 { margin:0; font-family: var(--serif); font-weight:600; font-size:19px; color: var(--ink); }
+  .comp .ch .tagline { font-size:13px; color: var(--ink-faint); }
+  .comp .model-line { font-family: var(--mono); font-size:11.5px; letter-spacing:.03em; color: var(--accent); font-weight:600; margin:2px 0 12px; }
+  .comp dl { display:grid; grid-template-columns: 148px 1fr; gap:2px 16px; margin:0; font-size:13.5px; }
+  @media (max-width:560px){ .comp dl { grid-template-columns:1fr; gap:2px; } .comp dt { margin-top:8px; } }
+  .comp dt { color: var(--ink-faint); font-family: var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:7px 0; border-top:1px solid var(--line); }
+  .comp dd { color: var(--ink-soft); padding:7px 0; border-top:1px solid var(--line); margin:0; }
+  .comp dd b { color: var(--ink); }
+  @media (max-width:560px){ .comp dd { border-top:none; padding-top:0; } }
+
+  code { font-family: var(--mono); font-size:.88em; background: var(--surface-2); padding:1px 5px; border-radius:4px; color: var(--ink-soft); }
+
+  /* Sources */
+  .footer { margin-top:66px; border-top:1px solid var(--line-strong); padding-top:26px; }
+  .footer h3 { margin-top:0; }
+  ol.srcs { margin:0; padding:0; list-style:none; counter-reset: s; font-size:13px; }
+  ol.srcs li { counter-increment:s; position:relative; padding:10px 0 10px 40px; border-bottom:1px solid var(--line); }
+  ol.srcs li:last-child { border-bottom:none; }
+  ol.srcs li::before { content:"["counter(s)"]"; position:absolute; left:0; top:10px; font-family: var(--mono); font-size:11.5px; font-weight:600; color: var(--accent); }
+  ol.srcs li a { color: var(--ink-soft); border:none; word-break:break-word; }
+  ol.srcs li a:hover { color: var(--accent); }
+  ol.srcs .what { display:block; color: var(--ink-faint); font-size:12px; margin-top:2px; }
+  ol.srcs li:target { background: var(--accent-wash); border-radius:6px; padding-left:44px; }
+  .disclaimer { margin-top:24px; font-family: var(--mono); font-size:11.5px; line-height:1.7; color: var(--ink-faint); max-width:96ch; }
+  .disclaimer b { color: var(--ink-soft); }
+  .colophon { margin-top:20px; font-family: var(--mono); font-size:11px; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="inner">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <p class="eyebrow">Insolvia · Competitive Intelligence</p>
+    <h1>How the competition makes money.</h1>
+    <p class="standfirst">A sourced breakdown of the <b>monetization strategy</b> of the bankruptcy petition-prep and practice-management tools we compete with — the pricing model, the headline numbers, and the second revenue line most of them run underneath the subscription. <em>Who</em> the competitors are is already documented in <a href="business-plan.html">business-plan.html §2</a> and <a href="business-product-strategy.html#market">business-product-strategy.html §2</a>; this document is the money deep-dive on that same set.</p>
+    <div class="metabar">
+      <span><b>Status</b> Research draft</span>
+      <span><b>Compiled</b> 2026-07-23</span>
+      <span><b>Competitor set</b> <a href="business-plan.html">business-plan.html §2</a></span>
+      <span><b>Every figure</b> cited below</span>
+    </div>
+  </header>
+
+  <!-- 1. MODELS AT A GLANCE -->
+  <section class="sec" id="models">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Monetization models at a glance</h2></div>
+    <p class="sec-note">The category runs on three overlapping pricing logics. Which one a vendor picks says as much about who they're chasing as any feature does.</p>
+    <div class="models">
+      <div class="model">
+        <div class="mtag">Model A</div>
+        <div class="mh">Per-seat / per-preparer</div>
+        <p>You pay for every person who touches the software. Revenue scales with the firm's headcount.</p>
+        <span class="who"><b>Who:</b> Best Case (incumbent)<sup class="cite"><a href="#s6">6</a></sup> — and Insolvia's own modeled price.<sup class="cite"><a href="#s13">13</a></sup></span>
+      </div>
+      <div class="model">
+        <div class="mtag">Model B</div>
+        <div class="mh">Flat plan, scaled by filing volume</div>
+        <p>A flat annual/monthly fee tiered by how many cases you file, with <b>users largely free</b>. Revenue scales with case volume, not seats.</p>
+        <span class="who"><b>Who:</b> NextChapter,<sup class="cite"><a href="#s1">1</a></sup> CINcompass,<sup class="cite"><a href="#s7">7</a></sup> Jubilee.<sup class="cite"><a href="#s9">9</a></sup></span>
+      </div>
+      <div class="model">
+        <div class="mtag">Model C</div>
+        <div class="mh">Opaque / custom-quoted</div>
+        <p>No public price; a rep quotes per firm by case volume. Common at both ends — the incumbent and the AI-native challenger.</p>
+        <span class="who"><b>Who:</b> Best Case,<sup class="cite"><a href="#s12">12</a></sup> Glade AI.<sup class="cite"><a href="#s4">4</a></sup></span>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="lbl">The second revenue line — payments</span>
+      <p>Several competitors don't just sell software; they take a cut of the <b>money the firm collects from its clients</b>. Glade builds in <b>native payments</b> to automate retainers and payment plans;<sup class="cite"><a href="#s5">5</a></sup> Jubilee integrates <b>LawPay</b>;<sup class="cite"><a href="#s10">10</a></sup> and MyCase (our channel) bundles <b>LawPay</b> free.<sup class="cite"><a href="#s3">3</a></sup> Payment processing is a monetization lever independent of seat count — and one Insolvia's current seat-only model does not yet touch.</p>
+    </div>
+  </section>
+
+  <!-- 2. THE FIELD, PRICED -->
+  <section class="sec" id="field">
+    <div class="sec-head"><span class="sec-num">02</span><h2>The field, priced</h2></div>
+    <p class="sec-note">Headline pricing and model for each competitor. "Users" is the tell: an incumbent charges per seat, the modern cloud tools give seats away and charge for filings. Figures are as most recently published or reported — see the reliability notes and sources.</p>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Player</th><th>Model</th><th>Headline price</th><th>Users</th><th>Pricing</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="name">Best Case by Stretto</span><small>incumbent · ~80% share</small></td>
+          <td><span class="badge seat">Per-preparer</span></td>
+          <td class="num">Not public<sup class="cite"><a href="#s12">12</a></sup><br><span style="color:var(--ink-faint);font-size:12px">desktop ~$1,750–4,500/yr + maint.<sup class="cite"><a href="#s13">13</a></sup></span></td>
+          <td>Per preparer</td>
+          <td><span class="badge closed">Sales-led</span></td>
+        </tr>
+        <tr class="threat-row">
+          <td><span class="name">Glade AI</span><small>the real threat · AI-native</small></td>
+          <td><span class="badge flat">Flat, unlimited users</span></td>
+          <td class="num">Not public<sup class="cite"><a href="#s4">4</a></sup><br><span style="color:var(--ink-faint);font-size:12px">custom, by case volume</span></td>
+          <td>Unlimited (flat)<sup class="cite"><a href="#s4">4</a></sup></td>
+          <td><span class="badge closed">Custom quote</span></td>
+        </tr>
+        <tr>
+          <td><span class="name">NextChapter</span><small>modern cloud UX</small></td>
+          <td><span class="badge vol">Volume tiers</span></td>
+          <td class="num">$159–$1,999/yr<sup class="cite"><a href="#s1">1</a></sup></td>
+          <td>6 free, then $99/user/yr<sup class="cite"><a href="#s1">1</a></sup></td>
+          <td><span class="badge open">Published</span></td>
+        </tr>
+        <tr>
+          <td><span class="name">CINcompass</span><small>Stretto's cloud tool</small></td>
+          <td><span class="badge vol">Volume tiers</span></td>
+          <td class="num">$75–$100/mo<sup class="cite"><a href="#s7">7</a></sup></td>
+          <td>Unlimited<sup class="cite"><a href="#s7">7</a></sup></td>
+          <td><span class="badge open">Published</span></td>
+        </tr>
+        <tr>
+          <td><span class="name">Jubilee</span><small>LegalPRO Systems · low-cost</small></td>
+          <td><span class="badge vol">Volume tiers</span> <span class="badge vol">per-case</span></td>
+          <td class="num">from $50/mo<sup class="cite"><a href="#s9">9</a></sup><br><span style="color:var(--ink-faint);font-size:12px">or $59/case (JubileeGo)</span></td>
+          <td>2+ incl.<sup class="cite"><a href="#s9">9</a></sup></td>
+          <td><span class="badge open">Published</span></td>
+        </tr>
+        <tr>
+          <td><span class="name">Caseway · CaseForm</span><small>via MyCase · in-channel signal</small></td>
+          <td><span class="badge seat">Per-user add-on</span></td>
+          <td class="num">$49/user/mo<sup class="cite"><a href="#s3">3</a></sup></td>
+          <td>Per user</td>
+          <td><span class="badge open">Published</span></td>
+        </tr>
+        <tr class="us">
+          <td><span class="name">Insolvia</span><small>modeled</small></td>
+          <td><span class="badge seat">Per-seat</span></td>
+          <td class="num">$129/seat/mo<sup class="cite"><a href="#s13">13</a></sup><br><span style="color:var(--ink-faint);font-size:12px">= $1,548/seat/yr, desktop incl.</span></td>
+          <td>Per seat</td>
+          <td><span class="badge open">Planned public</span></td>
+        </tr>
+      </tbody>
+    </table></div></div>
+    <div class="method"><span class="mlabel">MyCase — the channel, and a cost input, not a competitor</span> MyCase is where we distribute, but the firm already pays for it: <b>Basic $50</b>, <b>Pro $100</b>, <b>Advanced $130</b> per user/month billed annually ($60/$120/$150 monthly), with LawPay bundled free.<sup class="cite"><a href="#s2">2</a></sup><sup class="cite"><a href="#s3">3</a></sup> Insolvia's seat price sits <em>on top of</em> a MyCase seat the firm is already buying — relevant to total-cost-of-ownership framing in any sales conversation.</div>
+  </section>
+
+  <!-- 3. COMPETITOR DETAIL -->
+  <section class="sec" id="detail">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Competitor by competitor</h2></div>
+    <p class="sec-note">The monetization detail behind each headline, with the reliability of each figure noted honestly. Two vendors — the incumbent and the AI-native threat — deliberately hide their numbers, so those entries are ranges and second-hand reports, flagged as such.</p>
+
+    <div class="comp incumbent">
+      <div class="ch"><h4>Best Case by Stretto</h4><span class="tagline">The incumbent to displace — ~80% of U.S. filings</span></div>
+      <div class="model-line">MODEL · per-preparer subscription, desktop-rooted + cloud · sales-led, no public price</div>
+      <dl>
+        <dt>How they charge</dt><dd>By the preparer (per named user), the classic desktop-licensing shape carried into a subscription.<sup class="cite"><a href="#s6">6</a></sup> Pricing is <b>not published</b> — you contact Stretto for a quote.<sup class="cite"><a href="#s11">11</a></sup><sup class="cite"><a href="#s12">12</a></sup></dd>
+        <dt>Figures on record</dt><dd>Our own business plan records <b>desktop ~$1,750–4,500/yr + maintenance</b> and <b>Cloud ~$99/mo</b>.<sup class="cite"><a href="#s13">13</a></sup> A competitor (Glade) blog claims Best Case "starts at <b>$2,395/month</b>, with per-filing fees stacking at volume"<sup class="cite"><a href="#s5">5</a></sup> — <em>treat with caution</em>: it's a rival's marketing, and it's an order of magnitude above the cloud figure, so it likely describes a large multi-preparer or bundled configuration rather than an entry price.</dd>
+        <dt>Second revenue lines</dt><dd>Maintenance/support fees on desktop; Stretto's broader business monetizes court/claims services on the corporate side.</dd>
+        <dt>Read for us</dt><dd>Opacity is a weakness we can attack with transparent, published pricing. Per-preparer billing punishes firms that grow headcount — the exact firms we want.</dd>
+      </dl>
+    </div>
+
+    <div class="comp threat">
+      <div class="ch"><h4>Glade AI</h4><span class="tagline">The real threat — AI-native, cloud-only</span></div>
+      <div class="model-line">MODEL · flat monthly (unlimited users) + native payments · custom-quoted, opaque</div>
+      <dl>
+        <dt>How they charge</dt><dd>A <b>flat monthly subscription that does not climb as you add users</b>, custom-quoted per firm by case volume — sold explicitly as "scale your practice, not your team."<sup class="cite"><a href="#s4">4</a></sup> No self-serve price is published.</dd>
+        <dt>The contradiction</dt><dd>Glade's own marketing elsewhere touts "transparent per-seat pricing,"<sup class="cite"><a href="#s5">5</a></sup> which conflicts with the flat, unlimited-user framing that third-party reviews describe.<sup class="cite"><a href="#s4">4</a></sup> The honest read: pricing is <b>not actually transparent</b> — it's quoted by a rep — and worth re-confirming directly before we rely on it.</dd>
+        <dt>Second revenue line</dt><dd><b>Native payments.</b> Glade automates retainers and payment plans to cut 60–90-day collection cycles<sup class="cite"><a href="#s5">5</a></sup> — monetizing the firm's client cash flow, not just seats.</dd>
+        <dt>Who they target</dt><dd>High-volume practices filing "well over a dozen cases a week" (50+/mo)<sup class="cite"><a href="#s4">4</a></sup> — deliberately <em>not</em> our solo/small warm MyCase base.</dd>
+        <dt>Read for us</dt><dd>Their flat/unlimited-users model is genuinely attractive to multi-seat firms and undercuts per-seat billing on headcount. Our differentiation is segment (solo/small via MyCase) and channel — not price shape. Their opacity is, again, an opening for transparent pricing.</dd>
+      </dl>
+    </div>
+
+    <div class="comp">
+      <div class="ch"><h4>NextChapter</h4><span class="tagline">Modern cloud UX, weak AI</span></div>
+      <div class="model-line">MODEL · flat annual plans tiered by case volume · users mostly free · fully published</div>
+      <dl>
+        <dt>How they charge</dt><dd>Flat annual plans priced by <b>how many cases you file</b>, not by seat. Every plan <b>includes 6 users free</b>; extra users are <b>$99/user/yr</b>.<sup class="cite"><a href="#s1">1</a></sup></dd>
+        <dt>Plan ladder</dt><dd><b>Pro Basic</b> $159 (≤4 cases/yr) · $649 (≤11) · $999 (unlimited). <b>Pro+</b> $1,099 (≤11) · $1,599 (unlimited), adding client portal, texting, notices, scheduler. <b>Whoa</b> $1,999 (unlimited) adds Doc Creator.<sup class="cite"><a href="#s1">1</a></sup></dd>
+        <dt>Add-ons</dt><dd>Chapter 13 $250/yr, Doc Creator $500/yr, MyChapter client portal $500/yr, Notices $200/yr, NextMessage $300/yr, Virtual Paralegal from $1,500/yr.<sup class="cite"><a href="#s1">1</a></sup></dd>
+        <dt>Terms</dt><dd>No minimum contract, no setup or cancellation fee, free trial — "only pay when you download or file."<sup class="cite"><a href="#s1">1</a></sup></dd>
+        <dt>Read for us</dt><dd><b>The most important comparison.</b> A small firm with several preparers pays NextChapter one flat fee (6 users free) — while Insolvia's $129/seat/mo bills each of them. See §4.</dd>
+      </dl>
+    </div>
+
+    <div class="comp">
+      <div class="ch"><h4>CINcompass</h4><span class="tagline">Stretto's own cloud petition-prep</span></div>
+      <div class="model-line">MODEL · all-inclusive monthly tiers by filing volume · unlimited users · published</div>
+      <dl>
+        <dt>How they charge</dt><dd>All-inclusive tiers scaled by monthly filing volume, with <b>unlimited users</b> included.<sup class="cite"><a href="#s7">7</a></sup><sup class="cite"><a href="#s8">8</a></sup></dd>
+        <dt>Figures on record</dt><dd><b>Standard $75/mo</b> (~$825/yr) up to 10 filings/mo; <b>Plus $100/mo</b> (~$1,140/yr) for 11–25 filings/mo.<sup class="cite"><a href="#s7">7</a></sup> <em>Dated ~2021; re-verify.</em></dd>
+        <dt>Read for us</dt><dd>Notable that Stretto's <em>own</em> cloud tool uses the opposite model to Best Case — volume-based, unlimited users — signalling where the cloud SMB market's price expectation actually sits.</dd>
+      </dl>
+    </div>
+
+    <div class="comp">
+      <div class="ch"><h4>Jubilee</h4><span class="tagline">LegalPRO Systems — the low-cost floor</span></div>
+      <div class="model-line">MODEL · low flat monthly tiers by volume, or per-case · native payments (LawPay) · published</div>
+      <dl>
+        <dt>How they charge</dt><dd>Low flat monthly tiers by annual case volume, plus a per-case option and a free tier.<sup class="cite"><a href="#s9">9</a></sup><sup class="cite"><a href="#s10">10</a></sup></dd>
+        <dt>Figures on record</dt><dd><b>Jubilee 36</b> from $50/mo · <b>Jubilee 300</b> ~$83/mo · <b>JubileePRO</b> $71/mo (or $781/yr) incl. 51 filings/yr, payments, texting, notices · <b>JubileeGo</b> ~$59/case for two users.<sup class="cite"><a href="#s9">9</a></sup> Free version + trial.</dd>
+        <dt>Second revenue line</dt><dd><b>Payments</b> via a LawPay billing/payments integration.<sup class="cite"><a href="#s10">10</a></sup></dd>
+        <dt>Read for us</dt><dd>Sets the market's price <em>floor</em> (~$50/mo). We do not compete here on price; we compete on channel, integration, and safe AI.</dd>
+      </dl>
+    </div>
+
+    <div class="comp channel">
+      <div class="ch"><h4>Caseway · CaseForm</h4><span class="tagline">In-channel signal — an AI add-on inside MyCase</span></div>
+      <div class="model-line">MODEL · $49/user/mo add-on to MyCase · pay-as-you-go · published</div>
+      <dl>
+        <dt>How they charge</dt><dd><b>$49/user/mo</b> as a MyCase add-on, month-to-month, no long-term contract; the standalone "Casey" research assistant is also $49/mo.<sup class="cite"><a href="#s3">3</a></sup></dd>
+        <dt>Why it matters</dt><dd>Not bankruptcy-deep (generic court forms), so not a direct product threat — but it is <b>proof MyCase partners rather than builds verticals</b>, and a live benchmark for what an in-App-Bar add-on charges (~$49/user/mo). A signal to move fast in-channel.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 4. FINDINGS THAT TOUCH OUR MODEL -->
+  <section class="sec" id="findings">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Findings that touch our own model</h2></div>
+    <p class="sec-note">Three things this research surfaced that bear directly on Insolvia's pricing and the figures in our own plan. Flagged for the strategy discussion — <b>analysis, not settled decisions.</b></p>
+
+    <div class="callout">
+      <span class="lbl">Finding 1 — our NextChapter willingness-to-pay anchor looks stale</span>
+      <p>The business plan anchors blended willingness-to-pay partly on "NextChapter ~$165/preparer/mo (~$1,980/yr)."<sup class="cite"><a href="#s13">13</a></sup> But NextChapter's <b>current published pricing is not per-preparer at all</b> — it's flat annual plans by case volume ($159–$1,999/yr) with 6 users free.<sup class="cite"><a href="#s1">1</a></sup> The per-preparer figure survives in some 2026 review write-ups<sup class="cite"><a href="#s6">6</a></sup> but not on NextChapter's own page. If the seat-based anchor is wrong, the <b>~$1,700 blended WTP</b> underpinning the SAM/ARR model deserves a re-check.</p>
+    </div>
+
+    <div class="callout">
+      <span class="lbl">Finding 2 — the "MyCase Advanced = $89/mo for API" figure needs re-verifying</span>
+      <p>Our docs state the MyCase API needs the Advanced tier at <b>$89/mo</b>.<sup class="cite"><a href="#s13">13</a></sup> MyCase's current published tiers are Basic $50 / Pro $100 / <b>Advanced $130</b> per user/month billed annually.<sup class="cite"><a href="#s2">2</a></sup> The $89 figure may be an older tier, a promotional rate, or a separate API line-item. It's a customer cost input and an App-Bar prerequisite, so worth confirming with our MyCase contact.</p>
+    </div>
+
+    <div class="callout">
+      <span class="lbl">Finding 3 — we're the only SMB-facing tool billing per-seat</span>
+      <p>The modern cloud field — NextChapter, CINcompass, Jubilee — has converged on <b>flat pricing by filing volume with users largely free</b>.<sup class="cite"><a href="#s1">1</a></sup><sup class="cite"><a href="#s7">7</a></sup><sup class="cite"><a href="#s9">9</a></sup> Glade goes further with flat/unlimited-users.<sup class="cite"><a href="#s4">4</a></sup> Insolvia's <b>$129/seat/mo</b><sup class="cite"><a href="#s13">13</a></sup> matches the <em>incumbent's</em> per-preparer shape, not the challengers'. Worked example: a 3-preparer firm pays Insolvia ~$4,644/yr but NextChapter ~$999–1,999/yr flat (6 users free). Our channel + integration + safe-AI wedge has to carry that premium — or the packaging (flat tiers? seats bundled? a payments line?) is worth revisiting. Not a verdict; a tension to price in deliberately.</p>
+    </div>
+  </section>
+
+  <!-- SOURCES -->
+  <footer class="footer">
+    <h3>Sources</h3>
+    <ol class="srcs">
+      <li id="s1"><a href="https://nextchapterlegal.com/bankruptcy/pricing">NextChapter — official bankruptcy software pricing page</a><span class="what">Plan ladder ($159–$1,999/yr by case volume), 6 free users + $99/user/yr, add-on and trial terms. Primary source, vendor-published.</span></li>
+      <li id="s2"><a href="https://supportcenter.mycase.com/en/articles/9369812-how-much-does-mycase-cost">MyCase (8am) Help Center — "How much does MyCase cost?"</a><span class="what">Basic $50 / Pro $100 / Advanced $130 per user/mo billed annually ($60/$120/$150 monthly). Primary source, vendor-published.</span></li>
+      <li id="s3"><a href="https://caseway.ai/caseform/8am">Caseway — CaseForm + MyCase integration &amp; pricing</a> · <a href="https://caseway.ai/pricing">Caseway pricing</a><span class="what">CaseForm $49/user/mo MyCase add-on, month-to-month; MyCase bundles LawPay free. Vendor-published.</span></li>
+      <li id="s4"><a href="https://www.counselpro.ai/blog/glade-ai-reviews-pricing-alternatives">CounselPro — "Glade AI reviews, pricing, and alternatives (2026)"</a><span class="what">Third-party: Glade does not publish prices; flat monthly that doesn't climb with users; custom-quoted by case volume; targets high-volume firms. Note: CounselPro is itself a competitor in the space — corroborate.</span></li>
+      <li id="s5"><a href="https://glade.ai/blog/best-case-reviews-pricing-alternatives/">Glade AI — "Best Case Reviews, Pricing, and Alternatives"</a><span class="what">Vendor (Glade) blog. Claims Best Case "starts at $2,395/month" + per-filing fees, and Glade "native payments." Competitor marketing — treat pricing claims skeptically.</span></li>
+      <li id="s6"><a href="https://www.truereview.co/post/bankruptcy-law-software">TrueReview — "Best Bankruptcy Law Software for Attorneys (2026)"</a><span class="what">Third-party roundup: Best Case "subscription pricing by preparer"; NextChapter "~$165/preparer/mo on an annual plan"; CINcompass tiers "from ~$75/mo by filing volume."</span></li>
+      <li id="s7"><a href="https://www.capterra.com/p/181045/CINcompass/">Capterra — CINcompass pricing &amp; reviews</a><span class="what">CINcompass Standard $75/mo (~$825/yr, ≤10 filings/mo) and Plus $100/mo (~$1,140/yr, 11–25 filings/mo), unlimited users. Figures ~2021-era — re-verify.</span></li>
+      <li id="s8"><a href="https://www.americanbar.org/groups/journal/articles/2021/manage-your-bankruptcy-law-practice-with-this-software/">ABA Journal (2021) — "Manage your bankruptcy law practice with this software"</a><span class="what">Background on the bankruptcy-software field and CINcompass/NextChapter/Jubilee models. Dated 2021.</span></li>
+      <li id="s9"><a href="https://www.capterra.com/p/156277/Jubilee-Bankruptcy/pricing/">Capterra — Jubilee (LegalPRO Systems) pricing</a><span class="what">Jubilee 36 from $50/mo, Jubilee 300 ~$83/mo, JubileePRO $71/mo (or $781/yr, 51 filings/yr), JubileeGo ~$59/case; free tier + trial.</span></li>
+      <li id="s10"><a href="https://www.jubileepro.com/features/bankruptcy/">Jubilee by LegalPRO Systems — product &amp; features</a> · <a href="https://www.lawpay.com/partners/jubilee/">Jubilee + LawPay integration</a><span class="what">Vendor: Chapters 7/11/12/13; native payments via LawPay integration.</span></li>
+      <li id="s11"><a href="https://www.softwareadvice.com/legal/bankruptcy-comparison/">Software Advice — bankruptcy software comparison</a><span class="what">Category comparison; confirms Best Case pricing is quote-based (contact vendor). Corroborating.</span></li>
+      <li id="s12"><a href="https://www.getapp.com/legal-law-software/a/best-case/">GetApp — Best Case pricing &amp; reviews</a><span class="what">Confirms Best Case has no public self-serve pricing — "contact vendor" model. Corroborating.</span></li>
+      <li id="s13"><a href="business-plan.html">Insolvia — business-plan.html §3 &amp; §5</a> (internal)<span class="what">Our own recorded anchors: Best Case desktop ~$1,750–4,500/yr + maint., Cloud ~$99/mo; NextChapter ~$165/preparer/mo; MyCase API on Advanced tier ~$89/mo; Insolvia list price $129/seat/mo; ~$1,700 blended WTP.</span></li>
+    </ol>
+    <p class="disclaimer"><b>On the figures.</b> Software pricing in this category changes often and is frequently gated behind "contact sales," so treat every number as a point-in-time reference, not a quote. <b>Vendor-published primary sources</b> (NextChapter, MyCase, Caseway, Jubilee) are the most reliable; <b>third-party roundups</b> (TrueReview, Capterra, ABA Journal) may lag; and <b>competitor-authored</b> pricing claims (Glade's blog on Best Case; CounselPro on Glade) are marketing and are flagged inline. The two vendors most relevant to us — <b>Best Case</b> and <b>Glade</b> — do not publish prices, so their entries are ranges and second-hand reports by necessity. Confirm anything load-bearing directly with the vendor (or, for MyCase, our contact there) before it informs pricing or fundraising. Competitor <em>identities and positioning</em> live in <a href="business-plan.html">business-plan.html §2</a>; this document adds only the monetization layer.</p>
+    <p class="colophon">Insolvia · Competitor Monetization · Research draft · 2026-07-23 · Compiled from vendor pricing pages and third-party reviews; every figure cited above.</p>
+  </footer>
+
+</div>
+</div>
+</body>
+</html>
