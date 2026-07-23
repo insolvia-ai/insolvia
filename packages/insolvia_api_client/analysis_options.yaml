@@ -1,0 +1,17 @@
+# This package is pure Dart, so it cannot inherit the workspace root config
+# (that one pulls in `package:flutter_lints`, which needs a Flutter dependency).
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  errors:
+    always_declare_return_types: error
+    unused_import: error
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - avoid_print
+    - prefer_final_locals
