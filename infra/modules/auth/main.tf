@@ -163,12 +163,15 @@ resource "aws_cognito_user_pool_client" "web" {
   logout_urls   = local.web_logout_urls
 
   # Sign-in happens on the hosted domain, so the client needs no
-  # password-carrying SDK flow — SRP for completeness, refresh to renew.
-  # Deliberately NO ALLOW_USER_PASSWORD_AUTH: nothing should ever ship a raw
-  # password through this client.
+  # password-carrying SDK flow — SRP for completeness. Deliberately NO
+  # ALLOW_USER_PASSWORD_AUTH: nothing should ever ship a raw password
+  # through this client. And NO ALLOW_REFRESH_TOKEN_AUTH: with
+  # refresh_token_rotation enabled (below) Cognito REJECTS it as an explicit
+  # flow at CreateUserPoolClient time ("not a permitted ExplicitAuthFlow
+  # when refresh token rotation is enabled") — rotation owns the refresh
+  # path. Found by the first dev-env apply; validate can't see it.
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 
   prevent_user_existence_errors = "ENABLED"
@@ -208,9 +211,11 @@ resource "aws_cognito_user_pool_client" "desktop" {
   callback_urls = local.desktop_callback_urls
   logout_urls   = local.desktop_logout_urls
 
+  # No ALLOW_REFRESH_TOKEN_AUTH for the same reason as the web client:
+  # refresh_token_rotation below owns the refresh path, and Cognito rejects
+  # the explicit flow when rotation is enabled.
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH",
   ]
 
   prevent_user_existence_errors = "ENABLED"
