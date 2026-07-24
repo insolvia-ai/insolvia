@@ -557,39 +557,36 @@ module "email" {
   aws_region      = var.aws_region
   domain_name     = var.domain_name
   route53_zone_id = aws_route53_zone.main.zone_id
+
+  # Google Workspace domain-ownership token. Route53 permits exactly ONE TXT
+  # record set per name, so this cannot be a separate resource — it goes here
+  # and the module publishes it in the same set as the apex SPF record. Adding
+  # it as its own `aws_route53_record` would silently clobber SPF, which is the
+  # trap `additional_apex_txt_records` exists to prevent.
+  #
+  # Not a secret: verification tokens are public by design and prove only that
+  # whoever set them controls this zone.
+  additional_apex_txt_records = [
+    "google-site-verification=0zLxT_6T4BpPh5oSYJEEUN5EjdGe56DylP9yvnxFaqk",
+  ]
+
+  # Google Workspace's DKIM public key, from Admin console → Gmail →
+  # Authenticate email. Public by definition — the private half never leaves
+  # Google. Currently a 1024-bit key (Google's shorter option); see
+  # `var.google_dkim_value` for why 2048 is preferable and why nothing here has
+  # to change to switch.
+  google_dkim_value = "v=DKIM1;k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCh00xKEHBfQhVsuK0hNrNB6jsPiyFwUH1o2xcIUhX885biq4dp5af9qBwzKTjWSw8/DexMf2XnqiyHZyhZ0IP6Ie6ddSgHw9gx8upC4bLrz6MNbJPpqK4app0Bw+ewlVQ9KWfI5riE0Ltc8QGVMGM5CSHbBs8ce2g6ngrS/UgpXwIDAQAB"
 }
 # ── end email ──────────────────────────────────────────────────
 
-# ── Inbound forwarding (#21, #23, #24, #25) ────────────────────
-# SES receipt rules + the forwarder Lambda that delivers hello@ / support@ /
-# security@ to a private mailbox. Lives in `shared` for the same reason `email`
-# does: SES inbound is per-domain and per-region, and only one receipt rule set
-# can be active per account.
+# ── Inbound mail: Google Workspace, not AWS ────────────────────
+# There is deliberately no inbound-mail stack here. hello@ / support@ /
+# security@ were once SES receipt rules writing to S3 and a forwarder Lambda
+# that re-sent each message to one private mailbox (#21–#25); they are now real
+# Google Workspace inboxes, so the whole path — rule set, bucket, Lambda, DLQ,
+# alarms, and the forward-to SecureString — was removed.
 #
-# The apex MX that makes any of this reachable is owned by `module.email`.
-#
-# The destination address is a human secret and is deliberately absent from
-# terraform.tfvars. Supply it once at apply time:
-#
-#   TF_VAR_inbound_forward_to='someone@example.com' terraform apply
-#
-# after which the module ignores changes to the SSM value and the address is
-# owned outside Terraform.
-module "inbound_forwarding" {
-  source = "../../modules/inbound_forwarding"
-
-  environment = "shared"
-  aws_region  = var.aws_region
-  domain_name = var.domain_name
-
-  from_address     = module.email.from_address
-  ses_identity_arn = module.email.identity_arn
-
-  inbound_forward_to = var.inbound_forward_to
-
-  # Python source for the Lambda, provided by the inbound_forwarder service (#22).
-  lambda_source_dir = "${path.module}/../../../services/inbound_forwarder/src"
-
-  tags = local.common_tags
-}
-# ── end inbound forwarding ─────────────────────────────────────
+# The apex MX that makes Workspace reachable is owned by `module.email`, and
+# only one apex MX set can exist: reinstating SES receiving means taking inbound
+# mail away from Workspace. Outbound is untouched — SES still sends as
+# no-reply@insolvia.ai.

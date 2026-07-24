@@ -20,20 +20,3 @@ variable "github_repo" {
   default     = "insolvia-ai/insolvia"
 }
 
-# ── Inbound forwarding (#23) ───────────────────────────────────
-variable "inbound_forward_to" {
-  description = <<-EOT
-    Private destination mailbox for mail forwarded from hello@ / support@ /
-    security@. A human secret: it is NOT committed and NOT in
-    terraform.tfvars.example. Supply it at apply time via the environment:
-
-      TF_VAR_inbound_forward_to='someone@example.com' terraform apply
-
-    Terraform writes it once into an SSM SecureString and then ignores changes
-    to the value, so subsequent applies do not need it set.
-  EOT
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-# ── end inbound forwarding ─────────────────────────────────────

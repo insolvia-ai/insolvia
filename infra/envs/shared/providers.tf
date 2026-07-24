@@ -5,12 +5,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    # Used by module.inbound_forwarding to zip the forwarder Lambda source at
-    # plan time, so the Lambda needs no separate CI build step.
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.4"
-    }
   }
 }
 

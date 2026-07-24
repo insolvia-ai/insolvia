@@ -18,6 +18,11 @@ output "mail_from_domain" {
   value       = local.mail_from_domain
 }
 
+output "apex_mx_records" {
+  description = "Apex MX set — who receives mail for the domain (Google Workspace)."
+  value       = aws_route53_record.apex_mx.records
+}
+
 output "dkim_tokens" {
   description = "DKIM tokens whose CNAMEs are published in the hosted zone."
   value       = aws_ses_domain_dkim.domain.dkim_tokens
