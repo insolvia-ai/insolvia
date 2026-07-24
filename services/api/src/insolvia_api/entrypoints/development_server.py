@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
+from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -25,4 +26,11 @@ if config.waitlist_table_name:
 else:
     waitlist_store = MemoryWaitlistStore(echo=True)
 
-app = create_app(ApiDependencies(config=config, waitlist_store=waitlist_store))
+# The plain development server never sends real mail — mirroring the memory
+# waitlist store, this is local-only and never composed in a deployed
+# environment (adapters/aws/mailer_client.py's SigV4MailerClient is).
+mailer = InMemoryMailerClient()
+
+app = create_app(
+    ApiDependencies(config=config, waitlist_store=waitlist_store, mailer=mailer)
+)

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from flask import current_app
 
 from insolvia_api.core.config import AppConfig
-from insolvia_api.core.ports import WaitlistStore
+from insolvia_api.core.ports import Mailer, WaitlistStore
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class ApiDependencies:
 
     config: AppConfig
     waitlist_store: WaitlistStore
+    mailer: Mailer
 
 
 def dependencies() -> ApiDependencies:
