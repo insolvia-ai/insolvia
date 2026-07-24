@@ -86,8 +86,8 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
 - **SSM namespace** `/insolvia/<env>/api/<key>` (#70) — Terraform writes the
   values the service reads (`insolvia-env`, `waitlist-table-name`); the deploy
   workflow resolves the namespace into the Lambda environment. Future secrets
-  join as SecureStrings with `ignore_changes = [value]`, like
-  `/insolvia/shared/inbound-forward-to`.
+  join as SecureStrings with `ignore_changes = [value]`, so Terraform creates
+  the slot but never owns the value.
 - **Alarms** (#69) — Lambda errors and throttles, HTTP API `5xx`, p99 latency
   > 2 s sustained — all to an `insolvia-api-<env>-alarms` SNS topic.
   Subscribing an email is a manual step (confirmation click; no real addresses

@@ -8,7 +8,7 @@ of truth for conventions — read it first.
 - [`competitor-monetization.html`](competitor-monetization.html) — sourced deep-dive on **how competitors make money** (pricing models, headline figures, the payments layer) across Best Case, Glade AI, NextChapter, CINcompass, Jubilee, and Caseway; plus findings that touch our own pricing. Competitor identities/positioning stay in `business-plan.html` §2.
 - [`MVP_PLAN.md`](MVP_PLAN.md) — now a thin **index**: the decision log (D1–D8) and a foundation milestone map. The per-issue technical detail lives in the GitHub milestones/issues; the business/product context moved to `business-product-strategy.html`.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — one-time AWS/GitHub bootstrap runbook.
-- [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — `insolvia.ai` mail: address map, inbound forwarding, the Gmail "Send mail as" runbook, and the Google Workspace migration path.
+- [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — `insolvia.ai` mail: address map, the DNS records and who owns them, Google Workspace inbound + SES outbound.
 - [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — infra state model.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — monorepo, env model, hosting topology.
 
