@@ -124,6 +124,11 @@ output "mailer_configuration_set" {
   value       = module.mailer.configuration_set
 }
 
+output "mailer_alarms_topic_arn" {
+  description = "SNS topic for production mailer alarms — subscribe by hand (Terraform manages no subscriptions)."
+  value       = module.mailer.alarms_topic_arn
+}
+
 # ── Marketing site (www.insolvia.ai) — read by the deploy workflow ──
 output "marketing_distribution_id" {
   description = "Marketing CloudFront distribution ID (cache invalidation)."

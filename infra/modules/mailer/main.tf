@@ -15,13 +15,17 @@
 # that module's main.tf for the HTTP-API-behind-a-custom-domain shape this one
 # reuses.
 #
-# Deliberately deferred to a later PR (issue 6.7): the ~9 CloudWatch metric
-# alarms (Lambda errors, DLQ-not-empty, queue age, attachment threat/scan
-# failure, SES bounce/complaint rate) and their alerting SNS topic that
-# upstream's platform module ends with. This module ships the data plane
-# only — queues, storage, SES config, IAM, the API, and the SNS->SQS feedback
-# ingestion path (NOT an alerting topic; SES publishes bounce/complaint
-# notifications here so the feedback Lambda can process them, alarms or not).
+# The ~9 CloudWatch metric alarms (Lambda errors, DLQ-not-empty, queue age,
+# attachment threat/scan failure, SES bounce/complaint rate) and their
+# alerting SNS topic — deliberately deferred out of this PR's initial data
+# plane — now live at the bottom of this file, under "Alerting (issue 6.7)".
+# They protect SES sending reputation and are one of the things AWS reviews
+# before granting SES production access (issue 6.8); see
+# services/mailer/docs/operations.md for the response to each. This module's
+# core remains the data plane — queues, storage, SES config, IAM, the API,
+# and the SNS->SQS feedback ingestion path (NOT the alerting topic; SES
+# publishes bounce/complaint notifications to aws_sns_topic.feedback below so
+# the feedback Lambda can process them, alarms or not).
 #
 # ── Bootstrap order (read before the FIRST apply in a fresh account) ────────
 # Same image-before-apply deadlock as api_service, times three Lambdas from
@@ -957,4 +961,214 @@ resource "aws_ssm_parameter" "api_sending_enabled" {
   type  = "String"
   value = "true"
   tags  = var.tags
+}
+
+# ─── Alerting (issue 6.7) ────────────────────────────────────────────────────
+# Ported from andreas-services/mailer/infra/modules/platform's alarm block
+# (main.tf lines ~873-991), de-humbugged, and fixed: upstream's alarms carry
+# no alarm_actions/ok_actions at all — they page nobody. Every alarm below is
+# wired to aws_sns_topic.alarms, mirroring the house pattern in
+# infra/modules/api_service/main.tf (aws_sns_topic.alarms +
+# aws_cloudwatch_metric_alarm.*, output alarms_topic_arn).
+#
+# Terraform manages no subscriptions here, same reasoning as api_service: an
+# email subscription needs a human to click the confirmation link (a
+# Terraform-managed one would sit "pending" forever), and this repo is public
+# — it commits no real addresses (see CLAUDE.md). Subscribe by hand once,
+# against the topic ARN in this module's alarms_topic_arn output.
+
+resource "aws_sns_topic" "alarms" {
+  name = "${local.name}-alarms"
+  tags = var.tags
+}
+
+# Any Lambda error is worth a look: the service catches its own expected
+# failures (bad category, disallowed message class, disallowed caller) and
+# turns them into a structured reject event (see api_rejects below), so an
+# Errors datapoint on any of the three mailer Lambdas means an unhandled
+# exception or a crashed runtime.
+resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
+  for_each = {
+    ingress  = aws_lambda_function.ingress.function_name
+    sender   = aws_lambda_function.sender.function_name
+    feedback = aws_lambda_function.feedback.function_name
+  }
+
+  alarm_name          = "${local.name}-${each.key}-errors"
+  alarm_description   = "The mailer ${each.key} Lambda raised an unhandled error."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  dimensions          = { FunctionName = each.value }
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+# A non-empty DLQ means a message exhausted its redrive count (maxReceiveCount
+# = 5 on all three queues) — a consistent failure, not a transient one.
+# De-humbugged: keys name PR2's actual DLQ resources
+# (aws_sqs_queue.api_send_dlq / api_status_dlq / feedback_dlq), not upstream's
+# humbugg_send_dlq / humbugg_status_dlq.
+resource "aws_cloudwatch_metric_alarm" "dlq" {
+  for_each = {
+    send     = aws_sqs_queue.api_send_dlq.name
+    status   = aws_sqs_queue.api_status_dlq.name
+    feedback = aws_sqs_queue.feedback_dlq.name
+  }
+
+  alarm_name          = "${local.name}-${each.key}-dlq-not-empty"
+  alarm_description   = "Messages have landed in the mailer ${each.key} DLQ."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  dimensions          = { QueueName = each.value }
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+# The send queue's oldest-message age — a proxy for the sender Lambda falling
+# behind (or stopping) without any single message failing enough times to
+# DLQ. De-humbugged: humbugg-send-oldest-message -> api-send-oldest-message.
+resource "aws_cloudwatch_metric_alarm" "queue_age" {
+  alarm_name          = "${local.name}-api-send-oldest-message"
+  alarm_description   = "The oldest message on the mailer send queue is over 15 minutes old — the sender Lambda is falling behind or stalled."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateAgeOfOldestMessage"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  threshold           = 900
+  treat_missing_data  = "notBreaching"
+  dimensions          = { QueueName = aws_sqs_queue.api_send.name }
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+# The ingress/feedback Lambdas' structured "Reject" event count for
+# insolvia_api — a message the mailer refused at ingress or SES itself
+# rejected (bad category, disallowed message class, caller not in
+# allowed_role_arns, etc). De-humbugged: humbugg_rejects -> api_rejects,
+# dimension ServiceId "humbugg" -> "insolvia_api" (the service_registry_json
+# key — see feedback_lambda.py's _metric() call, which titlecases the
+# "reject" status into the "Reject" metric name this alarm watches).
+resource "aws_cloudwatch_metric_alarm" "api_rejects" {
+  alarm_name          = "${local.name}-api-rejects"
+  alarm_description   = "insolvia_api sent a message the mailer or SES rejected."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Reject"
+  namespace           = "Mailer"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  dimensions          = { ServiceId = "insolvia_api" }
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+# ── SES sending-reputation alarms — the core of issue 6.7 ──────────────────
+# Account-wide SES reputation metrics (no per-configuration-set dimension,
+# matching upstream). These two are also what AWS reviews before granting SES
+# production access (issue 6.8) — staying under threshold here is a
+# precondition for that request, not just an ops nicety. See
+# services/mailer/docs/operations.md for the recovery steps when either
+# fires.
+
+resource "aws_cloudwatch_metric_alarm" "ses_bounce_rate" {
+  alarm_name          = "${local.name}-ses-bounce-rate"
+  alarm_description   = "SES account bounce rate is above 5%. SES itself throttles or suspends sending well before its own ~10% cutoff — investigate immediately."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Reputation.BounceRate"
+  namespace           = "AWS/SES"
+  period              = 900
+  statistic           = "Average"
+  threshold           = 0.05
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ses_complaint_rate" {
+  alarm_name          = "${local.name}-ses-complaint-rate"
+  alarm_description   = "SES account complaint rate is above 0.1% — the more sensitive of the two reputation signals. Investigate immediately."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Reputation.ComplaintRate"
+  namespace           = "AWS/SES"
+  period              = 900
+  statistic           = "Average"
+  threshold           = 0.001
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+# ── GuardDuty attachment-scanning alarms (count-gated) ──────────────────────
+# Only ever produce data once var.enable_attachment_scanning is true (see
+# that variable's comment in variables.tf) — no category insolvia_api sends
+# today carries attachments, so an always-on alarm here would be a permanent,
+# meaningless notBreaching no-op. Gated off by default, exactly like the
+# GuardDuty resources above.
+
+resource "aws_cloudwatch_metric_alarm" "attachment_threat" {
+  count = var.enable_attachment_scanning ? 1 : 0
+
+  alarm_name          = "${local.name}-attachment-threat"
+  alarm_description   = "GuardDuty found a threat in an uploaded mailer attachment."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "AttachmentThreat"
+  namespace           = "Mailer"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "attachment_scan_failure" {
+  count = var.enable_attachment_scanning ? 1 : 0
+
+  alarm_name          = "${local.name}-attachment-scan-failure"
+  alarm_description   = "GuardDuty could not scan an uploaded mailer attachment (unsupported file, access denied, or scan failure)."
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "AttachmentScanFailure"
+  namespace           = "Mailer"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alarms.arn]
+  ok_actions    = [aws_sns_topic.alarms.arn]
+  tags          = var.tags
 }
