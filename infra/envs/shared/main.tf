@@ -235,6 +235,17 @@ data "aws_iam_policy_document" "github_permissions" {
     ]
   }
 
+  # The mailer's private content bucket (S3 message manifests) does not match
+  # the insolvia-web-* prefix either — see infra/modules/mailer.
+  statement {
+    sid     = "MailerContentBucket"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-mailer-*",
+      "arn:aws:s3:::insolvia-mailer-*/*",
+    ]
+  }
+
   statement {
     sid       = "ForwarderCompute"
     actions   = ["lambda:*"]
