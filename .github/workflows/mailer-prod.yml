@@ -1,0 +1,122 @@
+name: Mailer · Deploy · Production
+
+# Steady-state deploy: apply the env, push a fresh image, point all three
+# mailer Lambdas (ingress/sender/feedback — one image, three entrypoints) at
+# it. Unlike api-prod.yml, there is no "re-derive Lambda environment from SSM"
+# step: every mailer Lambda's `environment` block is Terraform-managed (see
+# the lifecycle note in infra/modules/mailer/main.tf) — every value it sets is
+# deterministic from this module's own resources, so nothing needs deriving
+# out-of-band at deploy time. The apply above already reconciled it.
+#
+# The FIRST deploy in a fresh environment cannot run through this workflow: an
+# Image-package Lambda refuses to be created before its image exists, so the
+# apply below deadlocks. Bootstrap once by hand, per
+# infra/modules/mailer/main.tf:
+#   1. terraform apply -target=module.mailer.aws_ecr_repository.mailer
+#   2. docker build --target lambda services/mailer, tag <repo-url>:latest, push
+#   3. terraform apply   (full)
+# After that, every deploy is this workflow.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# Shared with every workflow that `terraform apply`s infra/envs/prod
+# (api-prod.yml, app-prod.yml, marketing-prod.yml, infra-prod.yml) — the S3
+# backend's native lock (use_lockfile) fails-fast on anything that slips past
+# this group; the group is what turns "one fails" into "one waits". See the
+# matching comment in api-staging.yml for the incident that proved it
+# necessary.
+concurrency:
+  group: insolvia-terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` / `-json` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Apply prod infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init
+          terraform -chdir=infra/envs/prod apply -auto-approve
+          {
+            echo "repo=$(terraform -chdir=infra/envs/prod output -raw mailer_ecr_repository_url)"
+            echo "domain=$(terraform -chdir=infra/envs/prod output -raw mailer_api_url)"
+          } >> "$GITHUB_OUTPUT"
+          terraform -chdir=infra/envs/prod output -json mailer_lambda_function_names \
+            > mailer-functions.json
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # The registry host is everything before the first `/` of the repo URL.
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      - name: Build and push image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # `:sha` is the immutable deploy reference; `:latest` exists only so
+          # a from-scratch `terraform apply` (whose Lambda seed points at
+          # `:latest`) finds an image.
+          docker build --target lambda \
+            -t "$REPO:${{ github.sha }}" \
+            -t "$REPO:latest" \
+            services/mailer
+          docker push "$REPO:${{ github.sha }}"
+          docker push "$REPO:latest"
+
+      - name: Update Lambda code (ingress, sender, feedback)
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # One image, three entrypoints — mailer-functions.json is the
+          # {ingress, sender, feedback} map from mailer_lambda_function_names.
+          # Loop rather than three copy-pasted steps so a fourth entrypoint
+          # (should one ever exist) needs no workflow change.
+          for function in $(jq -r '.[]' mailer-functions.json); do
+            aws lambda update-function-code \
+              --function-name "$function" \
+              --image-uri "$REPO:${{ github.sha }}"
+          done
+          for function in $(jq -r '.[]' mailer-functions.json); do
+            aws lambda wait function-updated --function-name "$function"
+          done
+
+      - name: Smoke test
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          # The mailer API is SigV4-authenticated end to end — even /health (it
+          # has no unauthenticated route at all, unlike the API service). An
+          # unsigned request should get exactly a 403 from API Gateway's IAM
+          # authorizer, which is enough to prove the custom domain, DNS, and
+          # Lambda are wired together; a real send-path smoke test needs a
+          # signed request as the registered caller, which is PR4's job once
+          # the API service has a mailer client.
+          status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$DOMAIN/v1/services/insolvia_api/messages")"
+          if [ "$status" != "403" ]; then
+            echo "expected 403 (Forbidden — unsigned request) from $DOMAIN, got $status" >&2
+            exit 1
+          fi

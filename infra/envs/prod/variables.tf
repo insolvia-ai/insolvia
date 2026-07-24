@@ -22,6 +22,12 @@ variable "api_subdomain" {
   default     = "api.insolvia.ai"
 }
 
+variable "mailer_subdomain" {
+  description = "Hostname the mailer API serves in this environment."
+  type        = string
+  default     = "mailer-api.insolvia.ai"
+}
+
 variable "marketing_image_tag" {
   description = "ECR image tag the marketing SSR Lambda is created from (creation-time only; CI owns it afterwards)."
   type        = string

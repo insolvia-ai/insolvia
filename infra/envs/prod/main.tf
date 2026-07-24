@@ -59,6 +59,35 @@ module "api_service" {
   tags                = local.common_tags
 }
 
+# Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
+# exactly one registered caller — the API Lambda above. caller_role_name feeds
+# module.api_service's own execution role back into the mailer's SigV4
+# allowlist, which is why this module is declared after it. Same cert-lookup
+# reuse rationale as api_service: one REGIONAL wildcard cert, us-east-1,
+# serves every custom domain in this account.
+#
+# enable_attachment_scanning is false: no category this platform sends today
+# carries attachments, so GuardDuty Malware Protection for S3 would be a real
+# monthly cost with nothing to scan (see modules/mailer/variables.tf). Set
+# identically in staging — this is not an environment-specific decision.
+#
+# First apply in a fresh account needs the same image-before-apply bootstrap
+# as api_service, documented at the top of modules/mailer/main.tf.
+module "mailer" {
+  source = "../../modules/mailer"
+
+  project                    = "insolvia"
+  environment                = local.environment
+  domain_name                = var.mailer_subdomain
+  hosted_zone_id             = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn        = data.aws_acm_certificate.wildcard.arn
+  caller_role_name           = module.api_service.lambda_role_name
+  sender_address             = "no-reply@insolvia.ai"
+  cors_allowed_origin        = "https://${var.subdomain}"
+  enable_attachment_scanning = false
+  tags                       = local.common_tags
+}
+
 # Auth (#65): production Cognito user pool + web/desktop app clients.
 # Production registers ONLY the real app origin — no localhost dev callbacks
 # (those live on staging), so nothing running on a laptop can complete a prod
