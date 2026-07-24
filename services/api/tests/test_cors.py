@@ -1,5 +1,6 @@
 import pytest
 
+from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -14,6 +15,7 @@ def client_for(environment):
         ApiDependencies(
             config=load_config({"INSOLVIA_ENV": environment}),
             waitlist_store=MemoryWaitlistStore(),
+            mailer=InMemoryMailerClient(),
         )
     )
     return app.test_client()
