@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mailer-api.insolvia.ai/contracts/status-event-v1.json",
+  "title": "Mailer status event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "service_id",
+    "application_message_id",
+    "category",
+    "message_class",
+    "status",
+    "occurred_at",
+    "provider_message_id",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_id": { "type": "string", "minLength": 1 },
+    "service_id": { "type": "string", "minLength": 1 },
+    "application_message_id": { "type": "string", "minLength": 1 },
+    "category": { "type": "string", "minLength": 1 },
+    "message_class": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": [
+        "accepted",
+        "delivery_delay",
+        "delivery",
+        "bounce",
+        "complaint",
+        "reject",
+        "suppressed",
+        "disabled",
+        "attachment_blocked"
+      ]
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "provider_message_id": { "type": ["string", "null"] },
+    "reason": { "type": ["string", "null"] }
+  }
+}

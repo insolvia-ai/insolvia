@@ -1,0 +1,1 @@
+"""Versioned Mailer HTTP routes."""

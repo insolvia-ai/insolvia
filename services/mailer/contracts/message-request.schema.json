@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mailer-api.insolvia.ai/contracts/message-request-v1.json",
+  "title": "Mailer message request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "application_message_id",
+    "category",
+    "message_class",
+    "to_address",
+    "subject",
+    "html_body",
+    "text_body",
+    "attachments"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "application_message_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "category": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "message_class": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "to_address": { "type": "string", "minLength": 3, "maxLength": 320 },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 998 },
+    "html_body": { "type": "string", "minLength": 1, "maxLength": 4000000 },
+    "text_body": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+    "attachments": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attachment_id", "disposition", "content_id"],
+        "properties": {
+          "attachment_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "disposition": { "enum": ["attachment", "inline"] },
+          "content_id": { "type": ["string", "null"], "maxLength": 200 }
+        }
+      }
+    }
+  }
+}
