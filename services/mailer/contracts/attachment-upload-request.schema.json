@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mailer-api.insolvia.ai/contracts/attachment-upload-request-v1.json",
+  "title": "Mailer attachment upload request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "application_message_id",
+    "file_name",
+    "content_type",
+    "size_bytes",
+    "sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "application_message_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "file_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "content_type": { "type": "string", "minLength": 3, "maxLength": 255 },
+    "size_bytes": { "type": "integer", "minimum": 1, "maximum": 31457280 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

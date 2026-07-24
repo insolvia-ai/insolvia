@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "application_message_id": "insolvia_api_welcome_example",
+  "category": "welcome",
+  "message_class": "transactional",
+  "to_address": "recipient@example.com",
+  "subject": "Welcome to Insolvia",
+  "html_body": "<p>Welcome to Insolvia. We're glad you're here.</p>",
+  "text_body": "Welcome to Insolvia. We're glad you're here.",
+  "attachments": []
+}

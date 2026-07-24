@@ -1,0 +1,8 @@
+Flask==3.1.2
+gunicorn==23.0.0
+mangum==0.17.0
+asgiref==3.8.1
+# The Lambda runtime bundles a boto3, but its version drifts under us — pin
+# it explicitly so local, CI, and Lambda all resolve the same one (matches
+# services/api's pin, so both services stay on one boto3 version).
+boto3==1.40.66

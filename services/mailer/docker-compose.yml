@@ -1,0 +1,38 @@
+# Local dev for services/mailer — `./services/mailer/scripts/dev-up.sh`, then
+# POST http://127.0.0.1:8026/v1/services/insolvia_api/messages (see
+# contracts/examples/message.json) and read captured mail at
+# http://127.0.0.1:8025 (Mailpit).
+#
+# Unlike services/api, this loop needs NO AWS credentials at all: the `api`
+# service here is built from this repo's own ./Dockerfile `development`
+# target, whose CMD runs gunicorn against
+# insolvia_mailer.entrypoints.development_server:app — a Flask app wired to
+# the in-memory adapters (MAILER_DEVELOPMENT_SERVICES_JSON below), not AWS.
+# Its only external dependency is the mailpit container in this same compose
+# file. Mailpit has no outbound relay configured, so nothing sent through
+# this stack can ever leave the machine as a real email.
+services:
+  api:
+    build:
+      context: .
+      target: development
+    environment:
+      MAILER_RUNTIME: development
+      MAILER_DEVELOPMENT_SERVICES_JSON: >-
+        {"insolvia_api":{"sender_name":"Insolvia","sender_address":"no-reply@insolvia.ai","allowed_categories":["welcome","email_verification","password_reset"],"allowed_message_classes":["transactional"]}}
+      MAILER_SMTP_HOST: mailpit
+      MAILER_SMTP_PORT: "1025"
+    ports:
+      - "127.0.0.1:8026:8026"
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    environment:
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "0"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "0"
+    ports:
+      - "127.0.0.1:8025:8025"

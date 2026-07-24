@@ -1,0 +1,66 @@
+name: Mailer · PR
+
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  mailer:
+    name: Mailer service
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mailer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            services/mailer/**
+            # Shared root lint config — a rule change must re-lint this service.
+            ruff.toml
+            .github/workflows/mailer-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-python@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          # Matches the Lambda base image (public.ecr.aws/lambda/python:3.12)
+          # and pyproject's requires-python.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.filter.outputs.run == 'true'
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: ruff check .
+
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: ruff format --check .
+
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: pytest
+
+      # Packaging check: the exact image the deploy workflows ship must build.
+      # A requirements pin that resolves on the runner but not in the Lambda
+      # base image should fail here, not on a push to main.
+      - name: Build Lambda image
+        if: steps.filter.outputs.run == 'true'
+        run: docker build --target lambda -t insolvia-mailer-pr-check .
