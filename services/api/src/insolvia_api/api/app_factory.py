@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.api.routes.health import blueprint as health_blueprint
+from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
 from insolvia_api.core.cors import origin_allowed
 from insolvia_api.core.errors import ApiError, FieldValidationError, ValidationError
@@ -26,6 +27,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app = Flask(__name__)
     app.extensions["insolvia_api_dependencies"] = dependencies
     app.register_blueprint(health_blueprint)
+    app.register_blueprint(unsubscribe_blueprint)
     app.register_blueprint(waitlist_blueprint)
     # Further blueprints register here, one line per module.
 

@@ -10,7 +10,12 @@ from datetime import UTC, datetime, timedelta
 from insolvia_mailer.core.config import ServiceConfig
 from insolvia_mailer.core.errors import ConflictError, ValidationError
 from insolvia_mailer.core.mime import AttachmentContent
-from insolvia_mailer.core.models import AttachmentUploadRequest, MessageRequest
+from insolvia_mailer.core.models import (
+    AttachmentUploadRequest,
+    MessageRequest,
+    SuppressionRequest,
+    recipient_hash,
+)
 
 
 @dataclass
@@ -38,6 +43,11 @@ class MemoryStore:
         self.uploads: dict[str, MemoryUpload] = {}
         self.messages: dict[str, str] = {}
         self.deliveries: queue.Queue[MemoryDelivery] = queue.Queue()
+        # Keyed by the same one-way hash the DynamoDB table uses, so a test
+        # that asserts on suppression is asserting on the production key
+        # shape rather than a convenience representation that only exists
+        # here. Value is the reason, mirroring the item's `reason` attribute.
+        self.suppressions: dict[str, str] = {}
 
     def _register_upload(
         self, service_id: str, upload_request: AttachmentUploadRequest
@@ -129,6 +139,21 @@ class MemoryStore:
                     )
                 )
         return result
+
+    def suppress_recipient(
+        self, service: ServiceConfig, suppression: SuppressionRequest
+    ) -> None:
+        with self.lock:
+            self.suppressions[recipient_hash(suppression.email_address)] = (
+                suppression.reason
+            )
+
+    def is_suppressed(self, address: str) -> bool:
+        """Not part of the MailerStore port — the development delivery worker
+        below and the tests use it to make the memory path behave like the
+        sender Lambda, which refuses to send to a suppressed address."""
+        with self.lock:
+            return recipient_hash(address) in self.suppressions
 
     def admit_message(self, service: ServiceConfig, message: MessageRequest) -> None:
         message_key = f"{service.service_id}#{message.application_message_id}"

@@ -5,6 +5,13 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    # modules/api_service generates the unsubscribe signing key (#80).
+    # Declared here rather than in the module because this repo keeps all
+    # provider constraints at the environment level.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
