@@ -89,6 +89,13 @@ export default function App() {
             <Footer.Link href="/#faq">FAQ</Footer.Link>
             <Footer.Link href="/waitlist">Early access</Footer.Link>
           </Footer.Group>
+          {/* /privacy is linked from every page on purpose: AWS reviews a
+              site-wide, reachable-without-searching privacy policy as part of
+              the SES production-access request (docs/SES_PRODUCTION_ACCESS.md),
+              and every transactional email footer points at the same URL. */}
+          <Footer.Group title="Legal">
+            <Footer.Link href="/privacy">Privacy policy</Footer.Link>
+          </Footer.Group>
         </div>
         <Footer.Note>
           &copy; {new Date().getFullYear()} Insolvia. All rights reserved. Insolvia is
