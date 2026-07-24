@@ -26,3 +26,11 @@ variable "api_subdomain" {
   type        = string
   default     = "staging-api.insolvia.ai"
 }
+
+# Same flat-label reasoning again: `*.insolvia.ai` covers
+# `staging-mailer-api.insolvia.ai`, not a nested `mailer-api.staging.…`.
+variable "mailer_subdomain" {
+  description = "Hostname the mailer API serves in this environment."
+  type        = string
+  default     = "staging-mailer-api.insolvia.ai"
+}
