@@ -14,9 +14,61 @@ project + environment.
 > skipping it breaks certificate validation in a way that is hard to diagnose.
 
 ## 0. Prerequisites
-- AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account (the `insolvia` profile).
-- `terraform` `~> 1.5`, `tflint`.
+- AWS CLI configured with credentials that can create S3/IAM/Route53/ACM in the Insolvia account.
+- `terraform` `>= 1.10` (native S3 state locking — `use_lockfile`), `tflint`.
 - Admin access to the `insolvia-ai/insolvia` GitHub repo (to add secrets + branch protection).
+
+### Running Terraform locally — export credentials first
+
+**A working `aws` CLI is not enough for Terraform**, and the failure looks like
+having no credentials at all:
+
+```
+Error: No valid credential sources found
+Error: failed to refresh cached credentials, no EC2 IMDS role found, …
+```
+
+`aws sts get-caller-identity` succeeding while `terraform plan` says this is the
+signature. The cause is that `~/.aws/config` authenticates with the newer
+`login_session` (`aws login`) format, which is an **AWS CLI mechanism** —
+Terraform's Go SDK does not implement it, finds nothing in the standard chain,
+falls through to EC2 instance metadata, and times out.
+
+Resolve the session into the env vars every SDK understands, in the same shell:
+
+```bash
+eval "$(aws configure export-credentials --format env)"
+```
+
+Use `eval` rather than running it bare: the output *is* the secret. The
+credentials are short-lived, so re-run it when a session expires. This is the
+same step `scripts/dev-aws-common.sh`'s `export_temporary_aws_credentials` does
+for the per-developer AWS layer, hoisted here because manual applies (below)
+need it too.
+
+### When a local apply is *required* rather than convenient
+
+Normally every apply runs in CI through the OIDC deploy role. There is one
+deliberate exception: **`infra/envs/shared` cannot change the deploy role's own
+permissions from CI.** An explicit `Deny` (`DenySelfPrivilegeEscalation` in
+`infra/envs/shared/main.tf`) blocks `iam:PutRolePolicy` on the role itself, and
+explicit deny beats every allow — so any PR that edits
+`aws_iam_role_policy.github_permissions` makes `shared-infra-deploy.yml` fail
+with `AccessDenied`, and every env apply that depends on the new grant fails
+after it.
+
+That is the control working, not a bug: a privilege change must be applied by a
+human with their own credentials, so a code diff alone can never grant the
+pipeline more power. The recipe:
+
+```bash
+eval "$(aws configure export-credentials --format env)" && terraform -chdir=infra/envs/shared init -input=false && terraform -chdir=infra/envs/shared plan
+```
+
+Read the plan — it should touch `aws_iam_role_policy.github_permissions` and
+nothing else — then `apply`. Doing this *before* merging the PR keeps CI green,
+because the post-merge apply then sees no diff and never calls
+`iam:PutRolePolicy`.
 
 ## 1. Terraform state bucket — the first action in the entire plan
 Every `backend.tf` in the repo points at this bucket, so `terraform init` cannot
