@@ -10,11 +10,13 @@
 #   viewer ── CloudFront ──┬── /assets/*  → S3 (private, OAC)
 #                          └── everything → API Gateway HTTP API → SSR Lambda
 #
-# The distribution carries BOTH the www and apex aliases; a viewer-request
-# CloudFront Function 301s apex → www (path + query preserved), so no second
-# distribution is needed. Mirrors andreas-services/website/infra/modules/
-# {hosting,compute,data}, collapsed into the single-concern module this repo
-# prefers.
+# On an environment that owns the apex (prod), the distribution carries BOTH
+# the www and apex aliases and a viewer-request CloudFront Function 301s apex
+# → www (path + query preserved), so no second distribution is needed. Where
+# `apex_domain` is null (staging — a zone has exactly one apex and prod owns
+# it) the alias, the DNS records, and the redirect branch are all omitted.
+# Mirrors andreas-services/website/infra/modules/{hosting,compute,data},
+# collapsed into the single-concern module this repo prefers.
 #
 # FIRST APPLY (bootstrap): the Lambda cannot be created until an image exists
 # in the ECR repository, and the repository is created here. Bootstrap once:
@@ -31,6 +33,11 @@ locals {
   bucket_name   = "${local.name_prefix}-assets-${var.environment}"
   ecr_name      = "${local.name_prefix}-${var.environment}"
   function_name = "${local.name_prefix}-ssr-${var.environment}"
+
+  # Does this environment own the apex? Drives three things that must agree:
+  # the CloudFront alias list, the apex A/AAAA records, and whether the
+  # viewer-request function emits its 301 branch at all.
+  serves_apex = var.apex_domain != null
 }
 
 # No waitlist table here. The SSR action brokers submissions through the
@@ -235,7 +242,11 @@ resource "aws_cloudfront_origin_request_policy" "ssr" {
 #
 # 1. Apex 301: `insolvia.ai/*` → `https://www.insolvia.ai/*`, path and query
 #    preserved. One distribution carries both aliases, so this function IS
-#    the apex redirect — no second distribution.
+#    the apex redirect — no second distribution. Omitted entirely when this
+#    environment does not own the apex (local.serves_apex): there is no apex
+#    alias on the distribution, so no request can ever arrive with that Host,
+#    and emitting a branch comparing against an empty string would redirect
+#    nothing while reading as if it did.
 #
 # 2. X-Forwarded-Host — an app contract, not a nicety. The origin request
 #    policy cannot forward the viewer Host (API Gateway needs its own), so
@@ -249,13 +260,13 @@ resource "aws_cloudfront_origin_request_policy" "ssr" {
 resource "aws_cloudfront_function" "viewer_request" {
   name    = "${local.name_prefix}-viewer-request-${var.environment}"
   runtime = "cloudfront-js-2.0"
-  comment = "301 ${var.apex_domain} -> ${var.www_domain}; viewer Host -> X-Forwarded-Host"
+  comment = local.serves_apex ? "301 ${var.apex_domain} -> ${var.www_domain}; viewer Host -> X-Forwarded-Host" : "viewer Host -> X-Forwarded-Host"
   publish = true
-  code    = <<-EOT
+  code = <<-EOT
     function handler(event) {
       var request = event.request;
       var host = request.headers.host.value;
-
+    ${local.serves_apex ? <<-APEX
       if (host === "${var.apex_domain}") {
         var qs = "";
         var keys = Object.keys(request.querystring);
@@ -272,7 +283,8 @@ resource "aws_cloudfront_function" "viewer_request" {
           headers: { "location": { "value": "https://${var.www_domain}" + request.uri + qs } }
         };
       }
-
+    APEX
+: ""}
       request.headers["x-forwarded-host"] = { value: host };
       return request;
     }
@@ -285,7 +297,7 @@ resource "aws_cloudfront_distribution" "site" {
   is_ipv6_enabled = true
   comment         = "${var.project} ${var.environment} marketing (SSR + assets)"
   price_class     = "PriceClass_100"
-  aliases         = [var.www_domain, var.apex_domain]
+  aliases         = local.serves_apex ? [var.www_domain, var.apex_domain] : [var.www_domain]
   tags            = var.tags
 
   # SSR HTTP API (default origin)
@@ -324,8 +336,9 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   # Hashed client assets: cache forever at the edge. The function runs here
-  # too so apex asset URLs also 301 (the X-Forwarded-Host it sets is inert on
-  # this behavior — CachingOptimized forwards no headers to S3).
+  # too so apex asset URLs also 301 where an apex exists (the X-Forwarded-Host
+  # it sets is inert on this behavior — CachingOptimized forwards no headers
+  # to S3).
   ordered_cache_behavior {
     path_pattern           = "/assets/*"
     allowed_methods        = ["GET", "HEAD"]
@@ -379,7 +392,7 @@ resource "aws_s3_bucket_policy" "assets" {
   policy = data.aws_iam_policy_document.assets.json
 }
 
-# ── DNS: www + apex → CloudFront (A and AAAA; IPv6 is enabled) ──
+# ── DNS: www (+ apex where owned) → CloudFront (A and AAAA; IPv6 on) ──
 resource "aws_route53_record" "www" {
   for_each = toset(["A", "AAAA"])
 
@@ -394,8 +407,10 @@ resource "aws_route53_record" "www" {
   }
 }
 
+# Only the environment that owns the apex publishes these. Two environments
+# both creating insolvia.ai A/AAAA aliases would fight over one record set.
 resource "aws_route53_record" "apex" {
-  for_each = toset(["A", "AAAA"])
+  for_each = local.serves_apex ? toset(["A", "AAAA"]) : toset([])
 
   zone_id = var.hosted_zone_id
   name    = var.apex_domain
