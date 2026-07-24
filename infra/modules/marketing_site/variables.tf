@@ -4,7 +4,7 @@ variable "project" {
 }
 
 variable "environment" {
-  description = "Environment suffix for resource names (marketing is prod-only — decision D2)."
+  description = "Environment suffix for resource names (staging | prod)."
   type        = string
 }
 
@@ -14,8 +14,18 @@ variable "www_domain" {
 }
 
 variable "apex_domain" {
-  description = "Apex host that 301-redirects to www (e.g. insolvia.ai)."
+  description = <<-EOT
+    Apex host that 301-redirects to www (e.g. insolvia.ai). OPTIONAL: leave
+    null on any environment that does not own the apex. There is exactly one
+    apex per zone and prod owns it, so staging must pass null — otherwise both
+    environments would claim the same CloudFront alias and the same Route53
+    records, and the second apply would fail on the alias conflict.
+
+    Null means: no apex alias on the distribution, no apex A/AAAA records, and
+    the viewer-request function skips its redirect branch entirely.
+  EOT
   type        = string
+  default     = null
 }
 
 variable "hosted_zone_id" {
@@ -24,7 +34,10 @@ variable "hosted_zone_id" {
 }
 
 variable "acm_certificate_arn" {
-  description = "us-east-1 ACM cert covering BOTH www (via the wildcard) and the apex (via its SAN)."
+  description = <<-EOT
+    us-east-1 ACM cert covering www — via the `*.insolvia.ai` wildcard — and,
+    when apex_domain is set, the apex too (via the cert's SAN).
+  EOT
   type        = string
 }
 

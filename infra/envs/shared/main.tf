@@ -156,9 +156,11 @@ data "aws_iam_policy_document" "github_permissions" {
   }
 
   # ── Marketing site (issues #43, #47) ───────────────────────────
-  # The marketing stack in infra/envs/prod needs only one grant the other
-  # statements don't cover: its assets bucket (does not match the
-  # insolvia-web-* prefix). Its ECR repository, HTTP API, and access logs are
+  # The marketing stack (infra/envs/staging and infra/envs/prod) needs only
+  # one grant the other statements don't cover: its assets bucket (does not
+  # match the insolvia-web-* prefix). The prefix below is environment-agnostic,
+  # so adding the staging instantiation needed no change here.
+  # Its ECR repository, HTTP API, and access logs are
   # covered by the backend-API statements below (EcrAuthToken,
   # EcrRepositories, HttpApis, ApiAccessLogGroups — all insolvia-* scoped);
   # the Lambda, its log group, execution role, CloudFront, and Route53 by

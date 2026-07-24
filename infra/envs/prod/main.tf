@@ -130,9 +130,12 @@ module "auth" {
 }
 
 # ── Marketing site: www.insolvia.ai + apex 301 (issues #43, #47) ─
-# The marketing site has NO staging environment (decision D2), so this module
-# is instantiated here only. The wildcard cert looked up above carries the
-# apex as a SAN (see infra/envs/shared), so one cert covers both aliases.
+# Staging runs this module too now (infra/envs/staging — decision D2's
+# prod-only carve-out was reversed in Milestone 6). What stays exclusive to
+# prod is the APEX: a zone has exactly one, staging passes apex_domain = null,
+# and only this instantiation creates the apex alias, the apex A/AAAA records,
+# and the 301. The wildcard cert looked up above carries the apex as a SAN
+# (see infra/envs/shared), so one cert covers both aliases.
 module "marketing_site" {
   source = "../../modules/marketing_site"
 

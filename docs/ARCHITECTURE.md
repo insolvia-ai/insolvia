@@ -63,8 +63,18 @@ Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.h
 - `staging-app.insolvia.ai` → staging distribution/bucket
 - `app.insolvia.ai` → prod distribution/bucket
 
-No Lambda/API Gateway/DynamoDB yet — those arrive with the intake/forms phases
-(see `docs/business-plan.html`).
+The **marketing site** (`apps/insolvia_marketing`) does not use this topology —
+it is server-side rendered, so it gets its own module with an SSR Lambda behind
+the same CloudFront front (`infra/modules/marketing_site`, see
+[`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md)). It runs in both
+environments:
+
+- `staging-www.insolvia.ai` → staging distribution (noindexed, no apex)
+- `www.insolvia.ai` + the `insolvia.ai` apex 301 → prod distribution
+
+Only prod owns the apex — a hosted zone has exactly one, so staging passes
+`apex_domain = null` and the module omits the alias, the records, and the
+redirect.
 
 ## Desktop distribution
 
