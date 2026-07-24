@@ -7,6 +7,7 @@ of truth for conventions — read it first.
 - [`MVP_PLAN.md`](MVP_PLAN.md) — foundation milestone/issue breakdown; the source for the GitHub MVP project board.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — one-time AWS/GitHub bootstrap runbook.
 - [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — `insolvia.ai` mail: address map, the DNS records and who owns them, Google Workspace inbound + SES outbound.
+- [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) — the SES sandbox exit (issue #80): pre-submission checklist, the exact request text, and what a human has to do in the AWS console.
 - [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — infra state model.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — monorepo, env model, hosting topology.
 
