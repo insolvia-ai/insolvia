@@ -595,14 +595,14 @@ with a bad complaint rate, and retrofitting suppression afterwards is painful.
 
 | # | Issue | Notes |
 |---|---|---|
-| 6.1 | Port `mailer/` → `services/mailer/` | Strip humbugg-specific configuration sets. |
-| 6.2 | Insolvia service registry + IAM role mapping | Replace humbugg/scout entries. |
-| 6.3 | Port the mailer infra module | SQS, S3 manifests, sender + feedback Lambdas, suppression, kill switch. |
-| 6.4 | API → mailer integration over SigV4 | |
-| 6.5 | Mailpit local dev loop | Already in the upstream `docker-compose.yml`. |
-| 6.6 | Initial templates: welcome, email verification, password reset | |
-| 6.7 | Bounce/complaint monitoring + alarms | Protects SES reputation — and is one of the things AWS looks for in 6.8. |
-| 6.8 | **Request SES production access — the last thing we do** | Deliberately deferred so the request is made with everything AWS reviews already in place: a live `www`, working bounce/complaint handling (6.7), suppression (6.3), an unsubscribe path, and a published privacy policy. Until this lands we cannot reply as `@insolvia.ai` (see the sandbox note in M1) — so don't let it slip forever. |
+| ~~6.1~~ | ~~Port `mailer/` → `services/mailer/`~~ — ✅ **Done** | humbugg-specific configuration sets stripped. |
+| ~~6.2~~ | ~~Insolvia service registry + IAM role mapping~~ — ✅ **Done** | One registered caller: `insolvia_api`. |
+| ~~6.3~~ | ~~Port the mailer infra module~~ — ✅ **Done** | SQS, S3 manifests, sender + feedback Lambdas, suppression, kill switch. |
+| ~~6.4~~ | ~~API → mailer integration over SigV4~~ — ✅ **Done** | `services/api` `adapters/aws/mailer_client.py`. |
+| ~~6.5~~ | ~~Mailpit local dev loop~~ — ✅ **Done** | `services/mailer/docker-compose.yml`. |
+| ~~6.6~~ | ~~Initial templates: welcome, email verification, password reset~~ — ✅ **Done** | `services/api` `core/mail.py`. No route calls them yet — the auth flows that trigger them are a later milestone. |
+| ~~6.7~~ | ~~Bounce/complaint monitoring + alarms~~ — ✅ **Done** | Alarms at 5% bounce / 0.1% complaint, both well under the AWS review thresholds. |
+| 6.8 | **Request SES production access — the last thing we do** | **Everything in this repo is ready; submitting is a human AWS-console action.** Runbook, pre-submission checklist, and the exact request text: [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md). Deliberately deferred so the request is made with everything AWS reviews already in place: a live `www`, bounce/complaint handling (6.7), suppression (6.3), a working unsubscribe path, and a published privacy policy — the last two were built for this issue. **One thing blocks submission and it is a decision, not work:** `www.insolvia.ai` is parked offline (`site_enabled = false` in `infra/envs/prod`), so the privacy policy AWS reviews does not currently load. Until this lands we cannot send to any address that is not a verified SES identity (see the sandbox note in M1) — so don't let it slip forever. |
 
 ---
 

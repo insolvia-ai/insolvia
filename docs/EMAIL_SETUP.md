@@ -21,6 +21,12 @@ the next apply.
 > **#80 / 6.8**). While in the sandbox, SES rejects any send to an address that
 > is not itself a verified SES identity.
 >
+> Everything the request needs is built — privacy policy, unsubscribe path,
+> suppression, bounce/complaint alarms. What remains is a human action in the
+> AWS console, and one decision (`www.insolvia.ai` is parked offline, so the
+> privacy policy AWS reviews does not currently load). Runbook, checklist, and
+> the exact request text: **[`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md)**.
+>
 > This affects the **app's** transactional mail from `no-reply@` only. It does
 > **not** affect Google Workspace: mail humans send from their `@insolvia.ai`
 > mailboxes goes out through Google, which has no such restriction. Inbound is
@@ -124,6 +130,12 @@ confirm both senders pass alignment on real messages (read the headers), add a
 Issue **#80 / 6.8**. Until it lands, the app cannot send transactional mail to
 anyone who is not a verified SES identity. Unrelated to Workspace.
 
+The request itself is a form in the AWS console and cannot be automated from
+this repo. [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) has the
+pre-submission checklist (including the two prerequisites that are *not* yet
+true), the exact text to paste, and what to do after it is granted — or
+rejected.
+
 ---
 
 ## Verifying
@@ -198,6 +210,8 @@ retired.
 
 ## Related
 
+- [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) — getting out of the
+  SES sandbox: checklist, request text, and the post-grant steps.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — AWS/GitHub bootstrap, deploy gating.
 - [`MVP_PLAN.md`](MVP_PLAN.md) — Milestone 1 (`Foundation · Domain & Email`)
   issue breakdown and the SES-sandbox capability table.

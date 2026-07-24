@@ -25,7 +25,7 @@ in `andreas-services`.
 | `packages/insolvia_design_system_react/` | Marketing-site UI only, on Base UI + Tailwind v4, published as `@insolvia-ai/design-system`. Scope-capped at six components — see *Dual-target parity discipline*. **Outside the pub workspace** (npm, not pub). | React/TypeScript |
 | `packages/insolvia_api_client/` | Hand-written, typed Dart client for `services/api` (health + waitlist). Deliberately pure Dart so any Dart context can use it; the JSON contract is pinned by its tests, not by OpenAPI codegen — the package README records that decision (issue #66). | Pure Dart (`insolvia_api_client`) |
 | `apps/insolvia_app/` | The Insolvia application (hello-world today). Consumes the design system as a tag-pinned git dependency, never by path. | Flutter app (`insolvia_app`), desktop + web |
-| `apps/insolvia_marketing/` | The marketing site for `www.insolvia.ai` — React Router v7 framework mode, SSR. Consumes the **published** `@insolvia-ai/design-system` from GitHub Packages (`^0.1.1`); a local `file:` override is an uncommitted debugging aid only. **Outside the pub workspace** (npm, not pub). | React/TypeScript (`@insolvia/marketing`) |
+| `apps/insolvia_marketing/` | The marketing site for `www.insolvia.ai` (and `staging-www.insolvia.ai`) — React Router v7 framework mode, SSR. Consumes the **published** `@insolvia-ai/design-system` from GitHub Packages (`^0.1.1`); a local `file:` override is an uncommitted debugging aid only. **Outside the pub workspace** (npm, not pub). | React/TypeScript (`@insolvia/marketing`) |
 | `services/api/` | The backend API — Flask + Mangum on Lambda (decision D6 in `docs/MVP_PLAN.md`). Layered `core/api/adapters/entrypoints` mirroring `andreas-services/mailer`, with the dependency direction machine-enforced by `tests/test_architecture.py`. Brokers **all** AWS access for every client — see `docs/adr/0001-client-stays-dumb-trust-boundary.md`. **Not a pub workspace member** (Python, not Dart). | Python (`insolvia_api`) |
 | `services/mailer/` | The transactional email service, ported from `andreas-services/mailer` (milestone 7). Same layered `core/api/adapters/entrypoints` split as `services/api`, with its own `tests/test_architecture.py` enforcing the dependency direction. Owns admission, S3 manifests, SQS, and SES delivery behind the `MAILER_*`-prefixed env vars; local dev delivers only to a Mailpit container (`services/mailer/docker-compose.yml`), never a real relay. **Not a pub workspace member** (Python, not Dart). | Python (`insolvia_mailer`) |
 | `infra/` | All AWS infrastructure. | Terraform |
@@ -252,6 +252,8 @@ infra/
 - GitHub Environments mirror the Terraform envs one-for-one: `insolvia-shared`, `insolvia-staging`, `insolvia-production`. A deploy job **must** declare `environment:` — environment-scoped secrets are invisible to jobs that don't, resolving silently to empty strings rather than erroring. Never borrow another environment's name to reach its secrets; that hands the job every secret that environment holds.
 - Static web deploy: `s3 sync` hashed assets `Cache-Control: public,max-age=31536000,immutable` (exclude `*.html`), then HTML `no-cache`, then CloudFront `/*` invalidation.
 - API deploy (`api-<env>.yml`): terraform apply the env, read the `api_*` outputs, push the `services/api` Lambda image to ECR (`:sha` + `:latest`), `update-function-code`, re-derive the Lambda environment from `/insolvia/<env>/api/*`, smoke-test `/health`. The very first deploy per env needs the image-before-apply bootstrap documented atop `infra/modules/api_service/main.tf`.
+- **Outbound mail is still in the SES sandbox** (issue #80 / 6.8): SES rejects any send to an address that is not itself a verified SES identity, so no real user can receive a welcome, verification, or reset email yet. Everything the production-access request needs is built — privacy policy, unsubscribe path, suppression, bounce/complaint alarms — and **submitting is a human AWS-console action that cannot be automated from this repo**. Checklist, the exact request text, and the post-grant steps: `docs/SES_PRODUCTION_ACCESS.md`. One prerequisite is a decision rather than work: `www.insolvia.ai` is parked offline (`site_enabled = false`), so the privacy policy AWS reviews does not currently load.
+- **Unsubscribe crosses three services on purpose** (ADR 0001): marketing `/unsubscribe` → API `POST /v1/unsubscribe` → mailer `POST /v1/services/<id>/suppressions`. The mailer cannot tell whether a caller has the address owner's consent, so the API proves it with an HMAC token (`services/api` `core/unsubscribe.py`, key at `/insolvia/<env>/api/unsubscribe-secret`) before asking. Collapsing that into one public mailer endpoint would make it a "stop mail to anyone" button. Unsubscribes, bounces, and complaints all write the same suppression table so the sender needs only one check.
 - **Deploys are live.** DNS is delegated (`insolvia.ai` registered at Gandi, NS → Route53 zone `Z01038711J6IZ68FD6ZDW`), `infra/envs/shared` is applied, and the `*.insolvia.ai` ACM cert is `ISSUED`. The ordering still matters when bootstrapping a fresh account: every downstream env looks the cert up with `statuses = ["ISSUED"]`, so an env-level apply before the cert issues fails at plan time with a misleading "no matching certificate" error — `shared` first, always (see `docs/AWS_SETUP.md`).
 
 ### PR gates, required status checks, and why no `paths:` filter
@@ -298,7 +300,7 @@ block a merge. The workflows above are now shaped to allow turning them on. The
 remaining step is a **repo-settings change that must be made by a human in the
 GitHub UI or API** — nothing in this repo can grant itself branch protection.
 
-In `protect-main` → *Require status checks to pass*, add exactly these ten,
+In `protect-main` → *Require status checks to pass*, add exactly these eleven,
 which are the job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
@@ -309,6 +311,7 @@ which are the job `name:` values (matrix legs get a `(leg)` suffix):
 | `React design system` | `design-system-react-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
+| `Mailer service` | `mailer-pr.yml` |
 | `Dart API client` | `api-client-pr.yml` |
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
