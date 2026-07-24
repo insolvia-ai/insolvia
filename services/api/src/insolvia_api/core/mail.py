@@ -21,6 +21,15 @@ below and hand the result to `ApiDependencies.mailer.send(...)`. No route
 calls these yet; this PR only proves the send capability end-to-end via
 tests.
 
+Every template takes a `MailLinks` (build it with `links_for`) rather than
+reading a module constant, because both footer URLs are per-environment and
+the unsubscribe one is per-recipient — it embeds an HMAC token naming the
+address (core/unsubscribe.py). Passing `unsubscribe_url=None` is legal and
+means the footer shows the privacy link alone and the message ships without
+List-Unsubscribe headers; that is what a send with no configured signing
+secret degrades to, and it degrades visibly rather than emitting a link that
+cannot work.
+
 HTML bodies are deliberately email-client-safe: one self-contained document,
 inline styles only (no <style> blocks, no external CSS/fonts/images), a
 table-based layout, and a bulletproof button (a styled <a>, not <button>).
@@ -44,9 +53,31 @@ _COLOR_ACCENT_TEXT = "#ffffff"
 _FONT_HEADING = "Georgia, 'Times New Roman', serif"
 _FONT_BODY = "Arial, Helvetica, sans-serif"
 
-_PRIVACY_URL = "https://www.insolvia.ai/privacy"
-
 _MESSAGE_CLASS = "transactional"
+
+
+@dataclass(frozen=True)
+class MailLinks:
+    """The two site URLs every template's footer needs.
+
+    Passed in rather than hard-coded because they are per-environment: staging
+    mail must link staging pages. A staging email carrying
+    www.insolvia.ai/unsubscribe would send a tester's click to the production
+    API, and it would work, and it would suppress the address in production.
+
+    Build one with `links_for` below; the config knows the origin
+    (AppConfig.marketing_origin) and the signing secret.
+    """
+
+    privacy_url: str
+    unsubscribe_url: str | None = None
+
+
+def links_for(marketing_origin: str, unsubscribe_url: str | None = None) -> MailLinks:
+    return MailLinks(
+        privacy_url=f"{marketing_origin.rstrip('/')}/privacy",
+        unsubscribe_url=unsubscribe_url,
+    )
 
 
 @dataclass(frozen=True)
@@ -56,6 +87,11 @@ class OutboundEmail:
     message_class is always "transactional" today (the only class the mailer
     allows insolvia_api to send), but it is a field rather than a constant so
     a future non-transactional category does not require touching the port.
+
+    list_unsubscribe_url is passed straight through to the mailer, which turns
+    it into List-Unsubscribe + List-Unsubscribe-Post headers so a mail client
+    can render its own unsubscribe control (RFC 8058). It carries the same URL
+    the footer link does — one opt-out path, two ways to reach it.
     """
 
     category: str
@@ -64,6 +100,7 @@ class OutboundEmail:
     subject: str
     html_body: str
     text_body: str
+    list_unsubscribe_url: str | None = None
 
 
 def _greeting(recipient_name: str | None) -> str:
@@ -74,7 +111,9 @@ def _greeting(recipient_name: str | None) -> str:
     )
 
 
-def _html_document(*, preheader: str, heading: str, body_html: str) -> str:
+def _html_document(
+    *, preheader: str, heading: str, body_html: str, links: MailLinks
+) -> str:
     """Wrap templated body content in the shared branded shell.
 
     A single nested-table layout, inline styles only, so it renders
@@ -118,8 +157,15 @@ def _html_document(*, preheader: str, heading: str, body_html: str) -> str:
         'margin:0 0 4px 0;">This is a transactional message about your '
         "Insolvia account.</p>"
         f'<p style="font-family:{_FONT_BODY};font-size:12px;color:{_COLOR_MUTED};'
-        f'margin:0;"><a href="{_PRIVACY_URL}" style="color:{_COLOR_MUTED};">'
-        "Privacy policy</a></p>"
+        f'margin:0;"><a href="{escape(links.privacy_url)}" '
+        f'style="color:{_COLOR_MUTED};">Privacy policy</a>'
+        + (
+            f'&nbsp;&middot;&nbsp;<a href="{escape(links.unsubscribe_url)}" '
+            f'style="color:{_COLOR_MUTED};">Unsubscribe</a>'
+            if links.unsubscribe_url
+            else ""
+        )
+        + "</p>"
         "</td></tr>"
         "</table>"
         "</td></tr>"
@@ -145,20 +191,27 @@ def _button_html(*, label: str, url: str) -> str:
     )
 
 
-def _text_footer() -> str:
-    return (
+def _text_footer(links: MailLinks) -> str:
+    footer = (
         "\n\n--\n"
         "Insolvia -- bankruptcy case preparation & e-filing\n"
         "This is a transactional message about your Insolvia account.\n"
-        f"Privacy policy: {_PRIVACY_URL}\n"
+        f"Privacy policy: {links.privacy_url}\n"
     )
+    if links.unsubscribe_url:
+        footer += f"Unsubscribe: {links.unsubscribe_url}\n"
+    return footer
 
 
 # --- templates -----------------------------------------------------------
 
 
 def welcome_email(
-    to_address: str, *, recipient_name: str | None = None, app_url: str
+    to_address: str,
+    *,
+    links: MailLinks,
+    app_url: str,
+    recipient_name: str | None = None,
 ) -> OutboundEmail:
     """category "welcome" — sent once, right after signup."""
     greeting = _greeting(recipient_name)
@@ -175,8 +228,11 @@ def welcome_email(
         preheader="Welcome to Insolvia.",
         heading="Welcome to Insolvia",
         body_html=body_html,
+        links=links,
     )
-    text_body = f"{greeting}\n\n{intro}\n\nOpen Insolvia: {app_url}{_text_footer()}"
+    text_body = (
+        f"{greeting}\n\n{intro}\n\nOpen Insolvia: {app_url}{_text_footer(links)}"
+    )
     return OutboundEmail(
         category="welcome",
         message_class=_MESSAGE_CLASS,
@@ -184,11 +240,16 @@ def welcome_email(
         subject="Welcome to Insolvia",
         html_body=html_body,
         text_body=text_body,
+        list_unsubscribe_url=links.unsubscribe_url,
     )
 
 
 def email_verification_email(
-    to_address: str, *, verification_url: str, recipient_name: str | None = None
+    to_address: str,
+    *,
+    links: MailLinks,
+    verification_url: str,
+    recipient_name: str | None = None,
 ) -> OutboundEmail:
     """category "email_verification" — sent to confirm a new account's email."""
     greeting = _greeting(recipient_name)
@@ -212,12 +273,13 @@ def email_verification_email(
         preheader="Confirm your email address to activate your account.",
         heading="Verify your email address",
         body_html=body_html,
+        links=links,
     )
     text_body = (
         f"{greeting}\n\n{intro}\n\n"
         f"Verify email: {verification_url}\n\n"
         f"{expiry_note}"
-        f"{_text_footer()}"
+        f"{_text_footer(links)}"
     )
     return OutboundEmail(
         category="email_verification",
@@ -226,11 +288,16 @@ def email_verification_email(
         subject="Verify your email address",
         html_body=html_body,
         text_body=text_body,
+        list_unsubscribe_url=links.unsubscribe_url,
     )
 
 
 def password_reset_email(
-    to_address: str, *, reset_url: str, recipient_name: str | None = None
+    to_address: str,
+    *,
+    links: MailLinks,
+    reset_url: str,
+    recipient_name: str | None = None,
 ) -> OutboundEmail:
     """category "password_reset" — sent when a reset is requested."""
     greeting = _greeting(recipient_name)
@@ -254,12 +321,13 @@ def password_reset_email(
         preheader="Reset the password for your Insolvia account.",
         heading="Reset your Insolvia password",
         body_html=body_html,
+        links=links,
     )
     text_body = (
         f"{greeting}\n\n{intro}\n\n"
         f"Reset password: {reset_url}\n\n"
         f"{security_note}"
-        f"{_text_footer()}"
+        f"{_text_footer(links)}"
     )
     return OutboundEmail(
         category="password_reset",
@@ -268,4 +336,5 @@ def password_reset_email(
         subject="Reset your Insolvia password",
         html_body=html_body,
         text_body=text_body,
+        list_unsubscribe_url=links.unsubscribe_url,
     )

@@ -45,7 +45,7 @@ def _region(environ: dict[str, str]) -> str:
 
 def _message_body(email: OutboundEmail, idempotency_key: str) -> dict[str, object]:
     body = asdict(email)
-    return {
+    payload: dict[str, object] = {
         "schema_version": _SCHEMA_VERSION,
         "application_message_id": idempotency_key,
         "category": body["category"],
@@ -56,11 +56,19 @@ def _message_body(email: OutboundEmail, idempotency_key: str) -> dict[str, objec
         "text_body": body["text_body"],
         "attachments": [],
     }
+    # Omitted rather than sent as null when there is no link. The mailer's
+    # request model rejects unknown keys but accepts a missing optional one,
+    # and omitting keeps the wire body identical to what it was before
+    # unsubscribe links existed for any send that has none.
+    if body["list_unsubscribe_url"]:
+        payload["list_unsubscribe_url"] = body["list_unsubscribe_url"]
+    return payload
 
 
 class SigV4MailerClient:
-    """Mailer implementation that POSTs a signed request to the mailer's
-    public HTTPS endpoint at `{base_url}/v1/services/insolvia_api/messages`.
+    """Mailer implementation that POSTs signed requests to the mailer's public
+    HTTPS endpoints under `{base_url}/v1/services/insolvia_api/` — `messages`
+    to send, `suppressions` to stop sending.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -69,8 +77,28 @@ class SigV4MailerClient:
         self._botocore_session = Session()
 
     def send(self, email: OutboundEmail, *, idempotency_key: str) -> None:
-        url = f"{self.base_url}/v1/services/{_SERVICE_ID}/messages"
-        payload = json.dumps(_message_body(email, idempotency_key)).encode("utf-8")
+        self._post("messages", _message_body(email, idempotency_key))
+
+    def suppress(self, address: str, *, reason: str) -> None:
+        """Add `address` to the mailer's suppression store (issue #80).
+
+        Same endpoint family, same signing, same allowlisted caller role as
+        `send` — the mailer treats a suppression write as one more thing a
+        registered service may ask for. The ownership proof that justifies
+        the call is verified before we get here (api/routes/unsubscribe.py).
+        """
+        self._post(
+            "suppressions",
+            {
+                "schema_version": _SCHEMA_VERSION,
+                "email_address": address,
+                "reason": reason,
+            },
+        )
+
+    def _post(self, resource: str, body: dict[str, object]) -> None:
+        url = f"{self.base_url}/v1/services/{_SERVICE_ID}/{resource}"
+        payload = json.dumps(body).encode("utf-8")
 
         credentials = self._botocore_session.get_credentials()
         if credentials is None:

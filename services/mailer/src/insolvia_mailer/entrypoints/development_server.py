@@ -24,4 +24,4 @@ app = create_app(
         attachment_receiver=store,
     )
 )
-MemoryDeliveryWorker(store.deliveries, MailpitTransport()).start()
+MemoryDeliveryWorker(store, MailpitTransport()).start()

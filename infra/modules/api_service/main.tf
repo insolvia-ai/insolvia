@@ -325,6 +325,7 @@ resource "aws_route53_record" "api" {
 #                           is "production" — this parameter is where that
 #                           mapping is authoritatively recorded)
 #   waitlist-table-name  -> WAITLIST_TABLE_NAME
+#   unsubscribe-secret   -> UNSUBSCRIBE_SECRET (SecureString, below)
 #
 # Future secrets (#65/#70 consumers) slot in as SecureString siblings with
 # `lifecycle { ignore_changes = [value] }` — Terraform creates the slot, a human
@@ -340,6 +341,43 @@ resource "aws_ssm_parameter" "config" {
   type  = "String"
   value = each.value
   tags  = var.tags
+}
+
+# ── Unsubscribe signing key (#80) ───────────────────────────────
+# HMAC key for the tokens in every transactional email's unsubscribe link
+# (services/api core/unsubscribe.py). Only this service ever holds it: it
+# mints the tokens and it verifies them. The mailer neither has it nor needs
+# it — it trusts the API's SigV4 identity and records the outcome.
+#
+# Generated rather than human-supplied, unlike the "a human or CI owns the
+# value" pattern above, and the trade-off is deliberate. Generated means the
+# value lands in Terraform state (S3, encrypted, and this repo's state bucket
+# is not public); human-supplied would mean the SES production-access request
+# blocks on somebody remembering to set a parameter, and a missing key makes
+# every send drop its unsubscribe link. For a key whose entire authority is
+# "may stop mail to one address", unattended-and-present beats
+# manual-and-maybe-absent.
+#
+# ROTATION invalidates every unsubscribe link already sitting in someone's
+# inbox — verification is exact, and old tokens stop verifying the moment the
+# key changes. So do not rotate casually: an unsubscribe link that has stopped
+# working is a compliance problem. `keepers` is empty for exactly that reason,
+# and `ignore_changes` keeps a manual rotation (a new value written straight
+# to SSM) from being reverted by the next apply.
+resource "random_password" "unsubscribe_secret" {
+  length  = 64
+  special = false
+}
+
+resource "aws_ssm_parameter" "unsubscribe_secret" {
+  name  = "${local.ssm_prefix}/unsubscribe-secret"
+  type  = "SecureString"
+  value = random_password.unsubscribe_secret.result
+  tags  = var.tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 # ── Alarms (#69) ────────────────────────────────────────────────

@@ -29,6 +29,24 @@ _CORS_ALLOWED_ORIGINS: dict[str, tuple[str, ...]] = {
     "local": (),
 }
 
+# Where the marketing site lives, per environment (issue #80). Every URL this
+# service puts in an outgoing email — the privacy policy, the unsubscribe link
+# — is built from this, so a staging email links staging pages and a
+# production email links production pages. That matters more than it sounds:
+# staging mail pointing at www.insolvia.ai/unsubscribe would send a tester's
+# click to the production API, and it would work, and it would suppress the
+# address in production.
+#
+# A constant map rather than an SSM parameter because these hosts are decided
+# in this repo (infra/envs/*/variables.tf marketing_subdomain) and change with
+# a code review, not with an ops action. `local` is the React Router dev
+# server's default port.
+_MARKETING_ORIGINS: dict[str, str] = {
+    "production": "https://www.insolvia.ai",
+    "staging": "https://staging-www.insolvia.ai",
+    "local": "http://localhost:3000",
+}
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -43,6 +61,8 @@ class AppConfig:
     environment: str
     waitlist_table_name: str | None = None
     mailer_api_url: str | None = None
+    unsubscribe_secret: str | None = None
+    marketing_origin: str = _MARKETING_ORIGINS["local"]
     cors_allowed_origins: tuple[str, ...] = ()
     cors_allow_localhost: bool = True
 
@@ -59,6 +79,12 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
     fallback shape as the waitlist store.
+    UNSUBSCRIBE_SECRET is the HMAC key for unsubscribe tokens (SSM
+    SecureString /insolvia/<env>/api/unsubscribe-secret, same derivation).
+    Unset is NOT a fallback: core/unsubscribe.py refuses to mint or verify
+    without it rather than degrading to unsigned tokens, so the failure is a
+    500 on the unsubscribe route and a send that carries no unsubscribe link
+    — loud, not silent.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -71,6 +97,8 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         environment=environment,
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
+        unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
+        marketing_origin=_MARKETING_ORIGINS[environment],
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",
     )

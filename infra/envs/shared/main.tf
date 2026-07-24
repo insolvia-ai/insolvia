@@ -443,6 +443,35 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/insolvia/*"]
   }
 
+  # ssm:* above is NOT sufficient for a SecureString. The value is encrypted
+  # under the AWS-managed key alias/aws/ssm, whose key policy delegates to IAM
+  # — so creating one (api_service's unsubscribe-secret, #80) and reading one
+  # back (`get-parameters-by-path --with-decryption` in api-<env>.yml) both
+  # need these KMS actions in *this* policy, or the apply fails with an
+  # AccessDenied naming a key rather than a parameter.
+  #
+  # Scoped by condition rather than by resource: the AWS-managed key's ID is
+  # not knowable here without a data lookup, and kms:ViaService is the
+  # stronger control anyway — it makes this grant usable ONLY when SSM is the
+  # one calling KMS. It cannot be turned into "decrypt anything in the
+  # account".
+  statement {
+    sid = "ParameterEncryption"
+    actions = [
+      "kms:Decrypt",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
   # Enumeration APIs that do NOT support resource-level permissions. AWS
   # evaluates these against `arn:aws:<service>:<region>:<account>:*`, so a
   # prefix-scoped resource never matches and the call is denied no matter how

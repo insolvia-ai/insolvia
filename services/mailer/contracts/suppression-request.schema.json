@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mailer-api.insolvia.ai/contracts/suppression-request-v1.json",
+  "title": "Mailer suppression request v1",
+  "$comment": "Body of POST /v1/services/<service_id>/suppressions (issue #80). SigV4-authenticated like every other route on this API. The mailer cannot tell whether the caller has the address owner's consent — proving that is the caller's job (services/api mints an HMAC unsubscribe token); this endpoint only records the outcome. Idempotent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "email_address", "reason"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "email_address": {
+      "$comment": "One bare address, no display name. Stored only as a one-way hash.",
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 320
+    },
+    "reason": {
+      "$comment": "bounce and complaint are what the SES feedback path writes; unsubscribe is what a person clicking the link writes. Closed set so a typo cannot invent a fourth.",
+      "enum": ["bounce", "complaint", "unsubscribe"]
+    }
+  }
+}

@@ -146,11 +146,19 @@ export default function Privacy() {
             We do not run advertising campaigns or sell our list.
           </p>
           <p>
-            You can stop receiving email from us at any time. Email{" "}
-            <Mail address={CONTACT_EMAIL} /> and we will suppress your address. We also
-            suppress addresses automatically when a message permanently bounces or is reported
-            as spam, so a complaint is itself an effective opt-out. Suppression is kept as a
-            one-way hash of the address rather than the address itself.
+            You can stop receiving email from us at any time, three ways, all of which do
+            the same thing: the <strong className="text-ink">unsubscribe link</strong> in
+            every message&rsquo;s footer, your mail client&rsquo;s own unsubscribe button
+            (we send the headers that make it appear), or an email to{" "}
+            <Mail address={CONTACT_EMAIL} />. We also suppress addresses automatically when
+            a message permanently bounces or is reported as spam, so marking us as spam is
+            itself an effective opt-out.
+          </p>
+          <p>
+            Suppression is stored as a one-way hash of the address rather than the address
+            itself — the only question the record has to answer is &ldquo;is this address
+            opted out&rdquo;, and a hash answers it without us keeping a list of everyone
+            who left.
           </p>
           <p>
             Some messages are genuinely necessary to operate an account you hold — a password

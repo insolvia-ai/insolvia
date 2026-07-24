@@ -494,6 +494,17 @@ resource "aws_iam_role_policy" "ingress" {
         Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
         Resource = aws_dynamodb_table.messages.arn
       },
+      # Write-only on suppressions, for POST /v1/services/<id>/suppressions
+      # (issue #80): a registered caller can add an address, and that is all.
+      # No GetItem, no Scan, no Query — the ingress Lambda has no reason to
+      # read the table back, and not granting reads means a compromised
+      # ingress cannot enumerate who has unsubscribed. Deciding whether an
+      # address is suppressed stays with the sender role above.
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = aws_dynamodb_table.suppressions.arn
+      },
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject"]
