@@ -34,7 +34,7 @@ naming convention.
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | Domain is **insolvia.ai**, not `.com` | Repo, CLAUDE.md, shared ACM wildcard, and `environment.dart` are all already built on it. `.com` would mean re-authoring the shared env for no gain. |
-| D2 | Subdomain map — see the table below; every environment gets its own host, staging included | Staging needs a full parallel stack, not just an app. Flat `staging-*` naming (not `*.staging`) is load-bearing — see D2 below. |
+| D2 | Subdomain map — see the table below; every environment gets its own host, staging included — **marketing now included too** | Staging needs a full parallel stack, not just an app. Flat `staging-*` naming (not `*.staging`) is load-bearing — see D2 below, which also records why marketing's original "no staging" carve-out was reversed. |
 | D3 | Marketing site is **React Router v7**, mirroring `andreas-services/website` | Flutter web cannot be server-rendered or crawled. See D3 below. |
 | D4 | The **design system becomes dual-target**: Flutter package + React package, over one shared token source | Consequence of D3. If we're adding a framework, the design system serves both rather than fragmenting the brand. See D4 below. |
 | D5 | **The API is required for MVP**, not deferred | The desktop app is a fat client on an attorney's machine. It cannot hold AWS credentials. Per `docs/regulatory-source-register.html`, we handle SSNs and full financials under GLBA Safeguards — the trust boundary has to live server-side. |
@@ -46,14 +46,35 @@ naming convention.
 
 | Surface | Production | Staging |
 |---|---|---|
-| Marketing | `www.insolvia.ai` (apex 301s here) | — (PR previews only, by decision) |
+| Marketing | `www.insolvia.ai` (apex 301s here) | `staging-www.insolvia.ai` |
 | Web app | `app.insolvia.ai` | `staging-app.insolvia.ai` |
 | API | `api.insolvia.ai` | `staging-api.insolvia.ai` |
+| Mailer | `mailer-api.insolvia.ai` | `staging-mailer-api.insolvia.ai` |
 
-Marketing has no staging environment: it is static content, its PR preview build
-catches what staging would, and skipping it saves a CloudFront distribution and
-an SSR Lambda. `app` and `api` keep theirs — they have state, auth, and
-migrations worth rehearsing against.
+**Marketing originally had no staging environment. That is reversed (M6/6.8).**
+The original reasoning — static content, a PR preview build catching what
+staging would, one fewer CloudFront distribution and SSR Lambda — rested on a
+PR preview build that was never actually built, so in practice the site had no
+pre-production environment at all. Milestone 6 is what forced the issue: the
+SES production-access request is reviewed against a live privacy policy and a
+working unsubscribe path, and neither is something to first exercise on the
+host that AWS is reviewing. Prod is separately parked offline
+(`site_enabled = false`), which would have left nowhere at all to see them.
+
+Two things make a second public copy safe rather than a liability:
+
+- **It cannot be indexed.** `app/lib/seo.ts` allowlists exactly
+  `www.insolvia.ai`; every other host ships `noindex` and a `Disallow: /`
+  robots.txt (issue #48). `marketing-staging.yml`'s smoke check asserts both,
+  because a staging copy that started ranking would compete with production
+  for its own keywords.
+- **It owns no apex.** A zone has exactly one apex and prod owns it, so
+  `modules/marketing_site` takes `apex_domain = null` on staging and skips the
+  alias, the A/AAAA records, and the 301 branch. Two environments both
+  claiming `insolvia.ai` would collide on the CloudFront alias.
+
+`app` and `api` keep their staging environments for the original reason — they
+have state, auth, and migrations worth rehearsing against.
 
 **Flat `staging-app` beats nested `app.staging` — and this is not cosmetic.**
 An ACM wildcard covers exactly one label: `*.insolvia.ai` matches
@@ -614,7 +635,7 @@ All open questions from rev 2 are answered and folded into the plan above.
 | Windows at MVP, or macOS only? | **Both** | Milestone 4 issues 4.6–4.8 + the code-signing warning |
 | Address map | **Confirmed** | Issue 1.11 |
 | npm scope `@insolvia`? | **Overturned — it's `@insolvia-ai`.** GitHub Packages requires the scope to equal the owning org's login (`insolvia-ai`) and rejects `@insolvia` with a misleading "installation does not exist" 403 | Issue 2.7; `docs/PACKAGE_PUBLISHING.md` |
-| Staging for marketing? | **No** | D2 table; PR previews only |
+| Staging for marketing? | **Answered "no" in rev 3; reversed in M6** — it is `staging-www.insolvia.ai` now | D2 table; the reversal and its reasoning live there |
 
 ## Remaining risks worth watching
 

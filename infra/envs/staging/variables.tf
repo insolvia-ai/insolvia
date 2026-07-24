@@ -34,3 +34,18 @@ variable "mailer_subdomain" {
   type        = string
   default     = "staging-mailer-api.insolvia.ai"
 }
+
+# Same flat-label reasoning once more: `*.insolvia.ai` covers
+# `staging-www.insolvia.ai`, not a nested `www.staging.…`. Prod serves the
+# real `www.insolvia.ai` plus the apex; staging serves this host only.
+variable "marketing_subdomain" {
+  description = "Hostname the marketing site serves in this environment."
+  type        = string
+  default     = "staging-www.insolvia.ai"
+}
+
+variable "marketing_image_tag" {
+  description = "ECR image tag the marketing SSR Lambda is created from (creation-time only; CI owns it afterwards)."
+  type        = string
+  default     = "latest"
+}

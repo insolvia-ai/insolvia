@@ -1,31 +1,45 @@
-name: Marketing · Deploy · Production
+name: Marketing · Deploy · Staging
 
-# Deploys www.insolvia.ai: SSR Lambda image + hashed client assets on S3, both
-# behind one CloudFront distribution (infra/modules/marketing_site).
+# Deploys staging-www.insolvia.ai: SSR Lambda image + hashed client assets on
+# S3, both behind one CloudFront distribution (infra/modules/marketing_site).
 #
-# There is a staging deploy too — marketing-staging.yml, serving
-# staging-www.insolvia.ai. It did not always exist (issue #45 originally chose
-# "production + PR previews only"); Milestone 6 reversed that, and the reasoning
-# lives in marketing-staging.yml's header and docs/MVP_PLAN.md's D2.
+# The marketing site used to be production-only (issue #45, decision D2 —
+# "production + PR previews only"). That is reversed: the SES production-access
+# request (issue #80 / 6.8) is reviewed against a live privacy policy and a
+# working unsubscribe path, and those need somewhere to be exercised before
+# prod serves them. PR previews, the thing D2 leaned on instead, were never
+# built. See infra/envs/staging/main.tf and docs/MVP_PLAN.md.
 #
-# This workflow is the only one that owns the apex: modules/marketing_site
-# takes apex_domain = null on staging, so the apex alias, records, and 301
-# exist here and nowhere else. That is what the apex smoke check below covers.
+# Staging serves a full public copy of the site, and that is safe for SEO only
+# because the app noindexes every host that is not exactly www.insolvia.ai
+# (app/lib/seo.ts, issue #48) — staging robots.txt is `Disallow: /`. The smoke
+# check below asserts that, because a staging copy that started ranking would
+# compete with production for its own keywords.
 #
 # FIRST-EVER DEPLOY (bootstrap — manual, once): the SSR Lambda cannot be
 # created until an image exists in the ECR repository, and this workflow's
 # full `terraform apply` creates both. Bootstrap from a merged main checkout
 # (see infra/modules/marketing_site/main.tf):
 #
-#   terraform -chdir=infra/envs/prod apply \
+#   terraform -chdir=infra/envs/staging apply \
 #     -target=module.marketing_site.aws_ecr_repository.ssr
 #   # build the app, docker build, push <marketing_ecr_repository_url>:<tag>
-#   terraform -chdir=infra/envs/prod apply
+#   terraform -chdir=infra/envs/staging apply
 #
 # After that the Lambda's image_uri is lifecycle-ignored and this workflow owns
 # the running image via `aws lambda update-function-code`.
+#
+# Deploy workflows are not required status checks, so — unlike the *-pr.yml
+# gates — a `paths:` filter here is safe (same as api-staging.yml).
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/insolvia_marketing/**"
+      - "infra/envs/staging/**"
+      - "infra/modules/marketing_site/**"
+      - ".github/workflows/marketing-staging.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,12 +49,12 @@ permissions:
   # job's GITHUB_TOKEN needs read access to pull it.
   packages: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/prod
-# (api-prod.yml, app-prod.yml) — the backend has no state locking, so
-# concurrent applies of one env race. See the matching comment in
-# api-staging.yml for the incident that proved it.
+# Shared with every workflow that `terraform apply`s infra/envs/staging
+# (api-staging.yml, app-staging.yml, mailer-staging.yml) — concurrent applies
+# of one env race. See the matching comment in api-staging.yml for the
+# incident that proved it.
 concurrency:
-  group: insolvia-terraform-prod
+  group: insolvia-terraform-staging
   cancel-in-progress: false
 
 jobs:
@@ -48,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
     # that don't declare the environment — they resolve silently to "".
-    environment: insolvia-production
+    environment: insolvia-staging
     steps:
       - uses: actions/checkout@v4
 
@@ -85,17 +99,18 @@ jobs:
           # `$(terraform output -raw ...)` capture below.
           terraform_wrapper: false
 
-      - name: Apply prod infra
+      - name: Apply staging infra
         id: tf
         run: |
-          terraform -chdir=infra/envs/prod init -input=false
-          terraform -chdir=infra/envs/prod apply -auto-approve -input=false
-          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          terraform -chdir=infra/envs/staging init -input=false
+          terraform -chdir=infra/envs/staging apply -auto-approve -input=false
+          tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
           {
             echo "ecr=$(tf marketing_ecr_repository_url)"
             echo "lambda=$(tf marketing_ssr_function_name)"
             echo "bucket=$(tf marketing_assets_bucket_name)"
             echo "dist=$(tf marketing_distribution_id)"
+            echo "url=$(tf marketing_url)"
           } >> "$GITHUB_OUTPUT"
 
       # ── 3. SSR image → ECR ────────────────────────────────────────
@@ -124,7 +139,7 @@ jobs:
 
       # ── 5. Client assets → S3, then invalidate ────────────────────
       # Everything in build/client is content-hashed; HTML is SSR'd by the
-      # Lambda, so unlike app-prod.yml there is no second no-cache HTML pass.
+      # Lambda, so unlike app-staging.yml there is no second no-cache HTML pass.
       - name: Sync assets to S3 + invalidate
         env:
           BUCKET: ${{ steps.tf.outputs.bucket }}
@@ -135,14 +150,21 @@ jobs:
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
 
       # ── 6. Smoke check ────────────────────────────────────────────
+      # Unlike prod there is no apex to assert (staging owns no apex — see
+      # infra/envs/staging/main.tf). Instead assert the thing that is specific
+      # to a second public copy of the site: it must not be crawlable.
       - name: Smoke check
+        env:
+          URL: ${{ steps.tf.outputs.url }}
         run: |
-          # www serves a 200 with the SSR'd page.
-          curl -sSf -o /dev/null --retry 5 --retry-delay 5 --retry-all-errors \
-            https://www.insolvia.ai/
-          # The apex 301s to www (CloudFront viewer-request function).
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://insolvia.ai/)
-          if [ "$code" != "301" ]; then
-            echo "::error::Expected apex 301 → www, got HTTP $code"
+          curl -sSf -o /dev/null --retry 5 --retry-delay 5 --retry-all-errors "$URL/"
+          robots=$(curl -sSf "$URL/robots.txt")
+          if ! grep -q '^Disallow: /$' <<< "$robots"; then
+            echo "::error::staging robots.txt is not Disallow: / — a crawlable staging copy competes with production"
+            echo "$robots"
+            exit 1
+          fi
+          if ! curl -sSf "$URL/" | grep -qi 'name="robots" content="noindex'; then
+            echo "::error::staging pages are missing the noindex meta tag (see app/lib/seo.ts isProductionHost)"
             exit 1
           fi
