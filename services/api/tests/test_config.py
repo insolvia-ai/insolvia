@@ -32,6 +32,15 @@ def test_waitlist_table_name_is_read():
     assert config.waitlist_table_name == "insolvia-waitlist-staging"
 
 
+def test_mailer_api_url_defaults_to_none():
+    assert load_config({}).mailer_api_url is None
+
+
+def test_mailer_api_url_is_read():
+    config = load_config({"MAILER_API_URL": "https://mailer-staging.insolvia.ai"})
+    assert config.mailer_api_url == "https://mailer-staging.insolvia.ai"
+
+
 def test_cors_allowlist_per_environment():
     # Exact origins only; www.insolvia.ai deliberately absent everywhere —
     # the marketing site's waitlist call is server-to-server (no Origin).

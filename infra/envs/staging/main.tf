@@ -82,6 +82,26 @@ module "mailer" {
   tags                       = local.common_tags
 }
 
+# Publish the mailer's URL into the API's own SSM config namespace (issue
+# 6.4) so the API Lambda can read it as MAILER_API_URL. This is an env-level
+# resource, deliberately NOT inside module.api_service: module.mailer already
+# depends on module.api_service (it reads api_service's lambda_role_name to
+# build its SigV4 caller allowlist), so having api_service read
+# module.mailer.api_url back would be a dependency cycle. An env-level
+# resource referencing both modules' outputs has no such problem.
+#
+# Name follows the api_service module's own /insolvia/<env>/api/<kebab-key>
+# convention exactly (see modules/api_service/main.tf's aws_ssm_parameter
+# "config") so the deploy workflow's existing get-parameters-by-path step
+# picks it up and derives it into MAILER_API_URL alongside INSOLVIA_ENV and
+# WAITLIST_TABLE_NAME — no workflow change needed.
+resource "aws_ssm_parameter" "mailer_api_url" {
+  name  = "/insolvia/${local.environment}/api/mailer-api-url"
+  type  = "String"
+  value = module.mailer.api_url
+  tags  = local.common_tags
+}
+
 # Auth (#65): staging Cognito user pool + web/desktop app clients.
 #
 # web_origins carries a localhost dev origin ON STAGING ONLY: Cognito callback

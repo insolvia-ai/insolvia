@@ -42,6 +42,7 @@ class AppConfig:
 
     environment: str
     waitlist_table_name: str | None = None
+    mailer_api_url: str | None = None
     cors_allowed_origins: tuple[str, ...] = ()
     cors_allow_localhost: bool = True
 
@@ -54,6 +55,10 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     table behind POST /v1/waitlist — in local dev that is this machine's real
     per-developer table (scripts/dev-aws-setup.sh); unset means the in-memory
     store, which only unit tests and the bare development server use.
+    MAILER_API_URL is the mailer service's public HTTPS base URL (published
+    to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
+    var by the deploy workflow); unset means the in-memory mailer, same
+    fallback shape as the waitlist store.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -65,6 +70,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     return AppConfig(
         environment=environment,
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
+        mailer_api_url=source.get("MAILER_API_URL") or None,
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",
     )
