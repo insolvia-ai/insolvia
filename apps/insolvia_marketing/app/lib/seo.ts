@@ -27,7 +27,11 @@ export interface SeoRoute {
   path: string;
 }
 
-export const SEO_ROUTES: SeoRoute[] = [{ path: "/" }, { path: "/waitlist" }];
+export const SEO_ROUTES: SeoRoute[] = [
+  { path: "/" },
+  { path: "/waitlist" },
+  { path: "/privacy" },
+];
 
 /**
  * Is this request being served on the production host?

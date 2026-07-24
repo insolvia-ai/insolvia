@@ -20,6 +20,10 @@
     "audits (robots.txt included) see the production variant instead of the",
     "deliberate non-production noindex (issue #48).",
     "",
+    "Every public route is audited, /privacy included — it is a page AWS",
+    "reads during the SES production-access review (issue #80), so it has to",
+    "load like the rest of the site, not just exist.",
+    "",
     "Budget rationale (measured 2026-07-21 on / and /waitlist: performance",
     "0.98, accessibility 0.96, best-practices 0.96, SEO 1.00; LCP ~1.96 s;",
     "script transfer ~125 KB; total ~136 KB):",
@@ -36,7 +40,8 @@
     "collect": {
       "url": [
         "http://localhost:3000/",
-        "http://localhost:3000/waitlist"
+        "http://localhost:3000/waitlist",
+        "http://localhost:3000/privacy"
       ],
       "numberOfRuns": 3,
       "startServerCommand": "node scripts/lhci-serve.mjs",
