@@ -36,6 +36,19 @@ def build_message(
     message["X-Mailer-Service-Id"] = service.service_id
     message["X-Mailer-Application-Message-Id"] = request.application_message_id
     message["X-Mailer-Category"] = request.category
+    # RFC 2369 + RFC 8058. The pair is what makes a mail client render its own
+    # native "Unsubscribe" affordance next to the sender name, which is both
+    # what Gmail/Outlook increasingly expect of any bulk-ish sender and one of
+    # the things AWS looks for when granting SES production access (#80).
+    #
+    # List-Unsubscribe-Post is only emitted alongside a URL, never alone:
+    # advertising one-click support without a target that accepts a POST is
+    # worse than advertising nothing, because the client will show the button
+    # and the click will fail. The receiving end is the marketing site's
+    # /unsubscribe action, which accepts exactly this POST.
+    if request.list_unsubscribe_url:
+        message["List-Unsubscribe"] = f"<{request.list_unsubscribe_url}>"
+        message["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     message.set_content(request.text_body)
     message.add_alternative(request.html_body, subtype="html")
     html_part = message.get_payload()[-1]

@@ -24,6 +24,12 @@
     "subject": { "type": "string", "minLength": 1, "maxLength": 998 },
     "html_body": { "type": "string", "minLength": 1, "maxLength": 4000000 },
     "text_body": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+    "list_unsubscribe_url": {
+      "$comment": "Optional (issue #80). When present the sender emits List-Unsubscribe and List-Unsubscribe-Post: List-Unsubscribe=One-Click. https-only, and no control characters or angle brackets — the value lands verbatim in a mail header.",
+      "type": ["string", "null"],
+      "pattern": "^https://[^\\s<>]+$",
+      "maxLength": 2048
+    },
     "attachments": {
       "type": "array",
       "maxItems": 20,

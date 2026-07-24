@@ -7,6 +7,9 @@ from flask import Flask, jsonify
 from insolvia_mailer.api.dependencies import ApiDependencies
 from insolvia_mailer.api.routes.attachments import blueprint as attachments_blueprint
 from insolvia_mailer.api.routes.messages import blueprint as messages_blueprint
+from insolvia_mailer.api.routes.suppressions import (
+    blueprint as suppressions_blueprint,
+)
 from insolvia_mailer.core.errors import (
     AuthorizationError,
     ConflictError,
@@ -23,6 +26,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.extensions["mailer_dependencies"] = dependencies
     app.register_blueprint(attachments_blueprint)
     app.register_blueprint(messages_blueprint)
+    app.register_blueprint(suppressions_blueprint)
 
     @app.get("/health")
     def health():

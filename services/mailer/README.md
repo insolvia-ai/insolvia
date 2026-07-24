@@ -18,6 +18,40 @@ suppression, and normalized feedback.
 Attachments use `POST /v1/services/<service>/attachment-uploads` to obtain a
 15-minute presigned `PUT`; raw attachment bytes never pass through API Gateway.
 
+## Suppression, and who is allowed to add to it
+
+Step 4 above refuses to send to a suppressed address. Entries reach that table
+two ways:
+
+- **Automatically**, from the SES feedback path — a permanent bounce or any
+  complaint (`entrypoints/feedback_lambda.py`).
+- **On request**, from a registered caller: `POST
+  /v1/services/<service>/suppressions` with `reason: "unsubscribe"`
+  (`contracts/suppression-request.schema.json`). This is how a person clicking
+  the unsubscribe link in an email actually stops the mail.
+
+Both write the same one-way hash to the same table, on purpose: an opt-out
+stored anywhere else would need the sender to check two places, and the day
+someone forgets the second check is the day an unsubscribed person gets
+emailed.
+
+**The mailer does not verify that the caller has the address owner's consent.**
+It cannot — it sees a SigV4-signed request from a registered service and
+nothing else. Proving the request came from the address's owner belongs to the
+caller; for `insolvia_api` that proof is an HMAC token (`services/api`
+`core/unsubscribe.py`) which the mailer never sees and holds no key for. What
+bounds that split is the operation itself: the worst a compromised caller
+achieves is stopping its own mail to an address — never reading the table,
+never sending anything. The ingress role's IAM grant on the suppressions table
+is `PutItem` and nothing else, so "cannot enumerate who unsubscribed" is
+enforced and not merely intended.
+
+A caller that wants a mail client to render its own unsubscribe button sets
+`list_unsubscribe_url` on the message; the sender turns it into
+`List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 2369 / RFC 8058). The mailer
+never mints or interprets that URL — the caller composed the body, so the
+caller owns the link.
+
 ## Code boundaries
 
 The source tree makes the runtime boundary explicit:

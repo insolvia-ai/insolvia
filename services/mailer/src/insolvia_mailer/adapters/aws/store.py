@@ -18,7 +18,9 @@ from insolvia_mailer.core.errors import ConflictError, RetryableError, Validatio
 from insolvia_mailer.core.models import (
     AttachmentUploadRequest,
     MessageRequest,
+    SuppressionRequest,
     canonical_json,
+    recipient_hash,
 )
 
 
@@ -153,6 +155,30 @@ class AwsStore:
                 }
             )
         return records
+
+    def suppress_recipient(
+        self, service: ServiceConfig, suppression: SuppressionRequest
+    ) -> None:
+        # Same table, same key shape, and the same one-way hash the feedback
+        # Lambda writes for bounces and complaints (entrypoints/
+        # feedback_lambda.py `_suppress`) — the sender's `_suppressed` check
+        # reads exactly this and needs no knowledge of where an entry came
+        # from. The plaintext address is never stored: the only question the
+        # table has to answer is "is THIS address suppressed", and a hash
+        # answers it without keeping a list of everyone who opted out.
+        #
+        # An unconditional put_item is the idempotency: re-suppressing simply
+        # rewrites the same item, so a doubled click or a retried one-click
+        # POST cannot fail.
+        self.ddb.put_item(
+            TableName=self.suppressions_table,
+            Item={
+                "recipient_hash": {"S": recipient_hash(suppression.email_address)},
+                "reason": {"S": suppression.reason},
+                "source_service_id": {"S": service.service_id},
+                "suppressed_at": {"S": _iso()},
+            },
+        )
 
     def admit_message(self, service: ServiceConfig, message: MessageRequest) -> None:
         record_key = self.message_key(

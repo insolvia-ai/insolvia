@@ -108,6 +108,16 @@ BLOCKED_EXTENSIONS = {
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
+MAX_URL_CHARS = 2048
+
+# Why a suppression has a reason at all: the sender Lambda treats every entry
+# in the table identically (it refuses to send, full stop), but the reason is
+# what makes the table answerable when someone asks "why did this address stop
+# receiving mail" — a complaint, a hard bounce, and a person clicking
+# unsubscribe are three very different facts about the same address. Kept as a
+# closed set so a typo cannot invent a fourth.
+SUPPRESSION_REASONS = frozenset({"bounce", "complaint", "unsubscribe"})
+
 
 def _string(value: Any, name: str, *, maximum: int, required: bool = True) -> str:
     if value is None and not required:
@@ -133,15 +143,34 @@ def _only_keys(value: dict[str, Any], allowed: set[str]) -> None:
         raise ValidationError(f"request contains unsupported fields: {fields}")
 
 
-def _email(value: Any) -> str:
-    address = _string(value, "to_address", maximum=320).strip()
+def _email(value: Any, name: str = "to_address") -> str:
+    address = _string(value, name, maximum=320).strip()
     display, parsed = parseaddr(address)
     if display or parsed != address or "@" not in parsed or parsed.count("@") != 1:
-        raise ValidationError("to_address must contain exactly one bare email address")
+        raise ValidationError(f"{name} must contain exactly one bare email address")
     local, domain = parsed.rsplit("@", 1)
     if not local or "." not in domain or any(char.isspace() for char in parsed):
-        raise ValidationError("to_address is invalid")
+        raise ValidationError(f"{name} is invalid")
     return parsed
+
+
+def _https_url(value: Any, name: str) -> str:
+    """An absolute https URL safe to put in a mail header.
+
+    https-only and control-character-free are both load-bearing: this value
+    lands verbatim in a List-Unsubscribe header, so a CR or LF would let a
+    caller inject arbitrary headers into the outgoing message, and a
+    `javascript:` or `http:` scheme would be handed to a mail client as a
+    one-click action.
+    """
+    url = _string(value, name, maximum=MAX_URL_CHARS).strip()
+    if not url.startswith("https://"):
+        raise ValidationError(f"{name} must be an absolute https URL")
+    if any(char in url for char in "\r\n") or any(ord(char) < 0x20 for char in url):
+        raise ValidationError(f"{name} cannot contain control characters")
+    if "<" in url or ">" in url:
+        raise ValidationError(f"{name} cannot contain angle brackets")
+    return url
 
 
 @dataclass(frozen=True)
@@ -243,6 +272,12 @@ class MessageRequest:
     html_body: str
     text_body: str
     attachments: tuple[AttachmentReference, ...]
+    # Optional, and the caller's business: the mailer does not mint unsubscribe
+    # links or know how to verify one. The caller composed the body, so the
+    # caller owns the URL; all this field buys is turning that link into a
+    # List-Unsubscribe header the mail client can surface on its own (see
+    # core/mime.py). None means the message ships without those headers.
+    list_unsubscribe_url: str | None = None
 
     @classmethod
     def from_dict(
@@ -263,6 +298,7 @@ class MessageRequest:
             "html_body",
             "text_body",
             "attachments",
+            "list_unsubscribe_url",
         }
         if internal:
             allowed |= {"service_id", "sender_address", "configuration_set"}
@@ -291,6 +327,12 @@ class MessageRequest:
         subject = _string(value.get("subject"), "subject", maximum=998)
         if "\r" in subject or "\n" in subject:
             raise ValidationError("subject cannot contain line breaks")
+        raw_unsubscribe = value.get("list_unsubscribe_url")
+        list_unsubscribe_url = (
+            _https_url(raw_unsubscribe, "list_unsubscribe_url")
+            if raw_unsubscribe is not None
+            else None
+        )
         return cls(
             application_message_id=_identifier(
                 value.get("application_message_id"), "application_message_id"
@@ -302,6 +344,7 @@ class MessageRequest:
             html_body=_string(value.get("html_body"), "html_body", maximum=4_000_000),
             text_body=_string(value.get("text_body"), "text_body", maximum=1_000_000),
             attachments=attachments,
+            list_unsubscribe_url=list_unsubscribe_url,
         )
 
     def canonical_hash(self) -> str:
@@ -317,6 +360,7 @@ class MessageRequest:
             "subject": self.subject,
             "html_body": self.html_body,
             "text_body": self.text_body,
+            "list_unsubscribe_url": self.list_unsubscribe_url,
             "attachments": [
                 {
                     "attachment_id": item.attachment_id,
@@ -326,6 +370,44 @@ class MessageRequest:
                 for item in self.attachments
             ],
         }
+
+
+@dataclass(frozen=True)
+class SuppressionRequest:
+    """A caller asking that an address stop receiving its mail (issue #80).
+
+    The write path the SES feedback Lambda already uses for bounces and
+    complaints, exposed to the registered caller so a *user-initiated*
+    unsubscribe reaches the same table. It is deliberately the same store: an
+    opt-out that lived somewhere else would need the sender Lambda to check
+    two places, and the day someone forgets the second check is the day an
+    unsubscribed person gets emailed.
+
+    Note what this endpoint does NOT do: it does not verify that the caller
+    has any right to suppress this particular address. It cannot — it sees a
+    SigV4-signed request from a registered service and nothing else. Proving
+    the request came from the address's owner is the caller's job, and for
+    insolvia_api that proof is the HMAC unsubscribe token
+    (services/api core/unsubscribe.py). The blast radius of that split is
+    bounded by the operation itself: the worst a compromised caller achieves
+    is stopping its own mail to an address, never reading or sending anything.
+    """
+
+    email_address: str
+    reason: str
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> SuppressionRequest:
+        _schema(value)
+        _only_keys(value, {"schema_version", "email_address", "reason"})
+        reason = _string(value.get("reason"), "reason", maximum=32)
+        if reason not in SUPPRESSION_REASONS:
+            allowed = ", ".join(sorted(SUPPRESSION_REASONS))
+            raise ValidationError(f"reason must be one of {allowed}")
+        return cls(
+            email_address=_email(value.get("email_address"), "email_address"),
+            reason=reason,
+        )
 
 
 def _schema(value: dict[str, Any]) -> None:

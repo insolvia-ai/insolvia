@@ -13,6 +13,10 @@ class InMemoryMailerClient:
 
     def __init__(self) -> None:
         self.sent: list[tuple[OutboundEmail, str]] = []
+        self.suppressed: list[tuple[str, str]] = []
 
     def send(self, email: OutboundEmail, *, idempotency_key: str) -> None:
         self.sent.append((email, idempotency_key))
+
+    def suppress(self, address: str, *, reason: str) -> None:
+        self.suppressed.append((address, reason))
