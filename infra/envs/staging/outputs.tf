@@ -123,3 +123,8 @@ output "mailer_configuration_set" {
   description = "Staging SES configuration set the mailer sends through."
   value       = module.mailer.configuration_set
 }
+
+output "mailer_alarms_topic_arn" {
+  description = "SNS topic for staging mailer alarms — subscribe by hand (Terraform manages no subscriptions)."
+  value       = module.mailer.alarms_topic_arn
+}

@@ -56,3 +56,8 @@ output "configuration_set" {
   description = "The one SES configuration set this environment's mail flows through."
   value       = local.configuration_set
 }
+
+output "alarms_topic_arn" {
+  description = "SNS topic the mailer alarms (Lambda errors, DLQ, queue age, rejects, SES bounce/complaint rate, attachment scanning) publish to. A human must subscribe and confirm — Terraform does not manage subscriptions."
+  value       = aws_sns_topic.alarms.arn
+}
