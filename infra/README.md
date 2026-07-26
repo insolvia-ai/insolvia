@@ -5,14 +5,17 @@ Terraform for all Insolvia AWS infrastructure. See
 model and [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) for one-time bootstrap.
 
 ```
-modules/web_hosting/   S3 (private+OAC) + CloudFront + Route53 alias for a Flutter-web SPA
-modules/email/         SES domain identity, DKIM, custom MAIL FROM, apex MX/SPF/DMARC
-envs/shared/           Route53 zone insolvia.ai, *.insolvia.ai ACM cert, insolvia-github-actions role, email
-envs/staging/          web_hosting -> staging-app.insolvia.ai
-envs/prod/             web_hosting -> app.insolvia.ai
+modules/                 web_hosting, marketing_site, email, api_service, mailer_service, …
+envs/ci-trust/           OIDC provider + insolvia-github-actions deploy role + its policy (human-applied only)
+envs/shared/             Route53 zone insolvia.ai, *.insolvia.ai ACM cert, SES domain identity + mail DNS
+envs/staging/            staging-app / staging-www + the service stacks
+envs/prod/               app / www + the service stacks (owns the apex)
 ```
 
 State: `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`.
+The deploy role lives in **`ci-trust`**, not `shared` — CI can't apply its own
+permissions (see [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) and the
+**insolvia-deploy-role-permissions** skill).
 
 ## Usage
 
@@ -20,8 +23,9 @@ State: `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`.
 cd envs/<env>
 terraform init
 terraform plan     # offline validate: terraform init -backend=false && terraform validate
-terraform apply    # gated off until insolvia.ai DNS is live
+terraform apply
 ```
 
-Apply order: `shared` → `staging` → `prod`. Never `destroy` `shared` before the
-environments that depend on its zone/cert/role.
+Apply order: `ci-trust` (human) → `shared` → `staging` / `prod`. DNS is live and
+deploys are real; never `destroy` `shared` before the environments that depend on
+its zone/cert.

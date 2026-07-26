@@ -109,6 +109,46 @@ irrelevant PR they succeed in a few seconds having done nothing.
 you find yourself "cleaning that up", read
 `.github/actions/changed-paths/action.yml` first.
 
-Required-check names, and the fact that enabling them is a manual repo-settings
-step, are documented in the root `CLAUDE.md` under *PR gates, required status
-checks, and why no `paths:` filter*.
+### Branch protection — what `protect-main` enforces (and doesn't)
+
+`main` is protected by the `protect-main` ruleset. Verify, don't assume:
+`gh api repos/insolvia-ai/insolvia/rulesets/18947945 --jq .rules`.
+
+**Enforced today:** a PR is required (no direct pushes); linear history; no
+force-push; no branch deletion; squash or rebase merges only; review threads must
+be resolved, and pushes dismiss stale reviews.
+
+**Not enforced today** (despite `.github/CODEOWNERS` existing):
+`required_approving_review_count` is `0` and `require_code_owner_review` is
+`false` — a PR can merge with **no approval** — and there are **no required
+status checks**, so a PR with red CI can still merge. CODEOWNERS only *requests*
+the code owner's review; it does not gate the merge.
+
+### Required status checks — pending manual step
+
+Turning red CI into a merge blocker is a **repo-settings change a human makes in
+the GitHub UI/API** — nothing in this repo can grant itself branch protection.
+The workflows above are already shaped (always-run-and-report) to allow it. In
+`protect-main` → *Require status checks to pass*, add exactly these eleven job
+`name:` values (matrix legs get a `(leg)` suffix):
+
+| Check name | Workflow |
+|---|---|
+| `Flutter app` | `app-pr.yml` |
+| `macOS build` | `app-pr.yml` |
+| `Flutter design system` | `design-system-pr.yml` |
+| `React design system` | `design-system-react-pr.yml` |
+| `Marketing site` | `marketing-pr.yml` |
+| `API service` | `api-pr.yml` |
+| `Mailer service` | `mailer-pr.yml` |
+| `Dart API client` | `api-client-pr.yml` |
+| `Terraform validate (shared)` | `shared-infra-plan.yml` |
+| `Terraform validate (staging)` | `shared-infra-plan.yml` |
+| `Terraform validate (prod)` | `shared-infra-plan.yml` |
+
+These strings are a **contract with the ruleset**: renaming a job `name:` (or a
+matrix leg) silently orphans the required check — the ruleset waits forever for a
+name nobody reports. Change one only alongside the ruleset. Also enable *Require
+branches to be up to date before merging*, and set
+`required_approving_review_count` to 1 with `require_code_owner_review: true` if
+CODEOWNER review is wanted.

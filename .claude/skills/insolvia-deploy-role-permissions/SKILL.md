@@ -1,5 +1,5 @@
 ---
-name: deploy-role-permissions
+name: insolvia-deploy-role-permissions
 description: >-
   How to change what the Insolvia CI deploy role is allowed to do — and why
   those changes can't be applied by CI. Use this WHENEVER a change touches the
@@ -107,4 +107,4 @@ scoped and explained.
   script guards this, but the caution stands for bare commands.
 
 Credential mechanics for the local apply (the `aws login` session vs. the env
-vars Terraform needs, and the stale-var trap) live in the **`aws-auth`** skill.
+vars Terraform needs, and the stale-var trap) live in the **`insolvia-aws-auth`** skill.

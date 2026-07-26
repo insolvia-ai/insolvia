@@ -67,7 +67,9 @@ src/insolvia_mailer/
 API Gateway and the development server both invoke the same Flask application.
 Only their injected adapters differ. `core` has no framework or infrastructure
 dependencies, `api` depends only on `core`, and an architecture test enforces
-those dependency rules.
+those dependency rules. The trust invariants that ride on this layout (caller
+identity comes from the registered service, never the body; S3/SQS internals are
+not part of the contract) are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Development flow
 

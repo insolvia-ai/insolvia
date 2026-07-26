@@ -76,14 +76,13 @@ import { Button, Card, Field } from '@insolvia-ai/design-system';
 ## Working on it
 
 ```sh
-npm install
-npm run lint            # eslint (incl. jsx-a11y)
-npm run typecheck       # tsc --noEmit
-npm run test            # vitest + Testing Library (jsdom)
-npm run build           # tsup → dist/{index.js,index.cjs,index.d.ts,theme.css}
-npm run storybook       # dev server on :6006
-npm run build-storybook # static build, as CI runs it
+scripts/dev-setup.sh    # npm ci
+scripts/dev-up.sh       # Storybook on :6006
 ```
+
+Individual scripts once set up: `npm run lint` (eslint incl. jsx-a11y),
+`npm run typecheck` (tsc --noEmit), `npm run test` (vitest + Testing Library),
+`npm run build` (tsup → dist/), `npm run build-storybook` (static, as CI runs it).
 
 ### Conventions
 

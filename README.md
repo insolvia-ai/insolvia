@@ -10,54 +10,51 @@ desktop-loyal attorneys where they are.
 
 ## Layout
 
-Standard Flutter monorepo split — runnable apps in `apps/`, shared libraries in
-`packages/`:
+Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
+`services/`, infrastructure in `infra/`. The full annotated map is in
+[`CLAUDE.md`](CLAUDE.md).
 
 | Path | What |
 |---|---|
-| [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app (`insolvia_app`) — desktop + web. Currently a themed, feature-first hello-world. |
-| [`packages/insolvia_design_system/`](packages/insolvia_design_system/) | Shared Flutter UI package: tokens, theme, components. |
-| [`infra/`](infra/) | AWS infrastructure (Terraform): `shared`, `staging`, `prod`. |
+| [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app — desktop + web (themed, feature-first hello-world today). |
+| [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
+| [`packages/`](packages/) | Shared libraries: design tokens, the Flutter + React design systems, the Dart API client. |
+| [`services/`](services/) | Backend services (Python on Lambda): `api`, `mailer`. |
+| [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
 | [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
 
-## Prerequisites
+## Getting started
 
-- [FVM](https://fvm.app) (pins Flutter — see [`.fvmrc`](.fvmrc)): `dart pub global activate fvm && fvm install`
-- [Melos](https://melos.invertase.dev): `dart pub global activate melos`
-- For macOS desktop builds: full **Xcode** (Command Line Tools alone are not enough).
-
-## Quick start
+The `scripts/` directory is the toolchain — prefer it over hand-running
+`fvm`/`melos`/`npm`. One-time system setup (Homebrew installs Terraform, AWS CLI,
+Node, the pinned Flutter via FVM, Melos, Python), idempotent and re-runnable:
 
 ```bash
-fvm install                 # install the pinned Flutter
-melos bootstrap             # resolve the workspace packages (tokens + app)
-melos run ci                # token drift + format-check + analyze + test the workspace
-
-# The design system resolves OUTSIDE the workspace (consumers pin its git tag
-# — see docs/PACKAGE_PUBLISHING.md), so melos does not cover it:
-cd packages/insolvia_design_system
-fvm flutter pub get && fvm flutter analyze && fvm flutter test
-cd ../..
-
-# Run the app locally
-cd apps/insolvia_app
-fvm flutter run -d chrome   --dart-define=INSOLVIA_ENV=local   # web
-fvm flutter run -d macos    --dart-define=INSOLVIA_ENV=local   # desktop
+./scripts/dev-setup.sh          # add --check to report without installing
 ```
 
-## Builds
+Then set up and run whichever thing you're working on — each app/package/service
+has its own `scripts/dev-setup.sh` and `scripts/dev-up.sh`:
 
 ```bash
-cd apps/insolvia_app
-fvm flutter build web   --dart-define=INSOLVIA_ENV=staging     # -> build/web
-fvm flutter build macos --dart-define=INSOLVIA_ENV=staging     # -> build/macos/Build/Products/Release/insolvia_app.app
+apps/insolvia_app/scripts/dev-setup.sh   &&  apps/insolvia_app/scripts/dev-up.sh
+apps/insolvia_marketing/scripts/dev-setup.sh  &&  apps/insolvia_marketing/scripts/dev-up.sh
+services/api/scripts/dev-setup.sh  &&  services/api/scripts/dev-up.sh
 ```
 
-### Installing the macOS build (unsigned, for now)
+The full catalogue — including per-machine dev AWS resources and deploys — is in
+[`scripts/README.md`](scripts/README.md).
 
-The desktop app is **not yet code-signed/notarized**, so on first launch macOS
-Gatekeeper will block it. To open it: **right-click the app → Open → Open**. This
-is a one-time step per download. Signing/notarization is on the roadmap.
+**Prerequisites the scripts can't install for you:** [Docker
+Desktop](https://www.docker.com/products/docker-desktop/) (the services run in
+compose) and, for macOS desktop builds, full **Xcode** (Command Line Tools alone
+are not enough).
+
+### The macOS desktop build is unsigned (for now)
+
+`flutter build macos` produces an app that is **not yet code-signed/notarized**,
+so on first launch Gatekeeper blocks it: **right-click the app → Open → Open**
+(a one-time step per download). Signing/notarization is on the roadmap.
 
 ## Deployment
 

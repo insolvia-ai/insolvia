@@ -1,5 +1,5 @@
 ---
-name: aws-auth
+name: insolvia-aws-auth
 description: >-
   How AWS authentication works for the Insolvia repo, locally and in CI. Use
   this WHENEVER you are about to run — or are debugging — anything that touches
