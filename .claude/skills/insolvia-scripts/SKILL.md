@@ -26,7 +26,7 @@ installing).
 
 | Want to… | Run |
 |---|---|
-| Install the shared toolchain (Terraform, AWS CLI, Node ≥24, FVM+Flutter, Melos, Python 3.12) | `scripts/dev-setup.sh` |
+| Install the shared toolchain (Terraform, AWS CLI, Node ≥24, Flutter via Homebrew cask, Melos, Python 3.12) | `scripts/dev-setup.sh` |
 | Make a `read:packages` token available so `npm ci` can pull `@insolvia-ai/design-system` | `scripts/github-packages-auth.sh` |
 
 ## Run a package locally

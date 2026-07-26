@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run the Insolvia app with the FVM-pinned Flutter. Device selection is left to
+# Run the Insolvia app with the Homebrew Flutter. Device selection is left to
 # Flutter — it prompts when more than one device is available; pass `-d chrome`
 # / `-d macos` (or any `flutter run` flag) to choose directly.
 #
@@ -13,4 +13,4 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$APP_DIR"
-exec fvm flutter run "$@"
+exec flutter run "$@"

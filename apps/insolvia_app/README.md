@@ -10,7 +10,7 @@ any extra setup. To add another platform later (e.g. Windows or Linux), run from
 this directory with Flutter installed:
 
 ```bash
-fvm flutter create --platforms=windows,linux --org ai.insolvia --project-name insolvia_app .
+flutter create --platforms=windows,linux --org ai.insolvia --project-name insolvia_app .
 ```
 
 `flutter create` adds missing platform folders without touching existing `lib/`,
@@ -24,7 +24,7 @@ scripts/dev-up.sh               # flutter run (INSOLVIA_ENV=local; prompts for a
 scripts/dev-up.sh -d chrome     # any flutter run flag passes through
 ```
 
-To build a release artifact, `fvm flutter build web|macos
+To build a release artifact, `flutter build web|macos
 --dart-define=INSOLVIA_ENV=staging`; see the repo [`README.md`](../../README.md)
 for the unsigned-macOS install step. Working on the code? The agent rules for
 this app are in [`CLAUDE.md`](CLAUDE.md).

@@ -31,7 +31,29 @@ shared concerns (`routing/`, `config/`) alongside — not by technical layer.
   (`insolvia_design_system-v<version>`), never by path — see
   `docs/PACKAGE_PUBLISHING.md`.
 - **Task runner:** Melos (`melos.yaml`) — `melos bootstrap`, `melos run ci`.
-- **Flutter version:** pinned via FVM (`.fvmrc`).
+- **Flutter:** Homebrew cask `flutter` (latest stable); CI uses the same via
+  `subosito/flutter-action`. See *Flutter toolchain* below.
+
+## Flutter toolchain
+
+Flutter is the Homebrew cask `flutter` (latest stable), not FVM.
+`scripts/dev-setup.sh` runs `brew install --cask flutter`, and the `dart` bundled
+inside it powers Melos. CI installs the same latest stable via
+`subosito/flutter-action` (`channel: stable`), so local and CI share one channel
+— no pinned copy to drift.
+
+**Multi-user machines.** The cask installs the SDK to a shared prefix
+(`/opt/homebrew/share/flutter`) owned by whoever ran `brew`. Because the SDK is a
+git repo and Flutter shells out to git, a *second* user account hits
+`fatal: detected dubious ownership` and cannot write the SDK cache. To share one
+Flutter across users, trust it system-wide and make it group-writable (both
+accounts must share the group, e.g. `admin`):
+
+```bash
+sudo git config --system --add safe.directory /opt/homebrew/share/flutter
+sudo chgrp -R admin /opt/homebrew/share/flutter
+sudo chmod -R g+rwX /opt/homebrew/share/flutter
+```
 
 ## Environment model (staging vs production)
 
@@ -39,7 +61,7 @@ The app is a single binary/bundle configured at **build time** — no separate
 codepaths. Selection is via a compile-time define:
 
 ```bash
-fvm flutter build web --dart-define=INSOLVIA_ENV=staging      # or production, or local (default)
+flutter build web --dart-define=INSOLVIA_ENV=staging      # or production, or local (default)
 ```
 
 `apps/insolvia_app/lib/src/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed

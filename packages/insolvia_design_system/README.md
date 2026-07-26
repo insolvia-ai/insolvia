@@ -11,9 +11,9 @@ build on it. (The marketing site has its own React design system,
 This package resolves **outside** the pub workspace, so set it up standalone:
 
 ```bash
-scripts/dev-setup.sh            # standalone: fvm flutter pub get
-fvm flutter analyze
-fvm flutter test
+scripts/dev-setup.sh            # standalone: flutter pub get
+flutter analyze
+flutter test
 ```
 
 To see a change in the running app before publishing, add an *uncommitted*

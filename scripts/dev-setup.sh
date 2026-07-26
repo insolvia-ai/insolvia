@@ -3,7 +3,7 @@
 # Shared developer / CI toolchain bootstrap for the Insolvia monorepo.
 #
 # Installs the cross-cutting tools every package needs (Terraform, tflint, AWS
-# CLI, jq, Node.js, FVM + the pinned Flutter, Melos, Python 3.12) with Homebrew
+# CLI, jq, Node.js, Flutter (Homebrew cask), Melos, Python 3.12) with Homebrew
 # on BOTH macOS and Linux. Package-specific setup lives in per-package scripts,
 # e.g. services/api/scripts/dev-setup.sh (venv + pip).
 #
@@ -14,12 +14,13 @@
 #     non-root `ubuntu` user, and every `brew` call is run as that user via
 #     sudo. The prefix bin is added to PATH (this run + /etc/profile.d) so root
 #     and CI agents can execute the installed tools.
-#   - terraform, tflint, and fvm are NOT in homebrew-core; they come from taps
-#     (hashicorp/tap, terraform-linters/tap, leoafarias/fvm) on every platform.
+#   - terraform and tflint are NOT in homebrew-core; they come from taps
+#     (hashicorp/tap, terraform-linters/tap) on every platform.
 #
 # Toolchain pins (each is read from the file that owns it — update there, not
 # here):
-#   - Flutter: .fvmrc (currently the `stable` channel) via FVM.
+#   - Flutter: Homebrew cask `flutter` (latest stable). CI installs the same
+#     latest stable via subosito/flutter-action, so local and CI share a channel.
 #   - Melos:   root pubspec.yaml dev_dependencies (`melos: ^6.3.0`), activated
 #     globally so `melos bootstrap` / `melos run ...` work from any shell.
 #   - Node:    >= 24, matching `engines.node` in apps/insolvia_marketing and
@@ -123,62 +124,40 @@ brew_ensure() {
   brew_run install "$formula"
 }
 
-# --- Flutter via FVM --------------------------------------------------------
-# .fvmrc is the single source of truth for the Flutter pin; `fvm install` run
-# at the repo root reads it. The cache probe below only decides whether that
-# (idempotent but slow) call is needed at all — and lets --check answer without
-# touching the network.
-fvm_pin() {
-  sed -n 's/.*"flutter"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_ROOT/.fvmrc" | head -n1
-}
-
-fvm_flutter_cached() {
-  local pin="$1"
-  [[ -n "$pin" ]] || return 1
-  local cache="${FVM_CACHE_PATH:-$HOME/fvm}"
-  [[ -d "$cache/versions/$pin" ]]
-}
-
+# --- Flutter via Homebrew cask ----------------------------------------------
+# Flutter is a Homebrew *cask* that tracks the latest stable channel and updates
+# itself. CI installs the same latest stable via subosito/flutter-action
+# (channel: stable), so local and CI stay on one channel without a pinned copy.
+#
+# Multi-user note: the cask installs the SDK to a shared prefix owned by whoever
+# ran brew. For a second user to run it, that SDK must be trusted by git and
+# group-writable — see docs/ARCHITECTURE.md § "Flutter toolchain".
 ensure_flutter() {
-  local pin
-  pin="$(fvm_pin)"
-  if [[ -z "$pin" ]]; then
-    warn "could not parse the Flutter pin from .fvmrc — skipping 'fvm install'."
-    return 0
-  fi
-  if ! have fvm; then
-    # brew_ensure above already warned in --check mode; nothing more to say.
-    [[ "$CHECK_ONLY" -eq 1 ]] && warn "Flutter '$pin' cannot be checked without fvm"
-    return 0
-  fi
-  if fvm_flutter_cached "$pin"; then
-    skip "Flutter ($pin)" "${FVM_CACHE_PATH:-$HOME/fvm}/versions/$pin"
-    return 0
-  fi
+  if have flutter; then skip flutter "$(command -v flutter)"; return 0; fi
   if [[ "$CHECK_ONLY" -eq 1 ]]; then
-    warn "Flutter '$pin' is MISSING from the FVM cache (would: fvm install, per .fvmrc)"
+    warn "flutter is MISSING (would: brew install --cask flutter)"
     return 0
   fi
-  log "installing Flutter '$pin' via fvm (reads .fvmrc) ..."
-  (cd "$REPO_ROOT" && fvm install)
+  log "installing Flutter (brew cask) ..."
+  brew_run install --cask flutter
 }
 
 # --- Melos (Dart pub global) ------------------------------------------------
 # Pinned as a dev dependency in the root pubspec.yaml (melos: ^6.3.0); the
-# global activation is what puts `melos` on PATH for day-to-day use. Requires
-# the FVM-managed Flutter (for `dart`) to exist first.
+# global activation is what puts `melos` on PATH for day-to-day use. Uses the
+# `dart` that ships inside the Homebrew Flutter, so Flutter must exist first.
 ensure_melos() {
   if have melos; then skip melos "$(command -v melos)"; return 0; fi
   if [[ "$CHECK_ONLY" -eq 1 ]]; then
-    warn "melos is MISSING (would: fvm dart pub global activate melos)"
+    warn "melos is MISSING (would: dart pub global activate melos)"
     return 0
   fi
-  if ! have fvm || ! fvm_flutter_cached "$(fvm_pin)"; then
-    warn "cannot activate melos: the FVM-managed Flutter is not installed yet."
+  if ! have dart; then
+    warn "cannot activate melos: Flutter (which provides dart) is not installed yet."
     return 1
   fi
   log "activating melos (dart pub global) ..."
-  (cd "$REPO_ROOT" && fvm dart pub global activate melos)
+  dart pub global activate melos
   # pub puts global executables here; without it on PATH `melos` stays invisible.
   local pub_bin="$HOME/.pub-cache/bin"
   if ! have melos; then
@@ -199,7 +178,6 @@ brew_ensure tflint    terraform-linters/tap/tflint
 brew_ensure aws       awscli
 brew_ensure jq        jq
 brew_ensure node      node
-brew_ensure fvm       leoafarias/fvm/fvm
 ensure_flutter
 ensure_melos
 brew_ensure python3.12 python@3.12

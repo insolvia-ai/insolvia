@@ -19,9 +19,6 @@ doc/api/
 coverage/
 *.log
 
-# FVM
-.fvm/flutter_sdk
-
 # ── macOS build / Xcode ─────────────────────────────────────────
 **/macos/Flutter/ephemeral/
 **/macos/Pods/

@@ -9,7 +9,7 @@ Two layers — a shared base plus thin per-package scripts:
 
 | Script | Scope | Does |
 |---|---|---|
-| `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), FVM + the `.fvmrc`-pinned Flutter, Melos, Python 3.12 (+ Docker check) |
+| `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Flutter (Homebrew cask), Melos, Python 3.12 (+ Docker check) |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
@@ -19,8 +19,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/AWS_SETUP.md` § "The ci-trust anchor". |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
-| `apps/insolvia_app/scripts/dev-setup.sh` | Flutter app | Shared base → workspace `fvm flutter pub get` at the repo root; `dev-up.sh` runs `fvm flutter run` |
-| `packages/insolvia_design_system/scripts/dev-setup.sh` | Flutter design system | Shared base → **standalone** `fvm flutter pub get` in the package (it is outside the pub workspace, on purpose) |
+| `apps/insolvia_app/scripts/dev-setup.sh` | Flutter app | Shared base → workspace `flutter pub get` at the repo root; `dev-up.sh` runs `flutter run` |
+| `packages/insolvia_design_system/scripts/dev-setup.sh` | Flutter design system | Shared base → **standalone** `flutter pub get` in the package (it is outside the pub workspace, on purpose) |
 | `packages/insolvia_design_system_react/scripts/dev-setup.sh` | React design system | Shared base → `npm ci`; `dev-up.sh` runs Storybook |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
@@ -44,14 +44,16 @@ anything; per-package scripts pass it through to the shared base.
   `/etc/profile.d/homebrew.sh`, so root and CI agents can execute the tools.
 
 Notes:
-- **Terraform**, **tflint**, and **FVM** are not in homebrew-core; the scripts
-  install them from taps (`hashicorp/tap/terraform`,
-  `terraform-linters/tap/tflint`, `leoafarias/fvm/fvm`) on every platform.
-- **Flutter** is never installed directly — `fvm install` at the repo root
-  reads the pin from `.fvmrc`, so bumping Flutter is a one-file change.
-- **Melos** is pinned in the root `pubspec.yaml` (`melos: ^6.3.0`) and
-  activated globally with `fvm dart pub global activate melos`; make sure
-  `~/.pub-cache/bin` is on `PATH`.
+- **Terraform** and **tflint** are not in homebrew-core; the scripts install
+  them from taps (`hashicorp/tap/terraform`, `terraform-linters/tap/tflint`) on
+  every platform.
+- **Flutter** is the Homebrew cask `flutter` (latest stable). CI installs the
+  same latest stable via `subosito/flutter-action` (`channel: stable`), so local
+  and CI track one channel. On a machine with more than one user account, see
+  `docs/ARCHITECTURE.md` § "Flutter toolchain" for the shared-SDK permission fix.
+- **Melos** is pinned in the root `pubspec.yaml` (`melos: ^6.3.0`) and activated
+  globally with `dart pub global activate melos` (the `dart` bundled in Flutter);
+  make sure `~/.pub-cache/bin` is on `PATH`.
 - **Python 3.12** matches `services/api` (pyproject `requires-python` and the
   `public.ecr.aws/lambda/python:3.12` base image); the venv itself is created
   by the service's script, not the shared base.

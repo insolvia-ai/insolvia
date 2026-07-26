@@ -26,8 +26,8 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 ## Getting started
 
 The `scripts/` directory is the toolchain — prefer it over hand-running
-`fvm`/`melos`/`npm`. One-time system setup (Homebrew installs Terraform, AWS CLI,
-Node, the pinned Flutter via FVM, Melos, Python), idempotent and re-runnable:
+`flutter`/`melos`/`npm`. One-time system setup (Homebrew installs Terraform, AWS
+CLI, Node, Flutter, Melos, Python), idempotent and re-runnable:
 
 ```bash
 ./scripts/dev-setup.sh          # add --check to report without installing
