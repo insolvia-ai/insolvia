@@ -244,11 +244,11 @@ packages:
     dependency: transitive
     description:
       path: "packages/insolvia_design_system"
-      ref: "insolvia_design_system-v0.1.1"
-      resolved-ref: e4c2716685b4c5c9ca805760ec98bf77ddd88e78
+      ref: "insolvia_design_system-v0.1.2"
+      resolved-ref: "8b90708069626285325ac2f04291efc2730d7ef2"
       url: "https://github.com/insolvia-ai/insolvia.git"
     source: git
-    version: "0.1.1"
+    version: "0.1.2"
   io:
     dependency: transitive
     description:
