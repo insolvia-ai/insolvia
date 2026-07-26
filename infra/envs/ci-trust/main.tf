@@ -89,10 +89,17 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Accept BOTH subject forms. The org enforces immutable subject claims, so
+    # tokens carry the numeric-id `sub` (github_immutable_sub_prefix); the
+    # mutable `owner/name` form is kept too so this keeps working if immutable
+    # enforcement is ever disabled. StringLike over a list is an OR.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:*"]
+      values = [
+        "${var.github_immutable_sub_prefix}:*",
+        "repo:${var.github_repo}:*",
+      ]
     }
   }
 }
