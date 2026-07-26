@@ -1,5 +1,4 @@
 import pytest
-
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app

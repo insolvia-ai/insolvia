@@ -146,7 +146,10 @@ def _attachments(store: AwsStore, manifest: dict[str, Any]) -> list[AttachmentCo
 def _service_for_manifest(
     registry: dict[str, ServiceConfig], manifest: dict[str, Any]
 ) -> ServiceConfig:
-    service = registry.get(manifest.get("service_id"))
+    service_id = manifest.get("service_id")
+    if not isinstance(service_id, str):
+        raise ValidationError("manifest service is not registered")
+    service = registry.get(service_id)
     if not service:
         raise ValidationError("manifest service is not registered")
     return service

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 
 from insolvia_mailer.api.dependencies import authorized_service, dependencies
 from insolvia_mailer.api.request_body import json_body
@@ -14,7 +15,7 @@ blueprint = Blueprint("suppressions", __name__)
 
 
 @blueprint.post("/v1/services/<service_id>/suppressions")
-def add_suppression(service_id: str):
+def add_suppression(service_id: str) -> ResponseReturnValue:
     """Stop sending to an address (issue #80 / 6.8).
 
     SigV4-authenticated exactly like POST /v1/services/<id>/messages — same

@@ -64,7 +64,8 @@ class MemoryDeliveryWorker:
                 )
             except Exception:
                 logger.exception(
-                    "development email capture failed service_id=%s application_message_id=%s",
+                    "development email capture failed "
+                    "service_id=%s application_message_id=%s",
                     delivery.service.service_id,
                     delivery.request.application_message_id,
                 )

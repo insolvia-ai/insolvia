@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from flask import current_app
 
@@ -23,4 +24,4 @@ class ApiDependencies:
 
 
 def dependencies() -> ApiDependencies:
-    return current_app.extensions["insolvia_api_dependencies"]
+    return cast("ApiDependencies", current_app.extensions["insolvia_api_dependencies"])

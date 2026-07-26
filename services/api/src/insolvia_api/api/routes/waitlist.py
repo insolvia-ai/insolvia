@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.errors import ValidationError
@@ -17,7 +18,7 @@ MAX_REQUEST_BYTES = 64 * 1024
 
 
 @blueprint.post("/v1/waitlist")
-def submit_waitlist():
+def submit_waitlist() -> ResponseReturnValue:
     """Accept a marketing-site waitlist submission.
 
     Deliberately UNAUTHENTICATED — this is the public waitlist endpoint the

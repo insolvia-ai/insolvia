@@ -2,12 +2,13 @@ import hashlib
 import importlib
 import sys
 import time
+from typing import ClassVar
 
 import pytest
 
 
 class FakeSmtp:
-    messages = []
+    messages: ClassVar[list] = []
 
     def __init__(self, *_args, **_kwargs):
         pass

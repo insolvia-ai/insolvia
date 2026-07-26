@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from flask import Flask, jsonify
+from flask.typing import ResponseReturnValue
 
 from insolvia_mailer.api.dependencies import ApiDependencies
 from insolvia_mailer.api.routes.attachments import blueprint as attachments_blueprint
@@ -29,34 +30,34 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(suppressions_blueprint)
 
     @app.get("/health")
-    def health():
+    def health() -> ResponseReturnValue:
         return jsonify({"status": "ok"})
 
     @app.errorhandler(AuthorizationError)
-    def authorization_error(error: AuthorizationError):
+    def authorization_error(error: AuthorizationError) -> ResponseReturnValue:
         return jsonify({"error": "Forbidden", "message": str(error)}), 403
 
     @app.errorhandler(ConflictError)
-    def conflict_error(error: ConflictError):
+    def conflict_error(error: ConflictError) -> ResponseReturnValue:
         return jsonify({"error": "Conflict", "message": str(error)}), 409
 
     @app.errorhandler(ValidationError)
-    def validation_error(error: ValidationError):
+    def validation_error(error: ValidationError) -> ResponseReturnValue:
         return jsonify({"error": "ValidationError", "message": str(error)}), 400
 
     @app.errorhandler(RetryableError)
-    def retryable_error(_error: RetryableError):
+    def retryable_error(_error: RetryableError) -> ResponseReturnValue:
         logger.exception("retryable Mailer admission failure")
         return jsonify(
             {"error": "Unavailable", "message": "admission is unavailable"}
         ), 503
 
     @app.errorhandler(MailerError)
-    def mailer_error(error: MailerError):
+    def mailer_error(error: MailerError) -> ResponseReturnValue:
         return jsonify({"error": error.__class__.__name__, "message": str(error)}), 400
 
     @app.errorhandler(Exception)
-    def unexpected_error(_error: Exception):
+    def unexpected_error(_error: Exception) -> ResponseReturnValue:
         logger.exception("unexpected Mailer API failure")
         return jsonify({"error": "InternalError", "message": "request failed"}), 500
 

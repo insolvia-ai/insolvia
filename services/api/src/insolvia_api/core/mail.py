@@ -149,7 +149,8 @@ def _html_document(
         f'<div style="font-family:{_FONT_BODY};font-size:15px;line-height:1.6;'
         f'color:{_COLOR_INK};">{body_html}</div>'
         "</td></tr>"
-        f'<tr><td style="padding:24px 32px 32px 32px;border-top:1px solid {_COLOR_LINE};">'
+        f'<tr><td style="padding:24px 32px 32px 32px;'
+        f'border-top:1px solid {_COLOR_LINE};">'
         f'<p style="font-family:{_FONT_BODY};font-size:12px;color:{_COLOR_MUTED};'
         'margin:0 0 4px 0;">Insolvia &mdash; bankruptcy case preparation &amp; '
         "e-filing</p>"

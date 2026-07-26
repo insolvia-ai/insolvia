@@ -35,4 +35,4 @@ app = create_app(
         mailer=mailer,
     )
 )
-handler = Mangum(WsgiToAsgi(app), lifespan="off")
+handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

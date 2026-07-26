@@ -1,5 +1,4 @@
 import pytest
-
 from insolvia_api.core.mail import (
     email_verification_email,
     links_for,

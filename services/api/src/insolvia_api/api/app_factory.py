@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import time
 
-from flask import Flask, g, jsonify, request
+from flask import Flask, Response, g, jsonify, request
+from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
@@ -34,11 +35,11 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     config = dependencies.config
 
     @app.before_request
-    def start_request_timer():
+    def start_request_timer() -> None:
         g.insolvia_request_started = time.perf_counter()
 
     @app.after_request
-    def finalize_response(response):
+    def finalize_response(response: Response) -> Response:
         # --- CORS (issue #68): config-driven per-environment allowlist. ---
         # A matched Origin is echoed back exactly; anything else — including
         # a missing Origin — gets no Access-Control-* headers at all. The
@@ -76,20 +77,20 @@ def create_app(dependencies: ApiDependencies) -> Flask:
         return response
 
     @app.errorhandler(FieldValidationError)
-    def field_validation_error(error: FieldValidationError):
+    def field_validation_error(error: FieldValidationError) -> ResponseReturnValue:
         # The shape the marketing action surfaces per-field: {error, fields}.
         return jsonify({"error": "ValidationError", "fields": error.fields}), 400
 
     @app.errorhandler(ValidationError)
-    def validation_error(error: ValidationError):
+    def validation_error(error: ValidationError) -> ResponseReturnValue:
         return jsonify({"error": "ValidationError", "message": str(error)}), 400
 
     @app.errorhandler(ApiError)
-    def api_error(error: ApiError):
+    def api_error(error: ApiError) -> ResponseReturnValue:
         return jsonify({"error": error.__class__.__name__, "message": str(error)}), 400
 
     @app.errorhandler(Exception)
-    def unexpected_error(error: Exception):
+    def unexpected_error(error: Exception) -> ResponseReturnValue:
         if isinstance(error, HTTPException):
             return error
         logger.exception("unexpected Insolvia API failure")

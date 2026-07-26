@@ -130,10 +130,10 @@ def _string(value: Any, name: str, *, maximum: int, required: bool = True) -> st
 
 
 def _identifier(value: Any, name: str) -> str:
-    value = _string(value, name, maximum=200)
-    if not ID_PATTERN.fullmatch(value):
+    text = _string(value, name, maximum=200)
+    if not ID_PATTERN.fullmatch(text):
         raise ValidationError(f"{name} contains unsupported characters")
-    return value
+    return text
 
 
 def _only_keys(value: dict[str, Any], allowed: set[str]) -> None:

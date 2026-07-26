@@ -1,7 +1,6 @@
 import uuid
 
 import pytest
-
 from insolvia_api.core.errors import FieldValidationError
 from insolvia_api.core.waitlist import (
     WaitlistRecord,

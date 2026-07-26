@@ -3,7 +3,7 @@
 # Run the mailer's lint + format + test gate locally — the same commands, in
 # the same order, as the `Mailer service` job in
 # .github/workflows/mailer-pr.yml:
-#   ruff check .  →  ruff format --check .  →  pytest
+#   ruff check .  →  ruff format --check .  →  mypy  →  pytest
 # (CI additionally builds the Lambda image; run that separately with
 #  `docker build --target lambda services/mailer` when touching packaging.)
 #
@@ -24,5 +24,6 @@ fi
 cd "$MAILER_DIR"
 "$VENV/bin/ruff" check .
 "$VENV/bin/ruff" format --check .
+"$VENV/bin/mypy"
 "$VENV/bin/pytest"
 printf '\033[1;32m[ ok ]\033[0m lint, format, and tests all green.\n'

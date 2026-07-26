@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.policy import SMTP
+from typing import cast
 
 from insolvia_mailer.core.config import ServiceConfig
 from insolvia_mailer.core.errors import ValidationError
@@ -51,7 +52,8 @@ def build_message(
         message["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     message.set_content(request.text_body)
     message.add_alternative(request.html_body, subtype="html")
-    html_part = message.get_payload()[-1]
+    parts = cast("list[EmailMessage]", message.get_payload())
+    html_part = parts[-1]
 
     for attachment in attachments:
         maintype, subtype = attachment.content_type.split("/", 1)

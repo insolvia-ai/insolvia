@@ -10,7 +10,6 @@ from __future__ import annotations
 import base64
 
 import pytest
-
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
@@ -18,7 +17,7 @@ from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import AppConfig, load_config
 from insolvia_api.core.errors import ValidationError
 from insolvia_api.core.unsubscribe import (
-    UnsubscribeSecretMissing,
+    UnsubscribeSecretMissingError,
     mint_token,
     token_age_seconds,
     unsubscribe_url,
@@ -103,16 +102,16 @@ def test_refuses_to_mint_without_a_secret():
     # A missing secret must never degrade to "unsigned tokens are fine" —
     # that would make every made-up token valid. And it is not a
     # ValidationError, because the caller did nothing wrong.
-    with pytest.raises(UnsubscribeSecretMissing):
+    with pytest.raises(UnsubscribeSecretMissingError):
         mint_token(ADDRESS, secret="")
 
-    assert not issubclass(UnsubscribeSecretMissing, ValidationError)
+    assert not issubclass(UnsubscribeSecretMissingError, ValidationError)
 
 
 def test_refuses_to_verify_without_a_secret():
     token = mint_token(ADDRESS, secret=SECRET)
 
-    with pytest.raises(UnsubscribeSecretMissing):
+    with pytest.raises(UnsubscribeSecretMissingError):
         verify_token(token, secret="")
 
 

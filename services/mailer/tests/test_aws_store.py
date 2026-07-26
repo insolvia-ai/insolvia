@@ -1,6 +1,5 @@
 import pytest
 from botocore.exceptions import ClientError
-
 from insolvia_mailer.adapters.aws.store import AwsStore
 from insolvia_mailer.core.config import ServiceConfig
 from insolvia_mailer.core.errors import ConflictError

@@ -11,3 +11,16 @@ dependencies = []
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+# Strict static type checking (mirrors the CI `mypy` step). Scoped to `src`;
+# tests exercise fakes/monkeypatching where --strict is noise, not signal.
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["boto3.*", "botocore.*", "mangum.*"]
+ignore_missing_imports = true

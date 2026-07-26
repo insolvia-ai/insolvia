@@ -4,7 +4,6 @@ import json
 
 import pytest
 from botocore.credentials import Credentials
-
 from insolvia_api.adapters.aws.mailer_client import (
     MailerRequestError,
     SigV4MailerClient,

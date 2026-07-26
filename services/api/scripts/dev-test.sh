@@ -2,7 +2,7 @@
 #
 # Run the API's lint + format + test gate locally — the same commands, in the
 # same order, as the `API service` job in .github/workflows/api-pr.yml:
-#   ruff check .  →  ruff format --check .  →  pytest
+#   ruff check .  →  ruff format --check .  →  mypy  →  pytest
 # (CI additionally builds the Lambda image; run that separately with
 #  `docker build --target lambda services/api` when touching packaging.)
 #
@@ -23,5 +23,6 @@ fi
 cd "$API_DIR"
 "$VENV/bin/ruff" check .
 "$VENV/bin/ruff" format --check .
+"$VENV/bin/mypy"
 "$VENV/bin/pytest"
 printf '\033[1;32m[ ok ]\033[0m lint, format, and tests all green.\n'

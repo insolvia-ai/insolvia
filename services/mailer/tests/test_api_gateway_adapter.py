@@ -2,8 +2,6 @@ import asyncio
 import json
 
 from asgiref.wsgi import WsgiToAsgi
-from mangum import Mangum
-
 from insolvia_mailer.adapters.aws.auth import (
     IamAuthorizer,
     reset_principal,
@@ -12,6 +10,7 @@ from insolvia_mailer.adapters.aws.auth import (
 from insolvia_mailer.api.app_factory import create_app
 from insolvia_mailer.api.dependencies import ApiDependencies
 from insolvia_mailer.core.config import ServiceConfig
+from mangum import Mangum
 
 
 class RecordingStore:

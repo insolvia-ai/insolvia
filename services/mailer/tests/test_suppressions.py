@@ -9,7 +9,6 @@ actually lands on).
 from __future__ import annotations
 
 import pytest
-
 from insolvia_mailer.adapters.memory.auth import RegisteredServiceAuthorizer
 from insolvia_mailer.adapters.memory.config import load_service_registry
 from insolvia_mailer.adapters.memory.store import MemoryStore

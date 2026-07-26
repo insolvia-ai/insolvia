@@ -1,7 +1,6 @@
 import hashlib
 
 import pytest
-
 from insolvia_mailer.core.config import ServiceConfig
 from insolvia_mailer.core.errors import ValidationError
 from insolvia_mailer.core.models import AttachmentUploadRequest, MessageRequest

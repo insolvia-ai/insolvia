@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 import boto3
 from botocore.exceptions import ClientError
@@ -43,7 +43,7 @@ def _unwrap(record: dict[str, Any]) -> dict[str, Any]:
     body = json.loads(record["body"])
     if "Message" in body:
         body = json.loads(body["Message"])
-    return body
+    return cast("dict[str, Any]", body)
 
 
 def _tag(tags: dict[str, Any], name: str) -> str | None:
@@ -79,7 +79,7 @@ def _suppresses_recipient(payload: dict[str, Any], status: str) -> bool:
 
 
 def _event_identity(
-    payload: dict[str, Any], registry: dict, config_sets: dict[str, str]
+    payload: dict[str, Any], registry: dict[str, Any], config_sets: dict[str, str]
 ) -> tuple[Any, str, str, str]:
     mail = payload.get("mail", {})
     tags = mail.get("tags", {})
@@ -95,6 +95,8 @@ def _event_identity(
         application_id = f"auth_{mail.get('messageId')}"
         category = "authentication"
         message_class = "authentication"
+    if not service_id:
+        raise ValueError("SES event cannot be mapped to a registered service")
     service = registry.get(service_id)
     if not service or not application_id or not category or not message_class:
         raise ValueError("SES event cannot be mapped to a registered service")
@@ -190,7 +192,7 @@ def _update_message(
 
 
 def _process(
-    record: dict[str, Any], registry: dict, config_sets: dict[str, str]
+    record: dict[str, Any], registry: dict[str, Any], config_sets: dict[str, str]
 ) -> None:
     payload = _unwrap(record)
     event_type = payload.get("eventType") or payload.get("notificationType")

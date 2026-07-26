@@ -228,7 +228,10 @@ class AwsStore:
             "attachments": attachments,
         }
         manifest_bytes = canonical_json(manifest)
-        manifest_key = f"requests/{service.service_id}/{message.application_message_id}/manifest.json"
+        manifest_key = (
+            f"requests/{service.service_id}/"
+            f"{message.application_message_id}/manifest.json"
+        )
         digest = hashlib.sha256(manifest_bytes).hexdigest()
         self.s3.put_object(
             Bucket=self.bucket,

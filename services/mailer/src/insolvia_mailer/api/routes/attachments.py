@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from insolvia_mailer.api.dependencies import authorized_service, dependencies
 from insolvia_mailer.api.request_body import json_body
@@ -11,7 +12,7 @@ blueprint = Blueprint("attachments", __name__)
 
 
 @blueprint.post("/v1/services/<service_id>/attachment-uploads")
-def attachment_upload(service_id: str):
+def attachment_upload(service_id: str) -> ResponseReturnValue:
     service = authorized_service(service_id)
     upload = AttachmentUploadRequest.from_dict(json_body())
     response = dependencies().store.register_attachment(
@@ -23,7 +24,7 @@ def attachment_upload(service_id: str):
 
 
 @blueprint.put("/v1/development-uploads/<token>")
-def development_upload(token: str):
+def development_upload(token: str) -> ResponseReturnValue:
     receiver = dependencies().attachment_receiver
     if receiver is None:
         raise ValidationError("development attachment uploads are unavailable")

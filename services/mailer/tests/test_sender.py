@@ -1,7 +1,6 @@
 from io import BytesIO
 
 import pytest
-
 from insolvia_mailer.core.errors import AttachmentBlockedError, RetryableError
 from insolvia_mailer.entrypoints.sender_lambda import _attachments
 

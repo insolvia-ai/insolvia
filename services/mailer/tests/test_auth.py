@@ -1,5 +1,4 @@
 import pytest
-
 from insolvia_mailer.adapters.aws.auth import (
     IamAuthorizer,
     authorize,

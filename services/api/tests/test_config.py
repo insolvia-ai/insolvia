@@ -1,5 +1,4 @@
 import pytest
-
 from insolvia_api.core.config import AppConfig, load_config
 from insolvia_api.core.errors import ValidationError
 

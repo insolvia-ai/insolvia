@@ -84,7 +84,7 @@ def _signature(payload: bytes, secret: str) -> bytes:
     return hmac.new(secret.encode("utf-8"), payload, sha256).digest()
 
 
-class UnsubscribeSecretMissing(RuntimeError):
+class UnsubscribeSecretMissingError(RuntimeError):
     """No signing key is configured.
 
     Deliberately NOT an ApiError: every ApiError subclass maps to a 400, and a
@@ -98,7 +98,7 @@ def _require_secret(secret: str | None) -> str:
     if not secret:
         # A missing secret must never degrade to "no signature required" —
         # that would turn every token into a valid one.
-        raise UnsubscribeSecretMissing("unsubscribe secret is not configured")
+        raise UnsubscribeSecretMissingError("unsubscribe secret is not configured")
     return secret
 
 

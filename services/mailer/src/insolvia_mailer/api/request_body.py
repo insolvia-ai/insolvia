@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from typing import Any
+
 from flask import request
 
 from insolvia_mailer.core.errors import ValidationError
 from insolvia_mailer.core.models import MAX_REQUEST_BYTES
 
 
-def json_body() -> dict:
+def json_body() -> dict[str, Any]:
     if request.content_length and request.content_length > MAX_REQUEST_BYTES:
         raise ValidationError("request exceeds 4 MiB")
     value = request.get_json(silent=True)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.errors import ValidationError
@@ -20,7 +21,7 @@ _REASON = "unsubscribe"
 
 
 @blueprint.post("/v1/unsubscribe")
-def submit_unsubscribe():
+def submit_unsubscribe() -> ResponseReturnValue:
     """Honour an unsubscribe link (issue #80 / 6.8).
 
     Deliberately UNAUTHENTICATED in the AWS sense, like POST /v1/waitlist:

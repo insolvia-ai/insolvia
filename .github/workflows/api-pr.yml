@@ -54,6 +54,10 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: ruff format --check .
 
+      - name: Type check
+        if: steps.filter.outputs.run == 'true'
+        run: mypy
+
       - name: Test
         if: steps.filter.outputs.run == 'true'
         run: pytest

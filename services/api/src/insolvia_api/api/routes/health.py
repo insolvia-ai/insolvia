@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify
+from flask.typing import ResponseReturnValue
 
 from insolvia_api import __version__
 from insolvia_api.api.dependencies import dependencies
@@ -10,7 +11,7 @@ blueprint = Blueprint("health", __name__)
 
 
 @blueprint.get("/health")
-def health():
+def health() -> ResponseReturnValue:
     return jsonify(
         {
             "status": "ok",

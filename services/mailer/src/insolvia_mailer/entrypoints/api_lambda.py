@@ -25,7 +25,7 @@ app = create_app(
         authorizer=IamAuthorizer(),
     )
 )
-_mangum_handler = Mangum(WsgiToAsgi(app), lifespan="off")
+_mangum_handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
