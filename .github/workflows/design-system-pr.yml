@@ -126,7 +126,7 @@ jobs:
 
       - name: Analyze tokens
         if: steps.filter.outputs.run == 'true'
-        run: dart analyze packages/insolvia_tokens
+        run: dart analyze --fatal-infos packages/insolvia_tokens
 
       - name: Analyze design system
         if: steps.filter.outputs.run == 'true'

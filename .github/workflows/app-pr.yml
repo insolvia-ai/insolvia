@@ -57,7 +57,7 @@ jobs:
         run: dart format --output=none --set-exit-if-changed apps/insolvia_app
       - name: Analyze
         if: steps.filter.outputs.run == 'true'
-        run: dart analyze apps/insolvia_app
+        run: dart analyze --fatal-infos apps/insolvia_app
       - name: Test
         if: steps.filter.outputs.run == 'true'
         run: flutter test

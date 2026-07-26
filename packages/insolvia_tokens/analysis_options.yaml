@@ -5,6 +5,7 @@ include: package:lints/recommended.yaml
 analyzer:
   language:
     strict-casts: true
+    strict-inference: true
     strict-raw-types: true
   errors:
     always_declare_return_types: error
@@ -14,4 +15,5 @@ linter:
   rules:
     - prefer_single_quotes
     - avoid_print
+    - prefer_const_constructors
     - prefer_final_locals
