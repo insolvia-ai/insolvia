@@ -37,6 +37,7 @@ area's rules — it auto-loads when you work there; read it before editing) and 
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding a new package/app/service | `insolvia-new-package` skill |
+| **changing either design-system package** | `insolvia-design-system-pr` skill — **its own PR + a version bump** |
 | publishing a package / bumping versions | [`docs/PACKAGE_PUBLISHING.md`](docs/PACKAGE_PUBLISHING.md) |
 | touching env model, hosting, or PR-gate design | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | touching Terraform state / naming / deploy order | [`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md) |

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Flutter design-system developer bootstrap: shared tools, then a STANDALONE
-# `flutter pub get` inside the package.
+# `fvm flutter pub get` inside the package.
 #
 # This package is deliberately NOT a pub workspace member — pub silently
 # rewrites a workspace member's dependency back to the local path, which would
@@ -31,15 +31,15 @@ log "checking shared developer dependencies..."
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   "$REPO_ROOT/scripts/dev-setup.sh" --check
   if [[ -f "$PKG_DIR/pubspec.lock" ]]; then
-    ok "package resolved (pubspec.lock present; would still: flutter pub get)."
+    ok "package resolved (pubspec.lock present; would still: fvm flutter pub get)."
   else
-    warn "package not resolved (would: flutter pub get in the package)."
+    warn "package not resolved (would: fvm flutter pub get in the package)."
   fi
   exit 0
 fi
 "$REPO_ROOT/scripts/dev-setup.sh"
 
 log "resolving the package standalone (outside the workspace)..."
-(cd "$PKG_DIR" && flutter pub get)
+(cd "$PKG_DIR" && fvm flutter pub get)
 
-ok "design system is ready. Test it with: (cd packages/insolvia_design_system && flutter test)"
+ok "design system is ready. Test it with: (cd packages/insolvia_design_system && fvm flutter test)"
