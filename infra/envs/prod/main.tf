@@ -103,7 +103,17 @@ module "mailer" {
   enable_attachment_scanning = false
   ecr_repository_url         = data.aws_ecr_repository.service["mailer"].repository_url
   image_tag                  = local.environment
-  tags                       = local.common_tags
+
+  # LIVE, and deliberately live while the account is still in the SES sandbox
+  # (issue #80 / 6.8 tracks production access). Sandbox does not mean "cannot
+  # send" — it means SES only delivers to VERIFIED identities, and
+  # module.email in infra/envs/shared verifies the whole insolvia.ai DOMAIN.
+  # Every address at insolvia.ai is therefore already a valid recipient, so the
+  # real send path — SigV4 auth, queue, sender Lambda, SES call, feedback
+  # handling — is exercisable in prod today against an internal address. Mail
+  # to third-party domains is what the sandbox rejects, and that starts working
+  # the moment production access is granted, with no infrastructure change.
+  tags = local.common_tags
 }
 
 # Publish the mailer's URL into the API's own SSM config namespace (issue

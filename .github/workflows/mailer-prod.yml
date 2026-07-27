@@ -145,6 +145,29 @@ jobs:
             aws lambda wait function-updated --function-name "$function"
           done
 
+      # Keep the `prod` marker tag pointing at what prod actually runs.
+      # api-prod.yml and marketing-prod.yml already do this; without it here,
+      # `insolvia-mailer:prod` would stay pinned forever to the image that
+      # bootstrapped these Lambdas, while prod ran promoted digests. That tag
+      # is what a from-scratch apply seeds new Lambdas from (var.image_tag), so
+      # letting it go stale means a rebuilt prod mailer would come back on an
+      # image nobody has run for months — silently, and only in the one code
+      # path nobody exercises.
+      - name: Move the prod marker tag
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."
+
       - name: Smoke test
         env:
           DOMAIN: ${{ steps.tf.outputs.domain }}

@@ -964,7 +964,12 @@ resource "aws_iam_role_policy" "api_invoke" {
 # One kill switch per caller, generically named for the tenant it gates.
 # sender_lambda._enabled() reads this parameter's value
 # ("true"/"1"/"yes"/"enabled" all mean go) before every send.
-
+#
+# CAVEAT worth knowing before an incident: Terraform owns this value, so an
+# emergency flip made by hand in the console is REVERTED by the next apply of
+# this environment. Flipping by hand is still the right first move when mail
+# must stop now — just follow it with a PR, or the next apply silently turns
+# sending back on.
 resource "aws_ssm_parameter" "api_sending_enabled" {
   name  = "/${var.project}/${var.environment}/mailer/insolvia-api-sending-enabled"
   type  = "String"

@@ -28,6 +28,31 @@ single real attorney until this lands. It blocks every authenticated flow, not
 just a nice-to-have. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md) for why inbound is
 unaffected.
 
+### Any `@insolvia.ai` address is already a valid sandbox recipient
+
+Worth knowing before anyone adds per-address verification: a verified **domain**
+identity satisfies the sandbox's "verified identity" rule for *every* address
+under it, and `infra/modules/email` verifies the whole `insolvia.ai` domain
+(`aws_ses_domain_identity` + `aws_ses_domain_identity_verification`, applied
+from `infra/envs/shared`).
+
+So sending to an internal address — a developer or team mailbox at
+`insolvia.ai` — works in the sandbox today, in **both** environments, with no
+Terraform change and no per-address verification email to click. That is what
+makes the real send path (SigV4 → queue → sender Lambda → SES → feedback)
+exercisable end to end before production access is granted; only third-party
+recipients are rejected.
+
+Two things this does *not* do:
+
+- It does not create the mailbox. Inbound is Google Workspace
+  (see [`EMAIL_SETUP.md`](EMAIL_SETUP.md)), so the address must exist there as a
+  mailbox or group or the mail is accepted by SES and then bounces.
+- It does not put the address in this repo. **This repository is public**, and
+  the root `CLAUDE.md` forbids committing real mailbox addresses — so a test
+  recipient belongs in an uncommitted `*.tfvars`, an SSM `SecureString`, or
+  simply typed at the point of testing. Never hardcode one in Terraform.
+
 ---
 
 ## Pre-submission checklist
