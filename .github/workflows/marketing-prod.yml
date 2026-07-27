@@ -8,37 +8,74 @@ name: Marketing · Deploy · Production
 # "production + PR previews only"); Milestone 6 reversed that, and the reasoning
 # lives in marketing-staging.yml's header and docs/MVP_PLAN.md's D2.
 #
+# PROMOTES what staging validated — it does not build. The shared
+# insolvia-marketing repository (infra/envs/shared) already holds the image
+# staging tested, tagged `sha-<commit>`, and because the Dockerfile does
+# `COPY build ./build` that image carries BOTH the SSR server bundle and the
+# hashed client assets. This workflow resolves the tag to an immutable digest,
+# publishes the Lambda from it, and lifts the client assets straight out of the
+# same image — so the two can never disagree (see step 4's note on why
+# rebuilding the assets would 404 every request).
+#
+# The commit must have a successful `marketing-staging.yml` run before it can
+# ship (.github/actions/verified-commit), and the `insolvia-production`
+# environment's reviewers must approve if configured. Traffic moves last: the
+# candidate version is smoke-tested by its own version ARN before the `live`
+# alias shifts.
+#
 # This workflow is the only one that owns the apex: modules/marketing_site
 # takes apex_domain = null on staging, so the apex alias, records, and 301
 # exist here and nowhere else. That is what the apex smoke check below covers.
 #
 # FIRST-EVER DEPLOY (bootstrap — manual, once): the SSR Lambda cannot be
-# created until an image exists in the ECR repository, and this workflow's
-# full `terraform apply` creates both. Bootstrap from a merged main checkout
-# (see infra/modules/marketing_site/main.tf):
+# created until an image exists in the ECR repository. The repository is no
+# longer created by this env — `insolvia-marketing` is shared and lives in
+# infra/envs/shared, applied first (see infra/modules/marketing_site/main.tf):
 #
-#   terraform -chdir=infra/envs/prod apply \
-#     -target=module.marketing_site.aws_ecr_repository.ssr
-#   # build the app, docker build, push <marketing_ecr_repository_url>:<tag>
+#   terraform -chdir=infra/envs/shared apply    # creates insolvia-marketing
+#   # build the app, docker build, push <marketing_ecr_repository_url>:prod
 #   terraform -chdir=infra/envs/prod apply
 #
 # After that the Lambda's image_uri is lifecycle-ignored and this workflow owns
-# the running image via `aws lambda update-function-code`.
+# the running image.
 
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  # Also callable by the Release · Production orchestrator, which chains the
+  # services in a defined order. Same inputs as the manual dispatch above, so
+  # there is exactly one code path either way.
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
-  # The app installs @insolvia-ai/design-system from GitHub Packages; the
-  # job's GITHUB_TOKEN needs read access to pull it.
-  packages: read
+  # Reading the staging workflow's run conclusions. `packages: read` is gone
+  # with the build: nothing here installs from GitHub Packages any more.
+  actions: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/prod
-# (api-prod.yml, app-prod.yml) — the backend has no state locking, so
-# concurrent applies of one env race. See the matching comment in
-# api-staging.yml for the incident that proved it.
+# Retained even though this workflow no longer applies Terraform: it also
+# serializes against infra-prod.yml, so a promotion cannot land mid-apply.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false
@@ -52,27 +89,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── 1. Build the app ──────────────────────────────────────────
-      - uses: actions/setup-node@v4
+      - id: commit
+        uses: ./.github/actions/verified-commit
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/insolvia_marketing/package-lock.json
+          staging-workflow: marketing-staging.yml
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
 
-      # The only step that touches the network: the lockfile pins
-      # @insolvia-ai/design-system to GitHub Packages, which requires a token
-      # even for public packages (the app's .npmrc expands NODE_AUTH_TOKEN).
-      - name: Install
-        run: npm ci
-        working-directory: apps/insolvia_marketing
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build
-        run: npm run build
-        working-directory: apps/insolvia_marketing
-
-      # ── 2. Infra: apply + read outputs ────────────────────────────
+      # ── 1. Infra outputs ──────────────────────────────────────────
+      # No `npm ci` / `npm run build` here any more, and no docker build. Both
+      # the SSR server bundle AND the hashed client assets are promoted out of
+      # the image staging validated (see step 4).
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -85,54 +112,168 @@ jobs:
           # `$(terraform output -raw ...)` capture below.
           terraform_wrapper: false
 
-      - name: Apply prod infra
+      # Read-only: `output` needs the state, not an apply. Applying prod infra
+      # is infra-prod.yml's job — a code deploy must not carry infra drift.
+      - name: Read prod infra outputs
         id: tf
         run: |
           terraform -chdir=infra/envs/prod init -input=false
-          terraform -chdir=infra/envs/prod apply -auto-approve -input=false
           tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
           {
             echo "ecr=$(tf marketing_ecr_repository_url)"
             echo "lambda=$(tf marketing_ssr_function_name)"
             echo "bucket=$(tf marketing_assets_bucket_name)"
             echo "dist=$(tf marketing_distribution_id)"
+            echo "alias=$(tf marketing_ssr_alias_name)"
           } >> "$GITHUB_OUTPUT"
 
-      # ── 3. SSR image → ECR ────────────────────────────────────────
+      # ── 2. Resolve the validated image ────────────────────────────
       - uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Docker build + push
-        env:
-          IMAGE: ${{ steps.tf.outputs.ecr }}
-        run: |
-          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
-          docker push "$IMAGE:${{ github.sha }}"
-          docker push "$IMAGE:latest"
-        working-directory: apps/insolvia_marketing
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.ecr }}
+          sha: ${{ steps.commit.outputs.sha }}
 
-      # ── 4. Point the Lambda at the new image ──────────────────────
-      - name: Update Lambda function code
+      # ── 3. Point the Lambda at the promoted image ─────────────────
+      # Publishing does NOT move traffic: the `live` alias still points at the
+      # previous version until the smoke test in step 5 passes. `environment`
+      # on this Lambda is Terraform-owned (no SSM re-derive step), so the
+      # published version is a coherent code+config snapshot.
+      - name: Publish candidate version
+        id: candidate
         env:
           FUNCTION: ${{ steps.tf.outputs.lambda }}
-          IMAGE: ${{ steps.tf.outputs.ecr }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
         run: |
-          aws lambda update-function-code \
+          version="$(aws lambda update-function-code \
             --function-name "$FUNCTION" \
-            --image-uri "$IMAGE:${{ github.sha }}" \
-            --query '{FunctionName:FunctionName,CodeSize:CodeSize}' --output table
+            --image-uri "$IMAGE_URI" \
+            --publish \
+            --query Version --output text)"
           aws lambda wait function-updated --function-name "$FUNCTION"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo ":hourglass: Published version \`$version\` — not yet serving." >> "$GITHUB_STEP_SUMMARY"
 
-      # ── 5. Client assets → S3, then invalidate ────────────────────
-      # Everything in build/client is content-hashed; HTML is SSR'd by the
-      # Lambda, so unlike app-prod.yml there is no second no-cache HTML pass.
+      # ── 4. Client assets: EXTRACT from the promoted image ─────────
+      # This must not be a rebuild, and the reason is subtle enough to be worth
+      # stating: `build/client` filenames are content-hashed, and the SSR bundle
+      # inside the image references those exact filenames. Promoting a
+      # staging-built server bundle while syncing freshly-rebuilt client assets
+      # would put mismatched hashes in S3 — every /assets/* request 404s through
+      # CloudFront and the site renders unstyled and broken.
+      #
+      # The Dockerfile does `COPY build ./build`, so the image already contains
+      # the exact client assets that belong to this server bundle. Take them
+      # from there and the two can never disagree.
+      - name: Extract client assets from the promoted image
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
+        run: |
+          docker pull "$IMAGE_URI"
+          container="$(docker create "$IMAGE_URI")"
+          # LAMBDA_TASK_ROOT for the public.ecr.aws/lambda/nodejs base image.
+          docker cp "$container:/var/task/build/client" ./client-assets
+          docker rm "$container" > /dev/null
+          test -d ./client-assets/assets
+
       - name: Sync assets to S3 + invalidate
         env:
           BUCKET: ${{ steps.tf.outputs.bucket }}
           DIST: ${{ steps.tf.outputs.dist }}
         run: |
-          aws s3 sync apps/insolvia_marketing/build/client "s3://$BUCKET" --delete \
+          # Everything here is content-hashed; HTML is SSR'd by the Lambda, so
+          # unlike app-prod.yml there is no second no-cache HTML pass.
+          #
+          # ADDITIVE — no `--delete`, deliberately. Assets go up before the
+          # alias shifts, so for that window the OLD server bundle is still
+          # serving and still referencing its own asset filenames. `--delete`
+          # would remove exactly those files while they are still being
+          # requested, 404ing every /assets/* for anyone mid-session. Because
+          # the names are content-hashed there is no collision to worry about:
+          # old and new coexist, and superseded files simply age out.
+          aws s3 sync ./client-assets "s3://$BUCKET" \
             --cache-control "public,max-age=31536000,immutable"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      # ── 5. Smoke the candidate, then shift traffic ────────────────
+      - name: Smoke test the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.lambda }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          # Payload format 2.0 — the shape @react-router/architect consumes.
+          cat > event.json <<'EOF'
+          {
+            "version": "2.0",
+            "routeKey": "$default",
+            "rawPath": "/",
+            "rawQueryString": "",
+            "headers": { "host": "www.insolvia.ai", "accept": "text/html" },
+            "requestContext": {
+              "http": {
+                "method": "GET", "path": "/", "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1", "userAgent": "insolvia-deploy-smoke"
+              }
+            },
+            "isBase64Encoded": false
+          }
+          EOF
+
+          aws lambda invoke \
+            --function-name "$FUNCTION:$VERSION" \
+            --payload fileb://event.json \
+            --cli-read-timeout 60 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json
+
+          # An unhandled exception returns HTTP 200 from the Lambda API with
+          # FunctionError set, so the status alone would pass a crashed render.
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::Candidate version $VERSION raised: $(jq -r '.FunctionError' invoke-meta.json)"
+            cat response.json
+            exit 1
+          fi
+          jq -e '.statusCode == 200' response.json > /dev/null
+
+      - name: Shift live traffic to the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.lambda }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          REPO: ${{ steps.tf.outputs.ecr }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          previous="$(aws lambda get-alias \
+            --function-name "$FUNCTION" --name "$ALIAS" \
+            --query FunctionVersion --output text)"
+
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$VERSION"
+
+          # Move the `prod` marker tag onto the promoted digest, so a
+          # from-scratch apply seeds the Lambda from what prod actually runs.
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."
+
+          {
+            echo ":rocket: **Live.** Alias \`$ALIAS\` moved \`$previous\` → \`$VERSION\`."
+            echo
+            echo "Roll back without a rebuild:"
+            echo '```bash'
+            echo "aws lambda update-alias --function-name $FUNCTION --name $ALIAS --function-version $previous"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # ── 6. Smoke check ────────────────────────────────────────────
       - name: Smoke check

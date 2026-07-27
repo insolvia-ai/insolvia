@@ -1,16 +1,70 @@
 name: App · Deploy · Production
 
+# The one deploy in this repo that still BUILDS rather than promotes, and the
+# reason is the app's environment model, not an oversight.
+#
+# The Flutter app selects its environment at COMPILE time
+# (`--dart-define=INSOLVIA_ENV`, see apps/insolvia_app/lib/src/config/
+# environment.dart and docs/ARCHITECTURE.md § Environment model). The staging
+# bundle therefore has "staging" baked into its compiled JS and can never be
+# the production bundle, so there is no artifact to promote the way api,
+# mailer and marketing promote an image digest.
+#
+# What this workflow guarantees instead is SOURCE-level promotion, tightened at
+# both ends:
+#   • the commit must have a successful `app-staging.yml` run before it can
+#     ship (.github/actions/verified-commit), and the build is checked out at
+#     that exact commit rather than whatever main points at now, and
+#   • the Flutter version is pinned, so "same source" also means "same
+#     compiler". `channel: stable` floats, and a prod rebuild weeks after the
+#     staging run could otherwise compile with a different Flutter than the one
+#     staging validated.
+#
+# Getting byte-identical promotion here would mean moving the app to runtime
+# environment detection (one bundle, resolved from the serving hostname). That
+# is a real option, deliberately not taken: it would reverse the documented
+# `--dart-define` decision and split web from desktop, which has no hostname.
+#
+# This workflow no longer applies Terraform — `infra-prod.yml` is the only path
+# that mutates prod infrastructure.
+
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  # Also callable by the Release · Production orchestrator, which chains the
+  # services in a defined order. Same inputs as the manual dispatch above, so
+  # there is exactly one code path either way.
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
+  # Reading the staging workflow's run conclusions.
+  actions: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/prod
-# (api-prod.yml, marketing-prod.yml) — the backend has no state locking, so
-# concurrent applies of one env race. See the matching comment in
-# api-staging.yml for the incident that proved it.
+# Retained even though this workflow no longer applies Terraform: it also
+# serializes against infra-prod.yml, so a deploy cannot land mid-apply while
+# the bucket or distribution is being reconciled underneath it.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false
@@ -20,11 +74,29 @@ jobs:
     runs-on: ubuntu-latest
     environment: insolvia-production
     steps:
+      # Checked out twice on purpose: this first checkout is only so the local
+      # composite action below exists. The build checkout follows, pinned to
+      # the verified commit.
       - uses: actions/checkout@v4
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          staging-workflow: app-staging.yml
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
+      - name: Check out the verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.commit.outputs.sha }}
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned, not floating — see the header. This is what makes "same
+          # source" mean "same compiler".
+          flutter-version: "3.44.6"
 
       - run: flutter pub get
 
@@ -40,24 +112,42 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` capture below.
+          terraform_wrapper: false
 
-      - name: Apply prod infra
+      # Read-only: `output` needs the state, not an apply.
+      - name: Read prod infra outputs
         id: tf
         run: |
-          terraform -chdir=infra/envs/prod init
-          terraform -chdir=infra/envs/prod apply -auto-approve
-          echo "bucket=$(terraform -chdir=infra/envs/prod output -raw bucket_name)" >> "$GITHUB_OUTPUT"
-          echo "dist=$(terraform -chdir=infra/envs/prod output -raw distribution_id)" >> "$GITHUB_OUTPUT"
+          terraform -chdir=infra/envs/prod init -input=false
+          {
+            echo "bucket=$(terraform -chdir=infra/envs/prod output -raw bucket_name)"
+            echo "dist=$(terraform -chdir=infra/envs/prod output -raw distribution_id)"
+            echo "url=$(terraform -chdir=infra/envs/prod output -raw url)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Sync to S3 + invalidate
         env:
           BUCKET: ${{ steps.tf.outputs.bucket }}
           DIST: ${{ steps.tf.outputs.dist }}
         run: |
+          # Hashed assets first, immutable — so the new index.html never
+          # references an asset that has not landed yet.
           aws s3 sync apps/insolvia_app/build/web "s3://$BUCKET" --delete \
             --cache-control "public,max-age=31536000,immutable" \
             --exclude "*.html"
+          # HTML last, never cached, so new deploys are picked up immediately.
           aws s3 sync apps/insolvia_app/build/web "s3://$BUCKET" \
             --cache-control "no-cache,no-store,must-revalidate" \
             --exclude "*" --include "*.html"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      # A static bundle has no version to smoke-test before traffic moves, so
+      # unlike the Lambda services this can only be verified after the fact.
+      - name: Smoke check
+        env:
+          URL: ${{ steps.tf.outputs.url }}
+        run: |
+          curl -sSf -o /dev/null --retry 5 --retry-delay 3 --retry-all-errors "$URL/"
+          echo ":white_check_mark: \`$URL\` is serving commit \`${{ steps.commit.outputs.sha }}\`." >> "$GITHUB_STEP_SUMMARY"

@@ -12,7 +12,7 @@
 # with:
 #
 #   InvalidParameterValueException: Source image
-#     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-<svc>-<env>:latest
+#     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-<svc>:<env>
 #     does not exist. Provide a valid source image.
 #
 # The same note lives at the top of infra/modules/{api_service,mailer,
@@ -24,11 +24,12 @@
 #
 # ## What it does NOT do
 #
-# It does not apply Terraform and it does not create the ECR repositories. If a
-# repository is genuinely absent (nothing has applied the env at all yet),
-# create it first, per the module header:
+# It does not apply Terraform and it does not create the ECR repositories. The
+# repositories are shared across environments and live in infra/envs/shared
+# (one per service, no -<env> suffix); if one is genuinely absent, apply that
+# root first:
 #
-#   terraform -chdir=infra/envs/<env> apply -target=module.<svc>.aws_ecr_repository.<name>
+#   terraform -chdir=infra/envs/shared apply
 #
 # The images it pushes are placeholders. The deploy workflow immediately builds
 # its own from the merged commit and rolls the Lambda onto it with
@@ -156,12 +157,12 @@ build_api() {
   # Pure Python; --target lambda selects the public.ecr.aws/lambda stage (the
   # other stage is the local development server).
   docker build --platform "$PLATFORM" --target lambda \
-    -t "$1:latest" "$REPO_ROOT/services/api"
+    -t "$1:$ENV" "$REPO_ROOT/services/api"
 }
 
 build_mailer() {
   docker build --platform "$PLATFORM" --target lambda \
-    -t "$1:latest" "$REPO_ROOT/services/mailer"
+    -t "$1:$ENV" "$REPO_ROOT/services/mailer"
 }
 
 build_marketing() {
@@ -175,23 +176,29 @@ build_marketing() {
   NODE_AUTH_TOKEN="$(gh auth token)" npm ci --prefix "$dir" ||
     die "npm ci failed. If it was a 403, run: gh auth refresh -s read:packages"
   npm run build --prefix "$dir"
-  docker build --platform "$PLATFORM" -t "$1:latest" "$dir"
+  docker build --platform "$PLATFORM" -t "$1:$ENV" "$dir"
 }
 
 for svc in "${SERVICES[@]}"; do
-  repo="insolvia-$svc-$ENV"
+  # One repository per SERVICE, shared by every environment
+  # (infra/envs/shared). The image is seeded under this environment's moving
+  # marker tag, which is what the Lambda's Terraform seed points at
+  # (var.image_tag) — not `:latest`, which under a shared repository would mean
+  # "whatever any environment pushed last".
+  repo="insolvia-$svc"
   image="$REGISTRY/$repo"
   log "── $svc → $repo ─────────────────────────────"
 
   if ! ecr_repo_exists "$repo"; then
     die "ECR repository '$repo' does not exist yet. Create it first with:
-      terraform -chdir=infra/envs/$ENV apply -target=module.$svc.aws_ecr_repository.<name>
-    (see infra/modules/*/main.tf headers), then re-run this script."
+      terraform -chdir=infra/envs/shared apply
+    (the repositories are shared across environments — see
+    infra/envs/shared/main.tf), then re-run this script."
   fi
 
   "build_$svc" "$image"
-  docker push "$image:latest"
-  ok "pushed $image:latest"
+  docker push "$image:$ENV"
+  ok "pushed $image:$ENV"
 done
 
 # ── optionally re-run the deploys ──────────────────────────────────

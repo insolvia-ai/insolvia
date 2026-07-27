@@ -1,14 +1,18 @@
 name: Infra · Terraform apply · Production
 
-# Terraform for infra/envs/prod, on its own, with nothing else attached.
+# Terraform for infra/envs/prod, on its own, with nothing else attached — and
+# now the ONLY thing that applies it.
 #
-# The three prod deploy workflows (api-prod, app-prod, marketing-prod) each
-# begin by applying this same env, because infra/envs/prod is one root module
-# with one state and `terraform apply` reconciles all of it. That means an
-# infra-only change — flipping a toggle, resizing something, adding a record —
-# used to require dispatching a *service* deploy to carry it, rebuilding and
-# redeploying that service's Lambda as a side effect. This workflow is the way
-# to apply prod infra without pretending to deploy anything.
+# The prod deploy workflows (api-prod, mailer-prod, marketing-prod, app-prod)
+# used to each begin by applying this same env, because infra/envs/prod is one
+# root module with one state and `terraform apply` reconciles all of it. That
+# cut both ways: an infra-only change needed a *service* deploy to carry it
+# (redeploying a Lambda as a side effect), and — worse — a routine code deploy
+# silently dragged whatever infra drift was sitting on main into production.
+#
+# Those workflows no longer apply Terraform at all; they only read outputs. So
+# this workflow is not merely the tidier way to apply prod infra, it is the
+# only way. Apply deliberately, before the release that needs it.
 #
 # It also fills a real gap: shared-infra-plan.yml validates every env offline
 # (`init -backend=false`, no credentials), so nothing in CI could ever show a
@@ -29,11 +33,13 @@ permissions:
   id-token: write
   contents: read
 
-# MUST match the group used by api-prod.yml, app-prod.yml and
-# marketing-prod.yml: all four apply the same root module, and two concurrent
-# applies of one env race each other. Native S3 state locking (use_lockfile,
-# enabled in #117) turns that race into a hard lock error rather than corrupt
-# state — this group is what stops it happening at all.
+# MUST match the group used by api-prod.yml, mailer-prod.yml, app-prod.yml and
+# marketing-prod.yml. Only this workflow applies now, so the group no longer
+# guards apply-against-apply — it guards apply-against-DEPLOY: an apply that
+# lands while a service deploy is mid-promotion could rewrite a Lambda's
+# configuration underneath it, or move an alias the deploy is about to shift.
+# Native S3 state locking (use_lockfile, enabled in #117) still backstops any
+# apply that slips past the group.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false

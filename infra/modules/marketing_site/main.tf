@@ -17,10 +17,11 @@
 # it) the alias, the DNS records, and the redirect branch are all omitted.
 #
 # FIRST APPLY (bootstrap): the Lambda cannot be created until an image exists
-# in the ECR repository, and the repository is created here. Bootstrap once:
+# in the ECR repository. The repository is no longer created here — it lives in
+# infra/envs/shared and is applied before any environment — so bootstrap is:
 #
-#   terraform apply -target=module.marketing_site.aws_ecr_repository.ssr
-#   # build + docker push <repo_url>:<tag>
+#   terraform -chdir=infra/envs/shared apply   # creates insolvia-marketing
+#   # build + docker push <repo_url>:<env>     # this env's marker tag
 #   terraform apply
 #
 # After creation the deploy workflow owns the running image via
@@ -29,7 +30,6 @@
 locals {
   name_prefix   = "${var.project}-marketing"
   bucket_name   = "${local.name_prefix}-assets-${var.environment}"
-  ecr_name      = "${local.name_prefix}-${var.environment}"
   function_name = "${local.name_prefix}-ssr-${var.environment}"
 
   # Does this environment own the apex? Drives three things that must agree:
@@ -43,27 +43,35 @@ locals {
 # and the table lives with modules/api_service as insolvia-waitlist-<env>.
 
 # ── ECR — the SSR Lambda's Docker image ─────────────────────────
-resource "aws_ecr_repository" "ssr" {
-  name                 = local.ecr_name
-  image_tag_mutability = "MUTABLE"
+# Not owned here: `insolvia-marketing` is one repository shared by every
+# environment, created in infra/envs/shared and passed in as
+# `var.ecr_repository_url`, so prod can deploy the exact digest staging
+# validated. The image is environment-agnostic — the only env-specific value,
+# INSOLVIA_API_BASE_URL, is read from process.env at runtime (see the Lambda's
+# environment block below), never baked into a layer.
+#
+# See infra/envs/shared/main.tf for the repository and its retention policy.
 
-  image_scanning_configuration {
-    scan_on_push = true
+# ── One-time state migration (transitional) ─────────────────────
+# See the equivalent block in infra/modules/api_service/main.tf for the full
+# rationale. Short version: these resources were deleted from config but still
+# live in staging's and prod's state, and a plain deletion would plan a DESTROY
+# of a repository holding the image the RUNNING Lambda pulls from.
+# `destroy = false` forgets them from state without calling AWS.
+#
+# Delete these blocks ONLY after BOTH staging and prod have applied.
+removed {
+  from = aws_ecr_repository.ssr
+  lifecycle {
+    destroy = false
   }
-
-  tags = var.tags
 }
 
-resource "aws_ecr_lifecycle_policy" "ssr" {
-  repository = aws_ecr_repository.ssr.name
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep last 10 images"
-      selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 }
-      action       = { type = "expire" }
-    }]
-  })
+removed {
+  from = aws_ecr_lifecycle_policy.ssr
+  lifecycle {
+    destroy = false
+  }
 }
 
 # ── SSR Lambda execution role ───────────────────────────────────
@@ -111,9 +119,15 @@ resource "aws_lambda_function" "ssr" {
   function_name = local.function_name
   role          = aws_iam_role.ssr.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.ssr.repository_url}:${var.image_tag}"
+  image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
   timeout       = 30
   memory_size   = 512
+
+  # Publish a numbered version on every Terraform-driven change so the `live`
+  # alias always has a real version to target (an alias cannot point at
+  # $LATEST). The deploy workflow publishes its own with
+  # `update-function-code --publish`.
+  publish = true
 
   environment {
     variables = {
@@ -132,11 +146,37 @@ resource "aws_lambda_function" "ssr" {
   # `aws lambda update-function-code`; Terraform must not roll it back on the
   # next apply. Environment stays Terraform-owned so the INSOLVIA_API_BASE_URL
   # contract lives here, not in a workflow.
+  #
+  # CONSEQUENCE OF THE ALIAS (below), and it is specific to this module because
+  # `environment` is deliberately NOT ignored here: a Terraform-driven change to
+  # a variable like INSOLVIA_API_BASE_URL updates $LATEST and publishes a new
+  # version that `live` does NOT point at. The change therefore does not reach
+  # traffic until the next deploy publishes and shifts the alias. If you need
+  # such a change live immediately, dispatch a marketing deploy after applying.
   lifecycle {
     ignore_changes = [image_uri]
   }
 
   depends_on = [aws_cloudwatch_log_group.ssr]
+}
+
+# ── Blue/green alias ────────────────────────────────────────────
+# What the HTTP API invokes. The deploy workflow publishes a version,
+# smoke-tests that version directly, and only then repoints this alias — so a
+# failed smoke test leaves the previous version serving. See the equivalent
+# block in infra/modules/api_service/main.tf.
+resource "aws_lambda_alias" "live" {
+  name             = "live"
+  description      = "The version serving traffic. function_version is owned by the deploy workflow."
+  function_name    = aws_lambda_function.ssr.function_name
+  function_version = aws_lambda_function.ssr.version
+
+  # Mandatory: Terraform never sees the workflow's publishes (image_uri is
+  # ignored), so its copy of `version` is stale by construction. Without this,
+  # every apply reverts the alias to an older version.
+  lifecycle {
+    ignore_changes = [function_version]
+  }
 }
 
 # ── HTTP API fronting the SSR Lambda ────────────────────────────
@@ -153,10 +193,15 @@ resource "aws_apigatewayv2_api" "ssr" {
 resource "aws_apigatewayv2_integration" "ssr" {
   api_id                 = aws_apigatewayv2_api.ssr.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.ssr.invoke_arn
+  integration_uri        = aws_lambda_alias.live.invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
   timeout_milliseconds   = 30000
+
+  # Terraform infers no dependency between an integration and a permission;
+  # without this the apply can repoint at the alias before the alias-qualified
+  # permission exists, producing real 500s the plan never hints at.
+  depends_on = [aws_lambda_permission.ssr_apigw_live]
 }
 
 resource "aws_apigatewayv2_route" "ssr_default" {
@@ -172,10 +217,25 @@ resource "aws_apigatewayv2_stage" "ssr" {
   tags        = var.tags
 }
 
+# The original unqualified permission. Superseded by `ssr_apigw_live`, kept
+# until both environments serve through the alias — adding `qualifier` here
+# would force replacement, and destroy-then-create leaves a window with no
+# permission at all.
 resource "aws_lambda_permission" "ssr_apigw" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.ssr.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.ssr.execution_arn}/*/*"
+}
+
+# Lambda evaluates the alias's own resource policy, so the grant above does not
+# authorize invoking <function>:live.
+resource "aws_lambda_permission" "ssr_apigw_live" {
+  statement_id  = "AllowAPIGatewayInvokeLive"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ssr.function_name
+  qualifier     = aws_lambda_alias.live.name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.ssr.execution_arn}/*/*"
 }

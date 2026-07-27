@@ -24,6 +24,20 @@ data "aws_acm_certificate" "wildcard" {
   most_recent = true
 }
 
+# The shared per-service container repositories, created in infra/envs/shared.
+# Looked up rather than read from remote state, matching the zone/cert above
+# (docs/TERRAFORM_ARCHITECTURE.md: cross-layer references are data sources,
+# never terraform_remote_state).
+#
+# This is a second reason the documented apply order — shared before any
+# environment — is load-bearing rather than ceremonial: these lookups fail
+# outright until `shared` has applied, exactly as the certificate lookup does.
+data "aws_ecr_repository" "service" {
+  for_each = toset(["api", "marketing", "mailer"])
+
+  name = "insolvia-${each.key}"
+}
+
 module "web_hosting" {
   source = "../../modules/web_hosting"
 
@@ -56,6 +70,8 @@ module "api_service" {
   domain_name         = var.api_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  ecr_repository_url  = data.aws_ecr_repository.service["api"].repository_url
+  image_tag           = local.environment
   tags                = local.common_tags
 }
 
@@ -85,6 +101,8 @@ module "mailer" {
   sender_address             = "no-reply@insolvia.ai"
   cors_allowed_origin        = "https://${var.subdomain}"
   enable_attachment_scanning = false
+  ecr_repository_url         = data.aws_ecr_repository.service["mailer"].repository_url
+  image_tag                  = local.environment
   tags                       = local.common_tags
 }
 
@@ -145,6 +163,7 @@ module "marketing_site" {
   apex_domain         = var.domain_name
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  ecr_repository_url  = data.aws_ecr_repository.service["marketing"].repository_url
   image_tag           = var.marketing_image_tag
 
   # OFFLINE, deliberately: the site is parked until we have an engaged MyCase.

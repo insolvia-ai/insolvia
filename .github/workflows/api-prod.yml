@@ -1,28 +1,67 @@
 name: API · Deploy · Production
 
-# Steady-state deploy: apply the env, push a fresh image, point the Lambda at
-# it, re-derive its environment from SSM, smoke-test /health.
+# PROMOTES the image staging validated — it does not build one.
 #
-# The FIRST deploy in a fresh environment cannot run through this workflow: an
-# Image-package Lambda refuses to be created before its image exists, so the
-# apply below deadlocks. Bootstrap once by hand, per
-# infra/modules/api_service/main.tf:
-#   1. terraform apply -target=module.api_service.aws_ecr_repository.api
-#   2. docker build --target lambda services/api, tag <repo-url>:latest, push
-#   3. terraform apply   (full)
-# After that, every deploy is this workflow.
+# The shared insolvia-api repository (infra/envs/shared) already holds the
+# image staging tested, tagged `sha-<commit>`. This workflow resolves that tag
+# to an immutable digest and points the prod Lambda at it, so production runs
+# the exact bytes that were exercised on staging rather than a fresh compile of
+# the same source. There is deliberately no `docker build` here.
+#
+# Two gates stand in front of that:
+#   • the commit must have a successful `api-staging.yml` run (see
+#     .github/actions/verified-commit), and
+#   • the `insolvia-production` environment's reviewers must approve, if
+#     configured — that setting is a repo-settings change no workflow can make
+#     for itself (docs/ARCHITECTURE.md § Required status checks).
+#
+# Traffic moves LAST. The new version is published, smoke-tested by its own
+# version ARN while nothing routes to it, and only then does the `live` alias
+# shift. A failed smoke test leaves the previous version serving — the whole
+# reason the alias exists (infra/modules/api_service/main.tf).
+#
+# This workflow no longer applies Terraform. A code deploy must not carry
+# whatever infra drift happens to be sitting on main; `infra-prod.yml` is the
+# only path that mutates prod infrastructure.
 
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  # Also callable by the Release · Production orchestrator, which chains the
+  # services in a defined order. Same inputs as the manual dispatch above, so
+  # there is exactly one code path either way.
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
+  # Reading the staging workflow's run conclusions. Without this the gate
+  # cannot see whether the commit ever passed.
+  actions: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/prod
-# (app-prod.yml, marketing-prod.yml) — the backend has no state locking, so
-# concurrent applies of one env race. See the matching comment in
-# api-staging.yml for the incident that proved it.
+# Retained even though this workflow no longer applies Terraform: it also
+# serializes against infra-prod.yml, so a promotion cannot land mid-apply while
+# the Lambda's configuration is being rewritten underneath it.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false
@@ -33,6 +72,13 @@ jobs:
     environment: insolvia-production
     steps:
       - uses: actions/checkout@v4
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          staging-workflow: api-staging.yml
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -46,47 +92,37 @@ jobs:
           # `terraform output -raw` command substitutions below.
           terraform_wrapper: false
 
-      - name: Apply prod infra
+      # Read-only: `output` needs the state, not an apply. Applying prod infra
+      # is infra-prod.yml's job.
+      - name: Read prod infra outputs
         id: tf
         run: |
-          terraform -chdir=infra/envs/prod init
-          terraform -chdir=infra/envs/prod apply -auto-approve
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
           {
-            echo "repo=$(terraform -chdir=infra/envs/prod output -raw api_ecr_repository_url)"
-            echo "function=$(terraform -chdir=infra/envs/prod output -raw api_lambda_function_name)"
-            echo "domain=$(terraform -chdir=infra/envs/prod output -raw api_domain)"
+            echo "repo=$(tf api_ecr_repository_url)"
+            echo "function=$(tf api_lambda_function_name)"
+            echo "domain=$(tf api_domain)"
+            echo "alias=$(tf api_lambda_alias_name)"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Log in to ECR
-        env:
-          REPO: ${{ steps.tf.outputs.repo }}
-        run: |
-          # The registry host is everything before the first `/` of the repo URL.
-          aws ecr get-login-password --region us-east-1 \
-            | docker login --username AWS --password-stdin "${REPO%%/*}"
-
-      - name: Build and push image
-        env:
-          REPO: ${{ steps.tf.outputs.repo }}
-        run: |
-          # `:sha` is the immutable deploy reference; `:latest` exists only so
-          # a from-scratch `terraform apply` (whose Lambda seed points at
-          # `:latest`) finds an image.
-          docker build --target lambda \
-            -t "$REPO:${{ github.sha }}" \
-            -t "$REPO:latest" \
-            services/api
-          docker push "$REPO:${{ github.sha }}"
-          docker push "$REPO:latest"
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ steps.commit.outputs.sha }}
 
       - name: Update Lambda code
         env:
           FUNCTION: ${{ steps.tf.outputs.function }}
-          REPO: ${{ steps.tf.outputs.repo }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
         run: |
+          # No --publish: the next step rewrites the environment from SSM, and
+          # a version published now would snapshot the OLD configuration. The
+          # alias would then serve the new code with stale config.
           aws lambda update-function-code \
             --function-name "$FUNCTION" \
-            --image-uri "$REPO:${{ github.sha }}"
+            --image-uri "$IMAGE_URI"
           aws lambda wait function-updated --function-name "$FUNCTION"
 
       - name: Re-derive Lambda environment from SSM
@@ -117,9 +153,110 @@ jobs:
             --environment "$environment"
           aws lambda wait function-updated --function-name "$FUNCTION"
 
-      - name: Smoke test
+      # Code and configuration are settled, so this snapshot is coherent.
+      # Publishing does NOT move traffic: the alias still points at the
+      # previous version until the smoke test below passes.
+      - name: Publish candidate version
+        id: candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          version="$(aws lambda publish-version \
+            --function-name "$FUNCTION" \
+            --query Version --output text)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo ":hourglass: Published version \`$version\` — not yet serving." >> "$GITHUB_STEP_SUMMARY"
+
+      # Invoke the candidate DIRECTLY by version qualifier. Production traffic
+      # is still on the old version throughout, so a broken build fails here
+      # having served nobody.
+      - name: Smoke test the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          # Payload format 2.0 — the shape API Gateway sends and Mangum parses.
+          cat > event.json <<'EOF'
+          {
+            "version": "2.0",
+            "routeKey": "$default",
+            "rawPath": "/health",
+            "rawQueryString": "",
+            "headers": { "host": "api.insolvia.ai", "accept": "*/*" },
+            "requestContext": {
+              "http": {
+                "method": "GET", "path": "/health", "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1", "userAgent": "insolvia-deploy-smoke"
+              }
+            },
+            "isBase64Encoded": false
+          }
+          EOF
+
+          aws lambda invoke \
+            --function-name "$FUNCTION:$VERSION" \
+            --payload fileb://event.json \
+            --cli-read-timeout 60 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json
+
+          # An unhandled exception is a 200 from the Lambda API with
+          # FunctionError set — checking only the HTTP status would pass a
+          # crashed handler.
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::Candidate version $VERSION raised: $(jq -r '.FunctionError' invoke-meta.json)"
+            cat response.json
+            exit 1
+          fi
+
+          jq -e '.statusCode == 200' response.json > /dev/null
+          jq -r '.body' response.json | jq -e '.environment == "production"' > /dev/null
+
+      - name: Shift live traffic to the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          previous="$(aws lambda get-alias \
+            --function-name "$FUNCTION" --name "$ALIAS" \
+            --query FunctionVersion --output text)"
+
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$VERSION"
+
+          # Move the `prod` marker tag onto the promoted digest, so a
+          # from-scratch `terraform apply` seeds the Lambda from what prod is
+          # actually running (infra/modules/api_service/main.tf, var.image_tag).
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."
+
+          {
+            echo ":rocket: **Live.** Alias \`$ALIAS\` moved \`$previous\` → \`$VERSION\`."
+            echo
+            echo "Roll back without a rebuild:"
+            echo '```bash'
+            echo "aws lambda update-alias --function-name $FUNCTION --name $ALIAS --function-version $previous"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Belt-and-braces: the candidate passed in isolation, so this proves the
+      # alias shift and the API Gateway integration actually took effect.
+      - name: Verify through the public endpoint
         env:
           DOMAIN: ${{ steps.tf.outputs.domain }}
         run: |
-          curl -sSf "https://$DOMAIN/health" | tee health.json
+          curl -sSf --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://$DOMAIN/health" | tee health.json
           jq -e '.environment == "production"' health.json > /dev/null

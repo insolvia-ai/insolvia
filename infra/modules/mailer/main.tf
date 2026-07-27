@@ -27,9 +27,11 @@
 # Same image-before-apply deadlock as api_service, times three Lambdas from
 # one image:
 #
-#   1. terraform apply -target=module.mailer.aws_ecr_repository.mailer
+#   1. apply infra/envs/shared (creates insolvia-mailer)
 #   2. build services/mailer (`docker build --target lambda`), tag
-#      <repo-url>:latest, push it. Every later deploy just re-pushes and calls
+#      <repo-url>:<env> — the per-environment marker tag this module seeds from
+#      (`var.image_tag`), not `:latest`, which no longer exists under a shared
+#      repository — and push it. Every later deploy just re-pushes and calls
 #      update-function-code for ingress/sender/feedback — Terraform ignores
 #      image_uri drift (see the lifecycle note on each Lambda below).
 #   3. terraform apply   (full)
@@ -47,7 +49,9 @@ data "aws_iam_role" "caller" {
 
 locals {
   # insolvia-mailer-<env> — reused across resource types that don't need a
-  # purpose qualifier (ECR repo, HTTP API, SES configuration set).
+  # purpose qualifier (HTTP API, SES configuration set). No longer the ECR
+  # repository name: that repository is shared across environments and so
+  # carries no -<env> suffix (infra/envs/shared).
   name = "${var.project}-mailer-${var.environment}"
 
   # Insolvia's traffic is all transactional auth mail (welcome,
@@ -98,31 +102,37 @@ locals {
 
 # ─── Container repository ────────────────────────────────────────────────────
 
-resource "aws_ecr_repository" "mailer" {
-  name                 = local.name
-  image_tag_mutability = "MUTABLE"
+# Not owned here: `insolvia-mailer` is one repository shared by every
+# environment, created in infra/envs/shared and passed in as
+# `var.ecr_repository_url`, so prod can deploy the exact digest staging
+# validated. The image is environment-agnostic — every env-specific value
+# reaches these Lambdas through their Terraform-managed `environment` blocks,
+# never baked into a layer.
+#
+# See infra/envs/shared/main.tf for the repository and its retention policy.
 
-  image_scanning_configuration {
-    scan_on_push = true
+# ─── One-time state migration (transitional) ─────────────────────────────────
+# See the equivalent block in infra/modules/api_service/main.tf for the full
+# rationale. Short version: these were deleted from config but still live in
+# staging's and prod's state, and a plain deletion would plan a DESTROY of a
+# repository still holding the image the RUNNING Lambdas pull from
+# (`aws_ecr_repository` has no `force_delete`, so it fails on
+# RepositoryNotEmptyException and leaves a half-applied env).
+# `destroy = false` forgets them from state without calling AWS.
+#
+# Delete these blocks ONLY after BOTH staging and prod have applied.
+removed {
+  from = aws_ecr_repository.mailer
+  lifecycle {
+    destroy = false
   }
-
-  tags = var.tags
 }
 
-resource "aws_ecr_lifecycle_policy" "mailer" {
-  repository = aws_ecr_repository.mailer.name
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep the ten newest mailer images"
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
-      }
-      action = { type = "expire" }
-    }]
-  })
+removed {
+  from = aws_ecr_lifecycle_policy.mailer
+  lifecycle {
+    destroy = false
+  }
 }
 
 # ─── Private content storage ─────────────────────────────────────────────────
@@ -745,7 +755,7 @@ resource "aws_lambda_function" "ingress" {
   function_name = "${var.project}-mailer-ingress-${var.environment}"
   role          = aws_iam_role.ingress.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.mailer.repository_url}:latest"
+  image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
   timeout       = 30
   memory_size   = 512
   image_config { command = ["insolvia_mailer.entrypoints.api_lambda.handler"] }
@@ -766,7 +776,7 @@ resource "aws_lambda_function" "sender" {
   function_name                  = "${var.project}-mailer-sender-${var.environment}"
   role                           = aws_iam_role.sender.arn
   package_type                   = "Image"
-  image_uri                      = "${aws_ecr_repository.mailer.repository_url}:latest"
+  image_uri                      = "${var.ecr_repository_url}:${var.image_tag}"
   timeout                        = 120
   memory_size                    = 1024
   reserved_concurrent_executions = var.sender_reserved_concurrency
@@ -788,7 +798,7 @@ resource "aws_lambda_function" "feedback" {
   function_name = "${var.project}-mailer-feedback-${var.environment}"
   role          = aws_iam_role.feedback.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.mailer.repository_url}:latest"
+  image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
   timeout       = 120
   memory_size   = 512
   image_config { command = ["insolvia_mailer.entrypoints.feedback_lambda.handler"] }

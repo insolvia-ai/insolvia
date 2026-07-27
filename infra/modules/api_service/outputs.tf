@@ -1,6 +1,14 @@
+# Passed straight through. Kept as an output so the env roots and every
+# `terraform output -raw api_ecr_repository_url` in the deploy workflows keep
+# working unchanged now that the repository is shared rather than module-owned.
 output "ecr_repository_url" {
-  description = "ECR repository the deploy workflow pushes API images to."
-  value       = aws_ecr_repository.api.repository_url
+  description = "ECR repository the deploy workflow pushes API images to (shared across environments)."
+  value       = var.ecr_repository_url
+}
+
+output "lambda_alias_name" {
+  description = "Alias serving traffic. The deploy workflow shifts it only after the new version passes its smoke test."
+  value       = aws_lambda_alias.live.name
 }
 
 output "lambda_function_name" {

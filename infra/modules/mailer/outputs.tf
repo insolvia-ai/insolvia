@@ -3,9 +3,12 @@ output "api_url" {
   value       = "https://${var.domain_name}"
 }
 
+# Passed straight through, so the env roots and the deploy workflows' existing
+# `terraform output -raw mailer_ecr_repository_url` keep working now that the
+# repository is shared rather than module-owned.
 output "ecr_repository_url" {
-  description = "ECR repository the deploy workflow pushes mailer images to."
-  value       = aws_ecr_repository.mailer.repository_url
+  description = "ECR repository the deploy workflow pushes mailer images to (shared across environments)."
+  value       = var.ecr_repository_url
 }
 
 output "lambda_function_names" {

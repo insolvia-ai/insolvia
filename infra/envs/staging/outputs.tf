@@ -22,6 +22,11 @@ output "api_lambda_function_name" {
   value       = module.api_service.lambda_function_name
 }
 
+output "api_lambda_alias_name" {
+  description = "Staging API Lambda alias serving traffic. The deploy workflow shifts it only after the freshly published version passes its smoke test."
+  value       = module.api_service.lambda_alias_name
+}
+
 output "api_domain" {
   description = "Hostname the staging API serves."
   value       = module.api_service.domain_name
@@ -148,6 +153,11 @@ output "marketing_ecr_repository_url" {
 output "marketing_ssr_function_name" {
   description = "Marketing SSR Lambda function name."
   value       = module.marketing_site.ssr_function_name
+}
+
+output "marketing_ssr_alias_name" {
+  description = "Staging marketing SSR Lambda alias serving traffic. Shifted only after the freshly published version passes its smoke test."
+  value       = module.marketing_site.ssr_alias_name
 }
 
 output "marketing_url" {

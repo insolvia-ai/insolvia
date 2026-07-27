@@ -17,13 +17,13 @@ name: Marketing · Deploy · Staging
 # compete with production for its own keywords.
 #
 # FIRST-EVER DEPLOY (bootstrap — manual, once): the SSR Lambda cannot be
-# created until an image exists in the ECR repository, and this workflow's
-# full `terraform apply` creates both. Bootstrap from a merged main checkout
-# (see infra/modules/marketing_site/main.tf):
+# created until an image exists in the ECR repository. The repository is no
+# longer created by this env — `insolvia-marketing` is shared across
+# environments and lives in infra/envs/shared, applied first (see
+# infra/modules/marketing_site/main.tf):
 #
-#   terraform -chdir=infra/envs/staging apply \
-#     -target=module.marketing_site.aws_ecr_repository.ssr
-#   # build the app, docker build, push <marketing_ecr_repository_url>:<tag>
+#   terraform -chdir=infra/envs/shared apply     # creates insolvia-marketing
+#   # build the app, docker build, push <marketing_ecr_repository_url>:staging
 #   terraform -chdir=infra/envs/staging apply
 #
 # After that the Lambda's image_uri is lifecycle-ignored and this workflow owns
@@ -111,6 +111,7 @@ jobs:
             echo "bucket=$(tf marketing_assets_bucket_name)"
             echo "dist=$(tf marketing_distribution_id)"
             echo "url=$(tf marketing_url)"
+            echo "alias=$(tf marketing_ssr_alias_name)"
           } >> "$GITHUB_OUTPUT"
 
       # ── 3. SSR image → ECR ────────────────────────────────────────
@@ -120,34 +121,58 @@ jobs:
         env:
           IMAGE: ${{ steps.tf.outputs.ecr }}
         run: |
-          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
-          docker push "$IMAGE:${{ github.sha }}"
-          docker push "$IMAGE:latest"
+          docker build -t "$IMAGE:sha-${{ github.sha }}" -t "$IMAGE:staging" .
+          docker push "$IMAGE:sha-${{ github.sha }}"
+          docker push "$IMAGE:staging"
         working-directory: apps/insolvia_marketing
 
-      # ── 4. Point the Lambda at the new image ──────────────────────
-      - name: Update Lambda function code
-        env:
-          FUNCTION: ${{ steps.tf.outputs.lambda }}
-          IMAGE: ${{ steps.tf.outputs.ecr }}
-        run: |
-          aws lambda update-function-code \
-            --function-name "$FUNCTION" \
-            --image-uri "$IMAGE:${{ github.sha }}" \
-            --query '{FunctionName:FunctionName,CodeSize:CodeSize}' --output table
-          aws lambda wait function-updated --function-name "$FUNCTION"
-
-      # ── 5. Client assets → S3, then invalidate ────────────────────
-      # Everything in build/client is content-hashed; HTML is SSR'd by the
-      # Lambda, so unlike app-staging.yml there is no second no-cache HTML pass.
+      # ── 4. Client assets → S3 (BEFORE the code that references them) ──
+      # Ordering is load-bearing: build/client filenames are content-hashed and
+      # the SSR bundle references those exact names, so the assets must be in
+      # place before the Lambda that asks for them starts serving. The reverse
+      # order leaves a window where every /assets/* 404s.
+      #
+      # ADDITIVE — no `--delete`, deliberately. Until step 5 shifts the alias
+      # the OLD bundle is still serving and still referencing its own asset
+      # filenames; deleting them would 404 anyone mid-session. Content-hashed
+      # names cannot collide, so old and new coexist and superseded files age
+      # out. HTML is SSR'd by the Lambda, so unlike app-staging.yml there is no
+      # second no-cache HTML pass.
       - name: Sync assets to S3 + invalidate
         env:
           BUCKET: ${{ steps.tf.outputs.bucket }}
           DIST: ${{ steps.tf.outputs.dist }}
         run: |
-          aws s3 sync apps/insolvia_marketing/build/client "s3://$BUCKET" --delete \
+          aws s3 sync apps/insolvia_marketing/build/client "s3://$BUCKET" \
             --cache-control "public,max-age=31536000,immutable"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      # ── 5. Point the Lambda at the new image ──────────────────────
+      - name: Update Lambda function code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.lambda }}
+          IMAGE: ${{ steps.tf.outputs.ecr }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+        run: |
+          # `environment` on this Lambda is Terraform-owned (no SSM re-derive
+          # step, unlike the API), so publishing here snapshots a coherent
+          # code+config pair.
+          version="$(aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE:sha-${{ github.sha }}" \
+            --publish \
+            --query Version --output text)"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+          # Staging publishes and shifts in one go — it is the proving ground,
+          # and a failed smoke check below turns the run red. Production does
+          # the opposite (smoke-test the new version first, shift only on
+          # success) so a bad build never reaches live traffic there.
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$version"
+          echo "Staging now serving version $version via alias $ALIAS." >> "$GITHUB_STEP_SUMMARY"
 
       # ── 6. Smoke check ────────────────────────────────────────────
       # Unlike prod there is no apex to assert (staging owns no apex — see

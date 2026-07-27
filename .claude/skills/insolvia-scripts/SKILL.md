@@ -63,7 +63,7 @@ already working.
 | Want to… | Run | Notes |
 |---|---|---|
 | Seed the ECR image an env's Image-package Lambdas need before Terraform can create them | `scripts/bootstrap-ecr-images.sh <env> [api\|mailer\|marketing] [--dispatch] [--yes]` | Breaks the documented first-apply deadlock |
-| Dispatch a **production** deploy (prod is `workflow_dispatch`-only) | `scripts/prod-deploy.sh` (`--list`, `--ref`, `--yes`, `--no-watch`) | Uses `gh`; watches the run |
+| Dispatch a **production** deploy (prod is `workflow_dispatch`-only) | `scripts/prod-deploy.sh` (`--list`, `--ref`, `--input`, `--yes`, `--no-watch`) | Uses `gh`; watches the run. Promotes the staging-validated image rather than rebuilding, and refuses commits staging never shipped green. `release` chains every service |
 | Apply `infra/envs/ci-trust` (OIDC provider + deploy role + policy) after a deploy fails on a newly-granted IAM permission | `scripts/apply-ci-trust.sh` | Human-gated; CI **cannot** apply this. See **insolvia-deploy-role-permissions** |
 
 Staging deploys automatically on merge to `main` — there is no staging script.

@@ -11,6 +11,15 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
 - **Naming `insolvia-<thing>-<env>`;** tags `{ Project = "insolvia",
   Environment, ManagedBy = "terraform" }`. Sensitive vars `sensitive = true`,
   never committed — commit `terraform.tfvars.example`, never real `*.tfvars`.
+  **Carve-out: resources owned by `shared` carry no `-<env>` suffix**, because
+  they genuinely have no environment — `insolvia-api`, `insolvia-marketing`,
+  `insolvia-mailer` (the container repositories). Do not "fix" those names.
+- **Container repositories are shared across environments**, one per service,
+  in `envs/shared`. This is what lets a prod deploy run the exact image digest
+  staging validated instead of rebuilding — see the note in
+  `envs/shared/main.tf`. It deliberately replaced one-repo-per-env; environment
+  isolation lives in separate Lambdas, roles, tables, SSM namespaces and
+  Cognito pools, not in separate image stores.
 - **Structure:** `modules/<concern>/{main,variables,outputs}.tf`,
   `envs/<env>/{main,variables,providers,backend,outputs}.tf`. State:
   `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`,
@@ -29,8 +38,10 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   The only legitimate local applies are your own dev env (`scripts/dev-aws-*`) and
   the human-gated `ci-trust`. See the `insolvia-deploy` skill.
 - **Apply order (when a human bootstrap is legitimate): `ci-trust` (human) →
-  `shared` → `staging`/`prod`.** `shared` creates the `*.insolvia.ai` cert;
-  downstream envs look it up with `statuses = ["ISSUED"]`, so `shared` first.
+  `shared` → `staging`/`prod`.** `shared` creates the `*.insolvia.ai` cert
+  **and the container repositories**; downstream envs look both up by name
+  (`statuses = ["ISSUED"]`, `data "aws_ecr_repository"`), so `shared` first —
+  those lookups hard-fail until it has applied.
 - **A deploy job must declare `environment:`** matching the Terraform env
   (`insolvia-shared|staging|production`) — env-scoped secrets are invisible
   otherwise and resolve to empty strings silently. Never borrow another env's name.

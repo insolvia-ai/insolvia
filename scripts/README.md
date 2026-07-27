@@ -15,7 +15,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
-| `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--yes`, `--no-watch` |
+| `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`. Target `release` ships one commit to every service in order |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/AWS_SETUP.md` § "The ci-trust anchor". |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
@@ -173,18 +173,37 @@ button on the command line.
 # Deploy a service — prompts, then follows the run to completion:
 ./scripts/prod-deploy.sh api
 
+# Ship one specific commit rather than main's HEAD:
+./scripts/prod-deploy.sh api --input sha=abc1234
+
+# Ship one commit to every service, in dependency order:
+./scripts/prod-deploy.sh release
+
 # Fire and forget:
 ./scripts/prod-deploy.sh --yes --no-watch app
 ```
 
-Targets are `prod-infra`, `api`, `app`, `marketing`, and `shared-infra`.
+Targets are `release`, `prod-infra`, `api`, `mailer`, `app`, `marketing`, and
+`shared-infra`.
 
-**Use `prod-infra` for infrastructure changes.** `infra/envs/prod` is a single
-root module with a single state, so `terraform apply` there reconciles *all* of
-it — and `api`, `app` and `marketing` each begin by doing exactly that before
-deploying their own code. That makes any of them capable of carrying an
-infra-only change, at the cost of redeploying a service you never meant to
-touch. `infra-prod.yml` does the apply and stops.
+**A service deploy promotes; it does not rebuild.** The container repositories
+are shared across environments, so the image staging validated already sits in
+the repository prod pulls from — the workflow resolves that commit's
+`sha-<commit>` tag to an immutable digest and deploys it. It also refuses to
+run unless that exact commit has a successful staging deploy; `--input
+force=true` bypasses the check for a hotfix and says so loudly in the job
+summary. (The Flutter app rebuilds, because it bakes its environment in at
+compile time — it pins an explicit Flutter version so the compiler cannot drift
+between the staging run and the prod one.)
+
+**Use `prod-infra` for infrastructure changes — it is now the only way.**
+`infra/envs/prod` is a single root module with a single state, so
+`terraform apply` there reconciles *all* of it. The service workflows used to
+begin with exactly that apply, which meant any of them could carry an
+infra-only change while redeploying a service you never meant to touch — and,
+worse, could drag unrelated infra drift into production alongside a routine
+code deploy. They no longer apply Terraform at all; they only read outputs.
+`infra-prod.yml` does the apply and stops.
 
 It defaults to `mode: plan`, which is read-only and writes the plan to the run's
 job summary. That is the only way to see a plan against real prod state:

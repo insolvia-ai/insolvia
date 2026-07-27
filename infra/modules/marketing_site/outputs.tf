@@ -13,9 +13,17 @@ output "assets_bucket_name" {
   value       = aws_s3_bucket.assets.id
 }
 
+# Passed straight through, so the env roots and the deploy workflows' existing
+# `terraform output -raw marketing_ecr_repository_url` keep working now that the
+# repository is shared rather than module-owned.
 output "ecr_repository_url" {
-  description = "ECR repository URL the SSR image is pushed to."
-  value       = aws_ecr_repository.ssr.repository_url
+  description = "ECR repository URL the SSR image is pushed to (shared across environments)."
+  value       = var.ecr_repository_url
+}
+
+output "ssr_alias_name" {
+  description = "Alias serving traffic. The deploy workflow shifts it only after the new version passes its smoke test."
+  value       = aws_lambda_alias.live.name
 }
 
 output "ssr_function_name" {

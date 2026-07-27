@@ -29,7 +29,7 @@ variable "mailer_subdomain" {
 }
 
 variable "marketing_image_tag" {
-  description = "ECR image tag the marketing SSR Lambda is created from (creation-time only; CI owns it afterwards)."
+  description = "ECR image tag the marketing SSR Lambda is seeded from (creation-time only; CI owns the running image afterwards). Defaults to this environment's moving marker tag — NOT `latest`, which under the shared insolvia-marketing repository would mean whatever any environment pushed last."
   type        = string
-  default     = "latest"
+  default     = "prod"
 }

@@ -9,11 +9,11 @@ each with its own isolated S3 state — never Terraform workspaces.
 infra/
 ├── modules/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
-│   ├── api_service/          # reusable: ECR + Docker Lambda + HTTP API + custom domain
+│   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
 │   │                         #   + web (SPA) and desktop (loopback) PKCE app clients
-│   └── marketing_site/       # SSR marketing site: ECR + Lambda + HTTP API + S3 +
+│   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex) + DynamoDB waitlist table
 └── envs/
     ├── shared/               # account-wide, env-independent
@@ -34,9 +34,9 @@ infra/
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
 |---|---|---|
 | ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-github-actions` deploy role + its policy — **human-applied only**, never by CI (see below) |
-| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS |
-| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
-| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (ECR, Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
+| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-api`, `insolvia-marketing`, `insolvia-mailer` — one per service, shared by every env) |
+| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
+| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
 | dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-waitlist-dev-<short-id>` table and `insolvia-users-dev-<short-id>` pool |
 
 ## Cross-layer references (data sources, not outputs)
@@ -62,8 +62,17 @@ data "aws_acm_certificate" "wildcard" {
 One instance per environment (issue #63): `staging-api.insolvia.ai` and
 `api.insolvia.ai`. Each owns, per env:
 
-- **ECR** `insolvia-api-<env>` — scan on push, keep-last-10 lifecycle. Separate
-  repos per env, so a prod deploy can never reference a staging image.
+- **ECR** — *not* owned per env. One repository per service, `insolvia-api`,
+  shared by staging and prod and created in `envs/shared`. This **reverses**
+  the original "separate repos per env, so a prod deploy can never reference a
+  staging image": prod now deliberately deploys the exact image digest staging
+  validated, which requires one place both envs can name it. Environment
+  isolation lives in separate Lambdas, roles, tables, SSM namespaces and
+  Cognito pools — never in separate image stores, and the image is
+  environment-agnostic by construction (every service reads its environment at
+  runtime). Retention is time-based with no catch-all rule, because ECR
+  lifecycle rules only ever *expire* and never *protect*: a catch-all would
+  evict the digest prod is running once staging churned past it.
 - **Lambda (Image)** `insolvia-api-<env>` — 30 s / 512 MB, Flask+Mangum from
   `services/api/`. `lifecycle { ignore_changes = [image_uri, environment] }`:
   the **deploy workflow owns both** — it pushes an image and injects the
@@ -101,8 +110,8 @@ deadlocks**: Terraform owns the repo the image must already be in. Once per
 env:
 
 ```
-terraform apply -target=module.api_service.aws_ecr_repository.api
-docker build --target lambda -t <repo-url>:latest services/api && docker push <repo-url>:latest
+terraform -chdir=infra/envs/shared apply          # creates insolvia-api
+docker build --target lambda -t <repo-url>:<env> services/api && docker push <repo-url>:<env>
 terraform apply
 ```
 
@@ -207,13 +216,15 @@ viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  �
   `api_service`, and the marketing Lambda holds no AWS data-plane access
   (docs/adr/0001).
 - **Image lifecycle**: Terraform creates the Lambda from
-  `<ecr>:{var.marketing_image_tag}` and then ignores `image_uri`; CI rolls
-  images forward with `aws lambda update-function-code`. **First apply** needs
-  the image to exist: `terraform apply -target=module.marketing_site.aws_ecr_repository.ssr`,
-  push the image, then a full apply.
+  `<ecr>:{var.marketing_image_tag}` (this env's moving marker tag) and then
+  ignores `image_uri`; CI rolls images forward with
+  `aws lambda update-function-code`. **First apply** needs the image to exist:
+  apply `infra/envs/shared` (which creates the repository), push the image,
+  then a full apply.
 
-Names: `insolvia-marketing-prod` (ECR), `insolvia-marketing-ssr-prod`
-(Lambda + HTTP API + role), `insolvia-marketing-assets-prod` (S3).
+Names: `insolvia-marketing` (ECR — shared across envs, no suffix),
+`insolvia-marketing-ssr-prod` (Lambda + HTTP API + role),
+`insolvia-marketing-assets-prod` (S3).
 
 ## Providers
 
@@ -236,10 +247,20 @@ ci-trust  →  shared  →  staging  →  prod
 workflow touches it — because the deploy role can't grant itself permissions
 (`DenySelfPrivilegeEscalation`). Then `shared` (zone + cert + SES). CI applies
 `staging` on merge to `main`; `prod` is `workflow_dispatch`-gated. The ordering
-is not ceremonial: every env looks the cert up with `statuses = ["ISSUED"]`, so
-in a fresh account nothing downstream can even plan until `shared` has applied
-and the cert has issued, and `shared` itself can't be CI-applied until the
-`ci-trust` role exists. The first `shared` apply must be preceded by a manual
+is not ceremonial, for two independent reasons: every env looks the cert up
+with `statuses = ["ISSUED"]`, **and** every env looks its container
+repositories up with `data "aws_ecr_repository"`. Both hard-fail until
+`shared` has applied, so in a fresh account nothing downstream can even plan
+before then — and `shared` itself can't be CI-applied until the `ci-trust`
+role exists.
+
+Note that CI does **not** order `shared` against `staging`:
+`shared-infra-deploy.yml` uses concurrency group `insolvia-shared-infra` while
+the staging deploys use `insolvia-terraform-staging`, so on a merge that
+touches both they run concurrently. `shared` normally wins comfortably
+(creating a repository takes seconds; staging spends far longer in
+`terraform init` before it resolves any data source), but a staging run that
+loses the race fails on the lookup and simply needs re-running. The first `shared` apply must be preceded by a manual
 `terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13) — that
 import is done in this account.
 

@@ -144,6 +144,109 @@ module "email" {
 }
 # ── end email ──────────────────────────────────────────────────
 
+# ── Container repositories ─────────────────────────────────────
+# One repo per SERVICE, shared by every environment — deliberately NOT one per
+# environment. This reverses the original #63 arrangement (insolvia-api-staging
+# / insolvia-api-prod), and the reversal is the whole point of the promotion
+# pipeline: prod deploys the exact image digest staging validated, so there has
+# to be one place both environments can name it.
+#
+# The rule that replaced: "separate repos, so a prod deploy can never pick up a
+# staging build." That protected against prod *accidentally* running a staging
+# image. Environment isolation does not live here and never did — it lives in
+# separate Lambdas, IAM roles, DynamoDB tables, SSM namespaces and Cognito
+# pools. An image is the one artifact that is identical across environments by
+# construction: every service reads its environment at RUNTIME (the API from
+# SSM, the marketing SSR from process.env, the mailer from its Lambda env), so
+# nothing environment-specific is ever baked into a layer.
+#
+# These are the only `insolvia-<thing>` resources with no `-<env>` suffix. That
+# is the shared-layer convention (see infra/CLAUDE.md) — the name carries no
+# environment because the resource genuinely has none.
+#
+# Named `insolvia-*` so the deploy role's existing ECR grant covers them without
+# an IAM change (infra/envs/ci-trust/main.tf) — that grant is human-applied, so
+# a rename here would strand the pipeline.
+locals {
+  container_repositories = toset(["api", "marketing", "mailer"])
+}
+
+resource "aws_ecr_repository" "service" {
+  for_each = local.container_repositories
+
+  name = "insolvia-${each.key}"
+  # MUTABLE is load-bearing: `staging` and `prod` are moving marker tags that CI
+  # repoints at each deploy (see the lifecycle policy below).
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.common_tags
+}
+
+# Retention is TIME-based, and there is deliberately no catch-all rule.
+#
+# Two traps this avoids, both of which would delete the image a live Lambda is
+# running:
+#
+#   1. Count-based retention breaks under a shared repo. The old policy kept the
+#      10 newest images, which was fine when one repo served one environment.
+#      Staging now pushes on every merge to main while prod deploys rarely, so
+#      ~10 merges would evict the digest prod is serving. Staging's *rate* has
+#      nothing to do with prod's *recency*; a time window is the only bound that
+#      tracks what is actually still in use.
+#   2. ECR lifecycle rules only ever EXPIRE — they never PROTECT. A "keep the 30
+#      newest prod images" rule at priority 1 does not shield those images from
+#      a `tagStatus = "any"` rule at priority 3; the catch-all still selects and
+#      expires them. The only safe policy is one where no rule can select an
+#      in-use image, which means no catch-all at all.
+#
+# The invariant to preserve when editing this: THE DIGEST ANY LIVE FUNCTION
+# POINTS AT MUST REMAIN IN ECR. Rolling back via `update-alias` needs only the
+# published Lambda version, but re-deploying an old commit needs its image.
+#
+# 180 days is sized so a release freeze cannot outlive prod's running image.
+# Because layers are shared across builds, real storage sits far below
+# (image count x image size).
+resource "aws_ecr_lifecycle_policy" "service" {
+  for_each = aws_ecr_repository.service
+
+  repository = each.value.name
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged images after a day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
+      },
+      {
+        # Matches the `sha-<git-sha>` build tags only. The `staging` and `prod`
+        # marker tags are never selected by any rule, so the image an
+        # environment is currently running is structurally exempt from
+        # expiry — that is the safety property, not an accident of ordering.
+        rulePriority = 2
+        description  = "Keep every build for 180 days"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["sha-"]
+          countType     = "sinceImagePushed"
+          countUnit     = "days"
+          countNumber   = 180
+        }
+        action = { type = "expire" }
+      },
+    ]
+  })
+}
+
 # ── Inbound mail: Google Workspace, not AWS ────────────────────
 # There is deliberately no inbound-mail stack here. hello@ / support@ /
 # security@ were once SES receipt rules writing to S3 and a forwarder Lambda

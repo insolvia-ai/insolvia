@@ -1,28 +1,72 @@
 name: Mailer · Deploy · Production
 
-# Steady-state deploy: apply the env, push a fresh image, point all three
-# mailer Lambdas (ingress/sender/feedback — one image, three entrypoints) at
-# it. Unlike api-prod.yml, there is no "re-derive Lambda environment from SSM"
-# step: every mailer Lambda's `environment` block is Terraform-managed (see
-# the lifecycle note in infra/modules/mailer/main.tf) — every value it sets is
-# deterministic from this module's own resources, so nothing needs deriving
-# out-of-band at deploy time. The apply above already reconciled it.
+# PROMOTES the image staging validated — it does not build one. The shared
+# insolvia-mailer repository (infra/envs/shared) already holds the image
+# staging tested, tagged `sha-<commit>`; this workflow resolves it to an
+# immutable digest and points all three mailer Lambdas
+# (ingress/sender/feedback — one image, three entrypoints) at it.
+#
+# The commit must have a successful `mailer-staging.yml` run before it can ship
+# (.github/actions/verified-commit), and the `insolvia-production` environment's
+# reviewers must approve if configured.
+#
+# Unlike api-prod.yml there is no "re-derive Lambda environment from SSM" step:
+# every mailer Lambda's `environment` block is Terraform-managed (see the
+# lifecycle note in infra/modules/mailer/main.tf) — every value is deterministic
+# from that module's own resources, so nothing needs deriving at deploy time.
+#
+# Also unlike api-prod.yml, there is no blue/green alias here. That is
+# deliberate, not an omission — see the mailer note in
+# infra/modules/mailer/main.tf: the smoke test below never reaches mailer code
+# (API Gateway's IAM authorizer rejects the unsigned request first), two of the
+# three Lambdas are queue consumers where "shift after a smoke test" is not a
+# meaningful model, and aliasing only `ingress` would create version skew
+# against consumers sharing its image and table schemas.
+#
+# This workflow no longer applies Terraform — `infra-prod.yml` is the only path
+# that mutates prod infrastructure.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
-# Image-package Lambda refuses to be created before its image exists, so the
-# apply below deadlocks. Bootstrap once by hand, per
-# infra/modules/mailer/main.tf:
-#   1. terraform apply -target=module.mailer.aws_ecr_repository.mailer
-#   2. docker build --target lambda services/mailer, tag <repo-url>:latest, push
+# Image-package Lambda refuses to be created before its image exists. Bootstrap
+# once by hand, per infra/modules/mailer/main.tf:
+#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-mailer)
+#   2. docker build --target lambda services/mailer, tag <repo-url>:prod, push
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.
 
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  # Also callable by the Release · Production orchestrator, which chains the
+  # services in a defined order. Same inputs as the manual dispatch above, so
+  # there is exactly one code path either way.
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
+  # Reading the staging workflow's run conclusions.
+  actions: read
 
 # Shared with every workflow that `terraform apply`s infra/envs/prod
 # (api-prod.yml, app-prod.yml, marketing-prod.yml, infra-prod.yml) — the S3
@@ -41,6 +85,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          staging-workflow: mailer-staging.yml
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -53,11 +104,12 @@ jobs:
           # `terraform output -raw` / `-json` command substitutions below.
           terraform_wrapper: false
 
-      - name: Apply prod infra
+      # Read-only: `output` needs the state, not an apply. Applying prod infra
+      # is infra-prod.yml's job — a code deploy must not carry infra drift.
+      - name: Read prod infra outputs
         id: tf
         run: |
-          terraform -chdir=infra/envs/prod init
-          terraform -chdir=infra/envs/prod apply -auto-approve
+          terraform -chdir=infra/envs/prod init -input=false
           {
             echo "repo=$(terraform -chdir=infra/envs/prod output -raw mailer_ecr_repository_url)"
             echo "domain=$(terraform -chdir=infra/envs/prod output -raw mailer_api_url)"
@@ -65,31 +117,20 @@ jobs:
           terraform -chdir=infra/envs/prod output -json mailer_lambda_function_names \
             > mailer-functions.json
 
-      - name: Log in to ECR
-        env:
-          REPO: ${{ steps.tf.outputs.repo }}
-        run: |
-          # The registry host is everything before the first `/` of the repo URL.
-          aws ecr get-login-password --region us-east-1 \
-            | docker login --username AWS --password-stdin "${REPO%%/*}"
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ steps.commit.outputs.sha }}
 
-      - name: Build and push image
-        env:
-          REPO: ${{ steps.tf.outputs.repo }}
-        run: |
-          # `:sha` is the immutable deploy reference; `:latest` exists only so
-          # a from-scratch `terraform apply` (whose Lambda seed points at
-          # `:latest`) finds an image.
-          docker build --target lambda \
-            -t "$REPO:${{ github.sha }}" \
-            -t "$REPO:latest" \
-            services/mailer
-          docker push "$REPO:${{ github.sha }}"
-          docker push "$REPO:latest"
-
+      # All three move together, to the same digest. They share one image with
+      # different image_config.command entrypoints and the same table schemas,
+      # so a partial update would mean version skew between the HTTP front door
+      # and the queue consumers. No alias here, deliberately: see the mailer
+      # note in infra/modules/mailer/main.tf.
       - name: Update Lambda code (ingress, sender, feedback)
         env:
-          REPO: ${{ steps.tf.outputs.repo }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
         run: |
           # One image, three entrypoints — mailer-functions.json is the
           # {ingress, sender, feedback} map from mailer_lambda_function_names.
@@ -98,7 +139,7 @@ jobs:
           for function in $(jq -r '.[]' mailer-functions.json); do
             aws lambda update-function-code \
               --function-name "$function" \
-              --image-uri "$REPO:${{ github.sha }}"
+              --image-uri "$IMAGE_URI"
           done
           for function in $(jq -r '.[]' mailer-functions.json); do
             aws lambda wait function-updated --function-name "$function"

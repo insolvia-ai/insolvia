@@ -1,0 +1,91 @@
+name: Release · Production
+
+# Ships one commit to every production service, in a defined order, from a
+# single dispatch.
+#
+# Before this existed, a release spanning more than one service meant
+# dispatching three or four workflows by hand and hoping you picked the same
+# commit each time — they all defaulted to "main HEAD at the moment the run
+# started", so a merge landing mid-release could silently split a release
+# across two commits. Here the commit is resolved once, up front, and passed
+# explicitly to every service.
+#
+# ORDER MATTERS, and it is not alphabetical:
+#   1. mailer     — the API depends on it (module.mailer's caller allowlist is
+#                   the API's role; the API reads MAILER_API_URL from SSM), so
+#                   the dependency ships before its dependent.
+#   2. api        — the backend everything else talks to.
+#   3. marketing  — its SSR waitlist action POSTs to the API, so the API should
+#                   already be serving the contract it expects.
+#   4. app        — the client, last: it should never be the first thing that
+#                   expects a new API.
+#
+# Each step is the SAME workflow you would dispatch by hand — they are reusable
+# via `workflow_call`, so there is exactly one code path either way, and each
+# still enforces its own staging-green gate and its own
+# `insolvia-production` environment approval. A failure stops the chain: `needs`
+# means a red mailer deploy never reaches the API.
+#
+# Prod INFRA is deliberately not part of this. `terraform apply` was removed
+# from the service deploys precisely so a code release cannot carry infra drift
+# with it — apply infra as its own deliberate act with `infra-prod.yml`
+# (`./scripts/prod-deploy.sh prod-infra`), before starting a release that needs
+# it.
+#
+# Not every service has something to ship for a given commit. A service whose
+# staging workflow was skipped by its `paths:` filter has no image tagged for
+# this commit, and its leg fails with a clear "no promotable image" message —
+# use the individual workflows for a single-service deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to release (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check on every service (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  mailer:
+    uses: ./.github/workflows/mailer-prod.yml
+    with:
+      sha: ${{ inputs.sha }}
+      force: ${{ inputs.force }}
+    # Environment-scoped secrets (AWS_ROLE_ARN) do not cross into a called
+    # workflow without this — they would resolve to empty strings and the OIDC
+    # step would fail with an unhelpful error.
+    secrets: inherit
+
+  api:
+    needs: mailer
+    uses: ./.github/workflows/api-prod.yml
+    with:
+      sha: ${{ inputs.sha }}
+      force: ${{ inputs.force }}
+    secrets: inherit
+
+  marketing:
+    needs: api
+    uses: ./.github/workflows/marketing-prod.yml
+    with:
+      sha: ${{ inputs.sha }}
+      force: ${{ inputs.force }}
+    secrets: inherit
+
+  app:
+    needs: marketing
+    uses: ./.github/workflows/app-prod.yml
+    with:
+      sha: ${{ inputs.sha }}
+      force: ${{ inputs.force }}
+    secrets: inherit

@@ -38,6 +38,17 @@ variable "acm_certificate_arn" {
   type        = string
 }
 
+variable "ecr_repository_url" {
+  description = "URL of the shared insolvia-api repository (created in infra/envs/shared, looked up by the env root). Shared across environments so prod can deploy the exact digest staging validated — see the container-repository note in main.tf."
+  type        = string
+}
+
+variable "image_tag" {
+  description = "Moving per-environment marker tag CI repoints at each deploy ('staging' / 'prod'). Only the first-apply seed for the Lambda; every later deploy sets image_uri by digest."
+  type        = string
+  default     = "latest"
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

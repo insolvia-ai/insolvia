@@ -31,6 +31,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
+          # weeks after a staging run could compile with a different Flutter than the
+          # one staging validated — which would quietly break the "prod ships what
+          # staging tested" guarantee this pipeline exists to provide.
+          flutter-version: "3.44.6"
       - run: flutter pub get
       - name: Build web (staging)
         run: flutter build web --dart-define=INSOLVIA_ENV=staging
@@ -48,6 +53,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
+          # weeks after a staging run could compile with a different Flutter than the
+          # one staging validated — which would quietly break the "prod ships what
+          # staging tested" guarantee this pipeline exists to provide.
+          flutter-version: "3.44.6"
       - run: flutter pub get
       - name: Build macOS (staging, unsigned)
         run: flutter build macos --dart-define=INSOLVIA_ENV=staging

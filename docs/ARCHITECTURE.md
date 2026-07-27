@@ -111,6 +111,39 @@ deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
 `*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
 real (prod is dispatched manually).
 
+### Production deploys promote; they do not rebuild
+
+Merging to `main` ships staging. Production is a separate, manual dispatch —
+`./scripts/prod-deploy.sh <target>`, or `release` to ship one commit to every
+service in order. Three things make that dispatch safe:
+
+- **It ships the artifact staging validated.** The container repositories are
+  shared across environments (`infra/envs/shared`), so the image staging tested
+  is already in the repository prod pulls from. A prod deploy resolves the
+  commit's `sha-<commit>` tag to an immutable digest and deploys *that* — there
+  is no `docker build` in any prod workflow. The Flutter app is the one
+  exception and rebuilds, because it selects its environment at compile time
+  (see *Environment model* above); it pins an explicit Flutter version so
+  "same source" also means "same compiler".
+- **It refuses commits staging never blessed.** `.github/actions/verified-commit`
+  fails the run unless that exact commit has a successful `*-staging.yml` run.
+  There is no `workflow_run` chain, so ordering is asserted rather than assumed.
+  `force: true` bypasses it for a hotfix, loudly, in the job summary.
+- **Traffic moves last.** The API and marketing SSR Lambdas sit behind a `live`
+  alias. A deploy publishes a new version, smoke-tests it by its own version
+  ARN while nothing routes to it, and shifts the alias only on success — so a
+  failed smoke test leaves the previous version serving instead of leaving a
+  broken build live. Rollback is `aws lambda update-alias --function-version
+  <previous>`: seconds, no rebuild, no image pull.
+
+Prod deploys no longer run `terraform apply`. Applying prod infrastructure is
+`infra-prod.yml` alone (`prod-deploy.sh prod-infra`, `mode: plan` by default),
+so a routine code deploy cannot carry unrelated infra drift into production.
+
+The human gate is the `insolvia-production` GitHub Environment's **required
+reviewers** — like the required status checks below, that is a repo-settings
+change nothing in this repo can make for itself.
+
 ### PR gates have no `paths:` filter — on purpose
 
 Every `*-pr.yml` triggers on **every** pull request, and each job guards its own

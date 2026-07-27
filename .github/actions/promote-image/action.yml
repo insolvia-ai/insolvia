@@ -1,0 +1,78 @@
+name: Promote image
+description: >-
+  Resolve the image digest a commit produced in the shared ECR repository, so
+  production deploys the exact bytes staging validated instead of rebuilding.
+
+# WHY THIS EXISTS
+#
+# Production used to run its own `docker build` from source. Same source is not
+# the same artifact: a rebuild picks up whatever base image, transitive
+# dependency and toolchain happen to resolve at that moment, so "it passed on
+# staging" guaranteed nothing about the thing prod actually ran.
+#
+# Since the ECR repositories are shared across environments
+# (infra/envs/shared/main.tf), the image staging tested is already sitting in
+# the repository prod pulls from. Promotion is therefore a lookup, not a build:
+# resolve `sha-<commit>` to its immutable digest and deploy THAT.
+#
+# Digest, not tag, is what gets deployed. A tag is a mutable pointer — a later
+# push could move it between this lookup and the Lambda update. `@sha256:...`
+# names one specific manifest and cannot drift.
+
+inputs:
+  repository-url:
+    description: "Full ECR repository URL, e.g. <acct>.dkr.ecr.us-east-1.amazonaws.com/insolvia-api."
+    required: true
+  sha:
+    description: "Commit whose build should be promoted. Looked up as the tag `sha-<sha>`."
+    required: true
+
+outputs:
+  image-uri:
+    description: "Digest-pinned image URI to deploy: <repository-url>@sha256:<digest>."
+    value: ${{ steps.resolve.outputs.image_uri }}
+  digest:
+    description: "The resolved image digest."
+    value: ${{ steps.resolve.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        REPOSITORY_URL: ${{ inputs.repository-url }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        set -euo pipefail
+
+        # The repository NAME is everything after the registry host; the AWS
+        # CLI takes the name, while Lambda takes the full URL.
+        repo_name="${REPOSITORY_URL#*/}"
+        tag="sha-$SHA"
+
+        digest="$(aws ecr describe-images \
+          --repository-name "$repo_name" \
+          --image-ids "imageTag=$tag" \
+          --query 'imageDetails[0].imageDigest' \
+          --output text 2>/dev/null || true)"
+
+        if [[ -z "$digest" || "$digest" == "None" ]]; then
+          echo "::error::No image tagged $tag in $repo_name — staging never pushed this commit."
+          {
+            echo ":no_entry: **No promotable image.** \`$repo_name\` has no \`$tag\`."
+            echo
+            echo "The staging deploy for this commit is what pushes it. If staging"
+            echo "was skipped by a \`paths:\` filter, this service has nothing new"
+            echo "to ship for this commit."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+
+        echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        echo "image_uri=${REPOSITORY_URL}@${digest}" >> "$GITHUB_OUTPUT"
+        {
+          echo ":package: Promoting \`$tag\` → \`${digest}\`"
+          echo
+          echo "Built and validated on staging; not rebuilt."
+        } >> "$GITHUB_STEP_SUMMARY"

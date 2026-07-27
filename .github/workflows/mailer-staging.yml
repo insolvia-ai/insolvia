@@ -12,8 +12,8 @@ name: Mailer · Deploy · Staging
 # Image-package Lambda refuses to be created before its image exists, so the
 # apply below deadlocks. Bootstrap once by hand, per
 # infra/modules/mailer/main.tf:
-#   1. terraform apply -target=module.mailer.aws_ecr_repository.mailer
-#   2. docker build --target lambda services/mailer, tag <repo-url>:latest, push
+#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-mailer)
+#   2. docker build --target lambda services/mailer, tag <repo-url>:staging, push
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.
 #
@@ -85,15 +85,19 @@ jobs:
         env:
           REPO: ${{ steps.tf.outputs.repo }}
         run: |
-          # `:sha` is the immutable deploy reference; `:latest` exists only so
-          # a from-scratch `terraform apply` (whose Lambda seed points at
-          # `:latest`) finds an image.
+          # `sha-<sha>` is the immutable build identity — the tag a production
+          # promotion resolves to a digest. `staging` is a MOVING marker tag
+          # meaning "the image this environment currently runs"; it is what a
+          # from-scratch `terraform apply` seeds the Lambda from
+          # (var.image_tag). `:latest` is deliberately gone: the repository is
+          # now shared with prod, where `latest` would mean "whatever any
+          # environment pushed last".
           docker build --target lambda \
-            -t "$REPO:${{ github.sha }}" \
-            -t "$REPO:latest" \
+            -t "$REPO:sha-${{ github.sha }}" \
+            -t "$REPO:staging" \
             services/mailer
-          docker push "$REPO:${{ github.sha }}"
-          docker push "$REPO:latest"
+          docker push "$REPO:sha-${{ github.sha }}"
+          docker push "$REPO:staging"
 
       - name: Update Lambda code (ingress, sender, feedback)
         env:
@@ -106,7 +110,7 @@ jobs:
           for function in $(jq -r '.[]' mailer-functions.json); do
             aws lambda update-function-code \
               --function-name "$function" \
-              --image-uri "$REPO:${{ github.sha }}"
+              --image-uri "$REPO:sha-${{ github.sha }}"
           done
           for function in $(jq -r '.[]' mailer-functions.json); do
             aws lambda wait function-updated --function-name "$function"

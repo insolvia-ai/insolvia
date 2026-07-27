@@ -51,11 +51,18 @@ variable "api_base_url" {
   type        = string
 }
 
+variable "ecr_repository_url" {
+  description = "URL of the shared insolvia-marketing repository (created in infra/envs/shared, looked up by the env root). Shared across environments so prod can deploy the exact digest staging validated — see the container-repository note in main.tf."
+  type        = string
+}
+
 variable "image_tag" {
   description = <<-EOT
-    ECR image tag the SSR Lambda is created from. Only consulted at creation:
-    after that the deploy workflow owns the running image
-    (lifecycle ignore_changes on image_uri).
+    Moving per-environment marker tag ('staging' / 'prod') that CI repoints at
+    each deploy. Only consulted at creation: after that the deploy workflow
+    owns the running image (lifecycle ignore_changes on image_uri). Not
+    `latest` — under a shared repository that would mean "whatever any
+    environment pushed last".
   EOT
   type        = string
   default     = "latest"

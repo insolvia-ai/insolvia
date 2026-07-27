@@ -1,0 +1,116 @@
+name: Verified commit
+description: >-
+  Resolve the commit a production deploy should ship, and refuse to proceed
+  unless that exact commit already deployed green to staging.
+
+# WHY THIS EXISTS
+#
+# Production deploys are `workflow_dispatch`-only, which makes "deploy prod" a
+# deliberate human act — but dispatching alone proved too weak a gate in two
+# ways this action closes:
+#
+#   1. A dispatch used to build whatever `main` pointed at WHEN THE RUN
+#      STARTED. Anything merged between your staging test and your dispatch
+#      rode along silently. Callers now pass an explicit `sha`, or accept
+#      main's HEAD — either way the resolved commit is echoed into the job
+#      summary, so what shipped is a matter of record rather than inference.
+#   2. Nothing checked that the commit had ever *worked*. There is no
+#      `workflow_run` chain in this repo (deliberately — see the deploy
+#      workflows' concurrency comments), so ordering has to be asserted rather
+#      than assumed. This action asserts it.
+#
+# The check is "did the matching *-staging.yml conclude successfully for THIS
+# sha", not "is staging green now". A later unrelated staging failure must not
+# block promoting a commit that genuinely passed, and a later staging success
+# must not bless a commit that failed.
+
+inputs:
+  staging-workflow:
+    description: >-
+      Filename of the staging workflow that must have succeeded for this
+      commit, e.g. `api-staging.yml`.
+    required: true
+  sha:
+    description: >-
+      Commit to deploy. Empty means "main's current HEAD", resolved through the
+      API rather than the local checkout so the answer matches what GitHub will
+      actually build.
+    required: false
+    default: ""
+  force:
+    description: >-
+      Skip the staging-green check. For shipping a hotfix while staging is
+      broken for unrelated reasons — the run still requires whatever approval
+      the `insolvia-production` environment demands, and says loudly in the job
+      summary that the check was bypassed.
+    required: false
+    default: "false"
+
+outputs:
+  sha:
+    description: "The full 40-character commit SHA this deploy should ship."
+    value: ${{ steps.resolve.outputs.sha }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        INPUT_SHA: ${{ inputs.sha }}
+        WORKFLOW: ${{ inputs.staging-workflow }}
+        FORCE: ${{ inputs.force }}
+      run: |
+        set -euo pipefail
+
+        if [[ -n "$INPUT_SHA" ]]; then
+          # Resolve through the API: this both expands a short SHA to the full
+          # 40 characters and proves the commit exists on the remote. A typo'd
+          # SHA must fail here, not halfway through a deploy.
+          sha="$(gh api "repos/$REPO/commits/$INPUT_SHA" --jq .sha)" || {
+            echo "::error::Commit '$INPUT_SHA' does not exist on $REPO."
+            exit 1
+          }
+        else
+          sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+        fi
+        subject="$(gh api "repos/$REPO/commits/$sha" --jq .commit.message | head -1)"
+        echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### Deploying \`${sha:0:7}\`"
+          echo
+          echo "> $subject"
+          echo
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if [[ "$FORCE" == "true" ]]; then
+          echo "::warning::Staging-green check BYPASSED (force=true) for ${sha:0:7}."
+          {
+            echo ":warning: **Staging check bypassed** (\`force: true\`)."
+            echo "This commit was not verified against \`$WORKFLOW\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        # `status=success` filters on the RUN's conclusion, so a run that is
+        # still in progress does not count as a pass — promoting mid-run would
+        # be promoting an image that may not exist yet.
+        runs="$(gh api \
+          "repos/$REPO/actions/workflows/$WORKFLOW/runs?head_sha=$sha&status=success" \
+          --jq '.workflow_runs | length')"
+
+        if [[ "$runs" -eq 0 ]]; then
+          echo "::error::No successful $WORKFLOW run for ${sha:0:7} — refusing to deploy to production."
+          {
+            echo ":no_entry: **Blocked.** \`$WORKFLOW\` has no successful run for \`${sha:0:7}\`."
+            echo
+            echo "Merge the commit and let staging deploy first, or re-dispatch with"
+            echo "\`force: true\` if staging is broken for unrelated reasons."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi
+
+        echo ":white_check_mark: Verified: \`$WORKFLOW\` succeeded for \`${sha:0:7}\`." >> "$GITHUB_STEP_SUMMARY"

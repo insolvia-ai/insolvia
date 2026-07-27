@@ -1,6 +1,6 @@
 # The Insolvia backend API (services/api): a Flask+Mangum Docker Lambda behind
 # an API Gateway HTTP API, one instance per environment (#62, #63). Owns the
-# whole per-env API stack: ECR repo, Lambda + execution role, HTTP API +
+# whole per-env API stack: Lambda + execution role, HTTP API +
 # custom domain + DNS, the waitlist DynamoDB table (moved here from the
 # marketing site per docs/adr/0001), the /insolvia/<env>/api SSM config
 # namespace (#70), and the CloudWatch alarms + SNS topic (#69).
@@ -12,16 +12,20 @@
 # say otherwise — see the custom-domain section below for the deviation note.
 #
 # ── Bootstrap order (read before the FIRST apply in a fresh account) ────────
-# An Image-package Lambda cannot be created without an existing image: the
-# apply deadlocks — Terraform owns the ECR repo, but `aws_lambda_function`
-# fails ("Source image ... does not exist") until an image has been pushed,
-# and the deploy workflow that pushes images targets a repo Terraform has not
-# created yet. Break the cycle in three steps, once per environment:
+# An Image-package Lambda cannot be created without an existing image:
+# `aws_lambda_function` fails ("Source image ... does not exist") until one has
+# been pushed. The repository itself is no longer part of the deadlock — it
+# lives in infra/envs/shared and is applied before any environment (see the
+# deployment order in docs/TERRAFORM_ARCHITECTURE.md) — so the cycle is now
+# just "seed an image, then apply", once per environment:
 #
-#   1. terraform apply -target=module.api_service.aws_ecr_repository.api
+#   1. apply infra/envs/shared (creates insolvia-api)
 #   2. build services/api
 #      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
-#      tag it <repo-url>:latest, and push it. Both flags matter when building
+#      tag it <repo-url>:<env> — this environment's moving marker tag, which is
+#      what `var.image_tag` seeds the Lambda from; `:latest` no longer exists,
+#      because under a shared repository it would mean "whatever any
+#      environment pushed last" — and push it. Both flags matter when building
 #      locally: the Lambda is x86_64, so an Apple Silicon default build ships
 #      an arm64 image; and Docker Desktop's provenance attestations produce an
 #      OCI index that CreateFunction rejects with "The image manifest, config
@@ -43,36 +47,55 @@ locals {
 }
 
 # ── Container repository ────────────────────────────────────────
-# One repo per environment (insolvia-api-staging / insolvia-api-prod), matching
-# the insolvia-<thing>-<env> naming convention. #63's "separate ECR tags per
-# environment" is satisfied by separate repos: staging and prod never share an
-# image reference, so a prod deploy can never pick up a staging build.
+# This module no longer OWNS a repository. `insolvia-api` is a single repo
+# shared by every environment, created in infra/envs/shared and passed in as
+# `var.ecr_repository_url`.
+#
+# That reverses #63's "one repo per environment, so a prod deploy can never
+# pick up a staging build". The reversal is deliberate and is the whole point
+# of the promotion pipeline: prod deploys the exact digest staging validated,
+# which requires one place both environments can name it. Environment
+# isolation lives where it always did — separate Lambdas, roles, tables, SSM
+# namespaces and Cognito pools — not in separate image stores. The image is
+# environment-agnostic by construction: this service reads its entire
+# environment from SSM at deploy time (see the Lambda's lifecycle note), so
+# nothing environment-specific is baked into a layer.
+#
+# See infra/envs/shared/main.tf for the repository and its retention policy.
 
-resource "aws_ecr_repository" "api" {
-  name                 = local.name
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
+# ── One-time state migration (transitional) ─────────────────────
+# The two resources above were DELETED from config, but they still live in the
+# staging and prod state files until each has applied once. Deleting the config
+# without these blocks would make the next apply plan a real DESTROY of
+# insolvia-api-<env> — a repository that still holds the image the RUNNING
+# Lambda pulls from. `aws_ecr_repository` has no `force_delete`, so that
+# destroy fails on RepositoryNotEmptyException and leaves a half-applied env.
+#
+# `removed { ... destroy = false }` makes it a state-only forget: Terraform
+# drops the resource without calling AWS, so no ecr:DeleteRepository is needed
+# and CI can run it. The live repositories stay put, still holding the previous
+# images — which is the rollback path until each environment has redeployed
+# from the shared repo.
+#
+# Declared in the MODULE, so one block drains both staging's and prod's state.
+# Mirrors the ci-trust extraction in infra/envs/shared/main.tf.
+#
+# These blocks are one-time. Delete them ONLY after BOTH staging and prod have
+# applied — removing them while prod's state still holds the repo puts the
+# DESTROY back. The orphaned insolvia-api-<env> repositories are then deleted
+# out of band, after a soak.
+removed {
+  from = aws_ecr_repository.api
+  lifecycle {
+    destroy = false
   }
-
-  tags = var.tags
 }
 
-resource "aws_ecr_lifecycle_policy" "api" {
-  repository = aws_ecr_repository.api.name
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep the ten newest API images"
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
-      }
-      action = { type = "expire" }
-    }]
-  })
+removed {
+  from = aws_ecr_lifecycle_policy.api
+  lifecycle {
+    destroy = false
+  }
 }
 
 # ── Waitlist storage ────────────────────────────────────────────
@@ -163,9 +186,21 @@ resource "aws_lambda_function" "api" {
   function_name = local.name
   role          = aws_iam_role.api.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.api.repository_url}:latest"
-  timeout       = 30
-  memory_size   = 512
+  # The per-environment marker tag, not `:latest`. Under a shared repository
+  # `:latest` would mean "whatever any environment pushed last", so a
+  # from-scratch prod apply would seed the prod Lambda from a staging build —
+  # a promotion-invariant violation in the one code path nobody watches.
+  # `staging` / `prod` are moving tags CI repoints at each deploy, so this seed
+  # means "the last image THIS environment ran".
+  image_uri   = "${var.ecr_repository_url}:${var.image_tag}"
+  timeout     = 30
+  memory_size = 512
+
+  # Publish a numbered version on every Terraform-driven change, so the alias
+  # below always has a real version to point at (an alias cannot target
+  # $LATEST). The deploy workflow publishes its own versions with
+  # `update-function-code --publish`.
+  publish = true
 
   environment {
     variables = {
@@ -194,6 +229,34 @@ resource "aws_cloudwatch_log_group" "lambda" {
   tags              = var.tags
 }
 
+# ── Blue/green alias ────────────────────────────────────────────
+# `live` is what API Gateway invokes. The deploy workflow publishes a new
+# version, smoke-tests THAT version directly by ARN, and only then repoints
+# this alias — so a failed smoke test leaves the previous version serving
+# instead of leaving a broken build live (the old order deployed first and
+# tested afterwards, with no way back).
+#
+# It also makes rollback near-instant and ECR-independent: a published version
+# is an immutable snapshot Lambda stores itself, so
+# `aws lambda update-alias --function-version <previous>` reverts in seconds
+# with no image pull. (That does NOT relax the shared repo's retention rule —
+# re-deploying an old commit still needs its image.)
+resource "aws_lambda_alias" "live" {
+  name             = "live"
+  description      = "The version serving traffic. function_version is owned by the deploy workflow."
+  function_name    = aws_lambda_function.api.function_name
+  function_version = aws_lambda_function.api.version
+
+  # MANDATORY, not defensive. Terraform never sees the workflow's publishes
+  # (image_uri is ignored above), so its copy of `version` is stale by
+  # construction. Without this, every apply would yank the alias back to an old
+  # version — and since each deploy workflow applies BEFORE it pushes, that is
+  # a self-inflicted rollback on literally every deploy.
+  lifecycle {
+    ignore_changes = [function_version]
+  }
+}
+
 # ── HTTP API ────────────────────────────────────────────────────
 # $default route -> the Lambda, payload format 2.0 — what Mangum consumes.
 # Flask owns all routing, so API Gateway stays a dumb front door. Everything is
@@ -211,10 +274,16 @@ resource "aws_apigatewayv2_api" "api" {
 resource "aws_apigatewayv2_integration" "lambda" {
   api_id                 = aws_apigatewayv2_api.api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.api.invoke_arn
+  integration_uri        = aws_lambda_alias.live.invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
   timeout_milliseconds   = 30000
+
+  # Terraform infers NO dependency between an integration and a permission.
+  # Without this, the same apply can repoint the integration at the alias
+  # before the alias-qualified permission exists — a burst of real 500s that
+  # the plan gives no hint of.
+  depends_on = [aws_lambda_permission.api_live]
 }
 
 resource "aws_apigatewayv2_route" "default" {
@@ -258,10 +327,28 @@ resource "aws_cloudwatch_log_group" "api_access" {
   tags              = var.tags
 }
 
+# The ORIGINAL unqualified permission. Superseded by `api_live` below, but kept
+# until every environment serves through the alias — adding `qualifier` to this
+# resource would force replacement, and Terraform's destroy-then-create leaves a
+# window with no permission at all. A second resource with a different
+# statement_id has no such window. Delete this once both environments are on the
+# alias.
 resource "aws_lambda_permission" "api" {
   statement_id  = "AllowApiGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
+# Lambda evaluates the ALIAS's own resource policy, so a grant on the
+# unqualified function ARN does not authorize invoking <function>:live. Without
+# this, flipping the integration to the alias returns 500s immediately.
+resource "aws_lambda_permission" "api_live" {
+  statement_id  = "AllowApiGatewayInvokeLive"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  qualifier     = aws_lambda_alias.live.name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }

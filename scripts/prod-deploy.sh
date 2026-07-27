@@ -13,6 +13,13 @@
 # the workflow via OIDC, so this script needs a `gh` login and nothing else —
 # no AWS credentials on your machine.
 #
+# What a production deploy now does: the service workflows PROMOTE the image
+# staging already validated (resolved to an immutable digest in the shared ECR
+# repository) rather than rebuilding, and each refuses to run unless that exact
+# commit has a successful staging deploy. Pass `--input sha=<commit>` to ship a
+# specific commit rather than main's HEAD, and `--input force=true` only to
+# bypass the staging check in an emergency.
+#
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,8 +38,10 @@ require_command() {
 # dispatchable, so it belongs on the same dashboard as the prod deploys.
 targets() {
   cat <<'EOF'
+release|release-prod.yml|Release · Production
 prod-infra|infra-prod.yml|Infra · Terraform apply · Production
 api|api-prod.yml|API · Deploy · Production
+mailer|mailer-prod.yml|Mailer · Deploy · Production
 app|app-prod.yml|App · Deploy · Production
 marketing|marketing-prod.yml|Marketing · Deploy · Production
 shared-infra|shared-infra-deploy.yml|Infra · Terraform apply · Shared
@@ -52,6 +61,14 @@ Usage: ${0##*/} [options] <target>
 Targets:
 $(targets | awk -F'|' '{ printf "  %-14s %-34s (%s)\n", $1, $3, $2 }')
 
+Common inputs (see --input):
+  sha=<commit>   Deploy this exact commit instead of main's HEAD. It must have
+                 deployed green to staging.
+  force=true     Skip the staging-green check. Emergencies only — the run still
+                 needs whatever approval the insolvia-production environment
+                 requires, and says so loudly in the job summary.
+  mode=apply     prod-infra only: apply instead of the read-only default plan.
+
 Options:
   --ref REF      Git ref to deploy from (default: main)
   --input K=V    Pass a workflow_dispatch input (repeatable)
@@ -64,13 +81,19 @@ Examples:
   ${0##*/} --list                 # what ran last, and how it went
   ${0##*/} prod-infra             # plan prod infra (read-only; the default)
   ${0##*/} prod-infra --input mode=apply
-  ${0##*/} api                    # deploy the API to production from main
+  ${0##*/} api                    # promote the API to production from main
+  ${0##*/} api --input sha=abc1234 # promote one specific commit
+  ${0##*/} release                # ship one commit to every service, in order
   ${0##*/} --yes --no-watch app   # fire and forget
 
 To change prod infrastructure, use 'prod-infra' — it applies infra/envs/prod
-and nothing else. The service targets each apply that same env as their first
-step and then redeploy their own code, so reaching for one of those to carry an
-infra change redeploys a service you did not mean to touch.
+and nothing else. The service targets NO LONGER apply Terraform at all: they
+only promote and deploy code, so an infra change will not ride along with a
+service deploy, and a service deploy will not carry unrelated infra drift into
+production. Apply infra deliberately, before the release that needs it.
+
+'release' chains mailer -> api -> marketing -> app for one commit. Use it when
+a change spans services; use a single service target otherwise.
 EOF
 }
 
