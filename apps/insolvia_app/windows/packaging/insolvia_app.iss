@@ -92,14 +92,16 @@ SetupIconFile=..\runner\resources\app_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-; Flutter Windows is x64-only; refuse to install on anything else rather than
-; installing a binary that cannot run. Spelled `x64` rather than the newer
-; `x64compatible` on purpose: `x64compatible` is a hard error on Inno Setup
-; older than 6.3, whereas `x64` is merely deprecated on 6.3+. Since we take
-; whatever version the GitHub runner image happens to ship, the spelling that
-; degrades to a warning is the safe one.
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+; Flutter Windows builds an x64 binary, so refuse anything that cannot run one.
+; `x64compatible`, not the older `x64`: the latter is deprecated (it means
+; "the OS is literally x64") and would refuse to install on an ARM64 Windows
+; machine, even though those run x64 binaries fine under emulation. Blocking a
+; Copilot+ laptop from installing would be a self-inflicted wound on a build
+; whose entire purpose is to be available when someone asks for desktop.
+; Requires Inno Setup >= 6.3; the runner image ships 6.7.1 (verified in CI) and
+; the `choco install innosetup` fallback is also 6.x.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
