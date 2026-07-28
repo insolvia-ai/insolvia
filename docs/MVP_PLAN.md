@@ -174,10 +174,10 @@ This matches `business-plan.html` §1, which already frames the wedge as
 *seamlessness*, with a native desktop option for offline keyboard-driven
 drafting rather than as the pitch itself.
 
-**⚠️ It does not match the root `CLAUDE.md`**, whose opening paragraph says the
-wedge *is* "meeting desktop-loyal attorneys where they are." A future session
-reading only CLAUDE.md would over-invest in desktop. **CLAUDE.md should be
-updated to match** — that's issue 4.12.
+**Fixed in 4.12.** The root `CLAUDE.md` and `README.md` both used to open on
+"meeting desktop-loyal attorneys where they are," which would have led a future
+session reading only those files to over-invest in desktop. Both now open on
+seamlessness and point here.
 
 **What this decision buys:**
 - Windows and Apple certificates come off the day-one procurement list, removing
@@ -488,7 +488,7 @@ separately."*
 | 4.4 | Minimal signed-in shell home page | Uses `AppScaffold` + `BrandWordmark` from the Flutter design system. Intentionally thin. |
 | 4.5 | Add the `windows/` Flutter target | Only `web/` and `macos/` are checked in today. |
 | 4.6 | Produce unsigned `setup.exe` (Windows) and `.dmg` (macOS) artifacts | Distribution is a download link — no store, no approval. Not linked from `www` per D8. |
-| 4.7 | CI: add `windows-latest` + `macos-latest` build jobs | Flutter desktop must be built on its target OS — no cross-compilation. Both runners bill at a multiplier over Linux minutes. |
+| 4.7 | CI: add `windows-latest` + `macos-latest` build jobs | Flutter desktop must be built on its target OS — no cross-compilation. **The 2×/10× minute multipliers do not apply here:** they bill against the included-minutes quota on *private* repos, and `insolvia-ai/insolvia` is public, where standard runners are free with unlimited minutes. The real costs are queueing against the per-OS concurrency limits and wall-clock time in the PR gate. Larger and GPU runners *are* billable on public repos — don't reach for them without a reason. |
 | 4.8 | **Keep both desktop targets green in CI** | Load-bearing under D8: an unpromoted target rots silently and breaks exactly when a prospect finally demands desktop. This is what preserves the option. |
 | 4.9 | Desktop auto-update — **deferred**, but write down the decision | Not needed while distribution is hand-held and few. Revisit before *any* firm depends on a desktop build day-to-day; retrofitting an updater is far worse than building one. macOS (Sparkle-style) and Windows (MSIX/installer) paths differ. |
 | 4.10 | Artifact hosting for the unsigned builds | S3 + CloudFront, unlinked. Enough to hand someone a URL. |

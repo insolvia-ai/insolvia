@@ -9,6 +9,7 @@ behind its *Where things live* table.
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Monorepo shape, environment model, hosting topology, CI/CD, PR-gate design + required-check contract. |
 | [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) | Infra state model, modules, naming, deploy order. |
 | [`AWS_SETUP.md`](AWS_SETUP.md) | One-time AWS/GitHub bootstrap runbook, incl. the ci-trust anchor. |
+| [`APP_DEPLOY_VERIFICATION.md`](APP_DEPLOY_VERIFICATION.md) | Proving `staging-app` / `app.insolvia.ai` actually deploy and serve — dispatch order, per-host checks, failure modes. |
 | [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) | How both design systems publish and how consumers install them. |
 | [`EMAIL_SETUP.md`](EMAIL_SETUP.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
 | [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) | The SES sandbox exit: checklist, request text, and the human AWS-console steps. |

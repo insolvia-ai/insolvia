@@ -1,9 +1,11 @@
 # Insolvia
 
 Modern, cross-platform bankruptcy case-preparation & e-filing for consumer
-bankruptcy law firms — a competitor to Best Case by Stretto. One **Dart/Flutter**
-codebase ships a native **desktop** app *and* a **web** app, so we can meet
-desktop-loyal attorneys where they are.
+bankruptcy law firms — a competitor to Best Case by Stretto. The wedge is
+*seamlessness*: living inside the firm's existing workflow instead of being one
+more disconnected petition silo. One **Dart/Flutter** codebase ships the **web**
+app we promote *and* a native **desktop** app, held ready for offline,
+keyboard-driven drafting.
 
 > **Agents:** read [`CLAUDE.md`](CLAUDE.md) first — it is the source of truth for
 > conventions in this monorepo.

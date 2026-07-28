@@ -1,8 +1,12 @@
 # Insolvia — agent guide
 
 Cross-platform bankruptcy case-prep & e-filing: one Dart/Flutter codebase for the
-desktop + web app, a React site for `www.insolvia.ai`. Monorepo on AWS, one
+web + desktop app, a React site for `www.insolvia.ai`. Monorepo on AWS, one
 shared design system.
+
+**Web is the promoted path; desktop is built but not promoted** — kept green in
+CI as an option, not led with. Don't over-invest in it: decision D8 in
+[`docs/MVP_PLAN.md`](docs/MVP_PLAN.md) owns this and says what reversing costs.
 
 **This file is a catalog.** It says where things live and what to open before
 touching them — read the linked file when your task needs it. Detail lives there,
