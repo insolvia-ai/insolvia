@@ -214,19 +214,11 @@ jobs:
           path: web
 
       - name: Sync to S3 + invalidate
-        env:
-          BUCKET: ${{ steps.tf.outputs.bucket }}
-          DIST: ${{ steps.tf.outputs.dist }}
-        run: |
-          # Hashed assets: cache forever, immutable (everything except HTML).
-          aws s3 sync web "s3://$BUCKET" --delete \
-            --cache-control "public,max-age=31536000,immutable" \
-            --exclude "*.html"
-          # HTML: never cache, so new deploys are picked up immediately.
-          aws s3 sync web "s3://$BUCKET" \
-            --cache-control "no-cache,no-store,must-revalidate" \
-            --exclude "*" --include "*.html"
-          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+        uses: ./.github/actions/web-bundle-sync
+        with:
+          dir: web
+          bucket: ${{ steps.tf.outputs.bucket }}
+          distribution-id: ${{ steps.tf.outputs.dist }}
 
       # ── The unsigned desktop artifacts ─────────────────────────────
       - id: names

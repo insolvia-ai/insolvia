@@ -82,9 +82,10 @@ also `workflow_dispatch`-able. In one run it:
 2. builds the unsigned macOS app (a separate job — it does not gate the deploy),
 3. applies `infra/envs/staging` and reads `bucket_name` / `distribution_id` out
    of the outputs,
-4. syncs the bundle to S3 in two passes — everything except `*.html` as
-   `public,max-age=31536000,immutable`, then the HTML as
-   `no-cache,no-store,must-revalidate` — and invalidates the distribution.
+4. syncs the bundle to S3 in three passes — long-lived payloads, then the
+   unhashed entrypoints, then the HTML — and invalidates the distribution.
+   The passes live in `.github/actions/web-bundle-sync`, which owns the
+   Cache-Control rules for both environments; check 6 below verifies them.
 
 Unlike prod, this workflow **does** apply Terraform. That is why merging an
 infra change to `main` is enough to stand staging up.
@@ -193,43 +194,54 @@ Expect a non-zero count. Treat this as supporting evidence only — dart2js
 constant-folds the environment switch, so what survives into the bundle is a
 compiler detail, and a zero here means "look with your eyes", not "wrong build".
 
-**6. Cache-Control is right on both classes of object.** This is what makes a
-deploy visible immediately without giving up long-lived asset caching.
+**6. Cache-Control is right on all three classes of object.** This is what makes
+a deploy visible immediately without giving up long-lived asset caching.
 
-Hashed assets — immutable:
+Keep in mind while reading the results that **Flutter web content-hashes
+nothing** — every filename it emits is stable while the bytes behind it change.
+So the split is by *what the file is for*, not by whether the name looks hashed.
+
+Long-lived payloads — the binaries whose bytes are stable in practice:
+
+```bash
+curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/assets/fonts/MaterialIcons-Regular.otf
+```
+
+Expect `cache-control: public, max-age=31536000`, and **no** `immutable`. The
+name is not content-addressed, so a hard reload has to remain able to recover.
+
+Unhashed entrypoints — cached, but revalidated every request:
 
 ```bash
 curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/main.dart.js
+curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/flutter_bootstrap.js
 ```
 
-Expect `cache-control: public, max-age=31536000, immutable`.
+Expect `cache-control: no-cache`. This is the class fixed in #49: these change
+on every deploy under an unchanging name, so anything with a `max-age` here
+pins a returning browser to a whole old build. Spot-check the rest of the
+class the same way — `flutter.js`, `flutter_service_worker.js`, `version.json`,
+`manifest.json`, `assets/AssetManifest.bin`.
 
-HTML — never cached:
+HTML — never stored:
 
 ```bash
 curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/index.html
 ```
 
 Expect `cache-control: no-cache, no-store, must-revalidate`. If HTML comes back
-`immutable`, the two sync passes ran in the wrong order or the `--exclude`
+with a `max-age`, the sync passes ran in the wrong order or the `--exclude`
 filters drifted, and browsers will pin a stale `index.html` for a year — the
 CloudFront invalidation will not save you, because the staleness is in the
-client.
+client. The same reasoning is why nothing in the entrypoint class may carry a
+`max-age` either.
 
 Check the deep-link response too: it is served from `/index.html`, so it must
-carry the HTML headers, not the immutable ones.
+carry the HTML headers, not the long-lived ones.
 
 ```bash
 curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/auth/callback
 ```
-
-> **Watch item, not a blocker.** The sync splits on `*.html` alone, so
-> Flutter's *unhashed* filenames — `flutter_bootstrap.js`,
-> `flutter_service_worker.js`, `version.json`, `manifest.json` — land in the
-> immutable pass. CloudFront is invalidated on every deploy so the CDN is fine,
-> but a returning browser can hold an old bootstrap. If you see a client stuck
-> on a previous build after a green deploy, this is the first place to look, and
-> it is worth its own issue rather than a hurried fix during a verification run.
 
 When all six pass, #9 is done: record the run URL on the issue and close it.
 
@@ -310,10 +322,10 @@ To pin an explicit commit rather than main's HEAD:
 ./scripts/prod-deploy.sh app --input sha=<full-40-char-sha>
 ```
 
-The workflow builds with `--dart-define=INSOLVIA_ENV=production`, syncs with the
-same two-pass cache rules, invalidates, and runs its own `curl` smoke check
-against the root. That smoke check proves the host answers; it does not prove
-the right bundle is on it. Run the six checks from Part 1 against
+The workflow builds with `--dart-define=INSOLVIA_ENV=production`, syncs through
+the same `web-bundle-sync` action, invalidates, and runs its own `curl` smoke
+check against the root. That smoke check proves the host answers; it does not
+prove the right bundle is on it. Run the six checks from Part 1 against
 `app.insolvia.ai` anyway — check 5 especially.
 
 When they pass, #10 is done.
@@ -331,4 +343,4 @@ When they pass, #10 is done.
 | Deep link 404s | The CloudFront SPA rewrite is missing from the distribution — `infra/modules/web_hosting/main.tf` lines 56–69, and confirm the module is instantiated for that env. |
 | `terraform output` empty in `app-prod.yml` | Prod infra has never been applied. Run `infra-prod.yml` with `mode=apply` first. |
 | Prod dispatch blocked, "no successful app-staging.yml run" | Working as designed. The commit has not deployed green to staging. |
-| A returning browser shows an old build after a green deploy | Suspect the unhashed-asset cache header noted in Part 1, check 6. |
+| A returning browser shows an old build after a green deploy | An unhashed entrypoint went up with a `max-age` — Part 1, check 6. CloudFront invalidation cannot reach a client-side cache. |

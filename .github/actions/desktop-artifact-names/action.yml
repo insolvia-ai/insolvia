@@ -18,8 +18,9 @@ description: >-
 # Two names per platform, on purpose:
 #
 #   • the VERSIONED name embeds version + short commit, so its bytes never
-#     change and it can be cached forever (`immutable`), exactly like the
-#     hashed web assets in the same workflows;
+#     change and it can genuinely be cached forever (`immutable`) — unlike
+#     anything in the web bundle, none of which is content-addressed at all
+#     (see .github/actions/web-bundle-sync);
 #   • the LATEST alias is a stable, memorable URL to actually hand someone —
 #     it is overwritten on every deploy and therefore must be served
 #     `no-cache`, exactly like index.html in the same workflows.
