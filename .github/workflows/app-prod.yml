@@ -27,6 +27,29 @@ name: App · Deploy · Production
 #
 # This workflow no longer applies Terraform — `infra-prod.yml` is the only path
 # that mutates prod infrastructure.
+#
+# ── Why the commit is resolved in its own job ─────────────────────────────────
+# The desktop artifacts cannot be cross-compiled, so they need `macos-latest`
+# and `windows-latest` runners — separate jobs from the ubuntu `deploy`. All
+# three must build the SAME commit, and "main's HEAD" is not a stable answer
+# across three jobs that start at different times: if `main` moved mid-run,
+# three independent resolutions could disagree and ship a mixed build. So
+# `resolve` runs the verified-commit check exactly once and every other job
+# checks out `needs.resolve.outputs.sha`. Both guarantees above are intact —
+# the commit is still staging-verified, and every job still pins Flutter.
+#
+# `resolve` and the two desktop builds are deliberately NOT
+# `environment: insolvia-production`-gated, only `deploy` is. They touch no AWS
+# credentials and publish nothing; running them first means a commit that never
+# passed staging is rejected *before* anyone is asked to approve a deploy.
+#
+# ── The desktop jobs are load-bearing (D8). Do not trim them. ─────────────────
+# Under D8 desktop is built but NOT promoted — it is the answer held in reserve
+# if attorneys refuse to leave the desktop habit. An unpromoted target rots
+# silently, so building and publishing it on every prod deploy is the entire
+# cost of keeping that option real (issue #16 / MVP_PLAN 4.8). The artifacts go
+# to an unlinked download host and are unsigned by design; nothing on
+# `www.insolvia.ai` links to them.
 
 on:
   workflow_dispatch:
@@ -70,13 +93,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Resolve + verify once, so every build job below ships the same commit.
+  resolve:
     runs-on: ubuntu-latest
-    environment: insolvia-production
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
-      # Checked out twice on purpose: this first checkout is only so the local
-      # composite action below exists. The build checkout follows, pinned to
-      # the verified commit.
       - uses: actions/checkout@v4
 
       - id: commit
@@ -86,10 +108,123 @@ jobs:
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
 
+  build-macos:
+    needs: resolve
+    runs-on: macos-latest
+    steps:
+      # Checked out at the verified commit, not at whatever `main` points at
+      # now — the whole point of the `resolve` job above.
       - name: Check out the verified commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.commit.outputs.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Pinned, not floating — see the header. This is what makes "same
+          # source" mean "same compiler".
+          flutter-version: "3.44.6"
+      - run: flutter pub get
+
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: production
+          # The verified commit, NOT github.sha — github.sha is whatever main
+          # points at now, which is exactly what this workflow refuses to trust.
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Build macOS (production, unsigned)
+        run: flutter build macos --dart-define=INSOLVIA_ENV=production
+        working-directory: apps/insolvia_app
+
+      # `hdiutil` rather than `create-dmg` — see the matching comment in
+      # app-staging.yml for the reasoning. Kept identical to staging on
+      # purpose: the prod artifact should differ from the staging one only in
+      # its compiled-in environment.
+      - name: Package .dmg (production, unsigned)
+        env:
+          DMG: ${{ steps.names.outputs.dmg }}
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/dmg"
+          rm -rf "$stage" && mkdir -p "$stage"
+          ditto apps/insolvia_app/build/macos/Build/Products/Release/insolvia_app.app \
+            "$stage/insolvia_app.app"
+          ln -s /Applications "$stage/Applications"
+          mkdir -p dist
+          hdiutil create \
+            -volname "Insolvia" \
+            -srcfolder "$stage" \
+            -ov -format UDZO \
+            "dist/$DMG"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insolvia-macos-production
+          path: dist/${{ steps.names.outputs.dmg }}
+          retention-days: 30
+
+  build-windows:
+    needs: resolve
+    runs-on: windows-latest
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Pinned, not floating — see the header.
+          flutter-version: "3.44.6"
+      - run: flutter pub get
+
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: production
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Build Windows (production, unsigned)
+        run: flutter build windows --dart-define=INSOLVIA_ENV=production
+        working-directory: apps/insolvia_app
+
+      - name: Package setup.exe (production, unsigned)
+        shell: pwsh
+        env:
+          INSTALLER_BASE: ${{ steps.names.outputs.installer_base }}
+          APP_VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
+          & $iscc /DInsolviaEnv=production "/DAppVersion=$env:APP_VERSION" `
+            "/DOutputBase=$env:INSTALLER_BASE" `
+            windows\packaging\insolvia_app.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        working-directory: apps/insolvia_app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insolvia-windows-production
+          path: apps/insolvia_app/build/windows/installer/${{ steps.names.outputs.exe }}
+          retention-days: 30
+
+  deploy:
+    needs: [resolve, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -125,6 +260,13 @@ jobs:
             echo "bucket=$(terraform -chdir=infra/envs/prod output -raw bucket_name)"
             echo "dist=$(terraform -chdir=infra/envs/prod output -raw distribution_id)"
             echo "url=$(terraform -chdir=infra/envs/prod output -raw url)"
+            # The unlinked download host for the unsigned desktop builds
+            # (download.insolvia.ai) — MVP_PLAN 4.10 / issue #18. Added by that
+            # infra PR, which must merge before this workflow runs green. Still
+            # read-only: `infra-prod.yml` remains the only path that mutates
+            # prod infrastructure.
+            echo "dl_bucket=$(terraform -chdir=infra/envs/prod output -raw download_bucket_name)"
+            echo "dl_dist=$(terraform -chdir=infra/envs/prod output -raw download_distribution_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Sync to S3 + invalidate
@@ -143,11 +285,66 @@ jobs:
             --exclude "*" --include "*.html"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
 
+      # ── The unsigned desktop artifacts (D8 — unlinked, not promoted) ────
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: production
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: insolvia-macos-production
+          path: desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: insolvia-windows-production
+          path: desktop
+
+      - name: Upload desktop artifacts + invalidate
+        env:
+          DL_BUCKET: ${{ steps.tf.outputs.dl_bucket }}
+          DL_DIST: ${{ steps.tf.outputs.dl_dist }}
+          DMG: ${{ steps.names.outputs.dmg }}
+          EXE: ${{ steps.names.outputs.exe }}
+          DMG_LATEST: ${{ steps.names.outputs.dmg_latest }}
+          EXE_LATEST: ${{ steps.names.outputs.exe_latest }}
+        run: |
+          set -euo pipefail
+
+          # Same two-tier caching as the web bundle above. The version+commit
+          # filenames are immutable and cached forever; the `-latest` aliases
+          # are overwritten every deploy and must never be cached, or a stale
+          # installer stays pinned in CloudFront for a year.
+          for f in "$DMG" "$EXE"; do
+            aws s3 cp "desktop/$f" "s3://$DL_BUCKET/desktop/$f" \
+              --cache-control "public,max-age=31536000,immutable"
+          done
+
+          aws s3 cp "desktop/$DMG" "s3://$DL_BUCKET/desktop/$DMG_LATEST" \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws s3 cp "desktop/$EXE" "s3://$DL_BUCKET/desktop/$EXE_LATEST" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+          # Only the mutable aliases need invalidating — the versioned keys are
+          # new objects nobody has cached yet.
+          aws cloudfront create-invalidation --distribution-id "$DL_DIST" \
+            --paths "/desktop/$DMG_LATEST" "/desktop/$EXE_LATEST"
+
       # A static bundle has no version to smoke-test before traffic moves, so
       # unlike the Lambda services this can only be verified after the fact.
       - name: Smoke check
         env:
           URL: ${{ steps.tf.outputs.url }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+          DMG_LATEST: ${{ steps.names.outputs.dmg_latest }}
+          EXE_LATEST: ${{ steps.names.outputs.exe_latest }}
         run: |
           curl -sSf -o /dev/null --retry 5 --retry-delay 3 --retry-all-errors "$URL/"
-          echo ":white_check_mark: \`$URL\` is serving commit \`${{ steps.commit.outputs.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ":white_check_mark: \`$URL\` is serving commit \`${SHA:0:7}\`."
+            echo ""
+            echo "Unsigned desktop builds (unlinked, per D8):"
+            echo "- macOS: \`desktop/$DMG_LATEST\`"
+            echo "- Windows: \`desktop/$EXE_LATEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"

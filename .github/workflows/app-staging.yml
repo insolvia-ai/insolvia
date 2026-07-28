@@ -46,6 +46,16 @@ jobs:
           path: apps/insolvia_app/build/web
           retention-days: 14
 
+  # ── Desktop: built but NOT promoted (D8), and kept green on purpose ────
+  # docs/MVP_PLAN.md D8 holds desktop as the answer if attorneys refuse to
+  # leave the desktop habit. Unpromoted targets rot silently, so these two jobs
+  # (plus their counterparts in app-pr.yml) are the entire cost of keeping that
+  # option open — issue #16 / MVP_PLAN 4.8. They are not dead weight; do not
+  # trim them because "nothing ships from desktop".
+  #
+  # Both artifacts are UNSIGNED under D8: no certificate is procured, so macOS
+  # shows the Gatekeeper block and Windows shows SmartScreen. That is expected
+  # and documented, not a defect.
   build-macos:
     runs-on: macos-latest
     steps:
@@ -59,22 +69,111 @@ jobs:
           # staging tested" guarantee this pipeline exists to provide.
           flutter-version: "3.44.6"
       - run: flutter pub get
+
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: staging
+
       - name: Build macOS (staging, unsigned)
         run: flutter build macos --dart-define=INSOLVIA_ENV=staging
         working-directory: apps/insolvia_app
-      - name: Zip .app
+
+      # Replaces the old `zip -r` of the .app: a .dmg is what issue #14 asks
+      # for and what the install walkthrough (MVP_PLAN 4.11) describes, and a
+      # zipped .app is the shape most likely to arrive "damaged" on the far
+      # side.
+      #
+      # `hdiutil` over `create-dmg`: hdiutil ships with macOS, so this step has
+      # no dependency and cannot break on a brew outage. `create-dmg` buys a
+      # prettier window background and icon layout — cosmetics, for a build D8
+      # says we hand to a handful of design partners and do not link publicly.
+      # Not worth a network install on every deploy. Revisit if desktop is ever
+      # promoted.
+      - name: Package .dmg (staging, unsigned)
+        env:
+          DMG: ${{ steps.names.outputs.dmg }}
         run: |
-          cd apps/insolvia_app/build/macos/Build/Products/Release
-          zip -r -y "$GITHUB_WORKSPACE/insolvia_app-staging.zip" insolvia_app.app
+          set -euo pipefail
+          stage="$RUNNER_TEMP/dmg"
+          rm -rf "$stage" && mkdir -p "$stage"
+          # `ditto`, not `cp -R`: it is the macOS-correct copy for a bundle,
+          # preserving the symlinks and extended attributes inside .app.
+          ditto apps/insolvia_app/build/macos/Build/Products/Release/insolvia_app.app \
+            "$stage/insolvia_app.app"
+          # The conventional drag-to-install target.
+          ln -s /Applications "$stage/Applications"
+          mkdir -p dist
+          hdiutil create \
+            -volname "Insolvia (Staging)" \
+            -srcfolder "$stage" \
+            -ov -format UDZO \
+            "dist/$DMG"
+
       - uses: actions/upload-artifact@v4
         with:
           name: insolvia-macos-staging
-          path: insolvia_app-staging.zip
+          path: dist/${{ steps.names.outputs.dmg }}
+          retention-days: 14
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Pinned, not floating — same reason as every other job here.
+          flutter-version: "3.44.6"
+      - run: flutter pub get
+
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: staging
+
+      - name: Build Windows (staging, unsigned)
+        run: flutter build windows --dart-define=INSOLVIA_ENV=staging
+        working-directory: apps/insolvia_app
+
+      # `flutter build windows` emits a directory, not something installable.
+      # The Inno Setup script that wraps it — and the reasoning behind the
+      # per-user, unsigned install — lives in
+      # apps/insolvia_app/windows/packaging/insolvia_app.iss.
+      - name: Package setup.exe (staging, unsigned)
+        shell: pwsh
+        env:
+          INSTALLER_BASE: ${{ steps.names.outputs.installer_base }}
+          APP_VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            # Preinstalled on the windows-latest image today; this is the
+            # fallback if that ever stops being true.
+            choco install innosetup -y --no-progress
+          }
+          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
+          & $iscc /DInsolviaEnv=staging "/DAppVersion=$env:APP_VERSION" `
+            "/DOutputBase=$env:INSTALLER_BASE" `
+            windows\packaging\insolvia_app.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        working-directory: apps/insolvia_app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: insolvia-windows-staging
+          path: apps/insolvia_app/build/windows/installer/${{ steps.names.outputs.exe }}
           retention-days: 14
 
   # ── Deploy ─────────────────────────────────────────────────────
   deploy:
-    needs: build-web
+    # The desktop builds gate the deploy so that one job holds the AWS
+    # credentials and one `terraform apply` produces every output consumed
+    # below. The cost is that the web deploy waits on the two desktop runners;
+    # accepted, because splitting the upload into its own job would mean a
+    # second `terraform` read racing the apply in the same run.
+    needs: [build-web, build-macos, build-windows]
     runs-on: ubuntu-latest
     environment: insolvia-staging
     steps:
@@ -88,14 +187,26 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` captures below — same reason app-prod.yml
+          # sets it.
+          terraform_wrapper: false
 
       - name: Apply staging infra
         id: tf
         run: |
           terraform -chdir=infra/envs/staging init
           terraform -chdir=infra/envs/staging apply -auto-approve
-          echo "bucket=$(terraform -chdir=infra/envs/staging output -raw bucket_name)" >> "$GITHUB_OUTPUT"
-          echo "dist=$(terraform -chdir=infra/envs/staging output -raw distribution_id)" >> "$GITHUB_OUTPUT"
+          {
+            echo "bucket=$(terraform -chdir=infra/envs/staging output -raw bucket_name)"
+            echo "dist=$(terraform -chdir=infra/envs/staging output -raw distribution_id)"
+            # The unlinked download host for the unsigned desktop builds
+            # (staging-download.insolvia.ai) — MVP_PLAN 4.10 / issue #18. These
+            # two outputs are added by that infra PR, which must merge before
+            # this workflow can run green.
+            echo "dl_bucket=$(terraform -chdir=infra/envs/staging output -raw download_bucket_name)"
+            echo "dl_dist=$(terraform -chdir=infra/envs/staging output -raw download_distribution_id)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v4
         with:
@@ -116,3 +227,58 @@ jobs:
             --cache-control "no-cache,no-store,must-revalidate" \
             --exclude "*" --include "*.html"
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      # ── The unsigned desktop artifacts ─────────────────────────────
+      - id: names
+        uses: ./.github/actions/desktop-artifact-names
+        with:
+          env: staging
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: insolvia-macos-staging
+          path: desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: insolvia-windows-staging
+          path: desktop
+
+      - name: Upload desktop artifacts + invalidate
+        env:
+          DL_BUCKET: ${{ steps.tf.outputs.dl_bucket }}
+          DL_DIST: ${{ steps.tf.outputs.dl_dist }}
+          DMG: ${{ steps.names.outputs.dmg }}
+          EXE: ${{ steps.names.outputs.exe }}
+          DMG_LATEST: ${{ steps.names.outputs.dmg_latest }}
+          EXE_LATEST: ${{ steps.names.outputs.exe_latest }}
+        run: |
+          set -euo pipefail
+
+          # Same two-tier caching as the web bundle above, for the same
+          # reason. The version+commit filenames are immutable, so they may be
+          # cached forever; the `-latest` aliases are overwritten on every
+          # deploy, so they must never be. Marking an alias immutable would pin
+          # a stale installer in CloudFront for a year.
+          for f in "$DMG" "$EXE"; do
+            aws s3 cp "desktop/$f" "s3://$DL_BUCKET/desktop/$f" \
+              --cache-control "public,max-age=31536000,immutable"
+          done
+
+          aws s3 cp "desktop/$DMG" "s3://$DL_BUCKET/desktop/$DMG_LATEST" \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws s3 cp "desktop/$EXE" "s3://$DL_BUCKET/desktop/$EXE_LATEST" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+          # Only the mutable aliases need invalidating — the versioned keys are
+          # new objects nobody has cached yet.
+          aws cloudfront create-invalidation --distribution-id "$DL_DIST" \
+            --paths "/desktop/$DMG_LATEST" "/desktop/$EXE_LATEST"
+
+          {
+            echo "### Unsigned desktop builds (staging)"
+            echo ""
+            echo "- macOS: \`desktop/$DMG_LATEST\`"
+            echo "- Windows: \`desktop/$EXE_LATEST\`"
+            echo ""
+            echo "Not linked from www, per D8. Unsigned — expect Gatekeeper / SmartScreen."
+          } >> "$GITHUB_STEP_SUMMARY"

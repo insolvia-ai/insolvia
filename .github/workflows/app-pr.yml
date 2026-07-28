@@ -1,11 +1,30 @@
 name: App · PR
 
 # No `on.pull_request.paths:` filter, deliberately — see
-# `.github/actions/changed-paths/action.yml`. Both jobs here are required status
-# checks on `protect-main`, so they must trigger and report on *every* PR; the
+# `.github/actions/changed-paths/action.yml`. Every job here is a required status
+# check on `protect-main`, so they must trigger and report on *every* PR; the
 # `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
 # `paths:` filter would silently deadlock every PR that does not touch these
 # paths.
+#
+# ── The two desktop jobs are load-bearing. Do not trim them. ──────────────────
+# `build-macos` and `build-windows` look like dead weight: nothing ships from
+# them, and under D8 (docs/MVP_PLAN.md) desktop is deliberately built but NOT
+# promoted — web is the path we sell. That is exactly why they are here.
+# An unpromoted target rots silently; without a per-PR compile the Windows or
+# macOS build breaks and nobody finds out until a prospect finally demands
+# desktop, which is the one moment the option has to be worth something. These
+# two jobs ARE the cost of holding D8's optionality open (issue #16 / MVP_PLAN
+# 4.8), and the guard already makes them free on unrelated PRs. Deleting them to
+# "speed up CI" quietly throws away the whole reason the app is Flutter.
+#
+# Running on every PR (not nightly, not on merge) is the point: a red check on
+# the PR that broke it is what makes a broken desktop target impossible to miss.
+#
+# Cost note: this repo is PUBLIC, so `macos-latest` and `windows-latest`
+# standard runners are free with unlimited minutes. The 2x/10x minute
+# multipliers apply to private repos only. What these jobs spend is wall-clock,
+# which the changed-paths guard already bounds.
 on:
   pull_request:
 
@@ -118,4 +137,77 @@ jobs:
       - name: Build macOS (verify)
         if: steps.filter.outputs.run == 'true'
         run: flutter build macos --dart-define=INSOLVIA_ENV=staging
+        working-directory: apps/insolvia_app
+
+  # Same shape as build-macos above, on the other desktop OS. Flutter desktop
+  # cannot be cross-compiled, so keeping the `windows/` target green requires a
+  # Windows runner and there is no cheaper substitute. See the header.
+  build-windows:
+    name: Windows build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            apps/**
+            # Deliberately NOT packages/insolvia_design_system/** — the app is
+            # insulated behind its tag-pinned git dependency (see
+            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
+            # this build until the app bumps `ref` in its own pubspec.yaml /
+            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
+            # exactly that PR.
+            #
+            # insolvia_tokens stays: it is a pub workspace member co-resolved
+            # with the app by the root `flutter pub get`.
+            packages/insolvia_tokens/**
+            pubspec.yaml
+            # The root workspace lockfile pins the app's resolved deps —
+            # including the design-system tag's resolved commit.
+            pubspec.lock
+            melos.yaml
+            analysis_options.yaml
+            .github/workflows/app-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: subosito/flutter-action@v2
+        if: steps.filter.outputs.run == 'true'
+        with:
+          channel: stable
+          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
+          # weeks after a staging run could compile with a different Flutter than the
+          # one staging validated — which would quietly break the "prod ships what
+          # staging tested" guarantee this pipeline exists to provide.
+          flutter-version: "3.44.6"
+      - run: flutter pub get
+        if: steps.filter.outputs.run == 'true'
+      - name: Build Windows (verify)
+        if: steps.filter.outputs.run == 'true'
+        run: flutter build windows --dart-define=INSOLVIA_ENV=staging
+        working-directory: apps/insolvia_app
+
+      # Compiling the app is not enough to keep the *shipping* path green: the
+      # .iss script is the thing that turns the build directory into something
+      # installable, and a typo in it would otherwise only surface on a staging
+      # deploy. Compiling the installer here (and throwing it away) keeps that
+      # failure on the PR that caused it.
+      - name: Build installer (verify packaging script)
+        if: steps.filter.outputs.run == 'true'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            # Preinstalled on the windows-latest image today; this is the
+            # fallback if that ever stops being true.
+            choco install innosetup -y --no-progress
+          }
+          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
+          & $iscc /DInsolviaEnv=staging /DAppVersion=0.0.0 `
+            /DOutputBase=insolvia_app-pr-verify `
+            windows\packaging\insolvia_app.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         working-directory: apps/insolvia_app
