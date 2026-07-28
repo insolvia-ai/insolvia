@@ -181,18 +181,16 @@ be resolved, and pushes dismiss stale reviews.
 status checks**, so a PR with red CI can still merge. CODEOWNERS only *requests*
 the code owner's review; it does not gate the merge.
 
-### Required status checks — pending manual step
+### Required status checks
 
-Turning red CI into a merge blocker is a **repo-settings change a human makes in
-the GitHub UI/API** — nothing in this repo can grant itself branch protection.
-The workflows above are already shaped (always-run-and-report) to allow it. In
-`protect-main` → *Require status checks to pass*, add exactly these eleven job
-`name:` values (matrix legs get a `(leg)` suffix):
+Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
+twelve job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
 |---|---|
 | `Flutter app` | `app-pr.yml` |
 | `macOS build` | `app-pr.yml` |
+| `Windows build` | `app-pr.yml` |
 | `Flutter design system` | `design-system-pr.yml` |
 | `React design system` | `design-system-react-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
@@ -203,9 +201,27 @@ The workflows above are already shaped (always-run-and-report) to allow it. In
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
 
+`Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
+are deliberately **not** required — neither environment is ever applied by CI,
+so they exist for coverage rather than as gates. The reasoning is in
+`shared-infra-plan.yml`'s matrix comment.
+
+**Changing this list does not need a human clicking through settings.** Run
+`scripts/update-ruleset.sh` (`show` / `add` / `remove`); the
+`insolvia-branch-protection` skill covers the traps, the sharpest being that
+`PUT /rulesets/{id}` *replaces* the arrays it receives, so a hand-rolled
+`gh api` call carrying only your new check silently deletes `deletion`,
+`non_fast_forward` and `required_linear_history` from `main`.
+
 These strings are a **contract with the ruleset**: renaming a job `name:` (or a
-matrix leg) silently orphans the required check — the ruleset waits forever for a
-name nobody reports. Change one only alongside the ruleset. Also enable *Require
-branches to be up to date before merging*, and set
-`required_approving_review_count` to 1 with `require_code_owner_review: true` if
-CODEOWNER review is wanted.
+matrix leg) silently orphans the required check — GitHub accepts a required
+check nobody reports, and every PR then parks on *"Expected — waiting for status
+to be reported"* forever. Rename a job only alongside the ruleset.
+
+**Two settings are deliberately off.** *Require branches to be up to date before
+merging* (`strict_required_status_checks_policy`) is `false`: with twelve checks
+it would force a rebase-and-rerun on every PR whenever anything lands first.
+`required_approving_review_count` is unset, and should stay that way — Insolvia
+is maintained by one person, and GitHub does not let you approve your own PR, so
+requiring an approval would block every merge permanently. The gate here is CI,
+not review.
