@@ -168,6 +168,36 @@ data "aws_iam_policy_document" "github_permissions" {
   }
   # ── end marketing site ─────────────────────────────────────────
 
+  # ── Desktop artifact hosting (4.10 / #18) ──────────────────────
+  # `insolvia-download-<env>` — the S3 origin behind download.insolvia.ai and
+  # staging-download.insolvia.ai (infra/modules/artifact_hosting). Its
+  # CloudFront distribution, response headers policies, OAC and Route53 record
+  # are all covered by EdgeAndDns above; the bucket is the only thing that
+  # needed a grant, because it matches none of the existing prefixes.
+  #
+  # This grant is both control-plane (Terraform creating the bucket, its
+  # policy, lifecycle rule, and the Terraform-managed robots.txt object) and
+  # data-plane (the desktop build workflow uploading the `.dmg`/`setup.exe`).
+  # Unlike the waitlist table below, there is no reason to split them: the
+  # objects here are public build output, not PII — everything in this bucket
+  # is served unauthenticated to anyone holding the URL.
+  #
+  # Note the bucket is NOT called `insolvia-web-downloads-*`, which would have
+  # slipped under WebHostingBuckets and needed no ci-trust apply at all. That
+  # would have made an IAM boundary depend on an undocumented name collision —
+  # precisely the "relying on a prefix match is not a control" failure the
+  # DenySelfPrivilegeEscalation comment at the bottom of this file calls out.
+  # One human-gated apply is the cheaper price.
+  statement {
+    sid     = "DownloadArtifactBuckets"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-download-*",
+      "arn:aws:s3:::insolvia-download-*/*",
+    ]
+  }
+  # ── end desktop artifact hosting ───────────────────────────────
+
   # READ-ONLY on the pipeline's own role, and deliberately so.
   #
   # This environment manages the OIDC provider, this role, and this policy —

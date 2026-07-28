@@ -1,6 +1,9 @@
-aws_region       = "us-east-1"
-domain_name      = "insolvia.ai"
-subdomain        = "staging-app.insolvia.ai"
-api_subdomain    = "staging-api.insolvia.ai"
-mailer_subdomain = "staging-mailer-api.insolvia.ai"
+aws_region          = "us-east-1"
+domain_name         = "insolvia.ai"
+subdomain           = "staging-app.insolvia.ai"
+api_subdomain       = "staging-api.insolvia.ai"
+mailer_subdomain    = "staging-mailer-api.insolvia.ai"
 marketing_subdomain = "staging-www.insolvia.ai"
+
+# Unsigned desktop builds (4.10). Unlinked from the marketing site per D8.
+download_subdomain = "staging-download.insolvia.ai"

@@ -2,6 +2,7 @@
 #   • app.insolvia.ai — Flutter web app (static, module.web_hosting)
 #   • www.insolvia.ai + apex — marketing site (SSR, module.marketing_site)
 #   • api.insolvia.ai — backend API (module.api_service)
+#   • download.insolvia.ai — unsigned desktop builds (module.artifact_hosting)
 # References the shared zone + wildcard cert by name (not by remote state).
 
 locals {
@@ -44,6 +45,27 @@ module "web_hosting" {
   project             = "insolvia"
   environment         = local.environment
   domain_name         = var.subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  tags                = local.common_tags
+}
+
+# ── Desktop artifact hosting: download.insolvia.ai (4.10) ────────
+# Where the unsigned `.dmg` / `setup.exe` builds from 4.6 land. Unlinked from
+# the marketing site by design (D8: desktop is built but not promoted) — this
+# exists so someone can be handed a URL, nothing more. Publishing the link is a
+# marketing decision that also needs code-signing procurement, so bringing this
+# host online commits us to nothing.
+#
+# Staging runs this module too (infra/envs/staging/main.tf): the desktop binary
+# compiles its environment in via --dart-define, so the two environments build
+# genuinely different artifacts and cannot share one bucket.
+module "artifact_hosting" {
+  source = "../../modules/artifact_hosting"
+
+  project             = "insolvia"
+  environment         = local.environment
+  domain_name         = var.download_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   tags                = local.common_tags

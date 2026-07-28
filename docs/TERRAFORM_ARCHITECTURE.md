@@ -9,6 +9,8 @@ each with its own isolated S3 state — never Terraform workspaces.
 infra/
 ├── modules/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
+│   ├── artifact_hosting/     # reusable: same skeleton, download semantics —
+│   │                         #   no SPA rewrites, no index, noindex + attachment
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
@@ -23,10 +25,12 @@ infra/
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
     │                         # auth        -> insolvia-users-staging
+    │                         # artifact_hosting -> staging-download.insolvia.ai
     ├── prod/                 # web_hosting -> app.insolvia.ai
     │                         # api_service -> api.insolvia.ai
     │                         # auth        -> insolvia-users-prod
     │                         # marketing_site -> www.insolvia.ai (+ apex 301)
+    │                         # artifact_hosting -> download.insolvia.ai
     └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
                               # table + auth pool, env suffix dev-<short-id>
 ```
@@ -225,6 +229,40 @@ viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  �
 Names: `insolvia-marketing` (ECR — shared across envs, no suffix),
 `insolvia-marketing-ssr-prod` (Lambda + HTTP API + role),
 `insolvia-marketing-assets-prod` (S3).
+
+## Desktop artifact hosting (`modules/artifact_hosting`, staging + prod)
+
+Where the unsigned `.dmg` / `setup.exe` builds live (issue #18 / 4.10):
+`download.insolvia.ai` and `staging-download.insolvia.ai` — flat `staging-`
+per D2, so the shared wildcard covers both with no change to `envs/shared`.
+The host is **unlinked** from the marketing site (D8), and both environments
+get one because the desktop binary compiles its environment in via
+`--dart-define`, so the two builds are different artifacts.
+
+Same S3 + OAC + CloudFront + Route53 skeleton as `web_hosting`, but a separate
+module because the SPA behaviour is actively wrong for downloads:
+
+- **No `custom_error_response`.** `web_hosting` rewrites 403/404 to
+  `/index.html` with a 200 for go_router deep links; here that would make
+  `curl -O` on a typo'd URL save an HTML error page as `Insolvia.dmg`.
+- **No `default_root_object`, no listing.** Recipients get exact URLs; an S3
+  REST origin never lists a prefix, so `/` is a plain 403.
+- **Freshness is set per object at upload**, not by a distribution TTL:
+  versioned release keys go up `immutable, max-age=31536000`, any moving
+  `latest/` pointer goes up short — `Managed-CachingOptimized` honours the
+  origin's `Cache-Control` either way.
+- **Two response headers policies.** Artifacts get `Content-Disposition:
+  attachment` (as a floor — `override = false`, so an upload naming the file
+  still wins) plus `X-Robots-Tag: noindex, nofollow` and `nosniff`;
+  `/robots.txt` gets its own policy without the attachment header. A
+  Terraform-managed `robots.txt` (`Disallow: /`) ships with the bucket, so the
+  host is uncrawlable from the first apply and not merely once CI has run.
+
+**IAM:** the bucket `insolvia-download-<env>` matches none of the deploy
+role's existing S3 prefixes, so `ci-trust` carries a `DownloadArtifactBuckets`
+statement — a **human-applied** change (`scripts/apply-ci-trust.sh`). It is
+deliberately not named `insolvia-web-downloads-*` to slip under the existing
+`insolvia-web-*` grant.
 
 ## Providers
 

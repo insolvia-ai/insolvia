@@ -3,6 +3,7 @@
 #   • backend API    -> staging-api.insolvia.ai
 #   • mailer API     -> staging-mailer-api.insolvia.ai
 #   • marketing site -> staging-www.insolvia.ai
+#   • downloads      -> staging-download.insolvia.ai
 # References the shared zone + wildcard cert by name (not by remote state).
 
 locals {
@@ -45,6 +46,30 @@ module "web_hosting" {
   project             = "insolvia"
   environment         = local.environment
   domain_name         = var.subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  tags                = local.common_tags
+}
+
+# ── Desktop artifact hosting: staging-download.insolvia.ai (4.10) ─
+# Where the unsigned `.dmg` / `setup.exe` builds from 4.6 land. Unlinked from
+# the marketing site by design (D8: desktop is built but not promoted) — this
+# exists so someone can be handed a URL, nothing more.
+#
+# STAGING GETS ONE TOO, and that is not symmetry for its own sake. The desktop
+# binary compiles its environment in via --dart-define=INSOLVIA_ENV, so the
+# staging and prod builds are genuinely different artifacts pointing at
+# different APIs and Cognito pools; one shared bucket would mean the two
+# overwriting each other at the same keys. It also keeps the upload path
+# exercised on every merge to main rather than only on the rare prod dispatch,
+# which is the D8 bit-rot concern (4.8) applied to distribution instead of to
+# the build.
+module "artifact_hosting" {
+  source = "../../modules/artifact_hosting"
+
+  project             = "insolvia"
+  environment         = local.environment
+  domain_name         = var.download_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   tags                = local.common_tags

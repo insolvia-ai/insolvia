@@ -44,6 +44,17 @@ variable "marketing_subdomain" {
   default     = "staging-www.insolvia.ai"
 }
 
+# Same flat-label reasoning a final time: `*.insolvia.ai` covers
+# `staging-download.insolvia.ai`, not a nested `download.staging.…`. Singular
+# `download`, matching prod's `download.insolvia.ai` — the host is a place you
+# download FROM, and a plural would have to be kept in sync across two envs, a
+# CI upload step and every URL ever pasted into an email.
+variable "download_subdomain" {
+  description = "Hostname the unsigned desktop build artifacts are served from in this environment."
+  type        = string
+  default     = "staging-download.insolvia.ai"
+}
+
 variable "marketing_image_tag" {
   description = "ECR image tag the marketing SSR Lambda is seeded from (creation-time only; CI owns the running image afterwards). Defaults to this environment's moving marker tag — NOT `latest`, which under the shared insolvia-marketing repository would mean whatever any environment pushed last."
   type        = string
