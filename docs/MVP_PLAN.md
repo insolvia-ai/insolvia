@@ -90,7 +90,7 @@ to a host with no certificate route:
 
 - `infra/envs/staging/variables.tf` — the `subdomain` default
 - `infra/envs/staging/terraform.tfvars.example`
-- `apps/insolvia_app/lib/src/config/environment.dart` — the `host` getter
+- `apps/insolvia_app/lib/config/environment.dart` — the `host` getter
 
 Nothing is deployed yet, so this is a free rename today and an annoying one
 later. It's issue 1.15.

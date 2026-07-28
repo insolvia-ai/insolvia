@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
 
-import 'app_router.dart';
+import '../../routing/app_router.dart';
 
 /// The router's fallback for an unrecognised location — branded chrome and a
 /// way back, rather than go_router's default exception page.

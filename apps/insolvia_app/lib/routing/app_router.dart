@@ -1,8 +1,8 @@
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/presentation/auth_callback_screen.dart';
-import '../features/home/presentation/home_screen.dart';
-import 'not_found_screen.dart';
+import '../ui/auth/auth_callback_screen.dart';
+import '../ui/home/home_screen.dart';
+import '../ui/core/not_found_screen.dart';
 
 /// App route names, referenced instead of raw path strings.
 abstract final class AppRoute {

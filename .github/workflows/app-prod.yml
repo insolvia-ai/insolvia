@@ -4,7 +4,7 @@ name: App · Deploy · Production
 # reason is the app's environment model, not an oversight.
 #
 # The Flutter app selects its environment at COMPILE time
-# (`--dart-define=INSOLVIA_ENV`, see apps/insolvia_app/lib/src/config/
+# (`--dart-define=INSOLVIA_ENV`, see apps/insolvia_app/lib/config/
 # environment.dart and docs/ARCHITECTURE.md § Environment model). The staging
 # bundle therefore has "staging" baked into its compiled JS and can never be
 # the production bundle, so there is no artifact to promote the way api,

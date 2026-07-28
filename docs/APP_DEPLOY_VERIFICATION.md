@@ -173,7 +173,7 @@ If this fails, note that `error_caching_min_ttl = 10` means a wrong answer is
 itself cached for ten seconds. Wait, re-run, and only then investigate.
 
 **5. The build being served is the staging build.** The tell is the environment,
-compiled in — `apps/insolvia_app/lib/src/config/environment.dart` maps
+compiled in — `apps/insolvia_app/lib/config/environment.dart` maps
 `INSOLVIA_ENV` to a `label` and a `host`, and the home screen renders both.
 
 **The authoritative check is visual, and it has to be.** Flutter web paints into

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
 
-import '../../../config/environment.dart';
+import '../../config/environment.dart';
 import 'widgets/env_badge.dart';
 
 /// The signed-in shell's home screen.

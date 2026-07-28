@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
-import 'package:insolvia_app/src/app.dart';
-import 'package:insolvia_app/src/config/environment.dart';
-import 'package:insolvia_app/src/features/home/presentation/widgets/env_badge.dart';
+import 'package:insolvia_app/app.dart';
+import 'package:insolvia_app/config/environment.dart';
+import 'package:insolvia_app/ui/home/widgets/env_badge.dart';
 
 void main() {
   group('signed-in shell home', () {
@@ -62,24 +62,9 @@ void main() {
   });
 
   group('theming', () {
-    testWidgets('light mode paints the light canvas', (tester) async {
-      await tester.pumpWidget(const InsolviaApp());
-
-      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-      expect(scaffold.backgroundColor, InsolviaSemanticColors.light.bg);
-    });
-
-    testWidgets('dark mode paints the dark canvas — both themes are wired',
-        (tester) async {
-      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
-      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-
-      await tester.pumpWidget(const InsolviaApp());
-
-      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-      expect(scaffold.backgroundColor, InsolviaSemanticColors.dark.bg);
-    });
-
+    // Whether BOTH themes are wired at all is `app.dart`'s job, covered in
+    // test/app_test.dart. This asserts the screen's own text defers to
+    // whichever theme is active.
     testWidgets(
         'no screen text is painted with a literal color — everything '
         'resolves through the theme', (tester) async {

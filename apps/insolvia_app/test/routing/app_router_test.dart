@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
-import 'package:insolvia_app/src/app.dart';
-import 'package:insolvia_app/src/features/auth/presentation/auth_callback_screen.dart';
-import 'package:insolvia_app/src/features/home/presentation/home_screen.dart';
-import 'package:insolvia_app/src/routing/app_router.dart';
-import 'package:insolvia_app/src/routing/not_found_screen.dart';
+import 'package:insolvia_app/app.dart';
+import 'package:insolvia_app/ui/auth/auth_callback_screen.dart';
+import 'package:insolvia_app/ui/home/home_screen.dart';
+import 'package:insolvia_app/routing/app_router.dart';
+import 'package:insolvia_app/ui/core/not_found_screen.dart';
 
 void main() {
   group('deep links', () {

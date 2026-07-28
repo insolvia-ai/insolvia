@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:insolvia_app/src/config/environment.dart';
+import 'package:insolvia_app/config/environment.dart';
 
 void main() {
   group('AppEnvironment.apiBaseUrl', () {

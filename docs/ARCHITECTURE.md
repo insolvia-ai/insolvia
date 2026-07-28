@@ -20,9 +20,11 @@ insolvia/
 └── docs/                              business plan + runbooks
 ```
 
-Layout follows the standard Flutter monorepo split (`apps/` + `packages/`) and a
-**feature-first** app: code is grouped by feature under `lib/src/features/`, with
-shared concerns (`routing/`, `config/`) alongside — not by technical layer.
+Layout follows the standard Flutter monorepo split (`apps/` + `packages/`). Inside
+the app, UI is grouped by feature under `lib/ui/` and data by type under
+`lib/data/`, per Flutter's own architecture guide — see
+[ADR 0003](adr/0003-flutter-app-layout.md) for why, and
+[`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) for the rules.
 
 - **Workspace resolution:** pub workspaces (root `pubspec.yaml` `workspace:`)
   cover `insolvia_tokens` + the app. The design system is deliberately
@@ -64,7 +66,7 @@ codepaths. Selection is via a compile-time define:
 flutter build web --dart-define=INSOLVIA_ENV=staging      # or production, or local (default)
 ```
 
-`apps/insolvia_app/lib/src/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed
+`apps/insolvia_app/lib/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed
 `AppEnvironment` (label, `isProduction`, future API base URLs, etc.). The
 hello-world screen renders the active environment so staging vs prod is visually
 obvious.

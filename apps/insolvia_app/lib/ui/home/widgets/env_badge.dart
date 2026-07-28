@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
 
-import '../../../../config/environment.dart';
+import '../../../config/environment.dart';
 
 /// A small pill showing the current environment, tinted by the brand accent.
 ///

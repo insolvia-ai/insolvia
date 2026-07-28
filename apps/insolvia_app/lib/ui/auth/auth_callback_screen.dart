@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:insolvia_design_system/insolvia_design_system.dart';
 
-import '../../../routing/app_router.dart';
+import '../../routing/app_router.dart';
 
 /// Placeholder landing screen for the OAuth redirect.
 ///

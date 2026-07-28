@@ -20,7 +20,7 @@ final confirmation = await client.joinWaitlist(  // POST /v1/waitlist
 ```
 
 The app resolves the right base URL per environment from
-`AppEnvironment.apiBaseUrl` (`apps/insolvia_app/lib/src/config/environment.dart`).
+`AppEnvironment.apiBaseUrl` (`apps/insolvia_app/lib/config/environment.dart`).
 
 Failure model:
 
