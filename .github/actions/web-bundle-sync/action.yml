@@ -27,13 +27,25 @@ description: >-
 # and no invalidation can reach a client-side cache. Such a client stays pinned
 # to a whole old build.
 #
-# THREE TIERS, not two:
+# This is not a Flutter misconfiguration we could fix in the build. Flutter's
+# own web FAQ states it outright — "Flutter doesn't currently support appending
+# build IDs to resources automatically" — and `flutter build web --help` offers
+# no hashing flag. Flutter used to compensate with a service worker that carried
+# a per-file MD5 manifest; that was deliberately retired (flutter/flutter#156910),
+# and `flutter_service_worker.js` is now an 800-byte tombstone that unregisters
+# itself. Per the announcement, apps "stop using the Service Worker-managed
+# caches, and start using the default browser cache". These headers are
+# therefore not a backstop behind some other mechanism. They are the ONLY one.
 #
-#   1. Long-lived (`max-age=31536000`) — the binary payloads whose bytes really
-#      are stable in practice: canvaskit/, fonts, shaders, icons, favicon.
-#      Deliberately WITHOUT `immutable`: these names aren't content-addressed
-#      either, so a user must be able to recover with a hard reload. `immutable`
-#      denies even that, for a year.
+# THREE TIERS, not two. Values follow the Flutter web FAQ's own recommendation:
+#
+#   1. Static payloads (`public,max-age=3600,s-maxage=604800`) — fonts, shaders,
+#      icons, favicon, canvaskit/. Their bytes are stable between Flutter SDK
+#      bumps, but the NAMES still aren't content-addressed, so an SDK upgrade
+#      can hand a returning browser a new manifest against a year-old font or
+#      shader. One hour in the browser bounds that; a week at the CDN keeps it
+#      cheap. (An earlier draft used `max-age=31536000` here. Same class of bug
+#      as the one being fixed, just rarer — don't reintroduce it.)
 #
 #   2. Revalidate-always (`no-cache`) — the unhashed entrypoints above.
 #      `no-cache` does NOT mean "don't store": the browser keeps the bytes and
@@ -41,9 +53,22 @@ description: >-
 #      costs one 304 instead of a re-download. Correct AND fast; this is why the
 #      entrypoints do not simply reuse the HTML header below.
 #
+#      The FAQ suggests `max-age=0,s-maxage=604800` for this class. We go
+#      stricter and skip `s-maxage` on purpose: the invalidation below is issued
+#      fire-and-forget, so an edge told to hold these for a week is stale for
+#      however long the invalidation takes to propagate. `no-cache` makes the
+#      edge revalidate and needs no invalidation to be correct. Cheap here —
+#      it costs conditional GETs against S3, which this traffic volume will not
+#      notice.
+#
 #   3. Never stored (`no-cache,no-store,must-revalidate`) — the HTML shell.
 #      Tiny, and also served for every SPA deep link via the 403/404 rewrite, so
 #      it is the one thing that must never live in any cache.
+#
+# Tiers 2 and 3 are floored at 1 second of edge caching regardless: the managed
+# CachingOptimized policy on these distributions has a Min TTL of 1s, which
+# overrides `no-cache`/`no-store` from the origin. Immaterial, but it is why an
+# `x-cache: Hit` on index.html is not automatically a bug.
 #
 # Order matters: dependencies land before the entrypoints that name them, and
 # HTML lands last, so a bundle is never referenced before it exists.
@@ -110,7 +135,7 @@ runs:
         #    HTML names are a fixed set Flutter always emits, so they have
         #    nothing to prune.
         aws s3 sync "$SRC" "s3://$BUCKET" --delete \
-          --cache-control "public,max-age=31536000" \
+          --cache-control "public,max-age=3600,s-maxage=604800" \
           --exclude "*.html" "${skip_entrypoints[@]}"
 
         # 2. Unhashed entrypoints: cached, but revalidated on every request.

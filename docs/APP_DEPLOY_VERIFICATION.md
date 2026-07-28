@@ -199,16 +199,21 @@ a deploy visible immediately without giving up long-lived asset caching.
 
 Keep in mind while reading the results that **Flutter web content-hashes
 nothing** — every filename it emits is stable while the bytes behind it change.
-So the split is by *what the file is for*, not by whether the name looks hashed.
+Flutter's own web FAQ confirms it ("Flutter doesn't currently support appending
+build IDs to resources automatically"), and since the default service worker was
+retired these headers are the *only* cache-busting mechanism the app has. So the
+split is by *what the file is for*, not by whether the name looks hashed.
 
-Long-lived payloads — the binaries whose bytes are stable in practice:
+Static payloads — fonts, shaders, icons, canvaskit:
 
 ```bash
 curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/assets/fonts/MaterialIcons-Regular.otf
 ```
 
-Expect `cache-control: public, max-age=31536000`, and **no** `immutable`. The
-name is not content-addressed, so a hard reload has to remain able to recover.
+Expect `cache-control: public, max-age=3600, s-maxage=604800`, and **no**
+`immutable`. These names aren't content-addressed either, so the browser window
+stays bounded at an hour — a Flutter SDK bump can otherwise pair a new manifest
+with an old font.
 
 Unhashed entrypoints — cached, but revalidated every request:
 
@@ -235,6 +240,11 @@ filters drifted, and browsers will pin a stale `index.html` for a year — the
 CloudFront invalidation will not save you, because the staleness is in the
 client. The same reasoning is why nothing in the entrypoint class may carry a
 `max-age` either.
+
+One caveat when reading `x-cache` on these: the managed `CachingOptimized`
+policy has a Min TTL of 1 second, which overrides `no-cache`/`no-store` from the
+origin. A `Hit from cloudfront` on `index.html` is that one-second floor, not a
+broken header — read `cache-control` itself, not the hit/miss.
 
 Check the deep-link response too: it is served from `/index.html`, so it must
 carry the HTML headers, not the long-lived ones.
