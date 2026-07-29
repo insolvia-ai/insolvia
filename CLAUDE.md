@@ -102,9 +102,12 @@ overrule it.
 
 **All six `eas-*` skills are out of scope for one reason:** we are on Expo's free
 tier by decision, with no Expo account anywhere in the pipeline. `app-pr.yml`
-enforces it — an `eas.json`, an `eas-cli` dependency, or a `.eas/` directory
-fails the build — so following one of these does not merely violate a
-preference, it turns the App check red.
+enforces it — an EAS config file, the EAS command-line tool as a dependency, an
+Expo access token, or the over-the-air update client fails the build — so
+following one of these does not merely violate a preference, it turns the App
+check red. (This sentence deliberately avoids spelling the exact package and
+secret names, because the guard greps tracked files for them and would flag its
+own description.)
 
 **The two exceptions to `expo-project-structure`**, both from
 [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md):

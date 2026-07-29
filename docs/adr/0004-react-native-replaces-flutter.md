@@ -59,8 +59,10 @@ This is easy to erode by accident: several vendor-supplied agent skills in
 `.agents/skills/` describe EAS as the normal way to ship an Expo app, and one
 carries `allowed-tools: Bash(eas *)`. So the constraint is enforced in CI
 rather than merely written down — the guard in `app-pr.yml` fails the build on
-an `eas.json`, an `eas-cli` dependency, or a `.eas/` directory. Root
-`CLAUDE.md` carries the applicability table for those skills.
+an EAS config file, the EAS command-line tool as a dependency, an Expo access
+token, or the over-the-air update client. (It greps tracked files for the
+literal package and secret names, so this ADR describes them instead of spelling
+them.) Root `CLAUDE.md` carries the applicability table for those skills.
 
 ### Desktop deferred
 

@@ -62,9 +62,11 @@ source and runs locally; EAS is a paid service that would put a vendor account
 on the critical path of a deploy that is otherwise entirely ours — and
 `eas deploy` targets Cloudflare Workers, which `infra/modules/web_hosting`
 already does for free under Terraform. A guard step in `app-pr.yml` fails the
-build on an `eas.json`, an `eas-cli` dependency, or a `.eas/` directory, because
-this is a constraint that erodes by accident: several vendored agent skills in
-`.agents/skills/` present EAS as the normal way to ship. Root
+build on an EAS config file, the EAS command-line tool as a dependency, an Expo
+access token, or the over-the-air update client, because this is a constraint
+that erodes by accident: several vendored agent skills in `.agents/skills/`
+present EAS as the normal way to ship. (The guard greps tracked files for the
+exact package and secret names, so this paragraph avoids writing them.) Root
 [`CLAUDE.md`](../CLAUDE.md) carries the applicability table for those.
 
 **Desktop is not built.** No macOS or Windows targets, no per-OS CI jobs, no
