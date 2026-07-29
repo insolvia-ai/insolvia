@@ -6,6 +6,11 @@ on:
     paths:
       - "apps/**"
       - "packages/**"
+      # The app is an npm workspace member, so the root manifest and lockfile
+      # are real inputs to its build — a dependency bump that touches only the
+      # lockfile still changes the bundle that ships.
+      - "package.json"
+      - "package-lock.json"
       - "infra/envs/staging/**"
       - "infra/modules/**"
       - ".github/workflows/app-staging.yml"
@@ -23,157 +28,63 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── Always build + publish artifacts (no domain needed) ────────
+  # ── Build + publish the artifact (no AWS credentials needed) ────
+  #
+  # Still a separate job from `deploy` now that the desktop builds are gone, for
+  # two reasons that outlived them: the build runs BEFORE the
+  # `environment: insolvia-staging` gate, so a broken build never consumes an
+  # approval, and the uploaded artifact is the record of what actually shipped.
   build-web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+
+      # Must match the root package.json's `engines.node` (">=24"). No
+      # `cache-dependency-path`: the app is an npm workspace member, so the
+      # lockfile is the repo-root one setup-node already looks for by default.
+      - uses: actions/setup-node@v4
         with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # ── The Metro cache trap — this is why `--clear` is here ──────────────
+      #
+      # `EXPO_PUBLIC_*` values are inlined into the bundle at build time, but
+      # Metro's transform cache keys on file CONTENT and CONFIG — not on the
+      # environment the build ran in. So two exports of an unchanged tree with
+      # different `EXPO_PUBLIC_INSOLVIA_ENV` can hit the same cache entries and
+      # emit byte-identical output. The failure mode is silent and severe in
+      # either direction — a bundle with the wrong environment compiled into it,
+      # uploaded to the other environment's bucket, talking to the wrong API,
+      # with nothing in the logs to say so.
+      #
+      # `--clear` drops the cache before bundling, which makes the environment
+      # impossible to inherit from a previous build. The alternative is a
+      # per-env `cacheStoreDirectory` in metro.config.js; that is faster but it
+      # lives in the app (another agent's file) and it fails open — a typo in
+      # the path silently shares one cache again. A cold bundle on a deploy is
+      # a minute we can afford; shipping the wrong environment is not.
+      #
+      # Passed through `npm run build -- --clear` rather than calling the CLI
+      # directly, so "what a production web build is" keeps exactly one
+      # definition (the app's `build` script, `expo export -p web`) and this
+      # workflow only adds to it.
       - name: Build web (staging)
-        run: flutter build web --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
+        env:
+          EXPO_PUBLIC_INSOLVIA_ENV: staging
+        run: npm run build --workspace apps/insolvia_app -- --clear
+
       - uses: actions/upload-artifact@v4
         with:
           name: insolvia-web-staging
-          path: apps/insolvia_app/build/web
-          retention-days: 14
-
-  # ── Desktop: built but NOT promoted (D8), and kept green on purpose ────
-  # docs/MVP_PLAN.md D8 holds desktop as the answer if attorneys refuse to
-  # leave the desktop habit. Unpromoted targets rot silently, so these two jobs
-  # (plus their counterparts in app-pr.yml) are the entire cost of keeping that
-  # option open — issue #16 / MVP_PLAN 4.8. They are not dead weight; do not
-  # trim them because "nothing ships from desktop".
-  #
-  # Both artifacts are UNSIGNED under D8: no certificate is procured, so macOS
-  # shows the Gatekeeper block and Windows shows SmartScreen. That is expected
-  # and documented, not a defect.
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
-
-      - id: names
-        uses: ./.github/actions/desktop-artifact-names
-        with:
-          env: staging
-
-      - name: Build macOS (staging, unsigned)
-        run: flutter build macos --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
-
-      # Replaces the old `zip -r` of the .app: a .dmg is what issue #14 asks
-      # for and what the install walkthrough (MVP_PLAN 4.11) describes, and a
-      # zipped .app is the shape most likely to arrive "damaged" on the far
-      # side.
-      #
-      # `hdiutil` over `create-dmg`: hdiutil ships with macOS, so this step has
-      # no dependency and cannot break on a brew outage. `create-dmg` buys a
-      # prettier window background and icon layout — cosmetics, for a build D8
-      # says we hand to a handful of design partners and do not link publicly.
-      # Not worth a network install on every deploy. Revisit if desktop is ever
-      # promoted.
-      - name: Package .dmg (staging, unsigned)
-        env:
-          DMG: ${{ steps.names.outputs.dmg }}
-        run: |
-          set -euo pipefail
-          stage="$RUNNER_TEMP/dmg"
-          rm -rf "$stage" && mkdir -p "$stage"
-          # `ditto`, not `cp -R`: it is the macOS-correct copy for a bundle,
-          # preserving the symlinks and extended attributes inside .app.
-          ditto apps/insolvia_app/build/macos/Build/Products/Release/insolvia_app.app \
-            "$stage/insolvia_app.app"
-          # The conventional drag-to-install target.
-          ln -s /Applications "$stage/Applications"
-          mkdir -p dist
-          hdiutil create \
-            -volname "Insolvia (Staging)" \
-            -srcfolder "$stage" \
-            -ov -format UDZO \
-            "dist/$DMG"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: insolvia-macos-staging
-          path: dist/${{ steps.names.outputs.dmg }}
-          retention-days: 14
-
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          # Pinned, not floating — same reason as every other job here.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
-
-      - id: names
-        uses: ./.github/actions/desktop-artifact-names
-        with:
-          env: staging
-
-      - name: Build Windows (staging, unsigned)
-        run: flutter build windows --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
-
-      # `flutter build windows` emits a directory, not something installable.
-      # The Inno Setup script that wraps it — and the reasoning behind the
-      # per-user, unsigned install — lives in
-      # apps/insolvia_app/windows/packaging/insolvia_app.iss.
-      - name: Package setup.exe (staging, unsigned)
-        shell: pwsh
-        env:
-          INSTALLER_BASE: ${{ steps.names.outputs.installer_base }}
-          APP_VERSION: ${{ steps.names.outputs.version }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            # Preinstalled on the windows-latest image today; this is the
-            # fallback if that ever stops being true.
-            choco install innosetup -y --no-progress
-          }
-          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
-          & $iscc /DInsolviaEnv=staging "/DAppVersion=$env:APP_VERSION" `
-            "/DOutputBase=$env:INSTALLER_BASE" `
-            windows\packaging\insolvia_app.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        working-directory: apps/insolvia_app
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: insolvia-windows-staging
-          path: apps/insolvia_app/build/windows/installer/${{ steps.names.outputs.exe }}
+          path: apps/insolvia_app/dist
           retention-days: 14
 
   # ── Deploy ─────────────────────────────────────────────────────
   deploy:
-    # The desktop builds gate the deploy so that one job holds the AWS
-    # credentials and one `terraform apply` produces every output consumed
-    # below. The cost is that the web deploy waits on the two desktop runners;
-    # accepted, because splitting the upload into its own job would mean a
-    # second `terraform` read racing the apply in the same run.
-    needs: [build-web, build-macos, build-windows]
+    needs: [build-web]
     runs-on: ubuntu-latest
     environment: insolvia-staging
     steps:
@@ -200,12 +111,6 @@ jobs:
           {
             echo "bucket=$(terraform -chdir=infra/envs/staging output -raw bucket_name)"
             echo "dist=$(terraform -chdir=infra/envs/staging output -raw distribution_id)"
-            # The unlinked download host for the unsigned desktop builds
-            # (staging-download.insolvia.ai) — MVP_PLAN 4.10 / issue #18. These
-            # two outputs are added by that infra PR, which must merge before
-            # this workflow can run green.
-            echo "dl_bucket=$(terraform -chdir=infra/envs/staging output -raw download_bucket_name)"
-            echo "dl_dist=$(terraform -chdir=infra/envs/staging output -raw download_distribution_id)"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v4
@@ -213,64 +118,61 @@ jobs:
           name: insolvia-web-staging
           path: web
 
+      # ── Two-tier cache sync, inline ──────────────────────────────────────
+      #
+      # This replaces the `web-bundle-sync` composite action, which existed
+      # because Flutter web content-hashes NOTHING (issue #49, commit 5108690):
+      # every filename it emitted was stable while the bytes changed every
+      # deploy, so nothing in the bundle could be marked immutable and the
+      # action needed three tiers to say so.
+      #
+      # Expo hashes. Verified against a real export:
+      #   _expo/static/js/web/entry-<hash>.js
+      #   _expo/static/css/global-<hash>.css
+      # so everything under `_expo/` is content-addressed and genuinely safe to
+      # cache forever.
+      #
+      # TWO tiers, not one. The marketing site syncs its whole bucket in a
+      # single immutable pass (marketing-staging.yml) and that is only correct
+      # because its bucket holds nothing BUT hashed assets — its HTML is
+      # rendered by a Lambda. This bucket is not that: it holds `index.html`
+      # and everything copied out of the app's `public/`, all unhashed. One
+      # immutable pass here would pin a returning browser to a stale
+      # `index.html` for a year, and no CloudFront invalidation can reach a
+      # client-side cache. Do not "simplify" this into marketing's version.
+      #
+      # ORDER MATTERS: hashed assets first. `index.html` names the chunks it
+      # loads, so if HTML went up first there would be a window where the live
+      # page referenced a chunk that had not been uploaded yet.
+      #
+      # NO `--delete` ON THE HASHED PASS, deliberately. These distributions
+      # rewrite 403/404 to `index.html` for SPA deep links, so a pruned chunk
+      # does NOT 404 — CloudFront answers with `index.html`, HTTP 200,
+      # `Content-Type: text/html`. The browser then fails with "Expected a
+      # JavaScript module script but the server responded with a MIME type of
+      # text/html", which is a genuinely confusing error for anyone still
+      # sitting on the previous page when a deploy lands. Old chunks are small
+      # and cost pennies; prune them on a lag (a lifecycle rule or a manual
+      # sweep), never in the same breath as an upload.
       - name: Sync to S3 + invalidate
-        uses: ./.github/actions/web-bundle-sync
-        with:
-          dir: web
-          bucket: ${{ steps.tf.outputs.bucket }}
-          distribution-id: ${{ steps.tf.outputs.dist }}
-
-      # ── The unsigned desktop artifacts ─────────────────────────────
-      - id: names
-        uses: ./.github/actions/desktop-artifact-names
-        with:
-          env: staging
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: insolvia-macos-staging
-          path: desktop
-      - uses: actions/download-artifact@v4
-        with:
-          name: insolvia-windows-staging
-          path: desktop
-
-      - name: Upload desktop artifacts + invalidate
         env:
-          DL_BUCKET: ${{ steps.tf.outputs.dl_bucket }}
-          DL_DIST: ${{ steps.tf.outputs.dl_dist }}
-          DMG: ${{ steps.names.outputs.dmg }}
-          EXE: ${{ steps.names.outputs.exe }}
-          DMG_LATEST: ${{ steps.names.outputs.dmg_latest }}
-          EXE_LATEST: ${{ steps.names.outputs.exe_latest }}
+          SRC: web
+          BUCKET: ${{ steps.tf.outputs.bucket }}
+          DIST: ${{ steps.tf.outputs.dist }}
         run: |
           set -euo pipefail
 
-          # Same two-tier caching as the web bundle above, for the same
-          # reason. The version+commit filenames are immutable, so they may be
-          # cached forever; the `-latest` aliases are overwritten on every
-          # deploy, so they must never be. Marking an alias immutable would pin
-          # a stale installer in CloudFront for a year.
-          for f in "$DMG" "$EXE"; do
-            aws s3 cp "desktop/$f" "s3://$DL_BUCKET/desktop/$f" \
-              --cache-control "public,max-age=31536000,immutable"
-          done
+          # 1. Hashed, content-addressed assets — first, and cached forever.
+          aws s3 sync "$SRC/_expo" "s3://$BUCKET/_expo" \
+            --cache-control "public,max-age=31536000,immutable"
 
-          aws s3 cp "desktop/$DMG" "s3://$DL_BUCKET/desktop/$DMG_LATEST" \
-            --cache-control "no-cache,no-store,must-revalidate"
-          aws s3 cp "desktop/$EXE" "s3://$DL_BUCKET/desktop/$EXE_LATEST" \
+          # 2. Everything else — index.html and the unhashed `public/` payload.
+          #    Never cached, because the names are stable and the bytes are not.
+          aws s3 sync "$SRC" "s3://$BUCKET" --exclude "_expo/*" \
             --cache-control "no-cache,no-store,must-revalidate"
 
-          # Only the mutable aliases need invalidating — the versioned keys are
-          # new objects nobody has cached yet.
-          aws cloudfront create-invalidation --distribution-id "$DL_DIST" \
-            --paths "/desktop/$DMG_LATEST" "/desktop/$EXE_LATEST"
-
-          {
-            echo "### Unsigned desktop builds (staging)"
-            echo ""
-            echo "- macOS: \`desktop/$DMG_LATEST\`"
-            echo "- Windows: \`desktop/$EXE_LATEST\`"
-            echo ""
-            echo "Not linked from www, per D8. Unsigned — expect Gatekeeper / SmartScreen."
-          } >> "$GITHUB_STEP_SUMMARY"
+          # 3. The invalidation the deleted composite action used to issue.
+          #    Tier 2 is `no-store` at the browser, but CloudFront's managed
+          #    CachingOptimized policy has a 1s minimum TTL that overrides an
+          #    origin `no-cache`, so the edge still needs telling.
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"

@@ -4,38 +4,37 @@
   "type": "module",
   "//": [
     "Root of the Insolvia npm workspace. NOT a shippable package — it declares",
-    "the members and pins the shared toolchain, mirroring what pubspec.yaml does",
-    "for the Dart workspace it is replacing.",
+    "the members and pins the shared toolchain.",
     "",
     "The member list is EXPLICIT and must stay that way. `packages/*` would",
     "swallow packages/insolvia_design_system_react, which publishes to GitHub",
     "Packages and is consumed by the marketing site BY VERSION, never by path.",
     "Making it a workspace member would silently symlink marketing to the local",
-    "source, so a broken package would pass CI and only fail after publishing —",
-    "the exact trap the root pubspec.yaml documents for the Flutter design",
-    "system. apps/insolvia_marketing is out for the same reason: it resolves",
-    "against the published package.",
+    "source, so a broken package would pass CI and only fail after publishing.",
+    "apps/insolvia_marketing is out for the same reason: it resolves against the",
+    "published package.",
     "",
-    "CAUTION — Node resolution walks UP the tree, which pub never did. A missing",
-    "dependency in apps/insolvia_marketing or packages/insolvia_design_system_react",
-    "can now resolve from this root's node_modules and pass CI, then fail in a",
-    "clean install. Both keep their own package-lock.json and their own CI job",
-    "installs from it, which is what catches this — do not consolidate them here."
+    "CAUTION — Node resolution walks UP the tree. A missing dependency in",
+    "apps/insolvia_marketing or packages/insolvia_design_system_react can resolve",
+    "from this root's node_modules and pass CI, then fail in a clean install.",
+    "Both keep their own package-lock.json and their own CI job installs from it,",
+    "which is what catches this — do not consolidate them here."
   ],
   "engines": {
     "node": ">=24"
   },
   "workspaces": [
+    "apps/insolvia_app",
     "packages/insolvia_tokens",
     "packages/insolvia_api_client"
   ],
   "scripts": {
     "//tokens": [
       "Run with plain `node`, no loader and no build step: Node >=24 strips",
-      "TypeScript types natively, so the generator keeps the dependency-free",
-      "property its Dart predecessor was written to defend. Type-stripping",
-      "cannot execute `enum`, `namespace`, or parameter properties — the",
-      "generator must avoid all three."
+      "TypeScript types natively, so the generator stays dependency-free.",
+      "Type-stripping cannot execute `enum`, `namespace`, or parameter",
+      "properties — the generator must avoid all three (erasableSyntaxOnly in",
+      "tsconfig.base.json enforces it)."
     ],
     "tokens": "node packages/insolvia_tokens/tool/generate-tokens.ts",
     "tokens:check": "node packages/insolvia_tokens/tool/generate-tokens.ts --check",
@@ -48,13 +47,23 @@
       "package's own ESLint 8 gate. Read eslint.base.js before changing this."
     ],
     "lint": "npm run lint --workspaces --if-present",
-    "format": "prettier --check packages/insolvia_tokens packages/insolvia_api_client",
-    "format:write": "prettier --write packages/insolvia_tokens packages/insolvia_api_client",
+    "format": "prettier --check apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client",
+    "format:write": "prettier --write apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client",
+    "//app": [
+      "The app's own scripts (`build`, `web`, `lint`, `typecheck`, `test`) live in",
+      "apps/insolvia_app/package.json and are a contract with app-*.yml. These two",
+      "are conveniences for a developer at the repo root: `app` starts the dev",
+      "server on port 3000 (the exact-match Cognito origin), `app:build` produces",
+      "the production web export."
+    ],
+    "app": "npm run web --workspace @insolvia-ai/app",
+    "app:build": "npm run build --workspace @insolvia-ai/app",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "//ci": [
-      "The npm half of the gate only. While the Dart half still exists,",
-      "`melos run ci` remains the other half; PR 3 deletes it and leaves this."
+      "The whole local gate: token drift, format, lint, typecheck, test. Mirrors",
+      "what the CI workflows run per area, so `npm run ci` green locally is a",
+      "fair predictor of a green PR."
     ],
     "ci": "npm run tokens:check && npm run format && npm run lint && npm run typecheck && npm run test"
   },

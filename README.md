@@ -1,11 +1,11 @@
 # Insolvia
 
-Modern, cross-platform bankruptcy case-preparation & e-filing for consumer
-bankruptcy law firms — a competitor to Best Case by Stretto. The wedge is
-*seamlessness*: living inside the firm's existing workflow instead of being one
-more disconnected petition silo. One **Dart/Flutter** codebase ships the **web**
-app we promote *and* a native **desktop** app, held ready for offline,
-keyboard-driven drafting.
+Modern bankruptcy case-preparation & e-filing for consumer bankruptcy law firms —
+a competitor to Best Case by Stretto. The wedge is *seamlessness*: living inside
+the firm's existing workflow instead of being one more disconnected petition
+silo. One **TypeScript** codebase: the **web** app we promote, built with
+**React Native on Expo**, with mobile held open by `expo prebuild` and nothing
+committed until we want it.
 
 > **Agents:** read [`CLAUDE.md`](CLAUDE.md) first — it is the source of truth for
 > conventions in this monorepo.
@@ -18,18 +18,18 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 
 | Path | What |
 |---|---|
-| [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app — desktop + web (themed, feature-first hello-world today). |
+| [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app — React Native on Expo, web today (themed hello-world). |
 | [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
-| [`packages/`](packages/) | Shared libraries: design tokens, the Flutter + React design systems, the Dart API client. |
+| [`packages/`](packages/) | Shared libraries: design tokens, the React design system, the API client. |
 | [`services/`](services/) | Backend services (Python on Lambda): `api`, `mailer`. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
 | [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
 
 ## Getting started
 
-The `scripts/` directory is the toolchain — prefer it over hand-running
-`flutter`/`melos`/`npm`. One-time system setup (Homebrew installs Terraform, AWS
-CLI, Node, Flutter, Melos, Python), idempotent and re-runnable:
+The `scripts/` directory is the toolchain — prefer it over hand-running `npm` or
+`npx expo`. One-time system setup (Homebrew installs Terraform, AWS CLI, Node,
+Python), idempotent and re-runnable:
 
 ```bash
 ./scripts/dev-setup.sh          # add --check to report without installing
@@ -47,16 +47,21 @@ services/api/scripts/dev-setup.sh  &&  services/api/scripts/dev-up.sh
 The full catalogue — including per-machine dev AWS resources and deploys — is in
 [`scripts/README.md`](scripts/README.md).
 
-**Prerequisites the scripts can't install for you:** [Docker
-Desktop](https://www.docker.com/products/docker-desktop/) (the services run in
-compose) and, for macOS desktop builds, full **Xcode** (Command Line Tools alone
-are not enough).
+**A prerequisite the scripts can't install for you:** [Docker
+Desktop](https://www.docker.com/products/docker-desktop/) — the backend services
+run in compose. Nothing here needs Xcode: there are no native builds in the repo.
 
-### The macOS desktop build is unsigned (for now)
+### There is no desktop or mobile build
 
-`flutter build macos` produces an app that is **not yet code-signed/notarized**,
-so on first launch Gatekeeper blocks it: **right-click the app → Open → Open**
-(a one-time step per download). Signing/notarization is on the roadmap.
+The app targets **web**, and that is the only artifact CI produces. There are no
+macOS or Windows builds (see decision D9 in
+[`docs/MVP_PLAN.md`](docs/MVP_PLAN.md)) and nothing committed under `ios/` or
+`android/` — `npx expo prebuild` generates those from `app.json` if and when we
+want them.
+
+We use **Expo's free tier only**: no EAS Build, Submit, Update or Hosting, and no
+Expo account. A CI guard enforces it. Deploys go to our own AWS, through
+Terraform, like everything else.
 
 ## Deployment
 
@@ -64,7 +69,7 @@ Deploys run through GitHub Actions (AWS via OIDC) — see
 [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) and
 [`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md). Shared
 infra is applied and the `*.insolvia.ai` ACM cert is `ISSUED`, so pushes to
-`main` deploy for real; CI also builds and uploads web + macOS artifacts.
+`main` deploy for real.
 
 - **staging** → `staging-app.insolvia.ai` (auto, on merge to `main`)
 - **production** → `app.insolvia.ai` (manual, gated)

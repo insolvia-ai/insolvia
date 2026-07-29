@@ -1,9 +1,21 @@
 # Cognito auth for the Insolvia app (#65): one user pool per environment
-# (insolvia-users-<env>), a Cognito-provided hosted domain, and two public
-# PKCE app clients — one for the web SPA, one for the desktop app's loopback
-# flow. The house style is email-as-username, admin-only creation, and
-# SRP-only explicit flows, on the OAuth authorization-code + PKCE flows a
-# browser SPA and a native desktop app actually need.
+# (insolvia-users-<env>), a Cognito-provided hosted domain, and one public
+# PKCE app client for the web SPA. The house style is email-as-username,
+# admin-only creation, and SRP-only explicit flows, on the OAuth
+# authorization-code + PKCE flows a browser SPA actually needs.
+#
+# THERE WAS A SECOND CLIENT, for the Flutter desktop app, using the RFC 8252
+# §7.3 loopback redirect (`http://127.0.0.1:<port>/callback`, four fixed ports
+# because Cognito string-matches callback URLs and has no wildcard-port form).
+# It went with the desktop app itself.
+#
+# If a desktop or mobile client ever returns, it must register a CUSTOM SCHEME
+# — `insolvia://auth/callback` — and NOT loopback. That is the fact worth
+# carrying forward: the loopback pattern needs the app to bind an HTTP listener
+# on 127.0.0.1, which a React Native runtime has no way to do without a native
+# module, whereas a custom scheme is exactly what `expo-auth-session` +
+# `app.json`'s `scheme` already produce on every platform, web included.
+# Cognito accepts a custom scheme in `callback_urls` with no special handling.
 #
 # The API does NOT consume any of this yet — the waitlist stays public, and
 # JWT verification arrives with the first authenticated endpoint. This module
@@ -90,62 +102,35 @@ resource "aws_cognito_user_pool_domain" "main" {
   user_pool_id = aws_cognito_user_pool.main.id
 }
 
-# ── App clients ─────────────────────────────────────────────────
-# Both clients are OAuth public clients (RFC 6749 §2.1): no secret, because a
-# browser bundle and a desktop binary can both be unpacked and anything
-# embedded in them read out. Both use the authorization-code grant; PKCE
-# (RFC 7636) is the client's obligation — Cognito's authorize endpoint
-# accepts and enforces a code_challenge when one is sent, but offers no
-# server-side "require PKCE" toggle, so the app implementations MUST send
-# one (both Flutter OAuth packages and every AppAuth port do by default).
+# ── App client ──────────────────────────────────────────────────
+# An OAuth public client (RFC 6749 §2.1): no secret, because a browser bundle
+# can be unpacked and anything embedded in it read out. It uses the
+# authorization-code grant; PKCE (RFC 7636) is the client's obligation —
+# Cognito's authorize endpoint accepts and enforces a code_challenge when one
+# is sent, but offers no server-side "require PKCE" toggle, so the app
+# implementation MUST send one (`expo-auth-session` does by default).
 #
-# Refresh-token rotation is ENABLED on both: each refresh returns a new
-# refresh token and retires the old one, so a stolen refresh token stops
-# working as soon as the legitimate client refreshes. The 30 s grace period
-# keeps a flaky network from locking the client out when a rotation response
-# is lost in transit and the client retries with the "old" token.
+# Refresh-token rotation is ENABLED: each refresh returns a new refresh token
+# and retires the old one, so a stolen refresh token stops working as soon as
+# the legitimate client refreshes. The 30 s grace period keeps a flaky network
+# from locking the client out when a rotation response is lost in transit and
+# the client retries with the "old" token.
 
 locals {
   # The web SPA's redirect contract: the app must handle the code exchange at
   # <origin>/auth/callback and land sign-outs on the origin root. Derived
   # here, per origin, so staging's localhost dev origin gets the same paths
   # as the real one.
+  #
+  # Cognito matches callback URLs EXACTLY — no wildcard host, path, or port.
+  # That is why the dev origin has to pin a port (see the callers), and why a
+  # future native client would register `insolvia://auth/callback` as its own
+  # literal entry rather than anything pattern-shaped.
   web_callback_urls = [for o in var.web_origins : "${o}/auth/callback"]
   web_logout_urls   = var.web_origins
-
-  # Desktop loopback redirects, the RFC 8252 §7.3 native-app pattern: the
-  # app binds an HTTP listener on the loopback interface, opens the system
-  # browser at /oauth2/authorize, and receives the code on the listener.
-  #
-  # Two Cognito constraints shape this list (verified against the
-  # CreateUserPoolClient API reference, CallbackURLs):
-  #
-  #   1. Plain-HTTP callbacks are permitted ONLY for the loopback hosts
-  #      `http://localhost`, `http://127.0.0.1`, and `http://[::1]`, with
-  #      custom TCP ports allowed. We register the literal IP 127.0.0.1
-  #      rather than the localhost hostname — RFC 8252 recommends it because
-  #      it never touches the OS resolver (a hosts-file entry mapping
-  #      localhost elsewhere would otherwise redirect the auth code), and the
-  #      desktop app must bind and browse the SAME form, since Cognito
-  #      string-matches the redirect_uri against this list.
-  #
-  #   2. Callback URLs are EXACT-match. RFC 8252 §8.3 tells authorization
-  #      servers to allow any port on loopback redirects; Cognito does not —
-  #      there is no wildcard-port form. The standard workaround is this
-  #      small fixed port set: the desktop app must try to bind
-  #      127.0.0.1:<port> for each port IN THIS ORDER and use the first that
-  #      binds (four ports so one being occupied never blocks sign-in).
-  #      The ports sit below 49152 deliberately: macOS and Windows hand out
-  #      ephemeral (outbound) ports from 49152 up, so a port above that can
-  #      be transiently held by any outgoing connection on the machine.
-  #
-  # These URLs are the contract with apps/insolvia_app's desktop sign-in:
-  # change the ports or paths here and the app must change with them.
-  desktop_callback_urls = [for p in var.desktop_loopback_ports : "http://127.0.0.1:${p}/callback"]
-  desktop_logout_urls   = [for p in var.desktop_loopback_ports : "http://127.0.0.1:${p}/signout"]
 }
 
-# The web SPA (app.insolvia.ai / staging-app.insolvia.ai, Flutter web).
+# The web SPA (app.insolvia.ai / staging-app.insolvia.ai, Expo web).
 resource "aws_cognito_user_pool_client" "web" {
   name         = "${var.project}-web-${var.environment}"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -182,51 +167,6 @@ resource "aws_cognito_user_pool_client" "web" {
   access_token_validity  = 1
   id_token_validity      = 1
   refresh_token_validity = 30
-  token_validity_units {
-    access_token  = "hours"
-    id_token      = "hours"
-    refresh_token = "days"
-  }
-
-  refresh_token_rotation {
-    feature                    = "ENABLED"
-    retry_grace_period_seconds = 30
-  }
-}
-
-# The native desktop app (macOS/Windows, Flutter) — loopback-redirect PKCE.
-resource "aws_cognito_user_pool_client" "desktop" {
-  name         = "${var.project}-desktop-${var.environment}"
-  user_pool_id = aws_cognito_user_pool.main.id
-
-  generate_secret = false # public client — a shipped binary keeps no secrets
-
-  allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  supported_identity_providers         = ["COGNITO"]
-
-  callback_urls = local.desktop_callback_urls
-  logout_urls   = local.desktop_logout_urls
-
-  # No ALLOW_REFRESH_TOKEN_AUTH for the same reason as the web client:
-  # refresh_token_rotation below owns the refresh path, and Cognito rejects
-  # the explicit flow when rotation is enabled.
-  explicit_auth_flows = [
-    "ALLOW_USER_SRP_AUTH",
-  ]
-
-  prevent_user_existence_errors = "ENABLED"
-  enable_token_revocation       = true
-
-  # Same 1 h access/ID tokens as the web client, but a 90-day refresh token:
-  # the desktop app stores it in the OS keychain (not a browser), and
-  # desktop-loyal attorneys expect an installed app to stay signed in — a
-  # monthly full re-login is churn bait. Rotation (below) means the token at
-  # rest is retired on every refresh anyway.
-  access_token_validity  = 1
-  id_token_validity      = 1
-  refresh_token_validity = 90
   token_validity_units {
     access_token  = "hours"
     id_token      = "hours"

@@ -5,9 +5,10 @@ from urllib.parse import urlsplit
 from insolvia_api.core.config import AppConfig
 
 # Loopback hosts a browser dev server may serve from. Matching by hostname
-# (any port, http or https) rather than listing ports keeps `flutter run -d
-# chrome` working — it binds an arbitrary port per run. This is still an
-# exact-origin echo in the response, never a wildcard.
+# (any port, http or https) rather than listing ports keeps the Expo web dev
+# server working regardless of port. (The app pins `expo start --web` to :3000
+# to match Cognito's exact-origin allowlist, but this CORS check does not depend
+# on that.) This is still an exact-origin echo in the response, never a wildcard.
 _LOCALHOST_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 

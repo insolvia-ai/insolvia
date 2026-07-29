@@ -5,80 +5,104 @@
 ```
 insolvia/
 ├── apps/
-│   └── insolvia_app/                  Flutter app — desktop + web (feature-first)
-│       └── lib/
-│           ├── main.dart              runApp(InsolviaApp())
-│           └── src/
-│               ├── app.dart           app shell (MaterialApp.router + themes)
-│               ├── routing/           go_router config
-│               ├── config/            environment.dart (--dart-define)
-│               └── features/
-│                   └── home/presentation/   home_screen.dart + widgets/
+│   ├── insolvia_app/                  Expo app (React Native) — web today
+│   │   ├── app.config.ts              Expo config; no eas.json, on purpose
+│   │   └── src/
+│   │       ├── app/                   Expo Router routes ONLY (+not-found.tsx)
+│   │       ├── screens/               screen bodies the routes render
+│   │       ├── components/            our design system — RN primitives
+│   │       ├── config/                environment.ts (EXPO_PUBLIC_INSOLVIA_ENV)
+│   │       └── theme.ts               StyleSheet helpers over the tokens
+│   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
-│   └── insolvia_design_system/        shared UI — tokens, theme, components
-├── infra/                             Terraform — shared / staging / prod
+│   ├── insolvia_tokens/               @insolvia-ai/tokens — tokens.json + generator
+│   ├── insolvia_design_system_react/  published; marketing's components
+│   └── insolvia_api_client/           @insolvia-ai/api-client
+├── services/                          api · mailer (Python on Lambda)
+├── infra/                             Terraform — ci-trust / shared / staging / prod
 └── docs/                              business plan + runbooks
 ```
 
-Layout follows the standard Flutter monorepo split (`apps/` + `packages/`). Inside
-the app, UI is grouped by feature under `lib/ui/` and data by type under
-`lib/data/`, per Flutter's own architecture guide — see
-[ADR 0003](adr/0003-flutter-app-layout.md) for why, and
+Everything is TypeScript. The app follows the layout Expo itself publishes —
+`src/app/` is routes-only, screen bodies live in `src/screens/` — see
+[ADR 0005](adr/0005-expo-app-layout.md) for why, and
 [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) for the rules.
+[ADR 0004](adr/0004-react-native-replaces-flutter.md) is the stack decision
+behind all of it, including the measurements that ruled out a component library.
 
-- **Workspace resolution:** pub workspaces (root `pubspec.yaml` `workspace:`)
-  cover `insolvia_tokens` + the app. The design system is deliberately
-  **outside** the workspace and resolves standalone; the app consumes it as a
-  **git dependency pinned to a version tag**
-  (`insolvia_design_system-v<version>`), never by path — see
-  `docs/PACKAGE_PUBLISHING.md`.
-- **Task runner:** Melos (`melos.yaml`) — `melos bootstrap`, `melos run ci`.
-- **Flutter:** Homebrew cask `flutter` (latest stable); CI uses the same via
-  `subosito/flutter-action`. See *Flutter toolchain* below.
+- **Workspace resolution:** npm workspaces, root `package.json`. The member list
+  is **explicit and never `packages/*`** — globbing would swallow
+  `insolvia_design_system_react`, which marketing consumes *by published
+  version*. The reasoning is in the root `package.json`'s own comments; read
+  them before adding a member.
+- **Not members, deliberately:** `apps/insolvia_marketing` and
+  `packages/insolvia_design_system_react`. Each keeps its own lockfile and its
+  own CI job that installs from it, because Node resolution walks *up* the tree
+  and would otherwise let a missing dependency resolve from the root.
+- **Two design systems, one token source.** The React package serves marketing;
+  the app has its own React Native components. They share token *values* only,
+  generated from `packages/insolvia_tokens/tokens.json` into a Tailwind `@theme`
+  block for marketing and a typed `tokens.ts` for the app — see
+  [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
 
-## Flutter toolchain
+## Toolchain
 
-Flutter is the Homebrew cask `flutter` (latest stable), not FVM.
-`scripts/dev-setup.sh` runs `brew install --cask flutter`, and the `dart` bundled
-inside it powers Melos. CI installs the same latest stable via
-`subosito/flutter-action` (`channel: stable`), so local and CI share one channel
-— no pinned copy to drift.
+| | |
+|---|---|
+| Node | ≥ 24 (`engines.node`), installed by `scripts/dev-setup.sh` |
+| App | **Expo SDK 57**, pinned exact · Metro · Expo Router (`web.output: "single"`) |
+| Marketing | React Router v7 framework mode · Vite |
+| Services | Python 3.12 on Lambda |
+| Lint/format | ESLint 9 + Prettier, fanned out per workspace member |
 
-**Multi-user machines.** The cask installs the SDK to a shared prefix
-(`/opt/homebrew/share/flutter`) owned by whoever ran `brew`. Because the SDK is a
-git repo and Flutter shells out to git, a *second* user account hits
-`fatal: detected dubious ownership` and cannot write the SDK cache. To share one
-Flutter across users, trust it system-wide and make it group-writable (both
-accounts must share the group, e.g. `admin`):
+**Expo's free tier only — and CI enforces it.** No EAS Build, Submit, Update or
+Hosting, and no Expo account anywhere in the pipeline. Every part of Expo we
+depend on (the SDK, Metro, Expo Router, `expo export`, `expo prebuild`) is open
+source and runs locally; EAS is a paid service that would put a vendor account
+on the critical path of a deploy that is otherwise entirely ours — and
+`eas deploy` targets Cloudflare Workers, which `infra/modules/web_hosting`
+already does for free under Terraform. A guard step in `app-pr.yml` fails the
+build on an `eas.json`, an `eas-cli` dependency, or a `.eas/` directory, because
+this is a constraint that erodes by accident: several vendored agent skills in
+`.agents/skills/` present EAS as the normal way to ship. Root
+[`CLAUDE.md`](../CLAUDE.md) carries the applicability table for those.
 
-```bash
-sudo git config --system --add safe.directory /opt/homebrew/share/flutter
-sudo chgrp -R admin /opt/homebrew/share/flutter
-sudo chmod -R g+rwX /opt/homebrew/share/flutter
-```
+**Desktop is not built.** No macOS or Windows targets, no per-OS CI jobs, no
+artifact hosting. Decision D9 in [`MVP_PLAN.md`](MVP_PLAN.md) records the trade
+— under Flutter one toolchain built every target, so the option was nearly free;
+under React Native it would be a port. **Mobile is the held-open target now**,
+and `expo prebuild` holds it open with nothing committed under `ios/`/`android/`
+and no CI job at all.
 
 ## Environment model (staging vs production)
 
-The app is a single binary/bundle configured at **build time** — no separate
-codepaths. Selection is via a compile-time define:
+The app is a single bundle configured at **build time** — no separate codepaths.
+Selection is one inlined environment variable:
 
 ```bash
-flutter build web --dart-define=INSOLVIA_ENV=staging      # or production, or local (default)
+EXPO_PUBLIC_INSOLVIA_ENV=staging npx expo export -p web   # or production, or local (default)
 ```
 
-`apps/insolvia_app/lib/config/environment.dart` reads `INSOLVIA_ENV` and exposes a typed
-`AppEnvironment` (label, `isProduction`, future API base URLs, etc.). The
-hello-world screen renders the active environment so staging vs prod is visually
-obvious.
+`apps/insolvia_app/src/config/environment.ts` reads it and exposes a typed
+`AppEnvironment` (label, `isProduction`, API base URLs). The home screen renders
+the active environment so staging vs prod is visually obvious.
 
-We use `--dart-define` rather than full Flutter *flavors* deliberately: flavors
-add per-platform Xcode/Gradle scheme plumbing that a hello-world doesn't need.
-Flavors can be introduced later if we need distinct bundle IDs / icons per env.
+**The `EXPO_PUBLIC_` prefix is not a style choice.** Expo inlines *only*
+variables named `EXPO_PUBLIC_*` into the client bundle; anything else is simply
+absent at runtime, with no error. That is why the old `--dart-define`
+`INSOLVIA_ENV` became `EXPO_PUBLIC_INSOLVIA_ENV` rather than keeping its name —
+the rename was forced by the bundler, and a stray `INSOLVIA_ENV` in a workflow
+would read as `local` in production.
+
+The corollary is that **nothing secret may go in an `EXPO_PUBLIC_*` variable.**
+Everything so prefixed is compiled into a public static asset. Per
+[ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) the client holds no
+credentials anyway, so there is nothing that wants to be there.
 
 ## Web hosting topology
 
-Flutter web compiles to a **static** SPA. Hosting is intentionally
-compute-free:
+`expo export -p web` produces a **static** SPA (`web.output: "single"`), so
+hosting is unchanged from the Flutter era and intentionally compute-free:
 
 ```
 Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.html on 403/404)  →  S3 (private, OAC)
@@ -100,12 +124,6 @@ Only prod owns the apex — a hosted zone has exactly one, so staging passes
 `apex_domain = null` and the module omits the alias, the records, and the
 redirect.
 
-## Desktop distribution
-
-`flutter build macos` produces `insolvia_app.app`. It is currently **unsigned**;
-CI zips it as an artifact. First launch requires right-click → Open (Gatekeeper).
-Signing + notarization is deferred (needs an Apple Developer account).
-
 ## CI/CD
 
 See `.github/workflows/`. Each area has a `*-pr.yml` (checks) and, where it
@@ -123,10 +141,10 @@ service in order. Three things make that dispatch safe:
   shared across environments (`infra/envs/shared`), so the image staging tested
   is already in the repository prod pulls from. A prod deploy resolves the
   commit's `sha-<commit>` tag to an immutable digest and deploys *that* — there
-  is no `docker build` in any prod workflow. The Flutter app is the one
-  exception and rebuilds, because it selects its environment at compile time
-  (see *Environment model* above); it pins an explicit Flutter version so
-  "same source" also means "same compiler".
+  is no `docker build` in any prod workflow. The app is the one exception and
+  rebuilds, because it inlines its environment at build time (see *Environment
+  model* above); it pins an exact Expo SDK version so "same source" also means
+  "same bundler".
 - **It refuses commits staging never blessed.** `.github/actions/verified-commit`
   fails the run unless that exact commit has a successful `*-staging.yml` run.
   There is no `workflow_run` chain, so ordering is asserted rather than assumed.
@@ -168,38 +186,54 @@ you find yourself "cleaning that up", read
 
 ### Branch protection — what `protect-main` enforces (and doesn't)
 
-`main` is protected by the `protect-main` ruleset. Verify, don't assume:
-`gh api repos/insolvia-ai/insolvia/rulesets/18947945 --jq .rules`.
+`main` is protected by the `protect-main` ruleset. Verify, don't assume — and
+resolve it **by name, never by id**:
+
+```bash
+scripts/update-ruleset.sh show
+```
+
+**Do not hard-code a ruleset id here or anywhere else.** A ruleset recreated in
+the UI comes back with a new id, and the stale one 404s with no hint that the
+number is the problem. This document used to print `18947945`; the live ruleset
+is a different id today, which is exactly why the script resolves
+`name == "protect-main"` through `/repos/{owner}/{repo}/rulesets` and then uses
+whatever id that returns. If you need the raw JSON, get the id the same way
+first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews.
+be resolved, and pushes dismiss stale reviews. **Plus the nine required status
+checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
 `required_approving_review_count` is `0` and `require_code_owner_review` is
-`false` — a PR can merge with **no approval** — and there are **no required
-status checks**, so a PR with red CI can still merge. CODEOWNERS only *requests*
-the code owner's review; it does not gate the merge.
+`false` — a PR can merge with **no approval**. CODEOWNERS only *requests* the
+code owner's review; it does not gate the merge. That is deliberate and is the
+last paragraph of this section.
 
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-twelve job `name:` values (matrix legs get a `(leg)` suffix):
+**nine** job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
 |---|---|
-| `Flutter app` | `app-pr.yml` |
-| `macOS build` | `app-pr.yml` |
-| `Windows build` | `app-pr.yml` |
-| `Flutter design system` | `design-system-pr.yml` |
+| `App` | `app-pr.yml` |
 | `React design system` | `design-system-react-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
 | `Mailer service` | `mailer-pr.yml` |
-| `Dart API client` | `api-client-pr.yml` |
+| `API client` | `api-client-pr.yml` |
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
+
+This list was twelve before the Expo migration. Four checks went away with the
+Flutter stack — `Flutter app`, `macOS build` and `Windows build` collapsed into
+the single `App` job, and `Flutter design system` disappeared with its package —
+and `Dart API client` was renamed `API client`. **A rename is a ruleset change**,
+per the contract note below.
 
 `Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
 are deliberately **not** required — neither environment is ever applied by CI,
@@ -219,7 +253,7 @@ check nobody reports, and every PR then parks on *"Expected — waiting for stat
 to be reported"* forever. Rename a job only alongside the ruleset.
 
 **Two settings are deliberately off.** *Require branches to be up to date before
-merging* (`strict_required_status_checks_policy`) is `false`: with twelve checks
+merging* (`strict_required_status_checks_policy`) is `false`: with nine checks
 it would force a rebase-and-rerun on every PR whenever anything lands first.
 `required_approving_review_count` is unset, and should stay that way — Insolvia
 is maintained by one person, and GitHub does not let you approve your own PR, so

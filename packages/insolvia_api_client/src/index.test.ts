@@ -9,11 +9,9 @@
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/core/waitlist.py
 //
-// This is the TypeScript half of a pair: `test/insolvia_api_client_test.dart`
-// pins the same contract for the Dart client, assertion for assertion, so the
-// two can be read side by side until the Dart half is deleted. The transport
-// is a stubbed `fetch` — no network, no test server — the analogue of the
-// Dart suite's `MockClient`.
+// The transport is a stubbed `fetch` — no network, no test server — so every
+// assertion here is about the bytes this client sends and the objects it
+// builds from the bytes it is given.
 //
 // The client is imported by package name rather than by relative path: that
 // is the specifier the export map in package.json publishes, so the test
@@ -189,8 +187,8 @@ describe('joinWaitlist', () => {
   });
 
   test('an explicit undefined optional field is omitted, not sent as null', async () => {
-    // A TypeScript-only hazard with no Dart counterpart, and the reason the
-    // optional fields are typed `string | undefined`: callers hand this
+    // The reason the optional fields are typed `string | undefined`: callers
+    // hand this
     // client `string | undefined` values straight out of a form. Absent and
     // explicitly-undefined must produce the same wire body.
     const stub = stubFetch(() =>
@@ -313,8 +311,9 @@ describe('joinWaitlist', () => {
   });
 
   test('transport failures propagate untouched (no ApiException wrapping)', async () => {
-    // `fetch` rejects with a TypeError on a network-level failure — the
-    // analogue of the Dart client letting an http.ClientException through.
+    // `fetch` rejects with a TypeError on a network-level failure, and it
+    // reaches the caller as-is: "the network is down" stays distinguishable
+    // from "the API rejected this" by type alone.
     const transportFailure = new TypeError('Connection refused');
     const client = new InsolviaApiClient('http://localhost:8080', {
       fetch: () => Promise.reject(transportFailure),

@@ -11,24 +11,34 @@ description: >-
 
 # Adding a new package / app / service
 
-## Dart package or app (pub workspace member)
+## TypeScript package or app (npm workspace member)
 
 1. Create it under `packages/<name>/` (shared library) or `apps/<name>/`
-   (runnable app), with its own `pubspec.yaml` (`resolution: workspace`).
-2. Add it to the root `pubspec.yaml` `workspace:` list.
+   (runnable app), with its own `package.json` and a `tsconfig.json` that
+   `extends` the root `tsconfig.base.json`.
+2. Add it to the root `package.json` `workspaces` list **by exact path** — the
+   list is deliberately explicit and must never become `packages/*`. A glob
+   would sweep in `packages/insolvia_design_system_react`, which publishes to
+   GitHub Packages and is consumed *by its published version*; making it a
+   member symlinks the marketing site to local source, so a broken package
+   passes CI and only breaks after publishing. `apps/insolvia_marketing` is out
+   for the same reason. See the comment block in the root `package.json`.
 3. Give it a **`README.md`** (human: what it is + how to run it via its
    `scripts/`) and a **`CLAUDE.md`** (agent rules/conventions for that area).
-   Every area has both — see any existing package for the shape.
+   Every area has both — see any existing package for the shape. Add a one-line
+   `eslint.config.js` re-exporting the root `eslint.base.js` (there is
+   deliberately no discoverable `eslint.config.js` at the repo root — see that
+   file for why).
 4. If it deploys, add `<name>-pr.yml` + `<name>-<env>.yml` workflows (follow the
    existing `<area>-pr.yml` / `<area>-<env>.yml` shape and the PR-gate design in
-   [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)) and an `infra/envs/*`
+   [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md)) and an `infra/envs/*`
    entry.
-5. Document it in the map in the root [`README.md`](../../README.md).
+5. Document it in the map in the root [`README.md`](../../../README.md).
 
 ## Python service (the exception — not a workspace member)
 
-Lives under `services/<name>/`, is **not** a pub workspace member (no
-`pubspec.yaml`, no root `workspace:` entry). Use the mailer-style layered `src/`
+Lives under `services/<name>/`, is **not** an npm workspace member (no
+`package.json` in the root `workspaces` list). Use the mailer-style layered `src/`
 layout (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
 (pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
 enforcing the dependency direction. Steps 3–5 above still apply.

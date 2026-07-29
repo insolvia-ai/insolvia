@@ -1,0 +1,109 @@
+{
+  "name": "@insolvia-ai/app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "//": [
+    "The Insolvia app — Expo / React Native, shipped as a web SPA.",
+    "",
+    "A member of the root npm workspace, so `npm ci` at the repo root installs",
+    "it and symlinks @insolvia-ai/tokens. There is NO component library and NO",
+    "styling library here: bare React Native primitives + StyleSheet.create,",
+    "settled by measurement (docs/adr/0004). Adding gluestack, NativeWind,",
+    "Unistyles or Tailwind is a regression, not an upgrade.",
+    "",
+    "Expo's FREE tier only: none of the paid EAS services, no EAS config file,",
+    "no EAS command-line tool, no Expo access token in CI, and no over-the-air",
+    "updates package. Web builds run in GitHub Actions and hosting is the",
+    "existing S3 + CloudFront (infra/modules/web_hosting). A CI step greps for",
+    "those names, which is why they are described here rather than spelled out.",
+    "",
+    "ios/ and android/ are deliberately absent: `expo prebuild` generates them",
+    "if and when mobile starts."
+  ],
+  "//scripts": [
+    "`build`, `web`, `lint`, `typecheck` and `test` are a contract with",
+    ".github/workflows/app-*.yml — renaming one orphans a required check.",
+    "",
+    "`web` pins port 3000 because infra/envs/{dev,staging} register",
+    "http://localhost:3000 as an EXACT-MATCH Cognito allowed origin; Expo's own",
+    "default is 8081, which that origin list would reject.",
+    "",
+    "`build` passes --clear: Metro's transform cache keys on file content and",
+    "config, NOT on environment variables, so a staging export followed by a",
+    "production export in the same job can otherwise reuse the staging bundle",
+    "and ship it as production (EXPO_PUBLIC_INSOLVIA_ENV is inlined at",
+    "transform time). The cost is a cold Metro cache per build; the failure it",
+    "prevents is shipping the wrong API base URL."
+  ],
+  "scripts": {
+    "build": "expo export -p web --clear",
+    "web": "expo start --web --port 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "//dependencies": [
+    "Versions are the ones verified end-to-end in the Expo spike and are pinned",
+    "as a set: Expo SDK 57.0.8 / React Native 0.86.0 / React 19.2.3 /",
+    "expo-router 57.0.8. Upgrade with `npx expo install --check`, never one",
+    "package at a time.",
+    "",
+    "@insolvia-ai/api-client is wired in but not yet imported, exactly as the",
+    "Dart client was in the old pubspec.yaml: it sits beside",
+    "src/config/environment.ts's apiBaseUrl so the first API-backed feature only",
+    "has to import it."
+  ],
+  "dependencies": {
+    "@insolvia-ai/api-client": "*",
+    "@insolvia-ai/tokens": "*",
+    "expo": "~57.0.8",
+    "expo-constants": "~57.0.7",
+    "expo-linking": "~57.0.4",
+    "expo-router": "~57.0.8",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "~19.2.2",
+    "babel-preset-expo": "^57.0.4",
+    "jest": "^29.7.0",
+    "jest-expo": "~57.0.3",
+    "react-test-renderer": "19.2.3"
+  },
+  "//react-test-renderer": [
+    "A peer of @testing-library/react-native, pinned to the SAME version as",
+    "react. It must be declared: left to npm, the peer resolves to the newest",
+    "react-test-renderer, whose own `react` peer is then narrower than our",
+    "pinned 19.2.3 and the install fails with ERESOLVE. Bump it in lockstep with",
+    "react."
+  ],
+  "//jest": [
+    "jest-expo's native preset. Tests assert accessibility PROPS (role,",
+    "aria-level, aria-labelledby); that those props become real <h1>/<button>/",
+    "<label>-equivalent tags is react-native-web's own mapping, re-verified",
+    "against the built DOM in the deploy checks rather than mocked here.",
+    "",
+    "`transformIgnorePatterns` is deliberately NOT overridden. The preset's own",
+    "list is what has to win: expo-router 57 pulls in `standard-navigation`,",
+    "which ships untransformed ESM and appears only in the preset's list. A",
+    "hand-copied list (they circulate widely) silently drops it and every route",
+    "test dies with \"Cannot use import statement outside a module\".",
+    "",
+    "`moduleNameMapper` restates the `@/*` alias from tsconfig.json. Metro reads",
+    "the tsconfig paths itself; Jest does not, so without this every `@/`",
+    "import fails to resolve under test while building fine."
+  ],
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    }
+  }
+}

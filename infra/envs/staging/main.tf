@@ -3,7 +3,6 @@
 #   • backend API    -> staging-api.insolvia.ai
 #   • mailer API     -> staging-mailer-api.insolvia.ai
 #   • marketing site -> staging-www.insolvia.ai
-#   • downloads      -> staging-download.insolvia.ai
 # References the shared zone + wildcard cert by name (not by remote state).
 
 locals {
@@ -46,30 +45,6 @@ module "web_hosting" {
   project             = "insolvia"
   environment         = local.environment
   domain_name         = var.subdomain
-  hosted_zone_id      = data.aws_route53_zone.main.zone_id
-  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
-  tags                = local.common_tags
-}
-
-# ── Desktop artifact hosting: staging-download.insolvia.ai (4.10) ─
-# Where the unsigned `.dmg` / `setup.exe` builds from 4.6 land. Unlinked from
-# the marketing site by design (D8: desktop is built but not promoted) — this
-# exists so someone can be handed a URL, nothing more.
-#
-# STAGING GETS ONE TOO, and that is not symmetry for its own sake. The desktop
-# binary compiles its environment in via --dart-define=INSOLVIA_ENV, so the
-# staging and prod builds are genuinely different artifacts pointing at
-# different APIs and Cognito pools; one shared bucket would mean the two
-# overwriting each other at the same keys. It also keeps the upload path
-# exercised on every merge to main rather than only on the rare prod dispatch,
-# which is the D8 bit-rot concern (4.8) applied to distribution instead of to
-# the build.
-module "artifact_hosting" {
-  source = "../../modules/artifact_hosting"
-
-  project             = "insolvia"
-  environment         = local.environment
-  domain_name         = var.download_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
   tags                = local.common_tags
@@ -147,17 +122,19 @@ resource "aws_ssm_parameter" "mailer_api_url" {
   tags  = local.common_tags
 }
 
-# Auth (#65): staging Cognito user pool + web/desktop app clients.
+# Auth (#65): staging Cognito user pool + the web SPA app client.
 #
 # web_origins carries a localhost dev origin ON STAGING ONLY: Cognito callback
-# URLs are exact-match (no wildcard host or port), so local Flutter web dev
-# against staging auth must pin its port —
+# URLs are exact-match (no wildcard host or port), so local web dev against
+# staging auth must PIN ITS PORT — which is why the Expo dev server is started
+# on 3000 rather than Metro's default 8081:
 #
-#   flutter run -d chrome --web-port 3000
+#   npx expo start --web --port 3000
 #
-# http://localhost is one of Cognito's three permitted plain-HTTP loopback
-# hosts. Prod registers no dev origins — nothing running on a laptop should be
-# able to complete a prod sign-in.
+# The port below and that flag are one contract; changing either alone breaks
+# local sign-in. http://localhost is one of Cognito's three permitted
+# plain-HTTP loopback hosts. Prod registers no dev origins — nothing running on
+# a laptop should be able to complete a prod sign-in.
 module "auth" {
   source = "../../modules/auth"
 

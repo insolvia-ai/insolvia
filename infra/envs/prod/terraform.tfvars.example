@@ -4,8 +4,5 @@ subdomain        = "app.insolvia.ai"
 api_subdomain    = "api.insolvia.ai"
 mailer_subdomain = "mailer-api.insolvia.ai"
 
-# Unsigned desktop builds (4.10). Unlinked from www per D8.
-download_subdomain = "download.insolvia.ai"
-
 # Marketing SSR image tag; only consulted when the Lambda is first created.
 marketing_image_tag = "prod"

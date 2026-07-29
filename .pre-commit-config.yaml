@@ -16,5 +16,44 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
 
-  # Dart/Flutter formatting is enforced in CI via `melos run format`; run it
-  # locally before committing:  melos run format
+  # The JS/TS half — what `melos run format` used to cover for Dart.
+  #
+  # `language: system` (not `node`): pre-commit's own node environments would
+  # install a SECOND copy of the toolchain, pinned separately from the
+  # committed package-lock.json, and the two would drift into disagreeing about
+  # formatting. These run the repo's own npm scripts against the repo's own
+  # node_modules, so the hook and CI are the same command by construction.
+  # `pass_filenames: false` because both scripts define their own scope.
+  - repo: local
+    hooks:
+      # Prettier in --check mode, not --write: a hook that silently rewrites
+      # files mid-commit hides the diff you are about to author. Run
+      # `npm run format:write` when it complains.
+      - id: npm-format
+        name: prettier (npm run format)
+        entry: npm run format
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml)$
+
+      # ESLint, fanned out per workspace member by `--workspaces`.
+      #
+      # It MUST be invoked this way — never as a bare `eslint` with the repo
+      # root as cwd. There is deliberately no `eslint.config.js` at the root:
+      # the rules live in `eslint.base.js` and each workspace member
+      # re-exports it. ESLint discovers a flat config by walking UP from its
+      # cwd, so a root one would also be found by
+      # packages/insolvia_design_system_react — version-gated, still on
+      # eslintrc with ESLint 8 — and flip it into flat-config mode, breaking a
+      # package this change never touched. Read eslint.base.js before changing
+      # this entry.
+      - id: npm-lint
+        name: eslint (npm run lint --workspaces)
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|js|jsx|mjs|cjs)$
+
+  # Not hooked: `npm run typecheck` and `npm run test` are too slow for every
+  # commit. `npm run ci` runs the whole npm gate (tokens:check, format, lint,
+  # typecheck, test) — the same set the PR checks run.

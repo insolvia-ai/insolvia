@@ -1,17 +1,23 @@
 name: API client · PR
 
 # No `on.pull_request.paths:` filter, deliberately — see
-# `.github/actions/changed-paths/action.yml`. Both jobs below are intended as
-# required status checks on `protect-main`, so they must trigger and report on
-# *every* PR; the `steps.filter` guard inside each is what keeps an unrelated
-# PR cheap. Re-adding a `paths:` filter would silently deadlock every PR that
-# does not touch these paths.
+# `.github/actions/changed-paths/action.yml`. The job below is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths.
 #
-# TWO JOBS, ONE PACKAGE, for exactly one PR: `Dart API client` gates lib/ +
-# test/, `API client` gates the TypeScript port in src/. They coexist while
-# the app migrates off Flutter; the PR that deletes lib/ and test/ deletes the
-# Dart job with them (and drops it from the ruleset — see the
-# `insolvia-branch-protection` skill, which matches checks by exact name).
+# ONE JOB NOW. This file used to carry a second job, `Dart API client`, gating
+# the package's lib/ + test/ alongside `API client` gating the TypeScript port
+# in src/. Its own header said the coexistence lasted exactly until the PR that
+# deleted lib/ and test/ — this is that PR, and the Dart job left with them.
+#
+# ACTION REQUIRED ON MERGE: `Dart API client` must be removed from the
+# `protect-main` ruleset, which matches required checks by EXACT NAME and will
+# otherwise wait forever for a check nothing reports. Use the
+# `insolvia-branch-protection` skill; do not hand-roll the `gh api` call, which
+# replaces the arrays it is sent. `API client` keeps its name for the same
+# reason — renaming it would silently orphan the gate.
 on:
   pull_request:
 
@@ -19,57 +25,6 @@ permissions:
   contents: read
 
 jobs:
-  dart-api-client:
-    name: Dart API client
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Full history so the guard can diff against the PR base commit.
-          fetch-depth: 0
-
-      - id: filter
-        uses: ./.github/actions/changed-paths
-        with:
-          paths: |
-            packages/insolvia_api_client/**
-            pubspec.yaml
-            melos.yaml
-            .github/workflows/api-client-pr.yml
-            .github/actions/changed-paths/action.yml
-
-      # Flutter (not plain Dart) because `pub get` resolves the whole pub
-      # workspace from the root, and other members depend on the Flutter SDK.
-      # The package itself stays pure Dart — analyze/test run with `dart`.
-      - uses: subosito/flutter-action@v2
-        if: steps.filter.outputs.run == 'true'
-        with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-
-      - name: Resolve workspace
-        if: steps.filter.outputs.run == 'true'
-        run: flutter pub get
-
-      - name: Format check
-        if: steps.filter.outputs.run == 'true'
-        run: dart format --output=none --set-exit-if-changed packages/insolvia_api_client
-
-      - name: Analyze
-        if: steps.filter.outputs.run == 'true'
-        run: dart analyze --fatal-infos packages/insolvia_api_client
-
-      # The contract pin for services/api — see the header comment in
-      # packages/insolvia_api_client/test/insolvia_api_client_test.dart.
-      - name: Test
-        if: steps.filter.outputs.run == 'true'
-        run: dart test
-        working-directory: packages/insolvia_api_client
-
   api-client:
     name: API client
     runs-on: ubuntu-latest
@@ -82,16 +37,11 @@ jobs:
       - id: filter
         uses: ./.github/actions/changed-paths
         with:
-          # The Dart job's list plus the npm-side inputs this gate actually
-          # consumes. `packages/insolvia_api_client/**` covers both halves of
-          # the package, so a change to either client runs both jobs — while
-          # they share a directory that is the honest guard, and it keeps a
-          # reviewer from having to reason about two divergent path lists.
-          # `pubspec.yaml`/`melos.yaml` leave with the Dart job.
+          # `pubspec.yaml`/`melos.yaml` left with the Dart job — the pub
+          # workspace they described no longer exists, so listing them would
+          # guard paths that can never change again.
           paths: |
             packages/insolvia_api_client/**
-            pubspec.yaml
-            melos.yaml
             package.json
             package-lock.json
             tsconfig.base.json
@@ -121,9 +71,8 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm ci
 
-      # Scoped to this package, mirroring how the Dart job passes a path to
-      # `dart format`/`dart analyze`. The root `lint`/`format` scripts cover
-      # every workspace member, and this gate must not go red because a
+      # Scoped to this package, not the repo. The root `lint`/`format` scripts
+      # cover every workspace member, and this gate must not go red because a
       # *different* package has a lint error — that package has its own gate.
       - name: Format check
         if: steps.filter.outputs.run == 'true'

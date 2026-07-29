@@ -9,11 +9,9 @@
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/core/waitlist.py
 //
-// The module split mirrors the Dart client this replaces, file for file, so
-// the two can be read side by side during a contract review:
-//   models.ts      ← lib/src/models.dart
-//   exceptions.ts  ← lib/src/exceptions.dart
-//   client.ts      ← lib/src/client.dart
+// The module split is one file per concern — `models.ts`, `exceptions.ts`,
+// `client.ts` — so a contract review can read the wire shapes without the
+// transport in the way.
 //
 // This barrel is the package's only entry point (package.json exports
 // `./src/index.ts`), so what is re-exported here is the public surface.

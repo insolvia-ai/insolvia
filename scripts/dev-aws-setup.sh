@@ -75,7 +75,6 @@ outputs="$(terraform_output_json)"
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
-desktop_client_id="$(jq -r '.auth_desktop_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 
@@ -117,7 +116,6 @@ fi
 printf '\nCognito (for upcoming local auth work — nothing consumes these yet):\n'
 printf '  User pool id:      %s\n' "$pool_id"
 printf '  Web client id:     %s\n' "$web_client_id"
-printf '  Desktop client id: %s\n' "$desktop_client_id"
 printf '  Hosted domain:     %s\n' "$auth_domain"
 printf '  Issuer:            %s\n' "$issuer_url"
 printf '\nStart the API against your per-machine table with:\n  ./services/api/scripts/dev-up.sh\n'

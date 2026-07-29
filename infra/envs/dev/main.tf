@@ -18,7 +18,7 @@
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet).
 # No ECR/Lambda/API Gateway/S3: local dev runs the API via compose or the
-# plain dev server, not Lambda.
+# plain dev server, not Lambda, and the app runs on the Expo dev server.
 
 locals {
   # dev-<machine_short_id> is this machine's environment name, slotting into
@@ -72,9 +72,10 @@ resource "aws_dynamodb_table" "waitlist" {
 # (insolvia-dev-<machine_short_id>) is GLOBALLY unique across all of AWS —
 # the machine short id in it is what makes a per-developer pool safe to
 # create at all. Registers only the localhost web origin staging also
-# registers for dev (`flutter run -d chrome --web-port 3000`); nothing
-# deployed ever redirects here. Outputs only for now: this preps local auth
-# work, the app does not consume it yet.
+# registers for dev (`npx expo start --web --port 3000` — the port is pinned
+# to match, since Cognito callback URLs are exact-match); nothing deployed
+# ever redirects here. Outputs only for now: this preps local auth work, the
+# app does not consume it yet.
 
 module "auth" {
   source = "../../modules/auth"

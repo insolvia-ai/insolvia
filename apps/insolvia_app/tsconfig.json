@@ -1,0 +1,30 @@
+{
+  "//": [
+    "Extends `expo/tsconfig.base` rather than the repo's ../../tsconfig.base.json.",
+    "That file answers to Node (module NodeNext, types: node, no JSX, no DOM) and",
+    "is right for the pure-TypeScript workspace members; this app is bundled by",
+    "Metro and renders JSX, so Expo's own base is the honest parent.",
+    "",
+    "The two options the repo cares about are restated here so nothing is lost by",
+    "not extending it:",
+    "  - `strict` — on everywhere in this repo.",
+    "  - `erasableSyntaxOnly` — bans `enum`, `namespace` and parameter properties.",
+    "    Metro's Babel transform strips types rather than compiling them, exactly",
+    "    like Node >=24 does for the token generator, so those constructs would",
+    "    typecheck and then fail at runtime. This is why src/config/environment.ts",
+    "    is `as const` + a union instead of the Dart enum it replaces."
+  ],
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "erasableSyntaxOnly": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

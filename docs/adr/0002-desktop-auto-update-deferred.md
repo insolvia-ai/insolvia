@@ -1,6 +1,11 @@
 # ADR 0002 — Desktop auto-update is deferred, with a hard revisit trigger
 
-- **Status:** Accepted
+- **Status:** **Superseded by [ADR 0004](0004-react-native-replaces-flutter.md)**
+  — there is no desktop build to update. Flutter is gone, both desktop targets
+  are deleted rather than deferred, and D8 (which this rested on) is superseded
+  by D9. The reasoning below is kept intact because it is the checklist anyone
+  reversing the desktop deferral has to satisfy, and none of it stopped being
+  true — see *What survives the supersession* at the end.
 - **Date:** 2026-07-27
 - **Relates to:** decision D8 in `docs/MVP_PLAN.md`; issues #17, #16
 
@@ -64,3 +69,24 @@ late.
   lead time), notarization, then two independent updater implementations. Budget
   it as such the moment a firm's desktop dependency looks likely — not once it
   is real.
+
+## What survives the supersession
+
+ADR 0004 removed the subject of this decision rather than reversing it. Three
+things above outlive it and should be read by anyone who proposes desktop
+again:
+
+- **The revisit trigger is still the right one.** "Before any firm depends on a
+  desktop build day-to-day" was never about updaters specifically; it is the
+  point at which a hand-held distribution stops being honest.
+- **The last bullet's premise is void, and that is the whole change.** This ADR
+  rested on issue #16 keeping both desktop targets green in CI. Under Flutter
+  that was one job on a shared toolchain; under React Native, desktop means
+  `react-native-macos` / `react-native-windows` — separate forks on their own
+  cadence. So the targets are deleted rather than kept warm, and D9 records the
+  optionality that was traded away and the (mobile, via `expo prebuild`)
+  optionality bought in its place.
+- **The cost estimate got larger, not smaller.** Certificates, notarization and
+  two updaters were the old bill. A desktop return now adds a port before any
+  of that starts. Nothing here argues against desktop; it argues against
+  costing it as a ticket.

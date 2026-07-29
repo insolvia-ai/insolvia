@@ -62,11 +62,6 @@ output "auth_web_client_id" {
   value       = module.auth.web_client_id
 }
 
-output "auth_desktop_client_id" {
-  description = "Production desktop app client ID (loopback-redirect PKCE)."
-  value       = module.auth.desktop_client_id
-}
-
 output "auth_domain" {
   description = "Production hosted auth domain (Cognito-provided)."
   value       = module.auth.domain
@@ -162,23 +157,4 @@ output "marketing_ssr_alias_name" {
 
 output "marketing_url" {
   value = module.marketing_site.url
-}
-
-# ── Desktop artifact hosting (4.10) — read by the desktop build workflow ──
-# Named `download_*` rather than reusing the bare `bucket_name` /
-# `distribution_id` above, which belong to the Flutter web app and are already
-# consumed by app-prod.yml.
-output "download_bucket_name" {
-  description = "S3 bucket the unsigned production desktop artifacts are uploaded to."
-  value       = module.artifact_hosting.bucket_name
-}
-
-output "download_distribution_id" {
-  description = "CloudFront distribution ID for production downloads (invalidate only when an artifact is overwritten at an existing key)."
-  value       = module.artifact_hosting.distribution_id
-}
-
-output "download_url" {
-  description = "Base URL production desktop artifacts are handed out under. Unlinked (D8) — nothing on www points here."
-  value       = module.artifact_hosting.url
 }

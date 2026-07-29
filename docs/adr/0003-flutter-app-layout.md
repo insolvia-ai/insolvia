@@ -1,6 +1,9 @@
 # ADR 0003 — The Flutter app follows Flutter's own architecture guide, not `lib/src/features/`
 
-- **Status:** Accepted
+- **Status:** **Superseded by [ADR 0005](0005-expo-app-layout.md)** — the app is
+  no longer a Flutter app ([ADR 0004](0004-react-native-replaces-flutter.md)),
+  so this layout has nothing left to describe. 0005 makes the identical call
+  for Expo, and the reasoning below is why.
 - **Date:** 2026-07-28
 - **Relates to:** `apps/insolvia_app/CLAUDE.md`; issue #51 (Cognito sign-in) is
   the first feature this shape has to absorb

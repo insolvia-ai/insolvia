@@ -1,18 +1,44 @@
-# Publishing and consuming the design systems
+# Publishing and consuming the design system
 
-Two design systems, one rule: **consumers install a published, versioned
+**One published package, one rule: consumers install a published, versioned
 artifact — never the source by path.**
 
-| Target | Package | Published as | Section |
-|---|---|---|---|
-| React | `packages/insolvia_design_system_react/` | npm package `@insolvia-ai/design-system` on GitHub Packages | [React](#the-react-design-system-insolvia-aidesign-system-on-github-packages) |
-| Flutter | `packages/insolvia_design_system/` | annotated git tag `insolvia_design_system-v<version>` in this repo | [Flutter](#the-flutter-design-system-insolvia_design_system-via-git-tags) |
+| Target | Package | Published as |
+|---|---|---|
+| React (marketing) | `packages/insolvia_design_system_react/` | npm package `@insolvia-ai/design-system` on GitHub Packages |
 
-Both publish automatically on merge to `main`, both publishes are idempotent by
-version, and both PR gates machine-enforce the corollary: **any change to a
-design-system package bumps its version in the same PR**, because an unbumped
-merge publishes nothing and the published surface silently rots underneath its
-consumers.
+It publishes automatically on merge to `main`, the publish is idempotent by
+version, and the PR gate machine-enforces the corollary: **any change to the
+package bumps its version in the same PR**, because an unbumped merge publishes
+nothing and the published surface silently rots underneath its consumers.
+
+## The app's design system is not published — and shouldn't be
+
+There are still *two* design systems (decision D4, as revised by D9): the React
+one above, and the app's own React Native components inside
+`apps/insolvia_app/src/components/`. They share token *values* only, generated
+from one `packages/insolvia_tokens/tokens.json` — the Tailwind `@theme` CSS and
+the typed `tokens.ts` come out of the same TypeScript generator and ship together
+as `@insolvia-ai/tokens`. Neither generated file is ever hand-edited; `npm run
+tokens:check` at the root fails CI on drift.
+
+Nothing below applies to the app's set, deliberately. A registry boundary earns
+its keep for the React package because it has an out-of-tree-shaped consumer and
+a `dist` contract worth enforcing; the app's components have exactly one
+consumer, in the same directory tree, so publishing them would buy a version
+number and cost a release step. If a second consumer ever appears, this is the
+document that describes what to do about it.
+
+> **The Flutter half of this document is gone.** `packages/insolvia_design_system`
+> was published as an annotated git tag `insolvia_design_system-v<version>` and
+> consumed by the app as a version-pinned git dependency. The package, the
+> `design-system-pr.yml` gate and the `design-system-publish.yml` workflow are
+> all deleted under D9 — read the mechanism at `git show 17d2e37` if you need it.
+> **One artefact outlives it: the tag `insolvia_design_system-v0.1.2` is still on
+> the remote and is now orphaned.** Nothing resolves it, nothing publishes
+> another, and it is harmless; it is left in place because deleting a published
+> tag is the one irreversible step here, and a stale tag misleads nobody once
+> this paragraph exists.
 
 ## The React design system: `@insolvia-ai/design-system` on GitHub Packages
 
@@ -36,10 +62,12 @@ than wired up as a path dependency, deliberately:
   would — the built ESM/CJS output and `dist/theme.css`, through the `exports`
   map. A path dependency would let it reach into `src/`, and the first import of
   an unexported internal would silently become load-bearing.
-- **It keeps the npm and pub worlds from bleeding together.** The React package
-  and the marketing site are npm projects sitting inside a Dart pub workspace
-  they are both excluded from. A registry boundary is unambiguous where a
-  relative path across that line is not.
+- **It keeps the package out of the root npm workspace, where it must stay.**
+  The root `package.json`'s member list is explicit precisely so that
+  `packages/*` never globs this package in: a workspace member would be
+  symlinked, marketing would build against local source, and a broken package
+  would pass CI and only break after publishing. The registry boundary is what
+  makes that unambiguous.
 - **A second consumer costs nothing.** Nothing about the arrangement assumes one
   site.
 
@@ -230,101 +258,21 @@ Two things to watch:
   `noExternal` array. A regex (`/^@insolvia-ai\//`) is accepted and saves the
   bookkeeping.
 
-## The Flutter design system: `insolvia_design_system` via git tags
+## Hacking on the design system and the marketing site together
 
-`packages/insolvia_design_system/` is **not** published to pub.dev (and moving
-it out of this monorepo is explicitly deferred). The Dart-native way to publish
-a versioned artifact from an unpublished package is a **git dependency pinned
-to a version tag**: the published artifact is an annotated tag
-**`insolvia_design_system-v<version>`** in this repo, where `<version>` is the
-`version:` in the package's `pubspec.yaml`. The repo is public, so consumers
-clone it anonymously — no auth, no registry, no token.
+The published version is the contract, but npm has a sanctioned, *uncommitted*
+loop for this. From `apps/insolvia_marketing/`:
 
-| | |
-|---|---|
-| Package | `insolvia_design_system` |
-| Artifact | annotated git tag `insolvia_design_system-v<version>` |
-| Source | `packages/insolvia_design_system/` |
-| Publish workflow | `.github/workflows/design-system-publish.yml` |
-| PR gate | `.github/workflows/design-system-pr.yml` (job `Flutter design system`) |
-
-### How publishing works
-
-The workflow runs on **push to `main`** touching the package (plus
-`workflow_dispatch` — the escape hatch for a transient failure or for the very
-first tag of a version that landed before the workflow existed). It:
-
-1. reads `version:` from `packages/insolvia_design_system/pubspec.yaml`,
-2. asks origin whether the tag `insolvia_design_system-v<version>` already
-   exists (`git ls-remote --tags`),
-3. **skips cleanly** if it does — a version bump is the only thing that
-   triggers an actual publish,
-4. otherwise pushes an annotated tag at `HEAD` (the merge commit on `main`),
-   authenticated with the job's own `GITHUB_TOKEN`
-   (`permissions: { contents: write }` — no PAT, nothing to rotate).
-
-**To ship a new version: bump `version` in
-`packages/insolvia_design_system/pubspec.yaml` and merge to `main`.** Nothing
-else. As on the npm side, any change under the package without a version bump
-fails the PR gate (the *Require a version bump when the package changed* step
-in `design-system-pr.yml` — same diff-against-base, same
-hard-error-on-unreadable-base behaviour). And publishing sits outside the
-deploy machinery, for the same reason as the npm publish (see above): pushing
-a git tag touches no AWS resource.
-
-### Consuming it
-
-The app pins the tag:
-
-```yaml
-# apps/insolvia_app/pubspec.yaml
-insolvia_design_system:
-  git:
-    url: https://github.com/insolvia-ai/insolvia.git
-    path: packages/insolvia_design_system
-    ref: insolvia_design_system-v0.1.1
+```sh
+npm install ../../packages/insolvia_design_system_react   # writes a file: dep
 ```
 
-Upgrading the app to a new design-system version is a deliberate two-line
-change: bump `ref`, run `flutter pub get`, commit the regenerated root
-`pubspec.lock` (which pins the tag's resolved commit). Nothing upgrades
-implicitly — which is the point: the app builds against a published, versioned
-artifact, exactly like the marketing site does with npm.
-
-### Why the package sits outside the pub workspace
-
-Pub workspaces silently **override any dependency on a workspace member back
-to the local path**. If `insolvia_design_system` were still a member, the git
-dependency above would be quietly rewritten to the source path and the whole
-scheme would enforce nothing. So the package is not in the root
-`pubspec.yaml`'s `workspace:` list and has no `resolution: workspace`. The
-fallout, handled deliberately:
-
-- It resolves standalone: `flutter pub get` inside the package. Its own
-  `pubspec.lock` is a library lockfile and is **gitignored** (the root
-  *workspace* lock is still committed).
-- `melos bootstrap` and the melos exec scripts (`analyze`/`format`/`test`/`ci`)
-  no longer cover it. `design-system-pr.yml` runs the equivalent commands
-  directly inside the package (`flutter pub get`, `dart format
-  --set-exit-if-changed`, `flutter analyze --fatal-infos`, `flutter test`).
-- The token generator is unaffected — it writes into the package by file path.
-
-### Hacking on the design system and the app together
-
-The published tag is the contract, but pub has a sanctioned, *uncommitted*
-override file for exactly this loop. Create
-`apps/insolvia_app/pubspec_overrides.yaml`:
-
-```yaml
-dependency_overrides:
-  insolvia_design_system:
-    path: ../../packages/insolvia_design_system
-```
-
-run `flutter pub get`, and the app builds against your working tree. The file
-is gitignored at the root — **delete it before committing** (a committed
-override is the path dependency this whole document exists to forbid), and do
-not commit a `pubspec.lock` regenerated while the override was active.
+Build the package first (`npm run build` in it) — the `exports` map points at
+`dist`, so an unbuilt link resolves to nothing. **Revert it before committing:**
+a committed `file:` dependency is exactly the path dependency this document
+exists to forbid, and it takes the marketing site off the published `dist`
+contract without any error appearing anywhere. Restore the version range and
+re-run `npm ci` so the lockfile matches.
 
 ## Related
 
@@ -332,6 +280,9 @@ not commit a `pubspec.lock` regenerated while the override was active.
   and the local dev loop.
 - `packages/insolvia_design_system_react/.npmrc` — the scope→registry mapping
   used by this repo's own CI.
-- `CLAUDE.md` → *Patterns Every Package Follows* — the same rules in
-  agent-instruction form.
-- `docs/ARCHITECTURE.md` — the monorepo shape and where these packages sit.
+- The `insolvia-design-system-pr` skill — the same rules in agent-instruction
+  form: its own PR, its own version bump.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — the monorepo shape and where these
+  packages sit.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one token source, two targets) as
+  revised by D9.

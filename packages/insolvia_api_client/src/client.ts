@@ -40,8 +40,8 @@ const ACCEPT_JSON_HEADERS = { Accept: 'application/json' } as const;
  * - transport failures (DNS, refused connection, …) propagate untouched as
  *   whatever `fetch` rejects with.
  *
- * There is no `close()` counterpart to the Dart client's: `fetch` owns no
- * client object the caller has to release.
+ * There is no `close()`: `fetch` owns no client object the caller has to
+ * release.
  */
 export class InsolviaApiClient {
   readonly #baseUrl: string;
@@ -95,8 +95,8 @@ export class InsolviaApiClient {
 }
 
 // ---------------------------------------------------------------------------
-// Decoding internals — the private methods of the Dart client, as module
-// functions. Not exported: nothing outside this file may depend on them.
+// Decoding internals — module functions rather than methods. Not exported:
+// nothing outside this file may depend on them.
 // ---------------------------------------------------------------------------
 
 type JsonObject = Record<string, unknown>;
@@ -205,8 +205,8 @@ function toStringMap(source: JsonObject): Record<string, string> {
 
 /**
  * Reads a required string field, failing loudly rather than handing back an
- * `undefined` typed as `string` — the trap a bare cast would set here, and
- * the one place TypeScript is weaker than the Dart original's `as String`.
+ * `undefined` typed as `string` — the trap a bare cast would set here, since
+ * a TypeScript cast is erased and checks nothing at runtime.
  */
 function requireString(response: DecodedResponse, key: string): string {
   const value = response.json[key];

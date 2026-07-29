@@ -5,11 +5,11 @@ Terraform for all Insolvia AWS infrastructure. See
 model and [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) for one-time bootstrap.
 
 ```
-modules/                 web_hosting, artifact_hosting, marketing_site, email, api_service, mailer_service, …
+modules/                 web_hosting, marketing_site, auth, email, api_service, mailer, …
 envs/ci-trust/           OIDC provider + insolvia-github-actions deploy role + its policy (human-applied only)
 envs/shared/             Route53 zone insolvia.ai, *.insolvia.ai ACM cert, SES domain identity + mail DNS
-envs/staging/            staging-app / staging-www / staging-download + the service stacks
-envs/prod/               app / www / download + the service stacks (owns the apex)
+envs/staging/            staging-app / staging-www + the service stacks
+envs/prod/               app / www + the service stacks (owns the apex)
 ```
 
 State: `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`.

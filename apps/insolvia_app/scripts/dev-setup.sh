@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 #
-# Flutter app developer bootstrap: shared tools (Flutter via Homebrew, Melos),
-# then a workspace-wide `flutter pub get` at the repo root.
+# App developer bootstrap: shared tools, then an install of the npm workspace at
+# the repo root.
 #
-# The app is a pub workspace member, so one `pub get` at the root resolves it
-# together with insolvia_tokens and insolvia_api_client. The design system is
-# deliberately NOT a workspace member (the app pins it as a git tag — see
-# docs/PACKAGE_PUBLISHING.md); it resolves standalone via
-# packages/insolvia_design_system/scripts/dev-setup.sh.
+# The app is an npm workspace member, so one install at the root resolves it
+# together with @insolvia-ai/tokens and @insolvia-ai/api-client and symlinks both
+# into node_modules. There is nothing app-specific to install here.
 #
-# IDEMPOTENT: the shared base checks every tool before install, and `pub get`
-# with an up-to-date lockfile is a no-op.
+# Nothing native is built (web only), so no Xcode, CocoaPods or Android SDK is
+# needed. `expo prebuild` is what re-introduces them if and when mobile starts.
+#
+# IDEMPOTENT: the shared base checks every tool before installing, and `npm ci`
+# with an up-to-date lockfile is cheap.
 #
 # Usage:
 #   ./apps/insolvia_app/scripts/dev-setup.sh            # full setup
@@ -31,16 +32,16 @@ warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
 log "checking shared developer dependencies..."
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   "$REPO_ROOT/scripts/dev-setup.sh" --check
-  if [[ -f "$REPO_ROOT/pubspec.lock" ]]; then
-    ok "workspace resolved (pubspec.lock present; would still: flutter pub get)."
+  if [[ -d "$REPO_ROOT/node_modules/expo" ]]; then
+    ok "workspace installed (node_modules/expo present; would still: npm ci)."
   else
-    warn "workspace not resolved (would: flutter pub get at the repo root)."
+    warn "workspace not installed (would: npm ci at the repo root)."
   fi
   exit 0
 fi
 "$REPO_ROOT/scripts/dev-setup.sh"
 
-log "resolving the pub workspace (repo root)..."
-(cd "$REPO_ROOT" && flutter pub get)
+log "installing the npm workspace (repo root)..."
+(cd "$REPO_ROOT" && npm ci)
 
 ok "app is ready. Run it with: ./apps/insolvia_app/scripts/dev-up.sh"

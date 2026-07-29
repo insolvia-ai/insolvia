@@ -9,12 +9,10 @@ each with its own isolated S3 state — never Terraform workspaces.
 infra/
 ├── modules/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
-│   ├── artifact_hosting/     # reusable: same skeleton, download semantics —
-│   │                         #   no SPA rewrites, no index, noindex + attachment
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
-│   │                         #   + web (SPA) and desktop (loopback) PKCE app clients
+│   │                         #   + one web (SPA) PKCE app client
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex) + DynamoDB waitlist table
 └── envs/
@@ -25,12 +23,10 @@ infra/
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
     │                         # auth        -> insolvia-users-staging
-    │                         # artifact_hosting -> staging-download.insolvia.ai
     ├── prod/                 # web_hosting -> app.insolvia.ai
     │                         # api_service -> api.insolvia.ai
     │                         # auth        -> insolvia-users-prod
     │                         # marketing_site -> www.insolvia.ai (+ apex 301)
-    │                         # artifact_hosting -> download.insolvia.ai
     └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
                               # table + auth pool, env suffix dev-<short-id>
 ```
@@ -136,17 +132,20 @@ against prod. Each owns, per env:
 - **Hosted domain** — Cognito-provided prefix
   `insolvia-<env>.auth.us-east-1.amazoncognito.com`; a custom
   `auth.insolvia.ai` domain is deferred (vanity only, needs its own cert).
-- **Two public PKCE app clients**, both authorization-code, no secret,
-  refresh-token rotation enabled:
-  - `insolvia-web-<env>` — the SPA; callbacks at
-    `<origin>/auth/callback`, sign-out to the origin. Staging also registers
-    `http://localhost:3000` (dev must run `flutter run --web-port 3000`);
-    prod registers no dev origins.
-  - `insolvia-desktop-<env>` — loopback redirect per RFC 8252: Cognito
-    permits plain-HTTP callbacks only on `localhost`/`127.0.0.1`/`[::1]`
-    and matches them **exactly** (no wildcard ports), so a fixed four-port
-    set `http://127.0.0.1:{41539..41542}/callback` is registered and the
-    desktop app must bind one of exactly those ports.
+- **One public PKCE app client**, authorization-code, no secret, refresh-token
+  rotation enabled: `insolvia-web-<env>` — the SPA; callbacks at
+  `<origin>/auth/callback`, sign-out to the origin. Staging also registers
+  `http://localhost:3000`, so the dev server must serve on that exact port
+  (`apps/insolvia_app/scripts/dev-up.sh` pins it); prod registers no dev
+  origins. Cognito matches redirect URIs **exactly** — a different port is a
+  different URI and Cognito rejects it, which is the whole reason the port is
+  pinned rather than chosen per run.
+
+  There used to be a second client, `insolvia-desktop-<env>`, with a
+  loopback-redirect flow on a fixed four-port set. It is deleted along with the
+  desktop targets — decision D9 in [`MVP_PLAN.md`](MVP_PLAN.md). Any future
+  native client needs it back, and RFC 8252 loopback plus Cognito's
+  exact-match rule is why it was a fixed port set rather than a wildcard.
 
 The API does **not** verify tokens yet — the env outputs expose
 `auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
@@ -230,39 +229,25 @@ Names: `insolvia-marketing` (ECR — shared across envs, no suffix),
 `insolvia-marketing-ssr-prod` (Lambda + HTTP API + role),
 `insolvia-marketing-assets-prod` (S3).
 
-## Desktop artifact hosting (`modules/artifact_hosting`, staging + prod)
+## Removed: desktop artifact hosting (`modules/artifact_hosting`)
 
-Where the unsigned `.dmg` / `setup.exe` builds live (issue #18 / 4.10):
-`download.insolvia.ai` and `staging-download.insolvia.ai` — flat `staging-`
-per D2, so the shared wildcard covers both with no change to `envs/shared`.
-The host is **unlinked** from the marketing site (D8), and both environments
-get one because the desktop binary compiles its environment in via
-`--dart-define`, so the two builds are different artifacts.
+**The module, both `download.insolvia.ai` hosts, and the buckets are gone**,
+along with the desktop builds they served — decision D9 in
+[`MVP_PLAN.md`](MVP_PLAN.md). Two notes for whoever brings a download host back:
 
-Same S3 + OAC + CloudFront + Route53 skeleton as `web_hosting`, but a separate
-module because the SPA behaviour is actively wrong for downloads:
-
-- **No `custom_error_response`.** `web_hosting` rewrites 403/404 to
-  `/index.html` with a 200 for go_router deep links; here that would make
-  `curl -O` on a typo'd URL save an HTML error page as `Insolvia.dmg`.
-- **No `default_root_object`, no listing.** Recipients get exact URLs; an S3
-  REST origin never lists a prefix, so `/` is a plain 403.
-- **Freshness is set per object at upload**, not by a distribution TTL:
-  versioned release keys go up `immutable, max-age=31536000`, any moving
-  `latest/` pointer goes up short — `Managed-CachingOptimized` honours the
-  origin's `Cache-Control` either way.
-- **Two response headers policies.** Artifacts get `Content-Disposition:
-  attachment` (as a floor — `override = false`, so an upload naming the file
-  still wins) plus `X-Robots-Tag: noindex, nofollow` and `nosniff`;
-  `/robots.txt` gets its own policy without the attachment header. A
-  Terraform-managed `robots.txt` (`Disallow: /`) ships with the bucket, so the
-  host is uncrawlable from the first apply and not merely once CI has run.
-
-**IAM:** the bucket `insolvia-download-<env>` matches none of the deploy
-role's existing S3 prefixes, so `ci-trust` carries a `DownloadArtifactBuckets`
-statement — a **human-applied** change (`scripts/apply-ci-trust.sh`). It is
-deliberately not named `insolvia-web-downloads-*` to slip under the existing
-`insolvia-web-*` grant.
+- **A download host must not reuse `web_hosting`.** That module rewrites 403/404
+  to `/index.html` with a 200 so SPA deep links work; on a download host it
+  makes `curl -O` on a typo'd URL save an HTML error page as `Insolvia.dmg`.
+  Downloads also want no `default_root_object`, no listing, `Content-Disposition:
+  attachment` as an overridable floor, `X-Robots-Tag: noindex, nofollow`, and a
+  Terraform-managed `robots.txt` so the host is uncrawlable from the first apply
+  rather than once CI has run. That is why it was a separate module and would
+  need to be again.
+- **It needed a human-applied IAM change.** The bucket name matched none of the
+  deploy role's S3 prefixes, so `ci-trust` carried a dedicated statement applied
+  via `scripts/apply-ci-trust.sh`. Deliberately *not* named to slip under the
+  existing `insolvia-web-*` grant. Removing it is the same kind of change, in
+  reverse — see the `insolvia-deploy-role-permissions` skill.
 
 ## Providers
 

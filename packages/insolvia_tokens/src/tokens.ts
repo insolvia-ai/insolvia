@@ -13,8 +13,9 @@
  * one-file change.
  *
  * Derived states are pre-computed with the same sRGB blend that `theme.css`
- * expresses as `color-mix(in srgb, ...)` and that `InsolviaSemanticColors`
- * bakes into Dart, so all three stacks land on the same pixel.
+ * expresses as `color-mix(in srgb, ...)`. The browser defers that blend and
+ * React Native cannot, so it is resolved here — both stacks land on the
+ * same pixel.
  */
 
 /** A color scheme the app can render. Every one is declared in `colors`. */
@@ -129,7 +130,7 @@ export const colors = {
 
 /**
  * Exhaustiveness guard, in the spirit of the no-default-arm switches in
- * `apps/insolvia_app/lib/config/environment.dart`: naming a scheme in
+ * `apps/insolvia_app/src/config/environment.ts`: naming a scheme in
  * `ColorSchemeName` without declaring its colors above stops compiling
  * rather than resolving to `undefined` at runtime.
  */

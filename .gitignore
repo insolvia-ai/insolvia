@@ -1,34 +1,33 @@
-# ── Dart / Flutter ──────────────────────────────────────────────
-.dart_tool/
-.packages
-build/
-.flutter-plugins
-.flutter-plugins-dependencies
-# The root workspace pubspec.lock IS committed (reproducible app builds).
-# The design system resolves OUTSIDE the workspace (see root pubspec.yaml) and
-# is a library — its own lockfile is never committed.
-packages/insolvia_design_system/pubspec.lock
-# Local design-system debugging overrides (path override while hacking live,
-# see docs/PACKAGE_PUBLISHING.md) — never committed.
-pubspec_overrides.yaml
+# ── Expo / React Native (apps/insolvia_app) ─────────────────────
+# Expo's local cache: the dev server's resolved config, Metro's transform
+# cache, and the generated web `.expo/types`. Regenerated on every `expo
+# start`, never committed.
+.expo/
+# `expo export` output. Anchored per app for the same reason the Node build
+# output below is: a bare `dist/` would silently swallow any future build
+# directory anywhere in the repo.
+/apps/insolvia_app/dist/
+
+# GENERATED, NOT ABSENT. `ios/` and `android/` are the native projects `expo
+# prebuild` writes from app.json — the Continuous Native Generation workflow
+# (https://docs.expo.dev/workflow/continuous-native-generation/). They are
+# build output derived from committed config, so committing them would mean
+# hand-maintaining two copies of every native setting and resolving prebuild's
+# diffs by hand forever.
+#
+# There is nothing to ignore today: the app is a web SPA and no prebuild has
+# run (see the Xcode/CocoaPods note in scripts/dev-setup.sh). These lines are
+# here so that the day mobile starts, a `git add -A` cannot sweep 40 MB of
+# generated Xcode/Gradle project into a commit before anyone notices.
+/apps/insolvia_app/ios/
+/apps/insolvia_app/android/
+
 *.iml
 *.ipr
 *.iws
 .idea/
-doc/api/
 coverage/
 *.log
-
-# ── macOS build / Xcode ─────────────────────────────────────────
-**/macos/Flutter/ephemeral/
-**/macos/Pods/
-**/Podfile.lock
-*.dSYM/
-DerivedData/
-xcuserdata/
-
-# ── Web ─────────────────────────────────────────────────────────
-apps/insolvia_app/web/flutter_service_worker.js
 
 # ── Terraform ───────────────────────────────────────────────────
 **/.terraform/
@@ -64,7 +63,7 @@ __pycache__/
 venv/
 *.egg-info/
 
-# ── Node (packages/insolvia_design_system_react) ────────────────
+# ── Node (the npm workspace + the version-gated React packages) ─
 # package-lock.json IS committed (reproducible npm installs in CI).
 node_modules/
 storybook-static/
@@ -79,6 +78,11 @@ storybook-static/
 # different branch from sweeping them into an unrelated commit.
 .lighthouseci/
 .react-router/
+# Left over from the Flutter era. Nothing in this repo produces it any more,
+# but every machine that ever ran the old toolchain still has one on disk, and
+# checking out a pre-cutover commit recreates it. Delete this line once no
+# working copy has one.
+.dart_tool/
 
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store

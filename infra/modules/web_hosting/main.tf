@@ -1,6 +1,12 @@
-# Static hosting for a Flutter-web SPA: private S3 origin behind CloudFront
+# Static hosting for a client-rendered SPA: private S3 origin behind CloudFront
 # (OAC), TLS via the shared wildcard ACM cert, deep-link support via SPA error
 # rewrites, and a Route53 alias. Compute-free by design.
+#
+# Nothing here is framework-specific, which is why the Flutter→Expo cutover
+# changed this module not at all: the SPA error rewrite (403/404 → /index.html,
+# served with HTTP 200, below) is what Expo Router's `+not-found` route needs
+# for exactly the same reason go_router needed it — the client owns routing, so
+# the origin must hand every path the same document.
 
 locals {
   bucket_name = "${var.project}-web-${var.environment}"

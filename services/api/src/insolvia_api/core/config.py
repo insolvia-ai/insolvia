@@ -20,9 +20,9 @@ ENVIRONMENTS = ("local", "staging", "production")
 #     waitlist action calls POST /v1/waitlist server-to-server from its SSR
 #     Lambda (no browser, no Origin header), so CORS is not in play for it
 #     (docs/adr/0001).
-# Localhost dev origins are handled separately (cors_allow_localhost) because
-# `flutter run -d chrome` picks an arbitrary port; the response still echoes
-# the one matched origin, never a wildcard.
+# Localhost dev origins are handled separately (cors_allow_localhost) because a
+# browser dev server may bind any port; the response still echoes the one
+# matched origin, never a wildcard.
 _CORS_ALLOWED_ORIGINS: dict[str, tuple[str, ...]] = {
     "production": ("https://app.insolvia.ai",),
     "staging": ("https://staging-app.insolvia.ai",),
@@ -71,7 +71,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     """Build the configuration from the environment.
 
     INSOLVIA_ENV (local|staging|production) defaults to "local", mirroring the
-    app's --dart-define=INSOLVIA_ENV. WAITLIST_TABLE_NAME names the DynamoDB
+    app's EXPO_PUBLIC_INSOLVIA_ENV. WAITLIST_TABLE_NAME names the DynamoDB
     table behind POST /v1/waitlist — in local dev that is this machine's real
     per-developer table (scripts/dev-aws-setup.sh); unset means the in-memory
     store, which only unit tests and the bare development server use.

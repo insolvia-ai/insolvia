@@ -13,11 +13,6 @@ output "web_client_id" {
   value       = aws_cognito_user_pool_client.web.id
 }
 
-output "desktop_client_id" {
-  description = "App client ID for the desktop app (loopback-redirect PKCE)."
-  value       = aws_cognito_user_pool_client.desktop.id
-}
-
 output "domain" {
   description = "Hosted auth domain (Cognito-provided) serving /oauth2/authorize, /oauth2/token, and the sign-in pages."
   value       = "${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"

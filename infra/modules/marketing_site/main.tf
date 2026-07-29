@@ -1,6 +1,6 @@
 # Marketing site hosting (www + apex) — SSR on Lambda behind CloudFront.
 #
-# Unlike `web_hosting` (static-only, for the Flutter app), the marketing site
+# Unlike `web_hosting` (static-only, for the app SPA), the marketing site
 # is server-side rendered: a React Router v7 app whose Docker-image Lambda
 # (public.ecr.aws/lambda/nodejs:22, `server/index.handler` via
 # @react-router/architect) renders every HTML response, while the hashed

@@ -1,30 +1,24 @@
 name: App · PR
 
 # No `on.pull_request.paths:` filter, deliberately — see
-# `.github/actions/changed-paths/action.yml`. Every job here is a required status
-# check on `protect-main`, so they must trigger and report on *every* PR; the
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
 # `steps.filter` guard below is what keeps an unrelated PR cheap. Re-adding a
 # `paths:` filter would silently deadlock every PR that does not touch these
 # paths.
 #
-# ── The two desktop jobs are load-bearing. Do not trim them. ──────────────────
-# `build-macos` and `build-windows` look like dead weight: nothing ships from
-# them, and under D8 (docs/MVP_PLAN.md) desktop is deliberately built but NOT
-# promoted — web is the path we sell. That is exactly why they are here.
-# An unpromoted target rots silently; without a per-PR compile the Windows or
-# macOS build breaks and nobody finds out until a prospect finally demands
-# desktop, which is the one moment the option has to be worth something. These
-# two jobs ARE the cost of holding D8's optionality open (issue #16 / MVP_PLAN
-# 4.8), and the guard already makes them free on unrelated PRs. Deleting them to
-# "speed up CI" quietly throws away the whole reason the app is Flutter.
+# ── Desktop is deferred; the jobs that guarded it are gone ────────────────────
+# This file used to carry `macOS build` and `Windows build`, and a long header
+# arguing that they were load-bearing: under D8 (docs/MVP_PLAN.md) desktop was
+# built but not promoted, an unpromoted target rots silently, and a per-PR
+# compile was the entire cost of keeping that option real.
 #
-# Running on every PR (not nightly, not on merge) is the point: a red check on
-# the PR that broke it is what makes a broken desktop target impossible to miss.
-#
-# Cost note: this repo is PUBLIC, so `macos-latest` and `windows-latest`
-# standard runners are free with unlimited minutes. The 2x/10x minute
-# multipliers apply to private repos only. What these jobs spend is wall-clock,
-# which the changed-paths guard already bounds.
+# That argument was correct for a Flutter app and is answered, not discarded,
+# by docs/adr/0004-react-native-replaces-flutter.md — which records it as a
+# superseded position along with what replaces it. Read the ADR before
+# reinstating desktop coverage here; the reasoning is preserved there precisely
+# so this deletion is reversible on evidence rather than on memory.
+
 on:
   pull_request:
 
@@ -32,8 +26,8 @@ permissions:
   contents: read
 
 jobs:
-  flutter-app:
-    name: Flutter app
+  app:
+    name: App
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,173 +35,369 @@ jobs:
           # Full history so the guard can diff against the PR base commit.
           fetch-depth: 0
 
+      # ── Expo free-tier guard ──────────────────────────────────────────────
+      #
+      # Deliberately NOT behind `steps.filter` — it runs on every PR, always.
+      # Everything else in this job is gated because it is expensive; this is a
+      # `git grep` over tracked files and costs a second or two. Gating it would
+      # also put a hole straight through the middle of it: an `eas.json` added
+      # at the repo root matches none of the paths below, so the one commit the
+      # guard exists to catch is exactly the one that would skip it.
+      #
+      # WHAT THIS DEFENDS
+      #
+      # We use only Expo's open-source layer — the SDK, the CLI, Expo Router,
+      # `expo export`, `expo prebuild`. All of it is free and runs in this
+      # workflow. EAS (Build / Submit / Update / Hosting) is the *paid hosted
+      # service* and we use none of it: `infra/modules/web_hosting` already
+      # serves the web export from S3 + CloudFront that we own and pay for by
+      # the byte.
+      #
+      # This is not hypothetical. `.agents/skills/` vendors six Expo skills
+      # whose own frontmatter says "EAS service (paid)", and `eas-hosting`
+      # deploys an Expo web export to Cloudflare Workers — the exact job
+      # web_hosting already does for nothing. An agent that followed one of
+      # those skills would be doing what its instructions told it to do, and the
+      # first signal otherwise would be an invoice. This makes it a red check.
+      #
+      # Scoped to `git ls-files` so a stray `node_modules` or a local build
+      # cannot trip it. Two paths are excluded, for opposite reasons:
+      #
+      #   .agents/**  — vendor skill *documentation*. It describes EAS at
+      #                 length; that is why the guard exists, not a violation of
+      #                 it. It is untracked today but is not gitignored, so it
+      #                 may be committed at any time and must not detonate this.
+      #   this file   — it necessarily spells out the very strings it bans. The
+      #                 self-check below covers it instead, matching EAS *usage*
+      #                 rather than the bare words, so it cannot match itself.
+      - name: Guard — no EAS (paid tier)
+        run: |
+          set -euo pipefail
+
+          files="$(git ls-files \
+            | grep -v -e '^\.agents/' -e '^\.github/workflows/app-pr\.yml$' || true)"
+
+          # Same principle as .github/actions/changed-paths: a guard that
+          # silently finds nothing to inspect is worse than no guard, because it
+          # reports green. An empty file list here means the checkout is wrong,
+          # not that the tree is clean.
+          if [ -z "$files" ]; then
+            echo "::error::git ls-files returned nothing — refusing to report this guard as passed." >&2
+            exit 1
+          fi
+
+          fail=0
+
+          # 1. An `eas.json` anywhere is the configuration file for the paid
+          #    service; there is no free-tier reason to have one.
+          if config="$(printf '%s\n' "$files" | grep -E '(^|/)eas\.json$' || true)"; [ -n "$config" ]; then
+            echo "::error::EAS config committed (EAS is the paid tier — we use only Expo's open-source layer):"
+            printf '%s\n' "$config" | sed 's/^/  /'
+            fail=1
+          fi
+
+          # 2. The three strings that mean EAS has been adopted in practice:
+          #    the CLI, the service credential, and the over-the-air update
+          #    client that only talks to EAS Update.
+          if hits="$(printf '%s\n' "$files" | tr '\n' '\0' \
+              | xargs -0 -r grep -HnIE 'eas-cli|EXPO_TOKEN|expo-updates' || true)"; [ -n "$hits" ]; then
+            echo "::error::EAS reference in tracked files (see this workflow's guard comment):"
+            printf '%s\n' "$hits" | sed 's/^/  /'
+            fail=1
+          fi
+
+          # 3. The self-check. The patterns are bracket-escaped (`ea[s]`,
+          #    `TOKE[N]`) so they match real usage without matching their own
+          #    source — which is what lets this file be excluded above and still
+          #    be covered.
+          if self="$(grep -nE 'secrets\.EXPO_TOKE[N]|npx[[:space:]]+ea[s]|uses:[[:space:]]*expo/ea[s]' \
+              .github/workflows/app-pr.yml || true)"; [ -n "$self" ]; then
+            echo "::error::This workflow itself now invokes EAS:"
+            printf '%s\n' "$self" | sed 's/^/  /'
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Refusing the paid tier. If adopting EAS is a real decision, it needs an ADR and a budget — not a green check." >&2
+            exit 1
+          fi
+          echo "No EAS references in tracked files."
+
       - id: filter
         uses: ./.github/actions/changed-paths
         with:
           paths: |
-            apps/**
-            # Deliberately NOT packages/insolvia_design_system/** — the app is
-            # insulated behind its tag-pinned git dependency (see
-            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
-            # this build until the app bumps `ref` in its own pubspec.yaml /
-            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
-            # exactly that PR.
-            #
-            # insolvia_tokens stays: it is a pub workspace member co-resolved
-            # with the app by the root `flutter pub get`.
+            apps/insolvia_app/**
+            # insolvia_tokens stays from the Flutter era for the same reason it
+            # was there then: it is a workspace member the app consumes
+            # directly, co-installed by the root `npm ci` below, so a token
+            # change reaches this build with no version bump in between.
             packages/insolvia_tokens/**
-            pubspec.yaml
-            # The root workspace lockfile pins the app's resolved deps —
-            # including the design-system tag's resolved commit.
-            pubspec.lock
-            melos.yaml
-            analysis_options.yaml
+            # insolvia_api_client is a declared dependency of the app resolved by
+            # workspace symlink, so its source is compiled into this build's
+            # typecheck. Nothing imports it *yet* — it sits beside `apiBaseUrl`
+            # waiting for the first API-backed feature — which is exactly why the
+            # line is here now: `package-lock.json` does not change when a
+            # symlinked member's source does, so the day someone adds the first
+            # import, the gate would silently stop covering it.
+            packages/insolvia_api_client/**
+            # The root manifest and lockfile: the app is an npm workspace
+            # member, so both are real inputs to its install.
+            package.json
+            package-lock.json
+            # The shared toolchain configs the app's lint/typecheck re-export.
+            tsconfig.base.json
+            eslint.base.js
+            .prettierrc
+            .prettierignore
             .github/workflows/app-pr.yml
             .github/actions/changed-paths/action.yml
 
-      - uses: subosito/flutter-action@v2
+      # Must match the root package.json's `engines.node` (">=24"). No
+      # `cache-dependency-path`: the app is an npm *workspace member*, so the
+      # lockfile it installs from is the repo-root one setup-node already looks
+      # for by default.
+      - uses: actions/setup-node@v4
         if: steps.filter.outputs.run == 'true'
         with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
+          node-version: "24"
+          cache: npm
+
+      # `ci`, never `install`: the lockfile is committed precisely so CI
+      # resolves the same tree twice running, and `ci` fails loudly when
+      # package.json and the lockfile have drifted apart. Run from the repo
+      # root — it installs every workspace member and links them into
+      # node_modules/@insolvia-ai.
+      - name: Install
         if: steps.filter.outputs.run == 'true'
-      - name: Format check
+        run: npm ci
+
+      # The app is addressed as `--workspace apps/insolvia_app` — a path, not a
+      # package name — throughout this file, so renaming the package in its
+      # package.json cannot silently orphan these steps.
+      - name: Lint
         if: steps.filter.outputs.run == 'true'
-        run: dart format --output=none --set-exit-if-changed apps/insolvia_app
-      - name: Analyze
+        run: npm run lint --workspace apps/insolvia_app
+
+      - name: Typecheck
         if: steps.filter.outputs.run == 'true'
-        run: dart analyze --fatal-infos apps/insolvia_app
+        run: npm run typecheck --workspace apps/insolvia_app
+
       - name: Test
         if: steps.filter.outputs.run == 'true'
-        run: flutter test
-        working-directory: apps/insolvia_app
+        run: npm run test --workspace apps/insolvia_app
+
+      # The app's `build` script is `expo export -p web`. Going through the
+      # script rather than calling the CLI directly keeps one definition of what
+      # a production web build is — the deploy workflows run the same export.
       - name: Build web (verify)
         if: steps.filter.outputs.run == 'true'
-        run: flutter build web --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
+        run: npm run build --workspace apps/insolvia_app
 
-  build-macos:
-    name: macOS build
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: filter
-        uses: ./.github/actions/changed-paths
-        with:
-          paths: |
-            apps/**
-            # Deliberately NOT packages/insolvia_design_system/** — the app is
-            # insulated behind its tag-pinned git dependency (see
-            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
-            # this build until the app bumps `ref` in its own pubspec.yaml /
-            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
-            # exactly that PR.
-            #
-            # insolvia_tokens stays: it is a pub workspace member co-resolved
-            # with the app by the root `flutter pub get`.
-            packages/insolvia_tokens/**
-            pubspec.yaml
-            # The root workspace lockfile pins the app's resolved deps —
-            # including the design-system tag's resolved commit.
-            pubspec.lock
-            melos.yaml
-            analysis_options.yaml
-            .github/workflows/app-pr.yml
-            .github/actions/changed-paths/action.yml
-
-      - uses: subosito/flutter-action@v2
+      # ── Accessibility audit ───────────────────────────────────────────────
+      #
+      # Nothing else in this repo gates accessibility on the app side, and this
+      # is a bankruptcy petition tool: forms-heavy legal software, used under
+      # duress, by people who may well be filing *because* of a disability. The
+      # app's own tests cover component wiring; this covers the document the
+      # components add up to — heading order, unlabelled inputs, landmark
+      # structure — which no unit test sees.
+      #
+      # Precedent: the marketing site audits its production build with
+      # `@lhci/cli` (marketing-pr.yml). Same shape here, different tool, because
+      # what needs auditing is a client-rendered SPA rather than SSR HTML.
+      #
+      # WHY A REAL BROWSER. Expo's web export is an SPA shell: index.html is
+      # nearly empty and every element axe cares about exists only after the
+      # bundle runs. A static parse of the export would find no violations ever
+      # — a check that cannot fail. Hence headless Chrome, and hence the
+      # `waitForFunction` in the runner below, which fails the step outright if
+      # the app never renders. A blank page is a failure here, not a pass.
+      #
+      # THRESHOLD, and why it is two rules rather than one. Audited against the
+      # WCAG 2.0/2.1 A and AA tags *plus* axe's `best-practice` tag, because the
+      # document-level things this step exists to catch — heading order,
+      # landmark structure — are best-practice rules in axe, not WCAG ones.
+      # Scoping to WCAG alone would have made this step silently blind to
+      # exactly half its purpose (verified: an `<h1>` followed by an `<h4>` is
+      # not reported under the WCAG tags).
+      #
+      # What FAILS the build is therefore:
+      #   • any `critical` or `serious` violation — the impacts that map to a
+      #     real barrier: an input with no accessible name, a control with no
+      #     role, an image with no alt text; plus
+      #   • `heading-order` and `page-has-heading-one` regardless of impact.
+      #     Both are rated `moderate`, both are unambiguous, and both are cheap
+      #     to satisfy — a screen-reader user navigates a long petition form by
+      #     heading, so heading structure is a primary control here, not polish.
+      #
+      # Everything else (`region`, `landmark-one-main`, other moderate/minor
+      # findings) is printed to the step summary and does NOT fail. That is a
+      # deliberate carve-out, not an oversight: React Native Web renders to
+      # untagged `<div>`s, so `region` ("all content must be in a landmark")
+      # fires on a stock Expo export before anyone has written a single
+      # accessibility bug. Promote those two to blocking once the app grows a
+      # real landmark shell — but promote them on purpose. A gate whose first
+      # red check is an argument about axe's opinions gets deleted, and then
+      # there is no gate at all.
+      - name: Accessibility audit (axe)
         if: steps.filter.outputs.run == 'true'
-        with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
-        if: steps.filter.outputs.run == 'true'
-      - name: Build macOS (verify)
-        if: steps.filter.outputs.run == 'true'
-        run: flutter build macos --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
-
-  # Same shape as build-macos above, on the other desktop OS. Flutter desktop
-  # cannot be cross-compiled, so keeping the `windows/` target green requires a
-  # Windows runner and there is no cheaper substitute. See the header.
-  build-windows:
-    name: Windows build
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: filter
-        uses: ./.github/actions/changed-paths
-        with:
-          paths: |
-            apps/**
-            # Deliberately NOT packages/insolvia_design_system/** — the app is
-            # insulated behind its tag-pinned git dependency (see
-            # docs/PACKAGE_PUBLISHING.md). A design-system change cannot affect
-            # this build until the app bumps `ref` in its own pubspec.yaml /
-            # the root pubspec.lock, and apps/** + pubspec.lock below re-gate
-            # exactly that PR.
-            #
-            # insolvia_tokens stays: it is a pub workspace member co-resolved
-            # with the app by the root `flutter pub get`.
-            packages/insolvia_tokens/**
-            pubspec.yaml
-            # The root workspace lockfile pins the app's resolved deps —
-            # including the design-system tag's resolved commit.
-            pubspec.lock
-            melos.yaml
-            analysis_options.yaml
-            .github/workflows/app-pr.yml
-            .github/actions/changed-paths/action.yml
-
-      - uses: subosito/flutter-action@v2
-        if: steps.filter.outputs.run == 'true'
-        with:
-          channel: stable
-          # Pinned, not floating. `channel: stable` drifts, so a production rebuild
-          # weeks after a staging run could compile with a different Flutter than the
-          # one staging validated — which would quietly break the "prod ships what
-          # staging tested" guarantee this pipeline exists to provide.
-          flutter-version: "3.44.6"
-      - run: flutter pub get
-        if: steps.filter.outputs.run == 'true'
-      - name: Build Windows (verify)
-        if: steps.filter.outputs.run == 'true'
-        run: flutter build windows --dart-define=INSOLVIA_ENV=staging
-        working-directory: apps/insolvia_app
-
-      # Compiling the app is not enough to keep the *shipping* path green: the
-      # .iss script is the thing that turns the build directory into something
-      # installable, and a typo in it would otherwise only surface on a staging
-      # deploy. Compiling the installer here (and throwing it away) keeps that
-      # failure on the PR that caused it.
-      - name: Build installer (verify packaging script)
-        if: steps.filter.outputs.run == 'true'
-        shell: pwsh
+        env:
+          DIST: apps/insolvia_app/dist
+          AXE_URL: http://127.0.0.1:4173/
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            # Preinstalled on the windows-latest image today; this is the
-            # fallback if that ever stops being true.
-            choco install innosetup -y --no-progress
+          set -euo pipefail
+
+          if [ ! -f "$DIST/index.html" ]; then
+            echo "::error::No $DIST/index.html — the export step above did not produce the expected output directory." >&2
+            exit 1
+          fi
+
+          # Audit tooling is installed into $RUNNER_TEMP, never the workspace:
+          # `npm install` at the repo root would mutate the committed lockfile
+          # and defeat the `npm ci` above. Pinned to majors, matching how
+          # marketing-pr.yml pins `@lhci/cli`.
+          tools="$RUNNER_TEMP/axe-tools"
+          mkdir -p "$tools"
+          npm install --prefix "$tools" --no-audit --no-fund --silent \
+            puppeteer@24 axe-core@4
+
+          # `serve -s` rewrites unknown paths to index.html, which is exactly
+          # what the CloudFront 403/404 handler does in front of the real
+          # bucket — so the audit sees the app the way a user does.
+          npx --yes serve@14 -s "$DIST" -l 4173 >"$RUNNER_TEMP/serve.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+
+          # `-f` without `-S` while polling: a connection refused is the
+          # expected state for the first second or two and should not litter the
+          # log. The check after the loop uses `-sSf` so a real failure is loud.
+          for _ in $(seq 1 60); do
+            if curl -sf -o /dev/null "$AXE_URL"; then break; fi
+            sleep 1
+          done
+          curl -sSf -o /dev/null "$AXE_URL" || {
+            echo "::error::Static server never came up; log follows." >&2
+            cat "$RUNNER_TEMP/serve.log" >&2
+            exit 1
           }
-          if (-not (Test-Path $iscc)) { $iscc = "ISCC.exe" }
-          & $iscc /DInsolviaEnv=staging /DAppVersion=0.0.0 `
-            /DOutputBase=insolvia_app-pr-verify `
-            windows\packaging\insolvia_app.iss
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        working-directory: apps/insolvia_app
+
+          cat >"$RUNNER_TEMP/axe-run.cjs" <<'NODE'
+          const puppeteer = require('puppeteer');
+          const axe = require('axe-core');
+
+          const url = process.env.AXE_URL;
+
+          // See the THRESHOLD comment above this step for why this is two
+          // conditions rather than one impact cutoff.
+          const FAIL_ON_IMPACT = new Set(['critical', 'serious']);
+          const FAIL_ON_RULE = new Set(['heading-order', 'page-has-heading-one']);
+          const isBlocking = (v) =>
+            FAIL_ON_IMPACT.has(v.impact) || FAIL_ON_RULE.has(v.id);
+
+          (async () => {
+            const browser = await puppeteer.launch({
+              args: ['--no-sandbox', '--disable-dev-shm-usage'],
+            });
+            try {
+              const page = await browser.newPage();
+
+              // Forwarded so the "rendered no text" failure below is
+              // actionable: a bundle that throws on startup says why here, and
+              // otherwise the only symptom is a silent 60s timeout.
+              page.on('console', (m) => {
+                if (m.type() === 'error') console.error(`  [browser] ${m.text()}`);
+              });
+              page.on('pageerror', (e) => console.error(`  [browser error] ${e.message}`));
+
+              const res = await page.goto(url, {
+                waitUntil: 'networkidle0',
+                timeout: 60000,
+              });
+              if (!res || !res.ok()) {
+                throw new Error(`Failed to load ${url}: HTTP ${res ? res.status() : 'no response'}`);
+              }
+
+              // The load-bearing line. Expo ships an empty shell, so without
+              // this the audit could run against a blank <body>, find nothing,
+              // and report success forever. If the bundle throws, this times
+              // out and the step fails — which is the correct outcome.
+              try {
+                await page.waitForFunction(
+                  () => document.body && document.body.innerText.trim().length > 0,
+                  { timeout: 60000 },
+                );
+              } catch {
+                throw new Error(
+                  `The app served at ${url} rendered no text within 60s. Either the ` +
+                    'JS bundle threw on startup or the export is broken — check the ' +
+                    'browser console output above. Auditing an empty page would ' +
+                    'report success, so this is a failure.',
+                );
+              }
+
+              // `page.evaluate(source)` rather than `addScriptTag`: it injects
+              // axe through the debugger protocol, so a Content-Security-Policy
+              // on the page cannot block the audit.
+              await page.evaluate(axe.source);
+              const results = await page.evaluate(async () =>
+                await window.axe.run(document, {
+                  runOnly: {
+                    type: 'tag',
+                    values: [
+                      'wcag2a',
+                      'wcag2aa',
+                      'wcag21a',
+                      'wcag21aa',
+                      'best-practice',
+                    ],
+                  },
+                  resultTypes: ['violations'],
+                }),
+              );
+
+              const violations = results.violations || [];
+              const blocking = violations.filter(isBlocking);
+              const advisory = violations.filter((v) => !isBlocking(v));
+
+              const describe = (v) =>
+                `- **${v.impact}** \`${v.id}\` — ${v.help} (${v.nodes.length} node(s))\n` +
+                v.nodes.slice(0, 5).map((n) => `    - \`${n.target.join(' ')}\``).join('\n');
+
+              const lines = [`### Accessibility audit — ${url}`, ''];
+              lines.push(`${results.passes ? results.passes.length : 0} checks passed.`);
+              lines.push('');
+              if (blocking.length) {
+                lines.push(`#### Blocking (critical/serious + heading structure): ${blocking.length}`);
+                lines.push(...blocking.map(describe));
+              }
+              if (advisory.length) {
+                lines.push(`#### Advisory (not failing — see the threshold comment): ${advisory.length}`);
+                lines.push(...advisory.map(describe));
+              }
+              if (!violations.length) {
+                lines.push('No WCAG A/AA or best-practice violations found.');
+              }
+              const out = lines.join('\n');
+              console.log(out);
+              if (process.env.GITHUB_STEP_SUMMARY) {
+                require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, out + '\n');
+              }
+
+              if (blocking.length) {
+                console.error(
+                  `::error::${blocking.length} blocking accessibility violation(s): ` +
+                    blocking.map((v) => `${v.id} (${v.impact})`).join(', '),
+                );
+                process.exitCode = 1;
+              }
+            } finally {
+              await browser.close();
+            }
+          })().catch((err) => {
+            console.error(`::error::Accessibility audit failed to run: ${err.message}`);
+            process.exit(1);
+          });
+          NODE
+
+          NODE_PATH="$tools/node_modules" node "$RUNNER_TEMP/axe-run.cjs"

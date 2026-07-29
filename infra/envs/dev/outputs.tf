@@ -28,11 +28,6 @@ output "auth_web_client_id" {
   value       = module.auth.web_client_id
 }
 
-output "auth_desktop_client_id" {
-  description = "This machine's desktop app client ID (loopback-redirect PKCE)."
-  value       = module.auth.desktop_client_id
-}
-
 output "auth_domain" {
   description = "This machine's hosted auth domain (Cognito-provided)."
   value       = module.auth.domain

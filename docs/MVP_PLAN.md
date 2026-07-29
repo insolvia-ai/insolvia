@@ -33,14 +33,15 @@ naming convention.
 
 | # | Decision | Rationale |
 |---|---|---|
-| D1 | Domain is **insolvia.ai**, not `.com` | Repo, CLAUDE.md, shared ACM wildcard, and `environment.dart` are all already built on it. `.com` would mean re-authoring the shared env for no gain. |
+| D1 | Domain is **insolvia.ai**, not `.com` | Repo, CLAUDE.md, shared ACM wildcard, and the app's environment config are all already built on it. `.com` would mean re-authoring the shared env for no gain. |
 | D2 | Subdomain map — see the table below; every environment gets its own host, staging included — **marketing now included too** | Staging needs a full parallel stack, not just an app. Flat `staging-*` naming (not `*.staging`) is load-bearing — see D2 below, which also records why marketing's original "no staging" carve-out was reversed. |
-| D3 | Marketing site is **React Router v7** | Flutter web cannot be server-rendered or crawled. See D3 below. |
-| D4 | The **design system becomes dual-target**: Flutter package + React package, over one shared token source | Consequence of D3. If we're adding a framework, the design system serves both rather than fragmenting the brand. See D4 below. |
+| D3 | Marketing site is **React Router v7** | Flutter web cannot be server-rendered or crawled. See D3 below. **Still stands under D9** — marketing does not move, and D9 records the measured reason. |
+| D4 | The **design system becomes dual-target**, over one shared token source | Originally a Flutter package + a React package (a consequence of D3). **Revised by D9:** the Flutter package is deleted; the two targets are now the React design system and the app's own React Native one, still over one `tokens.json`. See D4 below. |
 | D5 | **The API is required for MVP**, not deferred | The desktop app is a fat client on an attorney's machine. It cannot hold AWS credentials. Per `docs/regulatory-source-register.html`, we handle SSNs and full financials under GLBA Safeguards — the trust boundary has to live server-side. |
 | D6 | Backend stack is **Python + Flask + Mangum on Lambda** | Flask 3.1.2, Mangum 0.17, gunicorn — the established house pattern. |
 | D7 | Human email and product email are **separate milestones, and now separate providers** | Human mailboxes were urgent and have no app dependency; the mailer service depends on the API. Bundling them would block the urgent thing behind the slow thing. Originally SES→Gmail forwarding; superseded by **Google Workspace for inbound, SES for outbound `no-reply@`** — only one apex MX set exists, so this is exclusive, not additive. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md). |
-| D8 | **Web is the promoted path. Desktop is built but not promoted** — unsigned, no certificate procurement yet | See D8 below. |
+| D8 | ~~**Web is the promoted path. Desktop is built but not promoted**~~ | **Superseded by D9.** Web is still the promoted path; desktop is no longer built. See D8 below — its reasoning is preserved, because D9 is a different answer to the same question. |
+| D9 | **Flutter and Dart are replaced by React Native on Expo**, free tier only, bare primitives, no component library; desktop deleted, mobile held open by `expo prebuild` | Supersedes D8. See D9 below and [ADR 0004](adr/0004-react-native-replaces-flutter.md), which carries the six-round spike measurements. |
 
 ### D2 — the subdomain map
 
@@ -90,12 +91,24 @@ to a host with no certificate route:
 
 - `infra/envs/staging/variables.tf` — the `subdomain` default
 - `infra/envs/staging/terraform.tfvars.example`
-- `apps/insolvia_app/lib/config/environment.dart` — the `host` getter
+- the app's environment config — the `host` getter (then
+  `lib/config/environment.dart`; now `src/config/environment.ts`, per D9)
 
 Nothing is deployed yet, so this is a free rename today and an annoying one
 later. It's issue 1.15.
 
 ### D3 — the marketing site is React, not Flutter
+
+> **Annotation (D9, 2026-07-29).** This decision stands, and D9 widened rather
+> than reversed it: the *app* has now moved to React Native too, so the split
+> D3 created is no longer Flutter-vs-React but two React stacks — Expo/Metro
+> for the app, React Router/Vite for the site. Marketing deliberately did
+> **not** move onto the app's stack. It could: bare React Native for Web passes
+> every gate. It would cost 2.3× the script weight (125 KB → 293 KB gzip) and
+> most of the LCP headroom, on the one page whose entire job is SEO. The
+> measurements are in [ADR 0004](adr/0004-react-native-replaces-flutter.md).
+> Everything below about CanvasKit is now history — it explains why the site
+> was never Flutter, not why it is React today.
 
 **Flutter web cannot be server-rendered.** It compiles to CanvasKit/Skwasm and
 paints into a `<canvas>`. There is no DOM tree to serialize, so there is no
@@ -123,6 +136,28 @@ than the public one, so POST actions get rejected until the public hosts are
 listed in `allowedActionOrigins` in `react-router.config.ts`.
 
 ### D4 — the design system serves both targets
+
+> **Revised by D9, 2026-07-29.** The *shape* of this decision survives intact —
+> one neutral token source, generated into per-stack artifacts, never one stack
+> owning the other's brand. What changed is the second target. There is no
+> Flutter package any more (`packages/insolvia_design_system/` is deleted, and
+> with it the Dart generator and the git-tag publish flow). The two consumers
+> of `tokens.json` are now:
+>
+> | Target | Consumer | Generated artifact |
+> |---|---|---|
+> | Marketing site | `packages/insolvia_design_system_react/` (published) | Tailwind v4 `@theme` block, `theme.css` |
+> | App | `apps/insolvia_app` — its own components, not a package | typed `tokens.ts`, read through `src/theme.ts` |
+>
+> Both ship from `packages/insolvia_tokens` as `@insolvia-ai/tokens`. The
+> generator is now TypeScript rather than Dart and emits both. The app's
+> design system is *not* published: it has exactly one consumer in this repo,
+> so the registry boundary that earns its keep for the React package would be
+> pure overhead here. **The dual-implementation cost below is unchanged** — two
+> renderings of one design, kept in sync by discipline — and so is the
+> containment: the React set stays capped at the marketing components, and the
+> app's set stays small because ADR 0004 chose to own it rather than import a
+> library.
 
 The proven model: Base UI
 headless primitives + Tailwind v4, tokens declared as a `@theme` block of CSS
@@ -163,7 +198,13 @@ CLAUDE.md**, or it will quietly expand.
 
 ---
 
-### D8 — desktop is kept in the back pocket
+### D8 — desktop is kept in the back pocket — **superseded by D9**
+
+> **Superseded by D9, 2026-07-29 — read this section anyway.** D9 did not
+> decide that desktop was a bad idea; it decided that the *mechanism* below
+> stopped being cheap. Everything here is the reasoning D9 had to answer, and
+> the "what to watch" paragraph is the risk that actually materialised, from
+> the other direction.
 
 We push customers to the web app. Both desktop targets are still built on
 Flutter and installable from an untrusted source, but they are **not promoted**
@@ -195,6 +236,72 @@ this reason; it should not be dropped as dead weight.
 
 ---
 
+### D9 — Flutter and Dart are replaced by React Native on Expo
+
+**Supersedes D8.** The full decision, the alternatives, and the six-round
+styling spike that settled the UI layer are
+[ADR 0004](adr/0004-react-native-replaces-flutter.md) — an ADR because this one
+outlives the plan. What belongs here is the plan-level consequence: which
+earlier decisions moved, and what the desktop trade actually was.
+
+`apps/insolvia_app` is now an Expo app on **SDK 57**, pinned exact, in place of
+the pinned Flutter `3.44.6`. No Dart remains anywhere in the repo — the Flutter
+design system, the Dart API client half, the Dart token generator, the pub
+workspace and Melos are all deleted. Five constraints ride along, and ADR 0004
+argues each:
+
+| | |
+|---|---|
+| Toolchain | Expo SDK 57 · Metro for the app, Vite for marketing · Expo Router, `web.output: "single"` |
+| Billing | **Expo free tier only** — no EAS Build/Submit/Update/Hosting, no Expo account in CI. Enforced by a guard step in `app-pr.yml`, not by good intentions |
+| UI | **No component library.** Bare React Native primitives + `StyleSheet.create` + a generated typed token module. No Tailwind in the app |
+| Desktop | **Deleted, not deferred** — no macOS/Windows targets, no desktop CI jobs, no `artifact_hosting`, no desktop Cognito client |
+| Mobile | **Latent.** Nothing under `ios/`/`android/` is committed; `expo prebuild` generates both on demand |
+
+**What D8 was really buying, and where it went.** D8's central claim was that
+optionality was nearly free: *"the desktop targets stay green in CI, so
+reversing this is a marketing decision plus certificate procurement, not an
+engineering rebuild."* That was true, and it was true **because of Flutter** —
+one toolchain compiled macOS, Windows and web from one source, so holding the
+option open cost a CI job.
+
+React Native does not have those economics. Desktop means
+`react-native-macos` / `react-native-windows`: separate forks, their own
+release cadence, their own SDK-version skew. Keeping them "green in CI" would
+not be maintenance, it would be a second port under continuous repair — the
+opposite of what D8 was paying for.
+
+So the option is kept a different way. **Under Expo the cheap held-open target
+is mobile, and `expo prebuild` holds it open with nothing committed and no CI
+job at all** — no `ios/`, no `android/`, no build minutes. Optionality now comes
+from *having chosen React Native*, not from running desktop builds. That is the
+whole substitution, and it is worth stating plainly: **we traded a cheap
+desktop option for a cheaper mobile one**, on the judgement that a bankruptcy
+attorney's second device is a phone rather than a second desktop OS.
+
+**What this costs, honestly.** If a firm demands macOS or Windows tomorrow, the
+answer is a port, not a certificate order. D8's estimate — weeks of Windows OV
+validation plus notarization — is now the *second* half of the bill. The
+sections below on signing and procurement stay in this document precisely
+because that half has not changed and will still apply.
+
+**Consequential edits elsewhere:**
+
+- **D8 → superseded** (above); **D4 → revised** (two targets, neither of them
+  Flutter); **D3 → annotated** (it stands; marketing does not move).
+- **[ADR 0002](adr/0002-desktop-auto-update-deferred.md) → superseded by ADR
+  0004.** Its subject was an updater for a build that no longer exists. Its
+  revisit trigger and cost model are kept, as the checklist for any desktop
+  return.
+- **[ADR 0003](adr/0003-flutter-app-layout.md) → superseded by
+  [ADR 0005](adr/0005-expo-app-layout.md)**, which makes the same "adopt the
+  framework's own published layout" call for Expo.
+- **Milestones 2 and 4 are partly historical** — see the notes on each.
+- The environment variable is renamed `INSOLVIA_ENV` → **`EXPO_PUBLIC_INSOLVIA_ENV`**.
+  Expo inlines only `EXPO_PUBLIC_*`, so this was forced.
+
+---
+
 ## Sequencing — what blocks what
 
 Two long-lead items gate almost everything, and both are *waiting*, not
@@ -203,7 +310,7 @@ Two long-lead items gate almost everything, and both are *waiting*, not
 ```
 DAY-ONE PROCUREMENT (waiting, not working — start together)
   [.ai registration]──┐
-  [SES prod access]───┤       ┌─▶ M4 web app (+ unpromoted desktop) ─┐
+  [SES prod access]───┤       ┌─▶ M4 web app (desktop dropped — D9) ─┐
   [MyCase Advanced]─┐ │       │                                      ├──▶ M6 mailer
                     │ ├─▶ DNS live ─▶ ACM issued ───────────────────┼─▶ M5 api ─┘
                     │ └─▶ M1 email ───────────────────────────────┘
@@ -226,11 +333,15 @@ control, which makes the AWS bootstrap block in Milestone 1 (issues 1.0 → 1.3b
 unambiguously the place to start — nothing else can proceed until the wildcard
 certificate is issued.
 
-**Deferred by D8:** Windows code-signing certificate and Apple Developer
-account. These were the two longest lead times in the plan; deprioritising
-desktop distribution removes both. Note that reversing D8 reintroduces a
-multi-week Windows validation window — promoting desktop is a decision with
-weeks of lead time, not a switch.
+**Off the procurement list, originally by D8 and now permanently by D9:**
+Windows code-signing certificate and Apple Developer account. These were the two
+longest lead times in the plan. Under D8 they were *deferred* — the desktop
+builds existed and only distribution was held back — so reversing it meant the
+multi-week Windows validation window and nothing else. **Under D9 they are not
+on the list at all**, because there is no desktop build to sign: a desktop
+return is a port to `react-native-macos` / `react-native-windows` *first*, and
+only then the certificates. Same weeks of lead time, now behind engineering
+rather than in front of it.
 
 **M0 and M2 need none of it.** The MyCase spike (once credentialed) and the
 React design system are both fully parallel to the DNS wait — that's where the
@@ -346,7 +457,7 @@ alias.
 | ~~1.12~~ | ~~SES SMTP credentials + Gmail "Send mail as" runbook~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md`](EMAIL_SETUP.md). Creating the credentials and adding the Gmail alias remain human steps; replies stay broken until 6.8. |
 | ~~1.13~~ | ~~Un-gate the deploy workflows~~ — ✅ **DONE** | 1.3 + 1.3b hold, deploys run for real, and the temporary deploy gate has been removed from the workflows entirely. |
 | ~~1.14~~ | ~~Document the Google Workspace migration path~~ — ✅ **Written** | [`docs/EMAIL_SETUP.md` § Migrating to Google Workspace](EMAIL_SETUP.md#migrating-to-google-workspace) — ordered cutover checklist plus what to verify after. |
-| 1.15 | Rename the staging host → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, `environment.dart`. Free now, annoying once anything is deployed. See D2. |
+| 1.15 | Rename the staging host → `staging-app.insolvia.ai` | Three files, one commit: `infra/envs/staging/variables.tf`, `terraform.tfvars.example`, and the app's environment config. Free now, annoying once anything is deployed. See D2. |
 
 ### Working in the SES sandbox — what does and doesn't function
 
@@ -429,6 +540,13 @@ above.
 
 ## Milestone 2 · Design system — React target
 
+> **Shipped, and partly rewritten by D9.** The milestone is done; the rows below
+> are the record of what was built, not a live checklist. Two of them no longer
+> describe the repo: the Dart half of 2.1/2.2 is gone (the generator is
+> TypeScript and emits marketing's `theme.css` plus the app's typed `tokens.ts`),
+> and `design-system-pr.yml` in 2.8 is deleted along with the Flutter package.
+> The React package, its scope cap and its parity discipline are untouched.
+
 **Outcome:** one token source of truth driving both a Flutter package and a
 React package, so the marketing site is on-brand by construction rather than by
 eyeballing.
@@ -460,7 +578,7 @@ with the apex redirecting to it.
 
 | # | Issue | Notes |
 |---|---|---|
-| 3.1 | Scaffold `apps/insolvia_marketing/` — React Router v7 framework mode | Own `package.json`; excluded from the pub workspace. |
+| 3.1 | Scaffold `apps/insolvia_marketing/` — React Router v7 framework mode | Own `package.json` and lockfile; deliberately **not** a root-workspace member (the reason is in the root `package.json` comments). |
 | 3.2 | Wire the design system + Tailwind entrypoint | `@import "tailwindcss"` → `@import "@insolvia-ai/design-system/theme.css"` → `@source` the dist. Missing the `@source` line is the classic "why are my styles gone" bug. |
 | 3.3 | Content pass — positioning, JTBD, competitive framing | Source from `business-plan.html` §6 (jobs-to-be-done) and §7 (positioning). Do not invent new claims; the plan's figures are sourced and shouldn't drift. |
 | 3.4 | SEO baseline | Per-route `<title>`/meta/OG, `sitemap.xml`, `robots.txt`, JSON-LD `Organization`. Explicitly allow GPTBot/ClaudeBot/PerplexityBot — inbound increasingly arrives through them. |
@@ -468,12 +586,22 @@ with the apex redirecting to it.
 | 3.6 | Set `allowedActionOrigins` for `www` + apex | The CSRF trap documented in D3. Cheaper to do now than to debug later. |
 | 3.7 | Workflows: `marketing-pr.yml`, `marketing-staging.yml`, `marketing-prod.yml` | Follow existing `app-*.yml` shape and the cache-control rules in CLAUDE.md. Staging serves `staging-www.insolvia.ai`. |
 | 3.10 | `noindex` on every non-prod host | `staging-www`, `staging-app`, `staging-api`. A crawlable staging copy of the marketing site competes with prod for its own keywords — a genuinely damaging and easily-missed SEO own-goal. |
-| 3.8 | Lighthouse / Core Web Vitals budget in CI | The whole reason we're not using Flutter here — enforce it or the reasoning rots. |
+| 3.8 | Lighthouse / Core Web Vitals budget in CI | The whole reason this site has its own stack — first D3, and now D9's measurements, which are what keep it off the app's. Enforce it or the reasoning rots. |
 | 3.9 | Waitlist / contact capture | **Soft-depends on Milestone 5.** Ship storing to DynamoDB directly from the SSR action first (no SES, intake straight to DynamoDB), rather than blocking on the API. |
 
 ---
 
 ## Milestone 4 · App shell (`app.insolvia.ai` + desktop)
+
+> **Shipped as written, then half of it removed by D9.** Rows 4.5–4.11 are the
+> desktop half: the `windows/` target, the `.dmg`/`setup.exe` artifacts, the two
+> per-OS CI jobs, `artifact_hosting`, and the unsigned-install walkthrough. All
+> of it was built and all of it is now deleted — D9 explains why holding that
+> option open stopped being cheap. The rows stay because *"why did the repo once
+> have a Windows build?"* is a question the git history answers badly and this
+> answers well. 4.1–4.4 and 4.12 are live and still describe the web app; 4.4's
+> components are now the app's own React Native ones rather than the Flutter
+> design system's.
 
 **Outcome:** infrastructure proven end-to-end for both delivery targets, with a
 deliberately minimal home page. Per the brief: *"we can just put up a really
@@ -540,6 +668,13 @@ None of that is on the critical path today — but the Windows validation window
 is long enough that promoting desktop is a *decision with weeks of lead time*,
 not a switch to flip. Worth remembering when the moment comes.
 
+**Still accurate under D9, and now the second half of a longer bill.** Every
+procurement fact above survives the migration untouched — certificates and
+notarization do not care what compiled the binary. What changed is that there
+is no longer a binary: D9 deleted both desktop targets, so a desktop return
+starts with a port to `react-native-macos` / `react-native-windows` and only
+*then* reaches this paragraph.
+
 ---
 
 ## Milestone 5 · API (`api.insolvia.ai`)
@@ -558,11 +693,11 @@ the layering rotting.
 | 5.1 | Scaffold `services/api/` — Flask + Mangum, mirroring mailer's layout | Port the architecture test with it. |
 | 5.2 | Infra: API Gateway HTTP API + Lambda (Docker/ECR) + CloudFront + custom domain | Note the CLAUDE.md rule: `lifecycle { ignore_changes = [image_uri, environment] }`, and build-and-push the image *before* Terraform applies, or fresh-account deploys deadlock. |
 | 5.3 | Stand up **both** `staging-api` and `api` environments | Per CLAUDE.md, each env is its own `infra/envs/<env>/` directory with its own state key — never Terraform workspaces. Separate ECR tags, Cognito pools, and DynamoDB tables per env; staging must never read prod data. |
-| 5.4 | Point the app's env config at the right API host per build | `environment.dart` gains an `apiBaseUrl` alongside `host`, resolved from `INSOLVIA_ENV`. A staging desktop build hitting prod is the failure mode to design out. |
-| 5.5 | Auth: Cognito user pool + app clients | Two flows: web PKCE, and **desktop loopback-redirect PKCE** — these differ, and the desktop one is the awkward one. Separate pools per environment. |
-| 5.6 | Dart API client package `packages/insolvia_api_client/` | Shared by web and desktop builds; generated from an OpenAPI spec if practical. |
+| 5.4 | Point the app's env config at the right API host per build | `src/config/environment.ts` gains an `apiBaseUrl` alongside `host`, resolved from `EXPO_PUBLIC_INSOLVIA_ENV`. A staging build hitting prod is the failure mode to design out. *(Was `environment.dart` / `INSOLVIA_ENV` — see D9.)* |
+| 5.5 | Auth: Cognito user pool + app clients | **One** flow now: web PKCE. D9 deleted the desktop client and its loopback-redirect flow — the awkward half of this row. Separate pools per environment. |
+| 5.6 | API client package `packages/insolvia_api_client/` | TypeScript, an npm workspace member; generated from an OpenAPI spec if practical. *(Planned as Dart, "shared by web and desktop builds" — D9 made it one language and one target.)* |
 | 5.7 | Write down the trust boundary as an ADR | The "client stays dumb" rule needs documenting, or it erodes the first time something is easier to do client-side. |
-| 5.8 | CORS allowlist per environment | `api` accepts `app.insolvia.ai`; `staging-api` accepts `staging-app.insolvia.ai` + localhost. Desktop sends no browser `Origin` — don't let a permissive desktop path widen the web policy. |
+| 5.8 | CORS allowlist per environment | `api` accepts `app.insolvia.ai`; `staging-api` accepts `staging-app.insolvia.ai` + localhost. *(The original caution — "desktop sends no browser `Origin`, don't let a permissive desktop path widen the web policy" — is moot under D9, and would return with any native client.)* |
 | 5.9 | Structured JSON logging, `/health`, CloudWatch alarms | |
 | 5.10 | Config + secrets via SSM, namespaced per env | `/insolvia/<env>/...`. |
 | 5.11 | Workflows: `api-pr.yml`, `api-staging.yml`, `api-prod.yml` | `staging` on push to `main`; `prod` `workflow_dispatch` behind the `insolvia-production` environment, per CLAUDE.md. |
@@ -624,7 +759,7 @@ All open questions from rev 2 are answered and folded into the plan above.
 | Question | Answer | Where it landed |
 |---|---|---|
 | Pull the MyCase spike forward? | **Yes** | New Milestone 0, running parallel to the DNS/SES wait |
-| Windows at MVP, or macOS only? | **Both** | Milestone 4 issues 4.6–4.8 + the code-signing warning |
+| Windows at MVP, or macOS only? | **Both — then neither.** Answered "both" in rev 3, shipped, and removed by D9 | Milestone 4 issues 4.6–4.8 + the code-signing warning; D9 for why the answer changed |
 | Address map | **Confirmed** | Issue 1.11 |
 | npm scope `@insolvia`? | **Overturned — it's `@insolvia-ai`.** GitHub Packages requires the scope to equal the owning org's login (`insolvia-ai`) and rejects `@insolvia` with a misleading "installation does not exist" 403 | Issue 2.7; `docs/PACKAGE_PUBLISHING.md` |
 | Staging for marketing? | **Answered "no" in rev 3; reversed in M6** — it is `staging-www.insolvia.ai` now | D2 table; the reversal and its reasoning live there |
@@ -644,21 +779,33 @@ Not questions — just the things most likely to bite, in order:
    relationship, which moves with the person. Business-plan §10 already flags
    this and recommends a formal partnership plus a second channel (direct/NACBA)
    before the channel is leaned on in a raise.
-4. **Desktop bit-rot (D8).** Unpromoted targets break silently. If the Windows
-   and macOS builds fall out of CI, they'll be broken at the exact moment a
-   prospect demands desktop — destroying the optionality this decision was
-   meant to preserve. Issue 4.8 is the guard; don't let it get trimmed.
-5. **Web-first is a bet on attorney behaviour.** The business plan describes
-   this market as desktop-loyal. Pushing web is right, but it's an assumption
-   worth testing explicitly with the design-partner firm rather than
-   discovering late — and it's cheap to test, because the desktop build exists.
-6. **SES production access deferred too long (6.8).** Deferring it is correct —
+4. ~~**Desktop bit-rot (D8).**~~ **Closed by D9 — the risk was realised, in the
+   cheapest available way.** D8's guard against unpromoted targets rotting was
+   issue 4.8, keeping both green in CI. D9 removed the targets instead, so
+   there is nothing left to rot. What replaces this risk is item 5.
+5. **Web-first is a bet on attorney behaviour — and D9 raised the stake.** The
+   business plan describes this market as desktop-loyal. Pushing web is still
+   right, but the assumption is now more expensive to be wrong about: under D8
+   the counter-evidence cost a marketing decision plus certificates, because the
+   desktop build already existed. Under D9 it costs a port. **So test it
+   explicitly with the design-partner firm, early** — this is the item on this
+   list whose cost of late discovery went up rather than down.
+6. **We now own complex-widget accessibility (D9).** No component library means
+   `Modal`, `Select`, `Combobox` and date pickers are ours, in a product that
+   needs all four. Guarded by the axe assertion in `app-pr.yml` from day one;
+   the intended relief is `@react-native-aria/*` when it lands. ADR 0004 records
+   both the library defects that made owning them attractive and the breadth
+   cost that makes it uncomfortable at forty components.
+7. **SES production access deferred too long (6.8).** Deferring it is correct —
    the request is stronger with a live site and real bounce handling. The risk is
    the opposite one: while it's outstanding we can receive mail at
    `@insolvia.ai` but cannot reply from it, so the mailbox is half-built. Set a
    date rather than leaving it open-ended.
-7. **Design-system parity drift.** Contained by the six-component scope limit in
-   D4 — which only holds if issue 2.9 actually writes it into CLAUDE.md.
+8. **Design-system parity drift.** Contained by the six-component scope limit in
+   D4 — which only holds if issue 2.9 actually writes it into CLAUDE.md. D9 did
+   not change the shape of this risk: there are still two implementations of one
+   design, and the second one is now the app's own React Native components
+   rather than a Flutter package.
 
 ---
 
