@@ -1,0 +1,29 @@
+# Prettier formats code here, not prose and not machine output.
+
+node_modules/
+dist/
+build/
+.dart_tool/
+
+# Markdown is hand-authored and hand-wrapped throughout this repo, with compact
+# `|---|---|` tables and `*emphasis*`. Prettier rewrites both on sight, which
+# would turn every docs edit into a reformatting diff and bury the actual
+# change. Neither design-system package runs Prettier over markdown either.
+*.md
+
+# NOTE — generated code is deliberately NOT ignored here.
+#
+# `packages/insolvia_tokens/src/tokens.ts` is generated, and it is still held to
+# Prettier and ESLint like any other source. That matches what this repo already
+# does on the Dart side: design-system-pr.yml runs `dart format
+# --set-exit-if-changed` over the four generated token .dart files, and they
+# pass. The generator is expected to emit correctly-formatted bytes.
+#
+# The trade is real and worth knowing: a Prettier version bump that changes a
+# default can fail CI on a file no human wrote, and the fix is editing the
+# generator's templates — never reformatting the output, which the drift check
+# would immediately reject.
+
+# The token source of truth. Its formatting is reviewed by humans and read by
+# two generators; leave it exactly as committed.
+packages/insolvia_tokens/tokens.json

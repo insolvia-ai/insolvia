@@ -1,0 +1,78 @@
+{
+  "name": "insolvia-workspace",
+  "private": true,
+  "type": "module",
+  "//": [
+    "Root of the Insolvia npm workspace. NOT a shippable package — it declares",
+    "the members and pins the shared toolchain, mirroring what pubspec.yaml does",
+    "for the Dart workspace it is replacing.",
+    "",
+    "The member list is EXPLICIT and must stay that way. `packages/*` would",
+    "swallow packages/insolvia_design_system_react, which publishes to GitHub",
+    "Packages and is consumed by the marketing site BY VERSION, never by path.",
+    "Making it a workspace member would silently symlink marketing to the local",
+    "source, so a broken package would pass CI and only fail after publishing —",
+    "the exact trap the root pubspec.yaml documents for the Flutter design",
+    "system. apps/insolvia_marketing is out for the same reason: it resolves",
+    "against the published package.",
+    "",
+    "CAUTION — Node resolution walks UP the tree, which pub never did. A missing",
+    "dependency in apps/insolvia_marketing or packages/insolvia_design_system_react",
+    "can now resolve from this root's node_modules and pass CI, then fail in a",
+    "clean install. Both keep their own package-lock.json and their own CI job",
+    "installs from it, which is what catches this — do not consolidate them here."
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/insolvia_tokens",
+    "packages/insolvia_api_client"
+  ],
+  "scripts": {
+    "//tokens": [
+      "Run with plain `node`, no loader and no build step: Node >=24 strips",
+      "TypeScript types natively, so the generator keeps the dependency-free",
+      "property its Dart predecessor was written to defend. Type-stripping",
+      "cannot execute `enum`, `namespace`, or parameter properties — the",
+      "generator must avoid all three."
+    ],
+    "tokens": "node packages/insolvia_tokens/tool/generate-tokens.ts",
+    "tokens:check": "node packages/insolvia_tokens/tool/generate-tokens.ts --check",
+    "//lint": [
+      "Members are named explicitly rather than globbed, matching the",
+      "changed-paths convention in design-system-pr.yml. A bare `eslint .` would",
+      "descend into the marketing site and the React design system, which have",
+      "their own configs, their own lockfiles, and their own required checks.",
+      "A new member adds its line here."
+    ],
+    "lint": "eslint packages/insolvia_tokens packages/insolvia_api_client",
+    "format": "prettier --check packages/insolvia_tokens packages/insolvia_api_client",
+    "format:write": "prettier --write packages/insolvia_tokens packages/insolvia_api_client",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "//ci": [
+      "The npm half of the gate only. While the Dart half still exists,",
+      "`melos run ci` remains the other half; PR 3 deletes it and leaves this."
+    ],
+    "ci": "npm run tokens:check && npm run format && npm run lint && npm run typecheck && npm run test"
+  },
+  "//devDependencies": [
+    "ESLint/Prettier versions match apps/insolvia_marketing deliberately — the",
+    "app added in PR 3 is told to match marketing's lint setup, so a second",
+    "ESLint major in the repo would be a trap, not a choice.",
+    "TypeScript is 5.9 rather than the 7.x line: `erasableSyntaxOnly` (5.8+) is",
+    "the feature this workspace depends on, and adopting a rewritten compiler in",
+    "the middle of a toolchain migration would confound any failure."
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^24.13.3",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.19.0",
+    "vitest": "^4.1.10"
+  }
+}

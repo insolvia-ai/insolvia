@@ -1,0 +1,21 @@
+{
+  "name": "@insolvia-ai/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "//": [
+    "Private and unpublished: the app resolves it as a workspace member by",
+    "symlink. Mirrors the Dart client in lib/ — both exist simultaneously for",
+    "exactly one PR, and PR 3 deletes the Dart half.",
+    "",
+    "No OpenAPI codegen. The tests ARE the contract pin against services/api;",
+    "see CLAUDE.md."
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

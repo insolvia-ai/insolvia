@@ -1,0 +1,57 @@
+{
+  "//": [
+    "Shared compiler options for the npm workspace members. Each member has its",
+    "own tsconfig.json that extends this and sets `include`.",
+    "",
+    "apps/insolvia_marketing and packages/insolvia_design_system_react do NOT",
+    "extend this — they are not workspace members and their configs answer to",
+    "their own bundlers (React Router / tsup). Keep this file about the members.",
+    "",
+    "`erasableSyntaxOnly` is the load-bearing one: it makes tsc reject the",
+    "constructs Node's native type-stripping cannot execute (enum, namespace,",
+    "parameter properties). Without it, `npm run tokens` would fail at runtime",
+    "on code that typechecked cleanly.",
+    "",
+    "NOTE: `\"//\"`-prefixed keys are only tolerated at the TOP LEVEL of a",
+    "tsconfig. Inside `compilerOptions` they are unknown options and tsc exits",
+    "with TS5025, so keep commentary out here."
+  ],
+  "//allowImportingTsExtensions": [
+    "Relative imports in workspace members are written with a literal `.ts`",
+    "extension, e.g. `import { x } from './models.ts'`. That is deliberate and",
+    "the only specifier that works everywhere these packages run.",
+    "",
+    "Members have no build step (package.json exports `./src/*.ts` directly),",
+    "and `moduleResolution: NodeNext` requires an explicit extension on relative",
+    "imports. The three candidates:",
+    "  './models'     — tsc rejects under NodeNext",
+    "  './models.js'  — typechecks, then ERR_MODULE_NOT_FOUND under Node",
+    "  './models.ts'  — needs this flag; works under tsc, Node >=24 native",
+    "                   type-stripping, Vitest and Metro alike",
+    "Only the third is right, and the second is the dangerous one: it fails at",
+    "runtime having passed the typecheck. Requires `noEmit`, set below."
+  ],
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "allowImportingTsExtensions": true,
+
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

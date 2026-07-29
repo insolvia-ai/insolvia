@@ -36,16 +36,33 @@ jobs:
           paths: |
             packages/insolvia_design_system_react/**
             packages/insolvia_tokens/**
+            # This job now runs `npm ci` at the repo root (for the token drift
+            # check), so the root manifest and lockfile are real inputs to it.
+            # Without these two lines a PR touching only the root lockfile
+            # would skip this gate, merge, and break the next PR that does
+            # touch a listed path — with the failure landing on that PR's
+            # author instead.
+            package.json
+            package-lock.json
             .github/workflows/design-system-react-pr.yml
             .github/actions/changed-paths/action.yml
 
-      # Must match the package's `engines.node` (">=24").
+      # Must match the package's `engines.node` (">=24"). 24 is also the floor
+      # for the token generator below: it runs as plain `node generate-tokens.ts`
+      # with no loader and no build step, which relies on Node's native
+      # TypeScript type-stripping.
+      #
+      # Two lockfiles, because this job installs two independent trees: the
+      # package's own (below) and the repo root's (for `npm run tokens:check`).
+      # Listing both keys the cache on either changing.
       - uses: actions/setup-node@v4
         if: steps.filter.outputs.run == 'true'
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: packages/insolvia_design_system_react/package-lock.json
+          cache-dependency-path: |
+            packages/insolvia_design_system_react/package-lock.json
+            package-lock.json
 
       # Version-bump gate. Every merge to main that changes this package must
       # bump `version` in package.json, because the publish workflow
@@ -89,6 +106,39 @@ jobs:
           fi
 
           echo "Version bumped: $BASE_VERSION -> $HEAD_VERSION."
+
+      # Everything from here to the drift check runs at the REPO ROOT, not in
+      # this package: `defaults.run.working-directory` above points every `run`
+      # step at packages/insolvia_design_system_react, and the root scripts —
+      # like the generator itself — resolve their paths from the repo root.
+      # Hence the explicit `working-directory` on both steps.
+      #
+      # The generator is dependency-free, so this install is not what makes it
+      # run. It is here so the root tree is resolved exactly as the committed
+      # lockfile pins it, and so `ci` fails loudly if the root package.json and
+      # package-lock.json have drifted apart — same reasoning as the package
+      # install below.
+      - name: Install workspace root
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        working-directory: ${{ github.workspace }}
+
+      # `src/styles/theme.css` in this package is GENERATED from
+      # packages/insolvia_tokens/tokens.json. Runs before the package's own
+      # install/lint/build steps for the same reason the Dart drift check runs
+      # before format/analyze in design-system-pr.yml: if someone hand-edited a
+      # generated file, the honest failure is "you edited the wrong file", not
+      # a downstream complaint about the edit.
+      #
+      # The Dart generator's equivalent check STAYS in design-system-pr.yml for
+      # this PR. Two required checks proving the same property is deliberate,
+      # not duplication to tidy up: the port's entire claim is that the Dart and
+      # TypeScript generators emit byte-identical output, and the only thing
+      # that can falsify it is running both against the committed files.
+      - name: Token drift check
+        if: steps.filter.outputs.run == 'true'
+        run: npm run tokens:check
+        working-directory: ${{ github.workspace }}
 
       # `ci`, never `install`: the lockfile is committed precisely so CI
       # resolves the same tree twice running, and `ci` fails loudly when

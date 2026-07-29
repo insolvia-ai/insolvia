@@ -1,11 +1,17 @@
 name: API client · PR
 
 # No `on.pull_request.paths:` filter, deliberately — see
-# `.github/actions/changed-paths/action.yml`. This job is intended as a
-# required status check on `protect-main`, so it must trigger and report on
-# *every* PR; the `steps.filter` guard below is what keeps an unrelated PR
-# cheap. Re-adding a `paths:` filter would silently deadlock every PR that
+# `.github/actions/changed-paths/action.yml`. Both jobs below are intended as
+# required status checks on `protect-main`, so they must trigger and report on
+# *every* PR; the `steps.filter` guard inside each is what keeps an unrelated
+# PR cheap. Re-adding a `paths:` filter would silently deadlock every PR that
 # does not touch these paths.
+#
+# TWO JOBS, ONE PACKAGE, for exactly one PR: `Dart API client` gates lib/ +
+# test/, `API client` gates the TypeScript port in src/. They coexist while
+# the app migrates off Flutter; the PR that deletes lib/ and test/ deletes the
+# Dart job with them (and drops it from the ruleset — see the
+# `insolvia-branch-protection` skill, which matches checks by exact name).
 on:
   pull_request:
 
@@ -63,3 +69,80 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: dart test
         working-directory: packages/insolvia_api_client
+
+  api-client:
+    name: API client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          # The Dart job's list plus the npm-side inputs this gate actually
+          # consumes. `packages/insolvia_api_client/**` covers both halves of
+          # the package, so a change to either client runs both jobs — while
+          # they share a directory that is the honest guard, and it keeps a
+          # reviewer from having to reason about two divergent path lists.
+          # `pubspec.yaml`/`melos.yaml` leave with the Dart job.
+          paths: |
+            packages/insolvia_api_client/**
+            pubspec.yaml
+            melos.yaml
+            package.json
+            package-lock.json
+            tsconfig.base.json
+            eslint.config.js
+            .prettierrc
+            .prettierignore
+            .github/workflows/api-client-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      # Must match the root package.json's `engines.node` (">=24"). There is
+      # no `cache-dependency-path` here, unlike design-system-react-pr.yml:
+      # this package is an npm *workspace member*, so the lockfile it installs
+      # from is the repo-root one setup-node already looks for by default.
+      - uses: actions/setup-node@v4
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+
+      # `ci`, never `install`: the lockfile is committed precisely so CI
+      # resolves the same tree twice running, and `ci` fails loudly when
+      # package.json and the lockfile have drifted apart. Run from the repo
+      # root — it installs every workspace member and links them into
+      # node_modules/@insolvia-ai, which is how the test below resolves
+      # `@insolvia-ai/api-client`.
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+
+      # Scoped to this package, mirroring how the Dart job passes a path to
+      # `dart format`/`dart analyze`. The root `lint`/`format` scripts cover
+      # every workspace member, and this gate must not go red because a
+      # *different* package has a lint error — that package has its own gate.
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: npx prettier --check packages/insolvia_api_client
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: npx eslint packages/insolvia_api_client
+
+      # `tsc` with the root tsconfig.base.json's `erasableSyntaxOnly`, which is
+      # the only thing standing between this package and a runtime failure:
+      # there is no build step, so Node and Metro consume src/*.ts directly and
+      # cannot execute `enum`, `namespace`, or parameter properties.
+      - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
+        run: npm run typecheck --workspace @insolvia-ai/api-client
+
+      # The contract pin for services/api — see the header comment in
+      # packages/insolvia_api_client/src/index.test.ts.
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: npm run test --workspace @insolvia-ai/api-client

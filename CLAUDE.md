@@ -31,6 +31,25 @@ Every app / package / service and `infra/` has its **own `CLAUDE.md`** (that
 area's rules — it auto-loads when you work there; read it before editing) and a
 `README.md` (for humans). One owner per fact — link, never restate.
 
+### Two package managers, mid-migration
+
+The repo is moving from Dart/Flutter to TypeScript, so **both a pub workspace
+(`pubspec.yaml` + `melos.yaml`) and an npm workspace (`package.json`) are live
+at once.** Each covers a different set of packages; read the comments in the
+root `package.json` before adding a member.
+
+Two things to know, because pub behaved differently:
+
+- **The npm member list is explicit, never `packages/*`.** Globbing would make
+  `insolvia_design_system_react` a workspace member and silently symlink the
+  marketing site to local source — but marketing consumes it *by published
+  version*. A broken package would then pass CI and only break after publishing.
+- **Node resolution walks UP the tree; pub's never did.** A dependency that
+  `apps/insolvia_marketing` or `packages/insolvia_design_system_react` forgot to
+  declare can now resolve from the root `node_modules` and pass locally. Both
+  keep their own lockfile and their own CI job that installs from it — that is
+  what catches this, so don't consolidate them into the root workspace.
+
 ## Catalog — need this? read that
 
 | When you're… | Open |
