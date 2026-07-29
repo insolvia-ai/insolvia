@@ -11,6 +11,12 @@ export interface EnvBadgeProps {
  * A small pill showing the current environment, tinted by the brand accent —
  * what makes a staging build unmistakable at a glance.
  *
+ * The brass accent tints the fill and the border, but the label is `ink`, not
+ * accent: brass on a pale brass tint is ~1.9:1, far under WCAG AA for 12px text,
+ * and the axe gate in `app-pr.yml` rightly fails on it. The pill still reads as
+ * brass; only the letters are high-contrast — the standard accessible-chip
+ * pattern (colored container, readable text).
+ *
  * The accessible name spells the host out ("Staging environment,
  * staging-app.insolvia.ai") because the visible text is an all-caps
  * abbreviation, and the Flutter badge carried the host in a tooltip that has no
@@ -33,9 +39,7 @@ export function EnvBadge({ env }: EnvBadgeProps) {
         },
       ]}
     >
-      <Text
-        style={[styles.label, { color: theme.colors.accent, fontFamily: theme.typography.body }]}
-      >
+      <Text style={[styles.label, { color: theme.colors.ink, fontFamily: theme.typography.body }]}>
         {info.label.toUpperCase()}
       </Text>
     </View>
