@@ -14,14 +14,26 @@ import 'dart:convert';
 import 'dart:io';
 
 const String _tokensPath = 'packages/insolvia_tokens/tokens.json';
+const String _tokensReadme = 'packages/insolvia_tokens/README.md';
 const String _regenCommand =
     'dart run packages/insolvia_tokens/tool/generate_tokens.dart';
 
 const String _dartBanner = '// DO NOT EDIT — generated from $_tokensPath\n'
     '// Regenerate with: $_regenCommand\n';
 
+// The two banners differ, deliberately — this is not an oversight to tidy up.
+//
+// `theme.css` is the only output that lands inside a version-gated
+// design-system package, so its bytes are expensive: any change to them drags
+// the PR into `insolvia-design-system-pr` territory (own PR + version bump).
+// Naming the README rather than a command makes the banner toolchain-agnostic,
+// so re-implementing this generator in another language rewrites no generated
+// bytes at all and needs no design-system PR.
+//
+// The Dart banner keeps naming `$_regenCommand` because those four outputs are
+// Flutter-only and live exactly as long as this toolchain does.
 const String _cssBanner = '/* DO NOT EDIT — generated from $_tokensPath\n'
-    ' * Regenerate with: $_regenCommand\n'
+    ' * Regenerate: see $_tokensReadme\n'
     ' */\n';
 
 const String _dartOutDir = 'packages/insolvia_design_system/lib/src/tokens';
