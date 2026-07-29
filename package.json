@@ -40,13 +40,14 @@
     "tokens": "node packages/insolvia_tokens/tool/generate-tokens.ts",
     "tokens:check": "node packages/insolvia_tokens/tool/generate-tokens.ts --check",
     "//lint": [
-      "Members are named explicitly rather than globbed, matching the",
-      "changed-paths convention in design-system-pr.yml. A bare `eslint .` would",
-      "descend into the marketing site and the React design system, which have",
-      "their own configs, their own lockfiles, and their own required checks.",
-      "A new member adds its line here."
+      "Fans out per member rather than running ESLint once from the root, and",
+      "there is deliberately NO `eslint.config.js` at the repo root — the rules",
+      "live in `eslint.base.js`, which each member re-exports. ESLint discovers",
+      "a flat config by walking UP from its cwd, so a root one is also found by",
+      "packages/insolvia_design_system_react, breaking that version-gated",
+      "package's own ESLint 8 gate. Read eslint.base.js before changing this."
     ],
-    "lint": "eslint packages/insolvia_tokens packages/insolvia_api_client",
+    "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --check packages/insolvia_tokens packages/insolvia_api_client",
     "format:write": "prettier --write packages/insolvia_tokens packages/insolvia_api_client",
     "typecheck": "npm run typecheck --workspaces --if-present",

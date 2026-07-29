@@ -15,6 +15,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   }

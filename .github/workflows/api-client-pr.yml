@@ -95,7 +95,7 @@ jobs:
             package.json
             package-lock.json
             tsconfig.base.json
-            eslint.config.js
+            eslint.base.js
             .prettierrc
             .prettierignore
             .github/workflows/api-client-pr.yml
@@ -129,9 +129,13 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npx prettier --check packages/insolvia_api_client
 
+      # Run via the package's own script, not `npx eslint <path>` from the root:
+      # there is deliberately no `eslint.config.js` at the repo root (see
+      # eslint.base.js), so ESLint invoked with the root as its cwd would find
+      # no config at all.
       - name: Lint
         if: steps.filter.outputs.run == 'true'
-        run: npx eslint packages/insolvia_api_client
+        run: npm run lint --workspace @insolvia-ai/api-client
 
       # `tsc` with the root tsconfig.base.json's `erasableSyntaxOnly`, which is
       # the only thing standing between this package and a runtime failure:
