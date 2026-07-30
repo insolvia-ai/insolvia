@@ -40,8 +40,8 @@ function Surface() {
 
       <div className="grid gap-lg px-lg sm:grid-cols-2">
         <Card.Root elevation="raised">
-          <Card.Title>Desktop and web, one codebase</Card.Title>
-          <Card.Body>A native macOS and Windows app plus the web, shipped together.</Card.Body>
+          <Card.Title>Bankruptcy prep, done right</Card.Title>
+          <Card.Body>Case intake, the forms engine, and e-filing — in one place.</Card.Body>
           <Card.Footer>
             <Button intent="secondary" size="sm">
               Book a demo

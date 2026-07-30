@@ -18,9 +18,9 @@ const faqs = [
     answer: 'Yes — we import your existing case files so nothing is re-keyed.',
   },
   {
-    value: 'desktop',
-    question: 'Is there a real desktop app?',
-    answer: 'A native macOS and Windows app, not a browser window in a wrapper.',
+    value: 'browser',
+    question: 'Do I need to install anything?',
+    answer: 'No — app.insolvia.ai runs in any modern browser, nothing to install.',
   },
   {
     value: 'efile',

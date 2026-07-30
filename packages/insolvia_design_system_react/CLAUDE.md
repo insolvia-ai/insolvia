@@ -6,8 +6,9 @@ Human docs: [`README.md`](README.md). Publishing flow:
 
 - **Hard cap: six components** — `Button, Card, NavBar, Footer, Accordion,
   Field`. The `src/index.ts` barrel is the source of truth (read it, don't count
-  directories). Everything the marketing site doesn't render is a second
-  implementation of something the Flutter design system already owns.
+  directories). Everything the marketing site doesn't render is a maintenance
+  surface with no consumer — the app has its own design system and shares only
+  token values, never components (ADR 0004).
 - **Adding a seventh is a scope decision, not a feature-PR call.** In the same
   PR: name the marketing page that renders it, update
   [`README.md`](README.md), this file, and decision D4 in

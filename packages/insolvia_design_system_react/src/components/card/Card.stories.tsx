@@ -22,9 +22,9 @@ type Story = StoryObj<typeof Card.Root>;
 export const Default: Story = {
   render: (args) => (
     <Card.Root {...args} className="max-w-sm">
-      <Card.Title>One codebase, two platforms</Card.Title>
+      <Card.Title>Bankruptcy prep, done right</Card.Title>
       <Card.Body>
-        A native macOS and Windows app plus the web, shipped from a single Flutter codebase.
+        Case intake, the forms engine, and e-filing — in one place, at app.insolvia.ai.
       </Card.Body>
       <Card.Footer>
         <Button size="sm">Book a demo</Button>

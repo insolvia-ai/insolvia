@@ -18,11 +18,12 @@ semantic design tokens generated out of `packages/insolvia_tokens/tokens.json`.
 **Do not add a seventh component without a corresponding scope decision.**
 
 This package is deliberately small — not a large library of Base UI wrappers.
-`app.insolvia.ai` and the macOS/Windows desktop app are Flutter and stay
-Flutter — a React component can never be shared with them. Every component
-added here that the marketing site does not actually render is a second
-implementation of something the Flutter design system already owns, and it will
-drift. The marketing site's needs are the ceiling, not the floor.
+It serves the marketing site only. `app.insolvia.ai` has its own design system
+(bare React Native primitives in `apps/insolvia_app/src/components/`, per ADR
+0004) and does not consume this one — the two share token *values*, never
+components. Every component added here that the marketing site does not actually
+render is a maintenance surface with no consumer, and it will drift. The
+marketing site's needs are the ceiling, not the floor.
 
 ## Theming — `theme.css` is generated
 
@@ -30,11 +31,11 @@ drift. The marketing site's needs are the ceiling, not the floor.
 rendered from `packages/insolvia_tokens/tokens.json` by
 
 ```sh
-dart run packages/insolvia_tokens/tool/generate_tokens.dart   # or: melos run tokens
+npm run tokens
 ```
 
 To change a color, radius, spacing step, or font: **edit `tokens.json` and
-regenerate.** `melos run tokens:check` fails CI on drift, so a hand-edit will be
+regenerate.** `npm run tokens:check` fails CI on drift, so a hand-edit will be
 caught rather than quietly shipped.
 
 Components read only the **semantic** layer — `bg-bg`, `bg-card`,
@@ -88,8 +89,8 @@ Individual scripts once set up: `npm run lint` (eslint incl. jsx-a11y),
 
 - Every exported component has at least one **behavioural** test — the accordion
   actually opens, the button actually fires `onClick`, the input is actually
-  reachable by its label. No snapshot tests. This mirrors the rule the Flutter
-  design system holds itself to.
+  reachable by its label. No snapshot tests. The app's design system holds itself
+  to the same rule.
 - Components are `forwardRef` wrappers with a `cn()` class merge and a variant
   map, and each lives in `src/components/<name>/` behind an `index.ts` barrel.
 - Landmarks are real: `NavBar` renders a named `<nav>`, `Footer` renders
