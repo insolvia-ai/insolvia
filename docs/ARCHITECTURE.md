@@ -10,13 +10,13 @@ insolvia/
 │   │   └── src/
 │   │       ├── app/                   Expo Router routes ONLY (+not-found.tsx)
 │   │       ├── screens/               screen bodies the routes render
-│   │       ├── components/            our design system — RN primitives
+│   │       ├── components/            the app's own components — RN primitives
 │   │       ├── config/                environment.ts (EXPO_PUBLIC_INSOLVIA_ENV)
 │   │       └── theme.ts               StyleSheet helpers over the tokens
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
+│       └── app/ui/                    the site's own themed components
 ├── packages/
 │   ├── insolvia_tokens/               @insolvia-ai/tokens — tokens.json + generator
-│   ├── insolvia_design_system_react/  published; marketing's components
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── services/                          api · mailer (Python on Lambda)
 ├── infra/                             Terraform — ci-trust / shared / staging / prod
@@ -31,19 +31,20 @@ Everything is TypeScript. The app follows the layout Expo itself publishes —
 behind all of it, including the measurements that ruled out a component library.
 
 - **Workspace resolution:** npm workspaces, root `package.json`. The member list
-  is **explicit and never `packages/*`** — globbing would swallow
-  `insolvia_design_system_react`, which marketing consumes *by published
-  version*. The reasoning is in the root `package.json`'s own comments; read
-  them before adding a member.
-- **Not members, deliberately:** `apps/insolvia_marketing` and
-  `packages/insolvia_design_system_react`. Each keeps its own lockfile and its
-  own CI job that installs from it, because Node resolution walks *up* the tree
-  and would otherwise let a missing dependency resolve from the root.
-- **Two design systems, one token source.** The React package serves marketing;
-  the app has its own React Native components. They share token *values* only,
-  generated from `packages/insolvia_tokens/tokens.json` into a Tailwind `@theme`
-  block for marketing and a typed `tokens.ts` for the app — see
-  [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
+  is **explicit and never `packages/*`** — the reasoning is in the root
+  `package.json`'s own comments; read them before adding a member.
+- **Not a member, deliberately:** `apps/insolvia_marketing`. It keeps its own
+  lockfile and its own CI job that installs from it, because Node resolution
+  walks *up* the tree and would otherwise let a missing dependency resolve from
+  the root.
+- **No design system — theming.** Insolvia shares token *values* only, not
+  components. `packages/insolvia_tokens/tokens.json` generates a Tailwind
+  `@theme` block into `apps/insolvia_marketing/app/styles/theme.css` for
+  marketing and a typed `tokens.ts` for the app; each app owns its own
+  components (`apps/insolvia_marketing/app/ui/`,
+  `apps/insolvia_app/src/components/`). A shared, versioned component package
+  returns only when a second consumer merits it — see
+  [ADR 0006](adr/0006-theming-over-design-system.md).
 
 ## Toolchain
 
@@ -205,7 +206,7 @@ first.
 
 **Enforced today:** a PR is required (no direct pushes); linear history; no
 force-push; no branch deletion; squash or rebase merges only; review threads must
-be resolved, and pushes dismiss stale reviews. **Plus the nine required status
+be resolved, and pushes dismiss stale reviews. **Plus the eight required status
 checks below** — red CI cannot merge.
 
 **Not enforced today** (despite `.github/CODEOWNERS` existing):
@@ -217,12 +218,11 @@ last paragraph of this section.
 ### Required status checks
 
 Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
-**nine** job `name:` values (matrix legs get a `(leg)` suffix):
+**eight** job `name:` values (matrix legs get a `(leg)` suffix):
 
 | Check name | Workflow |
 |---|---|
 | `App` | `app-pr.yml` |
-| `React design system` | `design-system-react-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
 | `Mailer service` | `mailer-pr.yml` |
@@ -234,8 +234,11 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 This list was twelve before the Expo migration. Four checks went away with the
 Flutter stack — `Flutter app`, `macOS build` and `Windows build` collapsed into
 the single `App` job, and `Flutter design system` disappeared with its package —
-and `Dart API client` was renamed `API client`. **A rename is a ruleset change**,
-per the contract note below.
+and `Dart API client` was renamed `API client`, taking it to nine. The ninth,
+`React design system`, then left when the React design system dissolved into the
+marketing site ([ADR 0006](adr/0006-theming-over-design-system.md)) — its
+components are ordinary marketing code now, covered by `Marketing site`. **A
+rename is a ruleset change**, per the contract note below.
 
 `Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
 are deliberately **not** required — neither environment is ever applied by CI,
@@ -255,7 +258,7 @@ check nobody reports, and every PR then parks on *"Expected — waiting for stat
 to be reported"* forever. Rename a job only alongside the ruleset.
 
 **Two settings are deliberately off.** *Require branches to be up to date before
-merging* (`strict_required_status_checks_policy`) is `false`: with nine checks
+merging* (`strict_required_status_checks_policy`) is `false`: with eight checks
 it would force a rebase-and-rerun on every PR whenever anything lands first.
 `required_approving_review_count` is unset, and should stay that way — Insolvia
 is maintained by one person, and GitHub does not let you approve your own PR, so

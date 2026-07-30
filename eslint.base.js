@@ -2,23 +2,13 @@
 //
 // DELIBERATELY NOT NAMED `eslint.config.js`, and it must never be renamed to
 // that. ESLint discovers a flat config by searching from its cwd and walking
-// UP the directory tree, so a flat config at the repo root is found by ESLint
-// runs inside *every* subdirectory — including
-// packages/insolvia_design_system_react, which is not a workspace member, is
-// version-gated, and still uses eslintrc with ESLint 8.
-//
-// Concretely, while a root `eslint.config.js` existed:
-//
-//   $ cd packages/insolvia_design_system_react && npm run lint
-//   # → eslint -c .eslintrc.json "src/**/*.{ts,tsx}"
-//   TypeError [ERR_IMPORT_ATTRIBUTE_MISSING]: Module ".eslintrc.json"
-//     needs an import attribute of "type: json"
-//
-// Finding a root flat config flips ESLint 8.57 into flat-config mode, which
-// reinterprets `-c .eslintrc.json` as a *flat* config path and imports the JSON
-// as an ES module. That package's required check went red for a change that
-// never touched it, and fixing it in place would have meant editing a
-// version-gated package — its own PR plus a version bump.
+// UP the directory tree, so a flat config at the repo root is picked up by
+// ESLint runs inside *every* subdirectory — even those that are not workspace
+// members and answer to their own config (apps/insolvia_marketing has its own
+// flat config; other trees may not, or may use a different ESLint major).
+// A discoverable root config silently reaches into all of them and can turn a
+// subdirectory's own lint red for a change that never touched it — which is
+// exactly what happened once, to a package whose lint was still eslintrc-based.
 //
 // So: each workspace member owns a one-line `eslint.config.js` re-exporting
 // this file, and nothing discoverable sits at the repo root. Root `npm run

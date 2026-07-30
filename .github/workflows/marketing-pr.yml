@@ -11,9 +11,6 @@ on:
 
 permissions:
   contents: read
-  # The app installs @insolvia-ai/design-system from GitHub Packages; the
-  # job's GITHUB_TOKEN needs read access to pull it.
-  packages: read
 
 defaults:
   run:
@@ -37,11 +34,8 @@ jobs:
         uses: ./.github/actions/changed-paths
         with:
           paths: |
-            # The app consumes the *published* @insolvia-ai/design-system,
-            # pinned by its lockfile — design-system (or token) source changes
-            # cannot affect this gate. It re-runs when the app bumps the
-            # dependency, because that edits package.json/package-lock.json
-            # under apps/insolvia_marketing/**.
+            # The site owns its UI (app/ui/) and its generated theme.css, so
+            # everything that affects this gate lives under its own directory.
             apps/insolvia_marketing/**
             .github/workflows/marketing-pr.yml
             .github/actions/changed-paths/action.yml
@@ -56,15 +50,12 @@ jobs:
 
       # `ci`, never `install`: the lockfile is committed precisely so CI
       # resolves the same tree twice running, and `ci` fails loudly when
-      # package.json and the lockfile have drifted apart. The install is the
-      # only step that touches the network — the lockfile pins
-      # @insolvia-ai/design-system to GitHub Packages, which requires a token
-      # even for public packages (the app's .npmrc expands NODE_AUTH_TOKEN).
+      # package.json and the lockfile have drifted apart. No registry auth: the
+      # site depends only on public packages now (the GitHub-Packages design
+      # system it used to pull is gone — it owns its UI in app/ui/).
       - name: Install
         if: steps.filter.outputs.run == 'true'
         run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Typecheck
         if: steps.filter.outputs.run == 'true'
@@ -74,9 +65,16 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm run lint
 
+      # Behavioural tests for the interactive components (Button, Field, and the
+      # hand-rolled Accordion). The site had no test runner while its UI came
+      # from a separately tested package; now that it owns those components, it
+      # tests them.
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: npm run test
+
       # react-router build emits build/client (hashed static assets) +
-      # build/server (SSR bundle). The design system arrives prebuilt from the
-      # registry — there is no prebuild step anymore.
+      # build/server (SSR bundle).
       - name: Build
         if: steps.filter.outputs.run == 'true'
         run: npm run build

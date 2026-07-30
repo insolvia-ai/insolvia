@@ -69,8 +69,9 @@ node_modules/
 storybook-static/
 # Build output is anchored per package rather than a bare `dist/`, which would
 # silently swallow any future build directory anywhere in the repo. Each new
-# Node package adds its own line.
-/packages/insolvia_design_system_react/dist/
+# Node package that builds adds its own line here. (None currently do — the
+# token generator and API client are consumed as source; marketing has its own
+# .gitignore for its React Router build/.)
 
 # Tool-run artifacts that may sit on disk while a branch that does not track
 # their package is checked out (the per-app .gitignore only exists on branches

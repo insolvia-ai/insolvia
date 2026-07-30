@@ -36,7 +36,7 @@ naming convention.
 | D1 | Domain is **insolvia.ai**, not `.com` | Repo, CLAUDE.md, shared ACM wildcard, and the app's environment config are all already built on it. `.com` would mean re-authoring the shared env for no gain. |
 | D2 | Subdomain map — see the table below; every environment gets its own host, staging included — **marketing now included too** | Staging needs a full parallel stack, not just an app. Flat `staging-*` naming (not `*.staging`) is load-bearing — see D2 below, which also records why marketing's original "no staging" carve-out was reversed. |
 | D3 | Marketing site is **React Router v7** | Flutter web cannot be server-rendered or crawled. See D3 below. **Still stands under D9** — marketing does not move, and D9 records the measured reason. |
-| D4 | The **design system becomes dual-target**, over one shared token source | Originally a Flutter package + a React package (a consequence of D3). **Revised by D9:** the Flutter package is deleted; the two targets are now the React design system and the app's own React Native one, still over one `tokens.json`. See D4 below. |
+| D4 | The **design system becomes dual-target**, over one shared token source | Originally a Flutter package + a React package (a consequence of D3). **Revised by D9:** the Flutter package is deleted; the two targets became the React design system and the app's own React Native one, still over one `tokens.json`. **Revised again by [ADR 0006](adr/0006-theming-over-design-system.md):** there is no shared design-system *package* at all — the React one dissolved into the marketing site; only *tokens* are shared, and each app owns its components. See D4 below. |
 | D5 | **The API is required for MVP**, not deferred | The desktop app is a fat client on an attorney's machine. It cannot hold AWS credentials. Per `docs/regulatory-source-register.html`, we handle SSNs and full financials under GLBA Safeguards — the trust boundary has to live server-side. |
 | D6 | Backend stack is **Python + Flask + Mangum on Lambda** | Flask 3.1.2, Mangum 0.17, gunicorn — the established house pattern. |
 | D7 | Human email and product email are **separate milestones, and now separate providers** | Human mailboxes were urgent and have no app dependency; the mailer service depends on the API. Bundling them would block the urgent thing behind the slow thing. Originally SES→Gmail forwarding; superseded by **Google Workspace for inbound, SES for outbound `no-reply@`** — only one apex MX set exists, so this is exclusive, not additive. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md). |
@@ -137,27 +137,37 @@ listed in `allowedActionOrigins` in `react-router.config.ts`.
 
 ### D4 — the design system serves both targets
 
-> **Revised by D9, 2026-07-29.** The *shape* of this decision survives intact —
-> one neutral token source, generated into per-stack artifacts, never one stack
-> owning the other's brand. What changed is the second target. There is no
-> Flutter package any more (`packages/insolvia_design_system/` is deleted, and
-> with it the Dart generator and the git-tag publish flow). The two consumers
-> of `tokens.json` are now:
+> **Revised by D9, 2026-07-29, then again by [ADR
+> 0006](adr/0006-theming-over-design-system.md), 2026-07-30.** The *token* half
+> of this decision survives intact — one neutral source, generated into
+> per-stack artifacts, never one stack owning the other's brand. The
+> *design-system* half did not. Read this pair of notes top-down: D9 changed the
+> second target; 0006 removed the idea of a shared design-system package
+> altogether.
+>
+> **D9 (2026-07-29).** There is no Flutter package any more
+> (`packages/insolvia_design_system/` is deleted, and with it the Dart generator
+> and the git-tag publish flow). The generator became TypeScript and emitted
+> both a Tailwind `@theme` `theme.css` for `packages/insolvia_design_system_react/`
+> (then still published) and a typed `tokens.ts` for the app.
+>
+> **ADR 0006 (2026-07-30).** `packages/insolvia_design_system_react/` was a
+> single-consumer, same-repo, same-build package — a registry boundary guarding
+> a version skew that could not open. It dissolved into the marketing site. The
+> two consumers of `tokens.json` are now:
 >
 > | Target | Consumer | Generated artifact |
 > |---|---|---|
-> | Marketing site | `packages/insolvia_design_system_react/` (published) | Tailwind v4 `@theme` block, `theme.css` |
-> | App | `apps/insolvia_app` — its own components, not a package | typed `tokens.ts`, read through `src/theme.ts` |
+> | Marketing site | `apps/insolvia_marketing/app/ui/` — the site's own components | Tailwind v4 `@theme` block, `apps/insolvia_marketing/app/styles/theme.css` |
+> | App | `apps/insolvia_app/src/components/` — its own components | typed `tokens.ts`, read through `src/theme.ts` |
 >
-> Both ship from `packages/insolvia_tokens` as `@insolvia-ai/tokens`. The
-> generator is now TypeScript rather than Dart and emits both. The app's
-> design system is *not* published: it has exactly one consumer in this repo,
-> so the registry boundary that earns its keep for the React package would be
-> pure overhead here. **The dual-implementation cost below is unchanged** — two
-> renderings of one design, kept in sync by discipline — and so is the
-> containment: the React set stays capped at the marketing components, and the
-> app's set stays small because ADR 0004 chose to own it rather than import a
-> library.
+> Both artifacts still ship from `packages/insolvia_tokens` as
+> `@insolvia-ai/tokens`; nothing publishes to a registry any more. **The
+> dual-implementation cost below is unchanged** — two renderings of one design,
+> kept in sync by owning both — but the containment is now *theming*: each app
+> owns its components and shares only token values, and a shared, versioned
+> package returns only when a second consumer merits it. The six-component cap
+> below was a property of the deleted package; it is history, not a live rule.
 
 The proven model: Base UI
 headless primitives + Tailwind v4, tokens declared as a `@theme` block of CSS
@@ -540,12 +550,17 @@ above.
 
 ## Milestone 2 · Design system — React target
 
-> **Shipped, and partly rewritten by D9.** The milestone is done; the rows below
-> are the record of what was built, not a live checklist. Two of them no longer
-> describe the repo: the Dart half of 2.1/2.2 is gone (the generator is
-> TypeScript and emits marketing's `theme.css` plus the app's typed `tokens.ts`),
-> and `design-system-pr.yml` in 2.8 is deleted along with the Flutter package.
-> The React package, its scope cap and its parity discipline are untouched.
+> **Shipped, then rewritten twice — by D9 and by [ADR
+> 0006](adr/0006-theming-over-design-system.md).** The milestone is done; the
+> rows below are the record of what was built, not a live checklist, and several
+> no longer describe the repo. The Dart half of 2.1/2.2 is gone (the generator
+> is TypeScript and emits marketing's `theme.css` plus the app's typed
+> `tokens.ts`), and `design-system-pr.yml` in 2.8 was deleted with the Flutter
+> package. **ADR 0006 then dissolved the React package too:** there is no
+> `packages/insolvia_design_system_react/`, no Storybook, no
+> `design-system-react-pr.yml`, and no publish — its six components (2.5) are
+> ordinary themed code in `apps/insolvia_marketing/app/ui/`, and the scope cap
+> (2.9) is history rather than a live rule.
 
 **Outcome:** one token source of truth driving both a Flutter package and a
 React package, so the marketing site is on-brand by construction rather than by
@@ -579,7 +594,7 @@ with the apex redirecting to it.
 | # | Issue | Notes |
 |---|---|---|
 | 3.1 | Scaffold `apps/insolvia_marketing/` — React Router v7 framework mode | Own `package.json` and lockfile; deliberately **not** a root-workspace member (the reason is in the root `package.json` comments). |
-| 3.2 | Wire the design system + Tailwind entrypoint | `@import "tailwindcss"` → `@import "@insolvia-ai/design-system/theme.css"` → `@source` the dist. Missing the `@source` line is the classic "why are my styles gone" bug. |
+| 3.2 | Wire the theme + Tailwind entrypoint | *As built (D9): `@import "tailwindcss"` → `@import "@insolvia-ai/design-system/theme.css"` → `@source` the dist.* **Revised by [ADR 0006](adr/0006-theming-over-design-system.md):** no published package, so the site imports its own generated `@import "./styles/theme.css"` and there is no `dist` to `@source`. |
 | 3.3 | Content pass — positioning, JTBD, competitive framing | Source from `business-plan.html` §6 (jobs-to-be-done) and §7 (positioning). Do not invent new claims; the plan's figures are sourced and shouldn't drift. |
 | 3.4 | SEO baseline | Per-route `<title>`/meta/OG, `sitemap.xml`, `robots.txt`, JSON-LD `Organization`. Explicitly allow GPTBot/ClaudeBot/PerplexityBot — inbound increasingly arrives through them. |
 | 3.5 | Infra: `www` + apex hosting | CloudFront + S3 assets + SSR Lambda (`infra/modules/marketing_site`). Apex → `www` 301. |
@@ -801,11 +816,13 @@ Not questions — just the things most likely to bite, in order:
    the opposite one: while it's outstanding we can receive mail at
    `@insolvia.ai` but cannot reply from it, so the mailbox is half-built. Set a
    date rather than leaving it open-ended.
-8. **Design-system parity drift.** Contained by the six-component scope limit in
-   D4 — which only holds if issue 2.9 actually writes it into CLAUDE.md. D9 did
-   not change the shape of this risk: there are still two implementations of one
-   design, and the second one is now the app's own React Native components
-   rather than a Flutter package.
+8. **Design-system parity drift.** There are still two renderings of one design,
+   so the drift risk is real — but its container changed. It was the
+   six-component scope limit in D4; under [ADR
+   0006](adr/0006-theming-over-design-system.md) it is simply that each app owns
+   its own components over one shared token source, and the marketing set is no
+   longer a package with a cap to police. Neither side imports the other, so
+   drift is caught by eye and by each app's own tests, not by a shared boundary.
 
 ---
 

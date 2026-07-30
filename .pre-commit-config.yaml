@@ -40,13 +40,11 @@ repos:
       #
       # It MUST be invoked this way — never as a bare `eslint` with the repo
       # root as cwd. There is deliberately no `eslint.config.js` at the root:
-      # the rules live in `eslint.base.js` and each workspace member
-      # re-exports it. ESLint discovers a flat config by walking UP from its
-      # cwd, so a root one would also be found by
-      # packages/insolvia_design_system_react — version-gated, still on
-      # eslintrc with ESLint 8 — and flip it into flat-config mode, breaking a
-      # package this change never touched. Read eslint.base.js before changing
-      # this entry.
+      # the rules live in `eslint.base.js` and each workspace member re-exports
+      # it. ESLint discovers a flat config by walking UP from its cwd, so a root
+      # one would reach into subdirectories that answer to their own config and
+      # could turn their lint red for a change that never touched them. Read
+      # eslint.base.js before changing this entry.
       - id: npm-lint
         name: eslint (npm run lint --workspaces)
         entry: npm run lint

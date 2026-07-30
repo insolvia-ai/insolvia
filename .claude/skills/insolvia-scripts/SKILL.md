@@ -6,10 +6,10 @@ description: >-
   setting up or running any part of the monorepo locally, provisioning or
   wiping this machine's dev AWS resources, bootstrapping an environment, or
   deploying: "set up my dev environment", "get the API running", "reset/clear
-  my dev database", "run the marketing site / Storybook / the app", "deploy to
-  prod / staging", "seed the ECR image", "apply ci-trust", "auth to GitHub
-  Packages", or any time you're about to hand-roll a Terraform/docker/npm command
-  that a committed script already wraps. Reach for this BEFORE improvising shell
+  my dev database", "run the marketing site / the app", "deploy to
+  prod / staging", "seed the ECR image", "apply ci-trust", or any time you're
+  about to hand-roll a Terraform/docker/npm command that a committed script
+  already wraps. Reach for this BEFORE improvising shell
   — running the wrong thing by hand can create real AWS resources or skip a
   required step. Defers AWS-credential specifics to insolvia-aws-auth and
   ci-trust specifics to insolvia-deploy-role-permissions.
@@ -27,7 +27,6 @@ installing).
 | Want to… | Run |
 |---|---|
 | Install the shared toolchain (Terraform, tflint, AWS CLI, jq, Node ≥24, Watchman, Python 3.12) | `scripts/dev-setup.sh` |
-| Make a `read:packages` token available so `npm ci` can pull `@insolvia-ai/design-system` | `scripts/github-packages-auth.sh` |
 
 ## Run a package locally
 
@@ -36,8 +35,7 @@ Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):
 | Package | Setup → Run |
 |---|---|
 | App (Expo/RN web SPA) | `apps/insolvia_app/scripts/dev-setup.sh` → `dev-up.sh` (`expo start --web`, pinned to **:3000** — Cognito registers that exact origin) |
-| Marketing site | `apps/insolvia_marketing/scripts/dev-setup.sh` → `dev-up.sh` (RR7 SSR dev server) |
-| React design system | `packages/insolvia_design_system_react/scripts/dev-setup.sh` → `dev-up.sh` (Storybook, :6006) |
+| Marketing site (the only React web app; owns its UI in `app/ui/`, `npm test` for the interactive bits) | `apps/insolvia_marketing/scripts/dev-setup.sh` → `dev-up.sh` (RR7 SSR dev server) |
 | API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose) → `dev-test.sh` (ruff+pytest, matches CI) |
 | Mailer | `services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh` |
 

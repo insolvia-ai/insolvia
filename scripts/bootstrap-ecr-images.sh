@@ -167,14 +167,11 @@ build_mailer() {
 
 build_marketing() {
   # The Dockerfile COPYs a pre-built ./build, so the app is built first. `npm
-  # ci` needs a GitHub Packages token — the lockfile pins
-  # @insolvia-ai/design-system to npm.pkg.github.com, which requires auth even
-  # for a public package. A 403 here means the gh token lacks the scope:
-  #   gh auth refresh -s read:packages
+  # ci` needs no registry auth — the site depends only on public packages (it
+  # owns its UI under app/ui/).
   local dir="$REPO_ROOT/apps/insolvia_marketing"
   log "Building the marketing app (npm ci + build)"
-  NODE_AUTH_TOKEN="$(gh auth token)" npm ci --prefix "$dir" ||
-    die "npm ci failed. If it was a 403, run: gh auth refresh -s read:packages"
+  npm ci --prefix "$dir" || die "npm ci failed."
   npm run build --prefix "$dir"
   docker build --platform "$PLATFORM" -t "$1:$ENV" "$dir"
 }

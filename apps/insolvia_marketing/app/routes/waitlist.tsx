@@ -1,5 +1,5 @@
 import { Form, Link, data, useNavigation } from "react-router";
-import { Button, Field } from "@insolvia-ai/design-system";
+import { Button, Field, buttonClass } from "~/ui";
 
 import { seo } from "../lib/seo";
 import {
@@ -90,9 +90,9 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
             Thanks — we&rsquo;ll be in touch as the build progresses, and you&rsquo;ll get a
             spot when doors open. No spam, no sales sequence.
           </p>
-          <Button intent="secondary" size="md" nativeButton={false} render={<Link to="/" />}>
+          <Link to="/" className={buttonClass({ intent: "secondary", size: "md" })}>
             Back home
-          </Button>
+          </Link>
         </div>
       </section>
     );
@@ -109,7 +109,12 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
         <h1 className="font-heading text-3xl font-semibold text-ink sm:text-4xl">
           Join the early-access list
         </h1>
-        <p className="max-w-xl text-base text-muted">
+        {/* max-w-[36rem], not max-w-xl: the theme defines a `--spacing-xl`
+            token, and Tailwind v4 resolves `max-w-xl` against the spacing scale
+            (2rem) before the container scale — so `max-w-xl` collapses this to
+            32px. The same trap sits under max-w-{sm,md,lg}; use an explicit
+            length for readable-paragraph widths. */}
+        <p className="max-w-[36rem] text-base text-muted">
           Insolvia is being built in the open with consumer-bankruptcy firms on MyCase. Leave
           your details and we&rsquo;ll keep you posted — and save you a spot when doors open.
         </p>

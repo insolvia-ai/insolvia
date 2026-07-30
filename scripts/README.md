@@ -10,7 +10,6 @@ Two layers — a shared base plus thin per-package scripts:
 | Script | Scope | Does |
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check) |
-| `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
@@ -19,9 +18,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/AWS_SETUP.md` § "The ci-trust anchor". |
-| `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
+| `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → `npm ci` (public packages only); `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
-| `packages/insolvia_design_system_react/scripts/dev-setup.sh` | React design system | Shared base → `npm ci`; `dev-up.sh` runs Storybook |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
 `packages/insolvia_tokens` and `packages/insolvia_api_client` have no scripts,
@@ -84,35 +82,6 @@ On Linux, if `brew`/its tools aren't on your `PATH` in a fresh non-login shell:
 ```bash
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 ```
-
-## GitHub Packages auth (`@insolvia-ai/design-system`)
-
-`apps/insolvia_marketing` depends on `@insolvia-ai/design-system` published to
-`npm.pkg.github.com`. Its committed `.npmrc` reads the token from
-`${NODE_AUTH_TOKEN}`, and GitHub Packages requires a token with the
-**`read:packages`** scope (classic PAT) / **Packages: Read-only** permission
-(fine-grained PAT) for *every* read — even though the package is public. The
-default `GH_TOKEN` in CI/sandboxes does not have it, so `npm ci` fails with a
-401/403.
-
-`scripts/github-packages-auth.sh` resolves this idempotently:
-
-```bash
-# CI / sandbox: provide a read:packages PAT, then the script picks it up:
-export GITHUB_PACKAGES_TOKEN=<pat-with-read:packages>
-eval "$(./scripts/github-packages-auth.sh --export)"   # sets NODE_AUTH_TOKEN
-
-# Developer machine with gh: adds the scope to your existing login:
-./scripts/github-packages-auth.sh                       # runs `gh auth refresh -s read:packages`
-
-# Verify only (no changes):
-./scripts/github-packages-auth.sh --check
-```
-
-The script never writes a token into a committed file — the repo is public,
-and the `.npmrc` uses the `${NODE_AUTH_TOKEN}` env indirection. The only
-non-scriptable step is creating a token with the scope in the first place (a
-GitHub UI / `gh` action); the script does everything after that.
 
 ## Per-machine AWS development resources
 

@@ -10,7 +10,7 @@ behind its *Where things live* table.
 | [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) | Infra state model, modules, naming, deploy order. |
 | [`AWS_SETUP.md`](AWS_SETUP.md) | One-time AWS/GitHub bootstrap runbook, incl. the ci-trust anchor. |
 | [`APP_DEPLOY_VERIFICATION.md`](APP_DEPLOY_VERIFICATION.md) | Proving `staging-app` / `app.insolvia.ai` actually deploy and serve — dispatch order, per-host checks, failure modes. |
-| [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) | How the React design system publishes and how consumers install it — and why the app's own one does not. |
+| [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) | Why nothing publishes to a registry — every unit is a private app or symlinked workspace member — and what a return would involve. |
 | [`EMAIL_SETUP.md`](EMAIL_SETUP.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
 | [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) | The SES sandbox exit: checklist, request text, and the human AWS-console steps. |
 | [`MVP_PLAN.md`](MVP_PLAN.md) | Milestone/issue plan — the source for the GitHub MVP project board. |

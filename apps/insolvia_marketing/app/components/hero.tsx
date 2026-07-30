@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { buttonClass } from "~/ui";
 
 // Every claim here traces to docs/business-plan.html §1 (the wedge is
 // seamlessness: MyCase-native, no double entry; AI kills data entry while the
@@ -22,17 +22,12 @@ export function Hero() {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-md">
-        <Button
-          intent="primary"
-          size="lg"
-          nativeButton={false}
-          render={<Link to="/waitlist" />}
-        >
+        <Link to="/waitlist" className={buttonClass({ intent: "primary", size: "lg" })}>
           Join the early-access list
-        </Button>
-        <Button intent="ghost" size="lg" nativeButton={false} render={<a href="#product" />}>
+        </Link>
+        <a href="#product" className={buttonClass({ intent: "ghost", size: "lg" })}>
           See what we&rsquo;re building
-        </Button>
+        </a>
       </div>
       <p className="text-sm text-muted">
         Insolvia is in active development, built in the open with consumer-bankruptcy firms.

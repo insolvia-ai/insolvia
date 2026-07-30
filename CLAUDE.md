@@ -27,10 +27,16 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React SSR)
-packages/   insolvia_tokens · insolvia_design_system_react · insolvia_api_client
+packages/   insolvia_tokens · insolvia_api_client
 services/   api · mailer            (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
 ```
+
+**No design system — theming.** The app and marketing each own their components
+(`apps/insolvia_app/src/components/`, `apps/insolvia_marketing/app/ui/`) and
+share only *token values* via `@insolvia-ai/tokens`. A shared, versioned
+component package returns only when a second consumer merits it —
+[ADR 0006](docs/adr/0006-theming-over-design-system.md).
 
 Every app / package / service and `infra/` has its **own `CLAUDE.md`** (that
 area's rules — it auto-loads when you work there; read it before editing) and a
@@ -42,16 +48,13 @@ area's rules — it auto-loads when you work there; read it before editing) and 
 adding a member** — they own the reasoning; two consequences are worth knowing
 before you touch anything:
 
-- **The member list is explicit, never `packages/*`.** Globbing would make
-  `insolvia_design_system_react` a member and silently symlink the marketing site
-  to local source — but marketing consumes it *by published version*. A broken
-  package would then pass CI and only break after publishing.
+- **The member list is explicit, never `packages/*`.** The root comments own why;
+  keep it a hand-listed set of paths.
 - **Node resolution walks UP the tree.** A dependency that
-  `apps/insolvia_marketing` or `packages/insolvia_design_system_react` forgot to
-  declare can resolve from the root `node_modules` and pass locally. Both are
-  deliberately outside the workspace, each with its own lockfile and its own CI
-  job installing from it — that is what catches this, so don't consolidate them
-  in.
+  `apps/insolvia_marketing` forgot to declare can resolve from the root
+  `node_modules` and pass locally. Marketing is deliberately outside the
+  workspace, with its own lockfile and its own CI job installing from it — that
+  is what catches this, so don't consolidate it in.
 
 ## Catalog — need this? read that
 
@@ -63,8 +66,7 @@ before you touch anything:
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding a new package/app/service | `insolvia-new-package` skill |
-| **changing `packages/insolvia_design_system_react`** | `insolvia-design-system-pr` skill — **its own PR + a version bump** |
-| changing the app's own components / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published |
+| changing the app's or marketing's components / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [`apps/insolvia_marketing/CLAUDE.md`](apps/insolvia_marketing/CLAUDE.md) · [ADR 0006](docs/adr/0006-theming-over-design-system.md) — each app owns its components; nothing published |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/PACKAGE_PUBLISHING.md`](docs/PACKAGE_PUBLISHING.md) |
 | touching env model, hosting, or PR-gate design | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |

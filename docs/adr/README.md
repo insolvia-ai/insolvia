@@ -12,6 +12,7 @@ where a decision graduates when it outlives the plan.
 | [0003](0003-flutter-app-layout.md) | The Flutter app follows Flutter's own architecture guide — UI by feature, data by type, no `lib/src/`. | Superseded by [0005](0005-expo-app-layout.md) |
 | [0004](0004-react-native-replaces-flutter.md) | React Native on Expo replaces Flutter everywhere; free tier only, bare primitives, no component library, desktop deferred. Carries the six-round UI spike measurements. | Accepted |
 | [0005](0005-expo-app-layout.md) | The Expo app follows Expo's own project structure — `src/app/` is routes-only, screen bodies in `src/screens/`. | Accepted |
+| [0006](0006-theming-over-design-system.md) | Insolvia themes off shared tokens; components are ordinary app code. No shared design-system package until a second consumer merits one — the React design system dissolved into the marketing site. | Accepted |
 
 New ones are `NNNN-kebab-title.md`, numbered in sequence, opening with
 **Status / Date / Relates to** and then **Decision → Context → Consequences**.

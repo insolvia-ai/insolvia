@@ -1,8 +1,7 @@
 @import "tailwindcss";
-@import "@insolvia-ai/design-system/theme.css";
+@import "./theme.css";
 
-/* Required: let Tailwind v4 scan the design system's compiled output for the
-   utility classes its components use. Tailwind only generates classes it sees
-   in scanned sources, and node_modules is excluded from scanning by default —
-   omitting this line silently drops every component's styles. */
-@source "../../node_modules/@insolvia-ai/design-system/dist";
+/* No `@source` for the UI components any more: they live in app/ui/, which
+   Tailwind v4 already scans as project source. The previous line pointed at the
+   design system's compiled output under node_modules (excluded from scanning by
+   default); with the components in-tree there is nothing outside to scan. */

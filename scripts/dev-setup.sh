@@ -19,10 +19,10 @@
 #
 # Toolchain pins (each is read from the file that owns it — update there, not
 # here):
-#   - Node:     >= 24, matching `engines.node` in the root package.json,
-#     apps/insolvia_marketing and packages/insolvia_design_system_react. Expo
-#     and its toolchain are npm dependencies of apps/insolvia_app, installed by
-#     that app's own script — there is nothing global to pin here.
+#   - Node:     >= 24, matching `engines.node` in the root package.json and
+#     apps/insolvia_marketing. Expo and its toolchain are npm dependencies of
+#     apps/insolvia_app, installed by that app's own script — there is nothing
+#     global to pin here.
 #   - Watchman: Homebrew formula `watchman`. Metro (the Expo/React Native
 #     bundler) uses it to watch the source tree; without it Metro falls back to
 #     Node's own recursive fs watching, which is slower and hits the macOS

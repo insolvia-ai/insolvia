@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Form, Link, data, useNavigation } from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { Button, buttonClass } from "~/ui";
 
 import { SITE_NAME } from "../lib/seo";
 import { submitUnsubscribe, tokenFrom } from "../lib/unsubscribe.server";
@@ -78,9 +78,9 @@ function Panel({ children }: { children: ReactNode }) {
 
 function BackHome() {
   return (
-    <Button intent="secondary" size="md" nativeButton={false} render={<Link to="/" />}>
+    <Link to="/" className={buttonClass({ intent: "secondary", size: "md" })}>
       Back home
-    </Button>
+    </Link>
   );
 }
 

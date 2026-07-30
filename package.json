@@ -6,19 +6,18 @@
     "Root of the Insolvia npm workspace. NOT a shippable package — it declares",
     "the members and pins the shared toolchain.",
     "",
-    "The member list is EXPLICIT and must stay that way. `packages/*` would",
-    "swallow packages/insolvia_design_system_react, which publishes to GitHub",
-    "Packages and is consumed by the marketing site BY VERSION, never by path.",
-    "Making it a workspace member would silently symlink marketing to the local",
-    "source, so a broken package would pass CI and only fail after publishing.",
-    "apps/insolvia_marketing is out for the same reason: it resolves against the",
-    "published package.",
+    "The member list is EXPLICIT and must stay that way. `apps/insolvia_marketing`",
+    "is deliberately NOT a member: it has its own lockfile and is packaged into a",
+    "standalone Docker image with `npm ci --omit=dev`, so making it a workspace",
+    "member (symlinking its deps from this root) would let it build here against",
+    "packages the image will not contain. `packages/*` globs are likewise banned",
+    "— a new package is added by name once, on purpose.",
     "",
     "CAUTION — Node resolution walks UP the tree. A missing dependency in",
-    "apps/insolvia_marketing or packages/insolvia_design_system_react can resolve",
-    "from this root's node_modules and pass CI, then fail in a clean install.",
-    "Both keep their own package-lock.json and their own CI job installs from it,",
-    "which is what catches this — do not consolidate them here."
+    "apps/insolvia_marketing can resolve from this root's node_modules and pass a",
+    "local build, then fail in the clean `npm ci` its own CI job and Docker build",
+    "run. That separate lockfile + separate job is what catches it — do not",
+    "consolidate marketing into this workspace."
   ],
   "engines": {
     "node": ">=24"
@@ -42,9 +41,8 @@
       "Fans out per member rather than running ESLint once from the root, and",
       "there is deliberately NO `eslint.config.js` at the repo root — the rules",
       "live in `eslint.base.js`, which each member re-exports. ESLint discovers",
-      "a flat config by walking UP from its cwd, so a root one is also found by",
-      "packages/insolvia_design_system_react, breaking that version-gated",
-      "package's own ESLint 8 gate. Read eslint.base.js before changing this."
+      "a flat config by walking UP from its cwd, so a root one would reach into",
+      "subdirectories that answer to their own config. Read eslint.base.js first."
     ],
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --check apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client",

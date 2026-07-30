@@ -45,9 +45,6 @@ on:
 permissions:
   id-token: write
   contents: read
-  # The app installs @insolvia-ai/design-system from GitHub Packages; the
-  # job's GITHUB_TOKEN needs read access to pull it.
-  packages: read
 
 # Shared with every workflow that `terraform apply`s infra/envs/staging
 # (api-staging.yml, app-staging.yml, mailer-staging.yml) — concurrent applies
@@ -73,14 +70,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/insolvia_marketing/package-lock.json
 
-      # The only step that touches the network: the lockfile pins
-      # @insolvia-ai/design-system to GitHub Packages, which requires a token
-      # even for public packages (the app's .npmrc expands NODE_AUTH_TOKEN).
+      # Public packages only — no registry auth. The GitHub-Packages design
+      # system this site used to pull is gone; it owns its UI in app/ui/.
       - name: Install
         run: npm ci
         working-directory: apps/insolvia_marketing
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: npm run build

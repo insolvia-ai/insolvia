@@ -17,12 +17,11 @@ description: >-
    (runnable app), with its own `package.json` and a `tsconfig.json` that
    `extends` the root `tsconfig.base.json`.
 2. Add it to the root `package.json` `workspaces` list **by exact path** — the
-   list is deliberately explicit and must never become `packages/*`. A glob
-   would sweep in `packages/insolvia_design_system_react`, which publishes to
-   GitHub Packages and is consumed *by its published version*; making it a
-   member symlinks the marketing site to local source, so a broken package
-   passes CI and only breaks after publishing. `apps/insolvia_marketing` is out
-   for the same reason. See the comment block in the root `package.json`.
+   list is deliberately explicit and must never become `packages/*`.
+   `apps/insolvia_marketing` is deliberately *out* of the workspace (its own
+   lockfile, its own CI job that installs from it), so a glob would wrongly sweep
+   it in and let a missing dependency resolve from the root and pass locally. See
+   the comment block in the root `package.json` for the full reasoning.
 3. Give it a **`README.md`** (human: what it is + how to run it via its
    `scripts/`) and a **`CLAUDE.md`** (agent rules/conventions for that area).
    Every area has both — see any existing package for the shape. Add a one-line
@@ -43,8 +42,14 @@ layout (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
 (pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
 enforcing the dependency direction. Steps 3–5 above still apply.
 
-## The design systems are special
+## There is no design-system package — don't scaffold one
 
-If the new thing is a design-system surface, read
-`packages/insolvia_design_system_react/CLAUDE.md` first — the React package is
-capped at six components and the parity rules gate what may be added.
+Insolvia themes off shared tokens; it does not run a shared, versioned component
+package. If the new thing is UI, it is **ordinary app code owned by the app that
+renders it** — `apps/insolvia_marketing/app/ui/` for the site,
+`apps/insolvia_app/src/components/` for the app — styled off `@insolvia-ai/tokens`
+([ADR 0006](../../../docs/adr/0006-theming-over-design-system.md)). Only *token
+values* are shared, from `packages/insolvia_tokens`. Reintroduce a published
+design-system package **only when a second consumer with a real boundary merits
+it** — the test and the mechanics live in ADR 0006 and
+[`docs/PACKAGE_PUBLISHING.md`](../../../docs/PACKAGE_PUBLISHING.md).

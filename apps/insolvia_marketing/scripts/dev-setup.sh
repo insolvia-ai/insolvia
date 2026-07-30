@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 #
-# Marketing-site developer bootstrap: shared tools, GitHub Packages auth, npm ci.
+# Marketing-site developer bootstrap: shared tools, then npm ci.
 #
-# The site depends on @insolvia-ai/design-system from GitHub Packages, which
-# requires a read:packages token even though the package is public — so auth
-# runs before the install (see scripts/github-packages-auth.sh for the token
-# resolution order). Everything cross-cutting (Node >= 24, Terraform, ...)
-# comes from the shared base.
+# The site depends only on public packages (its UI is its own source under
+# app/ui/), so `npm ci` needs no registry auth. Everything cross-cutting
+# (Node >= 24, Terraform, ...) comes from the shared base.
 #
-# IDEMPOTENT: the shared base checks every tool before install, the auth step
-# changes nothing when a working token exists, and `npm ci` is safe to re-run.
+# IDEMPOTENT: the shared base checks every tool before install, and `npm ci` is
+# safe to re-run.
 #
 # Usage:
 #   ./apps/insolvia_marketing/scripts/dev-setup.sh            # full setup
@@ -36,12 +34,6 @@ else
 fi
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
-  # Verify-only: does any available token read the package?
-  if "$REPO_ROOT/scripts/github-packages-auth.sh" --check; then
-    ok "GitHub Packages auth OK."
-  else
-    warn "GitHub Packages auth is not set up — 'npm ci' would fail."
-  fi
   if [[ -d "$APP_DIR/node_modules" ]]; then
     ok "node_modules present (would still: npm ci)."
   else
@@ -49,9 +41,6 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   fi
   exit 0
 fi
-
-log "ensuring GitHub Packages read access (@insolvia-ai/design-system)..."
-eval "$("$REPO_ROOT/scripts/github-packages-auth.sh" --export)"
 
 log "installing npm dependencies..."
 (cd "$APP_DIR" && npm ci)

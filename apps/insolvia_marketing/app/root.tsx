@@ -11,7 +11,7 @@ import {
   useRouteLoaderData,
   type LinksFunction,
 } from "react-router";
-import { Button, Footer, NavBar } from "@insolvia-ai/design-system";
+import { Footer, NavBar, buttonClass } from "~/ui";
 
 import { ORGANIZATION_JSONLD, isProductionHost } from "./lib/seo";
 import stylesheet from "./styles/app.css?url";
@@ -73,9 +73,9 @@ export default function App() {
           <NavBar.Link href="/#faq">FAQ</NavBar.Link>
         </NavBar.Links>
         <NavBar.Actions>
-          <Button intent="primary" size="sm" nativeButton={false} render={<Link to="/waitlist" />}>
+          <Link to="/waitlist" className={buttonClass({ intent: "primary", size: "sm" })}>
             Early access
-          </Button>
+          </Link>
         </NavBar.Actions>
       </NavBar.Root>
       <main className="flex-1">

@@ -155,6 +155,16 @@ revisiting this should read the position as *"viable but worse"*, not
 future where the app and the site converge is not ruled out on technical
 grounds.
 
+> **Revised by [ADR 0006](0006-theming-over-design-system.md), 2026-07-30.**
+> The token split survives exactly as described — one `tokens.json`, one
+> generator, `theme.css` for marketing and `tokens.ts` for the app. What no
+> longer holds is *"two design systems"*: the marketing components were never a
+> shared, versioned package worth the name, so `insolvia_design_system_react`
+> dissolved into `apps/insolvia_marketing/app/ui/` as ordinary themed code.
+> Each app now owns its components and shares only tokens. Read this section for
+> why marketing's *stack* stays put; read 0006 for why its components stopped
+> being a package.
+
 ## Consequences
 
 - **One language.** App, marketing, tokens, generator and API client are all
@@ -163,6 +173,8 @@ grounds.
 - **The CI matrix collapses.** `Flutter app`, `macOS build`, `Windows build`
   and `Flutter design system` are replaced by a single `App` check, taking the
   required-check list from twelve to nine. See `docs/ARCHITECTURE.md`.
+  *(Later eight: [ADR 0006](0006-theming-over-design-system.md) removed
+  `React design system` too.)*
 - **The environment variable is renamed.** `--dart-define=INSOLVIA_ENV` becomes
   **`EXPO_PUBLIC_INSOLVIA_ENV`**. This is forced, not cosmetic: Expo inlines
   only variables prefixed `EXPO_PUBLIC_`, and anything else is simply absent

@@ -14,7 +14,7 @@ build/
 # Markdown is hand-authored and hand-wrapped throughout this repo, with compact
 # `|---|---|` tables and `*emphasis*`. Prettier rewrites both on sight, which
 # would turn every docs edit into a reformatting diff and bury the actual
-# change. The React design-system package does not run Prettier over markdown
+# change. The marketing site does not run Prettier over markdown
 # either.
 *.md
 

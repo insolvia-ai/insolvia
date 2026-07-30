@@ -1,8 +1,7 @@
 # React Router (framework mode) SSR handler on AWS Lambda.
-# @insolvia-ai/design-system is a devDependency bundled into the server build
-# at build time (see vite.config.ts ssr.noExternal), so `npm ci --omit=dev`
-# below only installs public runtime packages — no GitHub Packages registry
-# auth (and no .npmrc) is needed inside the image.
+# The site depends only on public packages (its UI is its own source under
+# app/ui/), so `npm ci --omit=dev` below needs no GitHub Packages registry auth
+# and no .npmrc inside the image.
 FROM public.ecr.aws/lambda/nodejs:22
 
 WORKDIR ${LAMBDA_TASK_ROOT}
