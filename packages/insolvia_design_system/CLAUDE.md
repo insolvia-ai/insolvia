@@ -37,5 +37,10 @@ Publishing flow: [`docs/PACKAGE_PUBLISHING.md`](../../docs/PACKAGE_PUBLISHING.md
 - **Every component keeps ≥1 behavioural test** (Vitest + Testing Library,
   against the `.web` leaf). Props modules with real logic (accordion state
   machine, field id composition) get direct unit tests. No snapshot tests.
-- Keep `react-native` and `@insolvia-ai/tokens` **optional** peerDependencies:
-  a plain web `npm install` of this package must stay RN-free.
+- **Never declare `react-native` or `@insolvia-ai/tokens` as peerDependencies**,
+  optional or not. GitHub Packages strips `peerDependenciesMeta` from registry
+  metadata, so npm treats an "optional" peer as required and a registry
+  consumer's install 404s on the unpublished tokens package (this broke
+  marketing's Docker build once). The native leaves resolve those imports from
+  the consumer's own dependencies; the package.json `//` comment records the
+  reasoning.

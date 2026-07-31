@@ -1,6 +1,6 @@
 {
   "name": "@insolvia-ai/design-system",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Insolvia's owned, platform-split design system: one props module per component, a React DOM + Tailwind web leaf, and a React Native leaf over @insolvia-ai/tokens.",
   "type": "module",
   "license": "UNLICENSED",
@@ -39,11 +39,15 @@
     "here is its own PR with a version bump.",
     "",
     "clsx + tailwind-merge are real dependencies (cn() runs at render/SSR time",
-    "on web). react-native and @insolvia-ai/tokens are OPTIONAL peers: a web",
-    "consumer never imports the .native leaves, so it must not be made to",
-    "install them — keeping them out of `dependencies` is what keeps a plain",
-    "`npm install` from a web app free of react-native and of the unpublished",
-    "tokens package."
+    "on web). react-native and @insolvia-ai/tokens are DELIBERATELY NOT",
+    "DECLARED as peers, optional or otherwise: GitHub Packages strips",
+    "peerDependenciesMeta from registry metadata (the tarball carries it; the",
+    "registry document does not), so npm treats an 'optional' peer as required",
+    "and a web consumer's install 404s on the unpublished tokens package. The",
+    "native leaves' imports resolve from the CONSUMER's own dependencies — the",
+    "app has react-native and tokens as workspace deps — so declaring them here",
+    "bought documentation and broke installs. This comment is that",
+    "documentation instead."
   ],
   "files": [
     "src",
@@ -71,18 +75,10 @@
   },
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0",
-    "react-dom": "^18.2.0 || ^19.0.0",
-    "react-native": ">=0.74.0",
-    "@insolvia-ai/tokens": "*"
+    "react-dom": "^18.2.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "react-dom": {
-      "optional": true
-    },
-    "react-native": {
-      "optional": true
-    },
-    "@insolvia-ai/tokens": {
       "optional": true
     }
   },
