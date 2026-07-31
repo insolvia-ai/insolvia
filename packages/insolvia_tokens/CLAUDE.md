@@ -6,14 +6,14 @@ The single source of truth for every design token. Human docs:
 - **`tokens.json` is the only place token values live** — pure data, no CSS, no
   TypeScript. Every color, spacing step, radius, shadow, and font.
 - **Never hand-edit a generated file.** `tool/generate-tokens.ts` renders two
-  outputs: `insolvia_design_system_react/src/styles/theme.css` and this
+  outputs: `insolvia_design_system/src/styles/theme.css` and this
   package's own `src/tokens.ts`, each with a `DO NOT EDIT` banner. To change a
   value: edit `tokens.json`, then `npm run tokens` from the repo root. CI gate:
   `npm run tokens:check` (fails the PR on drift, naming the file you edited).
   If `git diff` is non-empty after `npm run tokens`, the *generator* is wrong —
   never reconcile by editing a generated file.
 - **`theme.css` bytes are expensive; `tokens.ts` bytes are cheap.** `theme.css`
-  lands inside `insolvia_design_system_react`, a version-gated package, so
+  lands inside `insolvia_design_system`, a version-gated package, so
   changing one byte of it drags the change into `insolvia-design-system-pr`
   territory (own PR + version bump). Its banner names this README rather than a
   regeneration command precisely so it stays toolchain-agnostic — that is what
