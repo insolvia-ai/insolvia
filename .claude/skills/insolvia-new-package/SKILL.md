@@ -17,12 +17,12 @@ description: >-
    (runnable app), with its own `package.json` and a `tsconfig.json` that
    `extends` the root `tsconfig.base.json`.
 2. Add it to the root `package.json` `workspaces` list **by exact path** — the
-   list is deliberately explicit and must never become `packages/*`. A glob
-   would sweep in `packages/insolvia_design_system_react`, which publishes to
-   GitHub Packages and is consumed *by its published version*; making it a
-   member symlinks the marketing site to local source, so a broken package
-   passes CI and only breaks after publishing. `apps/insolvia_marketing` is out
-   for the same reason. See the comment block in the root `package.json`.
+   list is deliberately explicit and must never become `packages/*` or
+   `apps/*`. `apps/insolvia_marketing` must stay OUT: it consumes
+   `@insolvia-ai/design-system` *by published version*, and a member symlink
+   would build it against local source, so a broken package would pass CI and
+   only break after publishing. See the comment block in the root
+   `package.json` — it owns this reasoning.
 3. Give it a **`README.md`** (human: what it is + how to run it via its
    `scripts/`) and a **`CLAUDE.md`** (agent rules/conventions for that area).
    Every area has both — see any existing package for the shape. Add a one-line
@@ -43,8 +43,11 @@ layout (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
 (pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
 enforcing the dependency direction. Steps 3–5 above still apply.
 
-## The design systems are special
+## The design system is special
 
-If the new thing is a design-system surface, read
-`packages/insolvia_design_system_react/CLAUDE.md` first — the React package is
-capped at six components and the parity rules gate what may be added.
+If the new thing is a design-system surface, this skill is the wrong door:
+read the `insolvia-design-system-pr` skill and
+`packages/insolvia_design_system/CLAUDE.md` first. That package is version
+gated (own PR + bump), platform-split (`.props.ts`/`.web.tsx`/`.native.tsx`
+per component), and both a workspace member and published — the one package
+where "just add a directory" is never the whole job.

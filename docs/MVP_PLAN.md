@@ -36,7 +36,7 @@ naming convention.
 | D1 | Domain is **insolvia.ai**, not `.com` | Repo, CLAUDE.md, shared ACM wildcard, and the app's environment config are all already built on it. `.com` would mean re-authoring the shared env for no gain. |
 | D2 | Subdomain map — see the table below; every environment gets its own host, staging included — **marketing now included too** | Staging needs a full parallel stack, not just an app. Flat `staging-*` naming (not `*.staging`) is load-bearing — see D2 below, which also records why marketing's original "no staging" carve-out was reversed. |
 | D3 | Marketing site is **React Router v7** | Flutter web cannot be server-rendered or crawled. See D3 below. **Still stands under D9** — marketing does not move, and D9 records the measured reason. |
-| D4 | The **design system becomes dual-target**, over one shared token source | Originally a Flutter package + a React package (a consequence of D3). **Revised by D9:** the Flutter package is deleted; the two targets are now the React design system and the app's own React Native one, still over one `tokens.json`. See D4 below. |
+| D4 | The **design system becomes dual-target**, over one shared token source | Originally a Flutter package + a React package (a consequence of D3). **Revised by D9:** the Flutter package is deleted; the two targets are now the React design system and the app's own React Native one, still over one `tokens.json`. **Revised again:** both targets now live in one cross-platform package, `packages/insolvia_design_system`. See D4 below. |
 | D5 | **The API is required for MVP**, not deferred | The desktop app is a fat client on an attorney's machine. It cannot hold AWS credentials. Per `docs/regulatory-source-register.html`, we handle SSNs and full financials under GLBA Safeguards — the trust boundary has to live server-side. |
 | D6 | Backend stack is **Python + Flask + Mangum on Lambda** | Flask 3.1.2, Mangum 0.17, gunicorn — the established house pattern. |
 | D7 | Human email and product email are **separate milestones, and now separate providers** | Human mailboxes were urgent and have no app dependency; the mailer service depends on the API. Bundling them would block the urgent thing behind the slow thing. Originally SES→Gmail forwarding; superseded by **Google Workspace for inbound, SES for outbound `no-reply@`** — only one apex MX set exists, so this is exclusive, not additive. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md). |
@@ -136,6 +136,13 @@ than the public one, so POST actions get rejected until the public hosts are
 listed in `allowedActionOrigins` in `react-router.config.ts`.
 
 ### D4 — the design system serves both targets
+
+> **Revised again by the cross-platform cutover, 2026-07.** The two-consumer
+> table below is the state D9 left, kept for the record. Since then both
+> render targets moved into **one** package,
+> `packages/insolvia_design_system` (a shared props module plus a `.web` and
+> a `.native` leaf per component; `insolvia_design_system_react` is deleted).
+> The current story is [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
 
 > **Revised by D9, 2026-07-29.** The *shape* of this decision survives intact —
 > one neutral token source, generated into per-stack artifacts, never one stack

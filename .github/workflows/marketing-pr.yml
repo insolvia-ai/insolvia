@@ -75,11 +75,36 @@ jobs:
         run: npm run lint
 
       # react-router build emits build/client (hashed static assets) +
-      # build/server (SSR bundle). The design system arrives prebuilt from the
-      # registry — there is no prebuild step anymore.
+      # build/server (SSR bundle). The design system arrives as SOURCE from the
+      # registry (.web.tsx/.native.tsx leaf pairs) and is bundled here — there
+      # is no prebuild step anymore.
       - name: Build
         if: steps.filter.outputs.run == 'true'
         run: npm run build
+
+      # Platform-split invariant guard. @insolvia-ai/design-system publishes
+      # per-component .web.tsx / .native.tsx leaf pairs behind extensionless
+      # imports, and this app's vite.config.ts resolve.extensions list (with
+      # .web.tsx first) is the ONLY thing steering Vite to the web leaf. If
+      # that ever stops holding — a reordered extensions list, a component
+      # whose .web leaf goes missing, a stray explicit .native import —
+      # react-native code lands in the WEB bundle, and nothing else in this
+      # job would notice (the build still succeeds; Lighthouse just gets
+      # slower). The string "react-native" cannot appear in a correct client
+      # build (verified when this guard landed), so a hit is always a leak.
+      # Scoped to build/client only — the minified bundle browsers actually
+      # download, which is what the invariant is about. build/server inlines
+      # the design system's source mostly unminified, where a surviving
+      # comment that merely DISCUSSES the platform split (the package's
+      # comments do) could false-positive.
+      - name: Guard - no react-native in client bundle
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          if grep -rIl "react-native" build/client; then
+            echo "::error::react-native leaked into build/client — the design system's .native leaf (or something importing it) was bundled for web. Check vite.config.ts resolve.extensions and the import that pulled it in."
+            exit 1
+          fi
+          echo "OK: build/client contains no react-native"
 
       # Core Web Vitals budget (issue #46). Being dramatically lighter and
       # faster than a Flutter-web build is the entire reason this site is React

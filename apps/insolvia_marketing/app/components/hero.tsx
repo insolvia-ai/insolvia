@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { buttonClass } from "@insolvia-ai/design-system";
 
 // Every claim here traces to docs/business-plan.html §1 (the wedge is
 // seamlessness: MyCase-native, no double entry; AI kills data entry while the
@@ -9,7 +9,7 @@ export function Hero() {
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-xl px-lg pb-xxl pt-xxl">
       <div className="flex flex-col gap-md">
-        <p className="text-sm font-medium uppercase tracking-wide text-accent">
+        <p className="text-sm font-medium uppercase tracking-wide text-primary">
           For consumer-bankruptcy firms on MyCase
         </p>
         <h1 className="max-w-3xl font-heading text-4xl font-semibold leading-tight text-ink sm:text-5xl">
@@ -22,17 +22,14 @@ export function Hero() {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-md">
-        <Button
-          intent="primary"
-          size="lg"
-          nativeButton={false}
-          render={<Link to="/waitlist" />}
-        >
+        {/* Navigation styled as a button: the design system's web Button is a
+            real <button> only; links use buttonClass on a <Link>/<a>. */}
+        <Link to="/waitlist" className={buttonClass({ intent: "primary", size: "lg" })}>
           Join the early-access list
-        </Button>
-        <Button intent="ghost" size="lg" nativeButton={false} render={<a href="#product" />}>
+        </Link>
+        <a href="#product" className={buttonClass({ intent: "ghost", size: "lg" })}>
           See what we&rsquo;re building
-        </Button>
+        </a>
       </div>
       <p className="text-sm text-muted">
         Insolvia is in active development, built in the open with consumer-bankruptcy firms.

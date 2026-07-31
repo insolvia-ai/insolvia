@@ -12,6 +12,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // @insolvia-ai/design-system publishes platform-split SOURCE: each
+    // per-component index re-exports an extensionless './button' etc. and the
+    // consumer's bundler picks the leaf. Vite picks .web.tsx via
+    // resolve.extensions (vite.config.ts); this is tsc's spelling of the same
+    // rule — without it, typecheck fails inside the package with TS2307
+    // "Cannot find module './button'".
+    "moduleSuffixes": [".web", ""],
     "jsx": "react-jsx",
     "rootDirs": [".", "./.react-router/types"],
     "baseUrl": ".",

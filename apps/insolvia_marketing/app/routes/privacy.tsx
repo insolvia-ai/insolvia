@@ -61,7 +61,7 @@ function Section({
 
 function Mail({ address }: { address: string }) {
   return (
-    <a href={`mailto:${address}`} className="text-accent underline">
+    <a href={`mailto:${address}`} className="text-primary underline">
       {address}
     </a>
   );
@@ -71,7 +71,7 @@ export default function Privacy() {
   return (
     <article className="mx-auto w-full max-w-3xl px-lg py-xxl">
       <header className="flex flex-col gap-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-accent">Legal</p>
+        <p className="text-sm font-medium uppercase tracking-wide text-primary">Legal</p>
         <h1 className="font-heading text-3xl font-semibold text-ink sm:text-4xl">
           Privacy policy
         </h1>
@@ -244,7 +244,7 @@ export default function Privacy() {
         </Section>
 
         <p className="text-base text-muted">
-          <Link to="/" className="text-accent underline">
+          <Link to="/" className="text-primary underline">
             Back home
           </Link>
         </p>

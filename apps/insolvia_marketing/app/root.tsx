@@ -11,7 +11,7 @@ import {
   useRouteLoaderData,
   type LinksFunction,
 } from "react-router";
-import { Button, Footer, NavBar } from "@insolvia-ai/design-system";
+import { buttonClass, Footer, NavBar } from "@insolvia-ai/design-system";
 
 import { ORGANIZATION_JSONLD, isProductionHost } from "./lib/seo";
 import stylesheet from "./styles/app.css?url";
@@ -73,9 +73,9 @@ export default function App() {
           <NavBar.Link href="/#faq">FAQ</NavBar.Link>
         </NavBar.Links>
         <NavBar.Actions>
-          <Button intent="primary" size="sm" nativeButton={false} render={<Link to="/waitlist" />}>
+          <Link to="/waitlist" className={buttonClass({ intent: "primary", size: "sm" })}>
             Early access
-          </Button>
+          </Link>
         </NavBar.Actions>
       </NavBar.Root>
       <main className="flex-1">
@@ -119,7 +119,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-4 px-6">
       <h1 className="font-heading text-4xl text-primary">{title}</h1>
       <p className="text-muted">{String(detail)}</p>
-      <a href="/" className="text-accent underline">
+      <a href="/" className="text-primary underline">
         Back home
       </a>
     </main>

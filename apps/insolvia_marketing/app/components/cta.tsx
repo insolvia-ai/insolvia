@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { buttonClass } from "@insolvia-ai/design-system";
 
 export function Cta() {
   return (
@@ -14,14 +14,9 @@ export function Cta() {
             early-access list to follow the build and get a spot when doors open.
           </p>
         </div>
-        <Button
-          intent="secondary"
-          size="lg"
-          nativeButton={false}
-          render={<Link to="/waitlist" />}
-        >
+        <Link to="/waitlist" className={buttonClass({ intent: "secondary", size: "lg" })}>
           Join the early-access list
-        </Button>
+        </Link>
       </div>
     </section>
   );

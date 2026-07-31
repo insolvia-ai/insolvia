@@ -12,10 +12,10 @@ name: Design system · Publish · Shared
 # failure, and for the very first publish of a package version that landed on
 # main before this workflow existed.
 #
-# COEXISTENCE (until PR 2): design-system-react-publish.yml keeps publishing
-# the OLD packages/insolvia_design_system_react package — the SAME npm name,
-# @insolvia-ai/design-system, on the 0.1.x line, while this workflow publishes
-# the cross-platform rewrite on the 0.2.x line. That is safe precisely because
+# HISTORY: while the old web-only package (insolvia_design_system_react)
+# coexisted, its design-system-react-publish.yml published the SAME npm name,
+# @insolvia-ai/design-system, on the 0.1.x line, while this workflow published
+# the cross-platform rewrite on the 0.2.x line. That was safe precisely because
 # both jobs are idempotent BY VERSION: each asks the registry about its own
 # package.json's exact version and publishes only when it is absent, so the
 # two lines can never overwrite each other. PR 2 deletes the old package and

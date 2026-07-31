@@ -41,7 +41,7 @@ export function Pillars() {
     <section id="why" className="w-full scroll-mt-xl bg-surface-alt">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-xl px-lg py-xxl">
         <div className="flex flex-col gap-sm">
-          <p className="text-sm font-medium uppercase tracking-wide text-accent">Why Insolvia</p>
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">Why Insolvia</p>
           <h2 className="max-w-2xl font-heading text-3xl font-semibold text-ink">
             Four reasons a MyCase firm leaves a disconnected petition tool behind
           </h2>

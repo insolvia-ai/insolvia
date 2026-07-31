@@ -62,7 +62,7 @@ export function Faq() {
     <section id="faq" className="w-full scroll-mt-xl bg-surface-alt">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-xl px-lg py-xxl">
         <div className="flex flex-col gap-sm">
-          <p className="text-sm font-medium uppercase tracking-wide text-accent">FAQ</p>
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">FAQ</p>
           <h2 className="max-w-2xl font-heading text-3xl font-semibold text-ink">
             Fair questions, straight answers
           </h2>

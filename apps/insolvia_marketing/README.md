@@ -23,8 +23,9 @@ Other commands: `npm run build` (production), `npm run typecheck`, `npm run lint
 
 ## Local design-system debugging
 
-To hack on `packages/insolvia_design_system_react` and see it live here,
-temporarily point the dep at the local package
-(`npm install ../../packages/insolvia_design_system_react`, or a `file:` path) —
-build the local package's gitignored `dist/` first. **Never commit that state**;
-the rules for landing a design-system change are in [`CLAUDE.md`](CLAUDE.md).
+To hack on `packages/insolvia_design_system` and see it live here, temporarily
+point the dep at the local package
+(`npm install ../../packages/insolvia_design_system`, or a `file:` path) —
+there is nothing to build first, the package publishes its source. **Never
+commit that state**; the rules for landing a design-system change are in
+[`CLAUDE.md`](CLAUDE.md).

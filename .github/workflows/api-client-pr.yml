@@ -52,9 +52,9 @@ jobs:
             .github/actions/changed-paths/action.yml
 
       # Must match the root package.json's `engines.node` (">=24"). There is
-      # no `cache-dependency-path` here, unlike design-system-react-pr.yml:
-      # this package is an npm *workspace member*, so the lockfile it installs
-      # from is the repo-root one setup-node already looks for by default.
+      # no `cache-dependency-path` here, unlike marketing-pr.yml: this package
+      # is an npm *workspace member*, so the lockfile it installs from is the
+      # repo-root one setup-node already looks for by default.
       - uses: actions/setup-node@v4
         if: steps.filter.outputs.run == 'true'
         with:

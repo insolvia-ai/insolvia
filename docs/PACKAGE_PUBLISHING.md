@@ -1,48 +1,86 @@
 # Publishing and consuming the design system
 
-**One published package, one rule: consumers install a published, versioned
-artifact — never the source by path.**
+**One published package, one rule: a consumer outside the npm workspace
+installs a published, versioned artifact — never the source by path.**
 
 | Target | Package | Published as |
 |---|---|---|
-| React (marketing) | `packages/insolvia_design_system_react/` | npm package `@insolvia-ai/design-system` on GitHub Packages |
+| Web + React Native | `packages/insolvia_design_system/` | npm package `@insolvia-ai/design-system` (0.2.x) on GitHub Packages |
 
 It publishes automatically on merge to `main`, the publish is idempotent by
 version, and the PR gate machine-enforces the corollary: **any change to the
 package bumps its version in the same PR**, because an unbumped merge publishes
 nothing and the published surface silently rots underneath its consumers.
 
-## The app's design system is not published — and shouldn't be
+## The package publishes source — deliberately
 
-There are still *two* design systems (decision D4, as revised by D9): the React
-one above, and the app's own React Native components inside
-`apps/insolvia_app/src/components/`. They share token *values* only, generated
-from one `packages/insolvia_tokens/tokens.json` — the Tailwind `@theme` CSS and
-the typed `tokens.ts` come out of the same TypeScript generator and ship together
-as `@insolvia-ai/tokens`. Neither generated file is ever hand-edited; `npm run
-tokens:check` at the root fails CI on drift.
+`@insolvia-ai/design-system` is the owned, platform-split design system. Each
+component is three files: `<name>.props.ts` (the shared contract and variant
+data — imports nothing platform-specific, ESLint-enforced),
+`<name>.web.tsx` (plain React DOM + Tailwind) and `<name>.native.tsx` (React
+Native primitives over `@insolvia-ai/tokens`). The per-component index
+re-exports the extensionless `./<name>` and the **consumer's bundler picks the
+leaf** — Vite resolves `.web.tsx`, Metro resolves `.native.tsx`.
 
-Nothing below applies to the app's set, deliberately. A registry boundary earns
-its keep for the React package because it has an out-of-tree-shaped consumer and
-a `dist` contract worth enforcing; the app's components have exactly one
-consumer, in the same directory tree, so publishing them would buy a version
-number and cost a release step. If a second consumer ever appears, this is the
-document that describes what to do about it.
+That resolution step is why the package has **no build step and publishes
+`src/` as-is** (`files: ["src"]`, an `exports` map pointing at `.ts`). Leaf
+selection belongs to the consumer's bundler, so the `.web`/`.native` pairs
+must survive into the published artifact verbatim; a package-side build
+(tsup, `tsc --emit`) would collapse each pair into one compiled entry and
+break the pattern. Do not "fix" this by adding a build — the package's own
+`package.json` comment block carries the full reasoning. The flip side is that
+every consumer must transpile TypeScript out of `node_modules`: Metro does
+that natively, and marketing's Vite does it by bundling the package
+(`ssr.noExternal`, below).
 
-> **The Flutter half of this document is gone.** `packages/insolvia_design_system`
-> was published as an annotated git tag `insolvia_design_system-v<version>` and
-> consumed by the app as a version-pinned git dependency. The package, the
-> `design-system-pr.yml` gate and the `design-system-publish.yml` workflow are
-> all deleted under D9 — read the mechanism at `git show 17d2e37` if you need it.
-> **One artefact outlives it: the tag `insolvia_design_system-v0.1.2` is still on
-> the remote and is now orphaned.** Nothing resolves it, nothing publishes
-> another, and it is harmless; it is left in place because deleting a published
-> tag is the one irreversible step here, and a stale tag misleads nobody once
-> this paragraph exists.
+`src/styles/theme.css` is **generated** from
+`packages/insolvia_tokens/tokens.json` — never hand-edited; `npm run
+tokens:check` at the root fails CI on drift. It ships inside the published
+package under the same public specifier as the 0.1.x line:
+`@insolvia-ai/design-system/theme.css`.
 
-## The React design system: `@insolvia-ai/design-system` on GitHub Packages
+## Two consumers, two channels
 
-`packages/insolvia_design_system_react/` is published as the npm package
+| Consumer | Channel | Leaf resolution |
+|---|---|---|
+| `apps/insolvia_app` | npm **workspace member symlink** — source, live | Metro picks `.native.tsx` (react-native-web renders it on app-web) |
+| `apps/insolvia_marketing` | **published version** from GitHub Packages | Vite picks `.web.tsx` (its `resolve.extensions` lists the `.web` suffixes) |
+
+The app is inside the workspace and tracks source automatically — no install,
+no version pin, no consume PR. The marketing site is deliberately **outside**
+the workspace, keeps its own lockfile, and installs the published version, so
+it imports exactly what an outside consumer would — through the `exports` map,
+never reaching into unexported internals — and a broken package fails at
+install/build time in its CI instead of passing on a symlink and only breaking
+after publishing. This split is why the version-bump rule below protects
+exactly one consumer (marketing), and why it is still absolute.
+
+## The other packages are not published
+
+`@insolvia-ai/tokens` and `@insolvia-ai/api-client` are `"private": true`
+workspace members, consumed only by symlink inside this repo — no registry
+presence, no version-bump gate; nothing below applies to them. The tokens
+package remains the single token source: `tokens.json` plus the TypeScript
+generator, which emits the design system's `theme.css` (above) and the typed
+`tokens.ts` that the `.native` leaves read.
+
+> **History — two predecessors.** A Flutter package once occupied this same
+> directory name, published as annotated git tags
+> `insolvia_design_system-v<version>`, and went with the Flutter stack under
+> D9 (mechanism at `git show 17d2e37`). **Its tag
+> `insolvia_design_system-v0.1.2` is still on the remote and is orphaned:**
+> nothing resolves it, deleting a published tag is the one irreversible step
+> here, and it misleads nobody while this paragraph exists. Its web-only
+> successor, `packages/insolvia_design_system_react` (Base UI + Tailwind,
+> tsup-built, `@insolvia-ai/design-system` 0.1.x), was replaced by the
+> cross-platform package publishing the **same npm name** on the 0.2.x line —
+> safe because publishing is idempotent by version, so the two lines could
+> coexist without overwriting each other. That package and its
+> `design-system-react-*.yml` workflows are deleted.
+
+## The registry: `@insolvia-ai/design-system` on GitHub Packages
+
+`packages/insolvia_design_system/` is published as the npm package
 **`@insolvia-ai/design-system`** to **GitHub Packages**
 (`https://npm.pkg.github.com`), not to npmjs.org.
 
@@ -53,63 +91,51 @@ and rejects any other scope with a misleading E403
 that names neither the scope nor the rule. Keep it `@insolvia-ai` everywhere:
 `package.json`, `.npmrc`, imports, docs.
 
-Its consumer — the marketing site (`apps/insolvia_marketing/`, Milestone 3) —
-lives in **this same repository**. It is still published and installed rather
-than wired up as a path dependency, deliberately:
-
-- **The published `dist` is the contract.** Consuming `@insolvia-ai/design-system`
-  by name means the marketing site imports exactly what an outside consumer
-  would — the built ESM/CJS output and `dist/theme.css`, through the `exports`
-  map. A path dependency would let it reach into `src/`, and the first import of
-  an unexported internal would silently become load-bearing.
-- **It keeps the package out of the root npm workspace, where it must stay.**
-  The root `package.json`'s member list is explicit precisely so that
-  `packages/*` never globs this package in: a workspace member would be
-  symlinked, marketing would build against local source, and a broken package
-  would pass CI and only break after publishing. The registry boundary is what
-  makes that unambiguous.
-- **A second consumer costs nothing.** Nothing about the arrangement assumes one
-  site.
-
 | | |
 |---|---|
 | Package | `@insolvia-ai/design-system` |
 | Registry | `https://npm.pkg.github.com` |
-| Source | `packages/insolvia_design_system_react/` |
-| Publish workflow | `.github/workflows/design-system-react-publish.yml` |
-| PR gate | `.github/workflows/design-system-react-pr.yml` |
+| Source | `packages/insolvia_design_system/` |
+| Publish workflow | `.github/workflows/design-system-publish.yml` |
+| PR gate | `.github/workflows/design-system-pr.yml` — required check `Design system` |
 
 ### How publishing works
 
 The workflow runs on **push to `main`** touching the package (plus
 `workflow_dispatch`). It:
 
-1. installs with `npm ci` (Node 24, matching `engines.node`),
+1. installs the root workspace with `npm ci` (Node 24, matching
+   `engines.node`) — the package is a workspace member with no lockfile of its
+   own,
 2. asks the registry whether `@insolvia-ai/design-system@<version>` already exists,
 3. **skips cleanly** if it does — a version bump is the only thing that triggers
    an actual publish,
-4. otherwise builds (`tsup`) and runs `npm publish`.
+4. otherwise runs `npm publish`. There is no build step: the published
+   artifact is `src/` verbatim, per the section above.
 
 **To ship a new version: bump `version` in
-`packages/insolvia_design_system_react/package.json` and merge to `main`.**
+`packages/insolvia_design_system/package.json` and merge to `main`.**
 Nothing else. Every other push to `main` lands on the skip path and stays green.
 
 #### Every package change must bump the version
 
 The skip path in step 3 has a failure mode: a PR that changes the package but
 not the version merges green, the publish no-ops, and the registry silently
-goes stale — consumers keep installing an artifact that no longer matches
-`main`, with no error anywhere. So the rule is: **any change under
-`packages/insolvia_design_system_react/` bumps `version` in the same PR.** This
-is machine-enforced by the *Require a version bump when the package changed*
-step in `design-system-react-pr.yml`, which diffs the package directory against
-the PR base and fails on an unchanged version (and hard-errors if it cannot
-read the base `package.json`, rather than silently passing).
+goes stale — the marketing site keeps installing an artifact that no longer
+matches `main`, with no error anywhere. (The app is immune — it sees source
+through the workspace symlink — which is exactly why marketing is who this
+rule protects.) So the rule is: **any change under
+`packages/insolvia_design_system/` bumps `version` in the same PR.** This is
+machine-enforced by the *Require a version bump when the package changed* step
+in `design-system-pr.yml`, which diffs the package directory against the PR
+base and fails on an unchanged version (and hard-errors if it cannot read the
+base `package.json`, rather than silently passing — with one carve-out for the
+PR that first introduces the package).
 
-The flip side of publish-on-every-change: consumers — the marketing site —
-**install the published package, never the source by path.** A committed
-`file:` dependency bypasses the published `dist` contract above; a local
-`file:` override while debugging is fine, but it never gets committed.
+The flip side of publish-on-every-change: the marketing site **installs the
+published package, never the source by path.** A committed `file:` dependency
+bypasses the published contract above; a local `file:` override while
+debugging is fine, but it never gets committed.
 
 Auth is `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` with
 `permissions: { contents: read, packages: write }`. There is no PAT, no
@@ -183,41 +209,38 @@ exists today.
 /* Tailwind v4 CSS entrypoint */
 @import 'tailwindcss';
 @import '@insolvia-ai/design-system/theme.css';
-@source '../node_modules/@insolvia-ai/design-system/dist';
+@source '../node_modules/@insolvia-ai/design-system/src';
 ```
 
 The `@source` line is not optional. Tailwind v4 scans your own source for class
-names, but the design system's classes live in its `dist` inside `node_modules`,
-which Tailwind does not scan by default. Omit it and the components render
-completely unstyled — the utilities they reference are simply never generated.
-This is the classic "why are my styles gone" bug (MVP_PLAN 3.2).
+names, but the design system's classes live in its published `src` inside
+`node_modules`, which Tailwind does not scan by default. Omit it and the
+components render completely unstyled — the utilities they reference are simply
+never generated. This is the classic "why are my styles gone" bug (MVP_PLAN
+3.2).
 
 ```tsx
 import { Button, Card, Field } from '@insolvia-ai/design-system';
 ```
 
-`react` and `react-dom` are peer dependencies (18 or 19).
+`react` and `react-dom` are peer dependencies (18 or 19). `react-native` and
+`@insolvia-ai/tokens` are **optional** peers: a web consumer never resolves the
+`.native` leaves, so a plain `npm install` must not — and does not — drag in
+React Native or the unpublished tokens package.
 
-### The `ssr.noExternal` trick — why the runtime image needs no token
+A web consumer also owns two pieces of resolution wiring, both in marketing's
+`vite.config.ts`: the `.web` suffixes in `resolve.extensions` (so the
+extensionless leaf imports pick `<name>.web.tsx`) and the bundling described
+next.
 
-**Apply this in `apps/insolvia_marketing/` when Milestone 3 scaffolds it.** It is
-a well-established technique for the same problem — a private-registry
-design-system dependency in an SSR build.
+### The `ssr.noExternal` trick — and why it is now mandatory
 
 The marketing site is server-rendered and deployed as a **Lambda container
-image**. The naive arrangement is: install `@insolvia-ai/design-system` at build
-time, and let the SSR server `require`/`import` it at runtime from
-`node_modules` inside the image. That drags the private-registry dependency
-into the **runtime** — the image must ship `node_modules`, and any layer that
-rebuilds or reinstalls at runtime needs a registry token in the deployed
-artifact. A registry credential inside a running Lambda image is exactly the
-kind of secret you do not want to have.
-
-Vite's `ssr.noExternal` removes the problem. By default Vite treats
-dependencies as **external** for the SSR build — it leaves the bare
-`@insolvia-ai/design-system` import in the server bundle and resolves it from
-`node_modules` at runtime. Marking it `noExternal` tells Vite to **bundle the
-package's source into the server build instead**:
+image**. By default Vite treats dependencies as **external** for the SSR
+build — it leaves the bare `@insolvia-ai/design-system` import in the server
+bundle and resolves it from `node_modules` at runtime. Marking the package
+`noExternal` tells Vite to **bundle its source into the server build
+instead**:
 
 ```ts
 // vite.config.ts (apps/insolvia_marketing/)
@@ -233,27 +256,36 @@ export default defineConfig({
 });
 ```
 
-The consequences, which are the whole point:
+Two reasons, one older than the other:
 
-- The private-registry dependency is a **build-time-only** concern. The token
-  lives in the build environment (GitHub Actions), never in the deployed image.
-- The runtime Lambda image can ship **without** `@insolvia-ai/design-system` in
-  `node_modules` at all.
-- **CSS needs no equivalent trick.** `theme.css` *is* shipped in the published
-  package — `tsup` copies it to `dist/theme.css` and the `exports` map publishes
-  it as `@insolvia-ai/design-system/theme.css`. `ssr.noExternal` is irrelevant to
-  it, because it is never imported by JavaScript at runtime: the site's Tailwind
-  entrypoint `@import`s it, Tailwind resolves that from `node_modules` while
-  compiling, and the output is a plain CSS file in the client bundle. So the CSS
-  is build-time-only for the same reason as the JS, but by a different
-  mechanism, and nothing needs configuring.
+- **It is now load-bearing, not just hygiene.** The package publishes
+  TypeScript source, and Node cannot import `.ts`/`.tsx` from `node_modules`
+  at runtime — so the SSR build *must* transpile and bundle the package.
+  Removing `noExternal` does not merely re-introduce a token problem; it
+  breaks the server outright.
+- **The token stays out of the runtime image**, the original reason. With the
+  package bundled at build time, the private-registry dependency is a
+  build-time-only concern: the token lives in the build environment (GitHub
+  Actions), never in the deployed image, and the runtime Lambda ships without
+  `@insolvia-ai/design-system` in `node_modules` at all. A registry credential
+  inside a running Lambda image is exactly the kind of secret you do not want
+  to have.
+
+**CSS needs no equivalent trick.** `theme.css` *is* shipped in the published
+package (`src/styles/theme.css`, exported as
+`@insolvia-ai/design-system/theme.css`), but it is never imported by
+JavaScript at runtime: the site's Tailwind entrypoint `@import`s it, Tailwind
+resolves that from `node_modules` while compiling, and the output is a plain
+CSS file in the client bundle. Build-time-only for the same reason as the JS,
+by a different mechanism, and nothing needs configuring.
 
 Two things to watch:
 
-- `noExternal` bundles the package's **published `dist`**, and `tsup` marks
-  `react`, `react-dom` and `@base-ui/react` as external. Those stay external in
-  the SSR bundle too — they are ordinary public-registry deps of the site, which
-  is fine.
+- `react` and `react-dom` stay external in the SSR bundle — they are ordinary
+  public-registry deps of the site, which is fine. The `.native` leaves and
+  `react-native` never enter the web build at all: the resolver never picks a
+  `.native.tsx`, and nothing else may import React Native (the props-module
+  lint rule above is what guarantees that).
 - If the site ever adds a second `@insolvia-ai/*` package, add it to the same
   `noExternal` array. A regex (`/^@insolvia-ai\//`) is accepted and saves the
   bookkeeping.
@@ -264,25 +296,29 @@ The published version is the contract, but npm has a sanctioned, *uncommitted*
 loop for this. From `apps/insolvia_marketing/`:
 
 ```sh
-npm install ../../packages/insolvia_design_system_react   # writes a file: dep
+npm install ../../packages/insolvia_design_system   # writes a file: dep
 ```
 
-Build the package first (`npm run build` in it) — the `exports` map points at
-`dist`, so an unbuilt link resolves to nothing. **Revert it before committing:**
-a committed `file:` dependency is exactly the path dependency this document
-exists to forbid, and it takes the marketing site off the published `dist`
-contract without any error appearing anywhere. Restore the version range and
-re-run `npm ci` so the lockfile matches.
+No build step is needed — the `exports` map points at `src`, so the link is
+live immediately. **Revert it before committing:** a committed `file:`
+dependency is exactly the path dependency this document exists to forbid, and
+it takes the marketing site off the published contract without any error
+appearing anywhere. Restore the version range and re-run `npm ci` so the
+lockfile matches.
+
+The app needs no loop at all: it is a workspace member, so edits to the
+package are live in the app's dev server as you make them.
 
 ## Related
 
-- `packages/insolvia_design_system_react/README.md` — component scope, theming,
-  and the local dev loop.
-- `packages/insolvia_design_system_react/.npmrc` — the scope→registry mapping
-  used by this repo's own CI.
-- The `insolvia-design-system-pr` skill — the same rules in agent-instruction
-  form: its own PR, its own version bump.
+- `packages/insolvia_design_system/README.md` — component scope, the
+  three-file pattern, theming, and the local dev loop.
+- `packages/insolvia_design_system/CLAUDE.md` — the pattern's rules in
+  agent-instruction form (props-module imports, no build step, generated
+  `theme.css`, both typecheck halves).
+- The `insolvia-design-system-pr` skill — the process rules: its own PR, its
+  own version bump, marketing-only consume PRs.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the monorepo shape and where these
   packages sit.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one token source, two targets) as
-  revised by D9.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one token source, two targets)
+  as revised by D9.

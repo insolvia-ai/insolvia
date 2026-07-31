@@ -46,7 +46,7 @@ export function Jobs() {
     <section id="product" className="mx-auto w-full max-w-5xl scroll-mt-xl px-lg py-xxl">
       <div className="flex flex-col gap-xl">
         <div className="flex flex-col gap-sm">
-          <p className="text-sm font-medium uppercase tracking-wide text-accent">The product</p>
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">The product</p>
           <h2 className="max-w-2xl font-heading text-3xl font-semibold text-ink">
             Built along the path a consumer case actually travels
           </h2>
@@ -59,7 +59,7 @@ export function Jobs() {
           {jobs.map((job) => (
             <li key={job.step} className="flex flex-col gap-sm border-t border-line pt-md">
               <div className="flex items-baseline justify-between gap-md">
-                <span className="font-heading text-sm font-semibold text-accent">{job.step}</span>
+                <span className="font-heading text-sm font-semibold text-primary">{job.step}</span>
                 <span className="rounded-pill border border-line px-sm py-xs text-xs font-medium uppercase tracking-wide text-muted">
                   {job.status}
                 </span>

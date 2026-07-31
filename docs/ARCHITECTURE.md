@@ -16,7 +16,7 @@ insolvia/
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
 │   ├── insolvia_tokens/               @insolvia-ai/tokens — tokens.json + generator
-│   ├── insolvia_design_system_react/  published; marketing's components
+│   ├── insolvia_design_system/        @insolvia-ai/design-system — platform-split, published
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── services/                          api · mailer (Python on Lambda)
 ├── infra/                             Terraform — ci-trust / shared / staging / prod
@@ -30,20 +30,23 @@ Everything is TypeScript. The app follows the layout Expo itself publishes —
 [ADR 0004](adr/0004-react-native-replaces-flutter.md) is the stack decision
 behind all of it, including the measurements that ruled out a component library.
 
-- **Workspace resolution:** npm workspaces, root `package.json`. The member list
-  is **explicit and never `packages/*`** — globbing would swallow
-  `insolvia_design_system_react`, which marketing consumes *by published
-  version*. The reasoning is in the root `package.json`'s own comments; read
-  them before adding a member.
-- **Not members, deliberately:** `apps/insolvia_marketing` and
-  `packages/insolvia_design_system_react`. Each keeps its own lockfile and its
-  own CI job that installs from it, because Node resolution walks *up* the tree
-  and would otherwise let a missing dependency resolve from the root.
-- **Two design systems, one token source.** The React package serves marketing;
-  the app has its own React Native components. They share token *values* only,
-  generated from `packages/insolvia_tokens/tokens.json` into a Tailwind `@theme`
-  block for marketing and a typed `tokens.ts` for the app — see
-  [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
+- **Workspace resolution:** npm workspaces, root `package.json`. The member
+  list is **explicit** — `packages/insolvia_design_system` is deliberately
+  *both* a member (the app consumes its source through the symlink) and
+  published (marketing consumes it by version). The reasoning is in the root
+  `package.json`'s own comments; read them before adding a member.
+- **Not a member, deliberately:** `apps/insolvia_marketing`. It keeps its own
+  lockfile and its own CI job that installs from it, because Node resolution
+  walks *up* the tree and would otherwise let a missing dependency resolve
+  from the root — and a member symlink would build it against local source
+  instead of the published package.
+- **One design system, one token source.** `packages/insolvia_design_system`
+  (`@insolvia-ai/design-system`) is platform-split — per component, a shared
+  props module plus a `.web` and a `.native` leaf, with the consumer's bundler
+  picking the leaf. Token *values* still generate from
+  `packages/insolvia_tokens/tokens.json`: the package's `theme.css` for web, a
+  typed `tokens.ts` for native — see
+  [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) and the package's own docs.
 
 ## Toolchain
 
@@ -222,7 +225,7 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 | Check name | Workflow |
 |---|---|
 | `App` | `app-pr.yml` |
-| `React design system` | `design-system-react-pr.yml` |
+| `Design system` | `design-system-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
 | `Mailer service` | `mailer-pr.yml` |
@@ -234,8 +237,10 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 This list was twelve before the Expo migration. Four checks went away with the
 Flutter stack — `Flutter app`, `macOS build` and `Windows build` collapsed into
 the single `App` job, and `Flutter design system` disappeared with its package —
-and `Dart API client` was renamed `API client`. **A rename is a ruleset change**,
-per the contract note below.
+and `Dart API client` was renamed `API client`. The design-system cutover then
+swapped `React design system` for `Design system` when the cross-platform
+package replaced the web-only one. **A rename is a ruleset change**, per the
+contract note below.
 
 `Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
 are deliberately **not** required — neither environment is ever applied by CI,
