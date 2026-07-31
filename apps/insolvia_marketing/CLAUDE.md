@@ -32,11 +32,13 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   `react-native` appears in `build/client` — the standing insurance that the
   platform split's core invariant holds (the web bundle never contains a native
   leaf). If it fires, fix the resolution leak; never delete the guard.
-- **`.npmrc` sets `legacy-peer-deps`** because GitHub Packages strips
-  `peerDependenciesMeta` from its registry metadata, which would otherwise make
-  npm install the package's OPTIONAL peers (react-native, the unpublished
-  `@insolvia-ai/tokens`). Every peer this app really needs is a direct
-  dependency.
+- **No `.npmrc` tricks, and keep it that way.** An earlier draft used
+  `legacy-peer-deps` to survive GitHub Packages stripping
+  `peerDependenciesMeta`; the real fix landed in the design system (0.2.1
+  declares no react-native/tokens peers at all — see that package's
+  `CLAUDE.md`), so a clean `npm ci` works everywhere, the Docker packaging
+  check included. If an install here ever demands react-native, the package
+  regressed — fix it there, not with npm flags here.
 - **Staging must stay non-indexable.** `app/lib/seo.ts` allowlists exactly
   `www.insolvia.ai`; never broaden it. A crawlable staging copy competes with
   prod for its own keywords.
