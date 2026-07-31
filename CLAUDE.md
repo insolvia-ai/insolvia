@@ -64,8 +64,8 @@ before you touch anything:
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding a new package/app/service | `insolvia-new-package` skill |
-| **changing `packages/insolvia_design_system`** | `insolvia-design-system-pr` skill — **its own PR + a version bump** |
-| changing the app's own components / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published |
+| **changing `packages/insolvia_design_system`** — the shared components (Button, Field) both surfaces render | `insolvia-design-system-pr` skill — **its own PR + a version bump** · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
+| changing the app-local components (`apps/insolvia_app/src/components/`) / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field live in the package, row above |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/PACKAGE_PUBLISHING.md`](docs/PACKAGE_PUBLISHING.md) |
 | touching env model, hosting, or PR-gate design | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |

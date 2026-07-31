@@ -1,8 +1,8 @@
+import { Button } from '@insolvia-ai/design-system';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
-import { Button } from '@/components/button';
 import { Heading } from '@/components/heading';
 import { fontSizes, useTheme } from '@/theme';
 
@@ -27,15 +27,22 @@ export function AuthCallback() {
         This build has no sign-in flow — accounts land in a later release. Nothing was signed in,
         and nothing was stored.
       </Text>
+      {/*
+        size="lg" for the 44dp target-size floor; the arrow glyph is aria-hidden
+        and aria-label pins the name to the visible label — same reasoning as
+        the home screen's CTA.
+      */}
       <Button
-        label="Continue to Insolvia"
-        icon="→"
+        size="lg"
+        aria-label="Continue to Insolvia"
         onPress={() => {
           // `replace`, not `push`: the callback URL carries no state worth a
           // back-button entry, and returning to it would re-land here.
           router.replace('/');
         }}
-      />
+      >
+        Continue to Insolvia <Text aria-hidden>→</Text>
+      </Button>
     </AppShell>
   );
 }

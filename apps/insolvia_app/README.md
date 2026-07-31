@@ -65,12 +65,18 @@ Actions and served from the existing S3 + CloudFront distribution.
 ## Layout
 
 `src/app/` is Expo Router — every file there is a URL. Screen bodies live in
-`src/screens/`, the hand-built component set in `src/components/`, tokens-derived
+`src/screens/`, app-specific components in `src/components/`, tokens-derived
 styling helpers in `src/theme.ts`. `public/` is copied verbatim to the export root
-(favicon, icons, `manifest.json`).
+(favicon, icons, `manifest.json`). Button and Field come from the shared
+[`@insolvia-ai/design-system`](../../packages/insolvia_design_system) — the app
+renders the package's React Native leaves on every platform, web included, via a
+resolver override explained in [`metro.config.js`](metro.config.js).
 
-There is deliberately no component library and no styling library; the reasoning,
-with numbers, is in
-[ADR 0004](../../docs/adr/0004-react-native-replaces-flutter.md), and the folder
-conventions are in [ADR 0005](../../docs/adr/0005-expo-app-layout.md). Working on
-the code? The agent rules for this app are in [`CLAUDE.md`](CLAUDE.md).
+There is deliberately no third-party component library and no styling library;
+the reasoning, with numbers, is in
+[ADR 0004](../../docs/adr/0004-react-native-replaces-flutter.md), the owned
+design-system split is in
+[ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md), and the
+folder conventions are in [ADR 0005](../../docs/adr/0005-expo-app-layout.md).
+Working on the code? The agent rules for this app are in
+[`CLAUDE.md`](CLAUDE.md).

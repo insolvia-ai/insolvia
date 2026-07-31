@@ -12,7 +12,14 @@
     "    Metro's Babel transform strips types rather than compiling them, exactly",
     "    like Node >=24 does for the token generator, so those constructs would",
     "    typecheck and then fail at runtime. This is why src/config/environment.ts",
-    "    is `as const` + a union instead of the Dart enum it replaces."
+    "    is `as const` + a union instead of the Dart enum it replaces.",
+    "",
+    "`moduleSuffixes: ['.native', '']` — @insolvia-ai/design-system's components",
+    "are leaf pairs re-exported as extensionless './<name>' imports. Metro",
+    "resolves those to the .native leaves on EVERY platform, web included (the",
+    "resolveRequest override in metro.config.js); this option makes tsc see the",
+    "same files, mirroring the package's own typecheck:native program. The empty",
+    "suffix stays last so ordinary imports still resolve."
   ],
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
@@ -21,6 +28,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "moduleSuffixes": [".native", ""],
     "paths": {
       "@/*": ["./src/*"]
     }

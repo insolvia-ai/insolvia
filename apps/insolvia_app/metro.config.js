@@ -33,4 +33,36 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.disableHierarchicalLookup = true;
 
+// ── @insolvia-ai/design-system: this app renders the .native leaves on EVERY
+// platform, web included ─────────────────────────────────────────────────────
+//
+// The design system is platform-split: each component is a shared props module
+// plus a `.web.tsx` leaf (plain DOM + Tailwind classes, for the marketing
+// site's Vite) and a `.native.tsx` leaf (RN primitives + StyleSheet). This app
+// is an RN app on every platform — react-native-web renders the native leaves
+// in the browser, exactly like its own components — and it has NO Tailwind
+// pipeline (ADR 0004, decision 3a), so a `.web` leaf here would render
+// unstyled: its className strings would reference CSS that is never built.
+//
+// Metro's own platform logic resolves `.web.tsx` first when bundling for web,
+// which is right for a DOM app and wrong for this one. The override below is
+// scoped to imports ORIGINATING inside the design-system package and tries the
+// `.native` leaf first; anything that isn't a leaf pair (props modules, the
+// barrel) falls through to normal resolution. Package `exports` conditions
+// cannot express this — conditions select entry points, not the platform
+// suffix of the package's internal relative imports.
+const packageDir = `${path.sep}insolvia_design_system${path.sep}`;
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const resolve = defaultResolveRequest ?? context.resolveRequest;
+  if (context.originModulePath.includes(packageDir) && moduleName.startsWith('.')) {
+    try {
+      return resolve(context, `${moduleName}.native`, platform);
+    } catch {
+      // Not a leaf pair (e.g. './button.props' or the barrel) — resolve as-is.
+    }
+  }
+  return resolve(context, moduleName, platform);
+};
+
 module.exports = config;
