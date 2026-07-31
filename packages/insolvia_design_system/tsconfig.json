@@ -1,0 +1,30 @@
+{
+  "//": [
+    "The WEB half of the platform-split typecheck (`npm run typecheck`);",
+    "tsconfig.native.json is the other half. The pattern's whole point is that",
+    "each per-component index re-exports the extensionless './<name>' and the",
+    "consumer's bundler picks the leaf — so tsc must be taught the same trick:",
+    "",
+    "  - `moduleSuffixes: ['.web', '']` makes './button' resolve to",
+    "    button.web.tsx here, exactly as Vite does. The native config flips it",
+    "    to ['.native', ''] for Metro's view of the same imports.",
+    "  - `moduleResolution: Bundler` overrides the base's NodeNext, which",
+    "    rejects extensionless relative imports outright and would never reach",
+    "    the suffix list. Bundler is the truthful mode: this package has no",
+    "    build step and is only ever consumed by bundlers (Vite, Metro).",
+    "",
+    "The .native.tsx leaves are excluded — they are the other program. Both",
+    "configs extend the strict base; nothing there is loosened."
+  ],
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleSuffixes": [".web", ""],
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src", "vitest.config.ts", "vitest.setup.ts"],
+  "exclude": ["src/**/*.native.tsx"]
+}

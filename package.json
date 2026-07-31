@@ -14,6 +14,14 @@
     "apps/insolvia_marketing is out for the same reason: it resolves against the",
     "published package.",
     "",
+    "MID-CUTOVER: two directories currently claim the npm name",
+    "@insolvia-ai/design-system. packages/insolvia_design_system (0.2.x, the",
+    "cross-platform rewrite) IS a member — the app consumes it by symlink, and",
+    "it ALSO publishes for marketing. packages/insolvia_design_system_react",
+    "(0.1.x) is the outgoing web-only one, still NOT a member, deleted when",
+    "marketing moves to 0.2.x. Marketing's own lockfile pins the registry copy,",
+    "so the member symlink never reaches it.",
+    "",
     "CAUTION — Node resolution walks UP the tree. A missing dependency in",
     "apps/insolvia_marketing or packages/insolvia_design_system_react can resolve",
     "from this root's node_modules and pass CI, then fail in a clean install.",
@@ -26,7 +34,8 @@
   "workspaces": [
     "apps/insolvia_app",
     "packages/insolvia_tokens",
-    "packages/insolvia_api_client"
+    "packages/insolvia_api_client",
+    "packages/insolvia_design_system"
   ],
   "scripts": {
     "//tokens": [
@@ -47,8 +56,8 @@
       "package's own ESLint 8 gate. Read eslint.base.js before changing this."
     ],
     "lint": "npm run lint --workspaces --if-present",
-    "format": "prettier --check apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client",
-    "format:write": "prettier --write apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client",
+    "format": "prettier --check apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client packages/insolvia_design_system",
+    "format:write": "prettier --write apps/insolvia_app packages/insolvia_tokens packages/insolvia_api_client packages/insolvia_design_system",
     "//app": [
       "The app's own scripts (`build`, `web`, `lint`, `typecheck`, `test`) live in",
       "apps/insolvia_app/package.json and are a contract with app-*.yml. These two",

@@ -33,3 +33,12 @@ build/
 # The token source of truth. Its formatting is reviewed by humans and read by
 # the generator; leave it exactly as committed.
 packages/insolvia_tokens/tokens.json
+
+# Generated theme.css, byte-frozen. The bytes must stay identical to what the
+# old design-system package published (the cutover's equivalence proof rests on
+# that), and Prettier would strip a blank line the generator deliberately
+# emits. Reformatting it would trip `npm run tokens:check`; edit tokens.json
+# and regenerate instead. This is the tokens.ts trade-off resolved the other
+# way: tokens.ts bytes are cheap, theme.css bytes are expensive (see
+# packages/insolvia_tokens/CLAUDE.md).
+packages/insolvia_design_system/src/styles/theme.css

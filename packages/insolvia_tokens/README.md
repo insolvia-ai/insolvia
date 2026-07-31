@@ -8,7 +8,7 @@ two places guarantees drift, so neither of them owns the values: `tokens.json`
 does, and a small script renders it into both.
 
 ```
-tokens.json  ──┬──▶ packages/insolvia_design_system_react/src/styles/theme.css
+tokens.json  ──┬──▶ packages/insolvia_design_system/src/styles/theme.css
                └──▶ packages/insolvia_tokens/src/tokens.ts
 ```
 
@@ -53,7 +53,9 @@ npm run tokens:check
 
 Regenerates in memory and exits non-zero, listing the offending paths, if any
 committed output differs. It is wired into
-`.github/workflows/design-system-react-pr.yml` and covers both outputs.
+`.github/workflows/design-system-pr.yml` (and, until the old web-only package
+is deleted, the outgoing `design-system-react-pr.yml` still runs it too) and
+covers both outputs.
 
 ## Token structure
 
