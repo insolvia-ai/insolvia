@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Form, Link, data, useNavigation } from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { Button, buttonClass } from "@insolvia-ai/design-system";
 
 import { SITE_NAME } from "../lib/seo";
 import { submitUnsubscribe, tokenFrom } from "../lib/unsubscribe.server";
@@ -78,15 +78,15 @@ function Panel({ children }: { children: ReactNode }) {
 
 function BackHome() {
   return (
-    <Button intent="secondary" size="md" nativeButton={false} render={<Link to="/" />}>
+    <Link to="/" className={buttonClass({ intent: "secondary", size: "md" })}>
       Back home
-    </Button>
+    </Link>
   );
 }
 
 function Contact() {
   return (
-    <a href="mailto:hello@insolvia.ai" className="text-accent underline">
+    <a href="mailto:hello@insolvia.ai" className="text-primary underline">
       hello@insolvia.ai
     </a>
   );
@@ -110,7 +110,7 @@ export default function Unsubscribe({ loaderData, actionData }: Route.ComponentP
         <p className="text-base text-muted">
           If you have an Insolvia account, messages strictly necessary to operate it — a
           password reset you asked for, for instance — may still need to reach you.{" "}
-          <Link to="/privacy" className="text-accent underline">
+          <Link to="/privacy" className="text-primary underline">
             Our privacy policy
           </Link>{" "}
           explains what happens then.

@@ -37,12 +37,13 @@ Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):
 |---|---|
 | App (Expo/RN web SPA) | `apps/insolvia_app/scripts/dev-setup.sh` → `dev-up.sh` (`expo start --web`, pinned to **:3000** — Cognito registers that exact origin) |
 | Marketing site | `apps/insolvia_marketing/scripts/dev-setup.sh` → `dev-up.sh` (RR7 SSR dev server) |
-| React design system | `packages/insolvia_design_system_react/scripts/dev-setup.sh` → `dev-up.sh` (Storybook, :6006) |
 | API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose) → `dev-test.sh` (ruff+pytest, matches CI) |
 | Mailer | `services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh` |
 
-`packages/insolvia_tokens` and `packages/insolvia_api_client` deliberately have
-no scripts — the app's workspace resolve already covers them.
+`packages/insolvia_tokens`, `packages/insolvia_api_client` and
+`packages/insolvia_design_system` deliberately have no scripts — the root
+workspace install covers them, and the design system has no dev server of its
+own (its `.web` leaves render in marketing, its `.native` leaves in the app).
 
 ## Per-machine dev AWS resources (the API's real dev DB — there is no emulator)
 

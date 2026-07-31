@@ -21,7 +21,6 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/AWS_SETUP.md` § "The ci-trust anchor". |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
-| `packages/insolvia_design_system_react/scripts/dev-setup.sh` | React design system | Shared base → `npm ci`; `dev-up.sh` runs Storybook |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
 `packages/insolvia_tokens` and `packages/insolvia_api_client` have no scripts,

@@ -1,5 +1,5 @@
 import { Form, Link, data, useNavigation } from "react-router";
-import { Button, Field } from "@insolvia-ai/design-system";
+import { Button, buttonClass, Field } from "@insolvia-ai/design-system";
 
 import { seo } from "../lib/seo";
 import {
@@ -90,9 +90,9 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
             Thanks — we&rsquo;ll be in touch as the build progresses, and you&rsquo;ll get a
             spot when doors open. No spam, no sales sequence.
           </p>
-          <Button intent="secondary" size="md" nativeButton={false} render={<Link to="/" />}>
+          <Link to="/" className={buttonClass({ intent: "secondary", size: "md" })}>
             Back home
-          </Button>
+          </Link>
         </div>
       </section>
     );
@@ -105,7 +105,7 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
   return (
     <section className="mx-auto w-full max-w-2xl px-lg py-xxl">
       <div className="flex flex-col gap-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-accent">Early access</p>
+        <p className="text-sm font-medium uppercase tracking-wide text-primary">Early access</p>
         <h1 className="font-heading text-3xl font-semibold text-ink sm:text-4xl">
           Join the early-access list
         </h1>

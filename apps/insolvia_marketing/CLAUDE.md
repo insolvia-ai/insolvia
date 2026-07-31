@@ -7,6 +7,36 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   `file:` path. A local `file:` override is an uncommitted debugging aid only —
   land the design-system change, publish a new version, then bump the range here
   (that `package.json`/lockfile bump is what re-runs this app's PR gate).
+- **The design system is the cross-platform package** (0.2.x+): it publishes
+  SOURCE — per-component `.web.tsx` / `.native.tsx` leaf pairs behind
+  extensionless imports, with the consumer's bundler picking the leaf. The web
+  leaves are plain React DOM + Tailwind; Base UI is gone from the dependency
+  tree entirely. Navigation styled as a button uses `buttonClass` on a
+  `<Link>`/`<a>` — the web `Button` is a real `<button>` only, no `render`
+  polymorphism.
+- **Three pieces of wiring are load-bearing for that package; break any one and
+  the site breaks quietly:**
+  - `vite.config.ts` `resolve.extensions` (`.web.tsx` first) is the ONLY thing
+    steering Vite to the web leaf — without it, extensionless leaf imports
+    don't resolve (or worse, resolve native). `tsconfig.json`'s
+    `moduleSuffixes: [".web", ""]` is tsc's spelling of the same rule.
+  - `vite.config.ts` `ssr.noExternal` must always include the package: it
+    ships raw `.ts/.tsx` that Node cannot resolve at SSR runtime, so Vite must
+    bundle it — dev and build alike (the file's comments cover why
+    clsx/tailwind-merge join only for the production build).
+  - `app/styles/app.css` `@source` points Tailwind v4 at the package's source
+    under `node_modules` — Tailwind doesn't scan `node_modules` by default, so
+    without it every component class silently purges and components render
+    unstyled while everything still "works".
+- **The RNW grep guard in `marketing-pr.yml`** fails the build if the string
+  `react-native` appears in `build/client` — the standing insurance that the
+  platform split's core invariant holds (the web bundle never contains a native
+  leaf). If it fires, fix the resolution leak; never delete the guard.
+- **`.npmrc` sets `legacy-peer-deps`** because GitHub Packages strips
+  `peerDependenciesMeta` from its registry metadata, which would otherwise make
+  npm install the package's OPTIONAL peers (react-native, the unpublished
+  `@insolvia-ai/tokens`). Every peer this app really needs is a direct
+  dependency.
 - **Staging must stay non-indexable.** `app/lib/seo.ts` allowlists exactly
   `www.insolvia.ai`; never broaden it. A crawlable staging copy competes with
   prod for its own keywords.

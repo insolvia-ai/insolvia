@@ -3,14 +3,14 @@
 // DELIBERATELY NOT NAMED `eslint.config.js`, and it must never be renamed to
 // that. ESLint discovers a flat config by searching from its cwd and walking
 // UP the directory tree, so a flat config at the repo root is found by ESLint
-// runs inside *every* subdirectory — including
-// packages/insolvia_design_system_react, which is not a workspace member, is
-// version-gated, and still uses eslintrc with ESLint 8.
+// runs inside *every* subdirectory — including ones outside the workspace with
+// their own ESLint setup (apps/insolvia_marketing today).
 //
-// Concretely, while a root `eslint.config.js` existed:
+// This bit once, for real, in the since-retired insolvia_design_system_react
+// package (then on eslintrc + ESLint 8), while a root `eslint.config.js`
+// existed:
 //
-//   $ cd packages/insolvia_design_system_react && npm run lint
-//   # → eslint -c .eslintrc.json "src/**/*.{ts,tsx}"
+//   $ npm run lint       # → eslint -c .eslintrc.json "src/**/*.{ts,tsx}"
 //   TypeError [ERR_IMPORT_ATTRIBUTE_MISSING]: Module ".eslintrc.json"
 //     needs an import attribute of "type: json"
 //

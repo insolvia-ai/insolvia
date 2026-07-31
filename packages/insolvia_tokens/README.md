@@ -53,9 +53,7 @@ npm run tokens:check
 
 Regenerates in memory and exits non-zero, listing the offending paths, if any
 committed output differs. It is wired into
-`.github/workflows/design-system-pr.yml` (and, until the old web-only package
-is deleted, the outgoing `design-system-react-pr.yml` still runs it too) and
-covers both outputs.
+`.github/workflows/design-system-pr.yml` and covers both outputs.
 
 ## Token structure
 

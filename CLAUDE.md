@@ -27,7 +27,7 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React SSR)
-packages/   insolvia_tokens · insolvia_design_system_react · insolvia_api_client
+packages/   insolvia_tokens · insolvia_design_system · insolvia_api_client
 services/   api · mailer            (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
 ```
@@ -42,16 +42,17 @@ area's rules — it auto-loads when you work there; read it before editing) and 
 adding a member** — they own the reasoning; two consequences are worth knowing
 before you touch anything:
 
-- **The member list is explicit, never `packages/*`.** Globbing would make
-  `insolvia_design_system_react` a member and silently symlink the marketing site
-  to local source — but marketing consumes it *by published version*. A broken
+- **The member list is explicit, and marketing is not on it.**
+  `packages/insolvia_design_system` is deliberately *both* a member (the app
+  consumes its source through the symlink) and published (marketing consumes
+  `@insolvia-ai/design-system` *by published version*). Adding
+  `apps/insolvia_marketing` would symlink it to local source too — a broken
   package would then pass CI and only break after publishing.
 - **Node resolution walks UP the tree.** A dependency that
-  `apps/insolvia_marketing` or `packages/insolvia_design_system_react` forgot to
-  declare can resolve from the root `node_modules` and pass locally. Both are
-  deliberately outside the workspace, each with its own lockfile and its own CI
-  job installing from it — that is what catches this, so don't consolidate them
-  in.
+  `apps/insolvia_marketing` forgot to declare can resolve from the root
+  `node_modules` and pass locally. It is deliberately outside the workspace,
+  with its own lockfile and its own CI job installing from it — that is what
+  catches this, so don't consolidate it in.
 
 ## Catalog — need this? read that
 
@@ -63,7 +64,7 @@ before you touch anything:
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding a new package/app/service | `insolvia-new-package` skill |
-| **changing `packages/insolvia_design_system_react`** | `insolvia-design-system-pr` skill — **its own PR + a version bump** |
+| **changing `packages/insolvia_design_system`** | `insolvia-design-system-pr` skill — **its own PR + a version bump** |
 | changing the app's own components / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/PACKAGE_PUBLISHING.md`](docs/PACKAGE_PUBLISHING.md) |
@@ -97,7 +98,7 @@ overrule it.
 | `eas-simulator` | **Do not use** | Paid cloud simulators for native builds we do not produce. `allowed-tools: Bash(eas *)` — it will try to run the CLI. |
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
 | `gluestack-ui-v5` | **Do not use** | It describes a component library this codebase deliberately does not have, and its first principle is *"gluestack components over React Native primitives"* — the exact inversion of our decision. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) has the measurements, including two accessibility defects that came from this library. |
-| `expo-tailwind-setup` | **Do not use** | **There is no Tailwind in the app at all** (it stays in marketing's design system). It also pins `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
+| `expo-tailwind-setup` | **Do not use** | **There is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pins `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 
 **All six `eas-*` skills are out of scope for one reason:** we are on Expo's free
