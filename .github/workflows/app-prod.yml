@@ -141,12 +141,15 @@ jobs:
       # app-staging.yml for why this is preferred over a per-env
       # `cacheStoreDirectory`.
       #
-      # Routed through the app's own `build` script (`expo export -p web`) so
-      # prod, staging and the PR gate all share one definition of a web build.
+      # Routed through the app's own `build` script (`expo export -p web
+      # --clear`) so prod, staging and the PR gate all share one definition of
+      # a web build. The `--clear` lives in the script and ONLY there — expo
+      # rejects a repeated flag, so appending `-- --clear` here breaks the
+      # build (it did once, on staging's first post-cutover run).
       - name: Build web (production)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: production
-        run: npm run build --workspace apps/insolvia_app -- --clear
+        run: npm run build --workspace apps/insolvia_app
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:

@@ -67,14 +67,16 @@ jobs:
       # the path silently shares one cache again. A cold bundle on a deploy is
       # a minute we can afford; shipping the wrong environment is not.
       #
-      # Passed through `npm run build -- --clear` rather than calling the CLI
-      # directly, so "what a production web build is" keeps exactly one
-      # definition (the app's `build` script, `expo export -p web`) and this
-      # workflow only adds to it.
+      # The app's `build` script IS `expo export -p web --clear` — the flag
+      # lives in exactly one place, the script, and the app's package.json
+      # explains why it must stay there. Do not append `-- --clear` here:
+      # expo rejects a repeated flag outright ("Can only provide one instance
+      # of -c or --clear"), which is how a doubled flag once broke this very
+      # deploy on its first post-cutover run.
       - name: Build web (staging)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: staging
-        run: npm run build --workspace apps/insolvia_app -- --clear
+        run: npm run build --workspace apps/insolvia_app
 
       - uses: actions/upload-artifact@v4
         with:
