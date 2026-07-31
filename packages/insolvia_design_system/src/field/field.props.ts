@@ -7,6 +7,7 @@
 import * as React from 'react';
 
 export interface FieldContextValue {
+  labelId: string;
   controlId: string;
   describedBy: string | undefined;
   invalid: boolean;
@@ -24,15 +25,24 @@ export function useFieldContext(part: string): FieldContextValue {
 }
 
 export interface FieldIds {
+  labelId: string;
   controlId: string;
   descriptionId: string;
   errorId: string;
 }
 
-/** Stable id triplet for one field. Shared derivation, no DOM. */
+/**
+ * Stable id set for one field. Shared derivation, no DOM. It carries ids for
+ * BOTH association directions because the platforms wire opposite ways: the
+ * web leaf points the label at the control (`htmlFor={controlId}`), the
+ * native leaf points the control back at the label
+ * (`aria-labelledby={labelId}` — the pair react-native-web emits as a
+ * correctly associated label/input).
+ */
 export function useFieldIds(): FieldIds {
   const id = React.useId();
   return {
+    labelId: `${id}-label`,
     controlId: `${id}-control`,
     descriptionId: `${id}-description`,
     errorId: `${id}-error`,

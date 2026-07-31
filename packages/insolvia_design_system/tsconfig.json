@@ -13,8 +13,10 @@
     "    the suffix list. Bundler is the truthful mode: this package has no",
     "    build step and is only ever consumed by bundlers (Vite, Metro).",
     "",
-    "The .native.tsx leaves are excluded — they are the other program. Both",
-    "configs extend the strict base; nothing there is loosened."
+    "Everything carrying a `.native.` infix is excluded — the leaves and the",
+    "shared native lib modules belong to tsconfig.native.json, the native",
+    "tests to tsconfig.native.test.json. All configs extend the strict base;",
+    "nothing there is loosened."
   ],
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
@@ -26,5 +28,5 @@
     "types": []
   },
   "include": ["src", "vitest.config.ts", "vitest.setup.ts"],
-  "exclude": ["src/**/*.native.tsx"]
+  "exclude": ["src/**/*.native.*"]
 }

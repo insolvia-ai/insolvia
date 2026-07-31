@@ -1,6 +1,6 @@
 {
   "name": "@insolvia-ai/design-system",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Insolvia's owned, platform-split design system: one props module per component, a React DOM + Tailwind web leaf, and a React Native leaf over @insolvia-ai/tokens.",
   "type": "module",
   "license": "UNLICENSED",
@@ -64,8 +64,9 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.native.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.native.json && tsc -p tsconfig.native.test.json",
     "typecheck:native": "tsc -p tsconfig.native.json",
+    "typecheck:native-test": "tsc -p tsconfig.native.test.json",
     "test": "vitest run",
     "typecheck:web": "tsc -p tsconfig.json"
   },
@@ -89,7 +90,11 @@
     "closing the spike's 'native leaves never typechecked' gap. The",
     "testing-library/jsdom set matches insolvia_design_system_react so the",
     "ported tests run against the same harness. vitest itself comes from the",
-    "root workspace devDependencies, like insolvia_api_client."
+    "root workspace devDependencies, like insolvia_api_client.",
+    "react-native-web is the native tests' renderer: the vitest `native`",
+    "project aliases react-native to it, which is exactly the pair the app",
+    "ships on web — pinned to the version the app installs so the workspace",
+    "dedupes to one copy."
   ],
   "devDependencies": {
     "@insolvia-ai/tokens": "*",
@@ -101,7 +106,8 @@
     "jsdom": "^25.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "react-native-web": "0.21.2"
   },
   "engines": {
     "node": ">=24"

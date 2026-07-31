@@ -1,0 +1,24 @@
+{
+  "//": [
+    "The THIRD typecheck program: the native-leaf TESTS. They need both sides",
+    "of the platform split at once — the native suffix list (so './button'",
+    "resolves to button.native.tsx, exactly as the vitest `native` project and",
+    "Metro do) AND the DOM lib (the tests assert on the DOM react-native-web",
+    "emits under jsdom). Neither existing program can take them:",
+    "tsconfig.json resolves the .web leaves, and tsconfig.native.json",
+    "deliberately has no DOM lib so the SHIPPED native leaves keep",
+    "typechecking against React Native's own types alone. skipLibCheck (from",
+    "the base) is what lets react-native's ambient types coexist with lib.dom",
+    "here — the same coexistence expo/tsconfig.base relies on in the app."
+  ],
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleSuffixes": [".native", ""],
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src/**/*.native.test.ts", "src/**/*.native.test.tsx", "vitest.native.setup.ts"]
+}
