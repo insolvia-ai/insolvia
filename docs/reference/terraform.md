@@ -138,9 +138,9 @@ against prod. Each owns, per env:
   origins. Cognito matches redirect URIs **exactly** — a different port is a
   different URI and Cognito rejects it, which is the whole reason the port is
   pinned rather than chosen per run. The web client is the only app client —
-  a future native client would need its own loopback-redirect client
-  (RFC 8252, on a fixed port set because Cognito matches redirect URIs
-  exactly).
+  a future native client registers the custom scheme
+  `insolvia://auth/callback`, **not** an RFC 8252 loopback redirect (the
+  header comment of `infra/modules/auth/main.tf` owns why).
 
 The API does **not** verify tokens yet — the env outputs expose
 `auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
