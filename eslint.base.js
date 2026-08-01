@@ -6,19 +6,9 @@
 // runs inside *every* subdirectory — including ones outside the workspace with
 // their own ESLint setup (apps/insolvia_marketing today).
 //
-// This bit once, for real, in the since-retired insolvia_design_system_react
-// package (then on eslintrc + ESLint 8), while a root `eslint.config.js`
-// existed:
-//
-//   $ npm run lint       # → eslint -c .eslintrc.json "src/**/*.{ts,tsx}"
-//   TypeError [ERR_IMPORT_ATTRIBUTE_MISSING]: Module ".eslintrc.json"
-//     needs an import attribute of "type: json"
-//
-// Finding a root flat config flips ESLint 8.57 into flat-config mode, which
-// reinterprets `-c .eslintrc.json` as a *flat* config path and imports the JSON
-// as an ES module. That package's required check went red for a change that
-// never touched it, and fixing it in place would have meant editing a
-// version-gated package — its own PR plus a version bump.
+// This bit once, for real: a root `eslint.config.js` flipped a since-retired
+// package's own eslintrc-based ESLint 8 run into flat-config mode, and its
+// required check went red for a change that never touched it.
 //
 // So: each workspace member owns a one-line `eslint.config.js` re-exporting
 // this file, and nothing discoverable sits at the repo root. Root `npm run
@@ -34,7 +24,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // Resolved relative to whichever member re-exports this, so every pattern is
   // location-independent (`**/`-prefixed) rather than repo-root-relative.
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/.dart_tool/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

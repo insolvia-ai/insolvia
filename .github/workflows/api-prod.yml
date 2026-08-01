@@ -20,7 +20,7 @@ name: API · Deploy · Production
 # shift. A failed smoke test leaves the previous version serving — the whole
 # reason the alias exists (infra/modules/api_service/main.tf).
 #
-# This workflow no longer applies Terraform. A code deploy must not carry
+# This workflow applies no Terraform. A code deploy must not carry
 # whatever infra drift happens to be sitting on main; `infra-prod.yml` is the
 # only path that mutates prod infrastructure.
 
@@ -59,9 +59,9 @@ permissions:
   # cannot see whether the commit ever passed.
   actions: read
 
-# Retained even though this workflow no longer applies Terraform: it also
-# serializes against infra-prod.yml, so a promotion cannot land mid-apply while
-# the Lambda's configuration is being rewritten underneath it.
+# This workflow applies no Terraform, but the group still serializes it
+# against infra-prod.yml, so a promotion cannot land mid-apply while the
+# Lambda's configuration is being rewritten underneath it.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false

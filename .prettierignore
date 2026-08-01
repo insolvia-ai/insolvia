@@ -3,7 +3,6 @@
 node_modules/
 dist/
 build/
-.dart_tool/
 
 # Expo-generated, gitignored, and self-labelled "should not be edited". Prettier
 # does not read .gitignore, so without these the format check trips on a file no
@@ -14,8 +13,7 @@ build/
 # Markdown is hand-authored and hand-wrapped throughout this repo, with compact
 # `|---|---|` tables and `*emphasis*`. Prettier rewrites both on sight, which
 # would turn every docs edit into a reformatting diff and bury the actual
-# change. The React design-system package does not run Prettier over markdown
-# either.
+# change.
 *.md
 
 # NOTE — generated code is deliberately NOT ignored here.
@@ -34,11 +32,10 @@ build/
 # the generator; leave it exactly as committed.
 packages/insolvia_tokens/tokens.json
 
-# Generated theme.css, byte-frozen. The bytes must stay identical to what the
-# old design-system package published (the cutover's equivalence proof rests on
-# that), and Prettier would strip a blank line the generator deliberately
-# emits. Reformatting it would trip `npm run tokens:check`; edit tokens.json
-# and regenerate instead. This is the tokens.ts trade-off resolved the other
-# way: tokens.ts bytes are cheap, theme.css bytes are expensive (see
+# Generated theme.css — the generator owns its bytes, and `npm run
+# tokens:check` fails on any drift. Prettier would strip a blank line the
+# generator deliberately emits, so a reformat trips that check; edit
+# tokens.json and regenerate instead. This is the tokens.ts trade-off resolved
+# the other way: tokens.ts bytes are cheap, theme.css bytes are expensive (see
 # packages/insolvia_tokens/CLAUDE.md).
 packages/insolvia_design_system/src/styles/theme.css

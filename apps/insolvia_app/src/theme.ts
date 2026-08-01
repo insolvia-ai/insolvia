@@ -27,9 +27,8 @@ export interface Theme {
 /**
  * The type scale, in density-independent pixels.
  *
- * `@insolvia-ai/tokens` carries font *families* but no sizes — the Flutter app
- * took its scale from Material's `TextTheme`, which has no React Native
- * equivalent. This is therefore the single place a font size is declared; a
+ * `@insolvia-ai/tokens` carries font *families* but no sizes.
+ * This is therefore the single place a font size is declared; a
  * component that spells one out inline is a bug. Promote this to `tokens.json`
  * the moment marketing needs the same numbers.
  */
@@ -54,9 +53,8 @@ export const fontSizes = {
 } as const;
 
 /**
- * The width the centered content column is capped at, carried over from the
- * Flutter `AppScaffold`'s `maxContentWidth` — a full-width line of text on a
- * 2560px display is unreadable.
+ * The width the centered content column is capped at — a full-width line of
+ * text on a 2560px display is unreadable.
  */
 export const contentMaxWidth = 720;
 
@@ -95,8 +93,7 @@ export function themeFor(scheme: string | null | undefined): Theme {
  * The theme for the active color scheme.
  *
  * `useColorScheme` follows the OS on native and `prefers-color-scheme` in the
- * browser, which is what the Flutter shell got from leaving `ThemeMode.system`
- * as the default.
+ * browser.
  */
 export function useTheme(): Theme {
   return themeFor(useColorScheme());

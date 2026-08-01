@@ -202,13 +202,12 @@ summary. (The app rebuilds, because it bakes its environment into the bundle at
 build time — the `EXPO_PUBLIC_*` values are inlined by Metro, so staging and
 prod are genuinely different bundles rather than one artifact promoted twice.)
 
-**Use `prod-infra` for infrastructure changes — it is now the only way.**
+**Use `prod-infra` for infrastructure changes — it is the only way.**
 `infra/envs/prod` is a single root module with a single state, so
-`terraform apply` there reconciles *all* of it. The service workflows used to
-begin with exactly that apply, which meant any of them could carry an
-infra-only change while redeploying a service you never meant to touch — and,
-worse, could drag unrelated infra drift into production alongside a routine
-code deploy. They no longer apply Terraform at all; they only read outputs.
+`terraform apply` there reconciles *all* of it. The service workflows apply no
+Terraform; they only read outputs — so a service deploy can neither carry an
+infra-only change while redeploying a service you never meant to touch, nor
+drag unrelated infra drift into production alongside a routine code deploy.
 `infra-prod.yml` does the apply and stops.
 
 It defaults to `mode: plan`, which is read-only and writes the plan to the run's

@@ -168,20 +168,6 @@ data "aws_iam_policy_document" "github_permissions" {
   }
   # ── end marketing site ─────────────────────────────────────────
 
-  # NOTE — there is deliberately no `insolvia-download-*` grant here any more.
-  # It existed for the desktop artifact host (4.10 / #18): the S3 origin behind
-  # download.insolvia.ai and staging-download.insolvia.ai, uploaded to by the
-  # desktop build workflow. Both the module and the workflow are gone with the
-  # Flutter desktop app, and a grant on buckets that no longer exist is a
-  # standing permission nobody is watching — the reason to remove it in the
-  # same change rather than "later".
-  #
-  # NOTE THE APPLY ORDER: this root is human-applied
-  # (DenySelfPrivilegeEscalation, below), and it must be applied AFTER the
-  # staging/prod applies that destroy the buckets, not before. Removing the
-  # grant first would leave CI unable to delete what it is about to be asked to
-  # delete. See the `insolvia-deploy-role-permissions` skill.
-
   # READ-ONLY on the pipeline's own role, and deliberately so.
   #
   # This environment manages the OIDC provider, this role, and this policy —

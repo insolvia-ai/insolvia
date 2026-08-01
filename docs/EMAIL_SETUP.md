@@ -17,9 +17,9 @@ the next apply.
 
 > ## ⚠️ Outbound is still in the SES sandbox
 >
-> The account has **not** been granted SES production access (tracked as issue
-> **#80 / 6.8**). While in the sandbox, SES rejects any send to an address that
-> is not itself a verified SES identity.
+> The account has **not** been granted SES production access. While in the
+> sandbox, SES rejects any send to an address that is not itself a verified SES
+> identity.
 >
 > Everything the request needs is built — privacy policy, unsubscribe path,
 > suppression, bounce/complaint alarms. What remains is a human action in the
@@ -89,8 +89,8 @@ Workspace requires it to point at Google. No arrangement of priorities makes
 both work — a lower-priority SES record just becomes a fallback that accepts
 mail Google never sees.
 
-Mailboxes are in Workspace, so Google wins, and the SES inbound path was removed
-outright (see [What was removed](#what-was-removed-and-why)).
+Mailboxes are in Workspace, so Google wins: there is no SES inbound path (see
+[SES inbound leftovers](#ses-inbound-leftovers--verify-they-are-gone)).
 
 ---
 
@@ -127,7 +127,7 @@ confirm both senders pass alignment on real messages (read the headers), add a
 
 ### SES production access
 
-Issue **#80 / 6.8**. Until it lands, the app cannot send transactional mail to
+Until it is granted, the app cannot send transactional mail to
 anyone who is not a verified SES identity. Unrelated to Workspace.
 
 The request itself is a form in the AWS console and cannot be automated from
@@ -170,25 +170,13 @@ Then end-to-end, which is the only check that actually proves anything:
 
 ---
 
-## What was removed, and why
+## SES inbound leftovers — verify they are gone
 
-`insolvia.ai` mail used to be received by SES and forwarded to one private Gmail
-address: an SES receipt rule set writing raw MIME to S3, a Python forwarder
-Lambda (`services/inbound_forwarder/`) that rebuilt each message and re-sent it,
-an SQS DLQ, and CloudWatch alarms — plus a `TF_VAR`-injected SSM SecureString
-holding the destination address. Issues **#21–#25**.
-
-Real Workspace mailboxes replace all of it, so it was deleted rather than left
-running: the apex MX now points at Google, so the receipt rules would match
-nothing, the forwarder would go permanently quiet, and the alarms would stay
-green *because no message ever arrives to fail*. Dead infrastructure that looks
-healthy is worse than no infrastructure.
-
-Removed in the same change: `infra/modules/inbound_forwarding`,
-`services/inbound_forwarder/`, `.github/workflows/inbound-forwarder-pr.yml`, the
-`inbound_forward_to` Terraform variable, and the forwarder outputs.
-
-Manual cleanup that Terraform cannot do for you:
+There is no SES inbound path: mailboxes are real Workspace mailboxes, and the
+one-time SES receive-and-forward setup (receipt rules → S3 → forwarder Lambda)
+was deleted rather than left running dead. A few leftovers of that teardown
+were manual — Terraform could not remove them — so verify each is actually
+gone:
 
 - **The `INBOUND_FORWARD_TO` secret** on the `insolvia-shared` GitHub
   environment. Nothing reads it now; delete it.
@@ -202,9 +190,8 @@ Manual cleanup that Terraform cannot do for you:
   nothing else uses SMTP. The app's transactional mail sends via an IAM role,
   not SMTP, so this is usually safe — confirm before deleting.
 
-**SES itself does not go away.** The domain identity, DKIM, custom MAIL FROM,
-and `no-reply@` are all still live and still needed. Only the inbound half was
-retired.
+**SES outbound is not a cleanup candidate.** The domain identity, DKIM, custom
+MAIL FROM, and `no-reply@` are live and needed.
 
 ---
 
@@ -213,9 +200,7 @@ retired.
 - [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) — getting out of the
   SES sandbox: checklist, request text, and the post-grant steps.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — AWS/GitHub bootstrap, deploy gating.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — the shipped-foundation summary (email's
-  milestone is complete; the sandbox capability table lives in
-  [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md)).
+- [`MVP_PLAN.md`](MVP_PLAN.md) — what is live and the decisions in force.
 - [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — state model and
   environment layout.
 </content>

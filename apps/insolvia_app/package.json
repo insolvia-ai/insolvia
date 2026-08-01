@@ -44,13 +44,11 @@
     "test": "jest"
   },
   "//dependencies": [
-    "Versions are the ones verified end-to-end in the Expo spike and are pinned",
-    "as a set: Expo SDK 57.0.8 / React Native 0.86.0 / React 19.2.3 /",
-    "expo-router 57.0.8. Upgrade with `npx expo install --check`, never one",
-    "package at a time.",
+    "Versions are verified end-to-end as a set and pinned as one: Expo SDK",
+    "57.0.8 / React Native 0.86.0 / React 19.2.3 / expo-router 57.0.8. Upgrade",
+    "with `npx expo install --check`, never one package at a time.",
     "",
-    "@insolvia-ai/api-client is wired in but not yet imported, exactly as the",
-    "Dart client was in the old pubspec.yaml: it sits beside",
+    "@insolvia-ai/api-client is wired in but not yet imported: it sits beside",
     "src/config/environment.ts's apiBaseUrl so the first API-backed feature only",
     "has to import it."
   ],

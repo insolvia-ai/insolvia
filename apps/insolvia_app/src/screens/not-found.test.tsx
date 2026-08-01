@@ -2,8 +2,6 @@ import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 /**
- * The port of `app_router_test.dart`'s unknown-path group.
- *
  * This route is what answers a mistyped URL in production: CloudFront rewrites
  * 403/404 to `/index.html` with HTTP 200, so the edge never 404s and the router
  * is the only thing that can say "not found".

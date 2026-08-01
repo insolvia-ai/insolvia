@@ -1,8 +1,8 @@
 # Verifying the app deploys — `staging-app` and `app`
 
-The runbook for issues **4.1 (#9)** and **4.2 (#10)**: proving that the web app
-actually deploys and actually serves, on staging first and then on production.
-It is written to be executed top to bottom, once per environment.
+The runbook for proving that the web app actually deploys and actually serves,
+on staging first and then on production. It is written to be executed top to
+bottom, once per environment.
 
 **This is a human runbook on purpose.** Deploys run in CI and never from a CLI
 (the `insolvia-deploy` skill, `infra/CLAUDE.md`), and the production dispatch is
@@ -69,7 +69,7 @@ rather than guessing — the failure modes there are easy to misdiagnose.
 
 ---
 
-## Part 1 — staging (`staging-app.insolvia.ai`, issue #9)
+## Part 1 — staging (`staging-app.insolvia.ai`)
 
 ### What the workflow does
 
@@ -93,8 +93,8 @@ Two things in that build step are load-bearing and easy to "tidy" into a bug:
   byte-identical output. The failure mode is silent and severe — a bundle with
   `staging` compiled into it, served from the production bucket. `--clear` makes
   the environment impossible to inherit.
-- **There is no macOS or Windows build job.** There used to be; decision D9
-  removed the desktop targets entirely.
+- **There is no macOS or Windows build job.** Web is the only target CI builds
+  (decision D9) — do not add one.
 
 Unlike prod, this workflow **does** apply Terraform. That is why merging an
 infra change to `main` is enough to stand staging up.
@@ -162,7 +162,7 @@ the app through that entry chunk; if it is absent, something other than
 `apps/insolvia_app/dist` was synced. **Keep the returned filename** — checks 5
 and 6 use it.
 
-**4. A deep link returns 200 — the #11 check.** Expo Router owns client-side
+**4. A deep link returns 200.** Expo Router owns client-side
 paths, and S3 has no object at them, so without the CloudFront SPA rewrite this
 returns 404 and the app never boots on a shared or bookmarked URL. This is why
 the app exports with `web.output: "single"`: one `index.html` plus client
@@ -196,18 +196,14 @@ inlined at build time — `apps/insolvia_app/src/config/environment.ts` maps
 renders both. This is the check that catches the Metro cache trap described
 above, and it is the one to run most carefully.
 
-**The authoritative check is still visual, for a different reason than before.**
-Under `web.output: "single"` there is no prerendering: `index.html` is an empty
-shell and the badge only exists after the bundle runs. So `curl` on `/` cannot
-see it. Open `https://staging-app.insolvia.ai/` in a browser and confirm the
-header badge reads **STAGING** and the body line names
-`staging-app.insolvia.ai`. A prod bundle served here would say `Production` /
-`app.insolvia.ai` — exactly the mistake this check exists to catch.
-
-What *has* improved: the app now renders real DOM rather than painting into a
-`<canvas>`, so the badge is inspectable text and this check is automatable with
-a headless browser whenever it is worth wiring up. It was not automatable at all
-before.
+**The authoritative check is visual.** Under `web.output: "single"` there is no
+prerendering: `index.html` is an empty shell and the badge only exists after
+the bundle runs. So `curl` on `/` cannot see it. Open
+`https://staging-app.insolvia.ai/` in a browser and confirm the header badge
+reads **STAGING** and the body line names `staging-app.insolvia.ai`. A prod
+bundle served here would say `Production` / `app.insolvia.ai` — exactly the
+mistake this check exists to catch. (The badge is real DOM text, so the check is
+automatable with a headless browser whenever that is worth wiring up.)
 
 As scriptable corroboration, the bundle carries the host string. Use the entry
 filename from check 3:
@@ -226,14 +222,9 @@ conclusive and bad.
 **6. Cache-Control is right on both classes of object.** This is what makes a
 deploy visible immediately without giving up long-lived asset caching.
 
-**The rule inverted at the Expo migration, so read this before comparing against
-older notes.** Flutter web content-hashed *nothing* — every filename it emitted
-was stable while the bytes changed — which is why `web-bundle-sync` needed three
-tiers split by what a file was *for*, and why issue #49 had to strip `immutable`
-from everything. Expo hashes: `_expo/static/js/web/entry-<hash>.js`,
-`_expo/static/css/global-<hash>.css`. So the split is now by *whether the name is
-content-addressed*, which is the split it should always have been, and it needs
-only two tiers.
+Expo content-hashes its static assets (`_expo/static/js/web/entry-<hash>.js`,
+`_expo/static/css/global-<hash>.css`) and nothing else, so the split is by
+*whether the name is content-addressed*, and it needs only two tiers.
 
 Hashed assets — cached forever. Use the entry filename from check 3:
 
@@ -241,9 +232,9 @@ Hashed assets — cached forever. Use the entry filename from check 3:
 curl -sS -D - -o /dev/null "https://staging-app.insolvia.ai/_expo/static/js/web/entry-<hash>.js"
 ```
 
-Expect `cache-control: public, max-age=31536000, immutable`. This is safe here
-and was *not* safe under Flutter: the name changes when the bytes change, so a
-returning browser cannot be pinned to stale code.
+Expect `cache-control: public, max-age=31536000, immutable`. This is safe
+because the name changes when the bytes change, so a returning browser cannot
+be pinned to stale code.
 
 Everything else — `index.html` and whatever was copied out of the app's
 `public/` — is unhashed and never stored:
@@ -281,11 +272,11 @@ carry the HTML headers, not the long-lived ones.
 curl -sS -D - -o /dev/null https://staging-app.insolvia.ai/auth/callback
 ```
 
-When all six pass, #9 is done: record the run URL on the issue and close it.
+When all six pass, staging is verified.
 
 ---
 
-## Part 2 — production (`app.insolvia.ai`, issue #10)
+## Part 2 — production (`app.insolvia.ai`)
 
 Same six checks, against `app.insolvia.ai`, with **Production** /
 `app.insolvia.ai` expected in check 5. What differs is everything before them.
@@ -368,7 +359,7 @@ Part 1 against `app.insolvia.ai` anyway — check 5 especially, since the Metro
 cache trap is precisely a wrong-environment bundle that every other check
 passes.
 
-When they pass, #10 is done.
+When they pass, production is verified.
 
 ---
 

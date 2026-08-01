@@ -79,12 +79,6 @@ storybook-static/
 # different branch from sweeping them into an unrelated commit.
 .lighthouseci/
 .react-router/
-# Left over from the Flutter era. Nothing in this repo produces it any more,
-# but every machine that ever ran the old toolchain still has one on disk, and
-# checking out a pre-cutover commit recreates it. Delete this line once no
-# working copy has one.
-.dart_tool/
-
 # ── OS / editor ─────────────────────────────────────────────────
 .DS_Store
 *.swp

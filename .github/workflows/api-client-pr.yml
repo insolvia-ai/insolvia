@@ -7,17 +7,10 @@ name: API client · PR
 # `paths:` filter would silently deadlock every PR that does not touch these
 # paths.
 #
-# ONE JOB NOW. This file used to carry a second job, `Dart API client`, gating
-# the package's lib/ + test/ alongside `API client` gating the TypeScript port
-# in src/. Its own header said the coexistence lasted exactly until the PR that
-# deleted lib/ and test/ — this is that PR, and the Dart job left with them.
-#
-# ACTION REQUIRED ON MERGE: `Dart API client` must be removed from the
-# `protect-main` ruleset, which matches required checks by EXACT NAME and will
-# otherwise wait forever for a check nothing reports. Use the
-# `insolvia-branch-protection` skill; do not hand-roll the `gh api` call, which
-# replaces the arrays it is sent. `API client` keeps its name for the same
-# reason — renaming it would silently orphan the gate.
+# The ruleset matches required checks by EXACT NAME — renaming the `API client`
+# job would silently orphan the gate. Use the `insolvia-branch-protection`
+# skill for any ruleset change; do not hand-roll the `gh api` call, which
+# replaces the arrays it is sent.
 on:
   pull_request:
 
@@ -37,9 +30,6 @@ jobs:
       - id: filter
         uses: ./.github/actions/changed-paths
         with:
-          # `pubspec.yaml`/`melos.yaml` left with the Dart job — the pub
-          # workspace they described no longer exists, so listing them would
-          # guard paths that can never change again.
           paths: |
             packages/insolvia_api_client/**
             package.json

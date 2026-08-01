@@ -4,18 +4,14 @@
 # admin-only creation, and SRP-only explicit flows, on the OAuth
 # authorization-code + PKCE flows a browser SPA actually needs.
 #
-# THERE WAS A SECOND CLIENT, for the Flutter desktop app, using the RFC 8252
-# §7.3 loopback redirect (`http://127.0.0.1:<port>/callback`, four fixed ports
-# because Cognito string-matches callback URLs and has no wildcard-port form).
-# It went with the desktop app itself.
-#
-# If a desktop or mobile client ever returns, it must register a CUSTOM SCHEME
-# — `insolvia://auth/callback` — and NOT loopback. That is the fact worth
-# carrying forward: the loopback pattern needs the app to bind an HTTP listener
-# on 127.0.0.1, which a React Native runtime has no way to do without a native
-# module, whereas a custom scheme is exactly what `expo-auth-session` +
-# `app.json`'s `scheme` already produce on every platform, web included.
-# Cognito accepts a custom scheme in `callback_urls` with no special handling.
+# A desktop or mobile client, if one is ever added, must register a CUSTOM
+# SCHEME — `insolvia://auth/callback` — and NOT an RFC 8252 §7.3 loopback
+# redirect (`http://127.0.0.1:<port>/callback`): the loopback pattern needs
+# the app to bind an HTTP listener on 127.0.0.1, which a React Native runtime
+# has no way to do without a native module, whereas a custom scheme is exactly
+# what `expo-auth-session` + `app.json`'s `scheme` already produce on every
+# platform, web included. Cognito accepts a custom scheme in `callback_urls`
+# with no special handling.
 #
 # The API does NOT consume any of this yet — the waitlist stays public, and
 # JWT verification arrives with the first authenticated endpoint. This module

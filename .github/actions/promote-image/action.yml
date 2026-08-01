@@ -5,10 +5,10 @@ description: >-
 
 # WHY THIS EXISTS
 #
-# Production used to run its own `docker build` from source. Same source is not
-# the same artifact: a rebuild picks up whatever base image, transitive
-# dependency and toolchain happen to resolve at that moment, so "it passed on
-# staging" guaranteed nothing about the thing prod actually ran.
+# Same source is not the same artifact: a production `docker build` from
+# source would pick up whatever base image, transitive dependency and toolchain
+# happen to resolve at that moment, so "it passed on staging" would guarantee
+# nothing about the thing prod actually ran.
 #
 # Since the ECR repositories are shared across environments
 # (infra/envs/shared/main.tf), the image staging tested is already sitting in

@@ -7,9 +7,9 @@
  * ```
  *
  * The `EXPO_PUBLIC_` prefix is not decoration: Expo inlines **only** variables
- * with that prefix into the client bundle, so the old `--dart-define=INSOLVIA_ENV`
- * name could not survive the port. Anything else would read as `undefined` at
- * runtime and — by design, see `resolveEnvironment` — fall back to `local`.
+ * with that prefix into the client bundle. An unprefixed name would read as
+ * `undefined` at runtime and — by design, see `resolveEnvironment` — fall back
+ * to `local`.
  *
  * A union of string literals rather than an `enum`: `erasableSyntaxOnly` is on
  * (see tsconfig.json), because Metro strips types instead of compiling them and
@@ -47,8 +47,7 @@ export const environmentApiBaseUrls = {
 } as const satisfies Record<AppEnvironment, string>;
 
 /**
- * Exhaustiveness guards — the TypeScript equivalent of the Dart switches that
- * had no default arm.
+ * Exhaustiveness guards.
  *
  * `satisfies Record<AppEnvironment, …>` already rejects a map that omits an
  * environment; these assertions state the intent where a reader will see it and

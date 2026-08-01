@@ -9,9 +9,8 @@ Router v7 + Vite (`apps/insolvia_marketing`), the services are Python on Lambda.
 only**: no EAS Build/Submit/Update/Hosting, no Expo account, and a CI guard that
 fails the build on an `eas.json`. Decision **D9** in
 [`docs/MVP_PLAN.md`](docs/MVP_PLAN.md) and
-[ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) own this; 0004 also
-carries the measurements that ruled out a component library, so read it before
-proposing NativeWind, Tailwind-in-the-app, or a UI library.
+[ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) own this — read 0004
+before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 
 **This file is a catalog.** It says where things live and what to open before
 touching them — read the linked file when your task needs it. Detail lives there,

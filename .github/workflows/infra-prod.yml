@@ -1,17 +1,17 @@
 name: Infra · Terraform apply · Production
 
 # Terraform for infra/envs/prod, on its own, with nothing else attached — and
-# now the ONLY thing that applies it.
+# the ONLY thing that applies it.
 #
 # The prod deploy workflows (api-prod, mailer-prod, marketing-prod, app-prod)
-# used to each begin by applying this same env, because infra/envs/prod is one
-# root module with one state and `terraform apply` reconciles all of it. That
-# cut both ways: an infra-only change needed a *service* deploy to carry it
-# (redeploying a Lambda as a side effect), and — worse — a routine code deploy
-# silently dragged whatever infra drift was sitting on main into production.
+# deliberately apply no Terraform; they only read outputs. infra/envs/prod is
+# one root module with one state and `terraform apply` reconciles all of it,
+# so coupling an apply to a deploy would cut both ways: an infra-only change
+# would need a *service* deploy to carry it (redeploying a Lambda as a side
+# effect), and — worse — a routine code deploy would silently drag whatever
+# infra drift was sitting on main into production.
 #
-# Those workflows no longer apply Terraform at all; they only read outputs. So
-# this workflow is not merely the tidier way to apply prod infra, it is the
+# So this workflow is not merely the tidier way to apply prod infra, it is the
 # only way. Apply deliberately, before the release that needs it.
 #
 # It also fills a real gap: shared-infra-plan.yml validates every env offline
@@ -34,8 +34,8 @@ permissions:
   contents: read
 
 # MUST match the group used by api-prod.yml, mailer-prod.yml, app-prod.yml and
-# marketing-prod.yml. Only this workflow applies now, so the group no longer
-# guards apply-against-apply — it guards apply-against-DEPLOY: an apply that
+# marketing-prod.yml. Only this workflow applies, so the group does not guard
+# apply-against-apply — it guards apply-against-DEPLOY: an apply that
 # lands while a service deploy is mid-promotion could rewrite a Lambda's
 # configuration underneath it, or move an alias the deploy is about to shift.
 # Native S3 state locking (use_lockfile, enabled in #117) still backstops any

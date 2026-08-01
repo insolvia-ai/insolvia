@@ -11,15 +11,6 @@ name: Design system · Publish · Shared
 # `workflow_dispatch` stays for re-publishing after a transient registry
 # failure, and for the very first publish of a package version that landed on
 # main before this workflow existed.
-#
-# HISTORY: while the old web-only package (insolvia_design_system_react)
-# coexisted, its design-system-react-publish.yml published the SAME npm name,
-# @insolvia-ai/design-system, on the 0.1.x line, while this workflow published
-# the cross-platform rewrite on the 0.2.x line. That was safe precisely because
-# both jobs are idempotent BY VERSION: each asks the registry about its own
-# package.json's exact version and publishes only when it is absent, so the
-# two lines can never overwrite each other. PR 2 deletes the old package and
-# its workflows.
 on:
   push:
     branches: [main]
@@ -61,14 +52,13 @@ jobs:
 
       # Must match the root package.json's `engines.node` (">=24").
       #
-      # Two deviations from design-system-react-publish.yml, both because this
-      # package is an npm WORKSPACE MEMBER with no lockfile of its own:
+      # This package is an npm WORKSPACE MEMBER with no lockfile of its own,
+      # hence:
       #
       #   - `cache-dependency-path` is the ROOT lockfile — the only tree this
       #     job installs (setup-node's default, spelled out for clarity).
-      #   - `registry-url`/`scope` ARE set here, where the old workflow
-      #     deliberately relied on its committed package-level .npmrc. This
-      #     package has no .npmrc; setup-node's generated one supplies the
+      #   - `registry-url`/`scope` ARE set here, because this package commits
+      #     no .npmrc of its own; setup-node's generated one supplies the
       #     @insolvia-ai → npm.pkg.github.com mapping and the auth line that
       #     `npm view`/`npm publish` below need. It does not disturb the root
       #     `npm ci`: the workspace members are the only @insolvia-ai
@@ -82,8 +72,8 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@insolvia-ai"
 
-      # Root install, not a package-local one (the old workflow ran `npm ci`
-      # inside the package against its own lockfile; this package has neither).
+      # Root install, not a package-local one — the root lockfile is the only
+      # lockfile there is.
       # No build needs it — see below — it is here so any pack-time lifecycle
       # script the package declares runs against the tree the committed
       # lockfile pins, and so `ci` fails loudly if the root package.json and
@@ -99,9 +89,7 @@ jobs:
       # The skip path should be rare for pushes that touch the package: the PR
       # gate (design-system-pr.yml) fails any PR that changes this package
       # without bumping `version`, precisely so a merge to main never lands
-      # here with a stale version and silently publishes nothing. This guard is
-      # also what makes the coexistence in the header safe: each publish
-      # workflow only ever acts on its own package.json's exact version.
+      # here with a stale version and silently publishes nothing.
       #
       # `npm view` exits non-zero when the version does not exist (E404) —
       # which is the normal "please publish" case — so the exit code is
@@ -127,9 +115,9 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # NO BUILD STEP, deliberately — do not "fix" this by adding tsup back.
-      # The old package shipped `dist/`; this one publishes SOURCE (.ts/.tsx),
-      # because the platform-split pattern depends on it: each component's
+      # NO BUILD STEP, deliberately — do not "fix" this by adding a bundler.
+      # This package publishes SOURCE (.ts/.tsx), not `dist/`, because the
+      # platform-split pattern depends on it: each component's
       # `.web.tsx` and `.native.tsx` leaves must survive into the published
       # artifact so the CONSUMER's bundler picks the leaf by extension —
       # marketing's Vite (via `ssr.noExternal` + `resolve.extensions`) takes

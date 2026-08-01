@@ -3,7 +3,7 @@ import { colors, radii, spacing } from '@insolvia-ai/tokens';
 import { contentMaxWidth, fontSizes, themeFor } from '@/theme';
 
 /**
- * The port of the Flutter `app_test.dart` theme-wiring test.
+ * Theme wiring.
  *
  * Both schemes are asserted rather than just the default one: a dark theme that
  * is declared but never actually reachable looks identical to a correct one until
@@ -51,8 +51,8 @@ describe('the type scale', () => {
 
 describe('the content column', () => {
   it('is capped, so text does not stretch across a desktop-width window', () => {
-    // The Flutter equivalent measured the rendered heading at 2560×1440; the cap
-    // itself is the property that test was really asserting.
+    // The cap itself is the property that matters — asserting the rendered
+    // width at a desktop resolution would only re-measure it.
     expect(contentMaxWidth).toBeLessThan(1200);
   });
 });

@@ -72,12 +72,11 @@
     "ci": "npm run tokens:check && npm run format && npm run lint && npm run typecheck && npm run test"
   },
   "//devDependencies": [
-    "ESLint/Prettier versions match apps/insolvia_marketing deliberately — the",
-    "app added in PR 3 is told to match marketing's lint setup, so a second",
-    "ESLint major in the repo would be a trap, not a choice.",
+    "ESLint/Prettier versions match apps/insolvia_marketing deliberately — a",
+    "second ESLint major in the repo would be a trap, not a choice.",
     "TypeScript is 5.9 rather than the 7.x line: `erasableSyntaxOnly` (5.8+) is",
-    "the feature this workspace depends on, and adopting a rewritten compiler in",
-    "the middle of a toolchain migration would confound any failure."
+    "the feature this workspace depends on, and adopting the rewritten 7.x",
+    "compiler would be a deliberate upgrade of its own, not a default."
   ],
   "devDependencies": {
     "@eslint/js": "^9.17.0",

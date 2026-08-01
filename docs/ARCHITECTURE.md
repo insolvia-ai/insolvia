@@ -80,12 +80,9 @@ exact package and secret names, so this paragraph avoids writing them.) Root
 [`CLAUDE.md`](../CLAUDE.md) carries the applicability table for those.
 
 **Desktop is not built.** No macOS or Windows targets, no per-OS CI jobs, no
-artifact hosting. [ADR 0004](adr/0004-react-native-replaces-flutter.md) records
-the trade — under Flutter one toolchain built every target, so the option was
-nearly free; under React Native it would be a port. **Mobile is the held-open
-target now**,
-and `expo prebuild` holds it open with nothing committed under `ios/`/`android/`
-and no CI job at all.
+artifact hosting — [ADR 0004](adr/0004-react-native-replaces-flutter.md) records
+the trade. **Mobile is the held-open target**, and `expo prebuild` holds it open
+with nothing committed under `ios/`/`android/` and no CI job at all.
 
 ## Environment model (staging vs production)
 
@@ -102,10 +99,8 @@ the active environment so staging vs prod is visually obvious.
 
 **The `EXPO_PUBLIC_` prefix is not a style choice.** Expo inlines *only*
 variables named `EXPO_PUBLIC_*` into the client bundle; anything else is simply
-absent at runtime, with no error. That is why the old `--dart-define`
-`INSOLVIA_ENV` became `EXPO_PUBLIC_INSOLVIA_ENV` rather than keeping its name —
-the rename was forced by the bundler, and a stray `INSOLVIA_ENV` in a workflow
-would read as `local` in production.
+absent at runtime, with no error — a workflow that sets a bare `INSOLVIA_ENV`
+would silently read as `local` in production.
 
 The corollary is that **nothing secret may go in an `EXPO_PUBLIC_*` variable.**
 Everything so prefixed is compiled into a public static asset. Per
@@ -115,7 +110,7 @@ credentials anyway, so there is nothing that wants to be there.
 ## Web hosting topology
 
 `expo export -p web` produces a **static** SPA (`web.output: "single"`), so
-hosting is unchanged from the Flutter era and intentionally compute-free:
+hosting is intentionally compute-free:
 
 ```
 Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.html on 403/404)  →  S3 (private, OAC)
@@ -169,7 +164,7 @@ service in order. Three things make that dispatch safe:
   broken build live. Rollback is `aws lambda update-alias --function-version
   <previous>`: seconds, no rebuild, no image pull.
 
-Prod deploys no longer run `terraform apply`. Applying prod infrastructure is
+Prod deploys do not run `terraform apply`. Applying prod infrastructure is
 `infra-prod.yml` alone (`prod-deploy.sh prod-infra`, `mode: plan` by default),
 so a routine code deploy cannot carry unrelated infra drift into production.
 
@@ -208,8 +203,7 @@ scripts/update-ruleset.sh show
 
 **Do not hard-code a ruleset id here or anywhere else.** A ruleset recreated in
 the UI comes back with a new id, and the stale one 404s with no hint that the
-number is the problem. This document used to print `18947945`; the live ruleset
-is a different id today, which is exactly why the script resolves
+number is the problem — which is why the script resolves
 `name == "protect-main"` through `/repos/{owner}/{repo}/rulesets` and then uses
 whatever id that returns. If you need the raw JSON, get the id the same way
 first.
@@ -241,14 +235,6 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 | `Terraform validate (shared)` | `shared-infra-plan.yml` |
 | `Terraform validate (staging)` | `shared-infra-plan.yml` |
 | `Terraform validate (prod)` | `shared-infra-plan.yml` |
-
-This list was twelve before the Expo migration. Four checks went away with the
-Flutter stack — `Flutter app`, `macOS build` and `Windows build` collapsed into
-the single `App` job, and `Flutter design system` disappeared with its package —
-and `Dart API client` was renamed `API client`. The design-system cutover then
-swapped `React design system` for `Design system` when the cross-platform
-package replaced the web-only one. **A rename is a ruleset change**, per the
-contract note below.
 
 `Terraform validate (ci-trust)` and `(dev)` run alongside the three above but
 are deliberately **not** required — neither environment is ever applied by CI,

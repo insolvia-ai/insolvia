@@ -10,20 +10,14 @@ name: Design system · PR
 #
 # The ruleset matches the job name `Design system` by EXACT name (see the
 # insolvia-branch-protection skill), so renaming the job silently orphans the
-# gate. This filename carried the Flutter design system's gate before the Expo
-# cutover deleted it; this is a new workflow for the cross-platform package at
-# packages/insolvia_design_system, not a revival of that one.
-#
-# The old web-only package this one replaced (insolvia_design_system_react,
-# 0.1.x) and its design-system-react-*.yml workflows are gone — deleted in the
-# marketing-cutover PR after both gates briefly ran side by side.
+# gate.
 on:
   pull_request:
 
 permissions:
   contents: read
 
-# No `defaults.run.working-directory`, unlike design-system-react-pr.yml: this
+# No `defaults.run.working-directory`: this
 # package is an npm *workspace member*, so every step below runs at the repo
 # root — the install is the root `npm ci`, and the package's own scripts are
 # reached with `--workspace` (same shape as api-client-pr.yml).

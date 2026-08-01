@@ -16,7 +16,7 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
 
-  # The JS/TS half — what `melos run format` used to cover for Dart.
+  # The JS/TS half.
   #
   # `language: system` (not `node`): pre-commit's own node environments would
   # install a SECOND copy of the toolchain, pinned separately from the

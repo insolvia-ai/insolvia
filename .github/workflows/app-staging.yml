@@ -30,8 +30,7 @@ concurrency:
 jobs:
   # ── Build + publish the artifact (no AWS credentials needed) ────
   #
-  # Still a separate job from `deploy` now that the desktop builds are gone, for
-  # two reasons that outlived them: the build runs BEFORE the
+  # A separate job from `deploy`, for two reasons: the build runs BEFORE the
   # `environment: insolvia-staging` gate, so a broken build never consumes an
   # approval, and the uploaded artifact is the record of what actually shipped.
   build-web:
@@ -72,7 +71,7 @@ jobs:
       # explains why it must stay there. Do not append `-- --clear` here:
       # expo rejects a repeated flag outright ("Can only provide one instance
       # of -c or --clear"), which is how a doubled flag once broke this very
-      # deploy on its first post-cutover run.
+      # deploy.
       - name: Build web (staging)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: staging
@@ -122,13 +121,7 @@ jobs:
 
       # ── Two-tier cache sync, inline ──────────────────────────────────────
       #
-      # This replaces the `web-bundle-sync` composite action, which existed
-      # because Flutter web content-hashes NOTHING (issue #49, commit 5108690):
-      # every filename it emitted was stable while the bytes changed every
-      # deploy, so nothing in the bundle could be marked immutable and the
-      # action needed three tiers to say so.
-      #
-      # Expo hashes. Verified against a real export:
+      # Expo content-hashes its bundle. Verified against a real export:
       #   _expo/static/js/web/entry-<hash>.js
       #   _expo/static/css/global-<hash>.css
       # so everything under `_expo/` is content-addressed and genuinely safe to
@@ -173,7 +166,7 @@ jobs:
           aws s3 sync "$SRC" "s3://$BUCKET" --exclude "_expo/*" \
             --cache-control "no-cache,no-store,must-revalidate"
 
-          # 3. The invalidation the deleted composite action used to issue.
+          # 3. Invalidate the edge.
           #    Tier 2 is `no-store` at the browser, but CloudFront's managed
           #    CachingOptimized policy has a 1s minimum TTL that overrides an
           #    origin `no-cache`, so the edge still needs telling.

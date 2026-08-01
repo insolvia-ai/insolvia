@@ -32,10 +32,7 @@ export default defineConfig(({ command }) => ({
     // @insolvia-ai/design-system must ALWAYS be bundled, dev and build alike:
     // it ships raw .ts/.tsx whose extensionless platform-split leaf imports
     // only Vite (via the `extensions` list above) can resolve — Node at SSR
-    // runtime cannot. (The previous web-only package shipped compiled JS, so
-    // it was bundled only for the production build, to spare the Lambda image
-    // registry auth and its Base UI dependency subtree; that subtree — and its
-    // dev-SSR-hostile CJS deps like use-sync-external-store — is gone.)
+    // runtime cannot.
     //
     // clsx + tailwind-merge (the package's only runtime deps) still join only
     // for the production build: the Docker image installs with

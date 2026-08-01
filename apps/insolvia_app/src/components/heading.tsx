@@ -14,12 +14,11 @@ export interface HeadingProps {
   /**
    * The heading level, chosen for **document structure** and nothing else.
    *
-   * Required, and never inferred from `size`. The component library this
-   * codebase rejected derived the tag from the visual size, so picking a
-   * smaller heading for looks silently broke the outline — `heading-order`
-   * failed on two of three spike routes. Skipping a level (an `<h1>` followed
-   * by an `<h3>`) is still a defect this component cannot catch for you; the
-   * axe assertion in CI is what catches it.
+   * Required, and never inferred from `size`: deriving the tag from the visual
+   * size lets picking a smaller heading for looks silently break the document
+   * outline (`heading-order`). Skipping a level (an `<h1>` followed by an
+   * `<h3>`) is still a defect this component cannot catch for you; the axe
+   * assertion in CI is what catches it.
    */
   level: HeadingLevel;
 

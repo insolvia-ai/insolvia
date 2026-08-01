@@ -36,8 +36,7 @@ that natively, and marketing's Vite does it by bundling the package
 `src/styles/theme.css` is **generated** from
 `packages/insolvia_tokens/tokens.json` — never hand-edited; `npm run
 tokens:check` at the root fails CI on drift. It ships inside the published
-package under the same public specifier as the 0.1.x line:
-`@insolvia-ai/design-system/theme.css`.
+package as `@insolvia-ai/design-system/theme.css`.
 
 ## Two consumers, two channels
 
@@ -64,19 +63,9 @@ package remains the single token source: `tokens.json` plus the TypeScript
 generator, which emits the design system's `theme.css` (above) and the typed
 `tokens.ts` that the `.native` leaves read.
 
-> **History — two predecessors.** A Flutter package once occupied this same
-> directory name, published as annotated git tags
-> `insolvia_design_system-v<version>`, and went with the Flutter stack under
-> D9 (mechanism at `git show 17d2e37`). **Its tag
-> `insolvia_design_system-v0.1.2` is still on the remote and is orphaned:**
-> nothing resolves it, deleting a published tag is the one irreversible step
-> here, and it misleads nobody while this paragraph exists. Its web-only
-> successor, `packages/insolvia_design_system_react` (Base UI + Tailwind,
-> tsup-built, `@insolvia-ai/design-system` 0.1.x), was replaced by the
-> cross-platform package publishing the **same npm name** on the 0.2.x line —
-> safe because publishing is idempotent by version, so the two lines could
-> coexist without overwriting each other. That package and its
-> `design-system-react-*.yml` workflows are deleted.
+> Orphaned git tags `insolvia_design_system-v0.1.*` remain on the remote from a
+> predecessor package; nothing resolves them, and deleting a published tag is
+> irreversible, so they stay.
 
 ## The registry: `@insolvia-ai/design-system` on GitHub Packages
 
@@ -216,8 +205,7 @@ The `@source` line is not optional. Tailwind v4 scans your own source for class
 names, but the design system's classes live in its published `src` inside
 `node_modules`, which Tailwind does not scan by default. Omit it and the
 components render completely unstyled — the utilities they reference are simply
-never generated. This is the classic "why are my styles gone" bug (MVP_PLAN
-3.2).
+never generated. This is the classic "why are my styles gone" bug.
 
 ```tsx
 import { Button, Card, Field } from '@insolvia-ai/design-system';
@@ -233,7 +221,7 @@ A web consumer also owns two pieces of resolution wiring, both in marketing's
 extensionless leaf imports pick `<name>.web.tsx`) and the bundling described
 next.
 
-### The `ssr.noExternal` trick — and why it is now mandatory
+### The `ssr.noExternal` trick — and why it is mandatory
 
 The marketing site is server-rendered and deployed as a **Lambda container
 image**. By default Vite treats dependencies as **external** for the SSR
@@ -256,14 +244,14 @@ export default defineConfig({
 });
 ```
 
-Two reasons, one older than the other:
+Two reasons:
 
-- **It is now load-bearing, not just hygiene.** The package publishes
+- **It is load-bearing, not just hygiene.** The package publishes
   TypeScript source, and Node cannot import `.ts`/`.tsx` from `node_modules`
   at runtime — so the SSR build *must* transpile and bundle the package.
   Removing `noExternal` does not merely re-introduce a token problem; it
   breaks the server outright.
-- **The token stays out of the runtime image**, the original reason. With the
+- **The token stays out of the runtime image.** With the
   package bundled at build time, the private-registry dependency is a
   build-time-only concern: the token lives in the build environment (GitHub
   Actions), never in the deployed image, and the runtime Lambda ships without

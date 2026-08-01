@@ -19,8 +19,7 @@ export interface EnvBadgeProps {
  *
  * The accessible name spells the host out ("Staging environment,
  * staging-app.insolvia.ai") because the visible text is an all-caps
- * abbreviation, and the Flutter badge carried the host in a tooltip that has no
- * React Native equivalent.
+ * abbreviation.
  */
 export function EnvBadge({ env }: EnvBadgeProps) {
   const theme = useTheme();
@@ -49,7 +48,6 @@ export function EnvBadge({ env }: EnvBadgeProps) {
 /**
  * Applies an alpha to a token color without inventing a new one.
  *
- * The Flutter badge used `Color.withValues(alpha:)` on the same accent token.
  * Tokens are `#RRGGBB` (or `#RRGGBBAA` for the dark hairline), and React Native
  * accepts 8-digit hex on every platform, so the alpha is appended rather than
  * blended — the underlying hue stays the token's.

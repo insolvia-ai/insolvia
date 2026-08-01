@@ -3,12 +3,12 @@ name: Marketing · Deploy · Staging
 # Deploys staging-www.insolvia.ai: SSR Lambda image + hashed client assets on
 # S3, both behind one CloudFront distribution (infra/modules/marketing_site).
 #
-# The marketing site used to be production-only (issue #45, decision D2 —
-# "production + PR previews only"). That is reversed: the SES production-access
-# request (issue #80 / 6.8) is reviewed against a live privacy policy and a
-# working unsubscribe path, and those need somewhere to be exercised before
-# prod serves them. PR previews, the thing D2 leaned on instead, were never
-# built. See infra/envs/staging/main.tf and docs/MVP_PLAN.md.
+# Staging exists because the SES production-access request (issue #80 / 6.8)
+# is reviewed against a live privacy policy and a working unsubscribe path,
+# which need somewhere to be exercised before prod serves them. This reverses
+# decision D2 ("production + PR previews only", issue #45); the PR previews D2
+# leaned on were never built. See infra/envs/staging/main.tf and
+# docs/MVP_PLAN.md.
 #
 # Staging serves a full public copy of the site, and that is safe for SEO only
 # because the app noindexes every host that is not exactly www.insolvia.ai
@@ -17,9 +17,9 @@ name: Marketing · Deploy · Staging
 # compete with production for its own keywords.
 #
 # FIRST-EVER DEPLOY (bootstrap — manual, once): the SSR Lambda cannot be
-# created until an image exists in the ECR repository. The repository is no
-# longer created by this env — `insolvia-marketing` is shared across
-# environments and lives in infra/envs/shared, applied first (see
+# created until an image exists in the ECR repository. The repository is not
+# created by this env — `insolvia-marketing` is shared across environments and
+# lives in infra/envs/shared, applied first (see
 # infra/modules/marketing_site/main.tf):
 #
 #   terraform -chdir=infra/envs/shared apply     # creates insolvia-marketing

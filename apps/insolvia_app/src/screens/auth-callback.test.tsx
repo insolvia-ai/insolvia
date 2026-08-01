@@ -4,7 +4,6 @@ import path from 'node:path';
 import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
-/** The port of `app_router_test.dart`'s Cognito-callback group. */
 describe('the /auth/callback route', () => {
   it('is declared at exactly the path infra registers', () => {
     // A drift guard. `web_callback_urls` in infra/modules/auth/main.tf is
