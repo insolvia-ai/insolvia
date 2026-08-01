@@ -2,7 +2,7 @@
 
 The owned, platform-split design system, published as
 `@insolvia-ai/design-system` (0.2.x). Human docs: [`README.md`](README.md).
-Publishing flow: [`docs/PACKAGE_PUBLISHING.md`](../../docs/PACKAGE_PUBLISHING.md).
+Publishing flow: [`docs/reference/package-publishing.md`](../../docs/reference/package-publishing.md).
 
 - **Three files per component**: `<name>.props.ts` (shared), `<name>.web.tsx`
   (React DOM + Tailwind), `<name>.native.tsx` (RN primitives over
