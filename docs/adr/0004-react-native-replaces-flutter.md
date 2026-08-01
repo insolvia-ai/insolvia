@@ -1,10 +1,13 @@
 # ADR 0004 — React Native on Expo replaces Flutter, on bare primitives
 
-- **Status:** Accepted
+- **Status:** Accepted — the *Marketing stays put* section's two-design-systems
+  ending is revised by [ADR 0006](0006-owned-cross-platform-design-system.md)
 - **Date:** 2026-07-29
 - **Relates to:** decision D9 in `docs/MVP_PLAN.md` (which supersedes D8);
   supersedes [ADR 0002](0002-desktop-auto-update-deferred.md); superseded
-  layout rules in [ADR 0003](0003-flutter-app-layout.md) → [0005](0005-expo-app-layout.md)
+  layout rules in [ADR 0003](0003-flutter-app-layout.md) → [0005](0005-expo-app-layout.md);
+  *Marketing stays put* revised by
+  [ADR 0006](0006-owned-cross-platform-design-system.md)
 
 ## Decision
 
@@ -139,6 +142,16 @@ when we own the code.**
   that association.
 
 ### Marketing stays put — and why that is a product call
+
+> **Revised by [ADR 0006](0006-owned-cross-platform-design-system.md),
+> 2026-07-31 — the "two design systems" ending only.** Marketing did stay put,
+> and still does; the weight argument below is untouched and still governs.
+> What changed is the mechanism in the closing paragraph: the two renderings
+> of one design now live in **one** platform-split package
+> (`packages/insolvia_design_system`) instead of two packages sharing token
+> values only. The final sentence proved right on its own terms — the surfaces
+> converged without marketing ever taking on react-native-web, and 0006
+> carries the measurements that show it cost nothing.
 
 Bare primitives *do* pass all seven gates, so moving `apps/insolvia_marketing`
 onto the same stack is technically viable. It is still a downgrade: 2.3× the

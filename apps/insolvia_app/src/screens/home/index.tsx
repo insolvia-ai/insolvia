@@ -1,8 +1,8 @@
+import { Button } from '@insolvia-ai/design-system';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
-import { Button } from '@/components/button';
 import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
 import { appEnvironment, environmentInfo } from '@/config/environment';
@@ -37,8 +37,20 @@ export function Home() {
       </Text>
 
       <View style={styles.actions}>
-        <Button label="Start a case" icon="→" onPress={showSoon} />
-        <Button label="Open a case" variant="secondary" onPress={showSoon} />
+        {/*
+          The design system's Button (its .native leaf — see metro.config.js).
+          `size="lg"` (48dp) because the package's md is 40dp, under the 44dp
+          WCAG 2.5.5 target-size floor the old app button enforced. The arrow is
+          a decorative glyph, not part of the name: it renders `aria-hidden` and
+          `aria-label` pins the accessible name to exactly the visible label,
+          so a screen reader never announces "Start a case right arrow".
+        */}
+        <Button size="lg" aria-label="Start a case" onPress={showSoon}>
+          Start a case <Text aria-hidden>→</Text>
+        </Button>
+        <Button size="lg" intent="secondary" onPress={showSoon}>
+          Open a case
+        </Button>
       </View>
 
       {/*

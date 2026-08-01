@@ -19,6 +19,16 @@ script weight and LCP worse. The numbers are in
 proposing one, because "we should just add NativeWind" is the first thing this
 setup invites and it has already been tested and rejected.
 
+The app *does* consume `@insolvia-ai/design-system`, and that is not the thing
+this paragraph forbids. What ADR 0004 measured and rejected is a **third-party**
+component library and a **styling runtime**; the design system is our own code,
+and its `.native` leaves are exactly the pattern above — bare RN primitives plus
+`StyleSheet.create` over `@insolvia-ai/tokens`, no new dependency, no styling
+runtime in the bundle. (The package's Tailwind class strings live in its `.web`
+leaves and shared props modules for the marketing site; the app never builds
+that CSS.) The split is
+[ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md).
+
 **Expo's free tier only.** None of the paid EAS services — no Build, Submit,
 Update, Hosting; no EAS config file, no EAS command-line tool, no Expo account or
 access token in CI, and no over-the-air updates package. Web builds run in GitHub
@@ -47,7 +57,8 @@ src/
 │   └── +not-found.tsx      the catch-all; load-bearing, see below
 ├── screens/                screen bodies the routes render
 │   └── home/index.tsx      a screen's private components live beside it
-├── components/             OUR design system — RN primitives, no library
+├── components/             APP-SPECIFIC UI — RN primitives, no library
+│                           (Button and Field come from the design system)
 ├── config/environment.ts   build-time configuration
 └── theme.ts                StyleSheet helpers over @insolvia-ai/tokens
 ```
@@ -63,8 +74,8 @@ Rules that follow from it:
   `StyleSheet` block runs once at module load and cannot read the color scheme;
   spacing, radii and type sizes are scheme-independent and so are read statically
   from `@/theme`.
-- **Tests are colocated** — `button.tsx` is tested by `button.test.tsx` beside it,
-  not in a mirrored `__tests__/` tree.
+- **Tests are colocated** — `heading.tsx` is tested by `heading.test.tsx` beside
+  it, not in a mirrored `__tests__/` tree.
 - **`@/*` is aliased to `./src/*`.** Prefer it over relative imports.
 - **Create folders when the second file arrives, not before.** A folder holding one
   file carries no information.
@@ -73,29 +84,53 @@ Rules that follow from it:
 
 ## Accessibility is this directory's main job
 
-`components/` is a small hand-built design system, and it exists in this shape
-because react-native-web maps `role` props onto real HTML elements
-(`propsToAccessibilityComponent.js`). That mapping is the whole accessibility
-story, and it only fires if a component asks for it:
+UI comes from two places, both rendering bare RN primitives:
 
-| Component    | Primitive + role                            | Emits                          |
-| ------------ | ------------------------------------------- | ------------------------------ |
-| `Heading`    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
-| `Button`     | `Pressable role="button"`                   | `<button type="button">`       |
-| `AppShell`   | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
-| `Field`      | `Text nativeID` + `TextInput aria-labelledby` | a correctly associated pair  |
-| `Wordmark`, `EnvBadge` | `Text` / `View`                   | —                              |
+- **`Button` and `Field` come from `@insolvia-ai/design-system`** — specifically
+  its `.native` leaves, which a `resolveRequest` override in
+  [`metro.config.js`](metro.config.js) resolves on **every** platform, web
+  included (the long comment there owns the reasoning: this app renders the RN
+  dialect via react-native-web and has no Tailwind pipeline, so a `.web` leaf
+  would arrive unstyled). Import them from `@insolvia-ai/design-system`, never
+  by deep path.
+- **Everything else in `components/` is app-specific** — the shell chrome and
+  branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`) that marketing has no
+  use for. It stays here by decision
+  ([ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md)).
+
+Both exist in this shape because react-native-web maps accessibility props onto
+real HTML elements (`propsToAccessibilityComponent.js`). That mapping is the
+whole accessibility story, and it only fires if a component asks for it:
+
+| Component    | Source | Primitive + role                            | Emits                          |
+| ------------ | ------ | ------------------------------------------- | ------------------------------ |
+| `Heading`    | app    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
+| `Button`     | design system | `Pressable accessibilityRole="button"` | `<button type="button">`       |
+| `AppShell`   | app    | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
+| `Field`      | design system | compound `Field.Root/Label/Control/Description/Error` | labelled input group |
+| `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
 
 Three rules, each of which was a real defect in the library this codebase rejected:
 
 - **`Heading` takes `level` for document structure and a separate `size` for
   appearance.** Never derive the tag from how big the text should look — that is
   what produced `heading-order` failures in the spike.
-- **`Field` is the only way to render an input.** No bare `TextInput` in a screen,
-  ever, so an unlabelled input cannot be written by accident.
-  `field.test.tsx` asserts the wiring; keep it.
+- **The design system's `Field` is the only way to render an input.** No bare
+  `TextInput` in a screen, ever, so an unlabelled input cannot be written by
+  accident. The package's own suite asserts the label/control wiring; screen
+  tests assert this app's usage.
 - **No `role="region"`.** A `<section>` without an accessible name is invalid ARIA
   and axe flags it. Open a block with a heading instead.
+
+Two usage rules the package's API makes easy to drop, both asserted in
+`src/screens/home/index.test.tsx`:
+
+- **Decorative glyphs never enter the accessible name.** The package button is
+  children-based with no `icon` prop, so a trailing glyph is an
+  `aria-hidden` `<Text>` child *and* `aria-label` pins the name to the visible
+  label (WCAG 2.5.3) — see the home screen's CTA.
+- **Buttons are `size="lg"`.** The package's `md` is 40dp, under the 44dp
+  WCAG 2.5.5 target-size floor this app enforces.
 
 ## `public/index.html` — the SPA shell, and its one sharp edge
 

@@ -1,8 +1,8 @@
+import { Button } from '@insolvia-ai/design-system';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
-import { Button } from '@/components/button';
 import { Heading } from '@/components/heading';
 import { fontSizes, useTheme } from '@/theme';
 
@@ -35,12 +35,15 @@ export function NotFound({ location }: NotFoundProps) {
       <Text style={[styles.body, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
         Nothing lives at {location}.
       </Text>
+      {/* size="lg": the package's md is 40dp, under the 44dp target-size floor. */}
       <Button
-        label="Back to home"
+        size="lg"
         onPress={() => {
           router.replace('/');
         }}
-      />
+      >
+        Back to home
+      </Button>
     </AppShell>
   );
 }

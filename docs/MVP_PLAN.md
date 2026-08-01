@@ -142,7 +142,11 @@ listed in `allowedActionOrigins` in `react-router.config.ts`.
 > render targets moved into **one** package,
 > `packages/insolvia_design_system` (a shared props module plus a `.web` and
 > a `.native` leaf per component; `insolvia_design_system_react` is deleted).
-> The current story is [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
+> The app now consumes that package too — as a workspace member, rendering
+> the `.native` leaves on every platform — so the table's *"its own
+> components, not a package"* row is history as well. The decision record is
+> [ADR 0006](adr/0006-owned-cross-platform-design-system.md); the operational
+> story is [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md).
 
 > **Revised by D9, 2026-07-29.** The *shape* of this decision survives intact —
 > one neutral token source, generated into per-stack artifacts, never one stack
@@ -552,7 +556,10 @@ above.
 > describe the repo: the Dart half of 2.1/2.2 is gone (the generator is
 > TypeScript and emits marketing's `theme.css` plus the app's typed `tokens.ts`),
 > and `design-system-pr.yml` in 2.8 is deleted along with the Flutter package.
-> The React package, its scope cap and its parity discipline are untouched.
+> The React package survived D9 untouched, then was itself replaced by the
+> cross-platform `packages/insolvia_design_system` — see D4's second revision
+> and [ADR 0006](adr/0006-owned-cross-platform-design-system.md). Its scope
+> cap and parity discipline carried over into that package.
 
 **Outcome:** one token source of truth driving both a Flutter package and a
 React package, so the marketing site is on-brand by construction rather than by
@@ -606,9 +613,11 @@ with the apex redirecting to it.
 > of it was built and all of it is now deleted — D9 explains why holding that
 > option open stopped being cheap. The rows stay because *"why did the repo once
 > have a Windows build?"* is a question the git history answers badly and this
-> answers well. 4.1–4.4 and 4.12 are live and still describe the web app; 4.4's
-> components are now the app's own React Native ones rather than the Flutter
-> design system's.
+> answers well. 4.1–4.4 and 4.12 are live and still describe the web app. 4.4's
+> components have moved twice: the Flutter design system's → the app's own
+> React Native ones (D9) → the shared cross-platform package,
+> `@insolvia-ai/design-system`
+> ([ADR 0006](adr/0006-owned-cross-platform-design-system.md)).
 
 **Outcome:** infrastructure proven end-to-end for both delivery targets, with a
 deliberately minimal home page. Per the brief: *"we can just put up a really
@@ -808,11 +817,14 @@ Not questions — just the things most likely to bite, in order:
    the opposite one: while it's outstanding we can receive mail at
    `@insolvia.ai` but cannot reply from it, so the mailbox is half-built. Set a
    date rather than leaving it open-ended.
-8. **Design-system parity drift.** Contained by the six-component scope limit in
-   D4 — which only holds if issue 2.9 actually writes it into CLAUDE.md. D9 did
-   not change the shape of this risk: there are still two implementations of one
-   design, and the second one is now the app's own React Native components
-   rather than a Flutter package.
+8. **Design-system parity drift — restructured by the cross-platform package
+   ([ADR 0006](adr/0006-owned-cross-platform-design-system.md)).** There are
+   still two renderings of one design, but they are now the `.web` and
+   `.native` leaves of one component in one package, reviewed side by side
+   against one shared props module — drift shows up as a diff in a single PR
+   instead of as skew between two packages kept in sync by discipline. What
+   remains is the per-component leaf-pair cost, which 0006 records honestly
+   along with its revisit trigger. The scope cap still applies.
 
 ---
 

@@ -59,6 +59,25 @@ describe('the home route', () => {
     expect(screen.getByText(`Serving ${env.label.toLowerCase()} · ${env.host}`)).toBeTruthy();
   });
 
+  it('keeps the decorative arrow glyph out of the primary CTA accessible name', () => {
+    // Ported from the deleted components/button.test.tsx when Button moved to
+    // @insolvia-ai/design-system: the package button has no `icon` prop, so the
+    // glyph is now an `aria-hidden` child at the call site and `aria-label`
+    // pins the name. If either half were dropped, a screen reader would
+    // announce "Start a case right arrow".
+    renderRouter('src/app', { initialUrl: '/' });
+
+    // RN aliases `aria-label` onto `accessibilityLabel` on the host element,
+    // which is the prop react-native-web emits as `aria-label` in the DOM.
+    const cta = screen.getByRole('button', { name: 'Start a case' });
+    expect(cta.props.accessibilityLabel).toBe('Start a case');
+
+    // The glyph renders (visible when hidden elements are included) but is
+    // excluded from the accessibility tree.
+    expect(screen.queryByText('→')).toBeNull();
+    expect(screen.getByText('→', { includeHiddenElements: true })).toBeTruthy();
+  });
+
   it('answers the primary CTA with an announced notice', async () => {
     renderRouter('src/app', { initialUrl: '/' });
 

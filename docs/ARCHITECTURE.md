@@ -10,7 +10,8 @@ insolvia/
 │   │   └── src/
 │   │       ├── app/                   Expo Router routes ONLY (+not-found.tsx)
 │   │       ├── screens/               screen bodies the routes render
-│   │       ├── components/            our design system — RN primitives
+│   │       ├── components/            app-local components — RN primitives
+│   │       │                          (Button/Field come from the package)
 │   │       ├── config/                environment.ts (EXPO_PUBLIC_INSOLVIA_ENV)
 │   │       └── theme.ts               StyleSheet helpers over the tokens
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
@@ -43,7 +44,13 @@ behind all of it, including the measurements that ruled out a component library.
 - **One design system, one token source.** `packages/insolvia_design_system`
   (`@insolvia-ai/design-system`) is platform-split — per component, a shared
   props module plus a `.web` and a `.native` leaf, with the consumer's bundler
-  picking the leaf. Token *values* still generate from
+  picking the leaf. **Both surfaces consume it:** marketing installs the
+  published version and Vite picks the `.web` leaves; the app consumes source
+  through the workspace, and a scoped `resolveRequest` override in its
+  `metro.config.js` prefers the `.native` leaves on every platform, web
+  included — react-native-web renders them, and no Tailwind enters the app.
+  [ADR 0006](adr/0006-owned-cross-platform-design-system.md) is the decision
+  record, with the measurements. Token *values* still generate from
   `packages/insolvia_tokens/tokens.json`: the package's `theme.css` for web, a
   typed `tokens.ts` for native — see
   [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) and the package's own docs.

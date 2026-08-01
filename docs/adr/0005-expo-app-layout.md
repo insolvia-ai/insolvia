@@ -29,6 +29,14 @@ apps/insolvia_app/
     └── theme.ts                (hooks/ · utils/ arrive with their first file)
 ```
 
+> **Note ([ADR 0006](0006-owned-cross-platform-design-system.md),
+> 2026-07-31).** The `components/` label above is now half-true: the shared
+> behavioral components (Button, Field) live in
+> `packages/insolvia_design_system` and are imported from
+> `@insolvia-ai/design-system`, while `src/components/` keeps the app-local
+> chrome (app shell, wordmark, environment badge, heading) — still RN
+> primitives, still no library. The layout rule itself is unchanged.
+
 Styles are a `StyleSheet.create({ … })` block at the bottom of the file that
 uses them, never a separate `.styles` file. Tests sit beside the file they test
 (`format-date.test.ts` next to `format-date.ts`), not in a `__tests__/` folder.
