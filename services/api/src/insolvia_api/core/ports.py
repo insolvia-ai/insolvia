@@ -1,9 +1,30 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
+
+
+class JwksProvider(Protocol):
+    """Supplies the public key a JWT's `kid` names (issue #79).
+
+    This port exists so `core/auth.py` can stay pure. Verification needs a
+    key; fetching one needs the network, and `core` may not have it. The real
+    implementation (adapters/aws/jwks_provider.py) reads the Cognito pool's
+    `<issuer>/.well-known/jwks.json` over stdlib urllib and caches by `kid`;
+    the static one (adapters/memory/jwks_provider.py) is handed keys directly
+    and is what the tests sign against.
+
+    Implementations MUST raise `insolvia_api.core.auth.AuthenticationError`
+    with `AuthFailureReason.UNKNOWN_KEY` for a `kid` they cannot resolve —
+    including after a refresh. Returning None or a placeholder would push a
+    "no key" case into the verifier, where the safe branch is easy to miss.
+    """
+
+    def signing_key(self, kid: str) -> Any:
+        """The key for `kid`, in whatever form PyJWT's `decode` accepts."""
+        ...
 
 
 class WaitlistStore(Protocol):

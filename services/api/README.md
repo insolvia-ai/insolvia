@@ -80,6 +80,15 @@ directory; ruff config is the repo-root `ruff.toml`).
 |---|---|
 | `INSOLVIA_ENV` | `local` (default) \| `staging` \| `production`; also selects the CORS allowlist (`core/config.py`) |
 | `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
+| `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
+| `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
+
+Both auth variables are published to SSM as `/insolvia/<env>/api/auth-issuer-url`
+and `.../auth-client-id` and re-derived into the Lambda's environment by the
+deploy workflow. **Unset never means "skip the check"**: `GET /v1/me` and every
+future protected route answer 401 without them (`core/auth.py`), the same
+fail-closed rule `UNSUBSCRIBE_SECRET` follows. Locally, `infra/envs/dev` outputs
+`auth_issuer_url` and `auth_web_client_id` for this machine's own pool.
 
 CORS (issue #68) is an exact-origin allowlist — production:
 `https://app.insolvia.ai`; staging: `https://staging-app.insolvia.ai` plus
@@ -87,3 +96,20 @@ localhost dev origins; local: localhost only. No wildcard: the desktop app
 sends no `Origin` (CORS not in play), and `www.insolvia.ai` is absent on
 purpose (its waitlist call is server-to-server). Logging (issue #69) is one
 JSON line per request — metadata only, never bodies or PII (GLBA).
+
+## Authentication
+
+The client sends the Cognito **access token** (not the ID token) as
+`Authorization: Bearer <jwt>`. The service verifies the RS256 signature against
+the pool's JWKS, then `iss`, `token_use == "access"`, `client_id`, and expiry —
+Cognito access tokens carry `client_id` and no `aud`, so `aud` is deliberately
+not checked. `GET /v1/me` answers from those verified claims alone; there is no
+call back to Cognito, and no email (the pool's `username_attributes` is
+`["email"]`, so an access token's `username` is a generated UUID — the app
+displays the address from the ID token it already holds).
+
+Routes are public unless decorated: `@require_auth` from `api/auth.py`, applied
+**below** the route decorator. `/health`, `POST /v1/waitlist`, and
+`POST /v1/unsubscribe` are public on purpose (see their docstrings). Every
+rejection is a 401 with `{"error": "Unauthorized", "message": "authentication
+required"}` — the reason stays in the log.

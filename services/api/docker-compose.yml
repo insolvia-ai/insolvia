@@ -21,6 +21,12 @@ services:
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
       WAITLIST_TABLE_NAME: ${WAITLIST_TABLE_NAME:-}
+      # Auth (issue #79). Unset is safe and fails CLOSED: every protected
+      # route answers 401 rather than skipping verification. Point them at
+      # this machine's own Cognito pool (infra/envs/dev outputs
+      # auth_issuer_url / auth_web_client_id) to exercise a real sign-in.
+      AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
