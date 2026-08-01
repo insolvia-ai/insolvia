@@ -48,9 +48,15 @@
     "57.0.8 / React Native 0.86.0 / React 19.2.3 / expo-router 57.0.8. Upgrade",
     "with `npx expo install --check`, never one package at a time.",
     "",
-    "@insolvia-ai/api-client is wired in but not yet imported: it sits beside",
-    "src/config/environment.ts's apiBaseUrl so the first API-backed feature only",
-    "has to import it."
+    "@insolvia-ai/api-client is consumed by src/components/me-panel.tsx (GET",
+    "/v1/me), built with the accessToken provider seam that src/session hands it.",
+    "",
+    "Sign-in adds NO dependency: PKCE is Web Crypto and storage is the platform",
+    "localStorage/sessionStorage, each read lazily behind a guard in",
+    "src/session/browser.ts. expo-auth-session, expo-secure-store and",
+    "async-storage are deliberately absent — a future NATIVE client (custom-scheme",
+    "redirect, system browser, platform secure store) is what would justify the",
+    "first of them; on web it would buy nothing. See docs/adr/0007."
   ],
   "dependencies": {
     "@insolvia-ai/api-client": "*",

@@ -1,0 +1,8 @@
+# Playwright run artifacts. These can contain a rendered screenshot of a
+# signed-in session and, for a locally-recorded trace, the value typed into the
+# password field — see the `trace`/`screenshot` comments in
+# playwright.config.ts. The repo is public; none of this is ever committed.
+test-results/
+playwright-report/
+blob-report/
+.playwright/

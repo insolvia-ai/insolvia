@@ -14,6 +14,9 @@ on:
       - "infra/envs/staging/**"
       - "infra/modules/**"
       - ".github/workflows/app-staging.yml"
+      # The post-deploy E2E suite is part of what makes this run green, so a
+      # change to it must re-run the workflow that enforces it.
+      - "e2e/**"
   workflow_dispatch:
 
 permissions:
@@ -27,13 +30,89 @@ concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
 
+# ── Job order: terraform → build-web → deploy → e2e ──────────────────────────
+#
+# The build used to run FIRST, with no AWS credentials, so that a broken build
+# never consumed an `environment: insolvia-staging` approval. That ordering
+# stopped being possible when the app started reading its Cognito configuration
+# at build time: `EXPO_PUBLIC_COGNITO_DOMAIN` and `EXPO_PUBLIC_COGNITO_CLIENT_ID`
+# are Terraform outputs of infra/envs/staging (`auth_domain`,
+# `auth_web_client_id`), and Metro inlines them into the bundle when it bundles.
+# A build that ran before the apply could only read *last* run's state — i.e. it
+# could ship a bundle pointing at an app client this very run just replaced.
+#
+# The fix is NOT "read the state from the build job". Reading state while an
+# apply is in flight is the race, not the cure. Instead the apply and the
+# `terraform output` reads happen back-to-back in ONE job, and every later job
+# consumes plain strings through `needs.*.outputs.*` — after `terraform`, no job
+# in this workflow touches Terraform state at all (`deploy` used to `init` a
+# second time; it no longer does). The workflow-level `concurrency` group above
+# already serializes this run against every other workflow that applies
+# infra/envs/staging, so nothing can apply between the apply and the reads, and
+# the values the build inlines are provably the values this run just applied.
+#
+# What the old ordering bought is cheap to lose here: the `insolvia-staging`
+# environment carries no protection rules (staging deploys on every merge to
+# `main`; the human gate is `insolvia-production`), so there is no approval for
+# a broken build to consume. If staging ever gains required reviewers, this
+# comment is where to start.
 jobs:
-  # ── Build + publish the artifact (no AWS credentials needed) ────
+  # ── 1. Infra: apply, and freeze the outputs the rest of the run uses ───
+  terraform:
+    runs-on: ubuntu-latest
+    # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
+    # that don't declare the environment — they resolve silently to "".
+    environment: insolvia-staging
+    outputs:
+      bucket: ${{ steps.tf.outputs.bucket }}
+      dist: ${{ steps.tf.outputs.dist }}
+      url: ${{ steps.tf.outputs.url }}
+      auth_domain: ${{ steps.tf.outputs.auth_domain }}
+      auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` captures below — same reason app-prod.yml
+          # sets it.
+          terraform_wrapper: false
+
+      # The apply and the reads are one step on purpose: nothing may run
+      # between them. See the job-order note above.
+      #
+      # Neither auth value is a secret — the client id rides in the query string
+      # of every `/oauth2/authorize` redirect and the domain *is* the URL — which
+      # is what makes an `EXPO_PUBLIC_` name legitimate for them downstream.
+      # Nothing secret may ever carry that prefix; Metro inlines it into a
+      # bundle any visitor can read.
+      - name: Apply staging infra
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          terraform -chdir=infra/envs/staging apply -auto-approve
+          tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
+          {
+            echo "bucket=$(tf bucket_name)"
+            echo "dist=$(tf distribution_id)"
+            echo "url=$(tf url)"
+            echo "auth_domain=$(tf auth_domain)"
+            echo "auth_client_id=$(tf auth_web_client_id)"
+          } >> "$GITHUB_OUTPUT"
+
+  # ── 2. Build + publish the artifact (no AWS credentials needed) ────
   #
-  # A separate job from `deploy`, for two reasons: the build runs BEFORE the
-  # `environment: insolvia-staging` gate, so a broken build never consumes an
-  # approval, and the uploaded artifact is the record of what actually shipped.
+  # Still a separate job from `deploy`: the uploaded artifact is the record of
+  # what actually shipped, and this job holds no credentials.
   build-web:
+    needs: [terraform]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,10 +151,33 @@ jobs:
       # expo rejects a repeated flag outright ("Can only provide one instance
       # of -c or --clear"), which is how a doubled flag once broke this very
       # deploy.
+      # The Cognito pair is what turns a green deploy into a signable-in app.
+      # `terraform output -raw` on an output that does not exist fails the
+      # apply step outright, but on an output that exists and is EMPTY it
+      # succeeds — and an empty `EXPO_PUBLIC_*` is inlined as an empty string,
+      # producing a bundle that builds, deploys, serves 200, and cannot sign
+      # anyone in. That silent failure is exactly what issue #40 exists to
+      # prevent, so fail loudly here instead.
       - name: Build web (staging)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: staging
-        run: npm run build --workspace apps/insolvia_app
+          EXPO_PUBLIC_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
+          EXPO_PUBLIC_COGNITO_CLIENT_ID: ${{ needs.terraform.outputs.auth_client_id }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [ -n "$EXPO_PUBLIC_COGNITO_DOMAIN" ] || missing+=(EXPO_PUBLIC_COGNITO_DOMAIN)
+          [ -n "$EXPO_PUBLIC_COGNITO_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_CLIENT_ID)
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Empty Cognito build config: ${missing[*]}. These come from the" \
+                 "infra/envs/staging outputs auth_domain / auth_web_client_id (see the" \
+                 "terraform job). Refusing to ship a bundle that cannot sign anyone in."
+            exit 1
+          fi
+          echo "Cognito hosted UI: $EXPO_PUBLIC_COGNITO_DOMAIN (client ${EXPO_PUBLIC_COGNITO_CLIENT_ID:0:6}…)"
+
+          npm run build --workspace apps/insolvia_app
 
       - uses: actions/upload-artifact@v4
         with:
@@ -83,9 +185,13 @@ jobs:
           path: apps/insolvia_app/dist
           retention-days: 14
 
-  # ── Deploy ─────────────────────────────────────────────────────
+  # ── 3. Deploy ──────────────────────────────────────────────────
+  #
+  # No Terraform here at all any more: bucket and distribution arrive as job
+  # outputs frozen by the `terraform` job, so this job cannot read state that
+  # has moved on since the apply.
   deploy:
-    needs: [build-web]
+    needs: [terraform, build-web]
     runs-on: ubuntu-latest
     environment: insolvia-staging
     steps:
@@ -95,24 +201,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.10"
-          # The wrapper interposes on stdout, which corrupts the
-          # `terraform output -raw` captures below — same reason app-prod.yml
-          # sets it.
-          terraform_wrapper: false
-
-      - name: Apply staging infra
-        id: tf
-        run: |
-          terraform -chdir=infra/envs/staging init
-          terraform -chdir=infra/envs/staging apply -auto-approve
-          {
-            echo "bucket=$(terraform -chdir=infra/envs/staging output -raw bucket_name)"
-            echo "dist=$(terraform -chdir=infra/envs/staging output -raw distribution_id)"
-          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v4
         with:
@@ -152,8 +240,8 @@ jobs:
       - name: Sync to S3 + invalidate
         env:
           SRC: web
-          BUCKET: ${{ steps.tf.outputs.bucket }}
-          DIST: ${{ steps.tf.outputs.dist }}
+          BUCKET: ${{ needs.terraform.outputs.bucket }}
+          DIST: ${{ needs.terraform.outputs.dist }}
         run: |
           set -euo pipefail
 
@@ -171,3 +259,73 @@ jobs:
           #    CachingOptimized policy has a 1s minimum TTL that overrides an
           #    origin `no-cache`, so the edge still needs telling.
           aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+  # ── 4. End-to-end: the authenticated round trip (issues #80, #40) ──────
+  #
+  # THIS JOB IS THE POINT. Until it existed, `app-staging.yml` asserted nothing
+  # at all — alone among the staging workflows, it had not even the liveness
+  # curl that api/mailer/marketing each run — and `verified-commit` therefore
+  # blessed a commit for production on the strength of "the sync command exited
+  # zero". It now blesses "a real browser signed in against real staging and saw
+  # the user's own identity render".
+  #
+  # WHY IT SITS HERE, AND NOT IN app-pr.yml. It must fail the staging RUN, since
+  # `.github/actions/verified-commit` gates production on the run's conclusion —
+  # a job that could go red without reddening the run would buy nothing. And it
+  # must stay OUT of the `protect-main` required checks: it needs a deployed
+  # environment and a live Cognito pool, so as a merge gate it would put
+  # staging's availability on the critical path of every PR, docs-only ones
+  # included (docs/reference/architecture.md § Required status checks). Do not
+  # add it to the ruleset, and do not give it `continue-on-error`.
+  #
+  # It runs after `deploy`, i.e. after the invalidation, so it exercises the
+  # bundle this run actually shipped. That deliberately accepts a brief window
+  # in which a bad build is live on staging — staging is the proving ground, and
+  # a static bundle has no pre-shift version to test against the way the Lambda
+  # services do (see the same trade-off in app-prod.yml's smoke check).
+  e2e:
+    needs: [terraform, deploy]
+    runs-on: ubuntu-latest
+    # Required for the E2E_TEST_USER_* secrets, which are scoped to this
+    # environment. A missing or borrowed `environment:` resolves them to "" in
+    # silence — the suite fails fast on that rather than signing in as nobody.
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      # `e2e/` is NOT an npm workspace member (see the `//` note in its
+      # package.json), so it installs from its OWN lockfile — which is what
+      # catches a dependency it forgot to declare.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: e2e
+
+      # Chromium only, and only Chromium: the auth loop is a redirect round
+      # trip, not a rendering concern. `--with-deps` installs the system
+      # libraries the headless browser needs on the runner image.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      # No artifact upload, deliberately, and no trace: a Playwright trace
+      # records `fill()` arguments verbatim — including the password typed into
+      # the Cognito form — and Actions artifacts on a PUBLIC repository are
+      # downloadable by anyone holding the run URL. playwright.config.ts turns
+      # traces, screenshots and video off whenever `CI` is set, so there is
+      # nothing here to leak; failures are diagnosed from this step's log, whose
+      # assertion messages name what was expected and never a credential. Debug
+      # locally (`cd e2e && npm test`) where the trace stays on your machine.
+      - name: Auth round trip against staging
+        working-directory: e2e
+        env:
+          E2E_BASE_URL: ${{ needs.terraform.outputs.url }}
+          E2E_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
+          E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+        run: npx playwright test

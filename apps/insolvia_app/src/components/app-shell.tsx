@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AccountBar } from '@/components/account-bar';
 import { Wordmark } from '@/components/wordmark';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
@@ -27,6 +28,13 @@ export interface AppShellProps {
  *
  * Note there is no `role="region"`: a `<section>` without an accessible name is
  * invalid ARIA and axe flags it. Use a heading, not a landmark, to open a block.
+ *
+ * The header ends with {@link AccountBar} — the signed-in user's address and the
+ * sign-out control. It lives here, not on each screen, so signing out is
+ * reachable from wherever the user happens to be; it renders `null` when there
+ * is no session, which is what keeps this frame usable on `/sign-in` and
+ * `/auth/callback`. Because of it, every `AppShell` needs a `SessionProvider`
+ * above it — which `src/app/_layout.tsx` guarantees for every route.
  */
 export function AppShell({ children, actions, maxContentWidth = contentMaxWidth }: AppShellProps) {
   const theme = useTheme();
@@ -47,6 +55,7 @@ export function AppShell({ children, actions, maxContentWidth = contentMaxWidth 
           </Link>
         </View>
         {actions}
+        <AccountBar />
       </View>
 
       <View role="main" style={styles.main}>

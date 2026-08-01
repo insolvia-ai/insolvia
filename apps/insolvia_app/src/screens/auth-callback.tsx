@@ -1,55 +1,98 @@
 import { Button } from '@insolvia-ai/design-system';
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 
-import { AppShell } from '@/components/app-shell';
-import { Heading } from '@/components/heading';
-import { fontSizes, useTheme } from '@/theme';
+import { StatusScreen } from '@/components/status-screen';
+import { useSession } from '@/session';
 
 /**
- * Placeholder landing screen for the OAuth redirect.
+ * The return leg of sign-in: the hosted UI redirects here with `?code=…&state=…`,
+ * and this screen turns that into a session.
  *
- * The Cognito user pool in `infra/modules/auth` registers `<origin>/auth/callback`
- * as the web client's callback URL, but this build carries **no OIDC client** —
- * sign-in is a separate ticket. This screen exists so that a redirect (or a stale
- * bookmark) lands on branded chrome with a way forward instead of the router's
- * unmatched-route page. It deliberately does not read, validate, or exchange the
- * `code`/`state` query parameters: half an auth flow is worse than none.
+ * **Its URL is pinned by infrastructure.** `web_callback_urls` in
+ * `infra/modules/auth/main.tf` is `"${origin}/auth/callback"`, matched by
+ * Cognito exactly, and under file-based routing the path *is* the route file's
+ * location — so `src/app/auth/callback.tsx` cannot move without breaking
+ * sign-in. `auth-callback.test.tsx` asserts the file exists at that path for
+ * that reason.
+ *
+ * The exchange runs **once**, guarded by a ref rather than by an effect
+ * dependency list: an authorization code is single-use, and a second exchange
+ * of a code Cognito has already redeemed is not merely wasteful — a replayed
+ * code is a signal Cognito treats as an attack and answers by invalidating the
+ * tokens it just issued.
+ *
+ * Reading `code`/`state` out of the URL is deliberate and complete: validating
+ * `state`, clearing the stored attempt, and exchanging the code all happen in
+ * `completeSignIn`, so this file holds no security logic of its own — only the
+ * three things a user sees.
  */
 export function AuthCallback() {
-  const theme = useTheme();
   const router = useRouter();
+  const { completeSignIn } = useSession();
+  const params = useLocalSearchParams();
+  const [failure, setFailure] = useState<string | null>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) {
+      return;
+    }
+    started.current = true;
+
+    const complete = async () => {
+      const result = await completeSignIn({
+        code: firstValue(params.code),
+        state: firstValue(params.state),
+        error: firstValue(params.error),
+      });
+
+      if (result.ok) {
+        // `replace`, not `push`: the callback URL carries a spent code, and a
+        // back-button entry that returns to it would land on this screen with
+        // nothing left to exchange.
+        router.replace(result.returnTo);
+        return;
+      }
+      setFailure(result.message);
+    };
+
+    void complete();
+  }, [completeSignIn, params, router]);
+
+  if (failure !== null) {
+    return (
+      <StatusScreen
+        tone="error"
+        title="Sign-in could not be completed"
+        message={failure}
+        actions={
+          // size="lg" for the 44dp WCAG 2.5.5 floor; the visible text is the
+          // whole accessible name.
+          <Button size="lg" onPress={() => router.replace('/sign-in')}>
+            Back to sign in
+          </Button>
+        }
+      />
+    );
+  }
 
   return (
-    <AppShell>
-      <Heading level={1}>Sign-in is not enabled yet</Heading>
-      <Text style={[styles.body, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
-        This build has no sign-in flow — accounts land in a later release. Nothing was signed in,
-        and nothing was stored.
-      </Text>
-      {/*
-        size="lg" for the 44dp target-size floor; the arrow glyph is aria-hidden
-        and aria-label pins the name to the visible label — same reasoning as
-        the home screen's CTA.
-      */}
-      <Button
-        size="lg"
-        aria-label="Continue to Insolvia"
-        onPress={() => {
-          // `replace`, not `push`: the callback URL carries no state worth a
-          // back-button entry, and returning to it would re-land here.
-          router.replace('/');
-        }}
-      >
-        Continue to Insolvia <Text aria-hidden>→</Text>
-      </Button>
-    </AppShell>
+    <StatusScreen title="Signing you in" message="Completing your sign-in. This takes a moment." />
   );
 }
 
-const styles = StyleSheet.create({
-  body: {
-    fontSize: fontSizes.body,
-    lineHeight: fontSizes.body * 1.5,
-  },
-});
+/**
+ * A query parameter as a single string.
+ *
+ * `useLocalSearchParams` types every value `string | string[]`, because a
+ * parameter can legally repeat (`?code=a&code=b`). Taking the first occurrence
+ * is not a workaround: a duplicated `state` still has to match the stored one,
+ * so a crafted repeat gains nothing.
+ */
+function firstValue(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}

@@ -28,6 +28,7 @@ that is rewritten as work lands.
 | [`aws-bootstrap.md`](runbooks/aws-bootstrap.md) | One-time AWS/GitHub bootstrap, incl. the ci-trust anchor. | Executed; kept for a fresh account |
 | [`app-deploy-verification.md`](runbooks/app-deploy-verification.md) | Six checks proving a host serves the app, and the right build. | Both envs verified; re-run per deploy |
 | [`ses-production-access.md`](runbooks/ses-production-access.md) | The SES sandbox exit: checklist, request text, human console steps. | **Open** — actionable now |
+| [`staging-e2e-setup.md`](runbooks/staging-e2e-setup.md) | One-time setup for the post-deploy auth E2E: the staging test user, then its Actions environment secrets. | **Open** — actionable now |
 
 ## [`adr/`](adr/) — decisions and their reasoning
 

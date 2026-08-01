@@ -1,0 +1,26 @@
+{
+  "//": [
+    "Standalone — it deliberately does NOT extend ../tsconfig.base.json.",
+    "That base is tuned for what Metro and Expo need (erasableSyntaxOnly, the",
+    "app's JSX runtime, the @/* alias); this package is Node-only test code run",
+    "by Playwright's own transpiler. Sharing the base would couple a suite that",
+    "is not a workspace member to the workspace's toolchain choices.",
+    "",
+    "Nothing here is emitted: `npm run typecheck` is --noEmit, and Playwright",
+    "transpiles the .ts files itself at run time."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["playwright.config.ts", "support/**/*.ts", "tests/**/*.ts"]
+}

@@ -51,14 +51,16 @@ different shape.
 public/                     static files copied verbatim to the export root
 src/
 ├── app/                    Expo Router — ROUTES ONLY, nothing else
-│   ├── _layout.tsx         the one navigator (headerShown: false)
-│   ├── index.tsx           /            → <Home />
+│   ├── _layout.tsx         the one navigator (headerShown: false) + SessionProvider
+│   ├── index.tsx           /            → <RequireSession><Home /></RequireSession>
+│   ├── sign-in.tsx         /sign-in     → <SignIn />   (public)
 │   ├── auth/callback.tsx   /auth/callback (path pinned by infra — see below)
 │   └── +not-found.tsx      the catch-all; load-bearing, see below
 ├── screens/                screen bodies the routes render
 │   └── home/index.tsx      a screen's private components live beside it
 ├── components/             APP-SPECIFIC UI — RN primitives, no library
 │                           (Button and Field come from the design system)
+├── session/                sign-in, tokens, refresh — see below
 ├── config/environment.ts   build-time configuration
 └── theme.ts                StyleSheet helpers over @insolvia-ai/tokens
 ```
@@ -175,6 +177,28 @@ below the `<title>` and why this paragraph is here rather than in the file.
   web client registers `<origin>/auth/callback` as its only OAuth callback URL.
   Under file-based routing that path *is* the file's location, so moving the file
   breaks sign-in's return leg. `auth-callback.test.tsx` guards it.
+- **`src/session/` owns sign-in, and
+  [ADR 0007](../../docs/adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md)
+  owns `src/session/`.** Read it before changing where a token rests. The three
+  things most likely to be "fixed" by someone who has not:
+  - **Access and ID tokens are in memory only; the refresh token is in
+    `localStorage`.** The second half is a deliberate, costed trade-off, not an
+    oversight — it buys the pool's 30-day window at a stated XSS risk.
+  - **Refresh goes to the hosted domain's `/oauth2/token` as an OAuth
+    `refresh_token` grant, never Cognito's SDK refresh flow.** The app client
+    permits `ALLOW_USER_SRP_AUTH` only, because Cognito rejects the SDK refresh
+    flow outright when refresh-token rotation is on — and it is on, so every
+    refresh returns a replacement token that must be persisted.
+  - **PKCE is the client's obligation.** Cognito has no "require PKCE" toggle, so
+    `pkce.test.ts` and `oauth.test.ts` are the only things asserting we send
+    `code_challenge`/S256 at all. Do not delete them as redundant.
+
+  `@/session` is the barrel and the public surface; screens need only
+  `useSession()`. **No new dependency was added for any of this** — PKCE is Web
+  Crypto and storage is the platform APIs, each read lazily behind a guard in
+  `session/browser.ts` so a non-web runtime degrades instead of crashing. A
+  future **native** client is what would justify `expo-auth-session`; on web it
+  would buy nothing.
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and
   `infra/envs/{dev,staging}` register `http://localhost:3000` as an
   **exact-match** Cognito allowed origin.
@@ -188,5 +212,10 @@ below the `<title>` and why this paragraph is here rather than in the file.
 - **Script names are a contract** with `.github/workflows/app-*.yml`: `build`,
   `web`, `lint`, `typecheck`, `test`. Renaming one orphans a required check on
   `main` (see the `insolvia-branch-protection` skill).
-- `@insolvia-ai/api-client` is a dependency that nothing imports yet — wired in
-  beside `apiBaseUrl` so the first API-backed feature only has to import it.
+- **`@insolvia-ai/api-client` is now imported** (`src/components/me-panel.tsx`,
+  `GET /v1/me`), constructed with the `accessToken` provider seam so a token
+  refreshed between calls is picked up without rebuilding the client. It has no
+  build step and publishes `src/index.ts` with literal `.ts` specifiers, which is
+  why `tsconfig.json` sets `allowImportingTsExtensions` — see the comment there.
+  On a 401, `source` decides: `'server'` earns **one** refresh and one retry,
+  `'client'` means there is no token and goes to sign-in.

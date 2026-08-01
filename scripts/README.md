@@ -18,6 +18,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`. Target `release` ships one commit to every service in order |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
+| `scripts/e2e-create-test-user.sh` | Staging E2E setup (one-time) | Creates the dedicated test user in the **staging** Cognito pool (self-signup is disabled, so `admin-create-user` is the only path) and gives it a permanent password so the first sign-in is not a password-change challenge. Pool id from `terraform output`, never a literal; password from the environment or a no-echo prompt, never a file. `--check`. Needs a staging AWS session — see the `insolvia-aws-auth` skill. |
+| `scripts/e2e-set-secrets.sh` | Staging E2E setup (one-time) | Sets `E2E_TEST_USER_EMAIL` / `E2E_TEST_USER_PASSWORD` as **`insolvia-staging` environment** secrets (the same scope as `AWS_ROLE_ARN`, not repo-level), read from the environment and piped on stdin. Re-running rotates, and says so first. `--check`, `--yes`. |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/runbooks/aws-bootstrap.md` § "The ci-trust anchor". |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
@@ -236,6 +238,28 @@ What it adds over clicking *Run workflow* in the UI:
 Whichever target you pick, the apply is `-auto-approve` and covers the whole
 env, so accumulated drift is reconciled along with your change. Run
 `prod-infra` in its default plan mode first if that matters.
+
+## Staging E2E setup (`e2e-*.sh`)
+
+Two one-time scripts that give the post-deploy auth round trip in
+`.github/workflows/app-staging.yml` something to sign in as. Run them in this
+order, once; the order, the expected output and how to tell it worked are in
+[`../docs/runbooks/staging-e2e-setup.md`](../docs/runbooks/staging-e2e-setup.md).
+
+```bash
+export E2E_TEST_USER_EMAIL='…'      # a dedicated synthetic address, never a real mailbox
+./scripts/e2e-create-test-user.sh   # prompts for the password, without echo
+./scripts/e2e-set-secrets.sh        # same two values → the insolvia-staging environment
+
+./scripts/e2e-create-test-user.sh --check
+./scripts/e2e-set-secrets.sh --check
+```
+
+Neither script accepts, writes, or generates a password into a file: this repo
+is public, and the value exists only in your shell and in GitHub's encrypted
+secret store. The test user must never enrol MFA — the pool allows it
+(`mfa_configuration = "OPTIONAL"`), and a TOTP challenge is something a browser
+test cannot answer, so the E2E job would hang and redden staging.
 
 ## Adding a new package
 
