@@ -8,9 +8,7 @@ name: App · Deploy · Production
 # apps/insolvia_app and docs/ARCHITECTURE.md § Environment model), so the
 # staging bundle has "staging" baked into it and can never be the production
 # bundle. There is no artifact to promote the way api, mailer and marketing
-# promote an image digest. The migration off Flutter did not change this: it was
-# `--dart-define=INSOLVIA_ENV` before and it is `EXPO_PUBLIC_INSOLVIA_ENV` now,
-# same compile-time model, same consequence.
+# promote an image digest.
 #
 # What this workflow guarantees instead is SOURCE-level promotion, tightened at
 # both ends:
@@ -27,24 +25,18 @@ name: App · Deploy · Production
 # is a real option and deliberately not taken — it would reverse the documented
 # compile-time environment decision.
 #
-# This workflow no longer applies Terraform — `infra-prod.yml` is the only path
+# This workflow does not apply Terraform — `infra-prod.yml` is the only path
 # that mutates prod infrastructure.
 #
 # ── Why the commit is resolved in its own job ─────────────────────────────────
 # `resolve` is deliberately NOT `environment: insolvia-production`-gated; only
 # `deploy` is. It touches no AWS credentials and publishes nothing, so running
 # it first means a commit that never passed staging is rejected BEFORE anyone is
-# asked to approve a production deploy. (It also used to keep three build jobs
-# agreeing on one commit; the desktop jobs are gone, but the reason above stands
-# on its own.)
+# asked to approve a production deploy.
 #
-# ── Desktop is deferred ───────────────────────────────────────────────────────
-# This file used to build and publish unsigned macOS and Windows artifacts to an
-# unlinked download host, and argued at length that doing so was the entire cost
-# of keeping D8's desktop option real. That argument was written for a Flutter
-# app and is preserved — as a superseded position, with what replaces it — in
-# docs/adr/0004-react-native-replaces-flutter.md. Read the ADR before
-# reinstating desktop publishing here.
+# ── No desktop publishing, by decision ────────────────────────────────────────
+# The case is recorded in docs/adr/0004-react-native-replaces-flutter.md —
+# read it before adding desktop artifact publishing here.
 
 on:
   workflow_dispatch:
@@ -80,9 +72,9 @@ permissions:
   # Reading the staging workflow's run conclusions.
   actions: read
 
-# Retained even though this workflow no longer applies Terraform: it also
-# serializes against infra-prod.yml, so a deploy cannot land mid-apply while
-# the bucket or distribution is being reconciled underneath it.
+# This workflow applies no Terraform, but the group still serializes it
+# against infra-prod.yml, so a deploy cannot land mid-apply while the bucket
+# or distribution is being reconciled underneath it.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false
@@ -145,7 +137,7 @@ jobs:
       # --clear`) so prod, staging and the PR gate all share one definition of
       # a web build. The `--clear` lives in the script and ONLY there — expo
       # rejects a repeated flag, so appending `-- --clear` here breaks the
-      # build (it did once, on staging's first post-cutover run).
+      # build (it did once, on the staging deploy).
       - name: Build web (production)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: production
@@ -176,12 +168,7 @@ jobs:
 
       # ── Two-tier cache sync, inline ──────────────────────────────────────
       #
-      # Replaces the `web-bundle-sync` composite action. That action existed
-      # because Flutter web content-hashes NOTHING (issue #49, commit 5108690)
-      # and so needed three tiers to describe a bundle in which nothing could be
-      # marked immutable.
-      #
-      # Expo hashes. Verified against a real export:
+      # Expo content-hashes its bundle. Verified against a real export:
       #   _expo/static/js/web/entry-<hash>.js
       #   _expo/static/css/global-<hash>.css
       # so everything under `_expo/` is content-addressed and safe to cache
@@ -224,7 +211,7 @@ jobs:
           aws s3 sync "$SRC" "s3://$BUCKET" --exclude "_expo/*" \
             --cache-control "no-cache,no-store,must-revalidate"
 
-          # 3. The invalidation the deleted composite action used to issue.
+          # 3. Invalidate the edge.
           #    Tier 2 is `no-store` at the browser, but CloudFront's managed
           #    CachingOptimized policy has a 1s minimum TTL that overrides an
           #    origin `no-cache`, so the edge still needs telling.

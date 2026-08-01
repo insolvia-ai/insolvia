@@ -1,8 +1,8 @@
 # The Insolvia backend API (services/api): a Flask+Mangum Docker Lambda behind
 # an API Gateway HTTP API, one instance per environment (#62, #63). Owns the
 # whole per-env API stack: Lambda + execution role, HTTP API +
-# custom domain + DNS, the waitlist DynamoDB table (moved here from the
-# marketing site per docs/adr/0001), the /insolvia/<env>/api SSM config
+# custom domain + DNS, the waitlist DynamoDB table
+# (per docs/adr/0001), the /insolvia/<env>/api SSM config
 # namespace (#70), and the CloudWatch alarms + SNS topic (#69).
 #
 # The house pattern for a Mangum service: HTTP API with a $default route to the
@@ -14,16 +14,16 @@
 # ── Bootstrap order (read before the FIRST apply in a fresh account) ────────
 # An Image-package Lambda cannot be created without an existing image:
 # `aws_lambda_function` fails ("Source image ... does not exist") until one has
-# been pushed. The repository itself is no longer part of the deadlock — it
+# been pushed. The repository itself is not part of the deadlock — it
 # lives in infra/envs/shared and is applied before any environment (see the
-# deployment order in docs/TERRAFORM_ARCHITECTURE.md) — so the cycle is now
+# deployment order in docs/TERRAFORM_ARCHITECTURE.md) — so the cycle is
 # just "seed an image, then apply", once per environment:
 #
 #   1. apply infra/envs/shared (creates insolvia-api)
 #   2. build services/api
 #      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
 #      tag it <repo-url>:<env> — this environment's moving marker tag, which is
-#      what `var.image_tag` seeds the Lambda from; `:latest` no longer exists,
+#      what `var.image_tag` seeds the Lambda from; there is no `:latest`,
 #      because under a shared repository it would mean "whatever any
 #      environment pushed last" — and push it. Both flags matter when building
 #      locally: the Lambda is x86_64, so an Apple Silicon default build ships
@@ -47,15 +47,15 @@ locals {
 }
 
 # ── Container repository ────────────────────────────────────────
-# This module no longer OWNS a repository. `insolvia-api` is a single repo
+# This module does NOT own a repository. `insolvia-api` is a single repo
 # shared by every environment, created in infra/envs/shared and passed in as
 # `var.ecr_repository_url`.
 #
-# That reverses #63's "one repo per environment, so a prod deploy can never
-# pick up a staging build". The reversal is deliberate and is the whole point
+# One repo per environment ("so a prod deploy can never pick up a staging
+# build") is deliberately rejected — a shared repo is the whole point
 # of the promotion pipeline: prod deploys the exact digest staging validated,
 # which requires one place both environments can name it. Environment
-# isolation lives where it always did — separate Lambdas, roles, tables, SSM
+# isolation lives elsewhere — separate Lambdas, roles, tables, SSM
 # namespaces and Cognito pools — not in separate image stores. The image is
 # environment-agnostic by construction: this service reads its entire
 # environment from SSM at deploy time (see the Lambda's lifecycle note), so
@@ -99,12 +99,11 @@ removed {
 }
 
 # ── Waitlist storage ────────────────────────────────────────────
-# Moved here from the marketing site: the review of the marketing waitlist
-# rejected the SSR Lambda holding a DynamoDB grant, and docs/adr/0001 makes
-# the API the only application principal with data-store access. Named
-# insolvia-waitlist-<env> — deliberately NOT insolvia-marketing-waitlist-*,
-# which still exists until the marketing_site module is stripped of it in a
-# follow-up PR; the two must coexist without colliding during the migration.
+# The API owns the waitlist table: docs/adr/0001 makes the API the only
+# application principal with data-store access (an SSR Lambda holding a
+# DynamoDB grant was reviewed and rejected). Named insolvia-waitlist-<env> —
+# deliberately NOT insolvia-marketing-waitlist-*: the table belongs to the
+# API, not to any one client of it.
 #
 # Schema matches insolvia_api.core.waitlist.record_item exactly: constant
 # "WAITLIST" partition, "<submittedAt>#<id>" sort key, so rows read back
@@ -233,8 +232,8 @@ resource "aws_cloudwatch_log_group" "lambda" {
 # `live` is what API Gateway invokes. The deploy workflow publishes a new
 # version, smoke-tests THAT version directly by ARN, and only then repoints
 # this alias — so a failed smoke test leaves the previous version serving
-# instead of leaving a broken build live (the old order deployed first and
-# tested afterwards, with no way back).
+# instead of leaving a broken build live (deploy-first-test-after would have
+# no way back).
 #
 # It also makes rollback near-instant and ECR-independent: a published version
 # is an immutable snapshot Lambda stores itself, so

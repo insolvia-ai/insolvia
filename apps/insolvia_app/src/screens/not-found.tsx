@@ -15,8 +15,7 @@ export interface NotFoundProps {
 }
 
 /**
- * The fallback for an unrecognised location — branded chrome and a way back,
- * ported from the Flutter `NotFoundScreen` that go_router's `errorBuilder` used.
+ * The fallback for an unrecognised location — branded chrome and a way back.
  *
  * This is load-bearing, not decoration: CloudFront rewrites 403/404 to
  * `/index.html` with HTTP **200**, so every mistyped URL reaches the router and

@@ -9,11 +9,11 @@ description: >-
 # deliberate human act — but dispatching alone proved too weak a gate in two
 # ways this action closes:
 #
-#   1. A dispatch used to build whatever `main` pointed at WHEN THE RUN
-#      STARTED. Anything merged between your staging test and your dispatch
-#      rode along silently. Callers now pass an explicit `sha`, or accept
-#      main's HEAD — either way the resolved commit is echoed into the job
-#      summary, so what shipped is a matter of record rather than inference.
+#   1. A bare dispatch builds whatever `main` points at WHEN THE RUN STARTS —
+#      anything merged between your staging test and your dispatch would ride
+#      along silently. Callers pass an explicit `sha`, or accept main's HEAD —
+#      either way the resolved commit is echoed into the job summary, so what
+#      shipped is a matter of record rather than inference.
 #   2. Nothing checked that the commit had ever *worked*. There is no
 #      `workflow_run` chain in this repo (deliberately — see the deploy
 #      workflows' concurrency comments), so ordering has to be asserted rather

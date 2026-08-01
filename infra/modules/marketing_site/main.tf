@@ -17,7 +17,7 @@
 # it) the alias, the DNS records, and the redirect branch are all omitted.
 #
 # FIRST APPLY (bootstrap): the Lambda cannot be created until an image exists
-# in the ECR repository. The repository is no longer created here — it lives in
+# in the ECR repository. The repository is not created here — it lives in
 # infra/envs/shared and is applied before any environment — so bootstrap is:
 #
 #   terraform -chdir=infra/envs/shared apply   # creates insolvia-marketing

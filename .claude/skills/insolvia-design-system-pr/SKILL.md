@@ -23,13 +23,6 @@ changed`, in `design-system-pr.yml`) fires on **any** file under the package
 directory — README and `CLAUDE.md` included, not just `src/`. Bump `version`
 in the package's `package.json`.
 
-> Two predecessors are gone. The web-only
-> `packages/insolvia_design_system_react` (Base UI, 0.1.x of the same npm
-> name) was replaced by this package in the cross-platform cutover; before
-> that, a Flutter package occupied this same directory name and published as a
-> git tag (removed with the Flutter stack, ADR 0004). A search of old history
-> turns both up — neither exists now.
-
 ## Rules
 
 1. **A change to the package goes in its OWN PR** — never bundled with app,
@@ -41,7 +34,7 @@ in the package's `package.json`.
 3. **Only marketing takes a consume PR — the app never does.** Two consumers,
    two channels: the app is a fellow npm workspace member and consumes
    **source** through the symlink, so it picks up a merged change
-   automatically; an app-side "update the dependency" PR no longer exists.
+   automatically; there is no app-side "update the dependency" PR.
    The marketing site consumes the **published version** — only after the new
    version publishes may a *separate, later* PR bump
    `apps/insolvia_marketing/package.json` + its lockfile. Never pin a version

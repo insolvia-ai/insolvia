@@ -106,9 +106,9 @@ jobs:
           fi
           echo "OK: build/client contains no react-native"
 
-      # Core Web Vitals budget (issue #46). Being dramatically lighter and
-      # faster than a Flutter-web build is the entire reason this site is React
-      # and not Flutter — this step is what keeps that reasoning true. Budgets,
+      # Core Web Vitals budget (issue #46). The site's lightness and speed are
+      # a deliberate, load-bearing property — this step is what keeps them
+      # true. Budgets,
       # thresholds, and their rationale live in lighthouserc.json; it serves
       # the production build via scripts/lhci-serve.mjs and audits / and
       # /waitlist on Lighthouse's throttled mobile preset. ubuntu-latest ships

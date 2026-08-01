@@ -70,12 +70,12 @@ on:
 permissions:
   id-token: write
   contents: read
-  # Reading the staging workflow's run conclusions. `packages: read` is gone
-  # with the build: nothing here installs from GitHub Packages any more.
+  # Reading the staging workflow's run conclusions. No `packages: read`:
+  # nothing here installs from GitHub Packages.
   actions: read
 
-# Retained even though this workflow no longer applies Terraform: it also
-# serializes against infra-prod.yml, so a promotion cannot land mid-apply.
+# This workflow applies no Terraform, but the group still serializes it
+# against infra-prod.yml, so a promotion cannot land mid-apply.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false

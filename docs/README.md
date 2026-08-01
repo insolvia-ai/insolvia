@@ -13,7 +13,7 @@ behind its *Where things live* table.
 | [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) | How the design system publishes (source, no build) and how its two consumers install it — the app from the workspace, marketing by published version. |
 | [`EMAIL_SETUP.md`](EMAIL_SETUP.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
 | [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) | The SES sandbox exit: checklist, request text, and the human AWS-console steps. |
-| [`MVP_PLAN.md`](MVP_PLAN.md) | Milestone/issue plan — the source for the GitHub MVP project board. |
+| [`MVP_PLAN.md`](MVP_PLAN.md) | The current plan: what shipped (one summary table), decisions in force, and the open work — MyCase spike, SES production access, product milestones. |
 | [`adr/`](adr/) | Architecture Decision Records — durable decisions with their rationale. |
 | [`business-plan.html`](business-plan.html) | What we're building and why. |
 | [`regulatory-source-register.html`](regulatory-source-register.html) | Regulatory source register. |

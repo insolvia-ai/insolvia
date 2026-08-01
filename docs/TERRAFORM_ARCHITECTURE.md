@@ -14,7 +14,7 @@ infra/
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
 │   │                         #   + one web (SPA) PKCE app client
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
-│                             # CloudFront (www + apex) + DynamoDB waitlist table
+│                             # CloudFront (www + apex)
 └── envs/
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
@@ -63,10 +63,9 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
 `api.insolvia.ai`. Each owns, per env:
 
 - **ECR** — *not* owned per env. One repository per service, `insolvia-api`,
-  shared by staging and prod and created in `envs/shared`. This **reverses**
-  the original "separate repos per env, so a prod deploy can never reference a
-  staging image": prod now deliberately deploys the exact image digest staging
-  validated, which requires one place both envs can name it. Environment
+  shared by staging and prod and created in `envs/shared`: prod deliberately
+  deploys the exact image digest staging validated, which requires one place
+  both envs can name it. Environment
   isolation lives in separate Lambdas, roles, tables, SSM namespaces and
   Cognito pools — never in separate image stores, and the image is
   environment-agnostic by construction (every service reads its environment at
@@ -83,15 +82,14 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   waitlist endpoint's abuse control; execute-api endpoint disabled so the
   custom domain is the only front door.
 - **Custom domain** — an API Gateway REGIONAL domain + Route53 alias,
-  **no CloudFront** (deviating from #62's title; the mailer precedent — an API
+  **no CloudFront** (an API
   gains nothing from an edge cache). A REGIONAL domain needs its cert in the
   API's own region — unlike CloudFront's unconditional us-east-1 — so the
   same shared wildcard-cert lookup serves both, only because everything is
   us-east-1.
 - **DynamoDB** `insolvia-waitlist-<env>` — `PK`/`SK` string keys,
-  PAY_PER_REQUEST, PITR. Moved here from the marketing site per
-  `docs/adr/0001`; deliberately not named `insolvia-marketing-waitlist-*`,
-  which coexists until the marketing module drops it. The Lambda's role gets
+  PAY_PER_REQUEST, PITR. Lives here rather than with the marketing site per
+  `docs/adr/0001`. The Lambda's role gets
   **PutItem only** (append-only by design), on its own env's table only.
 - **SSM namespace** `/insolvia/<env>/api/<key>` (#70) — Terraform writes the
   values the service reads (`insolvia-env`, `waitlist-table-name`); the deploy
@@ -139,13 +137,10 @@ against prod. Each owns, per env:
   (`apps/insolvia_app/scripts/dev-up.sh` pins it); prod registers no dev
   origins. Cognito matches redirect URIs **exactly** — a different port is a
   different URI and Cognito rejects it, which is the whole reason the port is
-  pinned rather than chosen per run.
-
-  There used to be a second client, `insolvia-desktop-<env>`, with a
-  loopback-redirect flow on a fixed four-port set. It is deleted along with the
-  desktop targets — decision D9 in [`MVP_PLAN.md`](MVP_PLAN.md). Any future
-  native client needs it back, and RFC 8252 loopback plus Cognito's
-  exact-match rule is why it was a fixed port set rather than a wildcard.
+  pinned rather than chosen per run. The web client is the only app client —
+  a future native client would need its own loopback-redirect client
+  (RFC 8252, on a fixed port set because Cognito matches redirect URIs
+  exactly).
 
 The API does **not** verify tokens yet — the env outputs expose
 `auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
@@ -192,9 +187,7 @@ grants it nothing. Tags add `DeveloperMachineId`/`DeveloperPrincipal`/
 
 The marketing site (`apps/insolvia_marketing`) is server-side rendered, so
 `web_hosting` cannot host it. `marketing_site` is its own single-concern
-module, instantiated in **both** `envs/staging` and `envs/prod` (decision D2's
-original prod-only carve-out was reversed in Milestone 6 — see
-[`MVP_PLAN.md`](MVP_PLAN.md)):
+module, instantiated in **both** `envs/staging` and `envs/prod`:
 
 ```
 viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  → S3 (private, OAC)
@@ -228,26 +221,6 @@ viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  �
 Names: `insolvia-marketing` (ECR — shared across envs, no suffix),
 `insolvia-marketing-ssr-prod` (Lambda + HTTP API + role),
 `insolvia-marketing-assets-prod` (S3).
-
-## Removed: desktop artifact hosting (`modules/artifact_hosting`)
-
-**The module, both `download.insolvia.ai` hosts, and the buckets are gone**,
-along with the desktop builds they served — decision D9 in
-[`MVP_PLAN.md`](MVP_PLAN.md). Two notes for whoever brings a download host back:
-
-- **A download host must not reuse `web_hosting`.** That module rewrites 403/404
-  to `/index.html` with a 200 so SPA deep links work; on a download host it
-  makes `curl -O` on a typo'd URL save an HTML error page as `Insolvia.dmg`.
-  Downloads also want no `default_root_object`, no listing, `Content-Disposition:
-  attachment` as an overridable floor, `X-Robots-Tag: noindex, nofollow`, and a
-  Terraform-managed `robots.txt` so the host is uncrawlable from the first apply
-  rather than once CI has run. That is why it was a separate module and would
-  need to be again.
-- **It needed a human-applied IAM change.** The bucket name matched none of the
-  deploy role's S3 prefixes, so `ci-trust` carried a dedicated statement applied
-  via `scripts/apply-ci-trust.sh`. Deliberately *not* named to slip under the
-  existing `insolvia-web-*` grant. Removing it is the same kind of change, in
-  reverse — see the `insolvia-deploy-role-permissions` skill.
 
 ## Providers
 

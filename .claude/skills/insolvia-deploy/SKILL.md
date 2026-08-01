@@ -42,7 +42,7 @@ before you debug one:
   what ships instead of taking main's HEAD.
 - **"No promotable image" means staging never pushed one** for that commit —
   usually its `paths:` filter skipped that service. Not an error to force past.
-- **Prod deploys no longer `terraform apply`.** Infra changes reach prod ONLY
+- **Prod deploys never `terraform apply`.** Infra changes reach prod ONLY
   via `prod-deploy.sh prod-infra --input mode=apply`. If you changed
   `infra/` and dispatched a service deploy expecting it to land, it did not.
 

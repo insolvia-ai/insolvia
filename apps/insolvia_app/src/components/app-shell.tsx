@@ -17,8 +17,7 @@ export interface AppShellProps {
 
 /**
  * The branded page frame every Insolvia screen sits inside: the wordmark header
- * over a centered, max-width content column on the brand canvas. Ported from the
- * Flutter `AppScaffold`.
+ * over a centered, max-width content column on the brand canvas.
  *
  * **The landmarks are the point.** `role="banner"`, `role="navigation"`,
  * `role="main"` and `role="contentinfo"` are what react-native-web maps to real

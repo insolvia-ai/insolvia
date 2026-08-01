@@ -30,7 +30,7 @@
 #   1. apply infra/envs/shared (creates insolvia-mailer)
 #   2. build services/mailer (`docker build --target lambda`), tag
 #      <repo-url>:<env> — the per-environment marker tag this module seeds from
-#      (`var.image_tag`), not `:latest`, which no longer exists under a shared
+#      (`var.image_tag`), not `:latest`, which does not exist under a shared
 #      repository — and push it. Every later deploy just re-pushes and calls
 #      update-function-code for ingress/sender/feedback — Terraform ignores
 #      image_uri drift (see the lifecycle note on each Lambda below).
@@ -49,7 +49,7 @@ data "aws_iam_role" "caller" {
 
 locals {
   # insolvia-mailer-<env> — reused across resource types that don't need a
-  # purpose qualifier (HTTP API, SES configuration set). No longer the ECR
+  # purpose qualifier (HTTP API, SES configuration set). NOT the ECR
   # repository name: that repository is shared across environments and so
   # carries no -<env> suffix (infra/envs/shared).
   name = "${var.project}-mailer-${var.environment}"

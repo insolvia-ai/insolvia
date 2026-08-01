@@ -1,7 +1,6 @@
 # SES production access — the request runbook
 
-Issue **#80 / 6.8**, the last item in Milestone 6. This is the runbook for
-getting `insolvia.ai` out of the Amazon SES sandbox.
+The runbook for getting `insolvia.ai` out of the Amazon SES sandbox.
 
 > **Submitting is a human action and cannot be automated from this repo.** It
 > is a form in the AWS console (or a Support case), tied to an AWS account and
@@ -240,9 +239,10 @@ more detail, which costs a round trip.
 1. **Remove the sandbox warning** from
    [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — the boxed "Outbound is still in the SES
    sandbox" section and the `### SES production access` note under *Remaining
-   setup steps*, plus the sandbox capability table in
-   [`MVP_PLAN.md`](MVP_PLAN.md) Milestone 1.
-2. **Close issue #80** and mark 6.8 done in `MVP_PLAN.md` Milestone 6.
+   setup steps*, plus this document's own sandbox capability table.
+2. **Remove the "Outstanding foundation item · SES
+   production access" section** from `MVP_PLAN.md` (and drop it from that
+   file's risk list).
 3. **Send a real end-to-end message** to an address that is *not* a verified
    SES identity — a personal Gmail is ideal. That single send is the only
    thing that actually proves the sandbox is behind us. Check the receiving
@@ -278,8 +278,8 @@ as evasion and slows everything down.
 
 - [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — the address map, DNS records, and the
   Google-Workspace-inbound / SES-outbound split.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — Milestone 6 issue breakdown, and the M1
-  sandbox capability table.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — the outstanding-item entry this document
+  resolves.
 - [`adr/0001-client-stays-dumb-trust-boundary.md`](adr/0001-client-stays-dumb-trust-boundary.md)
   — why the unsubscribe path has three hops instead of one.
 - `services/mailer/README.md` — the suppression store, and who is allowed to

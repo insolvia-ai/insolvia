@@ -11,9 +11,9 @@ describe('Heading', () => {
   });
 
   it('never derives the level from the visual size', () => {
-    // The rejected library mapped size→tag, so choosing a smaller heading for
-    // looks silently broke the document outline (`heading-order`). Here the two
-    // are independent: a level-1 heading rendered at body size is still an <h1>.
+    // Mapping size→tag would let choosing a smaller heading for looks silently
+    // break the document outline (`heading-order`). Here the two are
+    // independent: a level-1 heading rendered at body size is still an <h1>.
     render(
       <Heading level={1} size="body">
         Small but still the page heading

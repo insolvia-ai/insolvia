@@ -7,17 +7,9 @@ name: App · PR
 # `paths:` filter would silently deadlock every PR that does not touch these
 # paths.
 #
-# ── Desktop is deferred; the jobs that guarded it are gone ────────────────────
-# This file used to carry `macOS build` and `Windows build`, and a long header
-# arguing that they were load-bearing: under D8 (docs/MVP_PLAN.md) desktop was
-# built but not promoted, an unpromoted target rots silently, and a per-PR
-# compile was the entire cost of keeping that option real.
-#
-# That argument was correct for a Flutter app and is answered, not discarded,
-# by docs/adr/0004-react-native-replaces-flutter.md — which records it as a
-# superseded position along with what replaces it. Read the ADR before
-# reinstating desktop coverage here; the reasoning is preserved there precisely
-# so this deletion is reversible on evidence rather than on memory.
+# ── No desktop jobs, by decision ──────────────────────────────────────────────
+# The case is recorded in docs/adr/0004-react-native-replaces-flutter.md —
+# read it before adding desktop coverage here.
 
 on:
   pull_request:
@@ -128,8 +120,7 @@ jobs:
         with:
           paths: |
             apps/insolvia_app/**
-            # insolvia_tokens stays from the Flutter era for the same reason it
-            # was there then: it is a workspace member the app consumes
+            # insolvia_tokens is a workspace member the app consumes
             # directly, co-installed by the root `npm ci` below, so a token
             # change reaches this build with no version bump in between.
             packages/insolvia_tokens/**

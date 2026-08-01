@@ -3,7 +3,7 @@ import { usePathname } from 'expo-router';
 import { NotFound } from '@/screens/not-found';
 
 /**
- * The catch-all route — the direct port of go_router's `errorBuilder`.
+ * The catch-all route.
  *
  * **Not optional.** `infra/modules/web_hosting` has CloudFront rewrite 403/404 to
  * `/index.html` with HTTP **200**, which is what makes deep links work in a

@@ -17,7 +17,7 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
 - **Container repositories are shared across environments**, one per service,
   in `envs/shared`. This is what lets a prod deploy run the exact image digest
   staging validated instead of rebuilding — see the note in
-  `envs/shared/main.tf`. It deliberately replaced one-repo-per-env; environment
+  `envs/shared/main.tf`. One-repo-per-env is deliberately rejected; environment
   isolation lives in separate Lambdas, roles, tables, SSM namespaces and
   Cognito pools, not in separate image stores.
 - **Structure:** `modules/<concern>/{main,variables,outputs}.tf`,

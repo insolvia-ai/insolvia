@@ -10,8 +10,8 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
 - **The design system is the cross-platform package** (0.2.x+): it publishes
   SOURCE — per-component `.web.tsx` / `.native.tsx` leaf pairs behind
   extensionless imports, with the consumer's bundler picking the leaf. The web
-  leaves are plain React DOM + Tailwind; Base UI is gone from the dependency
-  tree entirely. Navigation styled as a button uses `buttonClass` on a
+  leaves are plain React DOM + Tailwind — no third-party UI library underneath.
+  Navigation styled as a button uses `buttonClass` on a
   `<Link>`/`<a>` — the web `Button` is a real `<button>` only, no `render`
   polymorphism.
 - **Three pieces of wiring are load-bearing for that package; break any one and
@@ -32,13 +32,12 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   `react-native` appears in `build/client` — the standing insurance that the
   platform split's core invariant holds (the web bundle never contains a native
   leaf). If it fires, fix the resolution leak; never delete the guard.
-- **No `.npmrc` tricks, and keep it that way.** An earlier draft used
-  `legacy-peer-deps` to survive GitHub Packages stripping
-  `peerDependenciesMeta`; the real fix landed in the design system (0.2.1
-  declares no react-native/tokens peers at all — see that package's
-  `CLAUDE.md`), so a clean `npm ci` works everywhere, the Docker packaging
-  check included. If an install here ever demands react-native, the package
-  regressed — fix it there, not with npm flags here.
+- **No `.npmrc` tricks, and keep it that way.** No peer-handling flags: a
+  workaround here once hid a design-system packaging bug from the Docker build.
+  A clean `npm ci` must work everywhere, the Docker packaging check included —
+  the design system declares no react-native/tokens peers (see that package's
+  `CLAUDE.md`), so if an install here ever demands react-native, the package
+  regressed. Fix the package, not flags here.
 - **Staging must stay non-indexable.** `app/lib/seo.ts` allowlists exactly
   `www.insolvia.ai`; never broaden it. A crawlable staging copy competes with
   prod for its own keywords.
@@ -48,5 +47,5 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   (`react-router.config.ts`) or POST actions 401 behind CloudFront → API Gateway
   (the Lambda sees the gateway host, not the public one).
 - **The Lighthouse / Core Web Vitals budget** (`lighthouserc.json`) is enforced
-  in CI. Being far lighter than Flutter-web is the whole reason this is React —
-  don't regress it.
+  in CI. This is the one public surface and Core Web Vitals feed search
+  ranking; the site must stay fast on a throttled phone — don't regress it.

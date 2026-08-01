@@ -9,10 +9,8 @@
 #     receivers know which senders are legitimate
 #
 # Sending and receiving are deliberately split across two providers: SES sends
-# transactional mail as no-reply@, Google Workspace holds the human mailboxes.
-# Nothing here receives mail into AWS any more — the SES inbound forwarder that
-# used to own hello@ / support@ / security@ was removed when the Workspace
-# mailboxes replaced it.
+# transactional mail as no-reply@, Google Workspace holds the human mailboxes
+# (hello@ / support@ / security@). Nothing here receives mail into AWS.
 
 locals {
   mail_from_domain = "mail.${var.domain_name}"

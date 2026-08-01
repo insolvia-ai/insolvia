@@ -17,12 +17,10 @@ function rolesIn(node: RenderedNode): string[] {
 }
 
 /**
- * The port of the Flutter `home_screen_test.dart`, plus the half of
- * `app_router_test.dart` that asserted `/` lands on the home shell.
+ * The home screen, and that `/` lands on it.
  *
- * These render through the **real router** (`renderRouter` mounts `src/app`), the
- * way the Flutter tests pumped the real `InsolviaApp` with a real `GoRouter`, so
- * a route file that moved or stopped compiling fails here.
+ * These render through the **real router** (`renderRouter` mounts `src/app`),
+ * so a route file that moved or stopped compiling fails here.
  */
 describe('the home route', () => {
   it('renders the branded chrome and the shell content at /', async () => {
@@ -60,11 +58,10 @@ describe('the home route', () => {
   });
 
   it('keeps the decorative arrow glyph out of the primary CTA accessible name', () => {
-    // Ported from the deleted components/button.test.tsx when Button moved to
-    // @insolvia-ai/design-system: the package button has no `icon` prop, so the
-    // glyph is now an `aria-hidden` child at the call site and `aria-label`
-    // pins the name. If either half were dropped, a screen reader would
-    // announce "Start a case right arrow".
+    // The design-system button has no `icon` prop, so the glyph is an
+    // `aria-hidden` child at the call site and `aria-label` pins the name. If
+    // either half were dropped, a screen reader would announce "Start a case
+    // right arrow".
     renderRouter('src/app', { initialUrl: '/' });
 
     // RN aliases `aria-label` onto `accessibilityLabel` on the host element,
@@ -85,8 +82,8 @@ describe('the home route', () => {
 
     await userEvent.press(screen.getByRole('button', { name: 'Start a case' }));
 
-    // The Flutter screen raised a SnackBar; this is the live region that
-    // replaced it, so the message reaches a screen reader too.
+    // A live region rather than a toast, so the message reaches a screen
+    // reader too.
     const notice = await screen.findByText('Case tools arrive in a later release.');
     expect(notice.props['aria-live']).toBe('polite');
   });

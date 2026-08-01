@@ -40,7 +40,7 @@ export function Home() {
         {/*
           The design system's Button (its .native leaf — see metro.config.js).
           `size="lg"` (48dp) because the package's md is 40dp, under the 44dp
-          WCAG 2.5.5 target-size floor the old app button enforced. The arrow is
+          WCAG 2.5.5 target-size floor this app enforces. The arrow is
           a decorative glyph, not part of the name: it renders `aria-hidden` and
           `aria-label` pins the accessible name to exactly the visible label,
           so a screen reader never announces "Start a case right arrow".
@@ -54,8 +54,7 @@ export function Home() {
       </View>
 
       {/*
-        The Flutter screen raised a SnackBar here. React Native has no
-        equivalent, and a toast is the wrong shape for a message a keyboard or
+        A toast would be the wrong shape for a message a keyboard or
         screen-reader user has to notice: `aria-live="polite"` announces it in
         place without stealing focus.
       */}
@@ -77,7 +76,6 @@ export function Home() {
 
 const styles = StyleSheet.create({
   actions: {
-    // The Flutter screen used a `Wrap`; this is its React Native equivalent.
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,

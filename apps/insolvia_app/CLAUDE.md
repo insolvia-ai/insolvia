@@ -42,8 +42,8 @@ root [`CLAUDE.md`](../../CLAUDE.md) for which of those skills apply.
 ## Where code goes
 
 The layout is Expo's own, per
-[`.agents/skills/expo-project-structure/`](../../.agents/skills/expo-project-structure/SKILL.md)
-— mirroring how the Flutter app adopted Flutter's. The reasoning is in
+[`.agents/skills/expo-project-structure/`](../../.agents/skills/expo-project-structure/SKILL.md).
+The reasoning is in
 [ADR 0005](../../docs/adr/0005-expo-app-layout.md); read it before proposing a
 different shape.
 
@@ -110,11 +110,11 @@ whole accessibility story, and it only fires if a component asks for it:
 | `Field`      | design system | compound `Field.Root/Label/Control/Description/Error` | labelled input group |
 | `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
 
-Three rules, each of which was a real defect in the library this codebase rejected:
+Three rules:
 
 - **`Heading` takes `level` for document structure and a separate `size` for
   appearance.** Never derive the tag from how big the text should look — that is
-  what produced `heading-order` failures in the spike.
+  what produces `heading-order` failures.
 - **The design system's `Field` is the only way to render an input.** No bare
   `TextInput` in a screen, ever, so an unlabelled input cannot be written by
   accident. The package's own suite asserts the label/control wiring; screen
@@ -161,8 +161,8 @@ below the `<title>` and why this paragraph is here rather than in the file.
   changes.
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
-  `EXPO_PUBLIC_*` variables, which is why the old `INSOLVIA_ENV` name could not
-  survive. Unknown or absent resolves to `local` and never to production, and the
+  `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.
+  Unknown or absent resolves to `local` and never to production, and the
   host/API maps are exhaustive, so a new environment cannot compile until it
   declares its API (issue #64). Keep both properties.
 - **No `enum`.** `erasableSyntaxOnly` is on: Metro strips types rather than
@@ -184,7 +184,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   production. `npm run build` passes `--clear` for that reason; do not remove it.
 - **`ios/` and `android/` are not committed.** `expo prebuild` generates them from
   `app.config.ts` if and when mobile starts; a returning native client uses the
-  `insolvia://` scheme, not the desktop loopback redirect that used to exist.
+  `insolvia://` scheme.
 - **Script names are a contract** with `.github/workflows/app-*.yml`: `build`,
   `web`, `lint`, `typecheck`, `test`. Renaming one orphans a required check on
   `main` (see the `insolvia-branch-protection` skill).

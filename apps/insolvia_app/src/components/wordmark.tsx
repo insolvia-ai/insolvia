@@ -11,9 +11,8 @@ export interface WordmarkProps {
  * The Insolvia wordmark: "Insolvia" in brand ink with a brass accent dot.
  *
  * A placeholder identity until the real logo lands, but themed, so it already
- * responds to light/dark and to any brand-color change. Ported from the Flutter
- * `BrandWordmark`; the nested `Text` is React Native's equivalent of the
- * `TextSpan` that tinted the dot.
+ * responds to light/dark and to any brand-color change. The nested `Text` is
+ * what tints the dot.
  *
  * Not a heading: the wordmark is the site identity, and marking it up as one
  * would put it in the document outline ahead of every page's real `<h1>`.

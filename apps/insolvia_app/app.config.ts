@@ -18,15 +18,13 @@ const config: ExpoConfig = {
   version: '0.1.0',
 
   // Deep-link scheme, registered now so `insolvia://auth/callback` is already
-  // the app's identity when mobile arrives. The desktop client's loopback
-  // redirect is gone with the desktop target; a returning native client uses
-  // this custom scheme instead.
+  // the app's identity when mobile arrives.
   scheme: 'insolvia',
 
   orientation: 'portrait',
 
-  // Follows the OS appearance, the way the Flutter shell's ThemeMode.system
-  // did — on web that is the browser's `prefers-color-scheme`.
+  // Follows the OS appearance — on web that is the browser's
+  // `prefers-color-scheme`.
   userInterfaceStyle: 'automatic',
 
   icon: './public/icons/Icon-512.png',

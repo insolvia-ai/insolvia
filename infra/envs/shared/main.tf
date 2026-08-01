@@ -146,14 +146,12 @@ module "email" {
 
 # ── Container repositories ─────────────────────────────────────
 # One repo per SERVICE, shared by every environment — deliberately NOT one per
-# environment. This reverses the original #63 arrangement (insolvia-api-staging
-# / insolvia-api-prod), and the reversal is the whole point of the promotion
-# pipeline: prod deploys the exact image digest staging validated, so there has
-# to be one place both environments can name it.
+# environment. A shared repo is the whole point of the promotion pipeline:
+# prod deploys the exact image digest staging validated, so there has to be
+# one place both environments can name it.
 #
-# The rule that replaced: "separate repos, so a prod deploy can never pick up a
-# staging build." That protected against prod *accidentally* running a staging
-# image. Environment isolation does not live here and never did — it lives in
+# Per-env repos would only protect against prod *accidentally* running a
+# staging image, and environment isolation does not live here — it lives in
 # separate Lambdas, IAM roles, DynamoDB tables, SSM namespaces and Cognito
 # pools. An image is the one artifact that is identical across environments by
 # construction: every service reads its environment at RUNTIME (the API from
@@ -191,12 +189,11 @@ resource "aws_ecr_repository" "service" {
 # Two traps this avoids, both of which would delete the image a live Lambda is
 # running:
 #
-#   1. Count-based retention breaks under a shared repo. The old policy kept the
-#      10 newest images, which was fine when one repo served one environment.
-#      Staging now pushes on every merge to main while prod deploys rarely, so
-#      ~10 merges would evict the digest prod is serving. Staging's *rate* has
-#      nothing to do with prod's *recency*; a time window is the only bound that
-#      tracks what is actually still in use.
+#   1. Count-based retention breaks under a shared repo. Staging pushes on
+#      every merge to main while prod deploys rarely, so a keep-the-N-newest
+#      rule would evict the digest prod is serving within ~N merges. Staging's
+#      *rate* has nothing to do with prod's *recency*; a time window is the
+#      only bound that tracks what is actually still in use.
 #   2. ECR lifecycle rules only ever EXPIRE — they never PROTECT. A "keep the 30
 #      newest prod images" rule at priority 1 does not shield those images from
 #      a `tagStatus = "any"` rule at priority 3; the catch-all still selects and

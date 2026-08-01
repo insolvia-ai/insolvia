@@ -54,8 +54,8 @@ bundle as production.
 
 Web is the only target built today. Nothing under `ios/` or `android/` is
 committed: `expo prebuild` generates those from `app.config.ts` if and when mobile
-starts, which is what keeps them cheap options rather than rewrites. Desktop
-(previously unsigned macOS and Windows builds) is deferred — see
+starts, which is what keeps them cheap options rather than rewrites. Desktop is
+deferred — see
 [ADR 0004](../../docs/adr/0004-react-native-replaces-flutter.md).
 
 Only Expo's free, open-source layer is used: no EAS Build, Submit, Update or

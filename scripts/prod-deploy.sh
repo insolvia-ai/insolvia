@@ -87,7 +87,7 @@ Examples:
   ${0##*/} --yes --no-watch app   # fire and forget
 
 To change prod infrastructure, use 'prod-infra' — it applies infra/envs/prod
-and nothing else. The service targets NO LONGER apply Terraform at all: they
+and nothing else. The service targets apply NO Terraform at all: they
 only promote and deploy code, so an infra change will not ride along with a
 service deploy, and a service deploy will not carry unrelated infra drift into
 production. Apply infra deliberately, before the release that needs it.

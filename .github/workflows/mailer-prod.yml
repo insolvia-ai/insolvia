@@ -23,8 +23,8 @@ name: Mailer · Deploy · Production
 # meaningful model, and aliasing only `ingress` would create version skew
 # against consumers sharing its image and table schemas.
 #
-# This workflow no longer applies Terraform — `infra-prod.yml` is the only path
-# that mutates prod infrastructure.
+# This workflow applies no Terraform — `infra-prod.yml` is the only path that
+# mutates prod infrastructure.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
 # Image-package Lambda refuses to be created before its image exists. Bootstrap
