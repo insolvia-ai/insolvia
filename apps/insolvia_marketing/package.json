@@ -11,19 +11,20 @@
   "//": [
     "@insolvia-ai/design-system lives in devDependencies on purpose: it",
     "publishes raw .ts/.tsx source, so Vite always bundles it (vite.config.ts",
-    "ssr.noExternal) and the runtime never imports it — and keeping it out of",
+    "ssr.noExternal) and the runtime never imports it \u2014 and keeping it out of",
     "`dependencies` is what lets the Docker image's `npm ci --omit=dev` skip",
     "it (and its clsx/tailwind-merge subtree, bundled at build time too) and",
     "stay free of GitHub Packages registry auth. Installing it here DOES need",
     "auth (see .npmrc). A file: path override for local design-system hacking",
-    "is fine, but never commit it — the committed dep is the published package."
+    "is fine, but never commit it \u2014 the committed dep is the published package."
   ],
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "lint": "eslint app server"
+    "lint": "eslint app server",
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-router/architect": "^7.18.1",
@@ -48,6 +49,7 @@
     "tailwindcss": "^4.3.2",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.19.0",
-    "vite": "^8.1.3"
+    "vite": "^8.1.3",
+    "vitest": "^4.1.10"
   }
 }
