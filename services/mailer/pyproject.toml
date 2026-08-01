@@ -10,7 +10,16 @@ dependencies = []
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "-q"
+# --strict-markers: an unregistered mark is an ERROR, not a warning. Without it
+# a typo — `@pytest.mark.parametrise` — silently degrades a table-driven test
+# into one no-op case that still reports green, which is the worst kind of
+# failure: invisible. This suite leans hard on parametrize, so the typo is a
+# real risk and the guard is nearly free.
+# --strict-config: the same treatment for typos in this ini block itself.
+addopts = "-q --strict-markers --strict-config"
+# Register any custom mark here before using it; that registration is what
+# --strict-markers checks against. `parametrize` is built in and needs none.
+markers = []
 
 # Strict static type checking (mirrors the CI `mypy` step). Scoped to `src`;
 # tests exercise fakes/monkeypatching where --strict is noise, not signal.
