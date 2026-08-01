@@ -5,9 +5,14 @@
 // error bodies — are the authoritative record of what `services/api`
 // actually speaks. If the API's contract changes, these tests must fail;
 // keep every literal in sync with:
-//   services/api/src/insolvia_api/api/routes/{health,waitlist}.py
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me}.py
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
-//   services/api/src/insolvia_api/core/waitlist.py
+//   services/api/src/insolvia_api/api/auth.py (UNAUTHORIZED_BODY, the 401)
+//   services/api/src/insolvia_api/core/{waitlist,auth}.py
+//
+// No real credentials appear here — this repo is public. The access token is
+// the literal string `test-access-token`; the client treats it as opaque and
+// never parses it, so a real JWT would buy nothing but risk.
 //
 // The transport is a stubbed `fetch` — no network, no test server — so every
 // assertion here is about the bytes this client sends and the objects it
@@ -20,11 +25,19 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ApiException,
+  ApiUnauthorizedException,
   ApiValidationException,
   InsolviaApiClient,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
 import type { FetchLike, WaitlistSubmission } from '@insolvia-ai/api-client';
+
+/**
+ * An obviously-fake stand-in for a Cognito access token. This repo is public:
+ * nothing here may resemble a real credential, and a real JWT is not needed —
+ * the client treats the token as an opaque string and never parses it.
+ */
+const ACCESS_TOKEN = 'test-access-token';
 
 /** What the stub captured about a request, flattened for assertions. */
 interface SeenRequest {
@@ -38,10 +51,14 @@ interface SeenRequest {
  * A `fetch` stub that records what it was called with. `lastRequest()`
  * throws rather than handing back `undefined`, so assertions never need a
  * non-null assertion to reach the captured request.
+ *
+ * `callCount()` exists for the assertion that matters most on the protected
+ * path: that a call with no token never reaches the transport at all.
  */
 function stubFetch(respond: (seen: SeenRequest) => Response): {
   fetch: FetchLike;
   lastRequest: () => SeenRequest;
+  callCount: () => number;
 } {
   const requests: SeenRequest[] = [];
   return {
@@ -62,6 +79,7 @@ function stubFetch(respond: (seen: SeenRequest) => Response): {
       }
       return seen;
     },
+    callCount: () => requests.length,
   };
 }
 
@@ -94,6 +112,13 @@ function asApiValidationException(error: unknown): ApiValidationException {
     return error;
   }
   throw new Error(`expected an ApiValidationException, got: ${String(error)}`);
+}
+
+function asApiUnauthorizedException(error: unknown): ApiUnauthorizedException {
+  if (error instanceof ApiUnauthorizedException) {
+    return error;
+  }
+  throw new Error(`expected an ApiUnauthorizedException, got: ${String(error)}`);
 }
 
 describe('health', () => {
@@ -323,5 +348,358 @@ describe('joinWaitlist', () => {
 
     expect(error).toBe(transportFailure);
     expect(error).not.toBeInstanceOf(ApiException);
+  });
+});
+
+describe('me', () => {
+  // Pinned against services/api/src/insolvia_api/api/routes/me.py, which
+  // returns {"subject", "username", "clientId", "scopes", "expiresAt"} —
+  // snake_case, unlike the waitlist endpoints. The path is /v1/me, not /me.
+  const IDENTITY = {
+    subject: '9f1c2d3e-4a5b-6c7d-8e9f-0a1b2c3d4e5f',
+    username: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d',
+    clientId: 'test-app-client-id',
+    scopes: ['aws.cognito.signin.user.admin'],
+    expiresAt: 1785312000,
+  };
+
+  test('GETs /v1/me with a bearer token and maps every contract field', async () => {
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const principal = await client.me();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/me');
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('accept')).toBe('application/json');
+    // A GET carries no body and must not announce a content type.
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+
+    expect(principal.subject).toBe('9f1c2d3e-4a5b-6c7d-8e9f-0a1b2c3d4e5f');
+    expect(principal.username).toBe('1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d');
+    expect(principal.clientId).toBe('test-app-client-id');
+    expect(principal.scopes).toEqual(['aws.cognito.signin.user.admin']);
+    expect(principal.expiresAt).toBe(1785312000);
+  });
+
+  test('a trailing slash on baseUrl does not double the path', async () => {
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080/', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.me();
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe('/v1/me');
+  });
+
+  test('null username and expiresAt survive as null, not undefined', async () => {
+    // Principal.username and .expiresAt are `str | None` / `int | None`
+    // server-side, so jsonify really can emit null. The model mirrors the
+    // wire rather than smoothing null into undefined.
+    const stub = stubFetch(() =>
+      jsonResponse({ ...IDENTITY, username: null, expiresAt: null }, 200),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const principal = await client.me();
+
+    expect(principal.username).toBeNull();
+    expect(principal.expiresAt).toBeNull();
+  });
+
+  test('an empty scopes array is preserved', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...IDENTITY, scopes: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect((await client.me()).scopes).toEqual([]);
+  });
+
+  test('awaits an async token provider', async () => {
+    // Native secure storage is async; an in-memory store is not. Both work,
+    // because the client awaits either.
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => Promise.resolve(ACCESS_TOKEN),
+    });
+
+    await client.me();
+
+    expect(stub.lastRequest().headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+  });
+
+  test('consults the provider on every call, so a refreshed token is picked up', async () => {
+    const tokens = ['test-access-token-first', 'test-access-token-second'];
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => tokens.shift(),
+    });
+
+    await client.me();
+    expect(stub.lastRequest().headers.get('authorization')).toBe('Bearer test-access-token-first');
+
+    await client.me();
+    expect(stub.lastRequest().headers.get('authorization')).toBe('Bearer test-access-token-second');
+  });
+
+  test('a provider returning undefined throws ApiUnauthorizedException WITHOUT calling fetch', async () => {
+    // The assertion that matters: no round trip. A request certain to be
+    // rejected is not worth making, and the app gets the same exception type
+    // it would get from a server 401.
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => undefined,
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+    expect(error.body).toBe('');
+    expect(error.message).not.toContain(ACCESS_TOKEN);
+  });
+
+  test('an async provider resolving to undefined also throws without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => Promise.resolve(undefined),
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+
+  test('an empty or blank token is treated as no token at all', async () => {
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    for (const blank of ['', '   ']) {
+      const client = new InsolviaApiClient('http://localhost:8080', {
+        fetch: stub.fetch,
+        accessToken: () => blank,
+      });
+
+      expect(asApiUnauthorizedException(await rejection(client.me())).source).toBe('client');
+    }
+    expect(stub.callCount()).toBe(0);
+  });
+
+  test('no provider configured at all throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+
+  test('a server 401 maps to ApiUnauthorizedException carrying the status and raw body', async () => {
+    // The exact single body every 401 gets — api/auth.py's UNAUTHORIZED_BODY.
+    // The API deliberately never says which check failed.
+    const body = JSON.stringify({ error: 'Unauthorized', message: 'authentication required' });
+    const stub = stubFetch(() => new Response(body, { status: 401 }));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(stub.callCount()).toBe(1);
+    expect(error.statusCode).toBe(401);
+    expect(error.body).toBe(body);
+    expect(error.source).toBe('server');
+    expect(error.message).toContain('Unauthorized');
+    expect(error.message).toContain('authentication required');
+    // A token must never reach a message, and messages get logged.
+    expect(error.message).not.toContain(ACCESS_TOKEN);
+  });
+
+  test('a 401 is still an ApiException, so existing catch blocks keep working', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'Unauthorized' }, 401));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await rejection(client.me());
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).toBeInstanceOf(ApiUnauthorizedException);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('a 401 with an unparseable body is still ApiUnauthorizedException', async () => {
+    // An ALB or API Gateway can answer 401 with HTML the app never sees the
+    // shape of. It still has to reach the refresh-or-redirect path.
+    const stub = stubFetch(() => new Response('<html>401</html>', { status: 401 }));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(error.statusCode).toBe(401);
+    expect(error.body).toBe('<html>401</html>');
+  });
+
+  test('status beats body shape: a 401 carrying "fields" is NOT a validation error', async () => {
+    // Precedence, decided deliberately. Were the body to win, the app would
+    // render field errors under a form instead of re-authenticating.
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'Unauthorized', fields: { token: 'expired' } }, 401),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.me()));
+
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+    expect(error.source).toBe('server');
+  });
+
+  test('a non-401 failure on a protected call is a plain ApiException', async () => {
+    // ApiUnauthorizedException must not swallow every protected-call failure.
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'InternalError', message: 'request failed' }, 500),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.me()));
+
+    expect(error.statusCode).toBe(500);
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+  });
+
+  test('a 200 missing a contract field throws ApiException naming the field', async () => {
+    const stub = stubFetch(() => {
+      const { clientId: _omitted, ...withoutClientId } = IDENTITY;
+      return jsonResponse(withoutClientId, 200);
+    });
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.me()));
+
+    expect(error.message).toContain('clientId');
+  });
+
+  test('a scopes array holding a non-string is rejected, not cast', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...IDENTITY, scopes: ['ok', 7] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect(asApiException(await rejection(client.me())).message).toContain('scopes');
+  });
+
+  test('a provider that throws propagates untouched', async () => {
+    // Secure storage can fail. That is not a 401 — the caller must see the
+    // real cause rather than a fabricated auth failure.
+    const storageFailure = new Error('secure storage unavailable');
+    const stub = stubFetch(() => jsonResponse(IDENTITY, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => {
+        throw storageFailure;
+      },
+    });
+
+    const error = await rejection(client.me());
+
+    expect(error).toBe(storageFailure);
+    expect(error).not.toBeInstanceOf(ApiException);
+    expect(stub.callCount()).toBe(0);
+  });
+});
+
+describe('public endpoints stay public', () => {
+  // The regression guard for the whole auth feature. `GET /health` and
+  // `POST /v1/waitlist` are unauthenticated on the server, and the marketing
+  // site calls the second one server-to-server with no user in sight.
+  // Attaching a bearer token to either would leak a credential to an endpoint
+  // that has no business seeing one, so configuring a provider must change
+  // NOTHING about what these two send.
+  test('health() sends no Authorization header even with a token provider configured', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { status: 'ok', service: 'insolvia-api', version: '0.1.0', environment: 'local' },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.health();
+
+    const seen = stub.lastRequest();
+    expect(seen.headers.has('authorization')).toBe(false);
+    // The full header set, pinned: exactly what it sent before auth existed.
+    expect(seen.headers.get('accept')).toBe('application/json');
+  });
+
+  test('joinWaitlist() sends no Authorization header even with a token provider configured', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ id: 'x', submittedAt: '2026-07-23T00:00:00.000Z' }, 201),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.joinWaitlist({
+      name: 'Ada Lovelace',
+      firm: 'Lovelace Law LLC',
+      email: 'ada@lovelace.law',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.headers.has('authorization')).toBe(false);
+    expect(seen.headers.get('accept')).toBe('application/json');
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+  });
+
+  test('a public call still works with no token provider at all', async () => {
+    // The provider is optional: a client built for marketing or for a
+    // signed-out app must not need one.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { status: 'ok', service: 'insolvia-api', version: '0.1.0', environment: 'local' },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    await expect(client.health()).resolves.toMatchObject({ status: 'ok' });
+    expect(stub.lastRequest().headers.has('authorization')).toBe(false);
   });
 });

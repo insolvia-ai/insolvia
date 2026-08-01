@@ -62,6 +62,8 @@ class AppConfig:
     waitlist_table_name: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
+    auth_issuer_url: str | None = None
+    auth_client_id: str | None = None
     marketing_origin: str = _MARKETING_ORIGINS["local"]
     cors_allowed_origins: tuple[str, ...] = ()
     cors_allow_localhost: bool = True
@@ -85,6 +87,15 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     without it rather than degrading to unsigned tokens, so the failure is a
     500 on the unsubscribe route and a send that carries no unsubscribe link
     — loud, not silent.
+    AUTH_ISSUER_URL and AUTH_CLIENT_ID are the Cognito pool's OIDC issuer
+    (https://cognito-idp.<region>.amazonaws.com/<pool-id>) and the web app
+    client id every access token must name (issue #79 / 7.4). Same SSM
+    derivation as the two above: /insolvia/<env>/api/auth-issuer-url and
+    .../auth-client-id. Unset follows UNSUBSCRIBE_SECRET's rule, NOT
+    MAILER_API_URL's — there is no degraded mode where a protected route
+    stops checking. `core/auth.py`'s settings_or_raise turns either one
+    missing into a 401 on every protected route, and api_lambda.py refuses to
+    boot without both.
     """
     source = os.environ if environ is None else environ
     environment = source.get("INSOLVIA_ENV", "local")
@@ -98,6 +109,8 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
+        auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
+        auth_client_id=source.get("AUTH_CLIENT_ID") or None,
         marketing_origin=_MARKETING_ORIGINS[environment],
         cors_allowed_origins=_CORS_ALLOWED_ORIGINS[environment],
         cors_allow_localhost=environment != "production",

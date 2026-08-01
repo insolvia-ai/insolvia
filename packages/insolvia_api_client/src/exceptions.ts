@@ -42,6 +42,64 @@ export class ApiException extends Error {
   }
 }
 
+/**
+ * Where a 401 came from.
+ *
+ * - `'client'` — this client refused to send the request at all, because no
+ *   access token was available. No network round trip happened.
+ * - `'server'` — the API answered 401: the token was missing, expired, or
+ *   rejected.
+ *
+ * The distinction is the app's: a `'server'` 401 is worth one refresh attempt,
+ * a `'client'` 401 means there is nothing to refresh — go to sign-in. A union
+ * of string literals rather than an `enum`, because `erasableSyntaxOnly` is on
+ * (see the root `tsconfig.base.json`).
+ */
+export type UnauthorizedSource = 'client' | 'server';
+
+/** Options accepted by {@link ApiUnauthorizedException}. */
+export interface ApiUnauthorizedExceptionOptions {
+  /** The HTTP status code, or `401` when no request was made. */
+  readonly statusCode: number;
+  /** The raw response body, or `''` when no request was made. */
+  readonly body: string;
+  /** Which side produced the failure. See {@link UnauthorizedSource}. */
+  readonly source: UnauthorizedSource;
+  /** Overrides the default summary for this `source`. */
+  readonly message?: string | undefined;
+}
+
+const UNAUTHORIZED_MESSAGES = {
+  client: 'no access token available: the request was not sent',
+  server: 'the API rejected the access token',
+} as const;
+
+/**
+ * The call was not authenticated — either the API answered 401, or this
+ * client had no access token to send and refused to make the request.
+ *
+ * Callers translate this into refresh-or-redirect; {@link source} says which.
+ * It extends {@link ApiException}, so a consumer that only catches
+ * `ApiException` keeps working unchanged.
+ *
+ * The access token never appears on this exception — not in `message`, not in
+ * `body`, not in any field. Nothing in this package stringifies a token.
+ */
+export class ApiUnauthorizedException extends ApiException {
+  /** Which side produced the failure. See {@link UnauthorizedSource}. */
+  readonly source: UnauthorizedSource;
+
+  constructor(options: ApiUnauthorizedExceptionOptions) {
+    super({
+      statusCode: options.statusCode,
+      body: options.body,
+      message: options.message ?? UNAUTHORIZED_MESSAGES[options.source],
+    });
+    this.name = 'ApiUnauthorizedException';
+    this.source = options.source;
+  }
+}
+
 /** Options accepted by {@link ApiValidationException}. */
 export interface ApiValidationExceptionOptions {
   readonly statusCode: number;

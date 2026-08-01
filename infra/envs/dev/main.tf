@@ -90,3 +90,27 @@ module "auth" {
 
   tags = local.common_tags
 }
+
+# ── API auth configuration ──────────────────────────────────────
+# The same /insolvia/<env>/api/<kebab-key> parameters staging and prod publish
+# (issue #79), under this machine's own environment name. No Lambda reads them
+# here — there is none in dev — but they keep the namespace identical across
+# every environment, so "where does AUTH_ISSUER_URL come from" has one answer
+# rather than two. For the local API, the values are also available directly
+# as this env's auth_issuer_url / auth_web_client_id outputs; export them into
+# services/api/.env to run the compose stack or the dev server against this
+# machine's pool.
+
+resource "aws_ssm_parameter" "auth_issuer_url" {
+  name  = "/insolvia/${local.environment}/api/auth-issuer-url"
+  type  = "String"
+  value = module.auth.issuer_url
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "auth_client_id" {
+  name  = "/insolvia/${local.environment}/api/auth-client-id"
+  type  = "String"
+  value = module.auth.web_client_id
+  tags  = local.common_tags
+}

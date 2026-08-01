@@ -6,3 +6,8 @@ asgiref==3.8.1
 # it explicitly so local, CI, and Lambda all resolve the same one (mailer
 # does the same).
 boto3==1.40.66
+# JWT verification for Cognito access tokens (issue #79). The [crypto] extra
+# pulls `cryptography`, which supplies RS256 — Cognito signs with nothing else.
+# Pinned exact for the same reason boto3 is: local, CI, and Lambda must resolve
+# one version of the code that decides whether a request is authenticated.
+PyJWT[crypto]==2.13.0

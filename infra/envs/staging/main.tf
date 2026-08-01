@@ -152,6 +152,34 @@ module "auth" {
   tags = local.common_tags
 }
 
+# Publish the pool's issuer and web app client id into the API's own SSM
+# config namespace (issue #79) so the API Lambda can read them as
+# AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.
+#
+# Env-level for the same reason mailer_api_url above is: module.api_service
+# knows nothing about module.auth, and having it read these back would couple
+# two modules that are otherwise independent. An env-level resource
+# referencing module.auth's outputs has no such problem.
+#
+# Same /insolvia/<env>/api/<kebab-key> convention, so the deploy workflow's
+# existing get-parameters-by-path step picks them up (last path segment,
+# upper-cased, hyphens to underscores) — no workflow change needed. Both are
+# plain Strings, not SecureStrings: an issuer URL and an app client id are
+# public values that appear in every sign-in redirect the browser makes.
+resource "aws_ssm_parameter" "auth_issuer_url" {
+  name  = "/insolvia/${local.environment}/api/auth-issuer-url"
+  type  = "String"
+  value = module.auth.issuer_url
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "auth_client_id" {
+  name  = "/insolvia/${local.environment}/api/auth-client-id"
+  type  = "String"
+  value = module.auth.web_client_id
+  tags  = local.common_tags
+}
+
 # ── Marketing site: staging-www.insolvia.ai ─────────────────────
 # The marketing site DOES have a staging environment (issue #45 revisited —
 # the original "production + PR previews only" decision D2 is reversed; see

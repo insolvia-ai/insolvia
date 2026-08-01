@@ -6,7 +6,7 @@ from typing import cast
 from flask import current_app
 
 from insolvia_api.core.config import AppConfig
-from insolvia_api.core.ports import Mailer, WaitlistStore
+from insolvia_api.core.ports import JwksProvider, Mailer, WaitlistStore
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,12 @@ class ApiDependencies:
     config: AppConfig
     waitlist_store: WaitlistStore
     mailer: Mailer
+    # None means "this deployment cannot verify tokens" (issue #79). It is a
+    # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
+    # every protected route when it is absent, and the Lambda entrypoint
+    # refuses to boot without one. It stays optional only so the existing
+    # public-route tests can build an ApiDependencies without one.
+    jwks_provider: JwksProvider | None = None
 
 
 def dependencies() -> ApiDependencies:

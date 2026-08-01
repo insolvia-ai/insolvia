@@ -91,12 +91,20 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 #     to this file.
 #   • INSOLVIA_ENV/AWS_DEFAULT_REGION also serve anyone running the plain
 #     dev server off this file: `set -a; source services/api/.env; set +a`.
+#   • AUTH_ISSUER_URL/AUTH_CLIENT_ID point token verification at this
+#     machine's own Cognito pool. Without them every authenticated route
+#     answers 401 — the service fails closed rather than waving requests
+#     through when auth is unconfigured, so these are not optional for
+#     local work on anything behind sign-in. Neither is a secret: both
+#     appear in every sign-in redirect.
 
 api_env="$API_DIR/.env"
 upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
+upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
 
 ok "AWS development resources are ready and services/api/.env was updated."
 

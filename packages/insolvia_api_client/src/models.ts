@@ -29,6 +29,47 @@ export interface HealthStatus {
 }
 
 /**
+ * The `GET /v1/me` 200 response: the signed-in caller's identity, derived
+ * purely from claims the access token already proved. The API makes no call
+ * to Cognito to build it.
+ *
+ * **The body is camelCase, like every other endpoint** — `{"subject",
+ * "username", "clientId", "scopes", "expiresAt"}`, matching `submittedAt` on
+ * the waitlist route. The underlying JWT claims are snake_case (`client_id`,
+ * `exp`), and the API translates at its edge rather than leaking claim
+ * spelling into its own wire format. Models here mirror that wire exactly and
+ * never translate again, so this file shows what actually goes over the
+ * socket.
+ *
+ * **There is no email.** The Cognito pool sets
+ * `username_attributes = ["email"]`, so an access token's `username` claim is
+ * a pool-generated UUID and no address appears in any access-token claim.
+ * Treat {@link username} as an opaque correlation id — never render it as an
+ * email address. The app displays the address from the ID token it holds.
+ */
+export interface Principal {
+  /**
+   * The `sub` claim: the pool's stable, immutable user id. The only value
+   * that should ever key user-owned data.
+   */
+  readonly subject: string;
+  /**
+   * Cognito's `username` claim — a generated UUID, **not** an email address.
+   * `null` when the token carried no username.
+   */
+  readonly username: string | null;
+  /** The Cognito app client the token was minted for. */
+  readonly clientId: string;
+  /** OAuth scopes on the token. Nothing enforces them server-side today. */
+  readonly scopes: readonly string[];
+  /**
+   * The token's `exp` as a Unix timestamp in **seconds** (not milliseconds —
+   * it is the JWT claim verbatim), or `null` when absent.
+   */
+  readonly expiresAt: number | null;
+}
+
+/**
  * The `POST /v1/waitlist` request body.
  *
  * `name`, `firm`, and `email` are required by the API; the rest are optional
