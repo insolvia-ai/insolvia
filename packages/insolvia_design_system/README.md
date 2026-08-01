@@ -5,8 +5,8 @@ Insolvia's owned, cross-platform design system, published as
 front-end stacks: the marketing site (React DOM + Tailwind) and the app
 (React Native / Expo). Agent rules: [`CLAUDE.md`](CLAUDE.md).
 
-It succeeds `packages/insolvia_design_system_react` (0.1.x, web-only, Base UI),
-which coexists frozen until marketing moves to 0.2.x and it is deleted.
+It succeeded `packages/insolvia_design_system_react` (0.1.x, web-only, Base
+UI), deleted when marketing cut over to 0.2.x.
 
 ## The pattern: one props module, two leaves
 
@@ -29,6 +29,14 @@ extension — **the consumer's bundler picks the leaf**:
 | App (native, later) | Metro | `.native.tsx` | RN primitives, tokens values |
 | App (web, today) | Metro | `.native.tsx` | react-native-web renders the RN tree — the app has no Tailwind (ADR 0004), so the `.web` leaf would be unstyled there |
 
+The native leaves resolve their **colors at render time** through
+`src/lib/native-theme.native.ts` (`useNativeColors()` — anything but `'dark'`
+resolves to light, mirroring the app's `themeFor`). A color read statically —
+`colors.light` at module load, or a color inside `StyleSheet.create` — can
+never follow the OS scheme: 0.2.1 shipped exactly that, and every
+design-system surface stayed light inside a dark app. Only scheme-independent
+layout belongs in `StyleSheet.create`.
+
 The props module is the platform-SHARED third and must never import a
 renderer — no `react-native`, no `react-dom`, no `@base-ui/*`. That rule is
 what keeps react-native-web out of marketing's bundle, so it is machine-
@@ -47,6 +55,9 @@ platforms' event and a11y models do not unify.
 |---|---|
 | `apps/insolvia_app` | workspace symlink (root npm workspace member) |
 | `apps/insolvia_marketing` | the **published version** from GitHub Packages |
+
+The app's channel is live: it consumes this package as **source**, through the
+workspace symlink plus a Metro `resolveRequest` (`apps/insolvia_app/metro.config.js`).
 
 Marketing consuming by version is why **any change here is its own PR with a
 `version` bump** — see the `insolvia-design-system-pr` skill. The app sees
@@ -72,14 +83,23 @@ drift in CI.
 
 ```bash
 npm run lint            --workspace @insolvia-ai/design-system
-npm run typecheck       --workspace @insolvia-ai/design-system   # web program
-npm run typecheck:native --workspace @insolvia-ai/design-system  # RN program
-npm run test            --workspace @insolvia-ai/design-system
+npm run typecheck       --workspace @insolvia-ai/design-system   # all three programs
+npm run typecheck:native --workspace @insolvia-ai/design-system  # RN program only
+npm run test            --workspace @insolvia-ai/design-system   # web + native projects
 ```
 
 Typechecking is split because the imports are: each tsconfig sets
 `moduleSuffixes` (`[".web", ""]` / `[".native", ""]`) so tsc resolves the same
-extensionless imports to the same leaves the bundlers do. Tests are Vitest +
-Testing Library against the `.web` leaves (plus direct unit tests for props
-modules that carry real logic); the native leaves are typechecked against real
-React Native types and rendered by the app's own test harness.
+extensionless imports to the same leaves the bundlers do. A third program,
+`tsconfig.native.test.json`, checks the native-leaf tests (native suffixes
+plus the DOM lib, since those tests assert on react-native-web's DOM).
+
+Tests run as two vitest projects (`vitest.config.ts`): `web` is Vitest +
+Testing Library against the `.web` leaves, resolved web-first as Vite does;
+`native` resolves the `.native` leaves native-first as Metro does and aliases
+`react-native` to `react-native-web` — the exact pair the app ships on web —
+rendering them into the same jsdom. `vitest.native.setup.ts` supplies the
+`matchMedia` mock that drives `prefers-color-scheme` in those tests. Props
+modules with real logic keep direct unit tests. Native tests live in
+`*.native.test.tsx` beside the leaf; Button and Field carry the a11y wiring
+and must keep native coverage.

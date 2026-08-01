@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { composeDescribedBy, type FieldIds } from './field.props';
 
 const ids: FieldIds = {
+  labelId: ':r1:-label',
   controlId: ':r1:-control',
   descriptionId: ':r1:-description',
   errorId: ':r1:-error',

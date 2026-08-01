@@ -14,6 +14,14 @@ export default [
   ...base,
   {
     files: ['**/*.props.ts', 'src/lib/**/*.ts'],
+    // `.native.*` files under src/lib are platform LEAVES, not shared modules:
+    // the same `.native.` infix that routes them to Metro (and to
+    // tsconfig.native.json's moduleSuffixes) is what exempts them here,
+    // because a leaf imports its own renderer by definition. The web typecheck
+    // and marketing's Vite cannot resolve a `.native.` file at all, so the
+    // exemption cannot leak react-native into a web bundle. Every props file
+    // and every extensionless (shared) lib module stays fenced.
+    ignores: ['src/lib/**/*.native.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

@@ -1,27 +1,36 @@
-// NATIVE LEAF — simpler layout port.
+// NATIVE LEAF — simpler layout port. Colors come from useNativeColors() at
+// render time (scheme-aware); only scheme-independent layout is static.
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewProps } from 'react-native';
 
-import { colors, spacing } from '@insolvia-ai/tokens';
+import { spacing } from '@insolvia-ai/tokens';
 
+import { useNativeColors } from '../lib/native-theme';
 import type { FooterGroupOwnProps } from './footer.props';
 
-const c = colors.light;
-
-const FooterRoot = ({ style, ...props }: ViewProps) => (
-  <View style={[styles.root, style]} {...props} />
-);
+const FooterRoot = ({ style, ...props }: ViewProps) => {
+  const c = useNativeColors();
+  return (
+    <View
+      style={[styles.root, { borderTopColor: c.line, backgroundColor: c.surfaceAlt }, style]}
+      {...props}
+    />
+  );
+};
 
 interface GroupProps extends FooterGroupOwnProps {
   children?: React.ReactNode;
 }
 
-const FooterGroup = ({ title, children }: GroupProps) => (
-  <View accessibilityRole="summary" accessibilityLabel={title} style={styles.group}>
-    <Text style={styles.groupTitle}>{title}</Text>
-    <View style={styles.groupLinks}>{children}</View>
-  </View>
-);
+const FooterGroup = ({ title, children }: GroupProps) => {
+  const c = useNativeColors();
+  return (
+    <View accessibilityRole="summary" accessibilityLabel={title} style={styles.group}>
+      <Text style={[styles.groupTitle, { color: c.ink }]}>{title}</Text>
+      <View style={styles.groupLinks}>{children}</View>
+    </View>
+  );
+};
 
 const FooterLink = ({
   children,
@@ -29,15 +38,19 @@ const FooterLink = ({
 }: {
   children?: React.ReactNode;
   onPress?: () => void;
-}) => (
-  <Pressable accessibilityRole="link" onPress={onPress}>
-    <Text style={styles.link}>{children}</Text>
-  </Pressable>
-);
+}) => {
+  const c = useNativeColors();
+  return (
+    <Pressable accessibilityRole="link" onPress={onPress}>
+      <Text style={[styles.link, { color: c.muted }]}>{children}</Text>
+    </Pressable>
+  );
+};
 
-const FooterNote = ({ children }: { children?: React.ReactNode }) => (
-  <Text style={styles.note}>{children}</Text>
-);
+const FooterNote = ({ children }: { children?: React.ReactNode }) => {
+  const c = useNativeColors();
+  return <Text style={[styles.note, { borderTopColor: c.line, color: c.muted }]}>{children}</Text>;
+};
 
 export const Footer = {
   Root: FooterRoot,
@@ -51,20 +64,16 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: c.line,
-    backgroundColor: c.surfaceAlt,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
   },
   group: { flexDirection: 'column', gap: spacing.sm },
-  groupTitle: { fontSize: 14, fontWeight: '600', color: c.ink },
+  groupTitle: { fontSize: 14, fontWeight: '600' },
   groupLinks: { flexDirection: 'column', gap: spacing.xs },
-  link: { fontSize: 14, color: c.muted },
+  link: { fontSize: 14 },
   note: {
     borderTopWidth: 1,
-    borderTopColor: c.line,
     paddingTop: spacing.md,
     fontSize: 14,
-    color: c.muted,
   },
 });
