@@ -16,7 +16,7 @@
 # `aws_lambda_function` fails ("Source image ... does not exist") until one has
 # been pushed. The repository itself is not part of the deadlock — it
 # lives in infra/envs/shared and is applied before any environment (see the
-# deployment order in docs/TERRAFORM_ARCHITECTURE.md) — so the cycle is
+# deployment order in docs/reference/terraform.md) — so the cycle is
 # just "seed an image, then apply", once per environment:
 #
 #   1. apply infra/envs/shared (creates insolvia-api)
@@ -363,7 +363,7 @@ resource "aws_lambda_permission" "api_live" {
 # Cert note: a REGIONAL API Gateway domain needs its ACM cert in the API's own
 # region — unlike CloudFront, which demands us-east-1 regardless of where the
 # origin runs. Everything in this account is us-east-1 (see
-# docs/TERRAFORM_ARCHITECTURE.md), so the shared *.insolvia.ai wildcard
+# docs/reference/terraform.md), so the shared *.insolvia.ai wildcard
 # satisfies both consumers and the envs reuse the exact same
 # data.aws_acm_certificate lookup they already had for CloudFront. If the API
 # ever moves region, it needs a wildcard cert issued in that region — the

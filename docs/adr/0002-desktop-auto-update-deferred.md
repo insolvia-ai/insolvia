@@ -7,7 +7,7 @@
   reversing the desktop deferral has to satisfy, and none of it stopped being
   true — see *What survives the supersession* at the end.
 - **Date:** 2026-07-27
-- **Relates to:** decision D8 in `docs/MVP_PLAN.md`; issues #17, #16
+- **Relates to:** decision D8 in `docs/plan.md`; issues #17, #16
 
 ## Decision
 

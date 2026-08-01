@@ -1,8 +1,8 @@
 # infra — agent rules
 
 All AWS infrastructure. Human overview: [`README.md`](README.md). Deep model:
-[`docs/TERRAFORM_ARCHITECTURE.md`](../docs/TERRAFORM_ARCHITECTURE.md); one-time
-bootstrap: [`docs/AWS_SETUP.md`](../docs/AWS_SETUP.md). Applies touch AWS — see
+[`docs/reference/terraform.md`](../docs/reference/terraform.md); one-time
+bootstrap: [`docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md). Applies touch AWS — see
 the `insolvia-aws-auth` skill first if credentials aren't working.
 
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no

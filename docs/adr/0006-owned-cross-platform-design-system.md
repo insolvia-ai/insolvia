@@ -5,8 +5,8 @@
 - **Relates to:** revises the *Marketing stays put* section of
   [ADR 0004](0004-react-native-replaces-flutter.md) (that section only — the
   stack decision, the free-tier rule and the no-component-library measurements
-  all stand); second revision of decision D4 in `docs/MVP_PLAN.md`;
-  `docs/PACKAGE_PUBLISHING.md` owns the operational rules. *(A draft numbered
+  all stand); second revision of decision D4 in `docs/plan.md`;
+  `docs/reference/package-publishing.md` owns the operational rules. *(A draft numbered
   0006, "theming over design system", existed only on the abandoned
   `claude/marketing-theming-05` branch and never merged — a superseded
   **direction**, not a superseded ADR. This is the first ADR 0006.)*
@@ -58,7 +58,7 @@ discipline.
 
 ADR 0004 left the repo with two design systems over one `tokens.json`: a
 web-only React package for marketing and the app's own unpublished React
-Native components. D4 in `MVP_PLAN.md` called the cost honestly — *"two
+Native components. D4 in `plan.md` called the cost honestly — *"two
 implementations of one design, kept in sync by discipline. Visual drift between
 parallel component libraries is the classic failure mode of dual-platform
 design systems"* — and contained it by scope caps rather than by mechanism.
@@ -190,4 +190,4 @@ exists precisely so this never has to happen.
 the `.web`/`.native` pairs — leaf selection is the consumer's bundler's job,
 so the pairs must reach `node_modules` verbatim. The cost is that every
 consumer transpiles TypeScript out of `node_modules`: Metro does natively,
-marketing via `ssr.noExternal`. `docs/PACKAGE_PUBLISHING.md` owns the details.
+marketing via `ssr.noExternal`. `docs/reference/package-publishing.md` owns the details.

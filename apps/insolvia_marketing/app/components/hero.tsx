@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { buttonClass } from "@insolvia-ai/design-system";
 
-// Every claim here traces to docs/business-plan.html §1 (the wedge is
+// Every claim here traces to docs/business/business-plan.html §1 (the wedge is
 // seamlessness: MyCase-native, no double entry; AI kills data entry while the
 // filed numbers stay rule-based). The product is pre-launch, so the posture is
 // early access — no shipped-feature or outcome claims.

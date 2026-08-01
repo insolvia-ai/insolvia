@@ -32,7 +32,7 @@ It shows a before/after diff and asks before writing. Rollback:
 The name is the job's `name:` in the workflow, matched **character for
 character** — matrix legs get a `(leg)` suffix. The list of valid names and
 which workflow reports each lives in
-[`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) § "Required status
+[`docs/reference/architecture.md`](../../../docs/reference/architecture.md) § "Required status
 checks".
 
 A typo doesn't error. GitHub accepts a required check nobody reports, and every

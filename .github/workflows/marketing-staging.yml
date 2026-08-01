@@ -8,7 +8,7 @@ name: Marketing · Deploy · Staging
 # which need somewhere to be exercised before prod serves them. This reverses
 # decision D2 ("production + PR previews only", issue #45); the PR previews D2
 # leaned on were never built. See infra/envs/staging/main.tf and
-# docs/MVP_PLAN.md.
+# docs/plan.md.
 #
 # Staging serves a full public copy of the site, and that is safe for SEO only
 # because the app noindexes every host that is not exactly www.insolvia.ai

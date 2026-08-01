@@ -11,7 +11,7 @@ Status: **foundation shipped; product work ahead** · Last pruned 2026-08-01
 
 ## How this maps to the business plan
 
-`docs/business-plan.html` §11 defines M0–M3 as *company* milestones:
+`docs/business/business-plan.html` §11 defines M0–M3 as *company* milestones:
 
 | Business-plan milestone | Status |
 |---|---|
@@ -30,8 +30,8 @@ detail:
 
 | Surface / concern | What exists | Owner of the detail |
 |---|---|---|
-| Domain + DNS + TLS | `insolvia.ai` on Route53, shared `*.insolvia.ai` ACM cert | [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) |
-| Human email | Google Workspace inbound, SES outbound `no-reply@` | [`EMAIL_SETUP.md`](EMAIL_SETUP.md) |
+| Domain + DNS + TLS | `insolvia.ai` on Route53, shared `*.insolvia.ai` ACM cert | [`terraform.md`](reference/terraform.md) |
+| Human email | Google Workspace inbound, SES outbound `no-reply@` | [`email.md`](reference/email.md) |
 | Marketing site | React Router v7 SSR Lambda, `www.insolvia.ai` (+ noindexed staging), Lighthouse-gated in CI | [`apps/insolvia_marketing/CLAUDE.md`](../apps/insolvia_marketing/CLAUDE.md) |
 | Web app | Expo / React Native SPA, `app.insolvia.ai`, S3 + CloudFront | [ADR 0004](adr/0004-react-native-replaces-flutter.md) · [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) |
 | Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
@@ -40,7 +40,7 @@ detail:
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
 | Mailer | SES-backed transactional service with unsubscribe path | [`services/mailer/CLAUDE.md`](../services/mailer/CLAUDE.md) |
 | Auth (seam only) | Cognito pools + hosted UI per env; `/auth/callback` registered; **the app does not sign in yet** | `infra/modules/auth/main.tf` |
-| CI/CD | Per-area PR gates (9 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| CI/CD | Per-area PR gates (9 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
 
 The subdomain map (D2) as deployed — flat `staging-*` naming, because one ACM
 wildcard covers exactly one label:
@@ -68,7 +68,7 @@ died in — this plan no longer carries their bodies.
 | D4 | **One owned cross-platform design system**, platform-split leaves, over one token source | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
 | D6 | Backend is **Python + Flask + Mangum on Lambda** | house pattern, shipped |
-| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`EMAIL_SETUP.md`](EMAIL_SETUP.md) |
+| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`email.md`](reference/email.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
 
 (D8 — "desktop built but not promoted" — is gone with desktop itself; ADR 0004
@@ -109,7 +109,7 @@ the intake milestone against it.
 
 Deliberately deferred until the site and bounce handling were live — **they now
 are**, so this is actionable: submit the request per
-[`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md). Until granted, we
+[`ses-production-access.md`](runbooks/ses-production-access.md). Until granted, we
 receive at `@insolvia.ai` but cannot reply from it. Set a date rather than
 leaving it open-ended.
 
@@ -124,7 +124,7 @@ leaving it open-ended.
 | `Product · Forms & petition engine` | M3 / P2 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. |
 | `Product · Means test` | P3 | Rule-based, with the IRS/Census refresh pipeline from the regulatory register. |
 
-**Worth flagging now:** `regulatory-source-register.html` describes a
+**Worth flagging now:** `business/regulatory-source-register.html` describes a
 maintenance calendar (§522 dollar amounts every 3 years, Census median income
 2–4×/yr, IRS standards periodically). Those are *scheduled data pipelines with
 effective-date fields*, not one-time loads. Not planned yet, but they must not

@@ -1,4 +1,4 @@
-// The jobs-to-be-done from docs/business-plan.html §6, presented as the path
+// The jobs-to-be-done from docs/business/business-plan.html §6, presented as the path
 // the product is being built along. The product is pre-launch, so the core
 // jobs are labeled "building now" and e-filing / notice tracking are labeled
 // as roadmap — never as shipped features.

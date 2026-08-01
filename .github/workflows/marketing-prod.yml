@@ -6,7 +6,7 @@ name: Marketing · Deploy · Production
 # There is a staging deploy too — marketing-staging.yml, serving
 # staging-www.insolvia.ai. It did not always exist (issue #45 originally chose
 # "production + PR previews only"); Milestone 6 reversed that, and the reasoning
-# lives in marketing-staging.yml's header and docs/MVP_PLAN.md's D2.
+# lives in marketing-staging.yml's header and docs/plan.md's D2.
 #
 # PROMOTES what staging validated — it does not build. The shared
 # insolvia-marketing repository (infra/envs/shared) already holds the image

@@ -46,7 +46,7 @@ jobs:
     # No `environment:` and no deploy-style gating: publishing an npm package
     # to GitHub Packages touches no AWS at all — no account, no Route53, no
     # CloudFront, no OIDC role — so this job never belongs behind the infra
-    # deploy machinery. See docs/PACKAGE_PUBLISHING.md.
+    # deploy machinery. See docs/reference/package-publishing.md.
     steps:
       - uses: actions/checkout@v4
 

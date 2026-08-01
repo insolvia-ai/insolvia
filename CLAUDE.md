@@ -8,7 +8,7 @@ Router v7 + Vite (`apps/insolvia_marketing`), the services are Python on Lambda.
 `ios/`/`android/` — `expo prebuild` generates those on demand. **Expo free tier
 only**: no EAS Build/Submit/Update/Hosting, no Expo account, and a CI guard that
 fails the build on an `eas.json`. Decision **D9** in
-[`docs/MVP_PLAN.md`](docs/MVP_PLAN.md) and
+[`docs/plan.md`](docs/plan.md) and
 [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) own this — read 0004
 before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 
@@ -29,11 +29,13 @@ apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React
 packages/   insolvia_tokens · insolvia_design_system · insolvia_api_client
 services/   api · mailer            (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
+docs/       plan.md · reference/ · runbooks/ · adr/ · business/
 ```
 
-Every app / package / service and `infra/` has its **own `CLAUDE.md`** (that
-area's rules — it auto-loads when you work there; read it before editing) and a
-`README.md` (for humans). One owner per fact — link, never restate.
+Every app / package / service, plus `infra/` and `docs/`, has its **own
+`CLAUDE.md`** (that area's rules — it auto-loads when you work there; read it
+before editing) and a `README.md` (for humans). One owner per fact — link,
+never restate.
 
 ### One npm workspace, with an explicit member list
 
@@ -66,11 +68,12 @@ before you touch anything:
 | **changing `packages/insolvia_design_system`** — the shared components (Button, Field) both surfaces render | `insolvia-design-system-pr` skill — **its own PR + a version bump** · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
 | changing the app-local components (`apps/insolvia_app/src/components/`) / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field live in the package, row above |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
-| publishing a package / bumping versions | [`docs/PACKAGE_PUBLISHING.md`](docs/PACKAGE_PUBLISHING.md) |
-| touching env model, hosting, or PR-gate design | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| touching Terraform state / naming / deploy order | [`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md) |
-| doing one-time AWS/GitHub bootstrap | [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) |
-| working on mail / SES | [`docs/EMAIL_SETUP.md`](docs/EMAIL_SETUP.md) · [`docs/SES_PRODUCTION_ACCESS.md`](docs/SES_PRODUCTION_ACCESS.md) |
+| publishing a package / bumping versions | [`docs/reference/package-publishing.md`](docs/reference/package-publishing.md) |
+| touching env model, hosting, or PR-gate design | [`docs/reference/architecture.md`](docs/reference/architecture.md) |
+| touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
+| doing one-time AWS/GitHub bootstrap | [`docs/runbooks/aws-bootstrap.md`](docs/runbooks/aws-bootstrap.md) |
+| working on mail / SES | [`docs/reference/email.md`](docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](docs/runbooks/ses-production-access.md) |
+| **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 
 ## `.agents/skills/` — vendor Expo skills, and which ones apply here
@@ -92,7 +95,7 @@ overrule it.
 | `expo-upgrade` | **Use** | The SDK is pinned exact, so an upgrade is a deliberate task and this is the procedure for it. |
 | `eas-hosting` | **Do not use** | It deploys to Expo-managed Cloudflare Workers — exactly what `infra/modules/web_hosting` already does for free, under Terraform, in our own account. Adopting it would fork the deploy path. |
 | `eas-app-stores` | **Do not use** | `eas build`/`eas submit` are paid, need an Expo account in CI, and need paid Apple/Google accounts. We ship no store builds. |
-| `eas-workflows` | **Do not use** | A second CI system alongside `.github/workflows/`, billed per job. Our required-check contract lives in GitHub Actions ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). |
+| `eas-workflows` | **Do not use** | A second CI system alongside `.github/workflows/`, billed per job. Our required-check contract lives in GitHub Actions ([`docs/reference/architecture.md`](docs/reference/architecture.md)). |
 | `eas-observe` | **Do not use** | Paid production metrics ingestion, and it wants `expo-observe` wired into the app root. Not on the free tier. |
 | `eas-simulator` | **Do not use** | Paid cloud simulators for native builds we do not produce. `allowed-tools: Bash(eas *)` — it will try to run the CLI. |
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |

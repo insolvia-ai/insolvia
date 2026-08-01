@@ -23,7 +23,7 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 | [`packages/`](packages/) | Shared libraries: design tokens, the cross-platform design system, the API client. |
 | [`services/`](services/) | Backend services (Python on Lambda): `api`, `mailer`. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
-| [`docs/`](docs/) | [Business plan](docs/business-plan.html) + engineering runbooks. |
+| [`docs/`](docs/) | [Business plan](docs/business/business-plan.html) + engineering runbooks. |
 
 ## Getting started
 
@@ -55,7 +55,7 @@ run in compose. Nothing here needs Xcode: there are no native builds in the repo
 
 The app targets **web**, and that is the only artifact CI produces. There are no
 macOS or Windows builds (see decision D9 in
-[`docs/MVP_PLAN.md`](docs/MVP_PLAN.md)) and nothing committed under `ios/` or
+[`docs/plan.md`](docs/plan.md)) and nothing committed under `ios/` or
 `android/` — `npx expo prebuild` generates those from `app.json` if and when we
 want them.
 
@@ -66,8 +66,8 @@ Terraform, like everything else.
 ## Deployment
 
 Deploys run through GitHub Actions (AWS via OIDC) — see
-[`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) and
-[`docs/TERRAFORM_ARCHITECTURE.md`](docs/TERRAFORM_ARCHITECTURE.md). Shared
+[`docs/runbooks/aws-bootstrap.md`](docs/runbooks/aws-bootstrap.md) and
+[`docs/reference/terraform.md`](docs/reference/terraform.md). Shared
 infra is applied and the `*.insolvia.ai` ACM cert is `ISSUED`, so pushes to
 `main` deploy for real.
 

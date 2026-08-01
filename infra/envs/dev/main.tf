@@ -12,7 +12,7 @@
 # `terraform validate -backend=false` here, like every other env).
 #
 # Scope is deliberately tiny — only what local development actually consumes
-# today (see docs/TERRAFORM_ARCHITECTURE.md):
+# today (see docs/reference/terraform.md):
 #   • the waitlist DynamoDB table — local dev's actual database (there is no
 #     local emulator; the compose stack's API talks straight to this table);
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs

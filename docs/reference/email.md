@@ -25,7 +25,7 @@ the next apply.
 > suppression, bounce/complaint alarms. What remains is a human action in the
 > AWS console, and one decision (`www.insolvia.ai` is parked offline, so the
 > privacy policy AWS reviews does not currently load). Runbook, checklist, and
-> the exact request text: **[`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md)**.
+> the exact request text: **[`ses-production-access.md`](../runbooks/ses-production-access.md)**.
 >
 > This affects the **app's** transactional mail from `no-reply@` only. It does
 > **not** affect Google Workspace: mail humans send from their `@insolvia.ai`
@@ -131,7 +131,7 @@ Until it is granted, the app cannot send transactional mail to
 anyone who is not a verified SES identity. Unrelated to Workspace.
 
 The request itself is a form in the AWS console and cannot be automated from
-this repo. [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) has the
+this repo. [`ses-production-access.md`](../runbooks/ses-production-access.md) has the
 pre-submission checklist (including the two prerequisites that are *not* yet
 true), the exact text to paste, and what to do after it is granted — or
 rejected.
@@ -197,10 +197,10 @@ MAIL FROM, and `no-reply@` are live and needed.
 
 ## Related
 
-- [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) — getting out of the
+- [`ses-production-access.md`](../runbooks/ses-production-access.md) — getting out of the
   SES sandbox: checklist, request text, and the post-grant steps.
-- [`AWS_SETUP.md`](AWS_SETUP.md) — AWS/GitHub bootstrap, deploy gating.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — what is live and the decisions in force.
-- [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — state model and
+- [`aws-bootstrap.md`](../runbooks/aws-bootstrap.md) — AWS/GitHub bootstrap, deploy gating.
+- [`plan.md`](../plan.md) — what is live and the decisions in force.
+- [`terraform.md`](terraform.md) — state model and
   environment layout.
 </content>

@@ -3,7 +3,7 @@
 - **Status:** Accepted — the *Marketing stays put* section's two-design-systems
   ending is revised by [ADR 0006](0006-owned-cross-platform-design-system.md)
 - **Date:** 2026-07-29
-- **Relates to:** decision D9 in `docs/MVP_PLAN.md` (which supersedes D8);
+- **Relates to:** decision D9 in `docs/plan.md` (which supersedes D8);
   supersedes [ADR 0002](0002-desktop-auto-update-deferred.md); superseded
   layout rules in [ADR 0003](0003-flutter-app-layout.md) → [0005](0005-expo-app-layout.md);
   *Marketing stays put* revised by
@@ -78,7 +78,7 @@ own release cadence, not a `--platform` flag.
 But the optionality D8 was buying does not disappear, it moves: under Expo the
 cheap held-open target is **mobile**, and it is held open by `prebuild`, which
 needs nothing committed and no CI job. So we keep the option by having chosen
-React Native, not by running desktop builds. D9 in `MVP_PLAN.md` records this
+React Native, not by running desktop builds. D9 in `plan.md` records this
 in full, and this ADR supersedes ADR 0002, whose subject — a desktop
 auto-updater — no longer has a desktop to update.
 
@@ -175,7 +175,7 @@ grounds.
   gone; the npm workspace in the root `package.json` is the only one left.
 - **The CI matrix collapses.** `Flutter app`, `macOS build`, `Windows build`
   and `Flutter design system` are replaced by a single `App` check, taking the
-  required-check list from twelve to nine. See `docs/ARCHITECTURE.md`.
+  required-check list from twelve to nine. See `docs/reference/architecture.md`.
 - **The environment variable is renamed.** `--dart-define=INSOLVIA_ENV` becomes
   **`EXPO_PUBLIC_INSOLVIA_ENV`**. This is forced, not cosmetic: Expo inlines
   only variables prefixed `EXPO_PUBLIC_`, and anything else is simply absent
