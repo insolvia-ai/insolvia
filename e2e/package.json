@@ -1,0 +1,40 @@
+{
+  "name": "insolvia-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "//": [
+    "End-to-end tests that run against DEPLOYED staging, after the deploy and",
+    "the CloudFront invalidation (.github/workflows/app-staging.yml). Seed of",
+    "the suite proposed in issue #40.",
+    "",
+    "NOT AN NPM WORKSPACE MEMBER, deliberately — the root package.json's",
+    "`workspaces` array is explicit and this directory is absent from it, for",
+    "exactly the reason apps/insolvia_marketing is absent: Node resolution walks",
+    "UP the tree, so a dependency this package forgot to declare would resolve",
+    "from the repo-root node_modules and pass CI, then fail in a clean install.",
+    "Its own package-lock.json and its own `npm ci` in the E2E job are what",
+    "catch that. Do not add it to the root `workspaces` array, and do not run",
+    "the root `npm ci` and expect these deps to be there.",
+    "",
+    "NOT A REQUIRED PR CHECK, deliberately — see CLAUDE.md in this directory.",
+    "",
+    "NO CREDENTIALS LIVE HERE. The repo is public. The test user's email and",
+    "password come from E2E_TEST_USER_EMAIL / E2E_TEST_USER_PASSWORD in the",
+    "environment, with no defaults and no fixture file."
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "browser": "playwright install --with-deps chromium",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^24.13.3",
+    "typescript": "^5.9.3"
+  }
+}

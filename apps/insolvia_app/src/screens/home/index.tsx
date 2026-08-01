@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AppShell } from '@/components/app-shell';
 import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
+import { MePanel } from '@/components/me-panel';
 import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -18,6 +19,10 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * `@insolvia-ai/tokens` via `@/theme`, so none is spelled out here. It also
  * surfaces the active environment, which is what makes a staging build
  * unmistakable at a glance.
+ *
+ * It is reached only through `RequireSession` (see `src/app/index.tsx`), so
+ * everything below can assume a signed-in user — which is what lets
+ * {@link MePanel} call the protected `GET /v1/me` without a guard of its own.
  */
 export function Home() {
   const theme = useTheme();
@@ -66,6 +71,9 @@ export function Home() {
           {notice}
         </Text>
       )}
+
+      {/* The authenticated round trip, proven on screen (issue #77). */}
+      <MePanel />
 
       <Text style={[styles.meta, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
         Serving {env.label.toLowerCase()} · {env.host}

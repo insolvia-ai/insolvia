@@ -118,6 +118,53 @@ jobs:
       # is the other half of the reproducibility guarantee in the header.
       - run: npm ci
 
+      # ── Infra outputs are read BEFORE the build, not after ────────────────
+      #
+      # The app reads its Cognito configuration at BUILD time — Metro inlines
+      # `EXPO_PUBLIC_COGNITO_DOMAIN` and `EXPO_PUBLIC_COGNITO_CLIENT_ID` into
+      # the bundle — and both values are outputs of infra/envs/prod
+      # (`auth_domain`, `auth_web_client_id`). So the read has to happen first.
+      # Only the step ORDER changed; this is the same read-only `terraform
+      # output` this workflow has always done.
+      #
+      # It is race-free for a reason specific to prod: this workflow applies no
+      # Terraform, `infra-prod.yml` is the only thing that applies
+      # infra/envs/prod, and the `insolvia-terraform-prod` concurrency group
+      # above serializes the two — so no apply can be in flight while these
+      # outputs are read. (Staging cannot rely on that, because it applies in
+      # the same run; see the job-order note in app-staging.yml.)
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` capture below.
+          terraform_wrapper: false
+
+      # Read-only: `output` needs the state, not an apply.
+      #
+      # Neither auth value is a secret — the client id rides in the query string
+      # of every `/oauth2/authorize` redirect and the domain *is* the URL — which
+      # is what makes an `EXPO_PUBLIC_` name legitimate for them. Nothing secret
+      # may ever carry that prefix; it is inlined into a bundle any visitor can
+      # read.
+      - name: Read prod infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "bucket=$(tf bucket_name)"
+            echo "dist=$(tf distribution_id)"
+            echo "url=$(tf url)"
+            echo "auth_domain=$(tf auth_domain)"
+            echo "auth_client_id=$(tf auth_web_client_id)"
+          } >> "$GITHUB_OUTPUT"
+
       # ── The Metro cache trap — this is why `--clear` is here ──────────────
       #
       # `EXPO_PUBLIC_*` is inlined at bundle time, but Metro's transform cache
@@ -138,33 +185,33 @@ jobs:
       # a web build. The `--clear` lives in the script and ONLY there — expo
       # rejects a repeated flag, so appending `-- --clear` here breaks the
       # build (it did once, on the staging deploy).
+      # The Cognito pair is what turns a green deploy into a signable-in app.
+      # `terraform output -raw` fails outright on an output that does not exist,
+      # but SUCCEEDS on one that exists and is empty — and an empty
+      # `EXPO_PUBLIC_*` is inlined as an empty string, producing a bundle that
+      # builds, deploys, serves 200, and cannot sign anyone in. Production is
+      # where that must never happen quietly, and staging's E2E job cannot catch
+      # it because prod builds its own bundle (see this workflow's header).
       - name: Build web (production)
         env:
           EXPO_PUBLIC_INSOLVIA_ENV: production
-        run: npm run build --workspace apps/insolvia_app
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.10"
-          # The wrapper interposes on stdout, which corrupts the
-          # `terraform output -raw` capture below.
-          terraform_wrapper: false
-
-      # Read-only: `output` needs the state, not an apply.
-      - name: Read prod infra outputs
-        id: tf
+          EXPO_PUBLIC_COGNITO_DOMAIN: ${{ steps.tf.outputs.auth_domain }}
+          EXPO_PUBLIC_COGNITO_CLIENT_ID: ${{ steps.tf.outputs.auth_client_id }}
         run: |
-          terraform -chdir=infra/envs/prod init -input=false
-          {
-            echo "bucket=$(terraform -chdir=infra/envs/prod output -raw bucket_name)"
-            echo "dist=$(terraform -chdir=infra/envs/prod output -raw distribution_id)"
-            echo "url=$(terraform -chdir=infra/envs/prod output -raw url)"
-          } >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          missing=()
+          [ -n "$EXPO_PUBLIC_COGNITO_DOMAIN" ] || missing+=(EXPO_PUBLIC_COGNITO_DOMAIN)
+          [ -n "$EXPO_PUBLIC_COGNITO_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_CLIENT_ID)
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Empty Cognito build config: ${missing[*]}. These come from the" \
+                 "infra/envs/prod outputs auth_domain / auth_web_client_id. Refusing to" \
+                 "ship a production bundle that cannot sign anyone in."
+            exit 1
+          fi
+          echo "Cognito hosted UI: $EXPO_PUBLIC_COGNITO_DOMAIN (client ${EXPO_PUBLIC_COGNITO_CLIENT_ID:0:6}…)"
+
+          npm run build --workspace apps/insolvia_app
 
       # ── Two-tier cache sync, inline ──────────────────────────────────────
       #

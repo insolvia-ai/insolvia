@@ -5,6 +5,7 @@ import {
   environmentHosts,
   environmentInfo,
   isProduction,
+  resolveAuthConfig,
   resolveEnvironment,
 } from '@/config/environment';
 
@@ -73,5 +74,51 @@ describe('environmentInfo', () => {
 
   it('defaults to the environment this bundle was built for', () => {
     expect(environmentInfo().name).toBe(appEnvironment);
+  });
+});
+
+describe('resolveAuthConfig', () => {
+  // Obviously-fake values throughout: this repository is public, and a real
+  // hosted domain or app client id must never appear in it. `.test` is reserved
+  // by RFC 6761 and can never be registered.
+  const domain = 'insolvia-test.auth.example.test';
+  const clientId = 'test-client-id-0000000000';
+
+  it('accepts a bare hostname and settles on an https origin', () => {
+    // Terraform's `aws_cognito_user_pool_domain` output is a hostname with no
+    // scheme, so this is the shape the deploy workflow actually passes.
+    expect(resolveAuthConfig(domain, clientId)).toEqual({
+      domain: `https://${domain}`,
+      clientId,
+    });
+  });
+
+  it('accepts an https URL unchanged, trailing slash and all', () => {
+    // A stray trailing slash would otherwise produce `//oauth2/token`.
+    expect(resolveAuthConfig(`https://${domain}/`, clientId)?.domain).toBe(`https://${domain}`);
+    expect(resolveAuthConfig(`https://${domain}`, clientId)?.domain).toBe(`https://${domain}`);
+  });
+
+  it('rejects a non-https scheme rather than repairing it', () => {
+    // An OAuth code exchange over plaintext puts a refresh token on the wire.
+    expect(resolveAuthConfig(`http://${domain}`, clientId)).toBeNull();
+  });
+
+  it.each([
+    ['both absent', undefined, undefined],
+    ['no domain', undefined, clientId],
+    ['no client id', domain, undefined],
+    ['a blank domain', '   ', clientId],
+    ['a blank client id', domain, '  '],
+  ])('reports %s as unconfigured rather than half-configured', (_label, rawDomain, rawClientId) => {
+    // `null` is a supported state: the sign-in screen says so, instead of
+    // building a redirect to `https://undefined/oauth2/authorize`.
+    expect(resolveAuthConfig(rawDomain, rawClientId)).toBeNull();
+  });
+
+  it('is unconfigured in this test run, which is the local default', () => {
+    // Tests run without the EXPO_PUBLIC_COGNITO_* variables, so this exercises
+    // the same arm an unconfigured `local` build takes.
+    expect(resolveAuthConfig()).toBeNull();
   });
 });

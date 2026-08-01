@@ -11,13 +11,15 @@ Two layers — a shared base plus thin per-package scripts:
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check) |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
-| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
+| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
-| `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
+| `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
 | `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`. Target `release` ships one commit to every service in order |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
+| `scripts/e2e-create-test-user.sh` | Staging E2E setup (one-time) | Creates the dedicated test user in the **staging** Cognito pool (self-signup is disabled, so `admin-create-user` is the only path) and gives it a permanent password so the first sign-in is not a password-change challenge. Pool id from `terraform output`, never a literal; password from the environment or a no-echo prompt, never a file. `--check`. Needs a staging AWS session — see the `insolvia-aws-auth` skill. |
+| `scripts/e2e-set-secrets.sh` | Staging E2E setup (one-time) | Sets `E2E_TEST_USER_EMAIL` / `E2E_TEST_USER_PASSWORD` as **`insolvia-staging` environment** secrets (the same scope as `AWS_ROLE_ARN`, not repo-level), read from the environment and piped on stdin. Re-running rotates, and says so first. `--check`, `--yes`. |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/runbooks/aws-bootstrap.md` § "The ci-trust anchor". |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
@@ -151,11 +153,26 @@ How it works:
   so the export is required, not cosmetic. The same short-lived set is what
   `dev-up.sh` injects into the API container; credentials are never written to
   a file.
-- **Wiring** — setup upserts `services/api/.env` (gitignored), which docker
-  compose reads for `${VAR:-default}` substitution in
-  `services/api/docker-compose.yml`; `dev-up.sh` reads `AWS_PROFILE` from it
-  to export credentials and requires `WAITLIST_TABLE_NAME` to be present.
-  Destroy removes those keys, so `dev-up.sh` fails fast until the next setup.
+- **Wiring** — setup upserts two gitignored `.env` files, and there is
+  deliberately **no `.env.example` for either**: every value is an identifier
+  for a resource `infra/envs/dev` creates per machine, so a copied template
+  would name nothing. Run setup and it writes them.
+  - `services/api/.env` — docker compose reads it for `${VAR:-default}`
+    substitution in `services/api/docker-compose.yml`; `dev-up.sh` reads
+    `AWS_PROFILE` from it to export credentials and requires
+    `WAITLIST_TABLE_NAME`. `AUTH_ISSUER_URL`/`AUTH_CLIENT_ID` point token
+    verification at this machine's pool — the API fails **closed**, so without
+    them every protected route answers 401.
+  - `apps/insolvia_app/.env` — Expo loads it automatically and inlines the
+    `EXPO_PUBLIC_*` values at build time. Without
+    `EXPO_PUBLIC_COGNITO_DOMAIN`/`_CLIENT_ID` the app renders "sign-in is not
+    configured" rather than failing loudly, so a missing file here is easy to
+    mistake for the app simply not having sign-in yet. Both point at the same
+    pool the API verifies against, so a local sign-in mints a token this
+    machine's own API accepts.
+
+  Destroy removes those keys, so `dev-up.sh` fails fast and the app returns to
+  its unconfigured state until the next setup.
 - **Safety** — reset/destroy refuse to touch anything whose name does not
   match this machine's expected names, require a typed `RESET` (or `--yes`),
   and support `--dry-run`. CI never touches `infra/envs/dev` beyond offline
@@ -236,6 +253,28 @@ What it adds over clicking *Run workflow* in the UI:
 Whichever target you pick, the apply is `-auto-approve` and covers the whole
 env, so accumulated drift is reconciled along with your change. Run
 `prod-infra` in its default plan mode first if that matters.
+
+## Staging E2E setup (`e2e-*.sh`)
+
+Two one-time scripts that give the post-deploy auth round trip in
+`.github/workflows/app-staging.yml` something to sign in as. Run them in this
+order, once; the order, the expected output and how to tell it worked are in
+[`../docs/runbooks/staging-e2e-setup.md`](../docs/runbooks/staging-e2e-setup.md).
+
+```bash
+export E2E_TEST_USER_EMAIL='…'      # a dedicated synthetic address, never a real mailbox
+./scripts/e2e-create-test-user.sh   # prompts for the password, without echo
+./scripts/e2e-set-secrets.sh        # same two values → the insolvia-staging environment
+
+./scripts/e2e-create-test-user.sh --check
+./scripts/e2e-set-secrets.sh --check
+```
+
+Neither script accepts, writes, or generates a password into a file: this repo
+is public, and the value exists only in your shell and in GitHub's encrypted
+secret store. The test user must never enrol MFA — the pool allows it
+(`mfa_configuration = "OPTIONAL"`), and a TOTP challenge is something a browser
+test cannot answer, so the E2E job would hang and redden staging.
 
 ## Adding a new package
 

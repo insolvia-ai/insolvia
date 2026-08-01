@@ -103,6 +103,86 @@ export interface EnvironmentInfo {
   readonly apiBaseUrl: string;
 }
 
+/**
+ * The Cognito hosted UI this build signs in against.
+ *
+ * `domain` is an **origin**, scheme included and no trailing slash
+ * (`https://…amazoncognito.com`); `/oauth2/authorize`, `/oauth2/token` and
+ * `/logout` hang off it.
+ */
+export interface AuthConfig {
+  readonly domain: string;
+  readonly clientId: string;
+}
+
+/**
+ * Resolves the hosted-UI configuration, or `null` when this build has none.
+ *
+ * **This is the one deliberate deviation from the hardcoded-map convention
+ * above,** and it is worth stating why. `environmentHosts` and
+ * `environmentApiBaseUrls` are exhaustive maps because their values are names
+ * *we* chose and can write down. The Cognito hosted domain and app client id
+ * are neither: Terraform generates them (`infra/modules/auth`), the client id
+ * is a random identifier, and both change whenever a pool is recreated. There
+ * is no correct value to hardcode, so they arrive as build-time environment
+ * variables that the deploy workflow fills in from `terraform output`.
+ *
+ * **Neither is a secret**, which is what makes `EXPO_PUBLIC_` legitimate here:
+ * `docs/reference/architecture.md` warns that an `EXPO_PUBLIC_` name is inlined
+ * into a bundle any visitor can read, and both of these values are already
+ * published on every sign-in redirect — the client id rides in the query string
+ * of `/oauth2/authorize` and the domain *is* the URL. The app client is a
+ * public OAuth client with `generate_secret = false` precisely so that nothing
+ * secret is needed in the browser (ADR 0007).
+ *
+ * **`null` is a supported state, not a failure.** The `local` default carries
+ * no pool, so the app renders an explicit "sign-in is not configured for this
+ * environment" screen rather than building a redirect to `undefined`.
+ *
+ * Both parameters have defaults rather than being read directly, for the same
+ * reason {@link resolveEnvironment} does: tests exercise every arm without a
+ * rebuild. Expo inlines `EXPO_PUBLIC_*` at transform time, so a direct read
+ * would be frozen into the bundle and untestable.
+ */
+export function resolveAuthConfig(
+  rawDomain: string | undefined = process.env.EXPO_PUBLIC_COGNITO_DOMAIN,
+  rawClientId: string | undefined = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID,
+): AuthConfig | null {
+  const domain = normalizeAuthDomain(rawDomain);
+  const clientId = rawClientId?.trim() ?? '';
+  if (domain === null || clientId === '') {
+    return null;
+  }
+  return { domain, clientId };
+}
+
+/**
+ * Normalizes a hosted-UI domain to a bare origin, or `null` when there isn't
+ * one.
+ *
+ * Terraform's `aws_cognito_user_pool_domain` output is a **hostname** with no
+ * scheme, while a custom-domain setup or a hand-set variable may well include
+ * one. Accepting both and settling on `https://<host>` here means no call site
+ * has to guess, and a stray trailing slash cannot produce `//oauth2/token`.
+ * Anything not `https:` is rejected — an OAuth code exchange over plaintext
+ * would put a refresh token on the wire.
+ */
+function normalizeAuthDomain(raw: string | undefined): string | null {
+  const trimmed = raw?.trim().replace(/\/+$/, '') ?? '';
+  if (trimmed === '') {
+    return null;
+  }
+  if (trimmed.startsWith('https://')) {
+    return trimmed.length > 'https://'.length ? trimmed : null;
+  }
+  // A scheme we did not just accept is a misconfiguration, not something to
+  // repair by prefixing `https://` in front of it.
+  if (trimmed.includes('://')) {
+    return null;
+  }
+  return `https://${trimmed}`;
+}
+
 /** Bundles an environment's label, host and API base URL together. */
 export function environmentInfo(env: AppEnvironment = appEnvironment): EnvironmentInfo {
   return {

@@ -39,7 +39,7 @@ detail:
 | API | Python/Flask on Lambda, `api.insolvia.ai` — health + waitlist; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
 | Mailer | SES-backed transactional service with unsubscribe path | [`services/mailer/CLAUDE.md`](../services/mailer/CLAUDE.md) |
-| Auth (seam only) | Cognito pools + hosted UI per env; `/auth/callback` registered; **the app does not sign in yet** | `infra/modules/auth/main.tf` |
+| Auth | Cognito pools + hosted UI per env; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · `infra/modules/auth/main.tf` |
 | CI/CD | Per-area PR gates (9 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
 
 The subdomain map (D2) as deployed — flat `staging-*` naming, because one ACM

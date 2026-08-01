@@ -51,8 +51,13 @@ terraform.rc
 infra/modules/*/.build/
 
 # Per-machine local wiring written by scripts/dev-aws-setup.sh (table name,
-# profile name — no secrets, but machine-specific and never committed).
+# profile name, this machine's own Cognito pool ids — no secrets, but
+# machine-specific and never committed). There is deliberately no `.example`
+# alongside these: every value is an identifier for a resource `infra/envs/dev`
+# creates per machine, so a copied template would name nothing. Run
+# `./scripts/dev-aws-setup.sh` and it writes both files.
 /services/api/.env
+/apps/insolvia_app/.env
 
 # ── Python ──────────────────────────────────────────────────────
 __pycache__/

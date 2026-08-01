@@ -52,5 +52,18 @@ terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 api_env="$API_DIR/.env"
 remove_env "$api_env" WAITLIST_TABLE_NAME
 remove_env "$api_env" AWS_PROFILE
+# The Cognito pool is gone too, so an issuer/client id left behind would point
+# token verification at nothing. The API fails closed on absent auth config, so
+# removing these degrades protected routes to a clean 401 rather than to a
+# confusing failure against a destroyed pool.
+remove_env "$api_env" AUTH_ISSUER_URL
+remove_env "$api_env" AUTH_CLIENT_ID
 
-ok "This machine's Insolvia development resources were destroyed and services/api/.env was unwound. The machine ID was retained for safe reuse."
+# Same for the app: a stale domain/client id would send sign-in to a pool that
+# no longer exists. Cleared, the app renders "sign-in is not configured", which
+# is the honest state after a destroy.
+app_env="$APP_DIR/.env"
+remove_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN
+remove_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID
+
+ok "This machine's Insolvia development resources were destroyed; services/api/.env and apps/insolvia_app/.env were unwound. The machine ID was retained for safe reuse."
