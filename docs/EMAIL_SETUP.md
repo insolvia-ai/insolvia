@@ -213,8 +213,9 @@ retired.
 - [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) — getting out of the
   SES sandbox: checklist, request text, and the post-grant steps.
 - [`AWS_SETUP.md`](AWS_SETUP.md) — AWS/GitHub bootstrap, deploy gating.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — Milestone 1 (`Foundation · Domain & Email`)
-  issue breakdown and the SES-sandbox capability table.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — the shipped-foundation summary (email's
+  milestone is complete; the sandbox capability table lives in
+  [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md)).
 - [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) — state model and
   environment layout.
 </content>

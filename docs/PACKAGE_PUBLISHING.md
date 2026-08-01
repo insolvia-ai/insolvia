@@ -320,5 +320,5 @@ package are live in the app's dev server as you make them.
   own version bump, marketing-only consume PRs.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the monorepo shape and where these
   packages sit.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one token source, two targets)
-  as revised by D9.
+- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one cross-platform design
+  system over one token source).

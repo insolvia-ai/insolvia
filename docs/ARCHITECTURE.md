@@ -80,9 +80,10 @@ exact package and secret names, so this paragraph avoids writing them.) Root
 [`CLAUDE.md`](../CLAUDE.md) carries the applicability table for those.
 
 **Desktop is not built.** No macOS or Windows targets, no per-OS CI jobs, no
-artifact hosting. Decision D9 in [`MVP_PLAN.md`](MVP_PLAN.md) records the trade
-— under Flutter one toolchain built every target, so the option was nearly free;
-under React Native it would be a port. **Mobile is the held-open target now**,
+artifact hosting. [ADR 0004](adr/0004-react-native-replaces-flutter.md) records
+the trade — under Flutter one toolchain built every target, so the option was
+nearly free; under React Native it would be a port. **Mobile is the held-open
+target now**,
 and `expo prebuild` holds it open with nothing committed under `ios/`/`android/`
 and no CI job at all.
 
