@@ -6,7 +6,9 @@
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewProps } from 'react-native';
 
-import { colors, spacing } from '@insolvia-ai/tokens';
+import { spacing } from '@insolvia-ai/tokens';
+
+import { useNativeColors } from '../lib/native-theme';
 import {
   AccordionItemContext,
   AccordionRootContext,
@@ -16,8 +18,6 @@ import {
   useAccordionState,
   type AccordionRootOwnProps,
 } from './accordion.props';
-
-const c = colors.light;
 
 export interface AccordionRootProps extends ViewProps, AccordionRootOwnProps {}
 
@@ -45,9 +45,10 @@ export interface AccordionItemProps extends ViewProps {
 const AccordionItem = ({ value, children, style, ...props }: AccordionItemProps) => {
   const { isOpen } = useAccordionRootContext('Item');
   const ctx = useAccordionItemState(value, isOpen);
+  const c = useNativeColors();
   return (
     <AccordionItemContext.Provider value={ctx}>
-      <View style={[styles.item, style]} {...props}>
+      <View style={[styles.item, { borderBottomColor: c.line }, style]} {...props}>
         {children}
       </View>
     </AccordionItemContext.Provider>
@@ -61,6 +62,7 @@ const AccordionHeader = ({ children }: { children?: React.ReactNode }) => (
 const AccordionTrigger = ({ children }: { children?: React.ReactNode }) => {
   const { toggle } = useAccordionRootContext('Trigger');
   const { value, open } = useAccordionItemContext('Trigger');
+  const c = useNativeColors();
   return (
     <Pressable
       accessibilityRole="button"
@@ -68,17 +70,18 @@ const AccordionTrigger = ({ children }: { children?: React.ReactNode }) => {
       onPress={() => toggle(value)}
       style={styles.trigger}
     >
-      <Text style={styles.triggerLabel}>{children}</Text>
+      <Text style={[styles.triggerLabel, { color: c.ink }]}>{children}</Text>
     </Pressable>
   );
 };
 
 const AccordionPanel = ({ children }: { children?: React.ReactNode }) => {
   const { open } = useAccordionItemContext('Panel');
+  const c = useNativeColors();
   if (!open) return null;
   return (
     <View style={styles.panel}>
-      <Text style={styles.panelText}>{children}</Text>
+      <Text style={[styles.panelText, { color: c.muted }]}>{children}</Text>
     </View>
   );
 };
@@ -93,14 +96,14 @@ export const Accordion = {
 
 const styles = StyleSheet.create({
   root: { flexDirection: 'column' },
-  item: { borderBottomWidth: 1, borderBottomColor: c.line },
+  item: { borderBottomWidth: 1 },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
   },
-  triggerLabel: { fontSize: 16, fontWeight: '500', color: c.ink },
+  triggerLabel: { fontSize: 16, fontWeight: '500' },
   panel: { paddingBottom: spacing.md },
-  panelText: { fontSize: 14, color: c.muted },
+  panelText: { fontSize: 14 },
 });

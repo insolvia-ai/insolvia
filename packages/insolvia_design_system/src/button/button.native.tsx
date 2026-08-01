@@ -4,8 +4,9 @@
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, type PressableProps } from 'react-native';
 
-import { colors, radii, spacing } from '@insolvia-ai/tokens';
+import { radii, spacing } from '@insolvia-ai/tokens';
 
+import { useNativeColors } from '../lib/native-theme';
 import type { ButtonIntent, ButtonSize } from './button.props';
 
 export interface ButtonProps extends PressableProps {
@@ -13,20 +14,6 @@ export interface ButtonProps extends PressableProps {
   size?: ButtonSize;
   children?: React.ReactNode;
 }
-
-const c = colors.light;
-
-const intentBg: Record<ButtonIntent, string> = {
-  primary: c.primary,
-  secondary: c.surfaceAlt,
-  ghost: 'transparent',
-};
-
-const intentText: Record<ButtonIntent, string> = {
-  primary: c.primaryText,
-  secondary: c.ink,
-  ghost: c.ink,
-};
 
 const sizeHeight: Record<ButtonSize, number> = { sm: 32, md: 40, lg: 48 };
 const sizePadX: Record<ButtonSize, number> = { sm: spacing.md, md: spacing.md, lg: spacing.lg };
@@ -40,6 +27,20 @@ export function Button({
   style,
   ...props
 }: ButtonProps) {
+  // Colors resolve per render so the leaf follows the OS scheme; only the
+  // scheme-independent maps and layout live at module level.
+  const c = useNativeColors();
+  const intentBg: Record<ButtonIntent, string> = {
+    primary: c.primary,
+    secondary: c.surfaceAlt,
+    ghost: 'transparent',
+  };
+  const intentText: Record<ButtonIntent, string> = {
+    primary: c.primaryText,
+    secondary: c.ink,
+    ghost: c.ink,
+  };
+
   return (
     <Pressable
       accessibilityRole="button"

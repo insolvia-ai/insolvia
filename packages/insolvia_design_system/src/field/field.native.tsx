@@ -1,9 +1,14 @@
 // NATIVE LEAF — React Native primitives, faithful field wiring. Shares the id
-// scheme and the describedby rule with the web leaf (field.props). Everything
-// rendered is reimplemented: <label htmlFor> becomes a <Text> + the control's
-// accessibilityLabel, <input> becomes <TextInput>, aria-invalid becomes
-// accessibilityState/hint, and the render-as-select/textarea hatch has no RN
-// analogue so it is dropped. Note how little of the a11y wiring transferred.
+// scheme and the describedby rule with the web leaf (field.props), but the
+// association INVERTS: the web leaf points the label at the control with
+// <label htmlFor>; here the label Text carries nativeID={labelId} and the
+// control points back at it with aria-labelledby — the pair react-native-web
+// emits as a correctly associated label/input on app-web. aria-describedby is
+// composed from ONLY the description/error ids actually rendered (each part
+// carries its nativeID), aria-invalid mirrors the web leaf, and the
+// render-as-select/textarea hatch has no RN analogue so it is dropped.
+// Colors come from useNativeColors() at render time (scheme-aware); only
+// scheme-independent layout is static in StyleSheet.create.
 import * as React from 'react';
 import {
   StyleSheet,
@@ -14,7 +19,9 @@ import {
   type ViewProps,
 } from 'react-native';
 
-import { colors, radii, spacing } from '@insolvia-ai/tokens';
+import { radii, spacing } from '@insolvia-ai/tokens';
+
+import { useNativeColors } from '../lib/native-theme';
 import {
   FieldContext,
   composeDescribedBy,
@@ -23,8 +30,6 @@ import {
   type FieldContextValue,
   type FieldRootOwnProps,
 } from './field.props';
-
-const c = colors.light;
 
 export interface FieldRootProps extends Omit<ViewProps, 'children'>, FieldRootOwnProps {
   children?: React.ReactNode;
@@ -42,6 +47,7 @@ const FieldRoot = ({ name, invalid = false, children, style, ...props }: FieldRo
   });
 
   const ctx: FieldContextValue = {
+    labelId: ids.labelId,
     controlId: ids.controlId,
     describedBy: composeDescribedBy(ids, hasDescription, hasError),
     invalid,
@@ -59,29 +65,68 @@ const FieldRoot = ({ name, invalid = false, children, style, ...props }: FieldRo
   );
 };
 
-const FieldLabel = ({ children }: { children?: React.ReactNode }) => (
-  <Text style={styles.label}>{children}</Text>
-);
+const FieldLabel = ({ children }: { children?: React.ReactNode }) => {
+  const { labelId } = useFieldContext('Label');
+  const c = useNativeColors();
+  return (
+    <Text nativeID={labelId} style={[styles.label, { color: c.ink }]}>
+      {children}
+    </Text>
+  );
+};
 
-const FieldControl = (props: TextInputProps) => {
-  const { invalid } = useFieldContext('Control');
+const FieldControl = ({ style, ...props }: TextInputProps) => {
+  const { labelId, controlId, describedBy, invalid } = useFieldContext('Control');
+  const c = useNativeColors();
+
+  // `aria-labelledby` is in react-native's types; `aria-describedby` and
+  // `aria-invalid` are not — they are web-only, and react-native-web forwards
+  // them to the DOM regardless. Both are OMITTED, not set to undefined, when
+  // inapplicable, so the control never points at an element that does not
+  // exist and never claims a validity state the root did not set. The cast is
+  // contained and documented where the semantics live — the same shape the
+  // app used before adopting this leaf.
+  const webAria = {
+    ...(describedBy === undefined ? {} : { 'aria-describedby': describedBy }),
+    ...(invalid ? { 'aria-invalid': true } : {}),
+  } as TextInputProps;
+
   return (
     <TextInput
+      nativeID={controlId}
+      aria-labelledby={labelId}
+      {...webAria}
       accessibilityState={{ disabled: props.editable === false }}
       placeholderTextColor={c.muted}
-      style={[styles.control, invalid ? styles.controlInvalid : null, props.style]}
+      style={[
+        styles.control,
+        { borderColor: invalid ? c.danger : c.line, backgroundColor: c.card, color: c.ink },
+        style,
+      ]}
       {...props}
     />
   );
 };
 
-const FieldDescription = ({ children }: { children?: React.ReactNode }) => (
-  <Text style={styles.description}>{children}</Text>
-);
+const FieldDescription = ({ children }: { children?: React.ReactNode }) => {
+  const { descriptionId } = useFieldContext('Description');
+  const c = useNativeColors();
+  return (
+    <Text nativeID={descriptionId} style={[styles.description, { color: c.muted }]}>
+      {children}
+    </Text>
+  );
+};
 
-const FieldError = ({ children }: { children?: React.ReactNode; match?: boolean }) => (
-  <Text style={styles.error}>{children}</Text>
-);
+const FieldError = ({ children }: { children?: React.ReactNode; match?: boolean }) => {
+  const { errorId } = useFieldContext('Error');
+  const c = useNativeColors();
+  return (
+    <Text nativeID={errorId} style={[styles.error, { color: c.danger }]}>
+      {children}
+    </Text>
+  );
+};
 
 export const Field = {
   Root: FieldRoot,
@@ -93,19 +138,15 @@ export const Field = {
 
 const styles = StyleSheet.create({
   root: { flexDirection: 'column', gap: spacing.xs },
-  label: { fontSize: 14, fontWeight: '500', color: c.ink },
+  label: { fontSize: 14, fontWeight: '500' },
   control: {
     height: 40,
     width: '100%',
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: c.line,
-    backgroundColor: c.card,
     paddingHorizontal: spacing.sm,
     fontSize: 14,
-    color: c.ink,
   },
-  controlInvalid: { borderColor: c.danger },
-  description: { fontSize: 14, color: c.muted },
-  error: { fontSize: 14, color: c.danger },
+  description: { fontSize: 14 },
+  error: { fontSize: 14 },
 });

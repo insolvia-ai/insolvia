@@ -35,6 +35,7 @@ const FieldRoot = React.forwardRef<HTMLDivElement, FieldRootProps>(
     });
 
     const ctx: FieldContextValue = {
+      labelId: ids.labelId,
       controlId: ids.controlId,
       describedBy: composeDescribedBy(ids, hasDescription, hasError),
       invalid,
@@ -56,10 +57,11 @@ FieldRoot.displayName = 'Field.Root';
 
 const FieldLabel = React.forwardRef<HTMLLabelElement, React.ComponentPropsWithoutRef<'label'>>(
   ({ className, ...props }, ref) => {
-    const { controlId } = useFieldContext('Label');
+    const { controlId, labelId } = useFieldContext('Label');
     return (
       <label
         ref={ref}
+        id={labelId}
         htmlFor={controlId}
         className={cn('font-body text-sm font-medium text-ink', className)}
         {...props}

@@ -1,31 +1,47 @@
 // NATIVE LEAF — RN primitives over @insolvia-ai/tokens. Pure surface, so the
 // port is layout-only: no state or a11y wiring to share beyond card.props.
+// Colors come from useNativeColors() at render time (scheme-aware); only the
+// scheme-independent layout sits in StyleSheet.create.
 import * as React from 'react';
 import { StyleSheet, Text, View, type ViewProps } from 'react-native';
 
-import { colors, radii, spacing } from '@insolvia-ai/tokens';
+import { radii, spacing } from '@insolvia-ai/tokens';
 
+import { useNativeColors } from '../lib/native-theme';
 import type { CardElevation } from './card.props';
-
-const c = colors.light;
 
 export interface CardProps extends ViewProps {
   elevation?: CardElevation;
 }
 
-const CardRoot = ({ elevation = 'flat', style, ...props }: CardProps) => (
-  <View style={[styles.root, elevation === 'raised' ? styles.raised : null, style]} {...props} />
-);
+const CardRoot = ({ elevation = 'flat', style, ...props }: CardProps) => {
+  const c = useNativeColors();
+  return (
+    <View
+      style={[
+        styles.root,
+        { borderColor: c.line, backgroundColor: c.card },
+        elevation === 'raised' ? styles.raised : null,
+        style,
+      ]}
+      {...props}
+    />
+  );
+};
 
-const CardTitle = ({ children }: { children?: React.ReactNode }) => (
-  <Text accessibilityRole="header" style={styles.title}>
-    {children}
-  </Text>
-);
+const CardTitle = ({ children }: { children?: React.ReactNode }) => {
+  const c = useNativeColors();
+  return (
+    <Text accessibilityRole="header" style={[styles.title, { color: c.ink }]}>
+      {children}
+    </Text>
+  );
+};
 
-const CardBody = ({ children }: { children?: React.ReactNode }) => (
-  <Text style={styles.body}>{children}</Text>
-);
+const CardBody = ({ children }: { children?: React.ReactNode }) => {
+  const c = useNativeColors();
+  return <Text style={[styles.body, { color: c.muted }]}>{children}</Text>;
+};
 
 const CardFooter = ({ style, ...props }: ViewProps) => (
   <View style={[styles.footer, style]} {...props} />
@@ -44,8 +60,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: c.line,
-    backgroundColor: c.card,
     padding: spacing.lg,
   },
   raised: {
@@ -55,7 +69,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  title: { fontSize: 18, fontWeight: '600', color: c.ink },
-  body: { fontSize: 14, color: c.muted },
+  title: { fontSize: 18, fontWeight: '600' },
+  body: { fontSize: 14 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.sm },
 });
