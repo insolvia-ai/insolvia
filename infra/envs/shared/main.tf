@@ -19,44 +19,6 @@ locals {
   }
 }
 
-# ── Trust-anchor extraction: state migration (transitional) ─────
-# The three resources above were MOVED to infra/envs/ci-trust in config, but
-# they still live in THIS root's state until the move is completed. Deleting
-# their config without this would make a CI apply of `shared` try to DESTROY
-# them — and that apply runs AS the deploy role, whose own policy denies
-# iam:DeleteRolePolicy on itself (DenySelfPrivilegeEscalation), so the destroy
-# fails and turns `Infra · Terraform apply · Shared` red on every push.
-#
-# `removed { ... destroy = false }` instead tells Terraform to FORGET each
-# resource from `shared`'s state without touching AWS — a state-only op that
-# needs no delete permission, so CI can run it. The live resources stay put and
-# are adopted into ci-trust's state by the matching `import` blocks there
-# (applied by a human via scripts/apply-ci-trust.sh).
-#
-# These blocks are one-time. Once a `shared` apply has run and dropped the three
-# from state, they are inert no-ops and should be deleted (along with the
-# ci-trust import blocks). See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
-removed {
-  from = aws_iam_openid_connect_provider.github
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = aws_iam_role.github_actions
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = aws_iam_role_policy.github_permissions
-  lifecycle {
-    destroy = false
-  }
-}
-
 # ── DNS zone ────────────────────────────────────────────────────
 # Register insolvia.ai (blocked on the domain support request), then delegate
 # the registrar to this zone's name servers (see outputs).

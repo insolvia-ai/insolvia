@@ -50,32 +50,6 @@ only legitimate local applies:
 scripts/apply-ci-trust.sh
 ```
 
-#### One-time migration from `shared` (extraction adoption)
-
-The trust anchor was extracted from `infra/envs/shared` **in config only** — the
-three live resources (OIDC provider, deploy role, its policy) still needed to be
-moved between Terraform states, with AWS left untouched. That migration is
-code-driven so it can't be forgotten (forgetting it is what turned
-`Infra · Terraform apply · Shared` red — CI tried to destroy the still-in-state
-resources and hit the deploy role's own self-deny):
-
-- `infra/envs/shared/main.tf` has `removed { ... destroy = false }` blocks that
-  make a CI apply of `shared` **forget** the three from its state (a state-only
-  op needing no delete permission), rather than destroy them.
-- `infra/envs/ci-trust/main.tf` has matching `import` blocks that **adopt** the
-  live resources into ci-trust's state on the first apply, instead of trying to
-  create them (they already exist).
-
-To complete the migration once, in either order:
-
-```bash
-scripts/apply-ci-trust.sh          # imports the 3 resources, applies the policy
-```
-
-and let the next push to `main` run `Infra · Terraform apply · Shared` (or apply
-it manually) to process the `removed` blocks. After both have run, the `removed`
-and `import` blocks are inert no-ops — delete them in a follow-up PR.
-
 ## 1. Terraform state bucket — the first action in the entire plan
 Every `backend.tf` in the repo points at this bucket, so `terraform init` cannot
 run anywhere until it exists. Verified absent 2026-07-21.

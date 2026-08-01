@@ -27,36 +27,6 @@ locals {
   }
 }
 
-# ── Trust-anchor extraction: adopt the existing live resources (transitional) ──
-# The OIDC provider, deploy role, and its policy already EXIST in AWS — they were
-# created while they lived in infra/envs/shared. This is a NEW root with EMPTY
-# state, so a bare apply would try to CREATE them and fail ("EntityAlreadyExists"
-# for the role, the provider URL already registered, etc.).
-#
-# These `import` blocks adopt the live resources into ci-trust's state on the
-# first `scripts/apply-ci-trust.sh` run instead. The apply then reconciles them
-# to this config — which updates the policy to the current (correct) event-
-# source-mapping scoping — while `shared`'s matching `removed` blocks forget them
-# from that root. AWS is never destroyed or recreated; only the managing state
-# changes. The import IDs are the account's real identifiers (account 521762924626).
-#
-# One-time: once imported, these are no-ops and should be deleted together with
-# shared's `removed` blocks. See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
-import {
-  to = aws_iam_openid_connect_provider.github
-  id = "arn:aws:iam::521762924626:oidc-provider/token.actions.githubusercontent.com"
-}
-
-import {
-  to = aws_iam_role.github_actions
-  id = "insolvia-github-actions"
-}
-
-import {
-  to = aws_iam_role_policy.github_permissions
-  id = "insolvia-github-actions:insolvia-deploy"
-}
-
 # ── GitHub Actions OIDC deploy role ─────────────────────────────
 # This is a dedicated Insolvia AWS account, so the account-level GitHub OIDC
 # provider does not exist yet — create it here. (There is exactly one such
