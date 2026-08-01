@@ -115,20 +115,27 @@ leaving it open-ended.
 
 ---
 
-## Product milestones (to be planned in their own sessions)
+## Product milestones (planned 2026-08-01 — tracked in GitHub)
 
-| Milestone | Business plan | One-line scope |
-|---|---|---|
-| `Product · Auth` | — | Wire the app to the existing Cognito seam: sign-in, session, the first authenticated API endpoint (JWT verification lands server-side with it). |
-| `Product · Intake & AI extraction` | M2 / P1 | Claude extracting credit reports and pay stubs; intake behind auth. **Shape depends on Milestone 0's findings** — particularly push vs. poll sync. |
-| `Product · Forms & petition engine` | M3 / P2 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. |
-| `Product · Means test` | P3 | Rule-based, with the IRS/Census refresh pipeline from the regulatory register. |
+Each is a GitHub milestone with its issues filed; the issue bodies carry the
+scope and "done when", so this table stays one line each. Ordering is the
+dependency order. MyCase sync is deliberately **out** of all four — it waits on
+Milestone 0; the intake data model keeps a sync seam open (issue 8.1).
+
+| Milestone | Business plan | Issues | One-line scope |
+|---|---|---|---|
+| [`Product · Auth`](https://github.com/insolvia-ai/insolvia/milestone/4) | — | 7.1–7.6 | Wire the app to the existing Cognito seam: sign-in, session, the first authenticated API endpoint (JWT verification lands server-side with it). |
+| [`Product · Intake & AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.10 | Standalone intake behind auth; Claude extracting credit reports and pay stubs, human-confirmed before case entry. Includes the intake form widgets (risk 4) and the design-partner web-first test (risk 3). |
+| [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) | M3 / P2 | 9.1–9.8 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. Opens with the effective-date model the register demands from day one. |
+| [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register. |
 
 **Worth flagging now:** `business/regulatory-source-register.html` describes a
 maintenance calendar (§522 dollar amounts every 3 years, Census median income
 2–4×/yr, IRS standards periodically). Those are *scheduled data pipelines with
-effective-date fields*, not one-time loads. Not planned yet, but they must not
-be a surprise when the forms engine lands.
+effective-date fields*, not one-time loads. Now planned: the shared
+effective-date model opens the forms milestone (9.1), the Dec-1 forms cycle has
+a runbook issue (9.8), and the UST refresh pipeline anchors the means-test
+milestone (10.1).
 
 ---
 
