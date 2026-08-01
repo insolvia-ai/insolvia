@@ -106,7 +106,26 @@ upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
 upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
 
-ok "AWS development resources are ready and services/api/.env was updated."
+# ── Wire the Expo app at the same pool ──────────────────────────
+# The app reads these two at BUILD time, not runtime: Expo inlines only
+# `EXPO_PUBLIC_*`-prefixed variables into the bundle, and it loads them from
+# apps/insolvia_app/.env automatically. Without them the app renders its
+# "sign-in is not configured" screen — a soft failure by design, so it is easy
+# to mistake for the app simply not having sign-in yet.
+#
+# The values are the SAME pool the API above verifies against, which is the
+# point: a local sign-in mints a token this machine's own API accepts. Neither
+# is a secret — both appear in every sign-in redirect — which is what makes the
+# EXPO_PUBLIC_ prefix legitimate here (nothing secret may ever carry it).
+#
+# Metro does not key its cache on environment variables, so `npm run build`
+# passes --clear; if you edit this file by hand, restart the dev server.
+app_env="$APP_DIR/.env"
+upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
+upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
+upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
+
+ok "AWS development resources are ready; services/api/.env and apps/insolvia_app/.env were updated."
 
 # If setup is reapplied while the API container is already running, replace it
 # so it picks up the new table name and the freshly exported credentials —

@@ -11,9 +11,9 @@ Two layers — a shared base plus thin per-package scripts:
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check) |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
-| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` at them; `--check` verifies |
+| `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
-| `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds `services/api/.env`; the machine id is retained |
+| `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
 | `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`. Target `release` ships one commit to every service in order |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
@@ -153,11 +153,26 @@ How it works:
   so the export is required, not cosmetic. The same short-lived set is what
   `dev-up.sh` injects into the API container; credentials are never written to
   a file.
-- **Wiring** — setup upserts `services/api/.env` (gitignored), which docker
-  compose reads for `${VAR:-default}` substitution in
-  `services/api/docker-compose.yml`; `dev-up.sh` reads `AWS_PROFILE` from it
-  to export credentials and requires `WAITLIST_TABLE_NAME` to be present.
-  Destroy removes those keys, so `dev-up.sh` fails fast until the next setup.
+- **Wiring** — setup upserts two gitignored `.env` files, and there is
+  deliberately **no `.env.example` for either**: every value is an identifier
+  for a resource `infra/envs/dev` creates per machine, so a copied template
+  would name nothing. Run setup and it writes them.
+  - `services/api/.env` — docker compose reads it for `${VAR:-default}`
+    substitution in `services/api/docker-compose.yml`; `dev-up.sh` reads
+    `AWS_PROFILE` from it to export credentials and requires
+    `WAITLIST_TABLE_NAME`. `AUTH_ISSUER_URL`/`AUTH_CLIENT_ID` point token
+    verification at this machine's pool — the API fails **closed**, so without
+    them every protected route answers 401.
+  - `apps/insolvia_app/.env` — Expo loads it automatically and inlines the
+    `EXPO_PUBLIC_*` values at build time. Without
+    `EXPO_PUBLIC_COGNITO_DOMAIN`/`_CLIENT_ID` the app renders "sign-in is not
+    configured" rather than failing loudly, so a missing file here is easy to
+    mistake for the app simply not having sign-in yet. Both point at the same
+    pool the API verifies against, so a local sign-in mints a token this
+    machine's own API accepts.
+
+  Destroy removes those keys, so `dev-up.sh` fails fast and the app returns to
+  its unconfigured state until the next setup.
 - **Safety** — reset/destroy refuse to touch anything whose name does not
   match this machine's expected names, require a typed `RESET` (or `--yes`),
   and support `--dry-run`. CI never touches `infra/envs/dev` beyond offline
