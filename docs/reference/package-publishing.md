@@ -306,7 +306,7 @@ package are live in the app's dev server as you make them.
   `theme.css`, both typecheck halves).
 - The `insolvia-design-system-pr` skill — the process rules: its own PR, its
   own version bump, marketing-only consume PRs.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — the monorepo shape and where these
+- [`architecture.md`](architecture.md) — the monorepo shape and where these
   packages sit.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — decision D4 (one cross-platform design
+- [`plan.md`](../plan.md) — decision D4 (one cross-platform design
   system over one token source).

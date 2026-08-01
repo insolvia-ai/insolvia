@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-22
-- **Relates to:** decision D6 in `docs/MVP_PLAN.md`; issue #67
+- **Relates to:** decision D6 in `docs/plan.md`; issue #67
 
 ## Decision
 

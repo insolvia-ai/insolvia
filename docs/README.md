@@ -1,37 +1,53 @@
 # Insolvia docs
 
-Engineering runbooks and the business plan. Conventions and rules live in the
-root [`../CLAUDE.md`](../CLAUDE.md) — read it first; these docs are the depth
-behind its *Where things live* table.
+Engineering reference, runbooks, decisions, and the business plan. Repo-wide
+conventions live in the root [`../CLAUDE.md`](../CLAUDE.md); the rules for
+adding to this directory are in [`CLAUDE.md`](CLAUDE.md).
+
+Documents are filed by **how they are read**: durable explanation, executable
+procedure, decision, or business artifact.
+
+## [`plan.md`](plan.md) — the living plan
+
+What shipped, the decisions in force, and the open work. The one document here
+that is rewritten as work lands.
+
+## [`reference/`](reference/) — how the system works
 
 | Doc | What |
 |---|---|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Monorepo shape, toolchain (incl. the Expo free-tier constraint), environment model, hosting topology, CI/CD, PR-gate design + required-check contract. |
-| [`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md) | Infra state model, modules, naming, deploy order. |
-| [`AWS_SETUP.md`](AWS_SETUP.md) | One-time AWS/GitHub bootstrap runbook, incl. the ci-trust anchor. |
-| [`APP_DEPLOY_VERIFICATION.md`](APP_DEPLOY_VERIFICATION.md) | Proving `staging-app` / `app.insolvia.ai` actually deploy and serve — dispatch order, per-host checks, failure modes. |
-| [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) | How the design system publishes (source, no build) and how its two consumers install it — the app from the workspace, marketing by published version. |
-| [`EMAIL_SETUP.md`](EMAIL_SETUP.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
-| [`SES_PRODUCTION_ACCESS.md`](SES_PRODUCTION_ACCESS.md) | The SES sandbox exit: checklist, request text, and the human AWS-console steps. |
-| [`MVP_PLAN.md`](MVP_PLAN.md) | The current plan: what shipped (one summary table), decisions in force, and the open work — MyCase spike, SES production access, product milestones. |
-| [`adr/`](adr/) | Architecture Decision Records — durable decisions with their rationale. |
-| [`business-plan.html`](business-plan.html) | What we're building and why. |
-| [`regulatory-source-register.html`](regulatory-source-register.html) | Regulatory source register. |
+| [`architecture.md`](reference/architecture.md) | Monorepo shape, toolchain (incl. the Expo free-tier constraint), environment model, hosting topology, CI/CD, PR-gate design + the required-check contract. |
+| [`terraform.md`](reference/terraform.md) | Infra state model, modules, naming, deploy order, the ci-trust self-deny. |
+| [`package-publishing.md`](reference/package-publishing.md) | How the design system publishes (source, no build) and how its two consumers install it — the app from the workspace, marketing by published version. |
+| [`email.md`](reference/email.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
 
-## Not in docs/
+## [`runbooks/`](runbooks/) — procedures you execute
 
-- **Area rules** (how to change a specific app/package/service, its conventions
-  and gotchas) live in that area's own `CLAUDE.md` and `README.md`, not here.
-- **Repo tooling** — which script to run when — is the `insolvia-scripts` skill
-  and [`../scripts/README.md`](../scripts/README.md).
-- **AWS auth / deploy-role permissions** are the `insolvia-aws-auth` and
-  `insolvia-deploy-role-permissions` skills.
+| Runbook | What | State |
+|---|---|---|
+| [`aws-bootstrap.md`](runbooks/aws-bootstrap.md) | One-time AWS/GitHub bootstrap, incl. the ci-trust anchor. | Executed; kept for a fresh account |
+| [`app-deploy-verification.md`](runbooks/app-deploy-verification.md) | Six checks proving a host serves the app, and the right build. | Both envs verified; re-run per deploy |
+| [`ses-production-access.md`](runbooks/ses-production-access.md) | The SES sandbox exit: checklist, request text, human console steps. | **Open** — actionable now |
 
-Docs are Markdown, `SCREAMING_SNAKE_CASE.md` for runbooks. Keep a doc current when
-you change the thing it describes — and don't restate a fact that already has an
-owner elsewhere; link to it.
+## [`adr/`](adr/) — decisions and their reasoning
 
-**Superseding beats rewriting in [`adr/`](adr/).** A decision that turned out
-wrong is more useful with its reasoning intact and its status changed — 0002 and
-0003 are marked superseded rather than deleted for exactly that reason, and
-[`MVP_PLAN.md`](MVP_PLAN.md) annotates revised `D<n>` entries the same way.
+Durable decisions that stay expensive to re-litigate. See
+[`adr/README.md`](adr/README.md) for the register and the numbering rule.
+Shorter-lived planning decisions live as `D<n>` entries in [`plan.md`](plan.md).
+
+## [`business/`](business/) — company artifacts
+
+| Doc | What |
+|---|---|
+| [`business-plan.html`](business/business-plan.html) | What we're building and why. |
+| [`regulatory-source-register.html`](business/regulatory-source-register.html) | Authoritative regulatory source per feature, with its refresh cadence. |
+
+## Not in `docs/`
+
+- **Area rules** — how to change a specific app/package/service — live in that
+  area's own `CLAUDE.md` and `README.md`.
+- **Which script to run when** — the `insolvia-scripts` skill and
+  [`../scripts/README.md`](../scripts/README.md).
+- **AWS auth, deploys, deploy-role permissions, branch protection,
+  design-system PRs** — the `insolvia-*` skills. Docs here name them rather
+  than restating them.

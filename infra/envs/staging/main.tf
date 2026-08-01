@@ -27,7 +27,7 @@ data "aws_acm_certificate" "wildcard" {
 
 # The shared per-service container repositories, created in infra/envs/shared.
 # Looked up rather than read from remote state, matching the zone/cert above
-# (docs/TERRAFORM_ARCHITECTURE.md: cross-layer references are data sources,
+# (docs/reference/terraform.md: cross-layer references are data sources,
 # never terraform_remote_state).
 #
 # This is a second reason the documented apply order — shared before any
@@ -155,7 +155,7 @@ module "auth" {
 # ── Marketing site: staging-www.insolvia.ai ─────────────────────
 # The marketing site DOES have a staging environment (issue #45 revisited —
 # the original "production + PR previews only" decision D2 is reversed; see
-# docs/MVP_PLAN.md). What changed: the site is the public face of the SES
+# docs/plan.md). What changed: the site is the public face of the SES
 # production-access request (issue #80 / 6.8), which reviews a live privacy
 # policy and a working unsubscribe path. Those pages have to be exercisable
 # somewhere before prod serves them, and PR previews — the thing D2 leaned on

@@ -13,7 +13,7 @@
 # `shared` can now be applied by CI freely, and the human gate is exactly here.
 #
 # Apply with scripts/apply-ci-trust.sh (guarded credential + plan + confirm).
-# See docs/AWS_SETUP.md § "The ci-trust anchor".
+# See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
 
 locals {
   # Environment stays "shared" on purpose: these are account-wide shared
@@ -41,7 +41,7 @@ locals {
 # changes. The import IDs are the account's real identifiers (account 521762924626).
 #
 # One-time: once imported, these are no-ops and should be deleted together with
-# shared's `removed` blocks. See docs/AWS_SETUP.md § "The ci-trust anchor".
+# shared's `removed` blocks. See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
 import {
   to = aws_iam_openid_connect_provider.github
   id = "arn:aws:iam::521762924626:oidc-provider/token.actions.githubusercontent.com"

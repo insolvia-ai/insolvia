@@ -19,68 +19,36 @@ are namespaced by the `insolvia` project + environment.
 
 ### Running Terraform locally — export credentials first
 
-**A working `aws` CLI is not enough for Terraform**, and the failure looks like
-having no credentials at all:
-
-```
-Error: No valid credential sources found
-Error: failed to refresh cached credentials, no EC2 IMDS role found, …
-```
-
-`aws sts get-caller-identity` succeeding while `terraform plan` says this is the
-signature. The cause is that `~/.aws/config` authenticates with the newer
-`login_session` (`aws login`) format, which is an **AWS CLI mechanism** —
-Terraform's Go SDK does not implement it, finds nothing in the standard chain,
-falls through to EC2 instance metadata, and times out.
-
-Resolve the session into the env vars every SDK understands, in the same shell:
+A working `aws` CLI is **not** enough for Terraform: the failure looks like
+having no credentials at all, and it is easy to misdiagnose. The mechanism, the
+three failure modes and the exact fix for each belong to the
+**`insolvia-aws-auth` skill** — read it rather than improvising. The one line
+every manual apply below needs, in the same shell:
 
 ```bash
 eval "$(aws configure export-credentials --format env)"
 ```
 
-Use `eval` rather than running it bare: the output *is* the secret. The
-credentials are short-lived, so re-run it when a session expires. This is the
-same step `scripts/dev-aws-common.sh`'s `export_temporary_aws_credentials` does
-for the per-developer AWS layer, hoisted here because manual applies (below)
-need it too.
-
 ### The ci-trust anchor
 
 `infra/envs/ci-trust` owns the GitHub OIDC provider, the
 `insolvia-github-actions` deploy role, and that role's permissions policy. It is
-**applied only by a human admin — never by CI — and that is the point.**
+**applied only by a human admin — never by CI — and that is the point**: the
+role's own policy denies it `iam:PutRolePolicy` on itself, so a privilege change
+cannot take effect from merged code alone. Because CI never applies `ci-trust`,
+there is deliberately **no `ci-trust-*.yml` workflow**; everything else
+(`shared`, `staging`, `prod`) is CI-applied as normal.
 
-The deploy role's policy carries an explicit `Deny`
-(`DenySelfPrivilegeEscalation`) on `iam:PutRolePolicy` targeting the role's own
-ARN, and an explicit deny beats every allow. So a `terraform apply` of this root
-run *as* the deploy role (i.e. from CI) cannot change the role's permissions —
-it fails with `AccessDenied`. A privilege change to the pipeline therefore
-*cannot* take effect from merged code alone; a human who already holds admin has
-to apply it with their own credentials. That removes the "any PR that edits the
-policy can grant CI admin, applied by CI" escalation path — code review would be
-the only control otherwise.
-
-Because CI never applies `ci-trust`, there is deliberately **no
-`ci-trust-*.yml` workflow**. Everything else (`shared`, `staging`, `prod`) is
-CI-applied as normal.
-
-**To change the deploy role's permissions** — e.g. adding an IAM action the
-pipeline needs — edit `infra/envs/ci-trust/main.tf`, merge, then apply locally:
+Why the self-deny exists is
+[`../reference/terraform.md`](../reference/terraform.md#deployment-order).
+Changing the role's permissions — including the `AccessDenied`-on-a-new-action
+symptom that means you need to — belongs to the
+**`insolvia-deploy-role-permissions` skill**. The apply itself is one of the
+only legitimate local applies:
 
 ```bash
 scripts/apply-ci-trust.sh
 ```
-
-That script does the credential dance (below), shows the plan, and applies after
-you confirm. It should report a change to `aws_iam_role_policy.github_permissions`
-and nothing else. (The bare commands, if you prefer: `eval "$(aws configure
-export-credentials --format env)"` then `terraform -chdir=infra/envs/ci-trust
-init -input=false && … plan && … apply`.)
-
-Symptom that tells you a change needs this: a merged PR that edited the policy,
-followed by a staging/prod deploy failing with `AccessDenied` on the new action.
-That's not broken CI — it's the gate. Apply `ci-trust`, then re-run the deploy.
 
 #### One-time migration from `shared` (extraction adoption)
 

@@ -24,7 +24,7 @@ The runbook for getting `insolvia.ai` out of the Amazon SES sandbox.
 
 So: the app cannot send a welcome, verification, or password-reset email to a
 single real attorney until this lands. It blocks every authenticated flow, not
-just a nice-to-have. See [`EMAIL_SETUP.md`](EMAIL_SETUP.md) for why inbound is
+just a nice-to-have. See [`email.md`](../reference/email.md) for why inbound is
 unaffected.
 
 ### Any `@insolvia.ai` address is already a valid sandbox recipient
@@ -45,7 +45,7 @@ recipients are rejected.
 Two things this does *not* do:
 
 - It does not create the mailbox. Inbound is Google Workspace
-  (see [`EMAIL_SETUP.md`](EMAIL_SETUP.md)), so the address must exist there as a
+  (see [`email.md`](../reference/email.md)), so the address must exist there as a
   mailbox or group or the mail is accepted by SES and then bounces.
 - It does not put the address in this repo. **This repository is public**, and
   the root `CLAUDE.md` forbids committing real mailbox addresses — so a test
@@ -69,7 +69,7 @@ rejected request costs days and a second rejection is materially harder.
 | 3 | A **working opt-out** | `/unsubscribe` → API → mailer suppression | See *Proving the unsubscribe path works* below |
 | 4 | **Bounce and complaint handling** | `services/mailer` feedback Lambda (issue 6.7) | Suppression is automatic on permanent bounce and on any complaint |
 | 5 | **Alarms** on bounce/complaint rates | `infra/modules/mailer` — `<name>-ses-bounce-rate` (>5%) and `<name>-ses-complaint-rate` (>0.1%) | Alarms exist; confirm the SNS topic has a **confirmed** subscription, or they fire into nothing |
-| 6 | **DKIM, SPF, DMARC** aligned | `infra/modules/email` | `dig` checks in [`EMAIL_SETUP.md § Verifying`](EMAIL_SETUP.md#verifying) |
+| 6 | **DKIM, SPF, DMARC** aligned | `infra/modules/email` | `dig` checks in [`email.md § Verifying`](../reference/email.md#verifying) |
 | 7 | A **verified domain identity** | `infra/envs/shared` | `aws ses get-identity-verification-attributes --identities insolvia.ai` |
 
 ### Two prerequisites that are NOT yet true
@@ -96,7 +96,7 @@ before submitting:
    `p=none`. Row 6 passes for the SES half regardless — SES signs its own mail
    with its own DKIM CNAMEs, which is what this request is about. The Google
    half is a separate click documented in
-   [`EMAIL_SETUP.md § Remaining setup steps`](EMAIL_SETUP.md#remaining-setup-steps).
+   [`email.md § Remaining setup steps`](../reference/email.md#remaining-setup-steps).
    Not a blocker for this request; worth doing anyway.
 
 ---
@@ -237,11 +237,11 @@ more detail, which costs a round trip.
 ## After it is granted
 
 1. **Remove the sandbox warning** from
-   [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — the boxed "Outbound is still in the SES
+   [`email.md`](../reference/email.md) — the boxed "Outbound is still in the SES
    sandbox" section and the `### SES production access` note under *Remaining
    setup steps*, plus this document's own sandbox capability table.
 2. **Remove the "Outstanding foundation item · SES
-   production access" section** from `MVP_PLAN.md` (and drop it from that
+   production access" section** from `plan.md` (and drop it from that
    file's risk list).
 3. **Send a real end-to-end message** to an address that is *not* a verified
    SES identity — a personal Gmail is ideal. That single send is the only
@@ -276,11 +276,11 @@ as evasion and slows everything down.
 
 ## Related
 
-- [`EMAIL_SETUP.md`](EMAIL_SETUP.md) — the address map, DNS records, and the
+- [`email.md`](../reference/email.md) — the address map, DNS records, and the
   Google-Workspace-inbound / SES-outbound split.
-- [`MVP_PLAN.md`](MVP_PLAN.md) — the outstanding-item entry this document
+- [`plan.md`](../plan.md) — the outstanding-item entry this document
   resolves.
-- [`adr/0001-client-stays-dumb-trust-boundary.md`](adr/0001-client-stays-dumb-trust-boundary.md)
+- [`adr/0001-client-stays-dumb-trust-boundary.md`](../adr/0001-client-stays-dumb-trust-boundary.md)
   — why the unsubscribe path has three hops instead of one.
 - `services/mailer/README.md` — the suppression store, and who is allowed to
   write to it.

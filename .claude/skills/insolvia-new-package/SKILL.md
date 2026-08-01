@@ -31,7 +31,7 @@ description: >-
    file for why).
 4. If it deploys, add `<name>-pr.yml` + `<name>-<env>.yml` workflows (follow the
    existing `<area>-pr.yml` / `<area>-<env>.yml` shape and the PR-gate design in
-   [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md)) and an `infra/envs/*`
+   [`docs/reference/architecture.md`](../../../docs/reference/architecture.md)) and an `infra/envs/*`
    entry.
 5. Document it in the map in the root [`README.md`](../../../README.md).
 

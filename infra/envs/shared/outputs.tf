@@ -35,7 +35,7 @@ output "ses_mail_from_domain" {
 # ── Container repositories ─────────────────────────────────────
 # Informational. The environment roots do NOT read these: they look the repos
 # up with `data "aws_ecr_repository"`, per the cross-layer rule in
-# docs/TERRAFORM_ARCHITECTURE.md (data sources, never terraform_remote_state).
+# docs/reference/terraform.md (data sources, never terraform_remote_state).
 output "ecr_repository_urls" {
   description = "Shared per-service container repositories, keyed by service."
   value       = { for k, r in aws_ecr_repository.service : k => r.repository_url }

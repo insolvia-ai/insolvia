@@ -2,7 +2,7 @@
 
 Durable decisions with their rationale — the ones that stay expensive to
 re-litigate and quietly erode if nobody wrote down *why*. Shorter-lived planning
-decisions live as `D<n>` entries in [`../MVP_PLAN.md`](../MVP_PLAN.md); an ADR is
+decisions live as `D<n>` entries in [`../plan.md`](../plan.md); an ADR is
 where a decision graduates when it outlives the plan.
 
 | ADR | Decision | Status |

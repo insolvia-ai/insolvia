@@ -42,8 +42,8 @@ targeting the role's *own* ARN. In IAM an explicit deny beats every allow, so:
 Same Terraform, same state, different identity. That's the security property:
 a privilege change to the pipeline can't take effect from merged code alone —
 someone holding admin has to consciously apply it. So there is deliberately **no
-`ci-trust-*.yml` workflow**. (Full reasoning: `docs/AWS_SETUP.md` §
-"The ci-trust anchor"; `docs/TERRAFORM_ARCHITECTURE.md`.)
+`ci-trust-*.yml` workflow**. (Full reasoning: `docs/runbooks/aws-bootstrap.md` §
+"The ci-trust anchor"; `docs/reference/terraform.md`.)
 
 ## The two signals that mean "this needs a human ci-trust apply"
 

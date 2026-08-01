@@ -1,8 +1,8 @@
 import { Accordion } from "@insolvia-ai/design-system";
 
-// Answers trace to docs/business-plan.html: the deterministic-core AI posture
+// Answers trace to docs/business/business-plan.html: the deterministic-core AI posture
 // (§4), the MyCase integration wedge (§1/§7), Best Case migration (§7/§9),
-// data handling (§4/§10), and the web-first stance (D9 in docs/MVP_PLAN.md —
+// data handling (§4/§10), and the web-first stance (D9 in docs/plan.md —
 // desktop was dropped entirely, so it is not mentioned at all).
 const faqs = [
   {

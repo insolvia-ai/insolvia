@@ -26,7 +26,7 @@ data "aws_acm_certificate" "wildcard" {
 
 # The shared per-service container repositories, created in infra/envs/shared.
 # Looked up rather than read from remote state, matching the zone/cert above
-# (docs/TERRAFORM_ARCHITECTURE.md: cross-layer references are data sources,
+# (docs/reference/terraform.md: cross-layer references are data sources,
 # never terraform_remote_state).
 #
 # This is a second reason the documented apply order — shared before any

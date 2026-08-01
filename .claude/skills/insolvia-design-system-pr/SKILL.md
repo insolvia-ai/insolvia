@@ -63,5 +63,5 @@ Editing the app's own code under `apps/insolvia_app/` is ordinary app work in
 an ordinary app PR — this rule fires only on the package directory.
 
 Full publish + consume flow:
-[`docs/PACKAGE_PUBLISHING.md`](../../../docs/PACKAGE_PUBLISHING.md). The
+[`docs/reference/package-publishing.md`](../../../docs/reference/package-publishing.md). The
 package's full rule set: `packages/insolvia_design_system/CLAUDE.md`.

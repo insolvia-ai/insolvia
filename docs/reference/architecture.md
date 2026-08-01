@@ -26,9 +26,9 @@ insolvia/
 
 Everything is TypeScript. The app follows the layout Expo itself publishes —
 `src/app/` is routes-only, screen bodies live in `src/screens/` — see
-[ADR 0005](adr/0005-expo-app-layout.md) for why, and
-[`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) for the rules.
-[ADR 0004](adr/0004-react-native-replaces-flutter.md) is the stack decision
+[ADR 0005](../adr/0005-expo-app-layout.md) for why, and
+[`apps/insolvia_app/CLAUDE.md`](../../apps/insolvia_app/CLAUDE.md) for the rules.
+[ADR 0004](../adr/0004-react-native-replaces-flutter.md) is the stack decision
 behind all of it, including the measurements that ruled out a component library.
 
 - **Workspace resolution:** npm workspaces, root `package.json`. The member
@@ -49,11 +49,11 @@ behind all of it, including the measurements that ruled out a component library.
   through the workspace, and a scoped `resolveRequest` override in its
   `metro.config.js` prefers the `.native` leaves on every platform, web
   included — react-native-web renders them, and no Tailwind enters the app.
-  [ADR 0006](adr/0006-owned-cross-platform-design-system.md) is the decision
+  [ADR 0006](../adr/0006-owned-cross-platform-design-system.md) is the decision
   record, with the measurements. Token *values* still generate from
   `packages/insolvia_tokens/tokens.json`: the package's `theme.css` for web, a
   typed `tokens.ts` for native — see
-  [`PACKAGE_PUBLISHING.md`](PACKAGE_PUBLISHING.md) and the package's own docs.
+  [`package-publishing.md`](package-publishing.md) and the package's own docs.
 
 ## Toolchain
 
@@ -77,10 +77,10 @@ access token, or the over-the-air update client, because this is a constraint
 that erodes by accident: several vendored agent skills in `.agents/skills/`
 present EAS as the normal way to ship. (The guard greps tracked files for the
 exact package and secret names, so this paragraph avoids writing them.) Root
-[`CLAUDE.md`](../CLAUDE.md) carries the applicability table for those.
+[`CLAUDE.md`](../../CLAUDE.md) carries the applicability table for those.
 
 **Desktop is not built.** No macOS or Windows targets, no per-OS CI jobs, no
-artifact hosting — [ADR 0004](adr/0004-react-native-replaces-flutter.md) records
+artifact hosting — [ADR 0004](../adr/0004-react-native-replaces-flutter.md) records
 the trade. **Mobile is the held-open target**, and `expo prebuild` holds it open
 with nothing committed under `ios/`/`android/` and no CI job at all.
 
@@ -104,7 +104,7 @@ would silently read as `local` in production.
 
 The corollary is that **nothing secret may go in an `EXPO_PUBLIC_*` variable.**
 Everything so prefixed is compiled into a public static asset. Per
-[ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) the client holds no
+[ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md) the client holds no
 credentials anyway, so there is nothing that wants to be there.
 
 ## Web hosting topology
@@ -122,7 +122,7 @@ Route53 (A-alias)  →  CloudFront (wildcard ACM TLS, SPA rewrite, /* -> index.h
 The **marketing site** (`apps/insolvia_marketing`) does not use this topology —
 it is server-side rendered, so it gets its own module with an SSR Lambda behind
 the same CloudFront front (`infra/modules/marketing_site`, see
-[`TERRAFORM_ARCHITECTURE.md`](TERRAFORM_ARCHITECTURE.md)). It runs in both
+[`terraform.md`](terraform.md)). It runs in both
 environments:
 
 - `staging-www.insolvia.ai` → staging distribution (noindexed, no apex)

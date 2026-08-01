@@ -8,7 +8,7 @@
 # so CI — which runs as that role — cannot apply a change here; it fails with
 # AccessDenied. A privilege change to the pipeline must be applied by a human
 # admin with their own credentials, so merged code alone can never escalate CI.
-# See docs/AWS_SETUP.md § "The ci-trust anchor".
+# See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
 #
 # When you need this: you edited the deploy role's permissions in
 # infra/envs/ci-trust/main.tf (e.g. added an IAM action the pipeline needs),

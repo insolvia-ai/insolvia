@@ -1,8 +1,8 @@
 # infra
 
 Terraform for all Insolvia AWS infrastructure. See
-[`../docs/TERRAFORM_ARCHITECTURE.md`](../docs/TERRAFORM_ARCHITECTURE.md) for the
-model and [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) for one-time bootstrap.
+[`../docs/reference/terraform.md`](../docs/reference/terraform.md) for the
+model and [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md) for one-time bootstrap.
 
 ```
 modules/                 web_hosting, marketing_site, auth, email, api_service, mailer, …
@@ -14,7 +14,7 @@ envs/prod/               app / www + the service stacks (owns the apex)
 
 State: `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`.
 The deploy role lives in **`ci-trust`**, not `shared` — CI can't apply its own
-permissions (see [`../docs/AWS_SETUP.md`](../docs/AWS_SETUP.md) and the
+permissions (see [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md) and the
 **insolvia-deploy-role-permissions** skill).
 
 ## Usage

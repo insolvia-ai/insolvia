@@ -5,7 +5,7 @@ name: App · Deploy · Production
 #
 # The app selects its environment at BUILD time. `EXPO_PUBLIC_*` variables are
 # inlined into the JS bundle by Metro when it bundles (see
-# apps/insolvia_app and docs/ARCHITECTURE.md § Environment model), so the
+# apps/insolvia_app and docs/reference/architecture.md § Environment model), so the
 # staging bundle has "staging" baked into it and can never be the production
 # bundle. There is no artifact to promote the way api, mailer and marketing
 # promote an image digest.

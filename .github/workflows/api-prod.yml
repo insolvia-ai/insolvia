@@ -13,7 +13,7 @@ name: API · Deploy · Production
 #     .github/actions/verified-commit), and
 #   • the `insolvia-production` environment's reviewers must approve, if
 #     configured — that setting is a repo-settings change no workflow can make
-#     for itself (docs/ARCHITECTURE.md § Required status checks).
+#     for itself (docs/reference/architecture.md § Required status checks).
 #
 # Traffic moves LAST. The new version is published, smoke-tested by its own
 # version ARN while nothing routes to it, and only then does the `live` alias

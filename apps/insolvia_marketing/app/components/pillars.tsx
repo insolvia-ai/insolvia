@@ -1,6 +1,6 @@
 import { Card } from "@insolvia-ai/design-system";
 
-// The four customer-facing pillars, translated from docs/business-plan.html §7.
+// The four customer-facing pillars, translated from docs/business/business-plan.html §7.
 // §7 lists five; the first ("warm MyCase distribution") is internal go-to-market
 // strategy, not a customer benefit, so public copy carries the other four.
 // Competitive framing stays qualitative — no market-share numbers, pricing, or

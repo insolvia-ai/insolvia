@@ -14,7 +14,7 @@
 #
 # The check name must match the workflow job's `name:` exactly; a typo is
 # accepted and then parks every PR on "waiting for status to be reported".
-# docs/ARCHITECTURE.md § "Required status checks" lists the valid names.
+# docs/reference/architecture.md § "Required status checks" lists the valid names.
 #
 set -euo pipefail
 

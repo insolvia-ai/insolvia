@@ -91,7 +91,7 @@ export default function App() {
           </Footer.Group>
           {/* /privacy is linked from every page on purpose: AWS reviews a
               site-wide, reachable-without-searching privacy policy as part of
-              the SES production-access request (docs/SES_PRODUCTION_ACCESS.md),
+              the SES production-access request (docs/runbooks/ses-production-access.md),
               and every transactional email footer points at the same URL. */}
           <Footer.Group title="Legal">
             <Footer.Link href="/privacy">Privacy policy</Footer.Link>

@@ -35,7 +35,7 @@ locals {
 #
 # These blocks are one-time. Once a `shared` apply has run and dropped the three
 # from state, they are inert no-ops and should be deleted (along with the
-# ci-trust import blocks). See docs/AWS_SETUP.md § "The ci-trust anchor".
+# ci-trust import blocks). See docs/runbooks/aws-bootstrap.md § "The ci-trust anchor".
 removed {
   from = aws_iam_openid_connect_provider.github
   lifecycle {

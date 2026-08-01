@@ -159,7 +159,7 @@ aws ecr get-login-password --region us-east-1 \
 #    Creds are short-lived — re-run step 2 (or 1→2) when they expire.
 ```
 
-Related repo material: `docs/AWS_SETUP.md` (§ "Running Terraform locally"),
-`scripts/dev-aws-common.sh` (`export_temporary_aws_credentials`),
+Related repo material: `docs/runbooks/aws-bootstrap.md` (the manual applies that
+need this), `scripts/dev-aws-common.sh` (`export_temporary_aws_credentials`),
 `scripts/bootstrap-ecr-images.sh` (the guarded pattern), and the AWS-credentials
 rule in the root `CLAUDE.md`.
