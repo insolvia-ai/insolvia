@@ -29,11 +29,27 @@ import { cognitoHostDescription, isCognitoHost, testUser } from '../support/env'
  * (`<input type="Submit" name="signInSubmitButton">` classic, `<button
  * type="submit">` managed), so it is matched as either.
  *
+ * **The classic hosted UI renders the whole sign-in form TWICE**, in two
+ * Bootstrap 3 responsive containers — `visible-xs visible-sm` and
+ * `visible-md visible-lg` — so every field exists twice, with duplicate
+ * element ids, and exactly one copy is displayed at any viewport width.
+ * Addressing a field without filtering for visibility picks whichever copy
+ * comes first in the DOM (the small-viewport one), which at Playwright's
+ * 1280px default is the hidden one; `fill()` then waits for it to become
+ * visible and dies on the action timeout. Everything is therefore scoped to
+ * `form[name="cognitoSignInForm"]:visible`. This is why the form is located
+ * once, up front, with its own assertion: a bare timeout on `fill()` says
+ * nothing, and the same symptom would appear if Cognito served an error page
+ * (it serves those on this same host, so the host check above cannot catch it).
+ *
  * NO SLEEPS. Every wait below is on a condition.
  */
 
 const signInButton = (page: Page) => page.getByRole('button', { name: 'Sign in' });
 const signOutButton = (page: Page) => page.getByRole('button', { name: 'Sign out' });
+
+/** The one displayed copy of the hosted UI's sign-in form — see the note above. */
+const hostedUiForm = (page: Page) => page.locator('form[name="cognitoSignInForm"]:visible');
 
 test.describe('staging auth round trip', () => {
   test('signs in through the Cognito hosted UI and back out again', async ({ page }) => {
@@ -75,10 +91,18 @@ test.describe('staging auth round trip', () => {
     // sets the value through the DOM — it is not typed into a log, not
     // interpolated into a URL, and no trace is recorded in CI (see
     // playwright.config.ts for why).
-    await page.locator('input[name="username"]').first().fill(email);
-    await page.locator('input[name="password"]').first().fill(password);
-    await page
-      .locator('input[type="Submit" i], button[type="submit"]')
+    const form = hostedUiForm(page);
+    await expect(
+      form,
+      'the Cognito hosted UI should show its sign-in form — if this fails, the ' +
+        'host redirected but served something else (an OAuth error page lives on ' +
+        'this same host), or the responsive form containers changed',
+    ).toBeVisible();
+
+    await form.locator('input[name="username"]').fill(email);
+    await form.locator('input[name="password"]').fill(password);
+    await form
+      .locator('input[name="signInSubmitButton"], input[type="Submit" i], button[type="submit"]')
       .first()
       .click();
 
