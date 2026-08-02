@@ -139,6 +139,38 @@ deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
 `*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
 real (prod is dispatched manually).
 
+### Staging and production deploy the same way
+
+There is **one** deploy model, in both environments:
+
+| | Staging | Production |
+|---|---|---|
+| Orchestrator | `release-staging.yml` | `release-prod.yml` |
+| Trigger | push to `main` | `workflow_dispatch` |
+| Service workflows | `*-staging.yml`, `workflow_call` + `workflow_dispatch` | `*-prod.yml`, same |
+| Who applies Terraform | `infra-staging.yml`, and nothing else | `infra-prod.yml`, and nothing else |
+| Ordering | `needs` between legs | `needs` between legs |
+
+The service workflows **never apply Terraform** — they `init` and read outputs.
+They are reusable, so a release and a hand-dispatched single-service deploy run
+exactly the same code path. Neither orchestrator declares a concurrency group;
+each called workflow holds its environment's group, and `needs` orders them. A
+group on both caller and callee would deadlock the callee behind its own parent.
+
+**The one deliberate difference** is where infra sits. `release-staging.yml`
+runs `infra-staging.yml` as its first job; `release-prod.yml` excludes infra
+entirely. That follows from what the two environments *are*: staging is `main`,
+so reconciling its infrastructure automatically is the definition being
+enforced, and the service legs read Terraform outputs so the apply must be
+ordered ahead of them. Production is a *promotion*, so an automatic apply would
+let a code release carry unrelated infra drift into prod — there, infra is
+applied deliberately with `infra-prod.yml` before the release that needs it.
+
+Both environments can be planned before they are applied: `infra-staging.yml`
+and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
+summary. `shared-infra-plan.yml` validates every env offline on a PR, which
+catches syntax and type errors but can never show what a change would *do*.
+
 ### Production deploys promote; they do not rebuild
 
 Merging to `main` ships staging. Production is a separate, manual dispatch —
@@ -154,7 +186,7 @@ service in order. Three things make that dispatch safe:
   model* above); it pins an exact Expo SDK version so "same source" also means
   "same bundler".
 - **It refuses commits staging never blessed.** `.github/actions/verified-commit`
-  fails the run unless that exact commit has a successful `*-staging.yml` run.
+  fails the run unless that exact commit has a successful `release-staging.yml` run.
   There is no `workflow_run` chain, so ordering is asserted rather than assumed.
   `force: true` bypasses it for a hotfix, loudly, in the job summary.
 - **Traffic moves last.** The API and marketing SSR Lambdas sit behind a `live`

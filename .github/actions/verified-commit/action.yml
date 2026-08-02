@@ -19,10 +19,28 @@ description: >-
 #      workflows' concurrency comments), so ordering has to be asserted rather
 #      than assumed. This action asserts it.
 #
-# The check is "did the matching *-staging.yml conclude successfully for THIS
-# sha", not "is staging green now". A later unrelated staging failure must not
-# block promoting a commit that genuinely passed, and a later staging success
-# must not bless a commit that failed.
+# The check is "did release-staging.yml conclude successfully for THIS sha",
+# not "is staging green now". A later unrelated staging failure must not block
+# promoting a commit that genuinely passed, and a later staging success must not
+# bless a commit that failed.
+#
+# WHY ONE WORKFLOW AND NOT FOUR. Every caller used to name its own counterpart
+# (`app-prod.yml` checked `app-staging.yml`, and so on), which gave per-service
+# promotion: the app could ship even if mailer's staging run had failed. Staging
+# is now one orchestrated release (release-staging.yml), and a workflow invoked
+# through `workflow_call` produces NO run record of its own — its jobs are
+# nested in the caller's run. So the old per-service lookups would return zero
+# runs forever and block every promotion. Pointing every caller at the
+# orchestrator is what keeps the gate working.
+#
+# The cost is deliberate and worth stating: the gate is now COARSER. A failure
+# in any staging leg blocks promoting every service for that commit. That is the
+# price of one mental model across staging and prod, and for a product shipped
+# as a whole it is arguably the stronger claim — if a commit could not deploy
+# cleanly to staging, none of it should reach production. Recovering per-service
+# granularity would mean matching JOB names inside the release run, where a
+# renamed job silently un-gates production instead of failing loudly. That is a
+# worse failure mode than the one it would fix.
 
 inputs:
   staging-workflow:

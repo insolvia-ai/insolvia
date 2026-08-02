@@ -1,4 +1,4 @@
-name: Infra · Terraform apply · Production
+name: Infra · Terraform · Production
 
 # Terraform for infra/envs/prod, on its own, with nothing else attached — and
 # the ONLY thing that applies it.

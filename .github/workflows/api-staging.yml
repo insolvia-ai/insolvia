@@ -16,27 +16,21 @@ name: API · Deploy · Staging
 # gates — a `paths:` filter here is safe (same as app-staging.yml).
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "services/api/**"
-      - "infra/envs/staging/**"
-      - "infra/modules/api_service/**"
-      - ".github/workflows/api-staging.yml"
+  # Reusable: release-staging.yml calls this as one leg of a staging
+  # release, and it stays dispatchable by hand for a single-service deploy.
+  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # trigger and the path filtering for every staging deploy.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/staging
-# (app-staging.yml). Two applies of the same env racing on one push to main
-# once corrupted each other — seen as "Stage already exists" / "domain name
-# already exists" when both ran concurrently. One group per env state file
-# serializes them so they queue cleanly. The S3 backend also holds a native
-# state lock now (use_lockfile, Terraform >= 1.10), which fails-fast on any
-# apply that slips past the group (a local run alongside CI); the group is
-# what turns "one fails" into "one waits".
+# Held while this workflow deploys, and shared with infra-staging.yml so a
+# hand-dispatched single-service deploy cannot overlap a Terraform apply.
+# release-staging.yml deliberately declares NO group of its own: a group on both
+# caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
@@ -60,11 +54,10 @@ jobs:
           # `terraform output -raw` command substitutions below.
           terraform_wrapper: false
 
-      - name: Apply staging infra
+      - name: Read staging infra outputs
         id: tf
         run: |
           terraform -chdir=infra/envs/staging init
-          terraform -chdir=infra/envs/staging apply -auto-approve
           {
             echo "repo=$(terraform -chdir=infra/envs/staging output -raw api_ecr_repository_url)"
             echo "function=$(terraform -chdir=infra/envs/staging output -raw api_lambda_function_name)"
