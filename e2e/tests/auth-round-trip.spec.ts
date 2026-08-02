@@ -22,12 +22,26 @@ import { cognitoHostDescription, isCognitoHost, testUser } from '../support/env'
  *   - sign-out control: button named "Sign out"
  *   - signed-in state : the user's email address rendered as visible text
  *
- * The Cognito hosted UI is NOT ours and gets no such contract, so its two
- * fields are addressed by the attribute names AWS has kept stable across both
- * the classic hosted UI and the newer managed login: `input[name="username"]`
- * and `input[name="password"]`. The submit control differs between the two
- * (`<input type="Submit" name="signInSubmitButton">` classic, `<button
- * type="submit">` managed), so it is matched as either.
+ * Cognito's pages are NOT ours and get no such contract. The pool serves
+ * MANAGED LOGIN (`managed_login_version = 2`), whose markup was read off the
+ * deployed staging page rather than inferred — the classic hosted UI's markup
+ * is completely different and none of it survived the switch.
+ *
+ * What is stable there, and what is not:
+ *
+ *   - `input[name="username"]` / `input[name="password"]` — STABLE. These are
+ *     the one thing both the classic UI and managed login agree on.
+ *   - `form#primary-form` — STABLE. It is a real id (and its own aria-label),
+ *     not a build artifact. Managed login renders exactly ONE sign-in form,
+ *     unlike the classic UI which rendered two responsive copies and made
+ *     `.first()` pick a hidden one.
+ *   - Element `id`s on the fields — NOT stable. They are React-generated
+ *     (`formField:R6dpf55:`) and change between renders. Never select on them.
+ *   - The submit button's classes — NOT stable. They are hashed
+ *     (`awsui_button_vjswe_1oayo_157`). It also carries NO `type` attribute,
+ *     so `button[type="submit"]` does not match it. Select it by role and
+ *     accessible name ("Sign in"), scoped to the form so it cannot collide
+ *     with the app's own "Sign in" button on the other side of the redirect.
  *
  * NO SLEEPS. Every wait below is on a condition.
  */
@@ -75,12 +89,19 @@ test.describe('staging auth round trip', () => {
     // sets the value through the DOM — it is not typed into a log, not
     // interpolated into a URL, and no trace is recorded in CI (see
     // playwright.config.ts for why).
-    await page.locator('input[name="username"]').first().fill(email);
-    await page.locator('input[name="password"]').first().fill(password);
-    await page
-      .locator('input[type="Submit" i], button[type="submit"]')
-      .first()
-      .click();
+    const form = page.locator('form#primary-form');
+    await expect(
+      form,
+      'the Cognito page should show its sign-in form — if this fails, either the ' +
+        'host redirected but served something else (OAuth error pages live on this ' +
+        'same host, so the host check above cannot catch that), or the app client ' +
+        'lost its managed-login branding style, which makes Cognito serve ' +
+        '"Login pages unavailable" instead of a form',
+    ).toBeVisible();
+
+    await form.locator('input[name="username"]').fill(email);
+    await form.locator('input[name="password"]').fill(password);
+    await form.getByRole('button', { name: 'Sign in' }).click();
 
     // ── 4. The return leg ─────────────────────────────────────────────────
     //
