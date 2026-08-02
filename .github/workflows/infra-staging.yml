@@ -1,0 +1,103 @@
+name: Infra · Terraform plan · Staging
+
+# Terraform for infra/envs/staging, on demand.
+#
+# This is NOT the staging counterpart of infra-prod.yml, and the difference
+# matters. Prod infra is applied by that workflow and nothing else. Staging
+# infra is applied on every merge to `main` by whichever of api-staging,
+# app-staging, mailer-staging and marketing-staging the change touches — that
+# stays true, and this workflow does not replace it.
+#
+# What this fills is a hole those workflows leave: there is no way to see a
+# staging plan BEFORE it applies. shared-infra-plan.yml validates every env
+# offline (`init -backend=false`, no credentials), so it can catch a syntax or
+# type error but can never show what a change would do to real staging state.
+# The deploy workflows go straight to `apply`. So today the first time anyone
+# sees a staging plan is in the log of the apply that already ran it.
+#
+# That is tolerable for a routine change and genuinely risky for a large one —
+# a provider major-version upgrade being the case that prompted this. `mode:
+# plan` is therefore the default, and the interesting one.
+#
+# `mode: apply` exists for the same reason prod's does: an infra-only change
+# has no service deploy to ride in on, and waiting for an unrelated code merge
+# to carry it is worse than applying it deliberately.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan (read-only, writes the plan to the job summary) or apply"
+        type: choice
+        options: [plan, apply]
+        default: plan
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+# MUST match the group used by api-staging.yml, app-staging.yml,
+# mailer-staging.yml and marketing-staging.yml. Unlike prod's, this group DOES
+# guard apply-against-apply, because those four workflows each apply this same
+# root module — and it guards plan-against-apply too, which is the point: a
+# plan read while another workflow is mid-apply would describe a state that no
+# longer exists by the time anyone reads it.
+concurrency:
+  group: insolvia-terraform-staging
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    # Environment-scoped secrets are invisible to a job that does not declare
+    # an environment — AWS_ROLE_ARN would resolve to an empty string and the
+    # OIDC step would fail with an unhelpful error.
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform -chdir=infra/envs/staging init -input=false
+
+      - name: Plan
+        if: inputs.mode == 'plan'
+        run: |
+          set -o pipefail
+          terraform -chdir=infra/envs/staging plan -input=false -no-color \
+            | tee plan.txt
+          {
+            echo '## Terraform plan — infra/envs/staging'
+            echo
+            echo '```terraform'
+            # The summary has a 1 MiB cap; a plan large enough to hit it is
+            # already a plan nobody should be reading in a browser.
+            head -c 900000 plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        if: inputs.mode == 'apply'
+        run: terraform -chdir=infra/envs/staging apply -auto-approve -input=false
+
+      - name: Outputs
+        if: inputs.mode == 'apply'
+        run: |
+          {
+            echo '## Outputs — infra/envs/staging'
+            echo
+            echo '```'
+            terraform -chdir=infra/envs/staging output
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

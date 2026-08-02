@@ -37,6 +37,13 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   staging on merge to `main`, prod via `workflow_dispatch` (`scripts/prod-deploy.sh`).
   The only legitimate local applies are your own dev env (`scripts/dev-aws-*`) and
   the human-gated `ci-trust`. See the `insolvia-deploy` skill.
+- **Before a large or risky staging change, dispatch `Infra · Terraform plan ·
+  Staging` (`infra-staging.yml`) and read the plan.** Staging otherwise goes
+  straight to `apply` on merge, and `shared-infra-plan.yml` only validates
+  offline (`init -backend=false`) — so without this, the first time anyone sees
+  a staging plan is in the log of the apply that already ran it. Fine for a
+  routine change; not fine for a provider major-version bump or anything that
+  might replace a resource.
 - **Apply order (when a human bootstrap is legitimate): `ci-trust` (human) →
   `shared` → `staging`/`prod`.** `shared` creates the `*.insolvia.ai` cert
   **and the container repositories**; downstream envs look both up by name
