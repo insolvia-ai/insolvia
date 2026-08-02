@@ -128,8 +128,21 @@ against prod. Each owns, per env:
   password policy, optional TOTP MFA, ESSENTIALS plan (threat protection is a
   PLUS-plan upsell, deferred). `deletion_protection` is ACTIVE on prod only.
 - **Hosted domain** — Cognito-provided prefix
-  `insolvia-<env>.auth.us-east-1.amazoncognito.com`; a custom
-  `auth.insolvia.ai` domain is deferred (vanity only, needs its own cert).
+  `insolvia-<env>.auth.us-east-1.amazoncognito.com`, serving **managed login**
+  (`managed_login_version = 2`), not the classic hosted UI. AWS calls the
+  classic UI a "first-generation" service; managed login is what carries the
+  branding editor, dark mode, localisation and the Terms/Privacy links at
+  sign-up, and it is available from the ESSENTIALS tier this pool is already on.
+  **The branding style is not in Terraform**: `aws_cognito_managed_login_branding`
+  first shipped in AWS provider v6.12.0 and this repo pins `~> 5.0`, so the style
+  is edited in the console until a provider upgrade — the module header records
+  how to export and codify it afterwards.
+  A custom `auth.insolvia.ai` domain is still deferred, and no longer only for
+  vanity reasons: Cognito provisions its own CloudFront distribution using the
+  **caller's** credentials, so the CI deploy role would need
+  `cloudfront:UpdateDistribution` — a grant only a human can apply
+  (`insolvia-deploy-role-permissions`). The wildcard cert and the apex A record
+  Cognito requires both already exist.
 - **One public PKCE app client**, authorization-code, no secret, refresh-token
   rotation enabled: `insolvia-web-<env>` — the SPA; callbacks at
   `<origin>/auth/callback`, sign-out to the origin. Staging also registers
@@ -142,9 +155,11 @@ against prod. Each owns, per env:
   `insolvia://auth/callback`, **not** an RFC 8252 loopback redirect (the
   header comment of `infra/modules/auth/main.tf` owns why).
 
-The API does **not** verify tokens yet — the env outputs expose
-`auth_issuer_url` (and pool/client ids) as the seam; JWT verification wires
-into `services/api` with the first authenticated endpoint.
+The API **does** verify tokens: the env outputs publish `auth_issuer_url` and
+the client id into `/insolvia/<env>/api/`, the deploy workflow derives them into
+`AUTH_ISSUER_URL` / `AUTH_CLIENT_ID`, and `services/api` validates the issuer,
+`token_use == "access"` and `client_id` against the pool's JWKS. Auth fails
+**closed** — missing config is a 401 on every protected route, never a bypass.
 
 ## Per-machine development environment (`infra/envs/dev/`)
 

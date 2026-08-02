@@ -87,16 +87,55 @@ resource "aws_cognito_user_pool" "main" {
 
 # ── Hosted domain ───────────────────────────────────────────────
 # Cognito-provided prefix domain: insolvia-<env>.auth.<region>.amazoncognito.com
-# hosts the /oauth2/authorize, /oauth2/token, and sign-in pages both clients
-# use. A custom domain (auth.insolvia.ai) is deferred: it needs its own
-# us-east-1 ACM cert, an alias record, and buys only vanity — the prefix
-# domain is fully functional and the client apps read the domain from config
-# either way, so switching later is a config change, not a code change.
-
+# hosts the /oauth2/authorize, /oauth2/token, and sign-in pages. A custom domain
+# (auth.insolvia.ai) is still deferred — it is a separate decision from branding
+# and needs a CI-role IAM change first: Cognito provisions its own CloudFront
+# distribution with the CALLER's credentials, so the deploy role would need
+# cloudfront:UpdateDistribution, and that grant can only be applied by a human
+# (see the insolvia-deploy-role-permissions skill). Branding, below, needs
+# neither DNS nor new IAM and works on this prefix domain today.
+#
+# managed_login_version = 2 selects MANAGED LOGIN over the classic hosted UI.
+# AWS calls the classic UI "a first-generation version of the managed login
+# services" with "a simpler design and fewer features"; managed login is what
+# carries the branding editor, dark mode, localisation, and the Terms/Privacy
+# links at sign-up. It is available from the ESSENTIALS feature tier, which
+# this pool is already on — no tier change, no extra cost.
+#
+# Two consequences worth knowing before touching this line:
+#   • Switching branding version signs everyone out. AWS does not preserve
+#     sessions across the switch, and it takes up to ~4 minutes to take effect.
+#   • The rendered markup changes completely, so the staging E2E's hosted-UI
+#     field selectors must be re-derived from the real page (see e2e/).
 resource "aws_cognito_user_pool_domain" "main" {
-  domain       = "${var.project}-${var.environment}"
-  user_pool_id = aws_cognito_user_pool.main.id
+  domain                = "${var.project}-${var.environment}"
+  user_pool_id          = aws_cognito_user_pool.main.id
+  managed_login_version = 2
 }
+
+# ── Managed login branding — NOT YET IN TERRAFORM ───────────────
+# The branding style itself (colours, logo, dark mode) is deliberately absent
+# from this module, and that is a provider limitation rather than a choice:
+# `aws_cognito_managed_login_branding` first shipped in AWS provider **v6.12.0**,
+# and this repo pins `~> 5.0` (infra/CLAUDE.md). Adding it here does not fail at
+# apply time — it fails `terraform validate`, so the PR gate catches it.
+#
+# Until a provider major-version upgrade is a deliberate piece of work, the
+# style is created and edited in the console's branding editor, which is the
+# one part of auth that is not under IaC. Two things follow from that:
+#
+#   • AWS documents that an app client created through the API — which is what
+#     Terraform does — starts with NO branding style: "managed login isn't
+#     available for an app client created with an AWS SDK until you create one
+#     with a CreateManagedLoginBranding request." Opening the branding editor
+#     and saving creates that style; until someone does, these pages render
+#     Cognito's stock defaults.
+#   • When the provider is upgraded, the console work is not thrown away.
+#     `DescribeManagedLoginBrandingByClient` with `ReturnMergedResources`
+#     exports the whole style as JSON, which becomes this module's `settings`
+#     plus `asset` blocks (images committed here and shipped with filebase64 —
+#     up to 40 assets, 2 MB each; Cognito stores and serves them, nothing is
+#     hosted by us).
 
 # ── App client ──────────────────────────────────────────────────
 # An OAuth public client (RFC 6749 §2.1): no secret, because a browser bundle
