@@ -39,7 +39,7 @@ require_command() {
 targets() {
   cat <<'EOF'
 release|release-prod.yml|Release · Production
-prod-infra|infra-prod.yml|Infra · Terraform apply · Production
+prod-infra|infra-prod.yml|Infra · Terraform · Production
 api|api-prod.yml|API · Deploy · Production
 mailer|mailer-prod.yml|Mailer · Deploy · Production
 app|app-prod.yml|App · Deploy · Production
