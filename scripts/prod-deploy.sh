@@ -39,7 +39,7 @@ require_command() {
 targets() {
   cat <<'EOF'
 release|release-prod.yml|Release · Production
-prod-infra|infra-prod.yml|Infra · Terraform apply · Production
+prod-infra|infra-prod.yml|Infra · Terraform · Production
 api|api-prod.yml|API · Deploy · Production
 mailer|mailer-prod.yml|Mailer · Deploy · Production
 app|app-prod.yml|App · Deploy · Production
@@ -68,6 +68,9 @@ Common inputs (see --input):
                  needs whatever approval the insolvia-production environment
                  requires, and says so loudly in the job summary.
   mode=apply     prod-infra only: apply instead of the read-only default plan.
+  allow_infra_drift=true
+                 release only: skip the read-only check that prod infra already
+                 matches the commit. Emergencies only.
 
 Options:
   --ref REF      Git ref to deploy from (default: main)
@@ -92,8 +95,10 @@ only promote and deploy code, so an infra change will not ride along with a
 service deploy, and a service deploy will not carry unrelated infra drift into
 production. Apply infra deliberately, before the release that needs it.
 
-'release' chains mailer -> api -> marketing -> app for one commit. Use it when
-a change spans services; use a single service target otherwise.
+'release' chains infra -> mailer -> api -> marketing -> app for one commit. Use
+it when a change spans services; use a single service target otherwise. Its
+infra step is READ-ONLY: it fails the release if prod infra is behind the
+commit, telling you to run 'prod-infra' first. It never applies.
 EOF
 }
 

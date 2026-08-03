@@ -1,0 +1,164 @@
+name: Release · Staging
+
+# The staging twin of release-prod.yml, and the ONLY thing that deploys staging.
+#
+# Until this existed, staging and production were two different mental models:
+# prod applied infra deliberately with infra-prod.yml and promoted services
+# through one ordered release, while staging had four independent workflows that
+# each applied infra/envs/staging themselves before deploying. That asymmetry
+# was never a decision — prod had `terraform apply` removed from its service
+# deploys (see release-prod.yml's header) and staging simply never got the same
+# surgery. This finishes it.
+#
+# WHAT IS NOW IDENTICAL TO PROD
+#   • Service workflows are `workflow_call` + `workflow_dispatch` reusables, so
+#     there is exactly one code path whether a release runs them or a human
+#     dispatches one by hand.
+#   • None of them applies Terraform. They `init` and read outputs.
+#   • Ordering is `needs`, guaranteed by GitHub, not by four workflows each
+#     making themselves safe.
+#   • Infra is the FIRST job of both releases, because in both environments the
+#     service legs READ Terraform outputs and deploying against stale ones is
+#     the race that ordering removes.
+#   • No concurrency group HERE. The called workflows each hold
+#     `insolvia-terraform-staging`; `needs` already serialises them, and a group
+#     on both caller and callee deadlocks — the callee would queue behind its
+#     own parent.
+#
+# THE ONE REMAINING DIFFERENCE, AND WHY
+#   Both releases guarantee the same property — infra matches the code before
+#   any service deploys — and only the mechanism differs. This workflow calls
+#   `infra-staging.yml` with `mode: apply`; release-prod.yml calls
+#   `infra-prod.yml` with `mode: verify`, a read-only check that fails the
+#   release if prod infra is behind the commit.
+#
+#   Staging can apply because staging IS `main`: reconciling it automatically is
+#   the definition being enforced, not drift being smuggled in. Prod cannot,
+#   because a promotion must never carry unrelated infra drift into production —
+#   so it asserts instead, and applying stays a separate deliberate act. That
+#   apply-vs-assert split is the reconcile-vs-promote distinction itself.
+#
+# TESTING THIS BEFORE MERGING: `workflow_dispatch` runs the workflow file from
+# whatever branch you select, so dispatch this from the PR branch to exercise
+# the whole chain before it ever runs on `main`.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "Deploy every service, ignoring which paths changed"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  # Path filtering lives here now, once, instead of in four `on.push.paths:`
+  # blocks. The repo's `changed-paths` action cannot be reused: it reads
+  # `github.event.pull_request.base.sha` and hard-fails on any other event, by
+  # design — it exists to keep required PR checks reporting, which is a
+  # different problem from "what did this push change".
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.f.outputs.api }}
+      app: ${{ steps.f.outputs.app }}
+      mailer: ${{ steps.f.outputs.mailer }}
+      marketing: ${{ steps.f.outputs.marketing }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: f
+        env:
+          # On a push this is the previous tip of `main`. It is all-zeroes for a
+          # branch's first push, and absent entirely on workflow_dispatch.
+          BEFORE: ${{ github.event.before }}
+          ALL: ${{ inputs.all }}
+        run: |
+          set -euo pipefail
+
+          # Deploy everything when we cannot know what changed (manual dispatch,
+          # or a first push with no previous tip). Failing OPEN is right here:
+          # deploying a service that did not change is wasteful, while skipping
+          # one that did leaves staging silently behind `main`, which is the one
+          # property staging exists to have.
+          if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "No usable diff base — deploying every service."
+            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+
+          files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+          if [ -z "$files" ]; then
+            echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
+            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+          printf '%s\n' "$files" | sed 's/^/  /'
+
+          # These sets are copied verbatim from the `on.push.paths:` filters the
+          # four staging workflows carried before this workflow took the trigger
+          # over. Keep them in step with what each service actually consumes.
+          emit() {
+            if printf '%s\n' "$files" | grep -qE "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"; echo "$1 -> true"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"; echo "$1 -> false"
+            fi
+          }
+
+          emit api       '^(services/api/|infra/envs/staging/|infra/modules/api_service/|\.github/workflows/(api-staging|release-staging)\.yml)'
+          emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release-staging)\.yml)'
+          emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release-staging)\.yml)'
+          emit app       '^(apps/|packages/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|\.github/workflows/(app-staging|release-staging)\.yml)'
+
+  # Infra first, always — every service job below reads its outputs.
+  infra:
+    needs: changes
+    uses: ./.github/workflows/infra-staging.yml
+    with:
+      mode: apply
+    # A called workflow receives no secrets at all without this — not even
+    # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
+    # the OIDC step would fail with an unhelpful error.
+    secrets: inherit
+
+  # Service order mirrors release-prod.yml: mailer, then api (which calls it),
+  # then marketing, then app.
+  #
+  # Every `if:` below deliberately avoids `success()`. A job whose dependency
+  # was SKIPPED is itself skipped under the default `if: success()`, which would
+  # mean a docs-only change to the mailer path silently cancelling the whole
+  # chain behind it. `!cancelled() && !failure()` runs after a skipped upstream
+  # but still stops dead on a failed one.
+  mailer:
+    needs: [changes, infra]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mailer == 'true' }}
+    uses: ./.github/workflows/mailer-staging.yml
+    secrets: inherit
+
+  api:
+    needs: [changes, infra, mailer]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.api == 'true' }}
+    uses: ./.github/workflows/api-staging.yml
+    secrets: inherit
+
+  marketing:
+    needs: [changes, infra, api]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
+    uses: ./.github/workflows/marketing-staging.yml
+    secrets: inherit
+
+  app:
+    needs: [changes, infra, marketing]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.app == 'true' }}
+    uses: ./.github/workflows/app-staging.yml
+    secrets: inherit

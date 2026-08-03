@@ -180,7 +180,7 @@ Worth knowing before you run the checks against `app.insolvia.ai`:
   the staging bundle has `staging` baked into its JS and can never be the prod
   bundle. The pinned exact Expo SDK is what makes "same source" also mean "same
   bundler". `.github/actions/verified-commit` still requires a green
-  `app-staging.yml` run for that exact SHA.
+  `release-staging.yml` run for that exact SHA.
 
 ---
 
@@ -194,7 +194,7 @@ Worth knowing before you run the checks against `app.insolvia.ai`:
 | TLS name mismatch on a staging host | A nested host (`app.staging.insolvia.ai`) was used somewhere. The wildcard covers one label; the flat map in D2 is load-bearing. |
 | Deep link 404s | The CloudFront SPA rewrite is missing from the distribution — `infra/modules/web_hosting/main.tf` lines 56–69, and confirm the module is instantiated for that env. |
 | `terraform output` empty in `app-prod.yml` | Prod infra has never been applied. Run `infra-prod.yml` with `mode=apply` first. |
-| Prod dispatch blocked, "no successful app-staging.yml run" | Working as designed. The commit has not deployed green to staging. |
+| Prod dispatch blocked, "no successful release-staging.yml run" | Working as designed. The commit has not deployed green to staging. |
 | A returning browser shows an old build after a green deploy | An unhashed object (`index.html` above all) went up with a `max-age` — check 6. CloudFront invalidation cannot reach a client-side cache. |
 | The badge says `Staging` on `app.insolvia.ai`, or vice versa | The Metro transform cache served a bundle built for the other environment. Confirm the export ran with `--clear`; do not re-dispatch without it, because a warm cache reproduces the bug. |
 | Browser console: *"Expected a JavaScript module script but the server responded with … text/html"* | A chunk `index.html` references is not in the bucket, and the SPA rewrite answered with HTML and a 200. Usually a `--delete` added to the hashed sync pass, which prunes chunks a still-open page is about to request. |

@@ -33,13 +33,11 @@ name: Marketing · Deploy · Staging
 # gates — a `paths:` filter here is safe (same as api-staging.yml).
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/insolvia_marketing/**"
-      - "infra/envs/staging/**"
-      - "infra/modules/marketing_site/**"
-      - ".github/workflows/marketing-staging.yml"
+  # Reusable: release-staging.yml calls this as one leg of a staging
+  # release, and it stays dispatchable by hand for a single-service deploy.
+  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # trigger and the path filtering for every staging deploy.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -49,10 +47,10 @@ permissions:
   # job's GITHUB_TOKEN needs read access to pull it.
   packages: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/staging
-# (api-staging.yml, app-staging.yml, mailer-staging.yml) — concurrent applies
-# of one env race. See the matching comment in api-staging.yml for the
-# incident that proved it.
+# Held while this workflow deploys, and shared with infra-staging.yml so a
+# hand-dispatched single-service deploy cannot overlap a Terraform apply.
+# release-staging.yml deliberately declares NO group of its own: a group on both
+# caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
@@ -99,11 +97,10 @@ jobs:
           # `$(terraform output -raw ...)` capture below.
           terraform_wrapper: false
 
-      - name: Apply staging infra
+      - name: Read staging infra outputs
         id: tf
         run: |
           terraform -chdir=infra/envs/staging init -input=false
-          terraform -chdir=infra/envs/staging apply -auto-approve -input=false
           tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
           {
             echo "ecr=$(tf marketing_ecr_repository_url)"

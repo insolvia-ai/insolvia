@@ -1,29 +1,44 @@
-name: Infra · Terraform plan · Staging
+name: Infra · Terraform · Staging
 
-# Terraform for infra/envs/staging, on demand.
+# Terraform for infra/envs/staging — the ONLY thing that applies it, exactly as
+# infra-prod.yml is the only thing that applies prod.
 #
-# This is NOT the staging counterpart of infra-prod.yml, and the difference
-# matters. Prod infra is applied by that workflow and nothing else. Staging
-# infra is applied on every merge to `main` by whichever of api-staging,
-# app-staging, mailer-staging and marketing-staging the change touches — that
-# stays true, and this workflow does not replace it.
+# This is the direct counterpart of infra-prod.yml. It used to say the opposite,
+# because staging's four service workflows each applied this root module
+# themselves before deploying. release-staging.yml removed that: the service
+# workflows now only `init` and read outputs, and this workflow owns the apply.
 #
-# What this fills is a hole those workflows leave: there is no way to see a
-# staging plan BEFORE it applies. shared-infra-plan.yml validates every env
-# offline (`init -backend=false`, no credentials), so it can catch a syntax or
-# type error but can never show what a change would do to real staging state.
-# The deploy workflows go straight to `apply`. So today the first time anyone
-# sees a staging plan is in the log of the apply that already ran it.
+# TWO WAYS IN, ONE CODE PATH
+#   • `workflow_call` from release-staging.yml with `mode: apply` — the first
+#     job of every staging release, ordered ahead of the service legs because
+#     they read the outputs it produces.
+#   • `workflow_dispatch` by hand, defaulting to `mode: plan`.
 #
-# That is tolerable for a routine change and genuinely risky for a large one —
-# a provider major-version upgrade being the case that prompted this. `mode:
-# plan` is therefore the default, and the interesting one.
+# WHY `plan` IS THE DEFAULT, AND WHY IT MATTERS
+# shared-infra-plan.yml validates every env offline (`init -backend=false`, no
+# credentials), so it catches syntax and type errors but can never show what a
+# change would DO to real staging state. Without a plan mode, the first sight of
+# a staging plan is the log of the apply that already ran. Fine for a routine
+# change; not fine for a provider major-version bump or anything that might
+# replace a resource. `infra-prod.yml` defaults to `plan` for the same reason.
 #
-# `mode: apply` exists for the same reason prod's does: an infra-only change
-# has no service deploy to ride in on, and waiting for an unrelated code merge
-# to carry it is worse than applying it deliberately.
+# THE ONE ASYMMETRY WITH PROD, AND ITS REASON
+# Both releases run infra as their first job, because in both environments the
+# service legs read the outputs it produces. What differs is the mode:
+# release-staging.yml calls this workflow with `mode: apply`; release-prod.yml
+# calls infra-prod.yml with `mode: verify`, which only ASSERTS that prod infra
+# already matches the commit and fails the release if it does not.
+#
+# Staging IS `main`, so reconciling its infrastructure on every merge is the
+# definition being enforced. Production is a promotion, so an automatic apply
+# would let a code release carry unrelated infra drift into prod — there,
+# applying stays a separate, deliberate act. infra-prod.yml's header has the
+# long form.
 
 on:
+  # Dispatched by hand for a plan; called by release-staging.yml with
+  # `mode: apply` as the first job of every staging release. One code path
+  # either way, exactly as the prod workflows are reusable for release-prod.yml.
   workflow_dispatch:
     inputs:
       mode:
@@ -32,17 +47,27 @@ on:
         options: [plan, apply]
         default: plan
         required: true
+  workflow_call:
+    inputs:
+      mode:
+        description: "plan or apply"
+        type: string
+        default: apply
+        required: false
 
 permissions:
   id-token: write
   contents: read
 
-# MUST match the group used by api-staging.yml, app-staging.yml,
-# mailer-staging.yml and marketing-staging.yml. Unlike prod's, this group DOES
-# guard apply-against-apply, because those four workflows each apply this same
-# root module — and it guards plan-against-apply too, which is the point: a
-# plan read while another workflow is mid-apply would describe a state that no
-# longer exists by the time anyone reads it.
+# MUST match the group the staging service workflows hold. Nothing but this
+# workflow applies the root module any more, so the group is not guarding
+# apply-against-apply; it guards apply-against-DEPLOY — an apply landing while a
+# hand-dispatched service deploy is mid-flight could rewrite a Lambda's
+# configuration underneath it. Same reasoning as infra-prod.yml's group.
+#
+# release-staging.yml deliberately declares NO group of its own: a group on both
+# the caller and the callee deadlocks the callee behind its own parent, and
+# `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false

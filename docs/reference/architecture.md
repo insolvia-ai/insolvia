@@ -139,6 +139,59 @@ deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
 `*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
 real (prod is dispatched manually).
 
+### Staging and production deploy the same way
+
+There is **one** deploy model, in both environments:
+
+| | Staging | Production |
+|---|---|---|
+| Orchestrator | `release-staging.yml` | `release-prod.yml` |
+| Trigger | push to `main` | `workflow_dispatch` |
+| Service workflows | `*-staging.yml`, `workflow_call` + `workflow_dispatch` | `*-prod.yml`, same |
+| Who applies Terraform | `infra-staging.yml`, and nothing else | `infra-prod.yml`, and nothing else |
+| First job | `infra-staging.yml`, `mode: apply` | `infra-prod.yml`, `mode: verify` |
+| Ordering | `needs` between legs | `needs` between legs |
+
+The service workflows **never apply Terraform** — they `init` and read outputs.
+They are reusable, so a release and a hand-dispatched single-service deploy run
+exactly the same code path. Neither orchestrator declares a concurrency group;
+each called workflow holds its environment's group, and `needs` orders them. A
+group on both caller and callee would deadlock the callee behind its own parent.
+
+**Infra is the first job of both**, and both guarantee the same property: the
+infrastructure matches the code before any service deploys. That ordering is not
+tidiness — the service legs resolve the ECR repository, function name, alias and
+domain they act on by reading Terraform outputs, so a release that runs ahead of
+its infra deploys against stale ones, silently.
+
+**The one deliberate difference** is the *mode*, and it follows from what the two
+environments are:
+
+- Staging **applies**. Staging is `main`, so reconciling its infrastructure on
+  every merge is the definition being enforced.
+- Production **asserts**. A promotion must never carry unrelated infra drift into
+  prod, so `release-prod.yml` calls `infra-prod.yml` with `mode: verify` — a
+  read-only `terraform plan -detailed-exitcode` that fails the release if prod
+  infra is behind the commit, and never applies. Applying prod infra stays a
+  separate deliberate act. `allow_infra_drift: true` skips the check for an
+  emergency promotion, as `force` skips the staging-green gate.
+
+That apply-vs-assert split *is* the reconcile-vs-promote distinction. Nothing
+else separates the two release workflows.
+
+The `verify` job deliberately declares no `environment:`. It only reads state,
+and `insolvia-production` carries required reviewers — declaring it would put a
+human approval in front of a read-only check at the head of every release. It
+still authenticates: `AWS_ROLE_ARN` is a repository secret and the deploy role's
+trust policy carries no environment condition. For the same reason it prints
+resource addresses rather than the diff, since prod state holds SecureString
+values.
+
+Both environments can also be planned before they are applied: `infra-staging.yml`
+and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
+summary. `shared-infra-plan.yml` validates every env offline on a PR, which
+catches syntax and type errors but can never show what a change would *do*.
+
 ### Production deploys promote; they do not rebuild
 
 Merging to `main` ships staging. Production is a separate, manual dispatch —
@@ -154,7 +207,7 @@ service in order. Three things make that dispatch safe:
   model* above); it pins an exact Expo SDK version so "same source" also means
   "same bundler".
 - **It refuses commits staging never blessed.** `.github/actions/verified-commit`
-  fails the run unless that exact commit has a successful `*-staging.yml` run.
+  fails the run unless that exact commit has a successful `release-staging.yml` run.
   There is no `workflow_run` chain, so ordering is asserted rather than assumed.
   `force: true` bypasses it for a hotfix, loudly, in the job summary.
 - **Traffic moves last.** The API and marketing SSR Lambdas sit behind a `live`
@@ -166,7 +219,9 @@ service in order. Three things make that dispatch safe:
 
 Prod deploys do not run `terraform apply`. Applying prod infrastructure is
 `infra-prod.yml` alone (`prod-deploy.sh prod-infra`, `mode: plan` by default),
-so a routine code deploy cannot carry unrelated infra drift into production.
+so a routine code deploy cannot carry unrelated infra drift into production. A
+release does *verify* prod infra first, read-only — see *Staging and production
+deploy the same way* above.
 
 The human gate is the `insolvia-production` GitHub Environment's **required
 reviewers** — like the required status checks below, that is a repo-settings

@@ -1,31 +1,21 @@
 name: App · Deploy · Staging
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/**"
-      - "packages/**"
-      # The app is an npm workspace member, so the root manifest and lockfile
-      # are real inputs to its build — a dependency bump that touches only the
-      # lockfile still changes the bundle that ships.
-      - "package.json"
-      - "package-lock.json"
-      - "infra/envs/staging/**"
-      - "infra/modules/**"
-      - ".github/workflows/app-staging.yml"
-      # The post-deploy E2E suite is part of what makes this run green, so a
-      # change to it must re-run the workflow that enforces it.
-      - "e2e/**"
+  # Reusable: release-staging.yml calls this as one leg of a staging
+  # release, and it stays dispatchable by hand for a single-service deploy.
+  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # trigger and the path filtering for every staging deploy.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/staging
-# (api-staging.yml) — the backend has no state locking, so concurrent applies
-# of one env race. See the matching comment in api-staging.yml.
+# Held while this workflow deploys, and shared with infra-staging.yml so a
+# hand-dispatched single-service deploy cannot overlap a Terraform apply.
+# release-staging.yml deliberately declares NO group of its own: a group on both
+# caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
@@ -93,11 +83,10 @@ jobs:
       # is what makes an `EXPO_PUBLIC_` name legitimate for them downstream.
       # Nothing secret may ever carry that prefix; Metro inlines it into a
       # bundle any visitor can read.
-      - name: Apply staging infra
+      - name: Read staging infra outputs
         id: tf
         run: |
           terraform -chdir=infra/envs/staging init
-          terraform -chdir=infra/envs/staging apply -auto-approve
           tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
           {
             echo "bucket=$(tf bucket_name)"

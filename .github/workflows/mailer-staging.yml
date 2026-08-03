@@ -21,23 +21,21 @@ name: Mailer · Deploy · Staging
 # gates — a `paths:` filter here is safe (same as api-staging.yml).
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "services/mailer/**"
-      - "infra/envs/staging/**"
-      - "infra/modules/mailer/**"
-      - "infra/modules/api_service/**" # its lambda_role_name output feeds the mailer's caller allowlist
-      - ".github/workflows/mailer-staging.yml"
+  # Reusable: release-staging.yml calls this as one leg of a staging
+  # release, and it stays dispatchable by hand for a single-service deploy.
+  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # trigger and the path filtering for every staging deploy.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
-# Shared with every workflow that `terraform apply`s infra/envs/staging
-# (api-staging.yml, app-staging.yml) — see api-staging.yml for the incident
-# that made this required.
+# Held while this workflow deploys, and shared with infra-staging.yml so a
+# hand-dispatched single-service deploy cannot overlap a Terraform apply.
+# release-staging.yml deliberately declares NO group of its own: a group on both
+# caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
   cancel-in-progress: false
@@ -61,11 +59,10 @@ jobs:
           # `terraform output -raw` / `-json` command substitutions below.
           terraform_wrapper: false
 
-      - name: Apply staging infra
+      - name: Read staging infra outputs
         id: tf
         run: |
           terraform -chdir=infra/envs/staging init
-          terraform -chdir=infra/envs/staging apply -auto-approve
           {
             echo "repo=$(terraform -chdir=infra/envs/staging output -raw mailer_ecr_repository_url)"
             echo "domain=$(terraform -chdir=infra/envs/staging output -raw mailer_api_url)"

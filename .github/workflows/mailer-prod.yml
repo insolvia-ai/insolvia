@@ -88,7 +88,7 @@ jobs:
       - id: commit
         uses: ./.github/actions/verified-commit
         with:
-          staging-workflow: mailer-staging.yml
+          staging-workflow: release-staging.yml
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
 

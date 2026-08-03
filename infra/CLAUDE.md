@@ -37,13 +37,22 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   staging on merge to `main`, prod via `workflow_dispatch` (`scripts/prod-deploy.sh`).
   The only legitimate local applies are your own dev env (`scripts/dev-aws-*`) and
   the human-gated `ci-trust`. See the `insolvia-deploy` skill.
-- **Before a large or risky staging change, dispatch `Infra · Terraform plan ·
-  Staging` (`infra-staging.yml`) and read the plan.** Staging otherwise goes
-  straight to `apply` on merge, and `shared-infra-plan.yml` only validates
-  offline (`init -backend=false`) — so without this, the first time anyone sees
-  a staging plan is in the log of the apply that already ran it. Fine for a
-  routine change; not fine for a provider major-version bump or anything that
-  might replace a resource.
+- **One deploy model, both environments.** `release-staging.yml` (push to
+  `main`) and `release-prod.yml` (dispatch) each orchestrate reusable
+  `*-<env>.yml` service workflows with `needs`. **No service workflow applies
+  Terraform** — `infra-staging.yml` and `infra-prod.yml` are the only appliers
+  of their roots, and the service legs only read outputs. **Infra is the first
+  job of both releases**, because both sets of service legs read its outputs.
+  The single deliberate asymmetry is the mode: staging calls `mode: apply`
+  (staging *is* `main`), prod calls `mode: verify` — read-only, fails the
+  release if prod infra is behind the commit — so a promotion can never carry
+  infra drift. `docs/reference/architecture.md` owns the full comparison.
+- **Before a large or risky change, dispatch the env's infra workflow with
+  `mode: plan` and read it.** Both default to `plan`. `shared-infra-plan.yml`
+  only validates offline (`init -backend=false`), so it catches syntax and type
+  errors but never shows what a change would *do*. Fine to skip for a routine
+  change; not for a provider major-version bump or anything that might replace
+  a resource.
 - **Apply order (when a human bootstrap is legitimate): `ci-trust` (human) →
   `shared` → `staging`/`prod`.** `shared` creates the `*.insolvia.ai` cert
   **and the container repositories**; downstream envs look both up by name
