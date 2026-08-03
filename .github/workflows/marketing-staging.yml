@@ -43,8 +43,13 @@ on:
 permissions:
   id-token: write
   contents: read
-  # The app installs @insolvia-ai/design-system from GitHub Packages; the
+  # The marketing site installs @insolvia-ai/design-system from GitHub Packages
+  # by published version (it is deliberately outside the npm workspace, so it
+  # does not get the symlink the app does — see the root package.json). The
   # job's GITHUB_TOKEN needs read access to pull it.
+  #
+  # release-staging.yml must hold this too: a called workflow cannot request a
+  # permission its caller lacks, and the whole run is rejected at startup.
   packages: read
 
 # Held while this workflow deploys, and shared with infra-staging.yml so a
