@@ -53,10 +53,22 @@ on:
         default: false
         type: boolean
 
+# A called workflow cannot request a permission the CALLER does not hold — the
+# whole run is rejected before any job starts, in about a second, with no logs
+# and no job list to read. So this block is the union of what every called
+# workflow declares, not just what the jobs here need:
+#   • `actions: read`  — nothing here uses it; kept in step with release-prod.yml.
+#   • `packages: read` — marketing-staging.yml installs
+#     @insolvia-ai/design-system from GitHub Packages and declares it.
+# Widening here does NOT widen the callees: each still gets only what it
+# declares itself, capped by this. Add to this block whenever a called workflow
+# gains a permission, or the first push to `main` after that merge dies at
+# startup.
 permissions:
   id-token: write
   contents: read
   actions: read
+  packages: read
 
 jobs:
   # Path filtering lives here now, once, instead of in four `on.push.paths:`
