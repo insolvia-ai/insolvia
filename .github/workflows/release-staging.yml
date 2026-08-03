@@ -17,19 +17,26 @@ name: Release · Staging
 #   • None of them applies Terraform. They `init` and read outputs.
 #   • Ordering is `needs`, guaranteed by GitHub, not by four workflows each
 #     making themselves safe.
+#   • Infra is the FIRST job of both releases, because in both environments the
+#     service legs READ Terraform outputs and deploying against stale ones is
+#     the race that ordering removes.
 #   • No concurrency group HERE. The called workflows each hold
 #     `insolvia-terraform-staging`; `needs` already serialises them, and a group
 #     on both caller and callee deadlocks — the callee would queue behind its
 #     own parent.
 #
 # THE ONE REMAINING DIFFERENCE, AND WHY
-#   Prod deliberately excludes infra from its release: a code promotion must
-#   never carry infra drift into production, so `infra-prod.yml` is a separate,
-#   human-dispatched act. Staging includes infra as the first job, because
-#   staging IS `main` — reconciling it automatically is the definition being
-#   enforced, not drift being smuggled in. Splitting it here would reintroduce
-#   the race this workflow exists to remove: the service jobs READ Terraform
-#   outputs, so an unordered infra apply means deploying against stale ones.
+#   Both releases guarantee the same property — infra matches the code before
+#   any service deploys — and only the mechanism differs. This workflow calls
+#   `infra-staging.yml` with `mode: apply`; release-prod.yml calls
+#   `infra-prod.yml` with `mode: verify`, a read-only check that fails the
+#   release if prod infra is behind the commit.
+#
+#   Staging can apply because staging IS `main`: reconciling it automatically is
+#   the definition being enforced, not drift being smuggled in. Prod cannot,
+#   because a promotion must never carry unrelated infra drift into production —
+#   so it asserts instead, and applying stays a separate deliberate act. That
+#   apply-vs-assert split is the reconcile-vs-promote distinction itself.
 #
 # TESTING THIS BEFORE MERGING: `workflow_dispatch` runs the workflow file from
 # whatever branch you select, so dispatch this from the PR branch to exercise
@@ -119,9 +126,9 @@ jobs:
     uses: ./.github/workflows/infra-staging.yml
     with:
       mode: apply
-    # Environment-scoped secrets (AWS_ROLE_ARN) do not cross into a called
-    # workflow without this — they would resolve to empty strings and the OIDC
-    # step would fail with an unhelpful error.
+    # A called workflow receives no secrets at all without this — not even
+    # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
+    # the OIDC step would fail with an unhelpful error.
     secrets: inherit
 
   # Service order mirrors release-prod.yml: mailer, then api (which calls it),

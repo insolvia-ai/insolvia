@@ -41,10 +41,12 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   `main`) and `release-prod.yml` (dispatch) each orchestrate reusable
   `*-<env>.yml` service workflows with `needs`. **No service workflow applies
   Terraform** — `infra-staging.yml` and `infra-prod.yml` are the only appliers
-  of their roots, and the service legs only read outputs. The single deliberate
-  asymmetry: staging's release calls `infra-staging.yml` first (staging *is*
-  `main`), while prod's excludes infra so a code promotion cannot carry infra
-  drift. `docs/reference/architecture.md` owns the full comparison.
+  of their roots, and the service legs only read outputs. **Infra is the first
+  job of both releases**, because both sets of service legs read its outputs.
+  The single deliberate asymmetry is the mode: staging calls `mode: apply`
+  (staging *is* `main`), prod calls `mode: verify` — read-only, fails the
+  release if prod infra is behind the commit — so a promotion can never carry
+  infra drift. `docs/reference/architecture.md` owns the full comparison.
 - **Before a large or risky change, dispatch the env's infra workflow with
   `mode: plan` and read it.** Both default to `plan`. `shared-infra-plan.yml`
   only validates offline (`init -backend=false`), so it catches syntax and type

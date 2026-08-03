@@ -1,7 +1,6 @@
 name: Infra · Terraform · Production
 
-# Terraform for infra/envs/prod, on its own, with nothing else attached — and
-# the ONLY thing that applies it.
+# Terraform for infra/envs/prod — the ONLY thing that applies it.
 #
 # The prod deploy workflows (api-prod, mailer-prod, marketing-prod, app-prod)
 # deliberately apply no Terraform; they only read outputs. infra/envs/prod is
@@ -14,20 +13,52 @@ name: Infra · Terraform · Production
 # So this workflow is not merely the tidier way to apply prod infra, it is the
 # only way. Apply deliberately, before the release that needs it.
 #
-# It also fills a real gap: shared-infra-plan.yml validates every env offline
-# (`init -backend=false`, no credentials), so nothing in CI could ever show a
-# *plan* against real prod state. `mode: plan` does, and writes it to the job
-# summary — which is why plan, not apply, is the default.
+# THREE MODES
+#   • plan   (dispatch default) — read-only; writes the full plan to the job
+#            summary. This fills a real gap: shared-infra-plan.yml validates
+#            every env offline (`init -backend=false`, no credentials), so
+#            nothing else in CI can show a plan against real prod state.
+#   • apply  — the one path that mutates prod infrastructure.
+#   • verify (workflow_call default) — read-only; the first job of every
+#            release-prod.yml run. Asserts prod infra ALREADY matches this
+#            commit, and fails the release if it does not.
+#
+# WHY `verify` EXISTS — it is the prod half of one deploy model
+#   release-staging.yml orders infra-staging.yml ahead of its service legs
+#   because those legs READ Terraform outputs, and deploying against stale
+#   outputs is exactly the race that ordering removes. The prod legs read
+#   outputs too — api-prod.yml's "Read prod infra outputs" step resolves the
+#   ECR repository, function name, alias and domain that way — so prod has the
+#   identical dependency. What prod cannot do is fix it by applying: a
+#   promotion must never carry unrelated infra drift into production.
+#
+#   So both releases now guarantee the same property — infra matches the code
+#   before any service deploys — and only the mechanism differs. Staging makes
+#   it true by applying; prod asserts it and stops if it is not. That
+#   apply-vs-assert split IS the reconcile-vs-promote distinction between the
+#   two environments, and it is the only difference left between the two
+#   release workflows.
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "plan (read-only, writes the plan to the job summary) or apply"
+        description: "plan (writes the plan to the job summary) · apply · verify (fail if prod infra is behind this commit)"
         type: choice
-        options: [plan, apply]
+        options: [plan, apply, verify]
         default: plan
         required: true
+
+  # Called by release-prod.yml as its first job, with `mode: verify`. One code
+  # path either way, exactly as infra-staging.yml is reusable for
+  # release-staging.yml.
+  workflow_call:
+    inputs:
+      mode:
+        description: "plan, apply, or verify"
+        type: string
+        default: verify
+        required: false
 
 permissions:
   id-token: write
@@ -40,12 +71,104 @@ permissions:
 # configuration underneath it, or move an alias the deploy is about to shift.
 # Native S3 state locking (use_lockfile, enabled in #117) still backstops any
 # apply that slips past the group.
+#
+# `verify` holds the group too, even though it only reads: a drift check that
+# races an in-flight apply reports an answer that is already stale.
+#
+# release-prod.yml deliberately declares NO group of its own — a group on both
+# the caller and the callee deadlocks the callee behind its own parent.
 concurrency:
   group: insolvia-terraform-prod
   cancel-in-progress: false
 
 jobs:
+  # Read-only drift check — see "WHY `verify` EXISTS" above.
+  verify:
+    if: inputs.mode == 'verify'
+    runs-on: ubuntu-latest
+    # Deliberately NO `environment:`. This job only reads state, and
+    # insolvia-production carries required reviewers — declaring it would put a
+    # human approval in front of a read-only check at the head of every
+    # release, on top of the four the service legs already ask for. Nothing is
+    # lost by omitting it: AWS_ROLE_ARN is a REPOSITORY secret (the
+    # insolvia-production environment defines none of its own), and the deploy
+    # role's trust policy matches `repo:<owner>/<repo>:*` with no environment
+    # condition (infra/envs/ci-trust/main.tf), so the OIDC assume works here.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform -chdir=infra/envs/prod init -input=false
+
+      - name: Verify prod infra matches this commit
+        run: |
+          set -euo pipefail
+
+          ec=0
+          terraform -chdir=infra/envs/prod plan \
+            -input=false -no-color -detailed-exitcode -out=tfplan > plan.txt || ec=$?
+
+          # -detailed-exitcode: 0 = in sync, 1 = the plan itself failed,
+          # 2 = planned successfully and there are pending changes.
+          if [ "$ec" -eq 1 ]; then
+            cat plan.txt
+            echo "::error::terraform plan failed — prod infra could not be verified."
+            exit 1
+          fi
+
+          if [ "$ec" -eq 0 ]; then
+            echo ":white_check_mark: **Prod infra is in sync with this commit.** Nothing to apply." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Pending changes. Print the resource ADDRESSES and actions only,
+          # never the diff itself: prod state carries SecureString values, and
+          # unlike `mode: plan` this job runs without the insolvia-production
+          # environment in front of it. Read the real plan with `mode: plan`.
+          pending="$(terraform -chdir=infra/envs/prod show -json tfplan \
+            | jq -r '(.resource_changes // [])[]
+                     | select(.change.actions != ["no-op"])
+                     | "- `\(.change.actions | join("+"))` \(.address)"')"
+
+          # A plan can also be non-empty for outputs alone, with no resource
+          # changes at all — say so rather than printing an empty list.
+          if [ -z "$pending" ]; then
+            pending='- _(no resource changes — the pending diff is in outputs only)_'
+          fi
+
+          {
+            echo '## :no_entry: Prod infra does not match this commit'
+            echo
+            echo "These have changes pending against \`infra/envs/prod\`:"
+            echo
+            echo "$pending"
+            echo
+            echo 'Apply them as their own deliberate act, then re-run the release:'
+            echo
+            echo '```bash'
+            echo './scripts/prod-deploy.sh prod-infra                     # read the plan first'
+            echo './scripts/prod-deploy.sh prod-infra --input mode=apply'
+            echo '```'
+            echo
+            echo "Or dispatch the release with \`allow_infra_drift: true\` to promote code anyway."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::error::Prod infra has pending changes — apply infra-prod.yml first, or dispatch the release with allow_infra_drift."
+          exit 1
+
   terraform:
+    if: inputs.mode != 'verify'
     runs-on: ubuntu-latest
     # Environment-scoped secrets are invisible to a job that does not declare
     # an environment — AWS_ROLE_ARN would resolve to an empty string and the

@@ -23,11 +23,17 @@ name: Infra · Terraform · Staging
 # replace a resource. `infra-prod.yml` defaults to `plan` for the same reason.
 #
 # THE ONE ASYMMETRY WITH PROD, AND ITS REASON
-# release-staging.yml calls this workflow; release-prod.yml deliberately does
-# NOT call infra-prod.yml. Staging IS `main`, so reconciling its infrastructure
-# on every merge is the definition being enforced. Production is a promotion, so
-# an automatic apply would let a code release carry unrelated infra drift into
-# prod — there it stays a separate, deliberate act.
+# Both releases run infra as their first job, because in both environments the
+# service legs read the outputs it produces. What differs is the mode:
+# release-staging.yml calls this workflow with `mode: apply`; release-prod.yml
+# calls infra-prod.yml with `mode: verify`, which only ASSERTS that prod infra
+# already matches the commit and fails the release if it does not.
+#
+# Staging IS `main`, so reconciling its infrastructure on every merge is the
+# definition being enforced. Production is a promotion, so an automatic apply
+# would let a code release carry unrelated infra drift into prod — there,
+# applying stays a separate, deliberate act. infra-prod.yml's header has the
+# long form.
 
 on:
   # Dispatched by hand for a plan; called by release-staging.yml with

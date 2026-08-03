@@ -149,6 +149,7 @@ There is **one** deploy model, in both environments:
 | Trigger | push to `main` | `workflow_dispatch` |
 | Service workflows | `*-staging.yml`, `workflow_call` + `workflow_dispatch` | `*-prod.yml`, same |
 | Who applies Terraform | `infra-staging.yml`, and nothing else | `infra-prod.yml`, and nothing else |
+| First job | `infra-staging.yml`, `mode: apply` | `infra-prod.yml`, `mode: verify` |
 | Ordering | `needs` between legs | `needs` between legs |
 
 The service workflows **never apply Terraform** — they `init` and read outputs.
@@ -157,16 +158,36 @@ exactly the same code path. Neither orchestrator declares a concurrency group;
 each called workflow holds its environment's group, and `needs` orders them. A
 group on both caller and callee would deadlock the callee behind its own parent.
 
-**The one deliberate difference** is where infra sits. `release-staging.yml`
-runs `infra-staging.yml` as its first job; `release-prod.yml` excludes infra
-entirely. That follows from what the two environments *are*: staging is `main`,
-so reconciling its infrastructure automatically is the definition being
-enforced, and the service legs read Terraform outputs so the apply must be
-ordered ahead of them. Production is a *promotion*, so an automatic apply would
-let a code release carry unrelated infra drift into prod — there, infra is
-applied deliberately with `infra-prod.yml` before the release that needs it.
+**Infra is the first job of both**, and both guarantee the same property: the
+infrastructure matches the code before any service deploys. That ordering is not
+tidiness — the service legs resolve the ECR repository, function name, alias and
+domain they act on by reading Terraform outputs, so a release that runs ahead of
+its infra deploys against stale ones, silently.
 
-Both environments can be planned before they are applied: `infra-staging.yml`
+**The one deliberate difference** is the *mode*, and it follows from what the two
+environments are:
+
+- Staging **applies**. Staging is `main`, so reconciling its infrastructure on
+  every merge is the definition being enforced.
+- Production **asserts**. A promotion must never carry unrelated infra drift into
+  prod, so `release-prod.yml` calls `infra-prod.yml` with `mode: verify` — a
+  read-only `terraform plan -detailed-exitcode` that fails the release if prod
+  infra is behind the commit, and never applies. Applying prod infra stays a
+  separate deliberate act. `allow_infra_drift: true` skips the check for an
+  emergency promotion, as `force` skips the staging-green gate.
+
+That apply-vs-assert split *is* the reconcile-vs-promote distinction. Nothing
+else separates the two release workflows.
+
+The `verify` job deliberately declares no `environment:`. It only reads state,
+and `insolvia-production` carries required reviewers — declaring it would put a
+human approval in front of a read-only check at the head of every release. It
+still authenticates: `AWS_ROLE_ARN` is a repository secret and the deploy role's
+trust policy carries no environment condition. For the same reason it prints
+resource addresses rather than the diff, since prod state holds SecureString
+values.
+
+Both environments can also be planned before they are applied: `infra-staging.yml`
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
 summary. `shared-infra-plan.yml` validates every env offline on a PR, which
 catches syntax and type errors but can never show what a change would *do*.
@@ -198,7 +219,9 @@ service in order. Three things make that dispatch safe:
 
 Prod deploys do not run `terraform apply`. Applying prod infrastructure is
 `infra-prod.yml` alone (`prod-deploy.sh prod-infra`, `mode: plan` by default),
-so a routine code deploy cannot carry unrelated infra drift into production.
+so a routine code deploy cannot carry unrelated infra drift into production. A
+release does *verify* prod infra first, read-only — see *Staging and production
+deploy the same way* above.
 
 The human gate is the `insolvia-production` GitHub Environment's **required
 reviewers** — like the required status checks below, that is a repo-settings

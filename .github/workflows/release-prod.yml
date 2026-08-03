@@ -26,11 +26,26 @@ name: Release · Production
 # `insolvia-production` environment approval. A failure stops the chain: `needs`
 # means a red mailer deploy never reaches the API.
 #
-# Prod INFRA is deliberately not part of this. `terraform apply` was removed
-# from the service deploys precisely so a code release cannot carry infra drift
-# with it — apply infra as its own deliberate act with `infra-prod.yml`
-# (`./scripts/prod-deploy.sh prod-infra`), before starting a release that needs
-# it.
+# Prod INFRA is deliberately never APPLIED by this workflow. `terraform apply`
+# was removed from the service deploys precisely so a code release cannot carry
+# infra drift with it — apply infra as its own deliberate act with
+# `infra-prod.yml` (`./scripts/prod-deploy.sh prod-infra`).
+#
+# It is VERIFIED here, though, as the first job. The service legs read Terraform
+# outputs to find the repository, function, alias and domain they act on, so a
+# release running against an unapplied infra change deploys against stale
+# outputs — silently. `infra-prod.yml` with `mode: verify` is a read-only
+# `plan -detailed-exitcode` that fails the release instead.
+#
+# That makes this the same shape as release-staging.yml: infra first, then
+# mailer → api → marketing → app. Only the mode differs — staging APPLIES
+# because staging is `main`, prod ASSERTS because prod is a promotion. That one
+# difference is the whole reconcile-vs-promote distinction, and it is the only
+# thing left separating the two release workflows. infra-prod.yml's header has
+# the long form.
+#
+# `allow_infra_drift: true` skips the check for an emergency promotion, exactly
+# as `force` skips the staging-green gate.
 #
 # Not every service has something to ship for a given commit. A service whose
 # staging workflow was skipped by its `paths:` filter has no image tagged for
@@ -49,6 +64,11 @@ on:
         required: false
         default: false
         type: boolean
+      allow_infra_drift:
+        description: "Skip the prod infra drift check (emergency only)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
@@ -56,18 +76,36 @@ permissions:
   actions: read
 
 jobs:
+  # Infra first, always — every service leg below reads its outputs. Read-only:
+  # this ASSERTS prod infra already matches the commit, it never applies.
+  infra:
+    if: ${{ !inputs.allow_infra_drift }}
+    uses: ./.github/workflows/infra-prod.yml
+    with:
+      mode: verify
+    # A called workflow receives no secrets at all without this — not even
+    # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
+    # the OIDC step would fail with an unhelpful error.
+    secrets: inherit
+
+  # Every `if:` below deliberately avoids `success()`. A job whose dependency
+  # was SKIPPED is itself skipped under the default `if: success()`, so
+  # `allow_infra_drift: true` — which skips the infra job — would otherwise
+  # silently cancel the entire release behind it. `!cancelled() && !failure()`
+  # runs after a skipped upstream but still stops dead on a failed one. Same
+  # idiom, same reason, as release-staging.yml.
   mailer:
+    needs: infra
+    if: ${{ !cancelled() && !failure() }}
     uses: ./.github/workflows/mailer-prod.yml
     with:
       sha: ${{ inputs.sha }}
       force: ${{ inputs.force }}
-    # Environment-scoped secrets (AWS_ROLE_ARN) do not cross into a called
-    # workflow without this — they would resolve to empty strings and the OIDC
-    # step would fail with an unhelpful error.
     secrets: inherit
 
   api:
-    needs: mailer
+    needs: [infra, mailer]
+    if: ${{ !cancelled() && !failure() }}
     uses: ./.github/workflows/api-prod.yml
     with:
       sha: ${{ inputs.sha }}
@@ -75,7 +113,8 @@ jobs:
     secrets: inherit
 
   marketing:
-    needs: api
+    needs: [infra, api]
+    if: ${{ !cancelled() && !failure() }}
     uses: ./.github/workflows/marketing-prod.yml
     with:
       sha: ${{ inputs.sha }}
@@ -83,7 +122,8 @@ jobs:
     secrets: inherit
 
   app:
-    needs: marketing
+    needs: [infra, marketing]
+    if: ${{ !cancelled() && !failure() }}
     uses: ./.github/workflows/app-prod.yml
     with:
       sha: ${{ inputs.sha }}
