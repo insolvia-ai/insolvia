@@ -355,6 +355,213 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-*"]
   }
 
+  # ── Case data store (milestone 5) ──────────────────────────────
+  # First customer-managed keys in the account. The case store and the case
+  # document bucket hold GLBA-scope data (SSNs, full financials), and business
+  # plan §10 commits to encryption at rest under a key we control rather than
+  # the AWS-managed default.
+  #
+  # These sit on "*" rather than an ARN fence, and that is deliberate rather
+  # than lazy. KMS keys are identified by generated UUIDs, so there is no
+  # insolvia-* name pattern to scope to, and kms:CreateKey authorizes against
+  # no resource at all. That leaves tags as the only available fence, and tags
+  # are the wrong tool here for two independent reasons:
+  #
+  #   - KMS tag changes take EFFECT ON AUTHORIZATION LAZILY (AWS documents up
+  #     to five minutes, and advises against tag-based access control for
+  #     critical resources). Terraform calls EnableKeyRotation and PutKeyPolicy
+  #     milliseconds after CreateKey, so a tag fence produces an intermittent
+  #     AccessDenied on first apply — and every one of those costs a human
+  #     ci-trust apply to diagnose.
+  #   - A key whose Project tag is ever missing becomes permanently
+  #     unmanageable: the create succeeds, the key lands in state, and every
+  #     later call including the refresh read is denied. Recovering needs a
+  #     human apply AND state surgery.
+  #
+  # The real control is DenyCaseDataDecryption below, which is an explicit
+  # deny and therefore beats every allow here. Scope comes from that, not from
+  # the resource list.
+  statement {
+    sid = "EncryptionKeyCreate"
+    actions = [
+      "kms:CreateKey",
+      "kms:TagResource",
+    ]
+    resources = ["*"]
+  }
+
+  # Control-plane only — no Decrypt, GenerateDataKey or ReEncrypt, matching
+  # the waitlist table's split above: per docs/adr/0001 the API's execution
+  # role is the only application principal that touches case data.
+  #
+  # Note carefully what this does and does not buy. kms:PutKeyPolicy is here
+  # because Terraform owns the key policy, and a KMS key policy authorizes a
+  # principal ON ITS OWN — unlike S3, no identity-policy allow is also
+  # required. DenyCaseDataDecryption below stops the pipeline using that to
+  # read case data ITSELF, since an explicit deny beats a key-policy allow.
+  #
+  # It does not make the key policy harmless, and pretending otherwise would
+  # be worse than saying so:
+  #
+  #   - A deny only constrains the principal it names. This role could write a
+  #     key policy granting kms:Decrypt to a principal in ANOTHER account,
+  #     which is evaluated against that principal's policies, not this one's.
+  #   - ServiceRoleManagement already grants iam:PutRolePolicy and iam:PassRole
+  #     over role/insolvia-*, so a new role with case-data access and a Lambda
+  #     to run it is reachable too.
+  #
+  # Both are inherent to a deploy role that provisions the store, and neither
+  # is fixable in an identity policy. The controls that actually cover them are
+  # the trail (every PutKeyPolicy is recorded) and PR review of the Terraform
+  # diff that would have to carry the change.
+  #
+  # Availability reach is also real and accepted: with no resource fence,
+  # ScheduleKeyDeletion and DisableKey apply to any customer-managed key in
+  # the account, including one a human admin creates to hold something back
+  # from CI.
+  statement {
+    sid = "EncryptionKeyManagement"
+    actions = [
+      "kms:DescribeKey",
+      "kms:GetKeyPolicy",
+      "kms:PutKeyPolicy",
+      "kms:GetKeyRotationStatus",
+      "kms:EnableKeyRotation",
+      "kms:DisableKeyRotation",
+      "kms:ListResourceTags",
+      "kms:UntagResource",
+      "kms:EnableKey",
+      "kms:DisableKey",
+      "kms:UpdateKeyDescription",
+      "kms:ScheduleKeyDeletion",
+      "kms:CancelKeyDeletion",
+    ]
+    resources = ["*"]
+  }
+
+  # DynamoDB creates a grant on the caller's behalf when a table is configured
+  # with a customer-managed key, so CreateTable fails without this. Fenced by
+  # kms:GrantIsForAWSResource, which is what keeps it from being a general
+  # escalation verb: the grantee can only ever be an AWS service, never a
+  # principal of our choosing.
+  #
+  # S3 is NOT in the same boat — SSE-KMS uses no grants, and S3 calls
+  # GenerateDataKey/Decrypt as the requester. One consequence worth knowing
+  # before 8.6 designs upload: the pipeline cannot read or write objects in an
+  # SSE-KMS case bucket at all, because DenyCaseDataDecryption fires with
+  # kms:ViaService = s3. That is the desired posture — case documents move
+  # through the API, never through CI — but it does mean an aws_s3_object
+  # targeting insolvia-case-* would fail, by design rather than by accident.
+  statement {
+    sid = "EncryptionKeyGrants"
+    actions = [
+      "kms:CreateGrant",
+      "kms:ListGrants",
+      "kms:RevokeGrant",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "Bool"
+      variable = "kms:GrantIsForAWSResource"
+      values   = ["true"]
+    }
+  }
+
+  # Aliases are a separate resource from the key they point at, and unlike
+  # keys they DO have names — so they get a real ARN fence. The pattern is
+  # `insolvia*`, not `insolvia-*`, so that the equally idiomatic
+  # `alias/insolvia/case-staging` form is not silently denied.
+  #
+  # `key/*` is the second half of the same call: CreateAlias authorizes
+  # against BOTH the alias and its target key, and keys have no name to fence.
+  # The widening is small — this grants naming rights over a key, not any
+  # access to it, and the name itself still has to match insolvia*.
+  statement {
+    sid = "EncryptionKeyAliases"
+    actions = [
+      "kms:CreateAlias",
+      "kms:DeleteAlias",
+      "kms:UpdateAlias",
+    ]
+    resources = [
+      "arn:aws:kms:*:${data.aws_caller_identity.current.account_id}:alias/insolvia*",
+      "arn:aws:kms:*:${data.aws_caller_identity.current.account_id}:key/*",
+    ]
+  }
+
+  # Issue 8.2 names "audit logging of data access" in scope, so a trail is a
+  # stated requirement rather than speculation. Worth knowing what it can and
+  # cannot prove before 8.2 designs against it: because ADR 0001 makes the
+  # API's execution role the ONLY application principal, CloudTrail data
+  # events on the case store would show `insolvia-api-<env>-role` for every
+  # read and never the end user behind it. It is therefore evidence about
+  # administrative and control-plane access — the "no human read paths in
+  # prod" claim — while "which signed-in user read this SSN" has to be an
+  # application-level log the API writes itself, which needs no grant here.
+  statement {
+    sid = "AuditTrails"
+    actions = [
+      "cloudtrail:CreateTrail",
+      "cloudtrail:DeleteTrail",
+      "cloudtrail:UpdateTrail",
+      "cloudtrail:StartLogging",
+      "cloudtrail:StopLogging",
+      "cloudtrail:GetTrail",
+      "cloudtrail:GetTrailStatus",
+      "cloudtrail:GetEventSelectors",
+      "cloudtrail:PutEventSelectors",
+      # The provider's trail read calls GetInsightSelectors unconditionally and
+      # only tolerates InsightNotEnabled / UnsupportedOperation — an
+      # AccessDenied here fails the refresh even with insights switched off.
+      "cloudtrail:GetInsightSelectors",
+      "cloudtrail:PutInsightSelectors",
+      "cloudtrail:AddTags",
+      "cloudtrail:RemoveTags",
+      "cloudtrail:ListTags",
+    ]
+    resources = ["arn:aws:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/insolvia-*"]
+  }
+
+  # cloudtrail:DescribeTrails and ListTrails do not support resource-level
+  # permissions — same class as the EnumerationApis statement below, and
+  # Terraform calls them on every refresh of a trail resource.
+  statement {
+    sid = "AuditTrailEnumeration"
+    actions = [
+      "cloudtrail:DescribeTrails",
+      "cloudtrail:ListTrails",
+    ]
+    resources = ["*"]
+  }
+
+  # Case documents — credit reports, pay stubs, bank statements. A separate
+  # bucket family from insolvia-web-* / insolvia-mailer-*, and the prefix is
+  # left broad (insolvia-case-*) so that issues 8.2 and 8.6 can settle exact
+  # bucket names without another human-applied round trip through this file.
+  statement {
+    sid     = "CaseDocumentBuckets"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-case-*",
+      "arn:aws:s3:::insolvia-case-*/*",
+    ]
+  }
+
+  # The trail's own destination bucket, in its own family so the grant that
+  # manages case documents is not the same grant that manages the log of
+  # access to them. Object deletion is denied separately below — a bucket
+  # family alone is a naming convention, not a control, since one role holds
+  # both.
+  statement {
+    sid     = "AuditLogBuckets"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-audit-*",
+      "arn:aws:s3:::insolvia-audit-*/*",
+    ]
+  }
+
   # API Gateway v2 IAM is path-based on generated API ids — there is no
   # insolvia-* name scoping like lambda/sqs/sns above. Constrained instead to
   # the resource paths Terraform manages (APIs, custom domains, tags); this
@@ -512,6 +719,8 @@ data "aws_iam_policy_document" "github_permissions" {
       "sns:ListTopics",
       "lambda:ListFunctions",
       "lambda:GetAccountSettings",
+      "kms:ListKeys",
+      "kms:ListAliases",
     ]
     resources = ["*"]
   }
@@ -579,6 +788,72 @@ data "aws_iam_policy_document" "github_permissions" {
       "iam:RemoveClientIDFromOpenIDConnectProvider",
     ]
     resources = [aws_iam_openid_connect_provider.github.arn]
+  }
+
+  # The control that makes EncryptionKeyManagement's "*" safe, and the reason
+  # the key statements above do not bother with a tag fence.
+  #
+  # The pipeline owns the case key's POLICY, and a KMS key policy authorizes a
+  # principal on its own — so kms:PutKeyPolicy is, by itself, a path to
+  # reading every SSN in the store. An identity-policy deny is the only thing
+  # that overrides a key-policy allow, which is what this is.
+  #
+  # The ViaService carve-out keeps ParameterEncryption working: SSM
+  # SecureStrings legitimately need Decrypt/Encrypt/GenerateDataKey, but only
+  # ever with SSM as the calling service. A direct Decrypt carries no
+  # kms:ViaService key at all, so StringNotEquals matches and the deny bites.
+  # Case data is unaffected in normal operation: DynamoDB and S3 decrypt under
+  # a grant as their own service principal, never as this role.
+  statement {
+    sid    = "DenyCaseDataDecryption"
+    effect = "Deny"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:GenerateDataKeyPair",
+      "kms:GenerateDataKeyPairWithoutPlaintext",
+      "kms:ReEncryptFrom",
+      "kms:ReEncryptTo",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "kms:ViaService"
+      values = [
+        "ssm.${var.aws_region}.amazonaws.com",
+        # CloudTrail asks the caller for GenerateDataKey when a trail's logs
+        # are encrypted under a customer-managed key. Listed pre-emptively so
+        # that choosing an encrypted trail in 8.2 is not a third human apply.
+        # kms:ViaService is set by AWS when a service calls on the caller's
+        # behalf and cannot be supplied by the caller, so this widens nothing
+        # a direct Decrypt could exploit.
+        "cloudtrail.${var.aws_region}.amazonaws.com",
+      ]
+    }
+  }
+
+  # An audit log the pipeline can erase is not an audit log. Terraform may
+  # create, configure and tag the trail's bucket, but never remove what has
+  # been written to it — including versioned overwrites, which are the obvious
+  # way around a plain DeleteObject deny.
+  #
+  # This is a floor, not tamper-proofing, and the gaps are worth naming so the
+  # next reader does not over-trust it. AuditLogBuckets still carries s3:*, so
+  # the same role can expire the logs with a one-day lifecycle rule, suspend
+  # versioning, or delete the bucket outright — none of which route through
+  # DeleteObject. Denying those too would take away the retention
+  # configuration the trail legitimately needs. Real immutability is S3 Object
+  # Lock, and that is a decision for 8.2 rather than something to fake here.
+  statement {
+    sid    = "DenyAuditLogErasure"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+    ]
+    resources = ["arn:aws:s3:::insolvia-audit-*/*"]
   }
 
   # Attaching AWS-managed policies is constrained to the single policy the
