@@ -17,6 +17,7 @@ that is rewritten as work lands.
 | Doc | What |
 |---|---|
 | [`architecture.md`](reference/architecture.md) | Monorepo shape, toolchain (incl. the Expo free-tier constraint), environment model, hosting topology, CI/CD, PR-gate design + the required-check contract. |
+| [`case-data-model.md`](reference/case-data-model.md) | The case schema: entities mapped to B101/B106/B107, per-field provenance and the confirm-before-entry invariant, derived values, the MyCase sync seam. |
 | [`terraform.md`](reference/terraform.md) | Infra state model, modules, naming, deploy order, the ci-trust self-deny. |
 | [`package-publishing.md`](reference/package-publishing.md) | How the design system publishes (source, no build) and how its two consumers install it — the app from the workspace, marketing by published version. |
 | [`email.md`](reference/email.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
