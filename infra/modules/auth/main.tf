@@ -187,8 +187,9 @@ resource "aws_route53_record" "auth" {
 
 # ── Managed login branding ──────────────────────────────────────
 # The style the sign-in pages render with. Cognito serves the pages; nothing
-# here is hosted by us. Requires provider >= 6.12.0, which is why
-# infra/CLAUDE.md pins `~> 6.12` rather than `~> 6.0`.
+# here is hosted by us. Requires provider >= 6.12.0 — one of the two reasons
+# infra/CLAUDE.md pins a floor rather than `~> 6.0`; modules/case_store sets
+# the other, and its 6.37.0 is the one the roots actually carry.
 #
 # `managed-login-settings.json` IS GENERATED — do not hand-edit it. JSON has no
 # comment syntax and AWS rejects unknown keys, so the file cannot carry its own

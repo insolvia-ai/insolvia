@@ -135,9 +135,10 @@ against prod. Each owns, per env:
   sign-up, and it is available from the ESSENTIALS tier this pool is already on.
   **The branding style is still not in Terraform**, but the provider is no
   longer why: `aws_cognito_managed_login_branding` shipped in v6.12.0 and the
-  repo now pins `~> 6.12`. What remains is that the authoritative copy of the
-  style lives in the console and has to be exported before it can be codified —
-  the module header records how.
+  repo's floor is now well past it (`~> 6.37`; `infra/CLAUDE.md` owns why).
+  What remains is that the authoritative copy of the style lives in the console
+  and has to be exported before it can be codified — the module header records
+  how.
 - **Custom auth domain — supported by the module, not yet enabled, and blocked
   on the marketing launch.** `modules/auth` takes `custom_domain` +
   `certificate_arn` + `hosted_zone_id` and builds the domain alongside the

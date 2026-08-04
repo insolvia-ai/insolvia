@@ -6,11 +6,17 @@ bootstrap: [`docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md)
 the `insolvia-aws-auth` skill first if credentials aren't working.
 
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no
-  DynamoDB lock table), AWS provider `~> 6.12` — **6.12 is a deliberate floor,
-  not a stale `~> 6.0`**: `aws_cognito_managed_login_branding` first shipped in
-  6.12.0, and `~> 6.0` would let a root resolve 6.11 and fail `validate`. All
-  five roots carry the same pin. **Region `us-east-1` everywhere**
-  (CloudFront ACM requirement).
+  DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
+  not a stale `~> 6.0`**. Two things set it, and the floor is the later:
+  `aws_cognito_managed_login_branding` first shipped in 6.12.0, and
+  `modules/case_store`'s `global_secondary_index.key_schema` first shipped in
+  6.29.0 — but *working* `key_schema` is 6.37.0, because 6.32.1 fixed a
+  perpetual diff on an index that has a range key (ours does) and 6.37.0 fixed
+  a removal that deletes **every** index on the table. **Since
+  `.terraform.lock.hcl` is gitignored, this constraint is the only floor there
+  is** — bump it whenever a root starts depending on a newer resource or a
+  data-loss fix. All five roots carry the same pin. **Region `us-east-1`
+  everywhere** (CloudFront ACM requirement).
 - **Naming `insolvia-<thing>-<env>`;** tags `{ Project = "insolvia",
   Environment, ManagedBy = "terraform" }`. Sensitive vars `sensitive = true`,
   never committed — commit `terraform.tfvars.example`, never real `*.tfvars`.
