@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from insolvia_api.core.access_log import AccessEvent
+from insolvia_api.core.cases import Case, CasePage
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
 
@@ -32,6 +34,46 @@ class WaitlistStore(Protocol):
     and adapters/memory (tests and the plain development server)."""
 
     def add(self, record: WaitlistRecord) -> None: ...
+
+
+class CaseStore(Protocol):
+    """Persists case records (issue 8.3). Implemented by adapters/aws
+    (DynamoDB) and adapters/memory (tests and the plain development server).
+
+    Every method takes the owner explicitly and every implementation MUST
+    enforce it rather than trusting the route to have checked. The route does
+    check, and this is still not belt-and-braces: ownership is the only thing
+    standing between one firm's cases and another's, and a scoping rule that
+    lives in exactly one place is one refactor away from not existing.
+
+    `get` and `update` return None for "no such case" AND for "not yours" —
+    the distinction must not reach the caller, because a route that can tell
+    them apart is an oracle for other firms' case ids.
+    """
+
+    def create(self, case: Case) -> None: ...
+
+    def get(self, case_id: str, *, owner_principal: str) -> Case | None: ...
+
+    def list_for_owner(
+        self, owner_principal: str, *, limit: int, cursor: str | None
+    ) -> CasePage: ...
+
+    def update(self, case: Case) -> Case | None:
+        """Write `case` back, but only if it is still owned by
+        `case.owner_principal`. Returns None if that no longer holds."""
+        ...
+
+
+class AccessLog(Protocol):
+    """Append-only record of who read or changed which case.
+
+    Write-only by design, on both sides of the boundary: this port has no read
+    method, and the API role's IAM grant is PutItem alone. See
+    core/access_log.py for why.
+    """
+
+    def record(self, event: AccessEvent) -> None: ...
 
 
 class Mailer(Protocol):

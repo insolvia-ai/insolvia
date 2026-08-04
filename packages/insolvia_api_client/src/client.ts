@@ -1,8 +1,20 @@
 import { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
-import { waitlistSubmissionToJson } from './models.ts';
+import {
+  createCaseRequestToJson,
+  listCasesQuery,
+  updateCaseChangesToJson,
+  waitlistSubmissionToJson,
+} from './models.ts';
 import type {
+  Case,
+  CaseChapter,
+  CaseStatus,
+  CreateCaseRequest,
   HealthStatus,
+  ListCasesOptions,
+  ListCasesResult,
   Principal,
+  UpdateCaseChanges,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
@@ -176,6 +188,88 @@ export class InsolviaApiClient {
       scopes: requireStringArray(decoded, 'scopes'),
       expiresAt: requireNullableNumber(decoded, 'expiresAt'),
     };
+  }
+
+  /**
+   * `POST /v1/cases` — start a new case.
+   *
+   * Protected: same bearer-token mechanism as {@link me}. Returns the created
+   * {@link Case} on 201. Throws {@link ApiValidationException} on a 400 with
+   * per-field messages (e.g. an out-of-range chapter).
+   */
+  async createCase(request: CreateCaseRequest): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/cases`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(createCaseRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return caseFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases` — the signed-in caller's cases, paginated.
+   *
+   * `limit` and `cursor` are both optional and, per this package's rule,
+   * omitted from the query string entirely when absent — see
+   * {@link listCasesQuery}. `nextCursor` on the result is absent, not `null`,
+   * on the last page.
+   */
+  async listCases(options: ListCasesOptions = {}): Promise<ListCasesResult> {
+    const headers = await this.#protectedHeaders();
+    const query = listCasesQuery(options).toString();
+    const url = `${this.#baseUrl}/v1/cases${query === '' ? '' : `?${query}`}`;
+    const response = await this.#fetch(url, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    const cases = requireCaseArray(decoded, 'cases');
+    const nextCursor = optionalString(decoded, 'nextCursor');
+    // Built conditionally, not `{ cases, nextCursor }`: a present key with
+    // value `undefined` still shows up in `'nextCursor' in result`, and the
+    // contract requires the key to be genuinely absent on the last page.
+    return nextCursor === undefined ? { cases } : { cases, nextCursor };
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}` — a single case by id.
+   *
+   * Throws a plain {@link ApiException} (statusCode `404`) when `caseId` is
+   * unknown **or** belongs to a different caller — the API deliberately
+   * answers both the same way, so a 404 here must never be rendered as "this
+   * case does not exist" in the UI.
+   */
+  async getCase(caseId: string): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return caseFromJson(decoded);
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}` — change a subset of a case's fields.
+   *
+   * `changes` may hold any subset of `{chapter, district, status}`; omitted
+   * keys mean "leave unchanged" and are never sent — see
+   * {@link updateCaseChangesToJson}. Returns the updated {@link Case} on 200.
+   *
+   * Like {@link getCase}, a 404 means unknown *or* not-owned; see that method's
+   * note.
+   */
+  async updateCase(caseId: string, changes: UpdateCaseChanges): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateCaseChangesToJson(changes)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return caseFromJson(decoded);
   }
 }
 
@@ -375,5 +469,80 @@ function malformedField(response: DecodedResponse, key: string, expected: string
     statusCode: response.statusCode,
     body: response.body,
     message: `response body was missing the ${expected} field "${key}"`,
+  });
+}
+
+/**
+ * Like {@link requireString}, but the field is allowed to be **absent**
+ * entirely, in which case the result is `undefined` — never `null`. Used for
+ * {@link ListCasesResult.nextCursor}, which the API omits rather than nulling
+ * on the last page.
+ */
+function optionalString(response: DecodedResponse, key: string): string | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    throw malformedField(response, key, 'string');
+  }
+  return value;
+}
+
+/** A required field that must be one of the four valid case chapters. */
+function requireCaseChapter(response: DecodedResponse, key: string): CaseChapter {
+  const value = response.json[key];
+  if (value === 7 || value === 11 || value === 12 || value === 13) {
+    return value;
+  }
+  throw malformedField(response, key, 'one of 7 | 11 | 12 | 13');
+}
+
+/** A required field that must be one of the three valid case statuses. */
+function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
+  const value = response.json[key];
+  if (value === 'intake' || value === 'ready_to_file' || value === 'filed') {
+    return value;
+  }
+  throw malformedField(response, key, 'one of "intake" | "ready_to_file" | "filed"');
+}
+
+/**
+ * Decodes a {@link Case} from a response body: `{"id", "chapter", "district",
+ * "status", "createdAt", "updatedAt"}`. Shared by every `/v1/cases` endpoint
+ * that returns a single case, and by {@link requireCaseArray} for the list
+ * endpoint's page of cases.
+ */
+function caseFromJson(response: DecodedResponse): Case {
+  return {
+    id: requireString(response, 'id'),
+    chapter: requireCaseChapter(response, 'chapter'),
+    district: requireString(response, 'district'),
+    status: requireCaseStatus(response, 'status'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
+/**
+ * An array field whose every element must decode as a {@link Case} — checked
+ * per-element, not cast. Each element borrows the parent response's
+ * `statusCode`/`body` so a malformed-element exception still carries the raw
+ * page body for diagnostics.
+ */
+function requireCaseArray(response: DecodedResponse, key: string): readonly Case[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'Case[]');
+  }
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, `${key}[${index}]`, 'object');
+    }
+    return caseFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+    });
   });
 }

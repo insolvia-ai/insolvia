@@ -5,7 +5,7 @@
 // error bodies — are the authoritative record of what `services/api`
 // actually speaks. If the API's contract changes, these tests must fail;
 // keep every literal in sync with:
-//   services/api/src/insolvia_api/api/routes/{health,waitlist,me}.py
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases}.py (cases.py expected — not yet added as of this change)
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (UNAUTHORIZED_BODY, the 401)
 //   services/api/src/insolvia_api/core/{waitlist,auth}.py
@@ -637,6 +637,416 @@ describe('me', () => {
     expect(error).toBe(storageFailure);
     expect(error).not.toBeInstanceOf(ApiException);
     expect(stub.callCount()).toBe(0);
+  });
+});
+
+describe('createCase', () => {
+  // Pinned against the shape this package's contract requires of
+  // `POST /v1/cases`: request `{"chapter", "district"}`, 201 response is a
+  // full Case.
+  const CASE = {
+    id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    chapter: 7,
+    district: 'D. Del.',
+    status: 'intake',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
+  };
+
+  test('POSTs /v1/cases with a bearer token and the request body, and maps the 201 Case', async () => {
+    const stub = stubFetch(() => jsonResponse(CASE, 201));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.createCase({ chapter: 7, district: 'D. Del.' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/cases');
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({ chapter: 7, district: 'D. Del.' });
+
+    expect(created).toEqual({
+      id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+      chapter: 7,
+      district: 'D. Del.',
+      status: 'intake',
+      createdAt: '2026-07-23T09:15:00.123Z',
+      updatedAt: '2026-07-23T09:15:00.123Z',
+    });
+  });
+
+  test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { chapter: 'must be one of 7, 11, 12, 13' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(error.fields).toEqual({ chapter: 'must be one of 7, 11, 12, 13' });
+  });
+
+  test('maps a 400 {"error","message"} body (no "fields") to a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', message: 'request body must be a JSON object' },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('a server 401 maps to ApiUnauthorizedException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'Unauthorized', message: 'authentication required' }, 401),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+    );
+
+    expect(error.statusCode).toBe(401);
+    expect(error.source).toBe('server');
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(CASE, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('listCases', () => {
+  const CASE_A = {
+    id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    chapter: 7,
+    district: 'D. Del.',
+    status: 'intake',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
+  };
+  const CASE_B = {
+    id: 'b4a2f0e1-5c3d-4e2f-8b6a-7d9f1e2a3b4c',
+    chapter: 13,
+    district: 'N.D. Ga.',
+    status: 'ready_to_file',
+    createdAt: '2026-07-24T09:15:00.123Z',
+    updatedAt: '2026-07-25T09:15:00.123Z',
+  };
+
+  test('GETs /v1/cases with no query string when limit/cursor are both omitted', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [CASE_A, CASE_B] }, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const result = await client.listCases();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/cases');
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+
+    expect(result.cases).toEqual([CASE_A, CASE_B]);
+    // Absent, not null, when there is no next page.
+    expect('nextCursor' in result).toBe(false);
+  });
+
+  test('sends limit and cursor as query params when both are supplied', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.listCases({ limit: 25, cursor: 'opaque-cursor-value' });
+
+    const url = new URL(stub.lastRequest().url);
+    expect(url.pathname).toBe('/v1/cases');
+    expect(url.searchParams.get('limit')).toBe('25');
+    expect(url.searchParams.get('cursor')).toBe('opaque-cursor-value');
+  });
+
+  test('omits only the missing param when just one of limit/cursor is supplied', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.listCases({ limit: 10 });
+
+    const url = new URL(stub.lastRequest().url);
+    expect(url.searchParams.get('limit')).toBe('10');
+    expect(url.searchParams.has('cursor')).toBe(false);
+  });
+
+  test('maps a present nextCursor through', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [CASE_A], nextCursor: 'next-page' }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const result = await client.listCases();
+
+    expect(result.nextCursor).toBe('next-page');
+  });
+
+  test('an empty page is preserved as an empty array', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect((await client.listCases()).cases).toEqual([]);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(await rejection(client.listCases()));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+
+  test('a server 401 maps to ApiUnauthorizedException', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'Unauthorized' }, 401));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(await rejection(client.listCases()));
+
+    expect(error.statusCode).toBe(401);
+    expect(error.source).toBe('server');
+  });
+});
+
+describe('getCase', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const CASE = {
+    id: CASE_ID,
+    chapter: 11,
+    district: 'S.D.N.Y.',
+    status: 'filed',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-26T09:15:00.123Z',
+  };
+
+  test('GETs /v1/cases/{caseId} with a bearer token and maps the 200 Case', async () => {
+    const stub = stubFetch(() => jsonResponse(CASE, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const found = await client.getCase(CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${CASE_ID}`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(found).toEqual(CASE);
+  });
+
+  test('URL-encodes the caseId into the path', async () => {
+    const stub = stubFetch(() => jsonResponse(CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.getCase('id with spaces/slash');
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe('/v1/cases/id%20with%20spaces%2Fslash');
+  });
+
+  test('maps a 404 {"error","message"} body to a plain ApiException, not a special "missing" type', async () => {
+    // The API returns this same shape whether the case does not exist or
+    // exists but belongs to someone else — see getCase's doc comment. This
+    // test only pins that a 404 stays a plain ApiException, not that it means
+    // "does not exist".
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.getCase(CASE_ID)));
+
+    expect(error.statusCode).toBe(404);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect(error.message).toContain('NotFoundError');
+    expect(error.message).toContain('case not found');
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(await rejection(client.getCase(CASE_ID)));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('updateCase', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const UPDATED_CASE = {
+    id: CASE_ID,
+    chapter: 13,
+    district: 'D. Del.',
+    status: 'ready_to_file',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-27T10:00:00.000Z',
+  };
+
+  test('PATCHes /v1/cases/{caseId} sending only the supplied fields, and maps the 200 Case', async () => {
+    const stub = stubFetch(() => jsonResponse(UPDATED_CASE, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateCase(CASE_ID, { status: 'ready_to_file' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PATCH');
+    expect(seen.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${CASE_ID}`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    const body = JSON.parse(seen.body) as Record<string, unknown>;
+    expect(body).toEqual({ status: 'ready_to_file' });
+    expect('chapter' in body).toBe(false);
+    expect('district' in body).toBe(false);
+
+    expect(updated).toEqual(UPDATED_CASE);
+  });
+
+  test('sends multiple supplied fields together, under their exact wire names', async () => {
+    const stub = stubFetch(() => jsonResponse(UPDATED_CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateCase(CASE_ID, { chapter: 13, district: 'D. Del.' });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({ chapter: 13, district: 'D. Del.' });
+    expect('status' in body).toBe(false);
+  });
+
+  test('an explicit undefined field is omitted, not sent as null', async () => {
+    const stub = stubFetch(() => jsonResponse(UPDATED_CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateCase(CASE_ID, {
+      status: 'ready_to_file',
+      chapter: undefined,
+      district: undefined,
+    });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({ status: 'ready_to_file' });
+  });
+
+  test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: { status: 'must be one of intake, ready_to_file, filed' },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.updateCase(CASE_ID, { status: 'filed' })),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(error.fields).toEqual({ status: 'must be one of intake, ready_to_file, filed' });
+  });
+
+  test('maps a 404 {"error","message"} body to a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.updateCase(CASE_ID, { status: 'filed' })));
+
+    expect(error.statusCode).toBe(404);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(UPDATED_CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.updateCase(CASE_ID, { status: 'filed' })),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
   });
 });
 
