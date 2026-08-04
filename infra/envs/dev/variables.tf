@@ -36,3 +36,22 @@ variable "machine_name" {
   description = "Human-readable machine hostname, stored only as a resource tag."
   type        = string
 }
+
+variable "enable_audit_trail" {
+  description = <<-EOT
+    Stand up this machine's own case-data audit trail (modules/audit_trail).
+
+    OFF by default, and that is a cost decision rather than a scope one: a
+    per-developer CloudTrail trail bills per data event to record a developer
+    reading their own synthetic cases, which is evidence nobody will ever
+    read. The module is still exercised locally on demand —
+
+      terraform -chdir=infra/envs/dev apply -var=enable_audit_trail=true ...
+
+    — so a change to modules/audit_trail can be validated on a laptop before
+    it reaches staging, which is the part that matters. Turn it back off and
+    re-apply to remove it.
+  EOT
+  type        = bool
+  default     = false
+}

@@ -13,6 +13,11 @@ infra/
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
 │   │                         #   + one web (SPA) PKCE app client
+│   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
+│   │                         #   single-table DynamoDB + the API role's grant
+│   ├── audit_trail/          # CloudTrail data events on the case store, into
+│   │                         #   insolvia-audit-<env> under its own key
+│   ├── mailer/               # transactional email: Lambda + S3 + DynamoDB + SES
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex)
 └── envs/
@@ -28,7 +33,8 @@ infra/
     │                         # auth        -> insolvia-users-prod
     │                         # marketing_site -> www.insolvia.ai (+ apex 301)
     └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
-                              # table + auth pool, env suffix dev-<short-id>
+                              # table + case store + auth pool, env suffix
+                              # dev-<short-id>; audit trail opt-in
 ```
 
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
@@ -37,7 +43,7 @@ infra/
 | shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-api`, `insolvia-marketing`, `insolvia-mailer` — one per service, shared by every env) |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
-| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-waitlist-dev-<short-id>` table and `insolvia-users-dev-<short-id>` pool |
+| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-waitlist-dev-<short-id>` and `insolvia-cases-dev-<short-id>` tables and `insolvia-users-dev-<short-id>` pool; the audit trail only with `-var=enable_audit_trail=true` |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -249,13 +255,7 @@ twice over instead: the table depends on the key, so a `terraform destroy`
 reaches the table first and aborts on its deletion protection, and even a
 scheduled key deletion is cancellable for 30 days.
 
-**Audit logging** is not in this module yet — a CloudTrail trail with data
-events on the table is the follow-up to issue 8.2, and `infra/envs/ci-trust`
-already carries the permissions for it. One limit worth knowing before relying
-on it: because ADR 0001 makes the API role the only application principal,
-trail data events show `insolvia-api-<env>-role` for every read and never the
-end user. "Which signed-in user read this SSN" is necessarily an
-application-level log the API writes itself.
+**Audit logging** lives next door, in `infra/modules/audit_trail/` — see below.
 
 **Wiring.** The module takes `api_role_name` — a name, not an ARN — looks the
 role up with a data source, and attaches the table grant from its own side.
@@ -265,6 +265,53 @@ name reaches the API through an **env-level** `aws_ssm_parameter` rather than
 through `api_service`'s own parameter map, landing as `CASE_TABLE_NAME` via the
 deploy workflow's existing `get-parameters-by-path` step. The key ARN is not
 published: DynamoDB decrypts under its own grant, so the API never names it.
+
+## Case-data audit trail (`infra/modules/audit_trail/`)
+
+CloudTrail data events for the stores holding GLBA-scope data, into an
+`insolvia-audit-<env>` bucket under its own key. One instance per deployed
+environment; on a developer machine it is opt-in (below).
+
+**What it can and cannot prove.** Because
+[ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md) makes the API
+Lambda's role the only application principal, every data event names
+`insolvia-api-<env>-role` and never the signed-in user behind it. That makes
+this evidence about **administrative** access — the "no human read paths in
+prod" claim — and about the shape and volume of application access. *Which
+user read this SSN* is a different question that only an application-level log
+the API writes can answer. Do not let this trail stand in for that one.
+
+**Its key is not the case key**, and that is forced rather than chosen:
+`ci-trust`'s `DenyCaseDataDecryption` denies the deploy role
+`kms:GenerateDataKey` on anything aliased `alias/insolvia-cases-*`, so a trail
+pointed at the case key fails at `CreateTrail`. The separation is worth having
+anyway — the deploy role holds no `kms:Decrypt` for audit keys in any
+statement, so the pipeline can create this trail and write to it and can never
+read back what it recorded.
+
+**Tamper resistance is a floor, not a guarantee.** `DenyAuditLogErasure` denies
+the deploy role `DeleteObject` and `DeleteObjectVersion`, and bucket versioning
+is what makes the second half meaningful — without it an overwrite is a silent
+deletion that calls no Delete API. The role still holds `s3:*` otherwise, so a
+lifecycle rule or a bucket deletion remains open to it. Real immutability is S3
+Object Lock, which is deliberately not here yet.
+
+**Scope and cost.** Data events bill per event, so the selector names the case
+table specifically rather than "all DynamoDB tables"; the case document bucket
+joins `data_resource_arns` when 8.6 lands. Management events are excluded —
+they would double the volume to say what the Terraform diff already says.
+Retention is 90 days on staging and a year on prod.
+
+**Locally** it is off by default: a per-developer trail bills to record a
+developer reading their own synthetic cases. It can still be stood up on a
+laptop, which is the part that matters —
+
+```
+terraform -chdir=infra/envs/dev apply -var=enable_audit_trail=true ...
+```
+
+— so a change to this module is exercised before staging meets it, rather
+than after. Turn it back off and re-apply to remove it.
 
 ## Per-machine development environment (`infra/envs/dev/`)
 
