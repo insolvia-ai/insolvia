@@ -1,12 +1,32 @@
 # insolvia_design_system
 
 Insolvia's owned, cross-platform design system, published as
-`@insolvia-ai/design-system` (0.2.x). One set of component names serves both
+`@insolvia-ai/design-system` (0.3.x). One set of component names serves both
 front-end stacks: the marketing site (React DOM + Tailwind) and the app
 (React Native / Expo). Agent rules: [`CLAUDE.md`](CLAUDE.md).
 
 It succeeded `packages/insolvia_design_system_react` (0.1.x, web-only, Base
 UI), deleted when marketing cut over to 0.2.x.
+
+## Components
+
+The original surfaces: `Accordion` · `Button` · `Card` · `Field` · `Footer` ·
+`NavBar`. The 0.3.0 wave added owned equivalents of the portable Base UI
+primitives (equivalent behavior, zero Base UI dependency): `AlertDialog` ·
+`Avatar` · `Checkbox` · `CheckboxGroup` · `Collapsible` · `Dialog` · `Meter` ·
+`Progress` · `RadioGroup` · `Separator` · `Switch` · `Tabs` · `Toggle` ·
+`ToggleGroup`. Compound components export their parts under one name
+(`Dialog.Root`, `Dialog.Trigger`, …); input-taking components support both
+uncontrolled (`default*`) and controlled (`*` + change callback) modes via
+`src/lib/controllable.ts`.
+
+Deliberately not ported, and why: hover-only surfaces (Tooltip, Preview Card —
+inaccessible on touch, per Base UI's own docs) and desktop-menu surfaces
+(Menubar, Navigation Menu); anchored-popup components (Popover, Menu, Select,
+Combobox, Autocomplete, Number Field, Scroll Area, Context Menu) need a
+positioning primitive and mobile idioms (sheets, native pickers) that deserve
+their own design pass; Toast needs an app-level provider architecture; Form /
+Fieldset / Input overlap with `Field`, which already owns form-control wiring.
 
 ## The pattern: one props module, two leaves
 

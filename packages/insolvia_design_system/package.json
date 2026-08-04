@@ -1,6 +1,6 @@
 {
   "name": "@insolvia-ai/design-system",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Insolvia's owned, platform-split design system: one props module per component, a React DOM + Tailwind web leaf, and a React Native leaf over @insolvia-ai/tokens.",
   "type": "module",
   "license": "UNLICENSED",
