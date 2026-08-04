@@ -147,11 +147,22 @@ resource "aws_dynamodb_table" "cases" {
     type = "S"
   }
 
+  # key_schema rather than the GSI's hash_key/range_key: the provider
+  # deprecated those in 6.29.0 when it added multi-attribute index keys, and
+  # `terraform validate` warns on them. Order matters — DynamoDB requires HASH
+  # before RANGE, and this list is passed through verbatim.
   global_secondary_index {
     name            = "by-owner"
-    hash_key        = "GSI1PK"
-    range_key       = "GSI1SK"
     projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "GSI1PK"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "GSI1SK"
+      key_type       = "RANGE"
+    }
   }
 
   point_in_time_recovery { enabled = var.point_in_time_recovery }
@@ -226,7 +237,7 @@ resource "aws_iam_role_policy" "api_case_access" {
         Resource = aws_kms_key.case.arn
         Condition = {
           StringEquals = {
-            "kms:ViaService" = "dynamodb.${data.aws_region.current.name}.amazonaws.com"
+            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
           }
         }
       },
