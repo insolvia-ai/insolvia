@@ -16,8 +16,7 @@ import {
 } from './avatar.props';
 
 export interface AvatarRootProps
-  extends React.ComponentPropsWithoutRef<'span'>,
-    AvatarRootOwnProps {}
+  extends React.ComponentPropsWithoutRef<'span'>, AvatarRootOwnProps {}
 
 const AvatarRoot = React.forwardRef<HTMLSpanElement, AvatarRootProps>(
   ({ size = 'md', className, style, children, ...props }, ref) => {

@@ -22,9 +22,7 @@ describe('useCollapsibleState', () => {
 
   it('uncontrolled: toggle flips its own state and fires onOpenChange', () => {
     const onOpenChange = vi.fn();
-    const { result } = renderHook(() =>
-      useCollapsibleState(undefined, false, onOpenChange, false),
-    );
+    const { result } = renderHook(() => useCollapsibleState(undefined, false, onOpenChange, false));
 
     act(() => result.current.toggle());
     expect(result.current.open).toBe(true);

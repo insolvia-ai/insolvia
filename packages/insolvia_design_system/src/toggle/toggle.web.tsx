@@ -17,8 +17,7 @@ import { useToggleState, type ToggleOwnProps } from './toggle.props';
 // type, different meaning, so the component's own must win outright (the
 // AccordionRootProps `defaultValue` Omit is the same idiom).
 export interface ToggleProps
-  extends Omit<React.ComponentPropsWithoutRef<'button'>, 'value'>,
-    ToggleOwnProps {}
+  extends Omit<React.ComponentPropsWithoutRef<'button'>, 'value'>, ToggleOwnProps {}
 
 export const Toggle = React.forwardRef<HTMLButtonElement, ToggleProps>(
   (

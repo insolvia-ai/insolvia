@@ -12,8 +12,7 @@ import {
 } from './meter.props';
 
 export interface MeterRootProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'value'>,
-    MeterRootOwnProps {}
+  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'value'>, MeterRootOwnProps {}
 
 const MeterRoot = React.forwardRef<HTMLDivElement, MeterRootProps>(
   ({ value, min = 0, max = 100, className, children, ...props }, ref) => {

@@ -31,8 +31,7 @@ import {
 } from './checkbox.props';
 
 export interface CheckboxRootProps
-  extends Omit<PressableProps, 'disabled' | 'children' | 'style'>,
-    CheckboxRootOwnProps {
+  extends Omit<PressableProps, 'disabled' | 'children' | 'style'>, CheckboxRootOwnProps {
   children?: React.ReactNode;
   /** Plain style only (no function-of-press-state form) — see Field/Accordion. */
   style?: StyleProp<ViewStyle>;

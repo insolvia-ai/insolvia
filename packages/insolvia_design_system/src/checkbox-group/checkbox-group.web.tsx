@@ -8,14 +8,22 @@
 import * as React from 'react';
 
 import { cn } from '../lib/cn';
-import { CheckboxGroupContext, useCheckboxGroupState, type CheckboxGroupRootOwnProps } from './checkbox-group.props';
+import {
+  CheckboxGroupContext,
+  useCheckboxGroupState,
+  type CheckboxGroupRootOwnProps,
+} from './checkbox-group.props';
 
 export interface CheckboxGroupRootProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'defaultValue' | 'onChange'>,
+  extends
+    Omit<React.ComponentPropsWithoutRef<'div'>, 'defaultValue' | 'onChange'>,
     CheckboxGroupRootOwnProps {}
 
 const CheckboxGroupRoot = React.forwardRef<HTMLDivElement, CheckboxGroupRootProps>(
-  ({ className, value, defaultValue, onValueChange, disabled = false, children, ...props }, ref) => {
+  (
+    { className, value, defaultValue, onValueChange, disabled = false, children, ...props },
+    ref,
+  ) => {
     const ctx = useCheckboxGroupState(value, defaultValue, onValueChange, disabled);
     return (
       <CheckboxGroupContext.Provider value={ctx}>

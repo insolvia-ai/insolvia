@@ -18,7 +18,9 @@ describe('Checkbox (native leaf)', () => {
     const user = userEvent.setup();
     const onCheckedChange = vi.fn();
 
-    render(<Checkbox.Root aria-label="Filed for bankruptcy before" onCheckedChange={onCheckedChange} />);
+    render(
+      <Checkbox.Root aria-label="Filed for bankruptcy before" onCheckedChange={onCheckedChange} />,
+    );
 
     const box = screen.getByRole('checkbox', { name: 'Filed for bankruptcy before' });
     expect(box).toHaveAttribute('aria-checked', 'false');

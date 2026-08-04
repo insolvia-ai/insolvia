@@ -28,7 +28,8 @@ import {
 // `string | number | readonly string[]`), and the checkbox's group-membership
 // string meaning must win.
 export interface CheckboxRootProps
-  extends Omit<
+  extends
+    Omit<
       React.ComponentPropsWithoutRef<'button'>,
       'checked' | 'defaultChecked' | 'onChange' | 'value'
     >,
@@ -101,7 +102,10 @@ const CheckboxIndicator = React.forwardRef<HTMLSpanElement, React.ComponentProps
     return (
       <span
         ref={ref}
-        className={cn('pointer-events-none flex items-center justify-center text-primary-text', className)}
+        className={cn(
+          'pointer-events-none flex items-center justify-center text-primary-text',
+          className,
+        )}
         {...props}
       >
         {children}

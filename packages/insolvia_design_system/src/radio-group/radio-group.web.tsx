@@ -27,7 +27,10 @@ export interface RadioGroupRootProps
   extends Omit<React.ComponentPropsWithoutRef<'div'>, 'defaultValue'>, RadioGroupRootOwnProps {}
 
 const RadioGroupRoot = React.forwardRef<HTMLDivElement, RadioGroupRootProps>(
-  ({ className, value, defaultValue, onValueChange, disabled = false, children, ...props }, ref) => {
+  (
+    { className, value, defaultValue, onValueChange, disabled = false, children, ...props },
+    ref,
+  ) => {
     const ctx = useRadioGroupState(value, defaultValue, onValueChange, disabled);
     return (
       <RadioGroupRootContext.Provider value={ctx}>
@@ -49,13 +52,19 @@ RadioGroupRoot.displayName = 'RadioGroup.Root';
 
 // `value` is Omit-ed because `ButtonHTMLAttributes` already declares it (as
 // the form-submission value), and the item's identity-string meaning must win.
-export interface RadioGroupItemProps extends Omit<React.ComponentPropsWithoutRef<'button'>, 'value'> {
+export interface RadioGroupItemProps extends Omit<
+  React.ComponentPropsWithoutRef<'button'>,
+  'value'
+> {
   /** This item's identity — the value the group takes on when it is picked. */
   value: string;
 }
 
 const RadioGroupItem = React.forwardRef<HTMLButtonElement, RadioGroupItemProps>(
-  ({ className, value, disabled: itemDisabled = false, onClick, onKeyDown, children, ...props }, forwardedRef) => {
+  (
+    { className, value, disabled: itemDisabled = false, onClick, onKeyDown, children, ...props },
+    forwardedRef,
+  ) => {
     const root = useRadioGroupRootContext('Item');
     const itemState = useRadioGroupItemState(value, root.value, root.disabled, itemDisabled);
 
@@ -130,29 +139,32 @@ const RadioGroupItem = React.forwardRef<HTMLButtonElement, RadioGroupItemProps>(
         )}
         {...props}
       >
-        <RadioGroupItemContext.Provider value={itemState}>{children}</RadioGroupItemContext.Provider>
+        <RadioGroupItemContext.Provider value={itemState}>
+          {children}
+        </RadioGroupItemContext.Provider>
       </button>
     );
   },
 );
 RadioGroupItem.displayName = 'RadioGroup.Item';
 
-const RadioGroupIndicator = React.forwardRef<HTMLSpanElement, React.ComponentPropsWithoutRef<'span'>>(
-  ({ className, children, ...props }, ref) => {
-    const { checked } = useRadioGroupItemContext('Indicator');
-    if (!checked) return null;
-    return (
-      <span
-        ref={ref}
-        data-radio-indicator=""
-        className={cn('h-2.5 w-2.5 rounded-pill bg-primary', className)}
-        {...props}
-      >
-        {children}
-      </span>
-    );
-  },
-);
+const RadioGroupIndicator = React.forwardRef<
+  HTMLSpanElement,
+  React.ComponentPropsWithoutRef<'span'>
+>(({ className, children, ...props }, ref) => {
+  const { checked } = useRadioGroupItemContext('Indicator');
+  if (!checked) return null;
+  return (
+    <span
+      ref={ref}
+      data-radio-indicator=""
+      className={cn('h-2.5 w-2.5 rounded-pill bg-primary', className)}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+});
 RadioGroupIndicator.displayName = 'RadioGroup.Indicator';
 
 export const RadioGroup = {

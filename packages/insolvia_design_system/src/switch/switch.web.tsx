@@ -7,13 +7,19 @@ import * as React from 'react';
 
 import { cn } from '../lib/cn';
 import { disabledStyles, focusRing } from '../lib/styles';
-import { SwitchContext, useSwitchContext, useSwitchState, type SwitchRootOwnProps } from './switch.props';
+import {
+  SwitchContext,
+  useSwitchContext,
+  useSwitchState,
+  type SwitchRootOwnProps,
+} from './switch.props';
 
 // `defaultChecked`/`defaultValue` are Omit-ed because React's own
 // `HTMLAttributes` already declares them (as native form-control types), and
 // the switch's boolean on/off meaning must win.
 export interface SwitchRootProps
-  extends Omit<React.ComponentPropsWithoutRef<'button'>, 'defaultChecked' | 'defaultValue'>,
+  extends
+    Omit<React.ComponentPropsWithoutRef<'button'>, 'defaultChecked' | 'defaultValue'>,
     SwitchRootOwnProps {}
 
 const SwitchRoot = React.forwardRef<HTMLButtonElement, SwitchRootProps>(

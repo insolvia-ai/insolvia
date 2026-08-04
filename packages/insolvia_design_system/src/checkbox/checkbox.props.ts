@@ -15,9 +15,7 @@ export interface CheckboxIndicatorContextValue {
   indeterminate: boolean;
 }
 
-export const CheckboxRootContext = React.createContext<CheckboxIndicatorContextValue | null>(
-  null,
-);
+export const CheckboxRootContext = React.createContext<CheckboxIndicatorContextValue | null>(null);
 
 export function useCheckboxRootContext(part: string): CheckboxIndicatorContextValue {
   const ctx = React.useContext(CheckboxRootContext);

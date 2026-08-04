@@ -68,26 +68,25 @@ const DialogRoot = ({ open, defaultOpen, onOpenChange, children }: DialogRootPro
   return <DialogRootContext.Provider value={ctx}>{children}</DialogRootContext.Provider>;
 };
 
-const DialogTrigger = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentPropsWithoutRef<'button'>
->(({ className, onClick, ...props }, ref) => {
-  const { open, setOpen } = useDialogRootContext('Trigger');
-  return (
-    <button
-      ref={ref}
-      type="button"
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      onClick={(event) => {
-        onClick?.(event);
-        if (!event.defaultPrevented) setOpen(true);
-      }}
-      className={cn('cursor-pointer', focusRing, disabledStyles, className)}
-      {...props}
-    />
-  );
-});
+const DialogTrigger = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
+  ({ className, onClick, ...props }, ref) => {
+    const { open, setOpen } = useDialogRootContext('Trigger');
+    return (
+      <button
+        ref={ref}
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={(event) => {
+          onClick?.(event);
+          if (!event.defaultPrevented) setOpen(true);
+        }}
+        className={cn('cursor-pointer', focusRing, disabledStyles, className)}
+        {...props}
+      />
+    );
+  },
+);
 DialogTrigger.displayName = 'Dialog.Trigger';
 
 const DialogBackdrop = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<'div'>>(

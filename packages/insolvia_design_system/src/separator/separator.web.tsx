@@ -9,8 +9,7 @@ import { cn } from '../lib/cn';
 import type { SeparatorOwnProps } from './separator.props';
 
 export interface SeparatorProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'role'>,
-    SeparatorOwnProps {}
+  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'role'>, SeparatorOwnProps {}
 
 const orientationClass: Record<'horizontal' | 'vertical', string> = {
   horizontal: 'h-px w-full',

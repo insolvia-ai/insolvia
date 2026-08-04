@@ -8,7 +8,9 @@ import { useCheckboxGroupState } from './checkbox-group.props';
 
 describe('useCheckboxGroupState', () => {
   it('starts empty without a defaultValue', () => {
-    const { result } = renderHook(() => useCheckboxGroupState(undefined, undefined, undefined, false));
+    const { result } = renderHook(() =>
+      useCheckboxGroupState(undefined, undefined, undefined, false),
+    );
 
     expect(result.current.value).toEqual([]);
   });
@@ -36,9 +38,7 @@ describe('useCheckboxGroupState', () => {
 
   it('fires onValueChange with the next array in both controlled and uncontrolled modes', () => {
     const onValueChange = vi.fn();
-    const { result } = renderHook(() =>
-      useCheckboxGroupState(undefined, [], onValueChange, false),
-    );
+    const { result } = renderHook(() => useCheckboxGroupState(undefined, [], onValueChange, false));
 
     act(() => result.current.toggle('debts'));
 

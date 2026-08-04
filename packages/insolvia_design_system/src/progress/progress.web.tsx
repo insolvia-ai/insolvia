@@ -15,8 +15,7 @@ import {
 } from './progress.props';
 
 export interface ProgressRootProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'value'>,
-    ProgressRootOwnProps {}
+  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'value'>, ProgressRootOwnProps {}
 
 const ProgressRoot = React.forwardRef<HTMLDivElement, ProgressRootProps>(
   ({ value = null, max = 100, className, children, ...props }, ref) => {

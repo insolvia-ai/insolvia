@@ -16,8 +16,7 @@ import {
 } from './collapsible.props';
 
 export interface CollapsibleRootProps
-  extends React.ComponentPropsWithoutRef<'div'>,
-    CollapsibleRootOwnProps {}
+  extends React.ComponentPropsWithoutRef<'div'>, CollapsibleRootOwnProps {}
 
 const CollapsibleRoot = React.forwardRef<HTMLDivElement, CollapsibleRootProps>(
   (

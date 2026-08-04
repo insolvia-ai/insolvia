@@ -57,9 +57,7 @@ describe('Checkbox', () => {
   it('a disabled checkbox ignores clicks', async () => {
     const user = userEvent.setup();
     const onCheckedChange = vi.fn();
-    render(
-      <Checkbox.Root aria-label="Locked" disabled onCheckedChange={onCheckedChange} />,
-    );
+    render(<Checkbox.Root aria-label="Locked" disabled onCheckedChange={onCheckedChange} />);
 
     const box = screen.getByRole('checkbox', { name: 'Locked' });
     expect(box).toBeDisabled();
@@ -73,7 +71,9 @@ describe('Checkbox', () => {
   it('is controlled when given `checked`: clicking reports the change but the caller must apply it', async () => {
     const user = userEvent.setup();
     const onCheckedChange = vi.fn();
-    render(<Checkbox.Root aria-label="Controlled" checked={true} onCheckedChange={onCheckedChange} />);
+    render(
+      <Checkbox.Root aria-label="Controlled" checked={true} onCheckedChange={onCheckedChange} />,
+    );
 
     const box = screen.getByRole('checkbox', { name: 'Controlled' });
     expect(box).toHaveAttribute('aria-checked', 'true');

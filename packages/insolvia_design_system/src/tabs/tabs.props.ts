@@ -58,11 +58,10 @@ export function useTabsState(
 ): TabsRootContextValue {
   const [current, setCurrent] = useControllableState(value, defaultValue, onValueChange);
   const rootId = React.useId();
-  return React.useMemo(() => ({ value: current, setValue: setCurrent, rootId }), [
-    current,
-    setCurrent,
-    rootId,
-  ]);
+  return React.useMemo(
+    () => ({ value: current, setValue: setCurrent, rootId }),
+    [current, setCurrent, rootId],
+  );
 }
 
 /**

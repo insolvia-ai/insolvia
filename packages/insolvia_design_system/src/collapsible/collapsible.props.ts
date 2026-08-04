@@ -17,9 +17,7 @@ export interface CollapsibleRootContextValue {
   panelId: string;
 }
 
-export const CollapsibleRootContext = React.createContext<CollapsibleRootContextValue | null>(
-  null,
-);
+export const CollapsibleRootContext = React.createContext<CollapsibleRootContextValue | null>(null);
 
 export function useCollapsibleRootContext(part: string): CollapsibleRootContextValue {
   const ctx = React.useContext(CollapsibleRootContext);

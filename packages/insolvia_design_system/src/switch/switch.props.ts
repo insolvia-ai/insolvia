@@ -50,15 +50,16 @@ export function useSwitchState(
   onCheckedChange: ((checked: boolean) => void) | undefined,
   disabled: boolean,
 ): SwitchState {
-  const [current, setCurrent] = useControllableState<boolean>(checked, defaultChecked, onCheckedChange);
+  const [current, setCurrent] = useControllableState<boolean>(
+    checked,
+    defaultChecked,
+    onCheckedChange,
+  );
 
   const toggle = React.useCallback(() => {
     if (disabled) return;
     setCurrent(!current);
   }, [current, disabled, setCurrent]);
 
-  return React.useMemo(
-    () => ({ checked: current, disabled, toggle }),
-    [current, disabled, toggle],
-  );
+  return React.useMemo(() => ({ checked: current, disabled, toggle }), [current, disabled, toggle]);
 }

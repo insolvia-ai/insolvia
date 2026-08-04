@@ -18,8 +18,7 @@ import {
 // Accordion's Root Omits it: this component's own `string[]` meaning must
 // win over the built-in HTML attribute of the same name.
 export interface ToggleGroupRootProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'defaultValue'>,
-    ToggleGroupRootOwnProps {}
+  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'defaultValue'>, ToggleGroupRootOwnProps {}
 
 const ToggleGroupRoot = React.forwardRef<HTMLDivElement, ToggleGroupRootProps>(
   (

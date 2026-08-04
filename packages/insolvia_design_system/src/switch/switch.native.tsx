@@ -21,8 +21,7 @@ import {
 } from './switch.props';
 
 export interface SwitchRootProps
-  extends Omit<PressableProps, 'onPress' | 'style' | 'disabled'>,
-    SwitchRootOwnProps {
+  extends Omit<PressableProps, 'onPress' | 'style' | 'disabled'>, SwitchRootOwnProps {
   style?: PressableProps['style'];
 }
 
@@ -67,7 +66,10 @@ const SwitchThumb = () => {
   const c = useNativeColors();
   return (
     <View
-      style={[styles.thumb, { backgroundColor: c.card, transform: [{ translateX: checked ? 22 : 2 }] }]}
+      style={[
+        styles.thumb,
+        { backgroundColor: c.card, transform: [{ translateX: checked ? 22 : 2 }] },
+      ]}
     />
   );
 };

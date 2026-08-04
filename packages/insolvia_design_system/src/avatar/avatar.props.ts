@@ -39,9 +39,6 @@ export interface AvatarRootOwnProps {
  * Starts `'idle'` (no image has resolved yet, so Fallback shows); `Image`
  * moves it to `'loaded'` or `'error'` from its own onLoad/onError.
  */
-export function useAvatarImageStatus(): [
-  AvatarImageStatus,
-  (status: AvatarImageStatus) => void,
-] {
+export function useAvatarImageStatus(): [AvatarImageStatus, (status: AvatarImageStatus) => void] {
   return React.useState<AvatarImageStatus>('idle');
 }

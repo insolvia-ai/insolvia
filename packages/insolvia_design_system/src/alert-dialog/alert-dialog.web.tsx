@@ -84,25 +84,24 @@ const AlertDialogTrigger = React.forwardRef<
 });
 AlertDialogTrigger.displayName = 'AlertDialog.Trigger';
 
-const AlertDialogBackdrop = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentPropsWithoutRef<'div'>
->(({ className, ...props }, ref) => {
-  const { open } = useAlertDialogRootContext('Backdrop');
-  if (!open) return null;
-  return createPortal(
-    <div
-      ref={ref}
-      data-alert-dialog-backdrop=""
-      // Decorative scrim only. Unlike the dialog's backdrop it has NO click
-      // handler: an alert dialog requires an explicit choice to dismiss.
-      aria-hidden="true"
-      className={cn('fixed inset-0 z-40 bg-ink/50', className)}
-      {...props}
-    />,
-    document.body,
-  );
-});
+const AlertDialogBackdrop = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<'div'>>(
+  ({ className, ...props }, ref) => {
+    const { open } = useAlertDialogRootContext('Backdrop');
+    if (!open) return null;
+    return createPortal(
+      <div
+        ref={ref}
+        data-alert-dialog-backdrop=""
+        // Decorative scrim only. Unlike the dialog's backdrop it has NO click
+        // handler: an alert dialog requires an explicit choice to dismiss.
+        aria-hidden="true"
+        className={cn('fixed inset-0 z-40 bg-ink/50', className)}
+        {...props}
+      />,
+      document.body,
+    );
+  },
+);
 AlertDialogBackdrop.displayName = 'AlertDialog.Backdrop';
 
 export type AlertDialogPopupProps = React.ComponentPropsWithoutRef<'div'>;
@@ -184,20 +183,19 @@ const AlertDialogPopup = React.forwardRef<HTMLDivElement, AlertDialogPopupProps>
 });
 AlertDialogPopup.displayName = 'AlertDialog.Popup';
 
-const AlertDialogTitle = React.forwardRef<
-  HTMLHeadingElement,
-  React.ComponentPropsWithoutRef<'h2'>
->(({ className, ...props }, ref) => {
-  const { titleId } = useAlertDialogRootContext('Title');
-  return (
-    <h2
-      ref={ref}
-      id={titleId}
-      className={cn('font-heading text-lg font-semibold text-ink', className)}
-      {...props}
-    />
-  );
-});
+const AlertDialogTitle = React.forwardRef<HTMLHeadingElement, React.ComponentPropsWithoutRef<'h2'>>(
+  ({ className, ...props }, ref) => {
+    const { titleId } = useAlertDialogRootContext('Title');
+    return (
+      <h2
+        ref={ref}
+        id={titleId}
+        className={cn('font-heading text-lg font-semibold text-ink', className)}
+        {...props}
+      />
+    );
+  },
+);
 AlertDialogTitle.displayName = 'AlertDialog.Title';
 
 const AlertDialogDescription = React.forwardRef<
