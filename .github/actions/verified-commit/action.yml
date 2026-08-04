@@ -1,53 +1,45 @@
 name: Verified commit
 description: >-
   Resolve the commit a production deploy should ship, and refuse to proceed
-  unless that exact commit already deployed green to staging.
+  unless staging has validated that exact commit.
 
 # WHY THIS EXISTS
 #
-# Production deploys are `workflow_dispatch`-only, which makes "deploy prod" a
-# deliberate human act — but dispatching alone proved too weak a gate in two
-# ways this action closes:
+# The release pipeline (release.yml) does not need this: its production stage
+# sits downstream of its staging stage in the same run, so "staging was green
+# for this commit" is guaranteed by `needs`. This action exists for the OTHER
+# way into production — dispatching a single service's prod workflow by hand —
+# which closes two gaps a bare dispatch leaves open:
 #
 #   1. A bare dispatch builds whatever `main` points at WHEN THE RUN STARTS —
 #      anything merged between your staging test and your dispatch would ride
 #      along silently. Callers pass an explicit `sha`, or accept main's HEAD —
 #      either way the resolved commit is echoed into the job summary, so what
 #      shipped is a matter of record rather than inference.
-#   2. Nothing checked that the commit had ever *worked*. There is no
-#      `workflow_run` chain in this repo (deliberately — see the deploy
-#      workflows' concurrency comments), so ordering has to be asserted rather
-#      than assumed. This action asserts it.
+#   2. Nothing else checks that the commit ever *worked* on staging.
 #
-# The check is "did release-staging.yml conclude successfully for THIS sha",
-# not "is staging green now". A later unrelated staging failure must not block
-# promoting a commit that genuinely passed, and a later staging success must not
-# bless a commit that failed.
+# THE EVIDENCE IS A COMMIT STATUS, NOT A RUN CONCLUSION. The check reads the
+# `insolvia/staging-release` status that release.yml's `record` job stamps on a
+# commit at the exact moment its staging stage finishes green. It used to ask
+# "did the staging workflow's run succeed for this sha", but a release run's
+# conclusion no longer means that: the run also contains the production stage,
+# so a staging-green release that was never approved ends `cancelled`, and one
+# whose prod leg failed ends `failure` — both with staging genuinely validated.
+# The status is written when the fact becomes true and never depends on what
+# happened downstream. It also survives job renames, which a run- or job-name
+# lookup would not.
 #
-# WHY ONE WORKFLOW AND NOT FOUR. Every caller used to name its own counterpart
-# (`app-prod.yml` checked `app-staging.yml`, and so on), which gave per-service
-# promotion: the app could ship even if mailer's staging run had failed. Staging
-# is now one orchestrated release (release-staging.yml), and a workflow invoked
-# through `workflow_call` produces NO run record of its own — its jobs are
-# nested in the caller's run. So the old per-service lookups would return zero
-# runs forever and block every promotion. Pointing every caller at the
-# orchestrator is what keeps the gate working.
+# The check is per-COMMIT, not per-service, deliberately: staging is one
+# orchestrated release, so a failure in any staging leg withholds the status
+# for every service at that commit. For a product shipped as a whole that is
+# the stronger claim — if a commit could not deploy cleanly to staging, none
+# of it should reach production.
 #
-# The cost is deliberate and worth stating: the gate is now COARSER. A failure
-# in any staging leg blocks promoting every service for that commit. That is the
-# price of one mental model across staging and prod, and for a product shipped
-# as a whole it is arguably the stronger claim — if a commit could not deploy
-# cleanly to staging, none of it should reach production. Recovering per-service
-# granularity would mean matching JOB names inside the release run, where a
-# renamed job silently un-gates production instead of failing loudly. That is a
-# worse failure mode than the one it would fix.
+# Callers need `statuses: read` on their GITHUB_TOKEN. Commits from before the
+# status existed (pre-pipeline history) carry no status and are treated as
+# unverified — promote them with `force: true` if you genuinely must.
 
 inputs:
-  staging-workflow:
-    description: >-
-      Filename of the staging workflow that must have succeeded for this
-      commit, e.g. `api-staging.yml`.
-    required: true
   sha:
     description: >-
       Commit to deploy. Empty means "main's current HEAD", resolved through the
@@ -58,8 +50,8 @@ inputs:
   force:
     description: >-
       Skip the staging-green check. For shipping a hotfix while staging is
-      broken for unrelated reasons — the run still requires whatever approval
-      the `insolvia-production` environment demands, and says loudly in the job
+      broken for unrelated reasons — the run still requires the
+      `insolvia-production` environment's approval, and says loudly in the job
       summary that the check was bypassed.
     required: false
     default: "false"
@@ -78,7 +70,6 @@ runs:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         INPUT_SHA: ${{ inputs.sha }}
-        WORKFLOW: ${{ inputs.staging-workflow }}
         FORCE: ${{ inputs.force }}
       run: |
         set -euo pipefail
@@ -108,27 +99,26 @@ runs:
           echo "::warning::Staging-green check BYPASSED (force=true) for ${sha:0:7}."
           {
             echo ":warning: **Staging check bypassed** (\`force: true\`)."
-            echo "This commit was not verified against \`$WORKFLOW\`."
+            echo "This commit was not verified against a staging release."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
 
-        # `status=success` filters on the RUN's conclusion, so a run that is
-        # still in progress does not count as a pass — promoting mid-run would
-        # be promoting an image that may not exist yet.
-        runs="$(gh api \
-          "repos/$REPO/actions/workflows/$WORKFLOW/runs?head_sha=$sha&status=success" \
-          --jq '.workflow_runs | length')"
+        # The combined-status endpoint returns the LATEST status per context,
+        # so a re-stamped commit reads correctly and a missing context reads
+        # as "missing" rather than an empty error.
+        state="$(gh api "repos/$REPO/commits/$sha/status" \
+          --jq '[.statuses[] | select(.context == "insolvia/staging-release")][0].state // "missing"')"
 
-        if [[ "$runs" -eq 0 ]]; then
-          echo "::error::No successful $WORKFLOW run for ${sha:0:7} — refusing to deploy to production."
+        if [[ "$state" != "success" ]]; then
+          echo "::error::Commit ${sha:0:7} has no successful insolvia/staging-release status (found: $state) — refusing to deploy to production."
           {
-            echo ":no_entry: **Blocked.** \`$WORKFLOW\` has no successful run for \`${sha:0:7}\`."
+            echo ":no_entry: **Blocked.** Staging has not validated \`${sha:0:7}\` (status: \`$state\`)."
             echo
-            echo "Merge the commit and let staging deploy first, or re-dispatch with"
-            echo "\`force: true\` if staging is broken for unrelated reasons."
+            echo "Merge the commit and let the release pipeline deploy staging first, or"
+            echo "re-dispatch with \`force: true\` if staging is broken for unrelated reasons."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
         fi
 
-        echo ":white_check_mark: Verified: \`$WORKFLOW\` succeeded for \`${sha:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
+        echo ":white_check_mark: Verified: staging released \`${sha:0:7}\` green." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,426 @@
+name: Release
+
+# THE deploy pipeline: staging, then one human approval, then production —
+# one run, one commit, end to end.
+#
+# Every push to `main` deploys staging (infra applied first, then the service
+# legs in dependency order). When the whole staging stage is green, the run
+# parks at the `promote` job, which carries the `insolvia-production`
+# environment and therefore waits for its required reviewer. Approving it — in
+# the GitHub UI, one click, once — releases the production stage: prod infra
+# applies, then every service promotes, in the same order staging deployed.
+#
+# This replaced a `workflow_dispatch`-only production model (release-prod.yml +
+# scripts/prod-deploy.sh). That model made "deploy prod" a script you ran, an
+# approval PER SERVICE LEG (five clicks per release, because every prod job
+# carried the environment), and a validation dance to re-prove that the commit
+# had deployed green to staging. Here the proof is the `needs` chain: the prod
+# stage exists downstream of the staging stage in the same run, so "staging
+# was green for this exact commit" is guaranteed by GitHub, not re-derived.
+#
+# WHAT AN APPROVAL PROMOTES: everything, at this run's commit — not just what
+# this push changed. Staging legs are path-filtered (deploying an unchanged
+# service is waste), but production promotion is whole-state: you might merge
+# five PRs and only approve the fifth run, and services touched by the first
+# four must not be left behind. The `record` job is what makes that resolvable
+# — see its comment.
+#
+# SUPERSEDING: each new green staging run cancels any OLDER run still waiting
+# at the gate, so at most one promotion is ever pending, and it is always the
+# newest staging-validated commit. An unapproved release therefore ends up
+# `cancelled` — that is the normal fate of a run you chose not to promote, not
+# an error. The gate double-checks on approval that nothing newer is waiting.
+#
+# ORDER MATTERS in the service legs, and it is not alphabetical:
+#   1. mailer     — the API depends on it (module.mailer's caller allowlist is
+#                   the API's role; the API reads MAILER_API_URL from SSM).
+#   2. api        — the backend everything else talks to.
+#   3. marketing  — its SSR waitlist action POSTs to the API.
+#   4. app        — the client, last: it should never be the first thing that
+#                   expects a new API.
+#
+# Infra is the FIRST job of each stage, because the service legs read Terraform
+# outputs and deploying against stale outputs is the race that ordering
+# removes. Both stages APPLY: staging because staging is `main` and reconciling
+# it on every merge is the definition being enforced; prod because the apply
+# sits behind the same approval as the code it ships, for the same commit
+# staging just validated — the approval IS the deliberate act that the old
+# separate `prod-infra` dispatch used to be. infra-prod.yml remains
+# dispatchable on its own for a read-only plan or an out-of-band apply.
+#
+# Every called workflow stays dispatchable by hand for a single-service
+# emergency deploy; dispatched directly, each brings its own
+# `insolvia-production` approval and its own staging-green check
+# (.github/actions/verified-commit). `gated: true` below tells them this run
+# already holds the approval and must not ask again.
+#
+# NO concurrency group HERE. The called workflows each hold their environment's
+# group (`insolvia-terraform-staging` / `insolvia-terraform-prod`); `needs`
+# already serialises the legs, and a group on both caller and callee deadlocks
+# — the callee would queue behind its own parent.
+#
+# TESTING THIS BEFORE MERGING: `workflow_dispatch` runs the workflow file from
+# whatever branch you select, so dispatch this from the PR branch to exercise
+# the staging stage before it ever runs on `main`. The `promote` job will stop
+# a non-main run: the insolvia-production environment's branch policy only
+# lets `main` deploy.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "Deploy every service to staging, ignoring which paths changed"
+        required: false
+        default: false
+        type: boolean
+
+# A called workflow cannot request a permission the CALLER does not hold — the
+# whole run is rejected before any job starts, in about a second, with no logs
+# and no job list to read. So this block is the union of what every called
+# workflow declares, plus what this workflow's own jobs need:
+#   • `actions: read`   — the `promote` job lists this workflow's runs to spot
+#     a newer pending release. (`supersede` needs write; it declares that
+#     itself at job level, since job-level permissions replace these defaults.)
+#   • `packages: read`  — marketing-staging.yml installs
+#     @insolvia-ai/design-system from GitHub Packages and declares it.
+#   • `statuses: write` — the `record` job marks the commit staging-green; the
+#     prod callees declare `statuses: read` to check that mark, and a callee's
+#     declaration must fit under this cap.
+# Widening here does NOT widen the callees: each still gets only what it
+# declares itself, capped by this. Add to this block whenever a called workflow
+# gains a permission, or the first push to `main` after that merge dies at
+# startup.
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+  packages: read
+  statuses: write
+
+jobs:
+  # Path filtering lives here, once, instead of in four `on.push.paths:`
+  # blocks. The repo's `changed-paths` action cannot be reused: it reads
+  # `github.event.pull_request.base.sha` and hard-fails on any other event, by
+  # design — it exists to keep required PR checks reporting, which is a
+  # different problem from "what did this push change".
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.f.outputs.api }}
+      app: ${{ steps.f.outputs.app }}
+      mailer: ${{ steps.f.outputs.mailer }}
+      marketing: ${{ steps.f.outputs.marketing }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: f
+        env:
+          # On a push this is the previous tip of `main`. It is all-zeroes for a
+          # branch's first push, and absent entirely on workflow_dispatch.
+          BEFORE: ${{ github.event.before }}
+          ALL: ${{ inputs.all }}
+        run: |
+          set -euo pipefail
+
+          # Deploy everything when we cannot know what changed (manual dispatch,
+          # or a first push with no previous tip). Failing OPEN is right here:
+          # deploying a service that did not change is wasteful, while skipping
+          # one that did leaves staging silently behind `main`, which is the one
+          # property staging exists to have.
+          if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "No usable diff base — deploying every service."
+            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+
+          files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+          if [ -z "$files" ]; then
+            echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
+            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+          printf '%s\n' "$files" | sed 's/^/  /'
+
+          # These sets are copied verbatim from the `on.push.paths:` filters the
+          # four staging workflows carried before this workflow took the trigger
+          # over. Keep them in step with what each service actually consumes.
+          emit() {
+            if printf '%s\n' "$files" | grep -qE "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"; echo "$1 -> true"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"; echo "$1 -> false"
+            fi
+          }
+
+          emit api       '^(services/api/|infra/envs/staging/|infra/modules/api_service/|\.github/workflows/(api-staging|release)\.yml)'
+          emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
+          emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
+          emit app       '^(apps/|packages/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|\.github/workflows/(app-staging|release)\.yml)'
+
+  # ── STAGING ──────────────────────────────────────────────────────────────
+
+  # Infra first, always — every service job below reads its outputs.
+  infra:
+    needs: changes
+    uses: ./.github/workflows/infra-staging.yml
+    with:
+      mode: apply
+    # A called workflow receives no secrets at all without this — not even
+    # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
+    # the OIDC step would fail with an unhelpful error.
+    secrets: inherit
+
+  # Every `if:` below deliberately avoids `success()`. A job whose dependency
+  # was SKIPPED is itself skipped under the default `if: success()`, which would
+  # mean a docs-only change to the mailer path silently cancelling the whole
+  # chain behind it. `!cancelled() && !failure()` runs after a skipped upstream
+  # but still stops dead on a failed one.
+  mailer:
+    needs: [changes, infra]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mailer == 'true' }}
+    uses: ./.github/workflows/mailer-staging.yml
+    secrets: inherit
+
+  api:
+    needs: [changes, infra, mailer]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.api == 'true' }}
+    uses: ./.github/workflows/api-staging.yml
+    secrets: inherit
+
+  marketing:
+    needs: [changes, infra, api]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
+    uses: ./.github/workflows/marketing-staging.yml
+    secrets: inherit
+
+  app:
+    needs: [changes, infra, marketing]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.app == 'true' }}
+    uses: ./.github/workflows/app-staging.yml
+    secrets: inherit
+
+  # ── RECORD: durable evidence that staging validated this commit ──────────
+  #
+  # Two artifacts, both consumed later and both surviving this run:
+  #
+  #   1. A complete set of `sha-<commit>` image tags. The staging legs only
+  #      build what changed, so a service untouched by this push has no image
+  #      tagged for this commit — yet an approval promotes EVERYTHING at this
+  #      commit (see the header). For each container service whose tag is
+  #      missing, the digest its `staging` marker tag points at — the exact
+  #      bytes staging is serving right now, at this commit — gets the
+  #      `sha-<commit>` tag too. Tagging is an ECR manifest copy, not a push;
+  #      promote-image then resolves every service uniformly. (The app has no
+  #      image: it rebuilds from the verified source, see app-prod.yml.)
+  #
+  #   2. An `insolvia/staging-release` commit status. This is what
+  #      .github/actions/verified-commit checks when a prod workflow is
+  #      dispatched BY HAND for a single-service deploy. It used to ask "did
+  #      the staging workflow's RUN succeed for this sha", but a run of THIS
+  #      workflow no longer ends `success` unless production also shipped — an
+  #      unapproved release ends `cancelled` — so run conclusions stopped
+  #      meaning "staging was green". The status is written at exactly the
+  #      moment that fact becomes true, and only then.
+  #
+  # The job-level concurrency group serialises this against every workflow
+  # that deploys staging, so no deploy can move a `staging` marker tag between
+  # the read and the copy.
+  record:
+    needs: [changes, infra, mailer, api, marketing, app]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: insolvia-terraform-staging
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      # Read-only: `output` needs the state, not an apply. The repository
+      # names come from the same outputs the deploy legs read, rather than
+      # being hard-coded here as a second owner of that fact.
+      - name: Read ECR repository names
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init -input=false
+          tf() { terraform -chdir=infra/envs/staging output -raw "$1"; }
+          # Everything after the registry host is the repository NAME, which is
+          # all the ECR tag operations below need.
+          {
+            echo "api=$(basename "$(tf api_ecr_repository_url)")"
+            echo "mailer=$(basename "$(tf mailer_ecr_repository_url)")"
+            echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure every service has a sha-tagged image for this commit
+        env:
+          SHA: ${{ github.sha }}
+          REPOS: >-
+            ${{ steps.tf.outputs.api }}
+            ${{ steps.tf.outputs.mailer }}
+            ${{ steps.tf.outputs.marketing }}
+        run: |
+          set -euo pipefail
+          for repo in $REPOS; do
+            if aws ecr describe-images --repository-name "$repo" \
+                --image-ids "imageTag=sha-$SHA" >/dev/null 2>&1; then
+              echo "$repo: sha-$SHA exists (built by this run)."
+              continue
+            fi
+            # Unchanged service: stamp the digest staging currently serves.
+            manifest="$(aws ecr batch-get-image \
+              --repository-name "$repo" \
+              --image-ids imageTag=staging \
+              --query 'images[0].imageManifest' --output text)"
+            if [ -z "$manifest" ] || [ "$manifest" = "None" ]; then
+              echo "::error::$repo has no 'staging' marker tag to copy — has this service ever deployed?"
+              exit 1
+            fi
+            aws ecr put-image \
+              --repository-name "$repo" \
+              --image-tag "sha-$SHA" \
+              --image-manifest "$manifest" >/dev/null
+            echo "$repo: tagged the current staging image as sha-$SHA (service unchanged this push)."
+          done
+
+      - name: Mark the commit staging-green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state=success \
+            -f context=insolvia/staging-release \
+            -f description="Staging release green — eligible for production" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # A new green staging run makes every older pending promotion stale — the
+  # reviewer should only ever be offered the newest validated commit. `waiting`
+  # is precisely "parked at an environment gate", so this cannot touch runs
+  # still deploying staging (in_progress) or already approved ones.
+  supersede:
+    needs: record
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    # Job-level permissions REPLACE the workflow-level block: `actions: write`
+    # (to cancel runs) stays confined to this job, which runs no third-party
+    # code and touches no AWS credentials.
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list --repo "${{ github.repository }}" \
+            --workflow release.yml --branch main --status waiting \
+            --json databaseId,number --jq \
+            '.[] | select(.number < ${{ github.run_number }}) | .databaseId' |
+          while read -r id; do
+            echo "Cancelling superseded release run $id (older pending promotion)."
+            gh run cancel "$id" --repo "${{ github.repository }}"
+          done
+
+  # ── THE GATE ─────────────────────────────────────────────────────────────
+  #
+  # This job IS the production release decision. It carries the
+  # `insolvia-production` environment, whose required reviewer must approve
+  # before it starts — the ONLY job in this run that does, which is what makes
+  # a release one approval instead of one per leg. The called prod workflows
+  # are told `gated: true` so they do not ask again.
+  #
+  # After approval it re-checks that nothing newer is already waiting: approval
+  # can race a merge, and the stale run must lose. (`supersede` above cancels
+  # the stale run the moment the newer one goes green, but only if it is still
+  # waiting — this closes the window where it was approved first.)
+  promote:
+    needs: record
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          newer="$(gh run list --repo "${{ github.repository }}" \
+            --workflow release.yml --branch main --status waiting \
+            --json number --jq \
+            '[.[] | select(.number > ${{ github.run_number }})] | length')"
+          if [ "$newer" -gt 0 ]; then
+            echo "::error::A newer staging-validated release is already waiting — approve that one instead."
+            exit 1
+          fi
+          {
+            echo "### :rocket: Promotion approved"
+            echo
+            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → marketing → app."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── PRODUCTION ───────────────────────────────────────────────────────────
+  #
+  # Default `if:` (success) everywhere below, deliberately: unlike the staging
+  # legs, nothing upstream of these can be skipped-but-fine — if `promote` did
+  # not succeed, production must not start, and if any prod leg fails the
+  # chain must stop dead.
+  prod-infra:
+    needs: promote
+    uses: ./.github/workflows/infra-prod.yml
+    with:
+      mode: apply
+      gated: true
+    secrets: inherit
+
+  prod-mailer:
+    needs: prod-infra
+    uses: ./.github/workflows/mailer-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  prod-api:
+    needs: [prod-infra, prod-mailer]
+    uses: ./.github/workflows/api-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  prod-marketing:
+    needs: [prod-infra, prod-api]
+    uses: ./.github/workflows/marketing-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  prod-app:
+    needs: [prod-infra, prod-marketing]
+    uses: ./.github/workflows/app-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit

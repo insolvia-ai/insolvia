@@ -9,10 +9,10 @@ created by merging code: a **user in the staging pool**, and **that user's
 credentials in GitHub Actions**. This runbook is the order to create them in and
 how to tell it worked.
 
-Why it is worth doing: `.github/actions/verified-commit` refuses to promote a
-commit to production unless `release-staging.yml` concluded successfully for it — so
-the strength of the production gate is exactly the strength of what the staging
-run asserts. Until this suite existed, the App staging run asserted nothing at
+Why it is worth doing: production only ships behind a green staging stage of
+`release.yml` (in-run via `needs`, or via the `insolvia/staging-release`
+commit status for a hand-dispatched deploy) — so the strength of the
+production gate is exactly the strength of what the staging run asserts. Until this suite existed, the App staging run asserted nothing at
 all. See issue #40 for the shape of the suite and #80 for this first test.
 
 ## Before you start
@@ -70,7 +70,7 @@ A ✓ against both `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD`, scoped to
 the **`insolvia-staging` environment** — not the repository. Repo-level secrets
 would be visible to every workflow; environment secrets are visible only to a
 job that declares `environment: insolvia-staging`, which is what the `e2e` job
-in `app-staging.yml` does (which release-staging.yml calls as its last leg).
+in `app-staging.yml` does (which release.yml calls as its last staging leg).
 
 ### Verify without changing anything
 

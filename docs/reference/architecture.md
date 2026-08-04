@@ -137,95 +137,87 @@ redirect.
 See `.github/workflows/`. Each area has a `*-pr.yml` (checks) and, where it
 deploys, a `*-<env>.yml`. Deploys are live: shared infra is applied, the
 `*.insolvia.ai` ACM cert is `ISSUED`, and merges to `main` deploy staging for
-real (prod is dispatched manually).
+real (prod ships when the release run's gate is approved).
 
-### Staging and production deploy the same way
+### One pipeline: staging, an approval, then production
 
-There is **one** deploy model, in both environments:
+`release.yml` is the deploy pipeline, and a push to `main` runs all of it:
 
-| | Staging | Production |
+| Stage | Jobs | Gate |
 |---|---|---|
-| Orchestrator | `release-staging.yml` | `release-prod.yml` |
-| Trigger | push to `main` | `workflow_dispatch` |
-| Service workflows | `*-staging.yml`, `workflow_call` + `workflow_dispatch` | `*-prod.yml`, same |
-| Who applies Terraform | `infra-staging.yml`, and nothing else | `infra-prod.yml`, and nothing else |
-| First job | `infra-staging.yml`, `mode: apply` | `infra-prod.yml`, `mode: verify` |
-| Ordering | `needs` between legs | `needs` between legs |
+| Staging | `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs` | none — staging *is* `main` |
+| Evidence | `record` (sha image tags + commit status), `supersede` | none |
+| Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order | `promote` carries the `insolvia-production` environment |
+
+Staging green parks the run at `promote`, which waits for the
+`insolvia-production` environment's **required reviewer** (a repo-settings
+gate nothing in this repo can change for itself). Approving it — once, in the
+GitHub UI — releases the production stage for the same commit. That `needs`
+edge is also the ordering proof: production exists downstream of staging in
+the same run, so "staging was green for this exact commit" is guaranteed by
+GitHub rather than re-derived from run history. `promote` is the *only* job
+carrying the environment; the called prod workflows are told `gated: true` so
+they don't each demand their own click.
+
+Not approving is normal. Each new green staging run cancels older runs still
+waiting at the gate (the `supersede` job), so exactly one promotion is ever
+pending and it is always the newest validated commit; an unapproved release
+ends `cancelled`, which is its expected fate, not a failure. After approval
+the gate re-checks that nothing newer is waiting, closing the approve-vs-merge
+race from the other side.
 
 The service workflows **never apply Terraform** — they `init` and read outputs.
-They are reusable, so a release and a hand-dispatched single-service deploy run
-exactly the same code path. Neither orchestrator declares a concurrency group;
-each called workflow holds its environment's group, and `needs` orders them. A
-group on both caller and callee would deadlock the callee behind its own parent.
+Infra is the first job of *both* stages for the same reason: the service legs
+resolve the ECR repository, function name, alias and domain they act on from
+Terraform outputs, and a leg that runs ahead of its infra deploys against
+stale ones, silently. Staging's apply is ungated because reconciling `main`
+on every merge is the definition being enforced; prod's apply sits behind the
+release's approval, for the exact commit staging just validated — the approval
+is the deliberate act that a separate infra dispatch used to be.
 
-**Infra is the first job of both**, and both guarantee the same property: the
-infrastructure matches the code before any service deploys. That ordering is not
-tidiness — the service legs resolve the ECR repository, function name, alias and
-domain they act on by reading Terraform outputs, so a release that runs ahead of
-its infra deploys against stale ones, silently.
-
-**The one deliberate difference** is the *mode*, and it follows from what the two
-environments are:
-
-- Staging **applies**. Staging is `main`, so reconciling its infrastructure on
-  every merge is the definition being enforced.
-- Production **asserts**. A promotion must never carry unrelated infra drift into
-  prod, so `release-prod.yml` calls `infra-prod.yml` with `mode: verify` — a
-  read-only `terraform plan -detailed-exitcode` that fails the release if prod
-  infra is behind the commit, and never applies. Applying prod infra stays a
-  separate deliberate act. `allow_infra_drift: true` skips the check for an
-  emergency promotion, as `force` skips the staging-green gate.
-
-That apply-vs-assert split *is* the reconcile-vs-promote distinction. Nothing
-else separates the two release workflows.
-
-The `verify` job deliberately declares no `environment:`. It only reads state,
-and `insolvia-production` carries required reviewers — declaring it would put a
-human approval in front of a read-only check at the head of every release. It
-still authenticates: `AWS_ROLE_ARN` is a repository secret and the deploy role's
-trust policy carries no environment condition. For the same reason it prints
-resource addresses rather than the diff, since prod state holds SecureString
-values.
+The pipeline declares no concurrency group of its own; each called workflow's
+deploy job holds its environment's group (`insolvia-terraform-staging` /
+`insolvia-terraform-prod`), and `needs` orders the legs. A group on both
+caller and callee would deadlock the callee behind its own parent.
 
 Both environments can also be planned before they are applied: `infra-staging.yml`
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
 summary. `shared-infra-plan.yml` validates every env offline on a PR, which
 catches syntax and type errors but can never show what a change would *do*.
 
-### Production deploys promote; they do not rebuild
+### Production promotes; it does not rebuild
 
-Merging to `main` ships staging. Production is a separate, manual dispatch —
-`./scripts/prod-deploy.sh <target>`, or `release` to ship one commit to every
-service in order. Three things make that dispatch safe:
+The production stage ships **the whole product at the approved commit**, not
+the push's diff — staging legs are path-filtered, but you might merge five PRs
+and approve only the fifth run, and services touched by the first four must
+not be left behind. Three mechanisms make that promotion sound:
 
 - **It ships the artifact staging validated.** The container repositories are
   shared across environments (`infra/envs/shared`), so the image staging tested
-  is already in the repository prod pulls from. A prod deploy resolves the
+  is already in the repository prod pulls from. A prod leg resolves the
   commit's `sha-<commit>` tag to an immutable digest and deploys *that* — there
-  is no `docker build` in any prod workflow. The app is the one exception and
-  rebuilds, because it inlines its environment at build time (see *Environment
-  model* above); it pins an exact Expo SDK version so "same source" also means
-  "same bundler".
-- **It refuses commits staging never blessed.** `.github/actions/verified-commit`
-  fails the run unless that exact commit has a successful `release-staging.yml` run.
-  There is no `workflow_run` chain, so ordering is asserted rather than assumed.
-  `force: true` bypasses it for a hotfix, loudly, in the job summary.
+  is no `docker build` in any prod workflow. The `record` job completes the
+  tag set: a service the push didn't touch gets its currently-serving staging
+  digest tagged with the new commit, so every staging-green commit resolves
+  for every service. The app is the one exception and rebuilds, because it
+  inlines its environment at build time (see *Environment model* above); it
+  pins an exact Expo SDK version so "same source" also means "same bundler".
+- **Hand-dispatched prod deploys refuse commits staging never blessed.** The
+  `*-prod.yml` workflows stay individually dispatchable as the single-service
+  emergency path, each behind its own `insolvia-production` approval.
+  `.github/actions/verified-commit` blocks them unless the commit carries the
+  `insolvia/staging-release` commit status the `record` job stamps the moment
+  a staging stage finishes green. (A status, not a run conclusion — a release
+  run's conclusion now includes the production stage, so "cancelled" no longer
+  says anything about staging.) `force: true` bypasses it for a hotfix,
+  loudly, in the job summary.
 - **Traffic moves last.** The API and marketing SSR Lambdas sit behind a `live`
   alias. A deploy publishes a new version, smoke-tests it by its own version
   ARN while nothing routes to it, and shifts the alias only on success — so a
   failed smoke test leaves the previous version serving instead of leaving a
   broken build live. Rollback is `aws lambda update-alias --function-version
-  <previous>`: seconds, no rebuild, no image pull.
-
-Prod deploys do not run `terraform apply`. Applying prod infrastructure is
-`infra-prod.yml` alone (`prod-deploy.sh prod-infra`, `mode: plan` by default),
-so a routine code deploy cannot carry unrelated infra drift into production. A
-release does *verify* prod infra first, read-only — see *Staging and production
-deploy the same way* above.
-
-The human gate is the `insolvia-production` GitHub Environment's **required
-reviewers** — like the required status checks below, that is a repo-settings
-change nothing in this repo can make for itself.
+  <previous>`: seconds, no rebuild, no image pull. A full re-promotion of an
+  older commit is a re-run of its green release run, approved again.
 
 ### PR gates have no `paths:` filter — on purpose
 

@@ -369,7 +369,8 @@ ci-trust  →  shared  →  staging  →  prod
 *assumes* to apply everything else. It is **human-applied only** — no CI
 workflow touches it — because the deploy role can't grant itself permissions
 (`DenySelfPrivilegeEscalation`). Then `shared` (zone + cert + SES). CI applies
-`staging` on merge to `main`; `prod` is `workflow_dispatch`-gated. The ordering
+`staging` on merge to `main`; `prod` behind the release's `insolvia-production`
+approval (or an out-of-band `infra-prod.yml` dispatch). The ordering
 is not ceremonial, for two independent reasons: every env looks the cert up
 with `statuses = ["ISSUED"]`, **and** every env looks its container
 repositories up with `data "aws_ecr_repository"`. Both hard-fail until

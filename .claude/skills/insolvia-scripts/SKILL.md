@@ -63,8 +63,9 @@ already working.
 | Want to… | Run | Notes |
 |---|---|---|
 | Seed the ECR image an env's Image-package Lambdas need before Terraform can create them | `scripts/bootstrap-ecr-images.sh <env> [api\|mailer\|marketing] [--dispatch] [--yes]` | Breaks the documented first-apply deadlock |
-| Dispatch a **production** deploy (prod is `workflow_dispatch`-only) | `scripts/prod-deploy.sh` (`--list`, `--ref`, `--input`, `--yes`, `--no-watch`) | Uses `gh`; watches the run. Promotes the staging-validated image rather than rebuilding, and refuses commits staging never shipped green. `release` chains every service |
 | Apply `infra/envs/ci-trust` (OIDC provider + deploy role + policy) after a deploy fails on a newly-granted IAM permission | `scripts/apply-ci-trust.sh` | Human-gated; CI **cannot** apply this. See **insolvia-deploy-role-permissions** |
 | Add / remove / show a required status check on `main`'s `protect-main` ruleset | `scripts/update-ruleset.sh [show\|add\|remove] "<check name>"` | Resolves the ruleset **by name**, never a hard-coded id, and re-PUTs the whole ruleset so it can't drop the other rules. Names must match a workflow job's `name:` exactly. See **insolvia-branch-protection** |
 
-Staging deploys automatically on merge to `main` — there is no staging script.
+There is no deploy script at all: staging deploys automatically on merge to
+`main`, and production ships by approving the release run's `promote` gate in
+the GitHub UI. See the **insolvia-deploy** skill.

@@ -12,9 +12,10 @@ name: App · Deploy · Production
 #
 # What this workflow guarantees instead is SOURCE-level promotion, tightened at
 # both ends:
-#   • the commit must have a successful `app-staging.yml` run before it can
-#     ship (.github/actions/verified-commit), and the build is checked out at
-#     that exact commit rather than whatever main points at now, and
+#   • the commit must carry the `insolvia/staging-release` commit status
+#     (.github/actions/verified-commit) before it can ship, and the build is
+#     checked out at that exact commit rather than whatever main points at
+#     now, and
 #   • the Node major is pinned and the install is `npm ci` from a committed
 #     lockfile, so "same source" also means "same toolchain and same dependency
 #     tree". A prod rebuild weeks after the staging run resolves the identical
@@ -25,13 +26,19 @@ name: App · Deploy · Production
 # is a real option and deliberately not taken — it would reverse the documented
 # compile-time environment decision.
 #
-# This workflow does not apply Terraform — `infra-prod.yml` is the only path
-# that mutates prod infrastructure.
+# THE NORMAL WAY IN is release.yml: its production stage calls this after its
+# own staging stage went green and its single `insolvia-production` approval
+# was given, passing `gated: true` so this workflow does not ask for a second
+# approval. Dispatching this BY HAND is the exception — a single-service
+# emergency deploy — and that path brings its own `approve` gate.
+#
+# This workflow does not apply Terraform. Prod infra applies as the first leg
+# of an approved release (release.yml → infra-prod.yml), or via infra-prod.yml
+# dispatched on its own.
 #
 # ── Why the commit is resolved in its own job ─────────────────────────────────
-# `resolve` is deliberately NOT `environment: insolvia-production`-gated; only
-# `deploy` is. It touches no AWS credentials and publishes nothing, so running
-# it first means a commit that never passed staging is rejected BEFORE anyone is
+# `resolve` touches no AWS credentials and publishes nothing, so running it
+# first means a commit that never passed staging is rejected BEFORE anyone is
 # asked to approve a production deploy.
 #
 # ── No desktop publishing, by decision ────────────────────────────────────────
@@ -51,9 +58,8 @@ on:
         default: false
         type: boolean
 
-  # Also callable by the Release · Production orchestrator, which chains the
-  # services in a defined order. Same inputs as the manual dispatch above, so
-  # there is exactly one code path either way.
+  # Also callable by the Release pipeline, which chains the services in a
+  # defined order behind its one approval. Same code path as a manual dispatch.
   workflow_call:
     inputs:
       sha:
@@ -65,22 +71,21 @@ on:
         required: false
         default: false
         type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
-  # Reading the staging workflow's run conclusions.
-  actions: read
-
-# This workflow applies no Terraform, but the group still serializes it
-# against infra-prod.yml, so a deploy cannot land mid-apply while the bucket
-# or distribution is being reconciled underneath it.
-concurrency:
-  group: insolvia-terraform-prod
-  cancel-in-progress: false
+  # Reading the insolvia/staging-release commit status.
+  statuses: read
 
 jobs:
-  # Resolve + verify once, before the production environment gate below.
+  # Resolve + verify once, with no credentials and no environment — see the
+  # header note on why this is its own job.
   resolve:
     runs-on: ubuntu-latest
     outputs:
@@ -91,14 +96,35 @@ jobs:
       - id: commit
         uses: ./.github/actions/verified-commit
         with:
-          staging-workflow: release-staging.yml
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
 
-  deploy:
-    needs: [resolve]
+  # The human gate, and ONLY for a direct dispatch: release.yml already put
+  # its own approval in front of the whole production stage and says so with
+  # `gated: true`. (`inputs.gated` is absent on a plain dispatch, so the
+  # comparison reads null there — which is not true, and the gate runs.)
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
     runs-on: ubuntu-latest
     environment: insolvia-production
+    steps:
+      - run: echo "Production deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  # `!cancelled() && !failure()` rather than the default `success()`: when the
+  # release pipeline calls this, `approve` is SKIPPED, and the default would
+  # silently skip the deploy behind it. A failed or rejected gate still stops it.
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    # This job applies no Terraform, but the group still serializes it
+    # against infra-prod.yml, so a deploy cannot land mid-apply while the bucket
+    # or distribution is being reconciled underneath it. Job-level, not
+    # workflow-level, so a dispatch parked at `approve` holds nothing.
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
     steps:
       # Checked out at the verified commit, not at whatever `main` points at
       # now — the whole point of the `resolve` job above.
@@ -127,12 +153,14 @@ jobs:
       # Only the step ORDER changed; this is the same read-only `terraform
       # output` this workflow has always done.
       #
-      # It is race-free for a reason specific to prod: this workflow applies no
-      # Terraform, `infra-prod.yml` is the only thing that applies
+      # It is race-free for a reason specific to prod: this job applies no
+      # Terraform, infra-prod.yml is the only thing that applies
       # infra/envs/prod, and the `insolvia-terraform-prod` concurrency group
       # above serializes the two — so no apply can be in flight while these
-      # outputs are read. (Staging cannot rely on that, because it applies in
-      # the same run; see the job-order note in app-staging.yml.)
+      # outputs are read. In a release run, `needs` additionally orders this
+      # leg after the prod infra apply for the same commit. (Staging cannot
+      # rely on that, because it applies in the same run; see the job-order
+      # note in app-staging.yml.)
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}

@@ -14,7 +14,7 @@ The design constraints these obey come from issue #40; #80 is the first test.
   reasoning is owned by the `//` comments in the root `package.json` — read them
   before "tidying" this in.
 - **Never a required PR check.** These run post-deploy in `app-staging.yml` —
-  the last leg of `release-staging.yml` — not
+  the last staging leg of `release.yml` — not
   in any `*-pr.yml`. Slow, environment-dependent E2E stays out of the required
   set (`docs/reference/architecture.md` § Required status checks); adding it
   there would put staging's availability on the merge path for every PR.

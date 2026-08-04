@@ -5,11 +5,11 @@ name: Infra · Terraform · Staging
 #
 # This is the direct counterpart of infra-prod.yml. It used to say the opposite,
 # because staging's four service workflows each applied this root module
-# themselves before deploying. release-staging.yml removed that: the service
+# themselves before deploying. release.yml removed that: the service
 # workflows now only `init` and read outputs, and this workflow owns the apply.
 #
 # TWO WAYS IN, ONE CODE PATH
-#   • `workflow_call` from release-staging.yml with `mode: apply` — the first
+#   • `workflow_call` from release.yml with `mode: apply` — the first
 #     job of every staging release, ordered ahead of the service legs because
 #     they read the outputs it produces.
 #   • `workflow_dispatch` by hand, defaulting to `mode: plan`.
@@ -23,22 +23,19 @@ name: Infra · Terraform · Staging
 # replace a resource. `infra-prod.yml` defaults to `plan` for the same reason.
 #
 # THE ONE ASYMMETRY WITH PROD, AND ITS REASON
-# Both releases run infra as their first job, because in both environments the
-# service legs read the outputs it produces. What differs is the mode:
-# release-staging.yml calls this workflow with `mode: apply`; release-prod.yml
-# calls infra-prod.yml with `mode: verify`, which only ASSERTS that prod infra
-# already matches the commit and fails the release if it does not.
-#
-# Staging IS `main`, so reconciling its infrastructure on every merge is the
-# definition being enforced. Production is a promotion, so an automatic apply
-# would let a code release carry unrelated infra drift into prod — there,
-# applying stays a separate, deliberate act. infra-prod.yml's header has the
-# long form.
+# Both stages of release.yml run infra as their first job with `mode: apply`,
+# because in both environments the service legs read the outputs it produces.
+# What differs is what stands in front of the apply: nothing here — staging IS
+# `main`, so reconciling its infrastructure on every merge is the definition
+# being enforced — while the prod apply sits behind the release's
+# `insolvia-production` approval, for the exact commit staging just validated.
+# infra-prod.yml's header has the long form.
 
 on:
-  # Dispatched by hand for a plan; called by release-staging.yml with
+  # Dispatched by hand for a plan; called by release.yml with
   # `mode: apply` as the first job of every staging release. One code path
-  # either way, exactly as the prod workflows are reusable for release-prod.yml.
+  # either way, exactly as infra-prod.yml is reusable for the release's
+  # production stage.
   workflow_dispatch:
     inputs:
       mode:
@@ -65,7 +62,7 @@ permissions:
 # hand-dispatched service deploy is mid-flight could rewrite a Lambda's
 # configuration underneath it. Same reasoning as infra-prod.yml's group.
 #
-# release-staging.yml deliberately declares NO group of its own: a group on both
+# release.yml deliberately declares NO group of its own: a group on both
 # the caller and the callee deadlocks the callee behind its own parent, and
 # `needs` already orders the legs.
 concurrency:
