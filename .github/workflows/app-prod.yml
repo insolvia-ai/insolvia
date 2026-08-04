@@ -86,7 +86,7 @@ jobs:
     outputs:
       sha: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - id: commit
         uses: ./.github/actions/verified-commit
@@ -103,13 +103,13 @@ jobs:
       # Checked out at the verified commit, not at whatever `main` points at
       # now — the whole point of the `resolve` job above.
       - name: Check out the verified commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.resolve.outputs.sha }}
 
       # Must match the root package.json's `engines.node` (">=24"). Pinning the
       # major is what makes "same source" mean "same toolchain" — see the header.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -133,12 +133,12 @@ jobs:
       # above serializes the two — so no apply can be in flight while these
       # outputs are read. (Staging cannot rely on that, because it applies in
       # the same run; see the job-order note in app-staging.yml.)
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "~1.10"
           # The wrapper interposes on stdout, which corrupts the

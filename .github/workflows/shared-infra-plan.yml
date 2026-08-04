@@ -33,7 +33,7 @@ jobs:
         # shared/staging/prod); they run for coverage, not as gates.
         env: [shared, staging, prod, ci-trust, dev]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history so the guard can diff against the PR base commit.
           fetch-depth: 0
@@ -47,12 +47,12 @@ jobs:
             .github/workflows/shared-infra-plan.yml
             .github/actions/changed-paths/action.yml
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         if: steps.filter.outputs.run == 'true'
         with:
           terraform_version: "~1.10"
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
         if: steps.filter.outputs.run == 'true'
         with:
           tflint_version: v0.62.0

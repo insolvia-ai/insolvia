@@ -175,7 +175,7 @@ The marketing site is in **this** repository, so its workflows install with the
 automatic `secrets.GITHUB_TOKEN` — no PAT, nothing to rotate:
 
 ```yaml
-- uses: actions/setup-node@v4
+- uses: actions/setup-node@v5
   with:
     node-version: "24"
     cache: npm

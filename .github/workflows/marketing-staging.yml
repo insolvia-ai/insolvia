@@ -67,10 +67,10 @@ jobs:
     # that don't declare the environment — they resolve silently to "".
     environment: insolvia-staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # ── 1. Build the app ──────────────────────────────────────────
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -90,12 +90,12 @@ jobs:
         working-directory: apps/insolvia_marketing
 
       # ── 2. Infra: apply + read outputs ────────────────────────────
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "~1.10"
           # The wrapper interleaves its own stdout, which corrupts

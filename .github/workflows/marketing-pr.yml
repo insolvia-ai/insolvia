@@ -26,7 +26,7 @@ jobs:
     steps:
       # `actions/checkout` ignores `defaults.run.working-directory` (it is not a
       # `run` step), so it still clones into the workspace root as intended.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history so the guard can diff against the PR base commit.
           fetch-depth: 0
@@ -47,7 +47,7 @@ jobs:
             .github/actions/changed-paths/action.yml
 
       # Must match the app's `engines.node` (">=24").
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.filter.outputs.run == 'true'
         with:
           node-version: "24"
@@ -129,7 +129,7 @@ jobs:
       # locally. Not a `run` step, so the path is from the repo root.
       - name: Upload Lighthouse reports
         if: failure() && steps.filter.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: lighthouse-reports
           path: apps/insolvia_marketing/.lighthouseci/reports

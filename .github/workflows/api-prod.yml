@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: insolvia-production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - id: commit
         uses: ./.github/actions/verified-commit
@@ -80,12 +80,12 @@ jobs:
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "~1.10"
           # The wrapper interposes on stdout, which corrupts the
