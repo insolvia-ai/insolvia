@@ -87,7 +87,7 @@ jobs:
     # that don't declare the environment — they resolve silently to "".
     environment: insolvia-production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - id: commit
         uses: ./.github/actions/verified-commit
@@ -100,12 +100,12 @@ jobs:
       # No `npm ci` / `npm run build` here any more, and no docker build. Both
       # the SSR server bundle AND the hashed client assets are promoted out of
       # the image staging validated (see step 4).
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "~1.10"
           # The wrapper interleaves its own stdout, which corrupts

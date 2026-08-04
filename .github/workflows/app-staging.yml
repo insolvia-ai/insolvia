@@ -60,14 +60,14 @@ jobs:
       auth_domain: ${{ steps.tf.outputs.auth_domain }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "~1.10"
           # The wrapper interposes on stdout, which corrupts the
@@ -104,12 +104,12 @@ jobs:
     needs: [terraform]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Must match the root package.json's `engines.node` (">=24"). No
       # `cache-dependency-path`: the app is an npm workspace member, so the
       # lockfile is the repo-root one setup-node already looks for by default.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -168,7 +168,7 @@ jobs:
 
           npm run build --workspace apps/insolvia_app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: insolvia-web-staging
           path: apps/insolvia_app/dist
@@ -184,14 +184,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: insolvia-staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: insolvia-web-staging
           path: web
@@ -280,12 +280,12 @@ jobs:
     # silence — the suite fails fast on that rather than signing in as nobody.
     environment: insolvia-staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # `e2e/` is NOT an npm workspace member (see the `//` note in its
       # package.json), so it installs from its OWN lockfile — which is what
       # catches a dependency it forgot to declare.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm

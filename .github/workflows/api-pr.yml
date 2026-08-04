@@ -20,7 +20,7 @@ jobs:
       run:
         working-directory: services/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history so the guard can diff against the PR base commit.
           fetch-depth: 0
@@ -35,7 +35,7 @@ jobs:
             .github/workflows/api-pr.yml
             .github/actions/changed-paths/action.yml
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: steps.filter.outputs.run == 'true'
         with:
           # Matches the Lambda base image (public.ecr.aws/lambda/python:3.12)

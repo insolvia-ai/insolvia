@@ -26,7 +26,7 @@ jobs:
     name: Design system
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history so the guard can diff against the PR base commit.
           fetch-depth: 0
@@ -65,7 +65,7 @@ jobs:
       # `cache-dependency-path`, unlike design-system-react-pr.yml: the
       # lockfile this job installs from is the repo-root one setup-node already
       # looks for by default — the package has no lockfile of its own.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.filter.outputs.run == 'true'
         with:
           node-version: "24"
