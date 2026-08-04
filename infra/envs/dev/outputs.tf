@@ -18,6 +18,16 @@ output "waitlist_table_name" {
   value       = aws_dynamodb_table.waitlist.name
 }
 
+output "case_table_name" {
+  description = "This machine's case DynamoDB table (CASE_TABLE_NAME for the local API)."
+  value       = module.case_store.table_name
+}
+
+output "case_kms_key_alias" {
+  description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
+  value       = module.case_store.kms_key_alias
+}
+
 output "auth_user_pool_id" {
   description = "This machine's Cognito user pool ID."
   value       = module.auth.user_pool_id

@@ -178,6 +178,93 @@ the client id into `/insolvia/<env>/api/`, the deploy workflow derives them into
 `token_use == "access"` and `client_id` against the pool's JWKS. Auth fails
 **closed** — missing config is a 401 on every protected route, never a bypass.
 
+## Case data store (`infra/modules/case_store/`)
+
+The first persistent store of GLBA-scope data in the account — SSNs, full
+financials — so the posture here is the one to copy, not to improvise on. The
+logical model it holds is
+[`case-data-model.md`](case-data-model.md); this section is how it is
+protected. One instance per environment — `insolvia-cases-staging`,
+`insolvia-cases-prod`, and `insolvia-cases-dev-<short-id>` on each developer
+machine — each under its own key. Local is the same module, not an
+approximation of it: there is no DynamoDB emulator here, so a KMS or IAM
+mistake surfaces on a laptop instead of after a deploy.
+
+**Encryption at rest.** A customer-managed KMS key per environment
+(`alias/insolvia-cases-<env>`), rotation enabled, with the DynamoDB table's
+`server_side_encryption` pointed at it. `enabled = true` alone would use the
+AWS-owned DynamoDB key, which is not a key we control — the distinction is the
+entire point. Staging and prod never share a key: the key is what makes prod
+data unreadable to a staging mistake. In transit, every path is TLS — the API
+reaches DynamoDB over the AWS SDK's HTTPS endpoint, and there is no other
+caller.
+
+**Who can read a case.** Exactly one principal: the API Lambda's execution
+role, per [ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md). Two
+grants, deliberately disjoint:
+
+| Principal | Table | Key |
+|---|---|---|
+| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb` |
+| CI deploy role | Control plane only — create, update, tag, PITR | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
+
+The API role's key grant is easy to mistake for redundancy, because DynamoDB
+creates its own grant when the table is built. It is not: that grant covers
+DynamoDB's key management, while the table-key `Decrypt` behind a read is
+issued **on behalf of the calling principal**, against a per-caller cached key
+that re-checks IAM when it expires. Delete the grant and reads keep working
+until the cache turns over — the worst failure shape there is.
+
+Table reads and writes additionally require `aws:SecureTransport`. The
+DynamoDB endpoint accepts plain HTTP, and the SDK preferring HTTPS is a default
+rather than a guarantee; the condition makes TLS in transit a control instead
+of an assumption.
+
+The absence of `dynamodb:Scan` is load-bearing rather than tidy: every read in
+the model is keyed, and a Scan on this table is a full read of every debtor's
+financials. Adding one should require a diff that says so.
+
+**On the key policy, and "no human read paths in prod".** The key policy grants
+the account root `kms:*` — AWS's default, and it means "IAM identity policies
+decide", not "everyone can decrypt". The stricter alternative, naming only the
+API role and omitting root, is what would make "no human read path" a property
+of the key itself; it is rejected because a key policy naming no principal able
+to change it is unrecoverable. The property is delivered instead by no human
+principal holding DynamoDB data-plane or KMS decrypt permissions, and by the
+deploy role's explicit deny in `infra/envs/ci-trust`. That is a weaker
+guarantee honestly stated, rather than a stronger one that risks locking the
+account out of its own data.
+
+**Backups.** Point-in-time recovery on both environments. Note what PITR does
+*not* cover: a restore is encrypted under the same key, so scheduling the key's
+deletion destroys the backups too. Prod therefore carries the maximum 30-day
+key deletion window and DynamoDB deletion protection; staging carries neither,
+holding only synthetic data.
+
+The key itself has no `prevent_destroy`, which looks like an omission and is
+not. It would bind staging too — `prevent_destroy` takes a literal, not a
+variable — and staging's disposability is the point. Prod's key is defended
+twice over instead: the table depends on the key, so a `terraform destroy`
+reaches the table first and aborts on its deletion protection, and even a
+scheduled key deletion is cancellable for 30 days.
+
+**Audit logging** is not in this module yet — a CloudTrail trail with data
+events on the table is the follow-up to issue 8.2, and `infra/envs/ci-trust`
+already carries the permissions for it. One limit worth knowing before relying
+on it: because ADR 0001 makes the API role the only application principal,
+trail data events show `insolvia-api-<env>-role` for every read and never the
+end user. "Which signed-in user read this SSN" is necessarily an
+application-level log the API writes itself.
+
+**Wiring.** The module takes `api_role_name` — a name, not an ARN — looks the
+role up with a data source, and attaches the table grant from its own side.
+That is the mailer's pattern, and it is what avoids a cycle, since
+`api_service` must not know this module exists. For the same reason the table
+name reaches the API through an **env-level** `aws_ssm_parameter` rather than
+through `api_service`'s own parameter map, landing as `CASE_TABLE_NAME` via the
+deploy workflow's existing `get-parameters-by-path` step. The key ARN is not
+published: DynamoDB decrypts under its own grant, so the API never names it.
+
 ## Per-machine development environment (`infra/envs/dev/`)
 
 One instance of this env exists **per developer machine**. A UUID generated
@@ -198,6 +285,14 @@ What it owns is deliberately only what local dev consumes today:
 - **DynamoDB** `insolvia-waitlist-dev-<short-id>` — same PK/SK schema as
   `api_service`'s table so the API's adapter behaves identically, but PITR is
   **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
+- **Case store** via the same `modules/case_store` as staging/prod —
+  `insolvia-cases-dev-<short-id>` under this machine's own customer-managed
+  key, so the owner index and the encrypted read path behave here exactly as
+  they do deployed. PITR and deletion protection are **off** and the key
+  deletion window is the minimum 7 days, so a teardown does not leave a
+  month-long pending key behind. `api_role_name` is null — there is no Lambda,
+  so no grant is created and the developer's own credentials are the
+  principal.
 - **Auth** via the same `modules/auth` as staging/prod —
   `insolvia-users-dev-<short-id>`, hosted-domain prefix
   `insolvia-dev-<short-id>` (Cognito domain prefixes are globally unique

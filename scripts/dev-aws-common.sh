@@ -84,6 +84,7 @@ load_aws_identity() {
   # What infra/envs/dev actually names things — asserted before any
   # destructive action ever touches a resource.
   WAITLIST_TABLE_NAME_EXPECTED="insolvia-waitlist-$DEV_ENVIRONMENT"
+  CASE_TABLE_NAME_EXPECTED="insolvia-cases-$DEV_ENVIRONMENT"
   USER_POOL_NAME_EXPECTED="insolvia-users-$DEV_ENVIRONMENT"
   STATE_KEY="insolvia/dev/$AWS_ACCOUNT_ID/$MACHINE_ID/terraform.tfstate"
 }

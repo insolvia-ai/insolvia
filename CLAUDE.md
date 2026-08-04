@@ -21,6 +21,16 @@ not here.
   addresses, or customer/case data.
 - Never commit to `main` — work on a branch (`claude/<name>-<id>`) and open a PR.
   *(A `PreToolUse` hook enforces this.)*
+- **Three environments, every time: local, staging, prod.** A change is not
+  finished when staging and prod are wired — say what it does on a developer's
+  machine, and do that too. `infra/envs/dev` is a real environment
+  (per-machine, applied by `scripts/dev-aws-*`), not a nicety.
+- **Everything must be testable locally**, unless there is a reason good enough
+  to write down. If a thing genuinely cannot be — it needs the OIDC deploy
+  role, a real CloudFront distribution, an SES production identity — say so
+  explicitly in the PR and give the nearest local approximation. "You'll see it
+  on staging" is not a plan; it moves the feedback loop from seconds to a
+  deploy, and it hides failures that only reproduce with real data.
 
 ## The map
 

@@ -2,11 +2,11 @@
 # `curl http://127.0.0.1:8080/health`.
 #
 # There is no local DynamoDB emulator: the container talks to this machine's
-# REAL per-developer AWS waitlist table
+# REAL per-developer AWS tables — the waitlist table and the case store
 # (infra/envs/dev), provisioned by ./scripts/dev-aws-setup.sh. That script
 # writes services/api/.env (gitignored), which compose auto-reads for the
-# ${VAR:-default} substitutions below — WAITLIST_TABLE_NAME names the
-# per-machine table.
+# ${VAR:-default} substitutions below — WAITLIST_TABLE_NAME and
+# CASE_TABLE_NAME name the per-machine tables.
 #
 # AWS credentials are never written to a file: scripts/dev-up.sh exports
 # short-lived credentials from the developer's AWS profile into the shell
@@ -21,6 +21,10 @@ services:
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
       WAITLIST_TABLE_NAME: ${WAITLIST_TABLE_NAME:-}
+      # Case store (issue 8.2). Encrypted under this machine's own
+      # customer-managed key, so a KMS permission mistake surfaces here
+      # rather than on staging.
+      CASE_TABLE_NAME: ${CASE_TABLE_NAME:-}
       # Auth (issue #79). Unset is safe and fails CLOSED: every protected
       # route answers 401 rather than skipping verification. Point them at
       # this machine's own Cognito pool (infra/envs/dev outputs

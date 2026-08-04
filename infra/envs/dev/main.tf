@@ -15,6 +15,9 @@
 # today (see docs/reference/terraform.md):
 #   • the waitlist DynamoDB table — local dev's actual database (there is no
 #     local emulator; the compose stack's API talks straight to this table);
+#   • the case store via modules/case_store — the same module staging and prod
+#     instantiate, so local development exercises the real encrypted path
+#     rather than an approximation of it;
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet).
 # No ECR/Lambda/API Gateway/S3: local dev runs the API via compose or the
@@ -66,6 +69,36 @@ resource "aws_dynamodb_table" "waitlist" {
   tags = local.common_tags
 }
 
+# ── Case store (issue 8.2) ──────────────────────────────────────
+# The SAME module staging and prod use, not a hand-rolled copy — which is the
+# whole point. The table's keys, its owner index and its customer-managed key
+# behave here exactly as they do deployed, so the DynamoDB adapter, the GSI
+# query behind GET /v1/cases, and any KMS permission mistake all surface on a
+# laptop instead of on staging.
+#
+# Three deliberate differences from the deployed instances, all for the same
+# reason the waitlist table above diverges — this is throwaway data on a
+# machine, not a case file:
+#   • PITR off — a developer wipes this with dev-aws-reset.sh.
+#   • Deletion protection off — dev-aws-destroy.sh has to be able to remove it.
+#   • The minimum 7-day key deletion window, so a destroy does not leave a
+#     30-day pending key (and a monthly charge) behind on every teardown.
+#
+# api_role_name is null: there is no Lambda here. The developer's own IAM user
+# is the principal, and it reaches the key through the key policy's root
+# delegation, exactly as an admin would.
+module "case_store" {
+  source = "../../modules/case_store"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  api_role_name               = null
+  point_in_time_recovery      = false
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
+
 # ── Auth ────────────────────────────────────────────────────────
 # The same module staging and prod instantiate, with the machine environment
 # name. The Cognito hosted-domain prefix the module derives
@@ -112,5 +145,17 @@ resource "aws_ssm_parameter" "auth_client_id" {
   name  = "/insolvia/${local.environment}/api/auth-client-id"
   type  = "String"
   value = module.auth.web_client_id
+  tags  = local.common_tags
+}
+
+# Same reasoning as the auth parameters above: nothing reads it here, but
+# keeping the namespace identical across every environment means "where does
+# CASE_TABLE_NAME come from" has one answer rather than two. The value a
+# developer actually consumes is the case_table_name output, which
+# dev-aws-setup.sh writes into services/api/.env.
+resource "aws_ssm_parameter" "case_table_name" {
+  name  = "/insolvia/${local.environment}/api/case-table-name"
+  type  = "String"
+  value = module.case_store.table_name
   tags  = local.common_tags
 }

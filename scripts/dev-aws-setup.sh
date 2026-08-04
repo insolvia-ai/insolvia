@@ -53,13 +53,17 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
     die "Terraform state does not match this machine ID."
   table="$(jq -r '.outputs.waitlist_table_name.value // empty' <<<"$state_json")"
+  case_table="$(jq -r '.outputs.case_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
+  [[ -n "$table" && -n "$case_table" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
     die "Development DynamoDB table '$table' is unavailable."
+  aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
+    die "Development case table '$case_table' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
     die "Development Cognito pool '$pool_id' is unavailable."
-  if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env"; then
+  if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
+    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
   ok "Per-machine AWS resources and services/api/.env are ready."
@@ -73,6 +77,7 @@ terraform -chdir="$TF_DIR" "${apply_args[@]}"
 
 outputs="$(terraform_output_json)"
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
+case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
@@ -85,6 +90,10 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 # ${VAR:-default} substitutions for exactly the keys below. So:
 #   • WAITLIST_TABLE_NAME here points the stack at this machine's table
 #     (dev-up.sh refuses to start without it).
+#   • CASE_TABLE_NAME points it at this machine's case store (issue 8.2),
+#     encrypted under this machine's own customer-managed key. Local work on
+#     anything storing case data needs it, and having it here means a KMS or
+#     IAM mistake fails on a laptop rather than after a deploy.
 #   • AWS_PROFILE is not read by compose at all — it is the profile name
 #     services/api/scripts/dev-up.sh uses to export short-lived credentials
 #     into the container at `compose up` time. Credentials are never written
@@ -100,6 +109,7 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 
 api_env="$API_DIR/.env"
 upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
+upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"

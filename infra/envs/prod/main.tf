@@ -235,3 +235,41 @@ module "marketing_site" {
   api_base_url = "https://${module.api_service.domain_name}"
   tags         = local.common_tags
 }
+
+# Case data store (issue 8.2): the first GLBA-scope persistent store — a
+# customer-managed key and the case table behind it. Declared after
+# module.api_service because it takes that module's execution role name and
+# attaches the table grant onto it from its own side (modules/case_store).
+#
+# Prod inverts staging's two settings: deletion protection on, and the maximum
+# key deletion window. Scheduling this key's deletion makes every case
+# permanently unreadable — PITR does not help, because the restore is
+# encrypted under the same key — so 30 days of second thoughts is the point.
+module "case_store" {
+  source = "../../modules/case_store"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  api_role_name               = module.api_service.lambda_role_name
+  deletion_protection         = true
+  key_deletion_window_in_days = 30
+  tags                        = local.common_tags
+}
+
+# Publish the case table name into the API's SSM config namespace, env-level
+# for the same reason mailer_api_url and the auth parameters above are:
+# module.case_store already depends on module.api_service, so having
+# api_service read the table name back would be a dependency cycle.
+#
+# Same /insolvia/<env>/api/<kebab-key> convention, so the deploy workflow's
+# get-parameters-by-path step derives it into CASE_TABLE_NAME with no workflow
+# change. The key ARN is deliberately NOT published: the SDK resolves the key
+# from the table, so nothing in services/api ever names it. That is NOT the
+# same as the API role needing no key permissions — it does, and
+# modules/case_store explains why.
+resource "aws_ssm_parameter" "case_table_name" {
+  name  = "/insolvia/${local.environment}/api/case-table-name"
+  type  = "String"
+  value = module.case_store.table_name
+  tags  = local.common_tags
+}

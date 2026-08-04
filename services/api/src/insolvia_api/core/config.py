@@ -60,6 +60,7 @@ class AppConfig:
 
     environment: str
     waitlist_table_name: str | None = None
+    case_table_name: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -77,6 +78,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     table behind POST /v1/waitlist — in local dev that is this machine's real
     per-developer table (scripts/dev-aws-setup.sh); unset means the in-memory
     store, which only unit tests and the bare development server use.
+    CASE_TABLE_NAME names the DynamoDB table holding case data (issue 8.2),
+    encrypted under a customer-managed key. Same SSM derivation and the same
+    unset-means-in-memory shape as WAITLIST_TABLE_NAME, and in local dev it is
+    likewise this machine's real per-developer table rather than an emulator.
+    Nothing reads it yet — the case routes and their store land with 8.3; the
+    value is wired now so local, staging and prod are configured identically
+    before the code that needs it arrives.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -107,6 +115,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     return AppConfig(
         environment=environment,
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
+        case_table_name=source.get("CASE_TABLE_NAME") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
