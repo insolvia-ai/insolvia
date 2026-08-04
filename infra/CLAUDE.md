@@ -37,19 +37,20 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   — a mismatch fails `AssumeRoleWithWebIdentity` with an unhelpful error. Keep it
   lowercase everywhere.
 - **Never `terraform apply` staging or prod from the CLI.** Those deploy in CI:
-  staging on merge to `main`, prod via `workflow_dispatch` (`scripts/prod-deploy.sh`).
-  The only legitimate local applies are your own dev env (`scripts/dev-aws-*`) and
-  the human-gated `ci-trust`. See the `insolvia-deploy` skill.
-- **One deploy model, both environments.** `release-staging.yml` (push to
-  `main`) and `release-prod.yml` (dispatch) each orchestrate reusable
-  `*-<env>.yml` service workflows with `needs`. **No service workflow applies
-  Terraform** — `infra-staging.yml` and `infra-prod.yml` are the only appliers
-  of their roots, and the service legs only read outputs. **Infra is the first
-  job of both releases**, because both sets of service legs read its outputs.
-  The single deliberate asymmetry is the mode: staging calls `mode: apply`
-  (staging *is* `main`), prod calls `mode: verify` — read-only, fails the
-  release if prod infra is behind the commit — so a promotion can never carry
-  infra drift. `docs/reference/architecture.md` owns the full comparison.
+  staging on merge to `main`, prod by approving the release run's `promote`
+  gate in the GitHub UI. The only legitimate local applies are your own dev
+  env (`scripts/dev-aws-*`) and the human-gated `ci-trust`. See the
+  `insolvia-deploy` skill.
+- **One pipeline, both environments.** `release.yml` (push to `main`) runs the
+  staging stage, parks at the `insolvia-production` approval, then runs the
+  production stage — each stage orchestrating reusable `*-<env>.yml` service
+  workflows with `needs`. **No service workflow applies Terraform** —
+  `infra-staging.yml` and `infra-prod.yml` are the only appliers of their
+  roots, and the service legs only read outputs. **Infra is the first job of
+  both stages**, because both sets of service legs read its outputs; the
+  staging apply is ungated (staging *is* `main`), the prod apply sits behind
+  the release's approval for the exact commit staging just validated.
+  `docs/reference/architecture.md` owns the full comparison.
 - **Before a large or risky change, dispatch the env's infra workflow with
   `mode: plan` and read it.** Both default to `plan`. `shared-infra-plan.yml`
   only validates offline (`init -backend=false`), so it catches syntax and type

@@ -33,9 +33,9 @@ name: Marketing · Deploy · Staging
 # gates — a `paths:` filter here is safe (same as api-staging.yml).
 
 on:
-  # Reusable: release-staging.yml calls this as one leg of a staging
+  # Reusable: release.yml calls this as one leg of a staging
   # release, and it stays dispatchable by hand for a single-service deploy.
-  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # The `push:` trigger moved to release.yml, which now owns both the
   # trigger and the path filtering for every staging deploy.
   workflow_call:
   workflow_dispatch:
@@ -48,13 +48,13 @@ permissions:
   # does not get the symlink the app does — see the root package.json). The
   # job's GITHUB_TOKEN needs read access to pull it.
   #
-  # release-staging.yml must hold this too: a called workflow cannot request a
+  # release.yml must hold this too: a called workflow cannot request a
   # permission its caller lacks, and the whole run is rejected at startup.
   packages: read
 
 # Held while this workflow deploys, and shared with infra-staging.yml so a
 # hand-dispatched single-service deploy cannot overlap a Terraform apply.
-# release-staging.yml deliberately declares NO group of its own: a group on both
+# release.yml deliberately declares NO group of its own: a group on both
 # caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging

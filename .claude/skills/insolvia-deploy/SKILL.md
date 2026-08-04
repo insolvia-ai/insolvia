@@ -16,42 +16,64 @@ description: >-
 **Deploys run in GitHub Actions, triggered by git — not from anyone's CLI.**
 The only credential that touches staging/prod AWS is the CI OIDC deploy role.
 
-## How each thing ships
+## The pipeline
+
+One workflow, `release.yml`, owns the whole path to production:
+
+1. **Merge to `main`.** The staging stage runs automatically: staging infra
+   applies, then the changed services deploy (path-filtered), in dependency
+   order.
+2. **Staging goes green → the run parks at the `promote` job**, waiting on the
+   `insolvia-production` environment's required reviewer.
+3. **Approve it in the GitHub UI** (the run's page, "Review deployments" —
+   one click, once). The production stage then ships the same commit: prod
+   infra applies, then every service promotes.
+
+So the deploy procedure is: **open a PR, get it merged, approve the pending
+release run when you want prod to have it.** There is no script and no
+dispatch in the normal path. Not approving is fine — each new green staging
+run cancels older pending ones, so the offer is always the newest validated
+commit, and an unapproved run ending `cancelled` is normal, not a failure.
 
 | Target | Trigger |
 |---|---|
-| **staging** (api, app, mailer, marketing) | **automatic on merge to `main`** — each `*-staging.yml` has a `paths:` filter, so merging a change to that area deploys it |
+| **staging** (infra + api, app, mailer, marketing) | automatic on merge to `main` — the staging stage of `release.yml` |
+| **prod** (infra + all services) | approving the `promote` gate of a green `release.yml` run |
 | **shared infra** | automatic on merge to `main` (`shared-infra-deploy.yml`, paths `infra/envs/shared/**`) |
-| **prod** (api, app, mailer, marketing) | **`workflow_dispatch` only** — dispatch via `./scripts/prod-deploy.sh` (uses `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`). Target `release` ships one commit to every service in order |
-| **prod infra** | `infra-prod.yml`, `workflow_dispatch` with `mode: plan` (default, read-only → job summary) or `mode: apply` |
+| **one prod service, out of band** | dispatch its `*-prod.yml` (emergency path: staging-green check + its own approval) |
+| **prod infra, out of band** | dispatch `infra-prod.yml` — `mode: plan` (default, read-only → job summary) or `mode: apply` |
 
-So the deploy procedure is: **open a PR, get it merged to `main`** (staging ships
-itself), and for prod, **dispatch the workflow** with `./scripts/prod-deploy.sh`.
+## What the production stage actually does
 
-## What a prod deploy actually does
-
-It **promotes**, it does not rebuild. The container repositories are shared
-across environments, so the image staging validated is already in the
-repository prod pulls from; the workflow resolves that commit's `sha-<commit>`
-tag to an immutable digest and deploys it. Three consequences worth knowing
+It **promotes**, it does not rebuild — and it promotes **everything at the
+approved commit**, not just what that push changed. You can merge five PRs and
+approve only the fifth run; nothing is left behind. Details worth knowing
 before you debug one:
 
-- **A prod deploy refuses a commit staging never shipped green.** That is
-  `.github/actions/verified-commit`, and the fix is normally "let staging
-  deploy first", not `force: true`. Use `--input sha=<commit>` to pin exactly
-  what ships instead of taking main's HEAD.
-- **"No promotable image" means staging never pushed one** for that commit —
-  usually its `paths:` filter skipped that service. Not an error to force past.
-- **Prod deploys never `terraform apply`.** Infra changes reach prod ONLY
-  via `prod-deploy.sh prod-infra --input mode=apply`. If you changed
-  `infra/` and dispatched a service deploy expecting it to land, it did not.
+- The container repositories are shared across environments, so the image
+  staging validated is already in the repository prod pulls from; each leg
+  resolves the commit's `sha-<commit>` tag to an immutable digest and deploys
+  that. The `record` job guarantees the tag exists for *every* service at
+  *every* staging-green commit (unchanged services get the digest staging is
+  currently serving). The app is the one exception and rebuilds from the
+  verified commit, because it bakes its environment in at build time.
+- **Prod infra applies as the first leg of the approved release** — same
+  shape as staging, behind the approval. `infra-prod.yml` stays dispatchable
+  for a read-only plan or an out-of-band apply.
+- **A hand-dispatched prod deploy refuses a commit staging never validated.**
+  That is `.github/actions/verified-commit` reading the
+  `insolvia/staging-release` commit status the `record` job stamps; the fix is
+  normally "let staging release it first", not `force: true`.
 
-Rolling back the API or marketing does not need this pipeline at all — they
+Rolling back the API or marketing does not need the pipeline at all — they
 serve through a `live` Lambda alias, so
 `aws lambda update-alias --function-name <fn> --name live --function-version <previous>`
 reverts in seconds. That is a read of the alias plus one write; it is the one
 production mutation that is faster by hand than through CI, and the job summary
 of every deploy prints the exact command with the previous version filled in.
+For a full re-promotion of an older commit, re-run its (green) `release.yml`
+run and approve the gate again, or dispatch the individual `*-prod.yml`
+workflows with `sha=<commit>`.
 
 ## The rule
 
@@ -73,4 +95,4 @@ offline with no credentials).
 - **The `ci-trust` anchor** — `scripts/apply-ci-trust.sh`, human-gated because CI
   cannot apply its own permissions (see `insolvia-deploy-role-permissions`).
 
-Everything else is a merge or a dispatch, never a hand-run apply.
+Everything else is a merge, an approval, or a dispatch — never a hand-run apply.

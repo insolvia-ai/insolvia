@@ -58,13 +58,14 @@ runs:
           --output text 2>/dev/null || true)"
 
         if [[ -z "$digest" || "$digest" == "None" ]]; then
-          echo "::error::No image tagged $tag in $repo_name — staging never pushed this commit."
+          echo "::error::No image tagged $tag in $repo_name — no staging release recorded this commit."
           {
             echo ":no_entry: **No promotable image.** \`$repo_name\` has no \`$tag\`."
             echo
-            echo "The staging deploy for this commit is what pushes it. If staging"
-            echo "was skipped by a \`paths:\` filter, this service has nothing new"
-            echo "to ship for this commit."
+            echo "A staging release stamps this tag for every service (release.yml's"
+            echo "\`record\` job — built images directly, unchanged services by copying"
+            echo "the \`staging\` marker). Its absence means no staging release went"
+            echo "green at this commit; commits older than the pipeline never got one."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
         fi

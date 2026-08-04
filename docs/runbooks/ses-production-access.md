@@ -79,10 +79,11 @@ before submitting:
 
 1. **`www.insolvia.ai` is parked offline.** `infra/envs/prod/main.tf` sets
    `site_enabled = false` — CloudFront serves a 403 and rows 1 and 2 above
-   both fail. Nothing is destroyed; flip it to `true` and apply prod infra:
+   both fail. Nothing is destroyed; flip it to `true`, merge, and approve the
+   release — or apply prod infra out of band:
 
    ```bash
-   ./scripts/prod-deploy.sh prod-infra --input mode=apply
+   gh workflow run infra-prod.yml -f mode=apply
    ```
 
    Do this *first*, then confirm both URLs return 200. Submitting with a dead

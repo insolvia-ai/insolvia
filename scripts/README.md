@@ -15,7 +15,6 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
-| `scripts/prod-deploy.sh` | Deploys (not setup) | Dispatches a production `workflow_dispatch` workflow with `gh`; `--list`, `--ref`, `--input`, `--yes`, `--no-watch`. Target `release` ships one commit to every service in order |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
 | `scripts/e2e-create-test-user.sh` | Staging E2E setup (one-time) | Creates the dedicated test user in the **staging** Cognito pool (self-signup is disabled, so `admin-create-user` is the only path) and gives it a permanent password so the first sign-in is not a password-change challenge. Pool id from `terraform output`, never a literal; password from the environment or a no-echo prompt, never a file. `--check`. Needs a staging AWS session — see the `insolvia-aws-auth` skill. |
@@ -178,81 +177,14 @@ How it works:
   and support `--dry-run`. CI never touches `infra/envs/dev` beyond offline
   `terraform validate`.
 
-## Production deploys (`prod-deploy.sh`)
+## Production deploys have no script
 
-Every production workflow is `workflow_dispatch`-only — nothing reaches prod on
-a push to `main`. (The one auto-apply on `main` is `shared-infra-deploy.yml`,
-and it applies `infra/envs/shared` only.) `prod-deploy.sh` is that dispatch
-button on the command line.
-
-```bash
-# What ran last against each production target, and how it went:
-./scripts/prod-deploy.sh --list
-
-# Infrastructure only — plan is the default, and it is read-only:
-./scripts/prod-deploy.sh prod-infra
-./scripts/prod-deploy.sh prod-infra --input mode=apply
-
-# Deploy a service — prompts, then follows the run to completion:
-./scripts/prod-deploy.sh api
-
-# Ship one specific commit rather than main's HEAD:
-./scripts/prod-deploy.sh api --input sha=abc1234
-
-# Ship one commit to every service, in dependency order:
-./scripts/prod-deploy.sh release
-
-# Fire and forget:
-./scripts/prod-deploy.sh --yes --no-watch app
-```
-
-Targets are `release`, `prod-infra`, `api`, `mailer`, `app`, `marketing`, and
-`shared-infra`.
-
-**A service deploy promotes; it does not rebuild.** The container repositories
-are shared across environments, so the image staging validated already sits in
-the repository prod pulls from — the workflow resolves that commit's
-`sha-<commit>` tag to an immutable digest and deploys it. It also refuses to
-run unless that exact commit has a successful staging deploy; `--input
-force=true` bypasses the check for a hotfix and says so loudly in the job
-summary. (The app rebuilds, because it bakes its environment into the bundle at
-build time — the `EXPO_PUBLIC_*` values are inlined by Metro, so staging and
-prod are genuinely different bundles rather than one artifact promoted twice.)
-
-**Use `prod-infra` for infrastructure changes — it is the only way.**
-`infra/envs/prod` is a single root module with a single state, so
-`terraform apply` there reconciles *all* of it. The service workflows apply no
-Terraform; they only read outputs — so a service deploy can neither carry an
-infra-only change while redeploying a service you never meant to touch, nor
-drag unrelated infra drift into production alongside a routine code deploy.
-`infra-prod.yml` does the apply and stops.
-
-It defaults to `mode: plan`, which is read-only and writes the plan to the run's
-job summary. That is the only way to see a plan against real prod state:
-`shared-infra-plan.yml` validates every env offline (`init -backend=false`, no
-credentials), so PR CI can never produce one.
-
-It needs a `gh` login and **no AWS credentials** — every deploy authenticates
-to AWS inside the workflow via OIDC. The script only dispatches; it never
-applies anything locally.
-
-What it adds over clicking *Run workflow* in the UI:
-
-- **Shows the commit GitHub will actually build**, resolved from the remote ref
-  rather than your checkout, and warns when your local `HEAD` differs from it
-  or you have uncommitted changes. Dispatching while the change is still
-  unpushed is the usual way to be surprised by a deploy.
-- **Warns on a non-`main` `--ref`**, since infra applies are meant to run from
-  merged `main`.
-- **Warns before the known red herring**: `marketing-prod.yml` ends by
-  smoke-testing `https://www.insolvia.ai/`, so while the site is parked
-  (`site_enabled = false` in `infra/envs/prod`) that run goes red even though
-  its apply succeeded.
-- **Exits non-zero on a failed run**, so it chains with `&&`.
-
-Whichever target you pick, the apply is `-auto-approve` and covers the whole
-env, so accumulated drift is reconciled along with your change. Run
-`prod-infra` in its default plan mode first if that matters.
+There used to be a `prod-deploy.sh` here. It is gone on purpose: production
+ships through the release pipeline — merge to `main`, staging deploys, and
+approving the run's `promote` gate in the GitHub UI ships production. The
+emergency paths (single-service `*-prod.yml`, `infra-prod.yml` plan/apply) are
+plain `workflow_dispatch` in the Actions UI or `gh workflow run`. The
+`insolvia-deploy` skill owns the full picture.
 
 ## Staging E2E setup (`e2e-*.sh`)
 

@@ -1,9 +1,9 @@
 name: App · Deploy · Staging
 
 on:
-  # Reusable: release-staging.yml calls this as one leg of a staging
+  # Reusable: release.yml calls this as one leg of a staging
   # release, and it stays dispatchable by hand for a single-service deploy.
-  # The `push:` trigger moved to release-staging.yml, which now owns both the
+  # The `push:` trigger moved to release.yml, which now owns both the
   # trigger and the path filtering for every staging deploy.
   workflow_call:
   workflow_dispatch:
@@ -14,7 +14,7 @@ permissions:
 
 # Held while this workflow deploys, and shared with infra-staging.yml so a
 # hand-dispatched single-service deploy cannot overlap a Terraform apply.
-# release-staging.yml deliberately declares NO group of its own: a group on both
+# release.yml deliberately declares NO group of its own: a group on both
 # caller and callee deadlocks, and `needs` already orders the legs.
 concurrency:
   group: insolvia-terraform-staging
@@ -258,9 +258,11 @@ jobs:
   # zero". It now blesses "a real browser signed in against real staging and saw
   # the user's own identity render".
   #
-  # WHY IT SITS HERE, AND NOT IN app-pr.yml. It must fail the staging RUN, since
-  # `.github/actions/verified-commit` gates production on the run's conclusion —
-  # a job that could go red without reddening the run would buy nothing. And it
+  # WHY IT SITS HERE, AND NOT IN app-pr.yml. It must fail the staging STAGE:
+  # release.yml only offers the production gate — and only stamps the
+  # `insolvia/staging-release` status verified-commit checks — after every
+  # staging job, this one included, succeeds. A job that could go red without
+  # blocking promotion would buy nothing. And it
   # must stay OUT of the `protect-main` required checks: it needs a deployed
   # environment and a live Cognito pool, so as a merge gate it would put
   # staging's availability on the critical path of every PR, docs-only ones

@@ -6,9 +6,14 @@ name: Mailer · Deploy · Production
 # immutable digest and points all three mailer Lambdas
 # (ingress/sender/feedback — one image, three entrypoints) at it.
 #
-# The commit must have a successful `mailer-staging.yml` run before it can ship
-# (.github/actions/verified-commit), and the `insolvia-production` environment's
-# reviewers must approve if configured.
+# THE NORMAL WAY IN is release.yml: its production stage calls this after its
+# own staging stage went green and its single `insolvia-production` approval
+# was given, passing `gated: true` so this workflow does not ask for a second
+# approval. Dispatching this BY HAND is the exception — a single-service
+# emergency deploy — and that path brings its own two gates: the
+# `insolvia/staging-release` commit status check in `resolve`
+# (.github/actions/verified-commit), before the approval, and the
+# `insolvia-production` environment approval in `approve`.
 #
 # Unlike api-prod.yml there is no "re-derive Lambda environment from SSM" step:
 # every mailer Lambda's `environment` block is Terraform-managed (see the
@@ -23,8 +28,9 @@ name: Mailer · Deploy · Production
 # meaningful model, and aliasing only `ingress` would create version skew
 # against consumers sharing its image and table schemas.
 #
-# This workflow applies no Terraform — `infra-prod.yml` is the only path that
-# mutates prod infrastructure.
+# This workflow applies no Terraform. Prod infra applies as the first leg of an
+# approved release (release.yml → infra-prod.yml), or via infra-prod.yml
+# dispatched on its own — never as a side effect of a service deploy.
 #
 # The FIRST deploy in a fresh environment cannot run through this workflow: an
 # Image-package Lambda refuses to be created before its image exists. Bootstrap
@@ -47,9 +53,8 @@ on:
         default: false
         type: boolean
 
-  # Also callable by the Release · Production orchestrator, which chains the
-  # services in a defined order. Same inputs as the manual dispatch above, so
-  # there is exactly one code path either way.
+  # Also callable by the Release pipeline, which chains the services in a
+  # defined order behind its one approval. Same code path as a manual dispatch.
   workflow_call:
     inputs:
       sha:
@@ -61,36 +66,64 @@ on:
         required: false
         default: false
         type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
-  # Reading the staging workflow's run conclusions.
-  actions: read
-
-# Shared with every workflow that `terraform apply`s infra/envs/prod
-# (api-prod.yml, app-prod.yml, marketing-prod.yml, infra-prod.yml) — the S3
-# backend's native lock (use_lockfile) fails-fast on anything that slips past
-# this group; the group is what turns "one fails" into "one waits". See the
-# matching comment in api-staging.yml for the incident that proved it
-# necessary.
-concurrency:
-  group: insolvia-terraform-prod
-  cancel-in-progress: false
+  # Reading the insolvia/staging-release commit status.
+  statuses: read
 
 jobs:
-  deploy:
+  # Resolve + verify once, with no credentials and no environment — a commit
+  # that never passed staging is rejected BEFORE anyone is asked to approve.
+  resolve:
     runs-on: ubuntu-latest
-    environment: insolvia-production
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
 
       - id: commit
         uses: ./.github/actions/verified-commit
         with:
-          staging-workflow: release-staging.yml
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
+
+  # The human gate, and ONLY for a direct dispatch: release.yml already put
+  # its own approval in front of the whole production stage and says so with
+  # `gated: true`. (`inputs.gated` is absent on a plain dispatch, so the
+  # comparison reads null there — which is not true, and the gate runs.)
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  # `!cancelled() && !failure()` rather than the default `success()`: when the
+  # release pipeline calls this, `approve` is SKIPPED, and the default would
+  # silently skip the deploy behind it. A failed or rejected gate still stops it.
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    # Shared with every workflow that touches infra/envs/prod — the S3
+    # backend's native lock (use_lockfile) fails-fast on anything that slips
+    # past this group; the group is what turns "one fails" into "one waits".
+    # Job-level, not workflow-level, so a dispatch parked at `approve` holds
+    # nothing. See the matching comment in api-staging.yml for the incident
+    # that proved it necessary.
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -105,7 +138,7 @@ jobs:
           terraform_wrapper: false
 
       # Read-only: `output` needs the state, not an apply. Applying prod infra
-      # is infra-prod.yml's job — a code deploy must not carry infra drift.
+      # is infra-prod.yml's job.
       - name: Read prod infra outputs
         id: tf
         run: |
@@ -121,7 +154,7 @@ jobs:
         uses: ./.github/actions/promote-image
         with:
           repository-url: ${{ steps.tf.outputs.repo }}
-          sha: ${{ steps.commit.outputs.sha }}
+          sha: ${{ needs.resolve.outputs.sha }}
 
       # All three move together, to the same digest. They share one image with
       # different image_config.command entrypoints and the same table schemas,

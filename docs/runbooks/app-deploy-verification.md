@@ -9,8 +9,8 @@ the host is the one you meant to ship.
 > `app.insolvia.ai` have passed all six. This is now a re-verification
 > reference, not outstanding work.
 
-**Dispatching a deploy is not covered here** — that is the `insolvia-deploy`
-skill and `scripts/prod-deploy.sh`. Hosts are decision **D2** in
+**Running a deploy is not covered here** — that is the `insolvia-deploy`
+skill. Hosts are decision **D2** in
 [`../plan.md`](../plan.md), hosting topology and the promote-don't-rebuild model
 are in [`../reference/architecture.md`](../reference/architecture.md), apply
 order is in [`../reference/terraform.md`](../reference/terraform.md).
@@ -179,8 +179,9 @@ Worth knowing before you run the checks against `app.insolvia.ai`:
   staging-validated digest; the app inlines its environment at build time, so
   the staging bundle has `staging` baked into its JS and can never be the prod
   bundle. The pinned exact Expo SDK is what makes "same source" also mean "same
-  bundler". `.github/actions/verified-commit` still requires a green
-  `release-staging.yml` run for that exact SHA.
+  bundler". `.github/actions/verified-commit` still requires the
+  `insolvia/staging-release` commit status on that exact SHA for a
+  hand-dispatched deploy; in a release run the `needs` chain is the proof.
 
 ---
 
@@ -194,7 +195,7 @@ Worth knowing before you run the checks against `app.insolvia.ai`:
 | TLS name mismatch on a staging host | A nested host (`app.staging.insolvia.ai`) was used somewhere. The wildcard covers one label; the flat map in D2 is load-bearing. |
 | Deep link 404s | The CloudFront SPA rewrite is missing from the distribution — `infra/modules/web_hosting/main.tf` lines 56–69, and confirm the module is instantiated for that env. |
 | `terraform output` empty in `app-prod.yml` | Prod infra has never been applied. Run `infra-prod.yml` with `mode=apply` first. |
-| Prod dispatch blocked, "no successful release-staging.yml run" | Working as designed. The commit has not deployed green to staging. |
+| Prod dispatch blocked, "no successful insolvia/staging-release status" | Working as designed. The commit has not deployed green to staging. |
 | A returning browser shows an old build after a green deploy | An unhashed object (`index.html` above all) went up with a `max-age` — check 6. CloudFront invalidation cannot reach a client-side cache. |
 | The badge says `Staging` on `app.insolvia.ai`, or vice versa | The Metro transform cache served a bundle built for the other environment. Confirm the export ran with `--clear`; do not re-dispatch without it, because a warm cache reproduces the bug. |
 | Browser console: *"Expected a JavaScript module script but the server responded with … text/html"* | A chunk `index.html` references is not in the bucket, and the SPA rewrite answered with HTML and a 200. Usually a `--delete` added to the hashed sync pass, which prunes chunks a still-open page is about to request. |

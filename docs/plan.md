@@ -24,9 +24,9 @@ Status: **foundation shipped; product work ahead** · Last pruned 2026-08-01
 
 ## What is live (the shipped foundation)
 
-Everything below deploys to staging on merge to `main`; production is a manual
-dispatch (`scripts/prod-deploy.sh`). One line each — the linked owner has the
-detail:
+Everything below deploys to staging on merge to `main`; production ships when
+the release run's `promote` gate is approved in the GitHub UI. One line each —
+the linked owner has the detail:
 
 | Surface / concern | What exists | Owner of the detail |
 |---|---|---|

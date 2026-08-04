@@ -8,21 +8,26 @@ name: API · Deploy · Production
 # the exact bytes that were exercised on staging rather than a fresh compile of
 # the same source. There is deliberately no `docker build` here.
 #
-# Two gates stand in front of that:
-#   • the commit must have a successful `api-staging.yml` run (see
-#     .github/actions/verified-commit), and
-#   • the `insolvia-production` environment's reviewers must approve, if
-#     configured — that setting is a repo-settings change no workflow can make
-#     for itself (docs/reference/architecture.md § Required status checks).
+# THE NORMAL WAY IN is release.yml: its production stage calls this after its
+# own staging stage went green and its single `insolvia-production` approval
+# was given, passing `gated: true` so this workflow does not ask for a second
+# approval. Dispatching this BY HAND is the exception — a single-service
+# emergency deploy — and that path brings its own two gates:
+#   • the commit must carry the `insolvia/staging-release` commit status (see
+#     .github/actions/verified-commit) — checked in `resolve`, BEFORE the
+#     approval, so a commit staging never blessed is rejected without
+#     consuming anyone's click, and
+#   • the `approve` job carries the `insolvia-production` environment, whose
+#     required reviewer must approve the run.
 #
 # Traffic moves LAST. The new version is published, smoke-tested by its own
 # version ARN while nothing routes to it, and only then does the `live` alias
 # shift. A failed smoke test leaves the previous version serving — the whole
 # reason the alias exists (infra/modules/api_service/main.tf).
 #
-# This workflow applies no Terraform. A code deploy must not carry
-# whatever infra drift happens to be sitting on main; `infra-prod.yml` is the
-# only path that mutates prod infrastructure.
+# This workflow applies no Terraform. Prod infra applies as the first leg of an
+# approved release (release.yml → infra-prod.yml), or via infra-prod.yml
+# dispatched on its own — never as a side effect of a service deploy.
 
 on:
   workflow_dispatch:
@@ -37,9 +42,8 @@ on:
         default: false
         type: boolean
 
-  # Also callable by the Release · Production orchestrator, which chains the
-  # services in a defined order. Same inputs as the manual dispatch above, so
-  # there is exactly one code path either way.
+  # Also callable by the Release pipeline, which chains the services in a
+  # defined order behind its one approval. Same code path as a manual dispatch.
   workflow_call:
     inputs:
       sha:
@@ -51,34 +55,63 @@ on:
         required: false
         default: false
         type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
-  # Reading the staging workflow's run conclusions. Without this the gate
-  # cannot see whether the commit ever passed.
-  actions: read
-
-# This workflow applies no Terraform, but the group still serializes it
-# against infra-prod.yml, so a promotion cannot land mid-apply while the
-# Lambda's configuration is being rewritten underneath it.
-concurrency:
-  group: insolvia-terraform-prod
-  cancel-in-progress: false
+  # Reading the insolvia/staging-release commit status. Without this the gate
+  # cannot see whether staging validated the commit.
+  statuses: read
 
 jobs:
-  deploy:
+  # Resolve + verify once, with no credentials and no environment — a commit
+  # that never passed staging is rejected BEFORE anyone is asked to approve.
+  resolve:
     runs-on: ubuntu-latest
-    environment: insolvia-production
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
 
       - id: commit
         uses: ./.github/actions/verified-commit
         with:
-          staging-workflow: release-staging.yml
           sha: ${{ inputs.sha }}
           force: ${{ inputs.force }}
+
+  # The human gate, and ONLY for a direct dispatch: release.yml already put
+  # its own approval in front of the whole production stage and says so with
+  # `gated: true`. (`inputs.gated` is absent on a plain dispatch, so the
+  # comparison reads null there — which is not true, and the gate runs.)
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  # `!cancelled() && !failure()` rather than the default `success()`: when the
+  # release pipeline calls this, `approve` is SKIPPED, and the default would
+  # silently skip the deploy behind it. A failed or rejected gate still stops it.
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    # This job applies no Terraform, but the group still serializes it against
+    # infra-prod.yml, so a promotion cannot land mid-apply while the Lambda's
+    # configuration is being rewritten underneath it. Job-level, not
+    # workflow-level, so a dispatch parked at `approve` holds nothing.
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -110,7 +143,7 @@ jobs:
         uses: ./.github/actions/promote-image
         with:
           repository-url: ${{ steps.tf.outputs.repo }}
-          sha: ${{ steps.commit.outputs.sha }}
+          sha: ${{ needs.resolve.outputs.sha }}
 
       - name: Update Lambda code
         env:
