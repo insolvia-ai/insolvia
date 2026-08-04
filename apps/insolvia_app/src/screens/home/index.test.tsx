@@ -90,7 +90,7 @@ describe('the home route', () => {
     expect(screen.getByText('Insolvia.')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Start a case' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Open a case' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Your cases' })).toBeTruthy();
   });
 
   it('gives the page exactly one level-1 heading', async () => {
@@ -143,17 +143,22 @@ describe('the home route', () => {
     expect(screen.getByText('→', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('answers the primary CTA with an announced notice', async () => {
-    await renderSignedInHome();
-
-    expect(screen.queryByText('Case tools arrive in a later release.')).toBeNull();
+  it('sends the primary CTA to the case list', async () => {
+    // This used to answer with a "case tools arrive in a later release"
+    // notice. It now navigates, because the thing that notice apologised for
+    // exists (issue 8.3). Both buttons go to the same place; the presence of
+    // the secondary one is asserted above, and pressing it here would only
+    // re-test expo-router.
+    const router = await renderSignedInHome();
 
     await userEvent.press(screen.getByRole('button', { name: 'Start a case' }));
 
-    // A live region rather than a toast, so the message reaches a screen
-    // reader too.
-    const notice = await screen.findByText('Case tools arrive in a later release.');
-    expect(notice.props['aria-live']).toBe('polite');
+    // `getPathname()` rather than the `toHavePathname` matcher, for the reason
+    // auth-callback.test.tsx gives: the matcher is registered at runtime but
+    // expo-router ships no type declaration for it.
+    await waitFor(() => {
+      expect(router.getPathname()).toBe('/cases');
+    });
   });
 
   it('frames every screen with the header, nav, main and footer landmarks', async () => {
