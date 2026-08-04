@@ -152,6 +152,11 @@ module "auth" {
 
   web_origins = ["https://${var.subdomain}"]
 
+  # The address attorneys actually see when they sign in.
+  custom_domain   = "auth.${var.domain_name}"
+  certificate_arn = data.aws_acm_certificate.wildcard.arn
+  hosted_zone_id  = data.aws_route53_zone.main.zone_id
+
   deletion_protection = true
 
   tags = local.common_tags

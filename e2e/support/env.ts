@@ -56,22 +56,30 @@ export function baseUrl(): string {
 }
 
 /**
- * The exact Cognito hosted-UI hostname this environment redirects to, when the
- * caller knows it (the workflow passes the Terraform `auth_domain` output).
+ * The exact sign-in hostname this environment redirects to, when the caller
+ * knows it (the workflow passes the Terraform `auth_domain` output).
  *
  * Unset is legitimate for a local run by someone without Terraform state to
- * hand; `expectsCognitoHost` then falls back to the weaker suffix assertion.
+ * hand; `isCognitoHost` then falls back to a weaker assertion.
  */
 export function cognitoDomain(): string | undefined {
   return optional('E2E_COGNITO_DOMAIN');
 }
 
-/** True when `hostname` is the hosted UI we expect to be redirected to. */
+/**
+ * True when `hostname` is the sign-in page we expect to be redirected to.
+ *
+ * The fallback accepts EITHER form because staging and prod now sign in on
+ * their own `*-auth.insolvia.ai` domain while dev still uses the Cognito prefix
+ * domain, and a local run has no way to tell which it is aimed at. It is only a
+ * fallback: CI always passes `E2E_COGNITO_DOMAIN` from the Terraform output and
+ * gets the exact-match branch, which is the assertion that would actually catch
+ * a redirect to the wrong environment's pool.
+ */
 export function isCognitoHost(hostname: string): boolean {
   const expected = cognitoDomain();
-  return expected === undefined
-    ? hostname.endsWith(COGNITO_HOSTED_UI_SUFFIX)
-    : hostname === expected;
+  if (expected !== undefined) return hostname === expected;
+  return hostname.endsWith(COGNITO_HOSTED_UI_SUFFIX) || /^[a-z-]*auth\./.test(hostname);
 }
 
 /** Human-readable description of what `isCognitoHost` is checking, for messages. */
