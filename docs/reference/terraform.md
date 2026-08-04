@@ -255,6 +255,28 @@ twice over instead: the table depends on the key, so a `terraform destroy`
 reaches the table first and aborts on its deletion protection, and even a
 scheduled key deletion is cancellable for 30 days.
 
+**The access log.** A second table, `insolvia-case-access-log-<env>`, keyed
+`PK = CASE#<id>` / `SK = <recorded_at>#<event_id>`, under the same key. It
+answers the question the CloudTrail trail structurally cannot: *which
+signed-in user* read this case. ADR 0001 means AWS only ever sees the API
+role, so the end user's identity exists solely inside the request — this is
+where the API writes it down. **Reads are logged, not just writes**; the
+provenance fields on the case record already answer "who changed this", and
+who *saw* it is the question with no other source.
+
+The API's grant on it is **`PutItem` and nothing else** — no `GetItem`, no
+`Query`, no update, no delete. The audited service cannot read, amend or
+remove its own audit trail. The consequence is real and intended: no endpoint
+can serve an access history today, and adding one means granting `Query` in a
+diff that says so rather than inheriting the capability by accident.
+Retention is by TTL, and the number is a compliance decision the
+[regulatory register](../business/regulatory-source-register.html) owns rather
+than an engineering one.
+
+A by-principal index — "what did this account touch" — is deliberately not
+here yet. It is the breach-response question rather than the client question,
+and a GSI can be added online later without a migration.
+
 **Audit logging** lives next door, in `infra/modules/audit_trail/` — see below.
 
 **Wiring.** The module takes `api_role_name` — a name, not an ARN — looks the
@@ -334,8 +356,8 @@ What it owns is deliberately only what local dev consumes today:
   `api_service`'s table so the API's adapter behaves identically, but PITR is
   **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
 - **Case store** via the same `modules/case_store` as staging/prod —
-  `insolvia-cases-dev-<short-id>` under this machine's own customer-managed
-  key, so the owner index and the encrypted read path behave here exactly as
+  `insolvia-cases-dev-<short-id>` and its access-log table under this
+  machine's own customer-managed key, so the owner index and the encrypted read path behave here exactly as
   they do deployed. PITR and deletion protection are **off** and the key
   deletion window is the minimum 7 days, so a teardown does not leave a
   month-long pending key behind. `api_role_name` is null — there is no Lambda,

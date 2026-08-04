@@ -25,6 +25,9 @@ services:
       # customer-managed key, so a KMS permission mistake surfaces here
       # rather than on staging.
       CASE_TABLE_NAME: ${CASE_TABLE_NAME:-}
+      # Append-only access log (issue 8.3): who read which case. The API can
+      # write it and, by IAM, can never read it back.
+      CASE_ACCESS_LOG_TABLE_NAME: ${CASE_ACCESS_LOG_TABLE_NAME:-}
       # Auth (issue #79). Unset is safe and fails CLOSED: every protected
       # route answers 401 rather than skipping verification. Point them at
       # this machine's own Cognito pool (infra/envs/dev outputs

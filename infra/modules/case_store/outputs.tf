@@ -24,3 +24,13 @@ output "kms_key_alias" {
   description = "Human-facing alias for the case key."
   value       = aws_kms_alias.case.name
 }
+
+output "access_log_table_name" {
+  description = "Append-only table recording which signed-in user read or changed which case (CASE_ACCESS_LOG_TABLE_NAME for the API)."
+  value       = aws_dynamodb_table.access_log.name
+}
+
+output "access_log_table_arn" {
+  description = "Access-log table ARN."
+  value       = aws_dynamodb_table.access_log.arn
+}

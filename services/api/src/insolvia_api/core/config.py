@@ -61,6 +61,7 @@ class AppConfig:
     environment: str
     waitlist_table_name: str | None = None
     case_table_name: str | None = None
+    case_access_log_table_name: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -85,6 +86,11 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     Nothing reads it yet — the case routes and their store land with 8.3; the
     value is wired now so local, staging and prod are configured identically
     before the code that needs it arrives.
+    CASE_ACCESS_LOG_TABLE_NAME names the append-only table recording which
+    signed-in user read or changed which case. The API's role holds PutItem on
+    it and nothing else, so this service can write an entry and can never read,
+    amend or delete one — see modules/case_store. Same unset-means-in-memory
+    shape as the two above.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -116,6 +122,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         environment=environment,
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         case_table_name=source.get("CASE_TABLE_NAME") or None,
+        case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,

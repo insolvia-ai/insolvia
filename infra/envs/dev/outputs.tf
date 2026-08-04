@@ -23,6 +23,11 @@ output "case_table_name" {
   value       = module.case_store.table_name
 }
 
+output "case_access_log_table_name" {
+  description = "This machine's case access-log table (CASE_ACCESS_LOG_TABLE_NAME for the local API)."
+  value       = module.case_store.access_log_table_name
+}
+
 output "case_kms_key_alias" {
   description = "Alias of this machine's case-data key. Printed for orientation; nothing consumes it — DynamoDB resolves the key from the table."
   value       = module.case_store.kms_key_alias

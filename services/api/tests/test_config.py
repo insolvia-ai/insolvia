@@ -40,6 +40,16 @@ def test_case_table_name_is_read():
     assert config.case_table_name == "insolvia-cases-staging"
 
 
+def test_case_access_log_table_name_defaults_to_none():
+    assert load_config({}).case_access_log_table_name is None
+
+
+def test_case_access_log_table_name_is_read():
+    name = "insolvia-case-access-log-staging"
+    config = load_config({"CASE_ACCESS_LOG_TABLE_NAME": name})
+    assert config.case_access_log_table_name == name
+
+
 def test_mailer_api_url_defaults_to_none():
     assert load_config({}).mailer_api_url is None
 
