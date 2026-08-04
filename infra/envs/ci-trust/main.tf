@@ -468,6 +468,33 @@ data "aws_iam_policy_document" "github_permissions" {
     }
   }
 
+  # An `aws_cloudtrail` with kms_key_id set makes the CALLER prove it can use
+  # the key, so CreateTrail needs GenerateDataKey even though CloudTrail does
+  # the encrypting. Carving CloudTrail out of DenyCaseDataDecryption below is
+  # necessary but NOT sufficient — removing a deny never creates an allow, and
+  # `aws iam simulate-principal-policy` returned implicitDeny for exactly this
+  # call until this statement existed.
+  #
+  # Fenced by kms:ViaService, which AWS sets when a service calls on the
+  # caller's behalf and a caller cannot supply itself — so this grants nothing
+  # a direct Decrypt could reach. Note 8.2 can also skip it entirely:
+  # encrypting the trail's destination BUCKET under the same key needs no KMS
+  # grant here at all, because S3 then encrypts as its own principal.
+  statement {
+    sid = "TrailLogEncryption"
+    actions = [
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["cloudtrail.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
   # Aliases are a separate resource from the key they point at, and unlike
   # keys they DO have names — so they get a real ARN fence. The pattern is
   # `insolvia*`, not `insolvia-*`, so that the equally idiomatic
@@ -823,12 +850,9 @@ data "aws_iam_policy_document" "github_permissions" {
       variable = "kms:ViaService"
       values = [
         "ssm.${var.aws_region}.amazonaws.com",
-        # CloudTrail asks the caller for GenerateDataKey when a trail's logs
-        # are encrypted under a customer-managed key. Listed pre-emptively so
-        # that choosing an encrypted trail in 8.2 is not a third human apply.
-        # kms:ViaService is set by AWS when a service calls on the caller's
-        # behalf and cannot be supplied by the caller, so this widens nothing
-        # a direct Decrypt could exploit.
+        # CloudTrail asks the CALLER for GenerateDataKey when a trail sets
+        # kms_key_id. Carved out here and allowed in TrailLogEncryption above
+        # — the two go together, and neither works alone.
         "cloudtrail.${var.aws_region}.amazonaws.com",
       ]
     }
