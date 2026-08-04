@@ -11,15 +11,27 @@ import { Holding } from "../components/holding";
 import { seo } from "../lib/seo";
 import { isPlaceholderSite } from "../lib/site-mode.server";
 
-export const meta: MetaFunction = () =>
-  seo({
-    title: "Insolvia — Bankruptcy case prep, native to your MyCase practice",
-    description:
-      "AI-assisted bankruptcy case preparation for consumer-bankruptcy law firms on MyCase. " +
-      "Native integration ends double data entry; AI kills the re-keying while the forms and " +
-      "means test stay rule-based. Chapters 7, 11, and 13.",
-    path: "/",
-  });
+// The meta has to follow the body into placeholder mode, and forgetting that is
+// an easy and expensive mistake: noindex keeps the page out of search results,
+// but it does NOTHING about the browser tab or an unfurled link. Slack, iMessage
+// and LinkedIn all read og:title/og:description directly, so a holding page
+// with the real meta still pastes the full positioning into any chat it is
+// shared in — which is exactly what placeholder mode exists to prevent.
+export const meta: MetaFunction<typeof loader> = ({ data }) =>
+  data?.placeholder
+    ? seo({
+        title: "Insolvia",
+        description: "Something is being built here.",
+        path: "/",
+      })
+    : seo({
+        title: "Insolvia — Bankruptcy case prep, native to your MyCase practice",
+        description:
+          "AI-assisted bankruptcy case preparation for consumer-bankruptcy law firms on MyCase. " +
+          "Native integration ends double data entry; AI kills the re-keying while the forms and " +
+          "means test stay rule-based. Chapters 7, 11, and 13.",
+        path: "/",
+      });
 
 export function loader() {
   return { placeholder: isPlaceholderSite() };

@@ -11,6 +11,31 @@ import { defineConfig } from "vitest/config";
 // the SSR Lambda and never touch a DOM. Component tests would need jsdom and a
 // separate environment — add it when the first one arrives, not before.
 export default defineConfig({
+  // The ONE thing borrowed from vite.config.ts, copied rather than imported for
+  // the reason above. @insolvia-ai/design-system publishes source whose
+  // per-component index re-exports an extensionless `./button`, and the
+  // CONSUMER's bundler picks the leaf — so without this list, importing any
+  // module that reaches the design system fails to resolve, which is what a
+  // route-component test does.
+  //
+  // `.web` first, exactly as vite.config.ts orders it: that is what keeps the
+  // react-native leaf out. The two lists must agree — a test resolving a
+  // different leaf than the build would be worse than no test.
+  resolve: {
+    extensions: [
+      ".web.tsx",
+      ".web.ts",
+      ".web.jsx",
+      ".web.js",
+      ".mjs",
+      ".js",
+      ".mts",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".json",
+    ],
+  },
   test: {
     environment: "node",
     include: ["app/**/*.test.{ts,tsx}"],
