@@ -5,7 +5,7 @@
 // The JSON contract it encodes is pinned by this package's tests, not by
 // codegen — see README.md for why there is no OpenAPI step. Keep every wire
 // literal in this package in sync with:
-//   services/api/src/insolvia_api/api/routes/{health,waitlist,me}.py
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases}.py (cases.py expected — not yet added as of this change)
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (the 401 body)
 //   services/api/src/insolvia_api/core/{waitlist,auth}.py
@@ -28,10 +28,23 @@ export type {
   UnauthorizedSource,
 } from './exceptions.ts';
 
-export { submittedAtUtc, waitlistSubmissionToJson } from './models.ts';
+export {
+  createCaseRequestToJson,
+  listCasesQuery,
+  submittedAtUtc,
+  updateCaseChangesToJson,
+  waitlistSubmissionToJson,
+} from './models.ts';
 export type {
+  Case,
+  CaseChapter,
+  CaseStatus,
+  CreateCaseRequest,
   HealthStatus,
+  ListCasesOptions,
+  ListCasesResult,
   Principal,
+  UpdateCaseChanges,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';

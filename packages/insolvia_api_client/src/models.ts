@@ -143,3 +143,133 @@ export function waitlistSubmissionToJson(submission: WaitlistSubmission): Record
 export function submittedAtUtc(confirmation: WaitlistConfirmation): Date {
   return new Date(confirmation.submittedAt);
 }
+
+/**
+ * The bankruptcy chapter a case is filed under. A union of numeric literals
+ * rather than `number`, so an invalid chapter is a compile error at the call
+ * site, not just a server-side rejection.
+ */
+export type CaseChapter = 7 | 11 | 12 | 13;
+
+/**
+ * A case's position in the filing workflow.
+ *
+ * A union of string literals rather than an `enum`, because `erasableSyntaxOnly`
+ * is on (see the root `tsconfig.base.json`) — the same reason
+ * {@link UnauthorizedSource} in `exceptions.ts` is one.
+ */
+export type CaseStatus = 'intake' | 'ready_to_file' | 'filed';
+
+/**
+ * A case, as returned by every `/v1/cases` endpoint:
+ * `{"id", "chapter", "district", "status", "createdAt", "updatedAt"}`.
+ */
+export interface Case {
+  /** The server-generated case id. */
+  readonly id: string;
+  /** The bankruptcy chapter. */
+  readonly chapter: CaseChapter;
+  /** The filing district. */
+  readonly district: string;
+  /** Where the case sits in the filing workflow. */
+  readonly status: CaseStatus;
+  /** The server's UTC creation timestamp, kept verbatim as the wire string. */
+  readonly createdAt: string;
+  /** The server's UTC last-update timestamp, kept verbatim as the wire string. */
+  readonly updatedAt: string;
+}
+
+/** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
+export interface CreateCaseRequest {
+  /** The bankruptcy chapter. */
+  readonly chapter: CaseChapter;
+  /** The filing district. */
+  readonly district: string;
+}
+
+/** The `POST /v1/cases` request body, verbatim — both fields are required. */
+export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
+  return {
+    chapter: request.chapter,
+    district: request.district,
+  };
+}
+
+/**
+ * `GET /v1/cases` query options. Both optional and, per this package's rule,
+ * omitted from the query string entirely when absent — see
+ * {@link listCasesQuery}.
+ */
+export interface ListCasesOptions {
+  /** Maximum number of cases to return. */
+  readonly limit?: number | undefined;
+  /** An opaque pagination cursor from a previous {@link ListCasesResult.nextCursor}. */
+  readonly cursor?: string | undefined;
+}
+
+/**
+ * `GET /v1/cases` query options rendered as `URLSearchParams`, with absent
+ * fields omitted entirely — never sent as an empty or literal `"undefined"`
+ * value. Mirrors {@link waitlistSubmissionToJson}'s omit-when-absent rule, at
+ * the query string instead of the body.
+ */
+export function listCasesQuery(options: ListCasesOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) {
+    params.set('limit', String(options.limit));
+  }
+  if (options.cursor !== undefined) {
+    params.set('cursor', options.cursor);
+  }
+  return params;
+}
+
+/**
+ * The `GET /v1/cases` 200 response: `{"cases", "nextCursor"?}`.
+ *
+ * {@link nextCursor} is **absent, not `null`**, when there are no more pages —
+ * mirroring the wire exactly, the same convention this package's request
+ * models use for absent optional fields.
+ */
+export interface ListCasesResult {
+  /** The page of cases. */
+  readonly cases: readonly Case[];
+  /** An opaque cursor for the next page, or absent on the last page. */
+  readonly nextCursor?: string | undefined;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}` request body: any subset of `{"chapter",
+ * "district", "status"}`. An omitted key means "leave unchanged" — the client
+ * must not send keys the caller did not supply, so {@link updateCaseChangesToJson}
+ * omits them rather than sending `null`.
+ */
+export interface UpdateCaseChanges {
+  /** A new chapter, or omit to leave it unchanged. */
+  readonly chapter?: CaseChapter | undefined;
+  /** A new district, or omit to leave it unchanged. */
+  readonly district?: string | undefined;
+  /** A new status, or omit to leave it unchanged. */
+  readonly status?: CaseStatus | undefined;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}` request body, with absent optional fields
+ * omitted from the JSON entirely — never sent as `null`.
+ */
+export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<string, unknown> {
+  const json: Record<string, unknown> = {};
+  // Explicit `if`s, not a conditional spread: matches
+  // `waitlistSubmissionToJson`'s style, and this is the rule the contract
+  // test pins ("omitted keys mean leave unchanged").
+  if (changes.chapter !== undefined) {
+    json.chapter = changes.chapter;
+  }
+  if (changes.district !== undefined) {
+    json.district = changes.district;
+  }
+  if (changes.status !== undefined) {
+    json.status = changes.status;
+  }
+  return json;
+}

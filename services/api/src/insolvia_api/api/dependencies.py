@@ -6,7 +6,13 @@ from typing import cast
 from flask import current_app
 
 from insolvia_api.core.config import AppConfig
-from insolvia_api.core.ports import JwksProvider, Mailer, WaitlistStore
+from insolvia_api.core.ports import (
+    AccessLog,
+    CaseStore,
+    JwksProvider,
+    Mailer,
+    WaitlistStore,
+)
 
 
 @dataclass(frozen=True)
@@ -21,6 +27,12 @@ class ApiDependencies:
     config: AppConfig
     waitlist_store: WaitlistStore
     mailer: Mailer
+    # Optional for the same reason jwks_provider is: the existing public-route
+    # tests build an ApiDependencies without them. The case routes are
+    # unreachable without both — api/routes/cases.py answers 503 rather than
+    # pretending, and the Lambda entrypoint refuses to boot without them.
+    case_store: CaseStore | None = None
+    access_log: AccessLog | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

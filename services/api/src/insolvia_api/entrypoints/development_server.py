@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
+from insolvia_api.adapters.memory.access_log import MemoryAccessLog
+from insolvia_api.adapters.memory.case_store import MemoryCaseStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
-from insolvia_api.core.ports import JwksProvider, WaitlistStore
+from insolvia_api.core.ports import AccessLog, CaseStore, JwksProvider, WaitlistStore
 
 config = load_config()
 if config.environment != "local":
@@ -39,6 +43,20 @@ mailer = InMemoryMailerClient()
 # the public routes, and auth fails CLOSED rather than waving requests
 # through. This is the ONE entrypoint that tolerates missing auth config;
 # api_lambda.py refuses to boot without it.
+# Same shape as the waitlist store above: with this machine's real tables
+# named (scripts/dev-aws-setup.sh writes both into services/api/.env) the
+# DynamoDB adapters run against them, and the bare dev server falls back to
+# in-memory. The pair moves together — an in-memory store with a real access
+# log, or the reverse, would be a confusing half-state to debug.
+case_store: CaseStore
+access_log: AccessLog
+if config.case_table_name and config.case_access_log_table_name:
+    case_store = DynamoDbCaseStore(config.case_table_name)
+    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+else:
+    case_store = MemoryCaseStore()
+    access_log = MemoryAccessLog()
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -49,5 +67,7 @@ app = create_app(
         waitlist_store=waitlist_store,
         mailer=mailer,
         jwks_provider=jwks_provider,
+        case_store=case_store,
+        access_log=access_log,
     )
 )

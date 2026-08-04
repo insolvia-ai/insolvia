@@ -3,6 +3,8 @@ from __future__ import annotations
 from asgiref.wsgi import WsgiToAsgi
 from mangum import Mangum
 
+from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
@@ -31,6 +33,16 @@ if not config.auth_issuer_url or not config.auth_client_id:
         "AUTH_ISSUER_URL and AUTH_CLIENT_ID must be set for the Lambda entrypoint"
     )
 
+# Hard-required together, and together on purpose (issue 8.3). Booting with a
+# case store but no access log would serve case data while recording nobody
+# reading it, which is the one failure mode this pair exists to prevent — and
+# it would be invisible, because every route would still answer 200.
+if not config.case_table_name or not config.case_access_log_table_name:
+    raise RuntimeError(
+        "CASE_TABLE_NAME and CASE_ACCESS_LOG_TABLE_NAME must be set "
+        "for the Lambda entrypoint"
+    )
+
 # AWS adapters are composed here, mirroring mailer's api_lambda entrypoint.
 # mailer_api_url is unset only if the mailer's SSM param hasn't been deployed
 # yet in this environment — fall back to the in-memory client rather than
@@ -51,6 +63,8 @@ app = create_app(
         # until the first token arrives — an unauthenticated request path
         # never touches the network.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
+        case_store=DynamoDbCaseStore(config.case_table_name),
+        access_log=DynamoDbAccessLog(config.case_access_log_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

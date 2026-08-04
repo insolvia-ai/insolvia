@@ -8,12 +8,18 @@ from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
+from insolvia_api.api.routes.cases import blueprint as cases_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
 from insolvia_api.core.cors import origin_allowed
-from insolvia_api.core.errors import ApiError, FieldValidationError, ValidationError
+from insolvia_api.core.errors import (
+    ApiError,
+    FieldValidationError,
+    NotFoundError,
+    ValidationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,7 @@ request_logger = logging.getLogger("insolvia_api.request")
 def create_app(dependencies: ApiDependencies) -> Flask:
     app = Flask(__name__)
     app.extensions["insolvia_api_dependencies"] = dependencies
+    app.register_blueprint(cases_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)
@@ -54,7 +61,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
         origin = request.headers.get("Origin")
         if origin and origin_allowed(config, origin):
             response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response.headers["Access-Control-Allow-Methods"] = (
+                "GET, POST, PATCH, OPTIONS"
+            )
             response.headers["Access-Control-Allow-Headers"] = (
                 "Content-Type, Authorization"
             )
@@ -86,6 +95,13 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     @app.errorhandler(ValidationError)
     def validation_error(error: ValidationError) -> ResponseReturnValue:
         return jsonify({"error": "ValidationError", "message": str(error)}), 400
+
+    @app.errorhandler(NotFoundError)
+    def not_found_error(error: NotFoundError) -> ResponseReturnValue:
+        # Registered above the ApiError handler on purpose: Flask dispatches to
+        # the most specific registered class, and NotFoundError IS an ApiError,
+        # so without this it would answer 400.
+        return jsonify({"error": "NotFoundError", "message": str(error)}), 404
 
     @app.errorhandler(ApiError)
     def api_error(error: ApiError) -> ResponseReturnValue:
