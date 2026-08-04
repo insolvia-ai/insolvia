@@ -111,32 +111,71 @@ resource "aws_cognito_user_pool_domain" "main" {
   domain                = "${var.project}-${var.environment}"
   user_pool_id          = aws_cognito_user_pool.main.id
   managed_login_version = 2
+
+  # Order the branding style BEFORE this flips to managed login. Nothing in the
+  # attribute references would do it — the branding hangs off the app client,
+  # not the domain — so without this the two are independent and Terraform may
+  # do them in either order.
+  #
+  # It matters because the failure is an outage, not a cosmetic gap: a client on
+  # managed login with no branding style does not fall back to defaults, it
+  # serves "Login pages unavailable. Please contact an administrator." and
+  # sign-in is simply down. That is exactly how staging broke — the version was
+  # flipped while the style still lived in a system Terraform could not reach.
+  #
+  # This matters most for `envs/dev`, where every developer applies this module
+  # to their own pool from their own machine: a partial apply there would break
+  # local sign-in per machine, with no CI run to notice. Depending on the
+  # branding makes "managed login is on but has nothing to render" unreachable
+  # rather than merely unlikely.
+  depends_on = [aws_cognito_managed_login_branding.web]
 }
 
-# ── Managed login branding — STILL CONSOLE-OWNED ────────────────
-# The branding style itself (colours, logo, dark mode) is still absent from this
-# module, but the provider is no longer the reason:
-# `aws_cognito_managed_login_branding` first shipped in AWS provider **v6.12.0**,
-# and this repo now pins `~> 6.12` (infra/CLAUDE.md), so the resource validates
-# today.
+# ── Managed login branding ──────────────────────────────────────
+# The style the sign-in pages render with. Cognito serves the pages; nothing
+# here is hosted by us. Requires provider >= 6.12.0, which is why
+# infra/CLAUDE.md pins `~> 6.12` rather than `~> 6.0`.
 #
-# What remains is that the style is DATA whose authoritative copy lives in the
-# console's branding editor — the one part of auth that is not under IaC.
-# Writing `settings` from scratch here would not codify the branding someone
-# designed; it would overwrite it on the next apply. Two things follow:
+# `managed-login-settings.json` IS GENERATED — do not hand-edit it. JSON has no
+# comment syntax and AWS rejects unknown keys, so the file cannot carry its own
+# DO-NOT-EDIT banner; this comment is it.
 #
-#   • AWS documents that an app client created through the API — which is what
-#     Terraform does — starts with NO branding style: "managed login isn't
-#     available for an app client created with an AWS SDK until you create one
-#     with a CreateManagedLoginBranding request." Opening the branding editor
-#     and saving creates that style; until someone does, these pages render
-#     Cognito's stock defaults.
-#   • To codify it, export first — the console work is not thrown away.
-#     `DescribeManagedLoginBrandingByClient` with `ReturnMergedResources`
-#     exports the whole style as JSON, which becomes this module's `settings`
-#     plus `asset` blocks (images committed here and shipped with filebase64 —
-#     up to 40 assets, 2 MB each; Cognito stores and serves them, nothing is
-#     hosted by us).
+# Its COLOURS come from `packages/insolvia_tokens/tokens.json` via
+# `npm run tokens`, from the semantic layer (`primary`, `bg`, `line`, …) rather
+# than palette names, so a re-brand stays a one-file change and this page can
+# never drift from the app. `npm run tokens:check` gates that in CI.
+#
+# Its STRUCTURE — layout, border radii, which auth methods appear — is AWS's
+# schema, owned by the console's branding editor. To change layout: edit in the
+# console, re-export with DescribeManagedLoginBrandingByClient
+# (ReturnMergedResources), commit, then re-run `npm run tokens` to restore the
+# token colours over whatever the console wrote.
+#
+# COLOURS ONLY, NO ASSETS, on purpose — two separate reasons:
+#
+#   • No logo has been uploaded yet. The logo slots currently hold Cognito's
+#     grey placeholder graphic, and committing that would make AWS's placeholder
+#     the thing Terraform reapplies on every deploy and carries to prod. When a
+#     real wordmark exists, it lands here as `asset` blocks
+#     (filebase64, <= 40 assets, 2 MB each).
+#   • The export merges in Cognito's OWN illustrations — the email, SMS,
+#     passkey and password graphics, plus identity-provider button icons for
+#     providers this pool does not use. Those are AWS's artwork; declaring them
+#     here would commit someone else's assets to a public repo to no purpose.
+#     Assets we do not declare are left alone, so Cognito keeps supplying them.
+#
+# Dark mode is fully branded, and the dark primary button is brass rather than
+# the inverted white-on-navy a hand-mapping reaches for. That is not a taste
+# call made here: `semantic.primary.dark` already answers it, the app renders
+# the same, and the sign-in page agreeing with the app matters more than this
+# module having an opinion. (Navy would also have failed — 1.21 contrast on the
+# dark page, against WCAG's 3.0 floor for a distinguishable control.)
+resource "aws_cognito_managed_login_branding" "web" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  client_id    = aws_cognito_user_pool_client.web.id
+
+  settings = file("${path.module}/managed-login-settings.json")
+}
 
 # ── App client ──────────────────────────────────────────────────
 # An OAuth public client (RFC 6749 §2.1): no secret, because a browser bundle

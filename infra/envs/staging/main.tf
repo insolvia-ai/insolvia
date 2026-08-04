@@ -152,6 +152,30 @@ module "auth" {
   tags = local.common_tags
 }
 
+# One-time adoption of the branding style that already exists in staging.
+#
+# It was created by hand (`aws cognito-idp create-managed-login-branding`) to
+# restore sign-in: managed login was switched on before any style existed, and
+# an app client with no style does not fall back to defaults — Cognito serves
+# "Login pages unavailable" and sign-in is simply down. That style is what the
+# console branding editor has been editing since.
+#
+# An `import` block rather than a CLI `terraform import`, because staging is
+# only ever applied by CI (infra/CLAUDE.md) and an import block is declarative:
+# CI adopts the existing style on the next apply instead of trying to CREATE
+# one, which AWS rejects with ManagedLoginBrandingExistsException when the
+# client already has a style.
+#
+# Staging-only. Prod has no style yet, so prod's apply creates one from the same
+# committed settings — no import, and nothing to adopt.
+#
+# Safe to delete once this has applied; it is idempotent, so leaving it costs
+# nothing but noise.
+import {
+  to = module.auth.aws_cognito_managed_login_branding.web
+  id = "us-east-1_M3y3AxIit,b978dad0-ece6-4262-9484-caa7b9bc8d73"
+}
+
 # Publish the pool's issuer and web app client id into the API's own SSM
 # config namespace (issue #79) so the API Lambda can read them as
 # AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.
