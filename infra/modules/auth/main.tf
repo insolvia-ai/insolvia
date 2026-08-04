@@ -118,11 +118,20 @@ resource "aws_cognito_user_pool_domain" "main" {
 # here is hosted by us. Requires provider >= 6.12.0, which is why
 # infra/CLAUDE.md pins `~> 6.12` rather than `~> 6.0`.
 #
-# `managed-login-settings.json` was EXPORTED from the console's branding editor
-# (DescribeManagedLoginBrandingByClient with ReturnMergedResources), not written
-# by hand — that JSON is 450 lines of AWS's own schema and is not something to
-# author blind. To change the branding: edit it in the console, re-export, and
-# commit the diff. Editing this file directly works but you lose the preview.
+# `managed-login-settings.json` IS GENERATED — do not hand-edit it. JSON has no
+# comment syntax and AWS rejects unknown keys, so the file cannot carry its own
+# DO-NOT-EDIT banner; this comment is it.
+#
+# Its COLOURS come from `packages/insolvia_tokens/tokens.json` via
+# `npm run tokens`, from the semantic layer (`primary`, `bg`, `line`, …) rather
+# than palette names, so a re-brand stays a one-file change and this page can
+# never drift from the app. `npm run tokens:check` gates that in CI.
+#
+# Its STRUCTURE — layout, border radii, which auth methods appear — is AWS's
+# schema, owned by the console's branding editor. To change layout: edit in the
+# console, re-export with DescribeManagedLoginBrandingByClient
+# (ReturnMergedResources), commit, then re-run `npm run tokens` to restore the
+# token colours over whatever the console wrote.
 #
 # COLOURS ONLY, NO ASSETS, on purpose — two separate reasons:
 #
@@ -137,9 +146,12 @@ resource "aws_cognito_user_pool_domain" "main" {
 #     here would commit someone else's assets to a public repo to no purpose.
 #     Assets we do not declare are left alone, so Cognito keeps supplying them.
 #
-# Dark mode is only partly branded: the page background is ours, the primary
-# button is still AWS's stock blue. That is faithfully what the export contained
-# — this file is a recording of the console, not an improvement on it.
+# Dark mode is fully branded, and the dark primary button is brass rather than
+# the inverted white-on-navy a hand-mapping reaches for. That is not a taste
+# call made here: `semantic.primary.dark` already answers it, the app renders
+# the same, and the sign-in page agreeing with the app matters more than this
+# module having an opinion. (Navy would also have failed — 1.21 contrast on the
+# dark page, against WCAG's 3.0 floor for a distinguishable control.)
 resource "aws_cognito_managed_login_branding" "web" {
   user_pool_id = aws_cognito_user_pool.main.id
   client_id    = aws_cognito_user_pool_client.web.id

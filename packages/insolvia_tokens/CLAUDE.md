@@ -5,13 +5,24 @@ The single source of truth for every design token. Human docs:
 
 - **`tokens.json` is the only place token values live** — pure data, no CSS, no
   TypeScript. Every color, spacing step, radius, shadow, and font.
-- **Never hand-edit a generated file.** `tool/generate-tokens.ts` renders two
-  outputs: `insolvia_design_system/src/styles/theme.css` and this
-  package's own `src/tokens.ts`, each with a `DO NOT EDIT` banner. To change a
-  value: edit `tokens.json`, then `npm run tokens` from the repo root. CI gate:
+- **Never hand-edit a generated file.** `tool/generate-tokens.ts` produces three
+  outputs: `insolvia_design_system/src/styles/theme.css`, this package's own
+  `src/tokens.ts`, and `infra/modules/auth/managed-login-settings.json` (the
+  colours of Cognito's hosted sign-in page). To change a value: edit
+  `tokens.json`, then `npm run tokens` from the repo root. CI gate:
   `npm run tokens:check` (fails the PR on drift, naming the file you edited).
   If `git diff` is non-empty after `npm run tokens`, the *generator* is wrong —
   never reconcile by editing a generated file.
+- **The Cognito output is RECONCILED, not rendered — it is the odd one out.**
+  The other two are written from scratch and carry a `DO NOT EDIT` banner; this
+  one is JSON (no comment syntax, and AWS rejects unknown keys, so no banner is
+  possible — the warning lives in `infra/modules/auth/main.tf`). Its *structure*
+  is AWS's schema, owned by the console branding editor and exported when the
+  layout changes; the generator rewrites only the colour slots listed in
+  `COGNITO_COLORS` and leaves everything else byte-for-byte. That makes it
+  idempotent, so `--check` asks only "do the colours still match the tokens?".
+  A path in that list that no longer exists is a hard error, never a skip:
+  silently branding fewer things is exactly the drift this gate exists to catch.
 - **`theme.css` bytes are expensive; `tokens.ts` bytes are cheap.** `theme.css`
   lands inside `insolvia_design_system`, a version-gated package, so
   changing one byte of it drags the change into `insolvia-design-system-pr`

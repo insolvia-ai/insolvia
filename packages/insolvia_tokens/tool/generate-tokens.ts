@@ -41,6 +41,118 @@ const TS_BANNER =
 const CSS_OUT = 'packages/insolvia_design_system/src/styles/theme.css';
 const TS_OUT = 'packages/insolvia_tokens/src/tokens.ts';
 
+// Cognito's managed-login branding: the colours of the hosted sign-in page.
+//
+// This output is RECONCILED, not rendered from scratch, and it is the only one
+// of the three that reads its own previous contents. The document is AWS's
+// schema — layout, border radii, `enabled` flags, which auth methods appear —
+// and that structure is owned by the console's branding editor, exported when
+// it changes. Only the colour slots below belong to us. So the generator
+// rewrites those slots in place and leaves everything else untouched, which
+// makes it idempotent: reconciling an already-reconciled file is a no-op, and
+// `--check` therefore asks exactly the right question — "do this file's colours
+// still match the tokens?" — without caring about structure it does not own.
+//
+// No banner: the file is JSON, which has no comment syntax, and AWS rejects
+// unknown keys so a "_comment" field cannot be smuggled in. The DO-NOT-EDIT
+// warning lives in infra/modules/auth/main.tf beside the resource instead.
+const COGNITO_OUT = 'infra/modules/auth/managed-login-settings.json';
+
+/**
+ * Colour slots in the managed-login document, each mapped to the semantic role
+ * that owns it. Dotted paths under the document root; `{mode}` is substituted
+ * with `lightMode`/`darkMode` and the role resolved in that mode.
+ *
+ * Semantic roles only — never palette names. That is the rule that makes a
+ * re-brand a one-file change (see this package's CLAUDE.md), and it is why the
+ * dark primary button is brass rather than the inverted white-on-navy a
+ * hand-mapping would reach for: `semantic.primary.dark` already answers that
+ * question, and the sign-in page must agree with the app rather than relitigate
+ * it.
+ */
+const COGNITO_COLORS: ReadonlyArray<readonly [string, string]> = [
+  // Primary button — the "Sign in" call to action.
+  ['components.primaryButton.{mode}.defaults.backgroundColor', 'primary'],
+  ['components.primaryButton.{mode}.defaults.textColor', 'primaryText'],
+  ['components.primaryButton.{mode}.hover.backgroundColor', 'primaryHover'],
+  ['components.primaryButton.{mode}.hover.textColor', 'primaryText'],
+  ['components.primaryButton.{mode}.active.backgroundColor', 'primaryActive'],
+  ['components.primaryButton.{mode}.active.textColor', 'primaryText'],
+  ['components.primaryButton.{mode}.disabled.backgroundColor', 'muted'],
+  ['components.primaryButton.{mode}.disabled.borderColor', 'muted'],
+
+  // Secondary button, and the identity-provider buttons that share its shape.
+  // No federated providers are configured, so the IdP ones never render today;
+  // mapped anyway so enabling one later cannot surface AWS blue.
+  ['components.secondaryButton.{mode}.defaults.backgroundColor', 'card'],
+  ['components.secondaryButton.{mode}.defaults.borderColor', 'primary'],
+  ['components.secondaryButton.{mode}.defaults.textColor', 'primary'],
+  ['components.secondaryButton.{mode}.hover.backgroundColor', 'surfaceAlt'],
+  ['components.secondaryButton.{mode}.hover.borderColor', 'primaryHover'],
+  ['components.secondaryButton.{mode}.hover.textColor', 'primaryHover'],
+  ['components.secondaryButton.{mode}.active.backgroundColor', 'surfaceAlt'],
+  ['components.secondaryButton.{mode}.active.borderColor', 'primaryActive'],
+  ['components.secondaryButton.{mode}.active.textColor', 'primaryActive'],
+  ['components.idpButton.standard.{mode}.defaults.backgroundColor', 'card'],
+  ['components.idpButton.standard.{mode}.defaults.borderColor', 'line'],
+  ['components.idpButton.standard.{mode}.defaults.textColor', 'ink'],
+  ['components.idpButton.standard.{mode}.hover.backgroundColor', 'surfaceAlt'],
+  ['components.idpButton.standard.{mode}.hover.borderColor', 'primary'],
+  ['components.idpButton.standard.{mode}.hover.textColor', 'ink'],
+  ['components.idpButton.standard.{mode}.active.backgroundColor', 'surfaceAlt'],
+  ['components.idpButton.standard.{mode}.active.borderColor', 'primaryActive'],
+  ['components.idpButton.standard.{mode}.active.textColor', 'ink'],
+
+  // Page and form surfaces.
+  ['components.pageBackground.{mode}.color', 'bg'],
+  ['components.form.{mode}.backgroundColor', 'card'],
+  ['components.form.{mode}.borderColor', 'line'],
+  ['components.pageHeader.{mode}.background.color', 'surfaceAlt'],
+  ['components.pageHeader.{mode}.borderColor', 'line'],
+  ['components.pageFooter.{mode}.background.color', 'surfaceAlt'],
+  ['components.pageFooter.{mode}.borderColor', 'line'],
+
+  // Text.
+  ['components.pageText.{mode}.headingColor', 'ink'],
+  ['components.pageText.{mode}.bodyColor', 'ink'],
+  ['components.pageText.{mode}.descriptionColor', 'muted'],
+
+  // Inputs, labels, and the focus ring — the keyboard-navigation affordance,
+  // which was still AWS blue in both modes before this existed.
+  ['componentClasses.input.{mode}.defaults.backgroundColor', 'card'],
+  ['componentClasses.input.{mode}.defaults.borderColor', 'line'],
+  ['componentClasses.input.{mode}.placeholderColor', 'muted'],
+  ['componentClasses.inputLabel.{mode}.textColor', 'ink'],
+  ['componentClasses.inputDescription.{mode}.textColor', 'muted'],
+  ['componentClasses.focusState.{mode}.borderColor', 'primary'],
+  ['componentClasses.divider.{mode}.borderColor', 'line'],
+
+  // Links — "Forgot your password?".
+  ['componentClasses.link.{mode}.defaults.textColor', 'primary'],
+  ['componentClasses.link.{mode}.hover.textColor', 'primaryHover'],
+
+  // Selection controls and the dropdown.
+  ['componentClasses.optionControls.{mode}.defaults.backgroundColor', 'card'],
+  ['componentClasses.optionControls.{mode}.defaults.borderColor', 'line'],
+  ['componentClasses.optionControls.{mode}.selected.backgroundColor', 'primary'],
+  ['componentClasses.optionControls.{mode}.selected.foregroundColor', 'primaryText'],
+  ['componentClasses.dropDown.{mode}.defaults.itemBackgroundColor', 'card'],
+  ['componentClasses.dropDown.{mode}.hover.itemBackgroundColor', 'surfaceAlt'],
+  ['componentClasses.dropDown.{mode}.hover.itemTextColor', 'ink'],
+  ['componentClasses.dropDown.{mode}.hover.itemBorderColor', 'line'],
+  ['componentClasses.dropDown.{mode}.match.itemTextColor', 'primary'],
+
+  // Status. `success`/`warning`/`danger` carry their own semantic roles, so a
+  // re-brand moves them too rather than leaving AWS's red and amber behind.
+  ['componentClasses.statusIndicator.{mode}.error.indicatorColor', 'danger'],
+  ['componentClasses.statusIndicator.{mode}.error.borderColor', 'danger'],
+  ['componentClasses.statusIndicator.{mode}.success.indicatorColor', 'success'],
+  ['componentClasses.statusIndicator.{mode}.success.borderColor', 'success'],
+  ['componentClasses.statusIndicator.{mode}.warning.indicatorColor', 'warning'],
+  ['componentClasses.statusIndicator.{mode}.warning.borderColor', 'warning'],
+  ['components.alert.{mode}.error.borderColor', 'danger'],
+];
+
 /** The brightnesses every semantic token must declare a value for. */
 const MODES = ['light', 'dark'] as const;
 type Mode = (typeof MODES)[number];
@@ -56,6 +168,14 @@ function main(args: string[]): void {
     [CSS_OUT, renderCss(tokens)],
     [TS_OUT, renderTypeScript(tokens)],
   ];
+
+  // Reconciled rather than rendered, so it needs its current contents as input.
+  // Absent (a fresh checkout of infra, or the file deliberately removed) is not
+  // an error — there is simply nothing to reconcile.
+  const cognitoCurrent = readIfExists(join(root, COGNITO_OUT));
+  if (cognitoCurrent !== null) {
+    outputs.push([COGNITO_OUT, renderCognitoBranding(tokens, cognitoCurrent)]);
+  }
 
   const drifted: string[] = [];
   for (const [path, contents] of outputs) {
@@ -251,6 +371,62 @@ function lookup(values: Map<string, string>, name: string): string {
   const value = values.get(name);
   if (value === undefined) throw new Error(`No resolved value for "${name}"`);
   return value;
+}
+
+/**
+ * Rewrite the colour slots of Cognito's managed-login settings from the
+ * semantic tokens, leaving every other key exactly as found.
+ *
+ * A path that does not exist in the document is a hard error, not a skip: it
+ * means AWS changed its schema (or a console re-export dropped a component),
+ * and silently branding fewer things than intended is precisely the failure
+ * this generator exists to prevent — the sign-in page would quietly regain a
+ * patch of AWS blue and nothing would say so.
+ */
+function renderCognitoBranding(tokens: JsonObject, current: string): string {
+  const document = JSON.parse(current) as JsonValue;
+  const root = asObject(document, COGNITO_OUT);
+
+  for (const mode of MODES) {
+    const values = valuesFor(tokens, mode);
+    const key = mode === 'light' ? 'lightMode' : 'darkMode';
+    for (const [template, role] of COGNITO_COLORS) {
+      setColor(
+        root,
+        template.replace('{mode}', key).split('.'),
+        cognitoColor(lookup(values, role)),
+      );
+    }
+  }
+
+  return `${JSON.stringify(root, null, 2)}\n`;
+}
+
+/** Walk a dotted path and assign, asserting every segment exists. */
+function setColor(root: JsonObject, path: readonly string[], value: string): void {
+  let node: JsonObject = root;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const segment = path[index] as string;
+    if (!(segment in node)) {
+      throw new Error(`${COGNITO_OUT}: no such path segment "${segment}" in ${path.join('.')}`);
+    }
+    node = asObject(node[segment], `${COGNITO_OUT}:${path.slice(0, index + 1).join('.')}`);
+  }
+  const leaf = path[path.length - 1] as string;
+  if (!(leaf in node)) {
+    throw new Error(`${COGNITO_OUT}: no such colour slot "${path.join('.')}"`);
+  }
+  node[leaf] = value;
+}
+
+/**
+ * Cognito wants `rrggbbaa` with no leading `#`, lower-cased for stability —
+ * the console writes mixed case and a diff should reflect a real colour change,
+ * not a round trip through the branding editor.
+ */
+function cognitoColor(hex: string): string {
+  const bare = hex.replace('#', '').toLowerCase();
+  return bare.length === 8 ? bare : `${bare}ff`;
 }
 
 // ─────────────────────────── output buffer ───────────────────────────

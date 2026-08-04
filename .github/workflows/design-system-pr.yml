@@ -39,6 +39,12 @@ jobs:
             # This package's theme.css is GENERATED from the tokens package, so
             # a tokens-only PR must still run the drift check below.
             packages/insolvia_tokens/**
+            # Cognito's managed-login colours are a third generated output of
+            # the same tokens run. It lives under infra/, so without this line a
+            # PR that hand-edited only that file would skip the drift gate and
+            # merge a sign-in page whose colours no longer match the tokens —
+            # the same hole the two root-manifest lines below close.
+            infra/modules/auth/managed-login-settings.json
             # Workspace member: the root manifest and lockfile ARE this
             # package's install inputs. Without these two lines a PR touching
             # only the root lockfile would skip this gate, merge, and break the
