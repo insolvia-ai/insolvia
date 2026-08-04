@@ -273,3 +273,29 @@ resource "aws_ssm_parameter" "case_table_name" {
   value = module.case_store.table_name
   tags  = local.common_tags
 }
+
+# Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
+# into an insolvia-audit-<env> bucket under its own key. Declared after
+# module.case_store because it records that module's table.
+#
+# The key is separate from the case key by necessity as well as design:
+# ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-cases-*,
+# so a trail pointed at the case key fails at CreateTrail. The upside is that
+# the pipeline can write this log and has no kms:Decrypt for audit keys
+# anywhere, so it can never read back what it recorded.
+# A year: this is the copy that has to answer a question asked long after the
+# access it records.
+
+module "audit_trail" {
+  source = "../../modules/audit_trail"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  # The case table, and its indexes via starts_with. The case document bucket
+  # joins this list when 8.6 lands.
+  data_resource_arns = [module.case_store.table_arn]
+
+  retention_days = 365
+  tags           = local.common_tags
+}

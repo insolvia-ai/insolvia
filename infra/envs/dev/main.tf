@@ -19,7 +19,11 @@
 #     instantiate, so local development exercises the real encrypted path
 #     rather than an approximation of it;
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
-#     only — nothing consumes it yet).
+#     only — nothing consumes it yet);
+#   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
+#     off by default because a per-developer trail is cost with no evidentiary
+#     value — but standable-up, so modules/audit_trail can be exercised on a
+#     laptop rather than first met on staging.
 # No ECR/Lambda/API Gateway/S3: local dev runs the API via compose or the
 # plain dev server, not Lambda, and the app runs on the Expo dev server.
 
@@ -158,4 +162,24 @@ resource "aws_ssm_parameter" "case_table_name" {
   type  = "String"
   value = module.case_store.table_name
   tags  = local.common_tags
+}
+
+# ── Case-data audit trail (issue 8.2), opt-in ───────────────────
+# Off unless -var=enable_audit_trail=true. See the variable's own description
+# for why the default is off and why the module is still worth being able to
+# stand up here: it is how a change to modules/audit_trail gets tested before
+# staging sees it, rather than after.
+#
+# Retention is the module's 90-day floor — the shortest the module allows,
+# since nothing here is evidence.
+module "audit_trail" {
+  count  = var.enable_audit_trail ? 1 : 0
+  source = "../../modules/audit_trail"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  data_resource_arns          = [module.case_store.table_arn]
+  retention_days              = 90
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
 }
