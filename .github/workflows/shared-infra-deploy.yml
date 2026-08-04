@@ -1,12 +1,21 @@
 name: Infra · Terraform apply · Shared
 
+# No `push:` trigger — release.yml calls this as the FIRST leg of its staging
+# stage (path-filtered by its `changes` job, same sets that used to live here
+# as `on.push.paths`). It used to fire on its own push trigger, concurrently
+# with the release run, and the two raced: a merge adding a shared resource
+# plus its consumer (a new ECR repository plus the service that uses it) could
+# have staging resolve its `data` lookups before shared had applied, failing
+# the whole release. `needs` ordering in release.yml is what removed that race,
+# and a second trigger here would reintroduce it as a double-apply.
+#
+# `shared` sits BEFORE the release's production gate, ungated, deliberately:
+# both environments consume these resources, and staging cannot even plan
+# until they exist — parking them behind the prod approval would deadlock the
+# staging stage. Account-wide changes therefore ship like staging does, on
+# merge — which is what this workflow always did.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "infra/envs/shared/**"
-      - "infra/modules/**"
-      - ".github/workflows/shared-infra-deploy.yml"
+  workflow_call:
   workflow_dispatch:
 
 # ⚠️ The FIRST apply of infra/envs/shared had to be done by a human, locally,

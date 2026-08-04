@@ -145,9 +145,19 @@ real (prod ships when the release run's gate is approved).
 
 | Stage | Jobs | Gate |
 |---|---|---|
-| Staging | `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs` | none — staging *is* `main` |
+| Staging | `shared-infra-deploy.yml` (if shared paths changed) → `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs` | none — staging *is* `main` |
 | Evidence | `record` (sha image tags + commit status), `supersede` | none |
 | Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order | `promote` carries the `insolvia-production` environment |
+
+Shared infra rides in the pipeline too, as the staging stage's very first leg:
+both env roots resolve shared's resources (the wildcard cert, the container
+repositories) with hard-failing `data` lookups, so `shared` must apply before
+either env can even plan — which is also why it sits *before* the gate,
+ungated, rather than behind the production approval. It is account-wide, so
+one apply per commit serves both stages. It used to deploy from its own push
+trigger, racing the staging jobs on any merge that touched both
+([`terraform.md`](terraform.md) § deploy order has the race); `needs` ordering
+replaced that.
 
 Staging green parks the run at `promote`, which waits for the
 `insolvia-production` environment's **required reviewer** (a repo-settings

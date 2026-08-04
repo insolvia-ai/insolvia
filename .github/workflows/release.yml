@@ -39,6 +39,15 @@ name: Release
 #   4. app        — the client, last: it should never be the first thing that
 #                   expects a new API.
 #
+# SHARED INFRA is the very first leg, ahead of even the staging apply, because
+# both env roots resolve shared's resources (the wildcard cert, the container
+# repositories) with hard-failing `data` lookups. It used to deploy from its
+# own push trigger, concurrently with this run, and a merge touching shared
+# plus a consumer could lose that race and fail the release. It is ungated —
+# staging cannot even plan until it applies, so it cannot sit behind the prod
+# approval — and account-wide, so applying it once here is right for both
+# stages. shared-infra-deploy.yml's header has the long form.
+#
 # Infra is the FIRST job of each stage, because the service legs read Terraform
 # outputs and deploying against stale outputs is the race that ordering
 # removes. Both stages APPLY: staging because staging is `main` and reconciling
@@ -112,6 +121,7 @@ jobs:
       app: ${{ steps.f.outputs.app }}
       mailer: ${{ steps.f.outputs.mailer }}
       marketing: ${{ steps.f.outputs.marketing }}
+      shared: ${{ steps.f.outputs.shared }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -133,14 +143,14 @@ jobs:
           # property staging exists to have.
           if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             echo "No usable diff base — deploying every service."
-            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in api app mailer marketing shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
             exit 0
           fi
 
           files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
           if [ -z "$files" ]; then
             echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
-            for s in api app mailer marketing; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in api app mailer marketing shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
             exit 0
           fi
           printf '%s\n' "$files" | sed 's/^/  /'
@@ -160,18 +170,33 @@ jobs:
           emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
           emit app       '^(apps/|packages/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|\.github/workflows/(app-staging|release)\.yml)'
+          # The set shared-infra-deploy.yml carried as `on.push.paths` before
+          # this workflow took its trigger over.
+          emit shared    '^(infra/envs/shared/|infra/modules/|\.github/workflows/(shared-infra-deploy|release)\.yml)'
 
   # ── STAGING ──────────────────────────────────────────────────────────────
 
-  # Infra first, always — every service job below reads its outputs.
-  infra:
+  # Account-wide resources first — both env roots resolve them with
+  # hard-failing `data` lookups (see the header). Ungated: staging cannot even
+  # plan until this applies.
+  shared:
     needs: changes
-    uses: ./.github/workflows/infra-staging.yml
-    with:
-      mode: apply
+    if: ${{ needs.changes.outputs.shared == 'true' }}
+    uses: ./.github/workflows/shared-infra-deploy.yml
     # A called workflow receives no secrets at all without this — not even
     # repository-level ones. AWS_ROLE_ARN would resolve to an empty string and
     # the OIDC step would fail with an unhelpful error.
+    secrets: inherit
+
+  # Env infra next, always — every service job below reads its outputs.
+  # `!cancelled() && !failure()` for the same reason as the legs below: a push
+  # that skips `shared` must not skip the rest of the release behind it.
+  infra:
+    needs: [changes, shared]
+    if: ${{ !cancelled() && !failure() }}
+    uses: ./.github/workflows/infra-staging.yml
+    with:
+      mode: apply
     secrets: inherit
 
   # Every `if:` below deliberately avoids `success()`. A job whose dependency
