@@ -64,7 +64,7 @@ locals {
   # from the account + region) is still tighter than a blanket Resource = "*".
   # The identity itself lives in infra/envs/shared (module.email) — this module
   # only ever references it.
-  ses_identity_arn = "arn:aws:ses:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:identity/insolvia.ai"
+  ses_identity_arn = "arn:aws:ses:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:identity/insolvia.ai"
 
   # The mailer's one tenant. Matches ServiceConfig / parse_service_registry in
   # services/mailer/src/insolvia_mailer/core/config.py field-for-field —
@@ -660,7 +660,7 @@ resource "aws_iam_role_policy" "guardduty" {
         Action = [
           "events:PutRule", "events:DeleteRule", "events:PutTargets", "events:RemoveTargets",
         ]
-        Resource = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:rule/DO-NOT-DELETE-AmazonGuardDutyMalwareProtectionS3*"
+        Resource = "arn:aws:events:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:rule/DO-NOT-DELETE-AmazonGuardDutyMalwareProtectionS3*"
       },
       {
         Effect   = "Allow"

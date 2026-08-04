@@ -15,7 +15,7 @@ output "web_client_id" {
 
 output "domain" {
   description = "Hosted auth domain (Cognito-provided) serving /oauth2/authorize, /oauth2/token, and the sign-in pages."
-  value       = "${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
+  value       = "${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
 }
 
 # The seam for the API (#65): the first authenticated endpoint verifies JWTs
@@ -24,5 +24,5 @@ output "domain" {
 # that endpoint's PR.
 output "issuer_url" {
   description = "OIDC issuer URL the API will validate access/ID tokens against."
-  value       = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+  value       = "https://cognito-idp.${data.aws_region.current.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
 }

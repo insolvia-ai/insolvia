@@ -133,10 +133,11 @@ against prod. Each owns, per env:
   classic UI a "first-generation" service; managed login is what carries the
   branding editor, dark mode, localisation and the Terms/Privacy links at
   sign-up, and it is available from the ESSENTIALS tier this pool is already on.
-  **The branding style is not in Terraform**: `aws_cognito_managed_login_branding`
-  first shipped in AWS provider v6.12.0 and this repo pins `~> 5.0`, so the style
-  is edited in the console until a provider upgrade — the module header records
-  how to export and codify it afterwards.
+  **The branding style is still not in Terraform**, but the provider is no
+  longer why: `aws_cognito_managed_login_branding` shipped in v6.12.0 and the
+  repo now pins `~> 6.12`. What remains is that the authoritative copy of the
+  style lives in the console and has to be exported before it can be codified —
+  the module header records how.
   A custom `auth.insolvia.ai` domain is still deferred, and no longer only for
   vanity reasons: Cognito provisions its own CloudFront distribution using the
   **caller's** credentials, so the CI deploy role would need

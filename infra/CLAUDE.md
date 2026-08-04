@@ -6,7 +6,10 @@ bootstrap: [`docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md)
 the `insolvia-aws-auth` skill first if credentials aren't working.
 
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no
-  DynamoDB lock table), AWS provider `~> 5.0`. **Region `us-east-1` everywhere**
+  DynamoDB lock table), AWS provider `~> 6.12` — **6.12 is a deliberate floor,
+  not a stale `~> 6.0`**: `aws_cognito_managed_login_branding` first shipped in
+  6.12.0, and `~> 6.0` would let a root resolve 6.11 and fail `validate`. All
+  five roots carry the same pin. **Region `us-east-1` everywhere**
   (CloudFront ACM requirement).
 - **Naming `insolvia-<thing>-<env>`;** tags `{ Project = "insolvia",
   Environment, ManagedBy = "terraform" }`. Sensitive vars `sensitive = true`,
