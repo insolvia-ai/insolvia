@@ -111,6 +111,24 @@ resource "aws_cognito_user_pool_domain" "main" {
   domain                = "${var.project}-${var.environment}"
   user_pool_id          = aws_cognito_user_pool.main.id
   managed_login_version = 2
+
+  # Order the branding style BEFORE this flips to managed login. Nothing in the
+  # attribute references would do it — the branding hangs off the app client,
+  # not the domain — so without this the two are independent and Terraform may
+  # do them in either order.
+  #
+  # It matters because the failure is an outage, not a cosmetic gap: a client on
+  # managed login with no branding style does not fall back to defaults, it
+  # serves "Login pages unavailable. Please contact an administrator." and
+  # sign-in is simply down. That is exactly how staging broke — the version was
+  # flipped while the style still lived in a system Terraform could not reach.
+  #
+  # This matters most for `envs/dev`, where every developer applies this module
+  # to their own pool from their own machine: a partial apply there would break
+  # local sign-in per machine, with no CI run to notice. Depending on the
+  # branding makes "managed login is on but has nothing to render" unreachable
+  # rather than merely unlikely.
+  depends_on = [aws_cognito_managed_login_branding.web]
 }
 
 # ── Managed login branding ──────────────────────────────────────
