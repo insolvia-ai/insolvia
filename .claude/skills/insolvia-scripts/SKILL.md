@@ -55,6 +55,7 @@ already working.
 | Provision this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito) and wire `services/api/.env` | `scripts/dev-aws-setup.sh` (`--check` verifies) |
 | Wipe this machine's dev **data** (table delete+recreate, Cognito users); resources survive | `scripts/dev-aws-reset.sh` (`--dry-run`, `--skip-cognito`) |
 | `terraform destroy` this machine's dev resources + unwind `.env` | `scripts/dev-aws-destroy.sh` |
+| Destroy a **previous** machine-id's orphaned dev resources (leftovers a lost/regenerated `~/.config/insolvia/machine-id` strands, which destroy can't reach) | `scripts/dev-aws-destroy-orphan.sh <short-id>` |
 
 (`dev-aws-common.sh` is sourced, not run.)
 

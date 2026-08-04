@@ -14,7 +14,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
-| `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the three scripts above and `dev-up.sh` |
+| `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
+| `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the four scripts above and `dev-up.sh` |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
 | `scripts/e2e-create-test-user.sh` | Staging E2E setup (one-time) | Creates the dedicated test user in the **staging** Cognito pool (self-signup is disabled, so `admin-create-user` is the only path) and gives it a permanent password so the first sign-in is not a password-change challenge. Pool id from `terraform output`, never a literal; password from the environment or a no-echo prompt, never a file. `--check`. Needs a staging AWS session — see the `insolvia-aws-auth` skill. |
@@ -131,7 +132,17 @@ commands are:
 ./services/api/scripts/dev-up.sh                # compose against YOUR real table
 ./scripts/dev-aws-reset.sh                      # wipe the data, keep the resources
 ./scripts/dev-aws-destroy.sh                    # tear it all down (machine id kept)
+./scripts/dev-aws-destroy-orphan.sh <short-id>  # tear down a PREVIOUS machine-id's leftovers
 ```
+
+A lost or regenerated `~/.config/insolvia/machine-id` orphans that old id's
+environment: `dev-aws-destroy.sh` only ever inits the *current* id's state
+key, so the old resources and state object survive every teardown.
+`dev-aws-destroy-orphan.sh` takes the 12-char short id visible in the leftover
+resource names (e.g. `insolvia-waitlist-dev-<short-id>`), locates that id's
+own state object in the bucket, destroys everything the state tracks, and
+removes the state object. It refuses the current machine's id, and without
+`--yes` the embedded `terraform destroy` shows its plan and asks first.
 
 The in-memory waitlist store still exists in code — it is what unit tests and
 the bare `development_server` use when `WAITLIST_TABLE_NAME` is unset — but it
