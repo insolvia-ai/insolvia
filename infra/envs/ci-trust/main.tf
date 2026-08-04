@@ -503,16 +503,14 @@ data "aws_iam_policy_document" "github_permissions" {
   # authorized to perform: kms:GenerateDataKey", naming a key nobody in this
   # repo created and cannot find, because AWS owns it.
   #
-  # Paired with the carve-out in DenyCaseDataDecryption below. Neither works
-  # alone: an allow is still overridden by the deny, and a hole in the deny
-  # without an allow leaves the implicit deny in place. This is the same trap
-  # the CloudTrail pair documents, hit a second time.
+  # This no longer needs a matching hole in DenyCaseDataDecryption. That deny is
+  # now scoped to the case keys by alias rather than applying to every key, so
+  # an allow here is simply an allow — the "both or neither" pairing the
+  # CloudTrail statement describes was an artefact of the deny covering `*`.
   #
-  # kms:Decrypt is included and is fenced by the same ViaService condition, so
-  # it authorizes only what LAMBDA decrypts on this role's behalf — function
-  # code and environment variables. It cannot reach case data: DynamoDB and S3
-  # decrypt as their own service principals, so those calls carry
-  # `kms:ViaService = dynamodb…`/`s3…` and the deny below still bites.
+  # kms:Decrypt stays fenced to `kms:ViaService = lambda…`, so it authorizes
+  # only what LAMBDA decrypts for this role — function code and environment
+  # variables — and never a direct Decrypt call.
   statement {
     sid = "LambdaCodeAndEnvEncryption"
     actions = [
@@ -860,12 +858,46 @@ data "aws_iam_policy_document" "github_permissions" {
   # reading every SSN in the store. An identity-policy deny is the only thing
   # that overrides a key-policy allow, which is what this is.
   #
-  # The ViaService carve-out keeps ParameterEncryption working: SSM
-  # SecureStrings legitimately need Decrypt/Encrypt/GenerateDataKey, but only
-  # ever with SSM as the calling service. A direct Decrypt carries no
-  # kms:ViaService key at all, so StringNotEquals matches and the deny bites.
-  # Case data is unaffected in normal operation: DynamoDB and S3 decrypt under
-  # a grant as their own service principal, never as this role.
+  # SCOPED BY KEY, NOT BY CALLING SERVICE. This replaced a kms:ViaService
+  # carve-out list, and the swap fixes a false positive and a false negative at
+  # once.
+  #
+  # The false positive was breaking deploys. `resources = ["*"]` covered every
+  # key in the account, including AWS's MANAGED DEFAULTS — `alias/aws/lambda`,
+  # which Lambda uses for function code and environment variables, and
+  # `alias/aws/dynamodb`, which the mailer's messages table uses. Neither holds
+  # case data. Both were denied, so `update-function-code` and
+  # `UpdateTimeToLive` failed, taking out every staging release and the
+  # production infra apply. Carving services out one at a time patched
+  # instances: cloudtrail, then lambda, then dynamodb would have been next —
+  # and dynamodb could not be carved out, because case data IS DynamoDB. The
+  # discriminator was never the calling service; it is the key.
+  #
+  # The false negative was quieter and worse. A ViaService carve-out applies to
+  # EVERY key, so the lambda and ssm exemptions permitted decrypting the CASE
+  # key through those services. Scoping by key closes that: the case keys are
+  # now denied whatever the route, including routes added later.
+  #
+  # HONEST ABOUT THE COST. EncryptionKeyCreate above rejects tags as a fence for
+  # two reasons, and BOTH apply to aliases: KMS evaluates alias changes lazily
+  # (AWS documents up to five minutes and advises against alias-based
+  # authorization), and a key without the expected alias is not matched. So
+  # there is a window after `aws_kms_key.case` is created and before
+  # `aws_kms_alias.case` lands where a case key is not covered.
+  #
+  # It is still the better trade, for a reason the tag argument does not share:
+  # the failure directions are opposite. A tag fence failed CLOSED — a missing
+  # tag denied every later call and left the key permanently unmanageable,
+  # recoverable only by a human apply plus state surgery. This fails OPEN for a
+  # few seconds on first create, against a key that contains nothing yet.
+  #
+  # There is no non-lazy option. A key ARN fence would be exact, but ci-trust
+  # cannot know the ARNs — the pipeline creates those keys in the staging, prod
+  # and dev roots, and this root is applied by a human before any of them.
+  #
+  # The pattern must track infra/modules/case_store: `alias/${local.name}` where
+  # name is "insolvia-cases-<env>". Renaming there without renaming here
+  # silently stops the deny matching, which is why it is spelled out.
   statement {
     sid    = "DenyCaseDataDecryption"
     effect = "Deny"
@@ -881,25 +913,11 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
 
     condition {
-      test     = "StringNotEquals"
-      variable = "kms:ViaService"
-      values = [
-        "ssm.${var.aws_region}.amazonaws.com",
-        # CloudTrail asks the CALLER for GenerateDataKey when a trail sets
-        # kms_key_id. Carved out here and allowed in TrailLogEncryption above
-        # — the two go together, and neither works alone.
-        "cloudtrail.${var.aws_region}.amazonaws.com",
-        # Lambda does the same for function code and environment variables,
-        # against the AWS-managed `alias/aws/lambda` key. Paired with
-        # LambdaCodeAndEnvEncryption above, same rule: both or neither.
-        #
-        # Scope is worth stating plainly, since this deny is what makes
-        # kms:PutKeyPolicy safe. Adding a service to this list does NOT open
-        # case data — it opens what THAT service decrypts for this role.
-        # Case data is reached through dynamodb/s3 as their own principals,
-        # which carry a different kms:ViaService and stay denied.
-        "lambda.${var.aws_region}.amazonaws.com",
-      ]
+      # ForAnyValue: a key may carry several aliases, and one of them matching
+      # the case pattern is enough to deny.
+      test     = "ForAnyValue:StringLike"
+      variable = "kms:ResourceAliases"
+      values   = ["alias/insolvia-cases-*"]
     }
   }
 
