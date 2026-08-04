@@ -137,6 +137,11 @@ resource "aws_lambda_function" "ssr" {
       # that makes the waitlist real. The SSR action POSTs here rather than
       # touching AWS itself (docs/adr/0001).
       INSOLVIA_API_BASE_URL = var.api_base_url
+      # "full" serves the real site; "placeholder" serves a holding page and
+      # noindexes everything. Read at RUNTIME, so the same image serves both —
+      # one environment-agnostic artifact, per the header comment above.
+      # Contract with apps/insolvia_marketing/app/lib/site-mode.server.ts.
+      INSOLVIA_SITE_MODE = var.site_mode
     }
   }
 

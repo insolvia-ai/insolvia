@@ -1,7 +1,8 @@
-import { Form, Link, data, useNavigation } from "react-router";
+import { Form, Link, data, redirect, useNavigation } from "react-router";
 import { Button, buttonClass, Field } from "@insolvia-ai/design-system";
 
 import { seo } from "../lib/seo";
+import { isPlaceholderSite } from "../lib/site-mode.server";
 import {
   parseWaitlistForm,
   putWaitlistSubmission,
@@ -32,7 +33,17 @@ interface ActionFailure {
   formError?: string;
 }
 
+// Placeholder mode has no waitlist: the page is positioning, and the whole
+// point of the holding page is that positioning is not public yet. Redirect
+// rather than 404 so a stale link or an old bookmark lands somewhere sensible.
+export function loader() {
+  if (isPlaceholderSite()) throw redirect("/");
+  return null;
+}
+
 export async function action({ request }: Route.ActionArgs) {
+  if (isPlaceholderSite()) throw redirect("/");
+
   const form = await request.formData();
 
   // Honeypot tripped → pretend success and drop the submission. Silence is the

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loader as robotsLoader } from "./[robots.txt]";
 import { loader as sitemapLoader } from "./[sitemap.xml]";
@@ -99,5 +99,47 @@ describe("sitemap.xml", () => {
 
     expect(body).toContain("<urlset");
     expect(body).toContain("sitemaps.org/schemas/sitemap");
+  });
+});
+
+/**
+ * Placeholder mode (see lib/site-mode.server.ts) has to change the crawler
+ * contract, not just the page: a holding page indexed as the site's canonical
+ * content would have to be undone at launch, and a sitemap advertising pages
+ * robots.txt forbids would simply contradict itself.
+ */
+describe("placeholder mode", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("disallows crawling even on the production host", async () => {
+    vi.stubEnv("INSOLVIA_SITE_MODE", "placeholder");
+
+    const body = await callLoader(robotsLoader, PRODUCTION_HOST).text();
+
+    expect(body).toContain("Disallow: /");
+    expect(body).not.toContain("Allow: /");
+  });
+
+  it("advertises no sitemap entries", async () => {
+    vi.stubEnv("INSOLVIA_SITE_MODE", "placeholder");
+
+    const body = await callLoader(sitemapLoader, PRODUCTION_HOST).text();
+
+    expect(body.match(/<loc>/g) ?? []).toHaveLength(0);
+    expect(body).toContain("<urlset");
+  });
+
+  it("leaves the production contract intact when off", async () => {
+    // The regression that matters: placeholder mode must not leak into the
+    // normal path, or launching would silently keep the site out of the index.
+    vi.stubEnv("INSOLVIA_SITE_MODE", "full");
+
+    const robots = await callLoader(robotsLoader, PRODUCTION_HOST).text();
+    const sitemap = await callLoader(sitemapLoader, PRODUCTION_HOST).text();
+
+    expect(robots).toContain("Allow: /");
+    expect(sitemap.match(/<loc>/g) ?? []).toHaveLength(SEO_ROUTES.length);
   });
 });

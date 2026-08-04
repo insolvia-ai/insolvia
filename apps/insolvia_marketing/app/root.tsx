@@ -14,6 +14,7 @@ import {
 import { buttonClass, Footer, NavBar } from "@insolvia-ai/design-system";
 
 import { ORGANIZATION_JSONLD, isProductionHost } from "./lib/seo";
+import { isPlaceholderSite } from "./lib/site-mode.server";
 import stylesheet from "./styles/app.css?url";
 import type { Route } from "./+types/root";
 
@@ -23,9 +24,13 @@ export const links: LinksFunction = () => [{ rel: "stylesheet", href: stylesheet
 // CloudFront/API-Gateway URLs, localhost) is noindexed — via the X-Robots-Tag
 // response header here and the <meta name="robots"> in <head> below.
 export function loader({ request }: Route.LoaderArgs) {
-  const noindex = !isProductionHost(request);
+  // Placeholder mode noindexes unconditionally, production host or not: a
+  // holding page indexed as the site's canonical content is worse than no
+  // index at all, and the real launch should get a clean first crawl.
+  const placeholder = isPlaceholderSite();
+  const noindex = placeholder || !isProductionHost(request);
   return data(
-    { noindex },
+    { noindex, placeholder },
     noindex ? { headers: { "X-Robots-Tag": "noindex, nofollow" } } : undefined,
   );
 }
@@ -63,6 +68,38 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const rootData = useRouteLoaderData<typeof loader>("root");
+  // Fail closed the same way the noindex flag does: no root data means an
+  // error page, where the marketing chrome is noise at best.
+  const placeholder = rootData?.placeholder ?? false;
+
+  // Placeholder mode drops the navigation entirely — every link in it points at
+  // marketing anchors that this deployment does not serve.
+  //
+  // The footer is KEPT, minus the Explore group, and that is deliberate rather
+  // than an oversight: the privacy policy has to stay reachable site-wide
+  // without searching, because AWS reviews exactly that as part of the SES
+  // production-access request (docs/runbooks/ses-production-access.md) and
+  // every transactional email footer points at the same URL. A holding page
+  // that broke the only link to it would quietly undermine issue #28.
+  if (placeholder) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <main className="flex-1">
+          <Outlet />
+        </main>
+        <Footer.Root>
+          <Footer.Group title="Legal">
+            <Footer.Link href="/privacy">Privacy policy</Footer.Link>
+          </Footer.Group>
+          <Footer.Note>
+            &copy; {new Date().getFullYear()} Insolvia. All rights reserved.
+          </Footer.Note>
+        </Footer.Root>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <NavBar.Root>

@@ -146,12 +146,26 @@ module "auth" {
     "http://localhost:3000",
   ]
 
-  # staging-auth, not auth.staging — the shared certificate is `*.insolvia.ai`
-  # and a wildcard covers exactly one label, the same reason the app is
-  # `staging-app` and the API `staging-api`.
-  custom_domain   = "staging-auth.${var.domain_name}"
-  certificate_arn = data.aws_acm_certificate.wildcard.arn
-  hosted_zone_id  = data.aws_route53_zone.main.zone_id
+  # No custom auth domain yet — BLOCKED ON THE APEX RESOLVING, not on anything
+  # in this module. Cognito refuses to create a custom domain unless the PARENT
+  # domain resolves to an IP, and `staging-auth.insolvia.ai`'s parent is the
+  # apex, exactly as `auth.insolvia.ai`'s is. The apex A record exists in
+  # Route53 but is an alias to prod's marketing distribution, which is parked
+  # (`site_enabled = false` in infra/envs/prod/main.tf) — a disabled
+  # distribution serves no DNS, so `dig +short insolvia.ai A` returns nothing
+  # and CreateUserPoolDomain fails with "Was not able to resolve a DNS A record
+  # for the parent domain".
+  #
+  # Checking that the Route53 RECORD exists is not the same check Cognito runs;
+  # it resolves the name. That mistake cost a broken staging apply.
+  #
+  # So this is gated on launching the marketing site, and the module keeps the
+  # capability ready: when prod flips site_enabled to true, uncomment the three
+  # lines below (and the matching pair in prod) and the domain builds.
+  #
+  #   custom_domain   = "staging-auth.${var.domain_name}"
+  #   certificate_arn = data.aws_acm_certificate.wildcard.arn
+  #   hosted_zone_id  = data.aws_route53_zone.main.zone_id
 
   # Staging pool holds only test accounts; keep it destroyable.
   deletion_protection = false
@@ -243,8 +257,10 @@ module "marketing_site" {
   ecr_repository_url  = data.aws_ecr_repository.service["marketing"].repository_url
   image_tag           = var.marketing_image_tag
 
-  # Staging serves; prod is parked (infra/envs/prod/main.tf site_enabled).
+  # Staging serves the REAL site — it is where the marketing site is reviewed
+  # before launch. Production serves a holding page (site_mode there).
   site_enabled = true
+  site_mode    = "full"
 
   # The SSR waitlist action brokers through the API (docs/adr/0001) — the
   # staging API, so staging submissions never touch the prod table.

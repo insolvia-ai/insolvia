@@ -138,19 +138,28 @@ against prod. Each owns, per env:
   repo now pins `~> 6.12`. What remains is that the authoritative copy of the
   style lives in the console and has to be exported before it can be codified —
   the module header records how.
-- **Custom auth domain** — `staging-auth.insolvia.ai` and `auth.insolvia.ai`,
-  off the shared wildcard cert, with a Route53 alias to the CloudFront
-  distribution Cognito provisions for it. Flat labels, because a wildcard covers
-  one label: `auth.staging.insolvia.ai` would need its own certificate.
-  **Dev keeps the prefix domain** — a custom domain is per-pool and takes 15–20
-  minutes to create, so a per-machine one would add a quarter-hour to every
-  `dev-aws-setup.sh` for a cosmetic gain.
-  Added **alongside** the prefix domain rather than replacing it: a pool may
-  hold one of each, so the cutover costs no downtime — the app moves when its
-  next build picks up the `auth_domain` output, and `prefix_domain` stays
-  available until someone removes it. Cognito requires the parent domain to have
-  an A record before it will create one (anti-hijacking); `insolvia.ai` has the
-  marketing apex alias, and an SOA record would not have counted.
+- **Custom auth domain — supported by the module, not yet enabled, and blocked
+  on the marketing launch.** `modules/auth` takes `custom_domain` +
+  `certificate_arn` + `hosted_zone_id` and builds the domain alongside the
+  prefix one (a pool may hold both, so the cutover costs no downtime — the app
+  moves when its next build picks up `auth_domain`, and `prefix_domain` keeps
+  serving). Every env passes null today.
+
+  The blocker is Cognito's anti-hijacking check: it will not create a custom
+  domain unless the **parent** domain resolves to an IP. Both
+  `staging-auth.insolvia.ai` and `auth.insolvia.ai` sit one label under the
+  apex, so both depend on `insolvia.ai` resolving — and it does not. The apex A
+  record exists in Route53, but aliases prod's marketing distribution, which is
+  parked (`site_enabled = false`). A disabled distribution serves no DNS.
+
+  **Verify with `dig +short insolvia.ai A`, not by reading the Route53 record.**
+  The record existing and the name resolving are different facts; assuming the
+  first implied the second broke a staging apply.
+
+  Names would be flat (`staging-auth`, not `auth.staging`) because the shared
+  wildcard covers one label. Dev would keep the prefix domain regardless: a
+  custom domain is per-pool and takes 15–20 minutes each way, so a per-machine
+  one would add a quarter-hour to every `dev-aws-setup.sh` run.
 - **One public PKCE app client**, authorization-code, no secret, refresh-token
   rotation enabled: `insolvia-web-<env>` — the SPA; callbacks at
   `<origin>/auth/callback`, sign-out to the origin. Staging also registers

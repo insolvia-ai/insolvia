@@ -1,4 +1,5 @@
 import { ORIGIN, isProductionHost } from "../lib/seo";
+import { isPlaceholderSite } from "../lib/site-mode.server";
 import type { Route } from "./+types/[robots.txt]";
 
 // AI crawlers are explicitly allowed on production (issue #42): an increasing
@@ -32,7 +33,11 @@ Disallow: /
 `;
 
 export function loader({ request }: Route.LoaderArgs) {
-  const body = isProductionHost(request) ? PRODUCTION_ROBOTS : NON_PRODUCTION_ROBOTS;
+  // Placeholder mode disallows crawling even on the production host: the
+  // holding page is thin content, and letting it become the site's indexed
+  // identity would have to be undone at launch.
+  const body =
+    isProductionHost(request) && !isPlaceholderSite() ? PRODUCTION_ROBOTS : NON_PRODUCTION_ROBOTS;
   return new Response(body, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",

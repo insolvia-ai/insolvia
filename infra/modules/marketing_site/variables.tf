@@ -68,6 +68,32 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "site_mode" {
+  description = <<-EOT
+    "full" serves the real marketing site. "placeholder" serves a holding page
+    at / (and redirects /waitlist to it), noindexes every response, and makes
+    robots.txt disallow crawling — for an environment whose DNS should resolve
+    before its positioning is public.
+
+    Distinct from site_enabled, which is a CloudFront on/off switch: disabled
+    serves a CloudFront 403 and, because a disabled distribution resolves to
+    nothing, takes the hostname out of DNS entirely. That side effect is why
+    prod cannot be parked and still own the apex A record that Cognito's custom
+    auth domain requires — placeholder mode exists to serve *something* while
+    the site itself is not ready.
+
+    /privacy and /unsubscribe keep working in either mode: the first is a legal
+    page and the second is the opt-out target of live production mail.
+  EOT
+  type        = string
+  default     = "full"
+
+  validation {
+    condition     = contains(["full", "placeholder"], var.site_mode)
+    error_message = "site_mode must be \"full\" or \"placeholder\"."
+  }
+}
+
 variable "site_enabled" {
   description = <<-EOT
     Whether the CloudFront distribution serves traffic. Set false to take the

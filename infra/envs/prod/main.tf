@@ -152,10 +152,17 @@ module "auth" {
 
   web_origins = ["https://${var.subdomain}"]
 
-  # The address attorneys actually see when they sign in.
-  custom_domain   = "auth.${var.domain_name}"
-  certificate_arn = data.aws_acm_certificate.wildcard.arn
-  hosted_zone_id  = data.aws_route53_zone.main.zone_id
+  # No custom auth domain yet. Cognito requires the PARENT domain to resolve
+  # before it will create one, and this environment's own marketing
+  # distribution — the thing the apex A record aliases — is parked
+  # (site_enabled = false below), so `insolvia.ai` resolves to nothing.
+  #
+  # Self-referential in a way worth naming: prod cannot have `auth.insolvia.ai`
+  # until prod's marketing site is serving. Enable that, then uncomment:
+  #
+  #   custom_domain   = "auth.${var.domain_name}"
+  #   certificate_arn = data.aws_acm_certificate.wildcard.arn
+  #   hosted_zone_id  = data.aws_route53_zone.main.zone_id
 
   deletion_protection = true
 
@@ -213,7 +220,16 @@ module "marketing_site" {
   # OFFLINE, deliberately: the site is parked until we have an engaged MyCase.
   # Nothing is destroyed — CloudFront just stops serving. Set back to true and
   # re-apply this env to bring www.insolvia.ai back; no rebuild is needed.
-  site_enabled = false
+  # ENABLED, serving a holding page rather than the real site (site_mode).
+  #
+  # Parked is not a neutral state: a disabled CloudFront distribution resolves
+  # to nothing, so `site_enabled = false` also removed insolvia.ai from DNS —
+  # and Cognito refuses to create a custom auth domain unless the PARENT domain
+  # resolves. That is why auth.insolvia.ai could not be created while this was
+  # false. Serving a holding page keeps the apex resolving without publishing
+  # any positioning.
+  site_enabled = true
+  site_mode    = "placeholder"
 
   # The SSR waitlist action brokers through the API (docs/adr/0001).
   api_base_url = "https://${module.api_service.domain_name}"
