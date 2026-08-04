@@ -152,13 +152,13 @@ module "auth" {
 
   web_origins = ["https://${var.subdomain}"]
 
-  # No custom auth domain yet. Cognito requires the PARENT domain to resolve
-  # before it will create one, and this environment's own marketing
-  # distribution — the thing the apex A record aliases — is parked
-  # (site_enabled = false below), so `insolvia.ai` resolves to nothing.
+  # No custom auth domain YET, and no longer because it cannot work: the apex
+  # now resolves (marketing is enabled below), so the prerequisite is met.
+  # It is staged behind staging on purpose — staging-auth.insolvia.ai proves the
+  # module against a real pool first, and the prod apply is 15-20 minutes of
+  # Cognito provisioning its own CloudFront distribution.
   #
-  # Self-referential in a way worth naming: prod cannot have `auth.insolvia.ai`
-  # until prod's marketing site is serving. Enable that, then uncomment:
+  # Enable by uncommenting, once staging's has been seen working:
   #
   #   custom_domain   = "auth.${var.domain_name}"
   #   certificate_arn = data.aws_acm_certificate.wildcard.arn
