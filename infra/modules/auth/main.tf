@@ -113,16 +113,17 @@ resource "aws_cognito_user_pool_domain" "main" {
   managed_login_version = 2
 }
 
-# ── Managed login branding — NOT YET IN TERRAFORM ───────────────
-# The branding style itself (colours, logo, dark mode) is deliberately absent
-# from this module, and that is a provider limitation rather than a choice:
+# ── Managed login branding — STILL CONSOLE-OWNED ────────────────
+# The branding style itself (colours, logo, dark mode) is still absent from this
+# module, but the provider is no longer the reason:
 # `aws_cognito_managed_login_branding` first shipped in AWS provider **v6.12.0**,
-# and this repo pins `~> 5.0` (infra/CLAUDE.md). Adding it here does not fail at
-# apply time — it fails `terraform validate`, so the PR gate catches it.
+# and this repo now pins `~> 6.12` (infra/CLAUDE.md), so the resource validates
+# today.
 #
-# Until a provider major-version upgrade is a deliberate piece of work, the
-# style is created and edited in the console's branding editor, which is the
-# one part of auth that is not under IaC. Two things follow from that:
+# What remains is that the style is DATA whose authoritative copy lives in the
+# console's branding editor — the one part of auth that is not under IaC.
+# Writing `settings` from scratch here would not codify the branding someone
+# designed; it would overwrite it on the next apply. Two things follow:
 #
 #   • AWS documents that an app client created through the API — which is what
 #     Terraform does — starts with NO branding style: "managed login isn't
@@ -130,7 +131,7 @@ resource "aws_cognito_user_pool_domain" "main" {
 #     with a CreateManagedLoginBranding request." Opening the branding editor
 #     and saving creates that style; until someone does, these pages render
 #     Cognito's stock defaults.
-#   • When the provider is upgraded, the console work is not thrown away.
+#   • To codify it, export first — the console work is not thrown away.
 #     `DescribeManagedLoginBrandingByClient` with `ReturnMergedResources`
 #     exports the whole style as JSON, which becomes this module's `settings`
 #     plus `asset` blocks (images committed here and shipped with filebase64 —

@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.12"
     }
     # modules/api_service generates the unsubscribe signing key (#80).
     # Declared here rather than in the module because this repo keeps all
