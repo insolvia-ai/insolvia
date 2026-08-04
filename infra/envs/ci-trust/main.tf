@@ -495,6 +495,41 @@ data "aws_iam_policy_document" "github_permissions" {
     }
   }
 
+  # Lambda encrypts every function's code package and environment variables,
+  # and when no CMK is set it uses the AWS-MANAGED key `alias/aws/lambda`. It
+  # asks the CALLER for the data key, so `aws lambda update-function-code` and
+  # `update-function-configuration` both need this — which means every service
+  # deploy does. Without it the deploy fails with "KMS access is denied ... not
+  # authorized to perform: kms:GenerateDataKey", naming a key nobody in this
+  # repo created and cannot find, because AWS owns it.
+  #
+  # Paired with the carve-out in DenyCaseDataDecryption below. Neither works
+  # alone: an allow is still overridden by the deny, and a hole in the deny
+  # without an allow leaves the implicit deny in place. This is the same trap
+  # the CloudTrail pair documents, hit a second time.
+  #
+  # kms:Decrypt is included and is fenced by the same ViaService condition, so
+  # it authorizes only what LAMBDA decrypts on this role's behalf — function
+  # code and environment variables. It cannot reach case data: DynamoDB and S3
+  # decrypt as their own service principals, so those calls carry
+  # `kms:ViaService = dynamodb…`/`s3…` and the deny below still bites.
+  statement {
+    sid = "LambdaCodeAndEnvEncryption"
+    actions = [
+      "kms:GenerateDataKey",
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["lambda.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
   # Aliases are a separate resource from the key they point at, and unlike
   # keys they DO have names — so they get a real ARN fence. The pattern is
   # `insolvia*`, not `insolvia-*`, so that the equally idiomatic
@@ -854,6 +889,16 @@ data "aws_iam_policy_document" "github_permissions" {
         # kms_key_id. Carved out here and allowed in TrailLogEncryption above
         # — the two go together, and neither works alone.
         "cloudtrail.${var.aws_region}.amazonaws.com",
+        # Lambda does the same for function code and environment variables,
+        # against the AWS-managed `alias/aws/lambda` key. Paired with
+        # LambdaCodeAndEnvEncryption above, same rule: both or neither.
+        #
+        # Scope is worth stating plainly, since this deny is what makes
+        # kms:PutKeyPolicy safe. Adding a service to this list does NOT open
+        # case data — it opens what THAT service decrypts for this role.
+        # Case data is reached through dynamodb/s3 as their own principals,
+        # which carry a different kms:ViaService and stay denied.
+        "lambda.${var.aws_region}.amazonaws.com",
       ]
     }
   }
