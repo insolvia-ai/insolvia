@@ -21,8 +21,14 @@ data "aws_region" "current" {}
 # passed as an ARN for the same reason module.mailer does it: a resource
 # reference across a module boundary would make api_service depend on this
 # module, and this module already depends on api_service.
+#
+# Optional, and null in exactly one place: infra/envs/dev, where there is no
+# Lambda at all — the local API runs as a dev server or under compose and the
+# developer's own IAM user is the principal. The waitlist table's dev instance
+# skips its grant for the same reason.
 data "aws_iam_role" "api" {
-  name = var.api_role_name
+  count = var.api_role_name == null ? 0 : 1
+  name  = var.api_role_name
 }
 
 locals {
@@ -148,7 +154,7 @@ resource "aws_dynamodb_table" "cases" {
     projection_type = "ALL"
   }
 
-  point_in_time_recovery { enabled = true }
+  point_in_time_recovery { enabled = var.point_in_time_recovery }
 
   # The whole point of this module. `enabled = true` alone would encrypt under
   # the AWS-owned DynamoDB key, which is not a key we control and not what
@@ -174,8 +180,10 @@ resource "aws_dynamodb_table" "cases" {
 # writes rows and can never change the shape. Per ADR 0001 it is also the only
 # principal on either side of that line.
 resource "aws_iam_role_policy" "api_case_access" {
+  count = var.api_role_name == null ? 0 : 1
+
   name = "access-${local.name}"
-  role = data.aws_iam_role.api.id
+  role = data.aws_iam_role.api[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"

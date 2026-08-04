@@ -167,8 +167,11 @@ The first persistent store of GLBA-scope data in the account — SSNs, full
 financials — so the posture here is the one to copy, not to improvise on. The
 logical model it holds is
 [`case-data-model.md`](case-data-model.md); this section is how it is
-protected. One instance per environment: `insolvia-cases-staging` and
-`insolvia-cases-prod`, each under its own key.
+protected. One instance per environment — `insolvia-cases-staging`,
+`insolvia-cases-prod`, and `insolvia-cases-dev-<short-id>` on each developer
+machine — each under its own key. Local is the same module, not an
+approximation of it: there is no DynamoDB emulator here, so a KMS or IAM
+mistake surfaces on a laptop instead of after a deploy.
 
 **Encryption at rest.** A customer-managed KMS key per environment
 (`alias/insolvia-cases-<env>`), rotation enabled, with the DynamoDB table's
@@ -265,6 +268,14 @@ What it owns is deliberately only what local dev consumes today:
 - **DynamoDB** `insolvia-waitlist-dev-<short-id>` — same PK/SK schema as
   `api_service`'s table so the API's adapter behaves identically, but PITR is
   **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
+- **Case store** via the same `modules/case_store` as staging/prod —
+  `insolvia-cases-dev-<short-id>` under this machine's own customer-managed
+  key, so the owner index and the encrypted read path behave here exactly as
+  they do deployed. PITR and deletion protection are **off** and the key
+  deletion window is the minimum 7 days, so a teardown does not leave a
+  month-long pending key behind. `api_role_name` is null — there is no Lambda,
+  so no grant is created and the developer's own credentials are the
+  principal.
 - **Auth** via the same `modules/auth` as staging/prod —
   `insolvia-users-dev-<short-id>`, hosted-domain prefix
   `insolvia-dev-<short-id>` (Cognito domain prefixes are globally unique

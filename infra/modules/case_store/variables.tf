@@ -16,8 +16,23 @@ variable "api_role_name" {
     and attaches the case-table grant from its own side, so api_service never
     has to know this module exists. A resource reference here would be a
     dependency cycle.
+
+    null in infra/envs/dev, where there is no Lambda and the developer's own
+    IAM user is the principal — the grant is then skipped entirely rather
+    than pointed at something that does not exist.
   EOT
   type        = string
+  default     = null
+}
+
+variable "point_in_time_recovery" {
+  description = <<-EOT
+    DynamoDB PITR. On everywhere that holds data worth recovering; off in dev,
+    which holds synthetic cases a developer wipes with dev-aws-reset.sh and
+    where paying for recovery would be noise.
+  EOT
+  type        = bool
+  default     = true
 }
 
 variable "deletion_protection" {

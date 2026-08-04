@@ -31,6 +31,15 @@ def test_waitlist_table_name_is_read():
     assert config.waitlist_table_name == "insolvia-waitlist-staging"
 
 
+def test_case_table_name_defaults_to_none():
+    assert load_config({}).case_table_name is None
+
+
+def test_case_table_name_is_read():
+    config = load_config({"CASE_TABLE_NAME": "insolvia-cases-staging"})
+    assert config.case_table_name == "insolvia-cases-staging"
+
+
 def test_mailer_api_url_defaults_to_none():
     assert load_config({}).mailer_api_url is None
 

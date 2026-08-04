@@ -44,9 +44,12 @@ output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
 # Paranoid ownership checks: every name must carry THIS machine's short id
 # and match what infra/envs/dev provisions, or the reset refuses to run.
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
+case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 [[ "$table" == "$WAITLIST_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected DynamoDB table '$table' (expected '$WAITLIST_TABLE_NAME_EXPECTED')."
+[[ "$case_table" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
+  die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
 [[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
   die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
@@ -55,6 +58,7 @@ printf '\nThis will clear development data owned by:\n'
 printf '  AWS account: %s\n' "$AWS_ACCOUNT_ID"
 printf '  Machine ID:  %s\n' "$MACHINE_ID"
 printf '  Table:       %s (delete + recreate)\n' "$table"
+printf '  Case table:  %s (delete + recreate)\n' "$case_table"
 if [[ "$SKIP_COGNITO" -eq 1 ]]; then
   printf '  Cognito:     skipped\n\n'
 else
@@ -87,6 +91,14 @@ log "Deleting $table..."
 aws_dev dynamodb delete-table --table-name "$table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$table"
 
+# The case store goes the same way. Its customer-managed key is deliberately
+# NOT touched: the key is Terraform-owned and survives a reset, so recreating
+# the table below re-grants against the same key rather than churning a new
+# one (and leaving the old one pending deletion) on every wipe.
+log "Deleting $case_table..."
+aws_dev dynamodb delete-table --table-name "$case_table" >/dev/null
+aws_dev dynamodb wait table-not-exists --table-name "$case_table"
+
 if [[ "$SKIP_COGNITO" -eq 0 ]]; then
   users_json="$(aws_dev cognito-idp list-users --user-pool-id "$pool_id" --output json)"
   while IFS= read -r username; do
@@ -96,7 +108,7 @@ if [[ "$SKIP_COGNITO" -eq 0 ]]; then
   ok "Removed $(jq '.Users | length' <<<"$users_json") Cognito user(s)."
 fi
 
-log "Recreating the empty DynamoDB table through Terraform..."
+log "Recreating the empty DynamoDB tables through Terraform..."
 terraform -chdir="$TF_DIR" apply -input=false -auto-approve "${TF_VARS[@]}"
 
 if [[ "$api_was_running" -eq 1 ]]; then
