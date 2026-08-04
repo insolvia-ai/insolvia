@@ -29,6 +29,18 @@ installing).
 | Install the shared toolchain (Terraform, tflint, AWS CLI, jq, Node ≥24, Watchman, Python 3.12) | `scripts/dev-setup.sh` |
 | Make a `read:packages` token available so `npm ci` can pull `@insolvia-ai/design-system` | `scripts/github-packages-auth.sh` |
 
+## Run everything at once
+
+| Want to… | Run |
+|---|---|
+| Bring the whole system up in one terminal (API + mailer + app + marketing), prefixed logs, one Ctrl-C stops it all | `scripts/dev-up.sh` — **takes no arguments** |
+| Stop one area, or reclaim a port a previous session left held | that area's `scripts/dev-down.sh` (idempotent) |
+
+`dev-up.sh` delegates to the per-area `dev-up.sh`/`dev-down.sh` pairs below
+rather than duplicating them — which is also why it has no `--only`: to run one
+part, run that part's own script. It refuses to start until `dev-aws-setup.sh`
+has run, because there is no DynamoDB emulator and no fake Cognito.
+
 ## Run a package locally
 
 Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):

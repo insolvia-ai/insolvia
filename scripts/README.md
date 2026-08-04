@@ -10,6 +10,7 @@ Two layers — a shared base plus thin per-package scripts:
 | Script | Scope | Does |
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check) |
+| `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
@@ -114,6 +115,44 @@ The script never writes a token into a committed file — the repo is public,
 and the `.npmrc` uses the `${NODE_AUTH_TOKEN}` env indirection. The only
 non-scriptable step is creating a token with the scope in the first place (a
 GitHub UI / `gh` action); the script does everything after that.
+
+## Running the whole system (`scripts/dev-up.sh`)
+
+```bash
+./scripts/dev-up.sh     # api + mailer + app + marketing. Ctrl-C stops it all.
+```
+
+That is the whole interface — it takes no arguments. To run one part, run that
+part's own script instead; there is no reason for this one to grow a flag that
+duplicates them.
+
+| Service | URL | Up | Down |
+|---|---|---|---|
+| app | <http://localhost:3000> | `apps/insolvia_app/scripts/dev-up.sh` | `…/dev-down.sh` |
+| api | <http://127.0.0.1:8080/health> | `services/api/scripts/dev-up.sh` | `…/dev-down.sh` |
+| marketing | <http://localhost:5173> | `apps/insolvia_marketing/scripts/dev-up.sh` | `…/dev-down.sh` |
+| mailer | <http://127.0.0.1:8026> (Mailpit <http://127.0.0.1:8025>) | `services/mailer/scripts/dev-up.sh` | `…/dev-down.sh` |
+
+**Every area owns both halves.** `dev-up.sh` knows how to start that area — the
+API's exports short-lived AWS credentials before `compose up`, the app's pins
+port 3000 because Cognito registers that exact origin. `dev-down.sh` knows how
+to stop it, which is not the same as killing the process that started it:
+compose containers outlive their `up`, and a stray `npx` grandchild keeps
+holding 3000. The root script delegates to both and re-implements neither.
+
+Each `dev-down.sh` is idempotent and safe to run when nothing is up — teardown
+that can fail is teardown you stop trusting — so they are also the thing to
+reach for when a previous session left a port held.
+
+Two things worth knowing:
+
+- **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
+  and no fake Cognito: the API talks to this machine's real per-developer
+  tables and the app signs in against its real pool. Preflight says so by name
+  rather than letting a container fail obscurely.
+- **The first run of the day is slow.** Both compose stacks build images and
+  Vite does its cold dependency scan, concurrently. The readiness wait is sized
+  for that; a service still missing at the end says so and keeps trying.
 
 ## Per-machine AWS development resources
 
