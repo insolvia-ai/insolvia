@@ -152,10 +152,17 @@ module "auth" {
 
   web_origins = ["https://${var.subdomain}"]
 
-  # The address attorneys actually see when they sign in.
-  custom_domain   = "auth.${var.domain_name}"
-  certificate_arn = data.aws_acm_certificate.wildcard.arn
-  hosted_zone_id  = data.aws_route53_zone.main.zone_id
+  # No custom auth domain yet. Cognito requires the PARENT domain to resolve
+  # before it will create one, and this environment's own marketing
+  # distribution — the thing the apex A record aliases — is parked
+  # (site_enabled = false below), so `insolvia.ai` resolves to nothing.
+  #
+  # Self-referential in a way worth naming: prod cannot have `auth.insolvia.ai`
+  # until prod's marketing site is serving. Enable that, then uncomment:
+  #
+  #   custom_domain   = "auth.${var.domain_name}"
+  #   certificate_arn = data.aws_acm_certificate.wildcard.arn
+  #   hosted_zone_id  = data.aws_route53_zone.main.zone_id
 
   deletion_protection = true
 
