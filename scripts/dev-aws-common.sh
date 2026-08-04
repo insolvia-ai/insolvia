@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Shared helpers for the per-machine AWS development scripts
-# (dev-aws-setup.sh / dev-aws-reset.sh / dev-aws-destroy.sh).
+# (dev-aws-setup.sh / dev-aws-reset.sh / dev-aws-destroy.sh /
+# dev-aws-destroy-orphan.sh).
 #
 # Identity model: a persistent UUID per OS user per machine, generated once
 # into ~/.config/insolvia/machine-id. Its first 12 hex chars become the
