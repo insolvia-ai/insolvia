@@ -13,8 +13,27 @@ output "web_client_id" {
   value       = aws_cognito_user_pool_client.web.id
 }
 
+# The one hostname consumers should ever use: the app builds its /oauth2
+# URLs from this, the E2E asserts the redirect landed on it, and both read it
+# from the env's Terraform output rather than hard-coding either form.
+#
+# Prefers the custom domain where one exists, which is what makes the cutover a
+# rebuild rather than a code change — the prefix domain keeps serving until the
+# app's next deploy picks this up.
 output "domain" {
-  description = "Hosted auth domain (Cognito-provided) serving /oauth2/authorize, /oauth2/token, and the sign-in pages."
+  description = "Hostname serving /oauth2/authorize, /oauth2/token and the sign-in pages — the custom domain where configured, otherwise the Cognito prefix domain."
+  value = (
+    var.custom_domain == null
+    ? "${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
+    : var.custom_domain
+  )
+}
+
+# The prefix domain specifically, which keeps serving after a custom domain is
+# added. Exposed so the cutover is observable — during it the two differ, and
+# afterwards this is what you would remove.
+output "prefix_domain" {
+  description = "Cognito-provided prefix hostname. Always present; equals `domain` when no custom domain is configured."
   value       = "${aws_cognito_user_pool_domain.main.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
 }
 

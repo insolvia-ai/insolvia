@@ -131,6 +131,60 @@ resource "aws_cognito_user_pool_domain" "main" {
   depends_on = [aws_cognito_managed_login_branding.web]
 }
 
+# ── Custom auth domain (staging, prod) ──────────────────────────
+# `auth.insolvia.ai` instead of `insolvia-prod.auth.<region>.amazoncognito.com`.
+# Sign-in is the one screen where an unfamiliar domain reads as phishing, and
+# AWS's own guidance is that a custom domain "improves user trust ... especially
+# when the root domain matches the domain that hosts your application".
+#
+# ADDED ALONGSIDE the prefix domain, not instead of it. A pool may hold one of
+# each, and keeping both makes the cutover free: the app moves when its build
+# picks up the new `domain` output, and the prefix keeps serving until then.
+# Replacing would mean deleting the prefix domain first and waiting out the
+# create — sign-in down for the duration.
+#
+# Two costs of a custom domain, both real:
+#   • Create and delete each take 15-20 minutes, and Terraform blocks. Plan
+#     accordingly; this is not a resource to churn.
+#   • Cognito serves `/.well-known/openid-configuration` from the CUSTOM domain
+#     only once one exists. Nothing here reads it — the API verifies against
+#     `issuer_url`, which is the pool's own endpoint and unaffected — but an
+#     OIDC client added later must point at the custom domain.
+#
+# The parent domain needs an A record or Cognito refuses to create this, as
+# protection against hijacking a domain you do not control. `insolvia.ai`
+# already has one (the marketing apex alias); an SOA record would not count.
+resource "aws_cognito_user_pool_domain" "custom" {
+  count = var.custom_domain == null ? 0 : 1
+
+  domain                = var.custom_domain
+  user_pool_id          = aws_cognito_user_pool.main.id
+  certificate_arn       = var.certificate_arn
+  managed_login_version = 2
+
+  # Same ordering rule as the prefix domain above: a domain on managed login
+  # with no branding style serves "Login pages unavailable", not a default.
+  depends_on = [aws_cognito_managed_login_branding.web]
+}
+
+# Cognito creates its own CloudFront distribution for the custom domain and
+# hands back the hostname to point at. The zone id comes from the resource
+# rather than the usual hard-coded CloudFront constant (Z2FDTNDATAQYW2) —
+# provider 6 exposes it, and reading it beats copying a magic string.
+resource "aws_route53_record" "auth" {
+  count = var.custom_domain == null ? 0 : 1
+
+  zone_id = var.hosted_zone_id
+  name    = var.custom_domain
+  type    = "A"
+
+  alias {
+    name                   = aws_cognito_user_pool_domain.custom[0].cloudfront_distribution
+    zone_id                = aws_cognito_user_pool_domain.custom[0].cloudfront_distribution_zone_id
+    evaluate_target_health = false
+  }
+}
+
 # ── Managed login branding ──────────────────────────────────────
 # The style the sign-in pages render with. Cognito serves the pages; nothing
 # here is hosted by us. Requires provider >= 6.12.0, which is why

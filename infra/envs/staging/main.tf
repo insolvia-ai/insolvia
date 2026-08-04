@@ -146,6 +146,13 @@ module "auth" {
     "http://localhost:3000",
   ]
 
+  # staging-auth, not auth.staging — the shared certificate is `*.insolvia.ai`
+  # and a wildcard covers exactly one label, the same reason the app is
+  # `staging-app` and the API `staging-api`.
+  custom_domain   = "staging-auth.${var.domain_name}"
+  certificate_arn = data.aws_acm_certificate.wildcard.arn
+  hosted_zone_id  = data.aws_route53_zone.main.zone_id
+
   # Staging pool holds only test accounts; keep it destroyable.
   deletion_protection = false
 

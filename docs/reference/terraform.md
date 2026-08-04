@@ -138,12 +138,19 @@ against prod. Each owns, per env:
   repo now pins `~> 6.12`. What remains is that the authoritative copy of the
   style lives in the console and has to be exported before it can be codified —
   the module header records how.
-  A custom `auth.insolvia.ai` domain is still deferred, and no longer only for
-  vanity reasons: Cognito provisions its own CloudFront distribution using the
-  **caller's** credentials, so the CI deploy role would need
-  `cloudfront:UpdateDistribution` — a grant only a human can apply
-  (`insolvia-deploy-role-permissions`). The wildcard cert and the apex A record
-  Cognito requires both already exist.
+- **Custom auth domain** — `staging-auth.insolvia.ai` and `auth.insolvia.ai`,
+  off the shared wildcard cert, with a Route53 alias to the CloudFront
+  distribution Cognito provisions for it. Flat labels, because a wildcard covers
+  one label: `auth.staging.insolvia.ai` would need its own certificate.
+  **Dev keeps the prefix domain** — a custom domain is per-pool and takes 15–20
+  minutes to create, so a per-machine one would add a quarter-hour to every
+  `dev-aws-setup.sh` for a cosmetic gain.
+  Added **alongside** the prefix domain rather than replacing it: a pool may
+  hold one of each, so the cutover costs no downtime — the app moves when its
+  next build picks up the `auth_domain` output, and `prefix_domain` stays
+  available until someone removes it. Cognito requires the parent domain to have
+  an A record before it will create one (anti-hijacking); `insolvia.ai` has the
+  marketing apex alias, and an SOA record would not have counted.
 - **One public PKCE app client**, authorization-code, no secret, refresh-token
   rotation enabled: `insolvia-web-<env>` — the SPA; callbacks at
   `<origin>/auth/callback`, sign-out to the origin. Staging also registers
