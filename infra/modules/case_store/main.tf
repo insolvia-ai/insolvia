@@ -182,6 +182,65 @@ resource "aws_dynamodb_table" "cases" {
   tags = var.tags
 }
 
+# ── The access log ──────────────────────────────────────────────
+# The log that answers "which signed-in user read this case", which the
+# CloudTrail trail in modules/audit_trail structurally cannot: ADR 0001 makes
+# the API role the only principal AWS ever sees, so the end user's identity
+# exists only inside the request. This table is where the API writes it down.
+#
+# The two are complementary and neither replaces the other. CloudTrail proves
+# nothing but the API touched the store; this proves who asked the API to.
+#
+#   PK = CASE#<case_id>
+#   SK = <recorded_at>#<event_id>   chronological within a case
+#
+# Keyed by case because that is the question actually asked — of a client, in
+# a dispute, or in a breach notice: who saw THIS file. "What did this account
+# touch" wants a by-principal index instead; it is deliberately not here yet,
+# and a GSI can be added online later without a migration.
+#
+# READS ARE LOGGED, not just writes. A write log answers "who changed this",
+# which the provenance fields in the case record already answer better. The
+# question this table exists for is who *saw* it.
+resource "aws_dynamodb_table" "access_log" {
+  name         = "${var.project}-case-access-log-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  # Retention is a compliance decision rather than an engineering one, and the
+  # regulatory register owns the number. The default here is a placeholder that
+  # errs long; TTL deletes silently, so shortening it is a decision to make on
+  # purpose rather than to inherit.
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  point_in_time_recovery { enabled = var.point_in_time_recovery }
+
+  # Same key as the case table. That is deliberate: it means the deploy role,
+  # already denied every data-plane verb on alias/insolvia-cases-*, cannot read
+  # the access log either.
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.case.arn
+  }
+
+  deletion_protection_enabled = var.deletion_protection
+
+  tags = var.tags
+}
+
 # ── The one application principal ───────────────────────────────
 # Attached from inside this module onto the role looked up above — the mailer
 # module's pattern, and the reason there is no dependency cycle.
@@ -222,6 +281,25 @@ resource "aws_iam_role_policy" "api_case_access" {
         # choosing HTTPS is a default rather than a guarantee. Issue 8.2 puts
         # TLS in transit in scope, so this makes it one. Behaviour-neutral
         # today — nothing in services/api would notice.
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # APPEND-ONLY, and the omissions are the design. No GetItem, no Query,
+        # no UpdateItem, no DeleteItem: the API writes access records and can
+        # never read, amend or remove one. An audit log the audited service can
+        # rewrite is not evidence, and the waitlist table's PutItem-only grant
+        # is the same reasoning.
+        #
+        # The consequence is that no endpoint can serve an access history
+        # today. That is a real limitation and the right default — serving it
+        # means granting Query, which should be its own decision with its own
+        # diff, not a capability that arrived by accident.
+        Sid      = "CaseAccessLogAppend"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = aws_dynamodb_table.access_log.arn
         Condition = {
           Bool = { "aws:SecureTransport" = "true" }
         }

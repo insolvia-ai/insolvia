@@ -164,6 +164,15 @@ resource "aws_ssm_parameter" "case_table_name" {
   tags  = local.common_tags
 }
 
+# The access log's table name, same namespace and same reasoning as
+# case-table-name above — the API derives it as CASE_ACCESS_LOG_TABLE_NAME.
+resource "aws_ssm_parameter" "case_access_log_table_name" {
+  name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
+  type  = "String"
+  value = module.case_store.access_log_table_name
+  tags  = local.common_tags
+}
+
 # ── Case-data audit trail (issue 8.2), opt-in ───────────────────
 # Off unless -var=enable_audit_trail=true. See the variable's own description
 # for why the default is off and why the module is still worth being able to

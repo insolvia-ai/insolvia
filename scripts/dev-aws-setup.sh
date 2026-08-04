@@ -54,16 +54,20 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Terraform state does not match this machine ID."
   table="$(jq -r '.outputs.waitlist_table_name.value // empty' <<<"$state_json")"
   case_table="$(jq -r '.outputs.case_table_name.value // empty' <<<"$state_json")"
+  access_log_table="$(jq -r '.outputs.case_access_log_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
+  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
     die "Development DynamoDB table '$table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
     die "Development case table '$case_table' is unavailable."
+  aws_dev dynamodb describe-table --table-name "$access_log_table" >/dev/null ||
+    die "Development case access-log table '$access_log_table' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
     die "Development Cognito pool '$pool_id' is unavailable."
   if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
-    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env"; then
+    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
+    ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
   ok "Per-machine AWS resources and services/api/.env are ready."
@@ -78,6 +82,7 @@ terraform -chdir="$TF_DIR" "${apply_args[@]}"
 outputs="$(terraform_output_json)"
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
+access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
@@ -110,6 +115,7 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 api_env="$API_DIR/.env"
 upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
 upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
+upsert_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"

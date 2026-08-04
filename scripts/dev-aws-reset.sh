@@ -45,11 +45,14 @@ output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
 # and match what infra/envs/dev provisions, or the reset refuses to run.
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
+access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 [[ "$table" == "$WAITLIST_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected DynamoDB table '$table' (expected '$WAITLIST_TABLE_NAME_EXPECTED')."
 [[ "$case_table" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
+[[ "$access_log_table" == "$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED" ]] ||
+  die "Refusing reset: unexpected access-log table '$access_log_table' (expected '$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED')."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
 [[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
   die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
@@ -59,6 +62,7 @@ printf '  AWS account: %s\n' "$AWS_ACCOUNT_ID"
 printf '  Machine ID:  %s\n' "$MACHINE_ID"
 printf '  Table:       %s (delete + recreate)\n' "$table"
 printf '  Case table:  %s (delete + recreate)\n' "$case_table"
+printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
 if [[ "$SKIP_COGNITO" -eq 1 ]]; then
   printf '  Cognito:     skipped\n\n'
 else
@@ -98,6 +102,13 @@ aws_dev dynamodb wait table-not-exists --table-name "$table"
 log "Deleting $case_table..."
 aws_dev dynamodb delete-table --table-name "$case_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$case_table"
+
+# The access log goes with the cases it describes. Keeping it would leave
+# entries pointing at case ids that no longer exist, which is worse than
+# nothing — and on a laptop it is synthetic either way.
+log "Deleting $access_log_table..."
+aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
+aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
 
 if [[ "$SKIP_COGNITO" -eq 0 ]]; then
   users_json="$(aws_dev cognito-idp list-users --user-pool-id "$pool_id" --output json)"
