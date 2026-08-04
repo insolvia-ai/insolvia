@@ -1,10 +1,14 @@
 import { ORIGIN, SEO_ROUTES } from "../lib/seo";
+import { isPlaceholderSite } from "../lib/site-mode.server";
 
 // sitemap.xml (issue #42), generated from the SEO_ROUTES list in app/lib/seo.ts.
 // A new page adds itself by appending one entry there. URLs are always the
 // canonical production origin, whatever host served this response.
 export function loader() {
-  const urls = SEO_ROUTES.map(
+  // Placeholder mode advertises nothing: robots.txt disallows crawling, so a
+  // sitemap listing pages that are not being served would only contradict it.
+  const routes = isPlaceholderSite() ? [] : SEO_ROUTES;
+  const urls = routes.map(
     ({ path }) => `  <url>\n    <loc>${ORIGIN}${path}</loc>\n  </url>`,
   ).join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>

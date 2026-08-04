@@ -220,7 +220,16 @@ module "marketing_site" {
   # OFFLINE, deliberately: the site is parked until we have an engaged MyCase.
   # Nothing is destroyed — CloudFront just stops serving. Set back to true and
   # re-apply this env to bring www.insolvia.ai back; no rebuild is needed.
-  site_enabled = false
+  # ENABLED, serving a holding page rather than the real site (site_mode).
+  #
+  # Parked is not a neutral state: a disabled CloudFront distribution resolves
+  # to nothing, so `site_enabled = false` also removed insolvia.ai from DNS —
+  # and Cognito refuses to create a custom auth domain unless the PARENT domain
+  # resolves. That is why auth.insolvia.ai could not be created while this was
+  # false. Serving a holding page keeps the apex resolving without publishing
+  # any positioning.
+  site_enabled = true
+  site_mode    = "placeholder"
 
   # The SSR waitlist action brokers through the API (docs/adr/0001).
   api_base_url = "https://${module.api_service.domain_name}"

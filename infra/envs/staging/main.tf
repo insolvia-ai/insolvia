@@ -257,8 +257,10 @@ module "marketing_site" {
   ecr_repository_url  = data.aws_ecr_repository.service["marketing"].repository_url
   image_tag           = var.marketing_image_tag
 
-  # Staging serves; prod is parked (infra/envs/prod/main.tf site_enabled).
+  # Staging serves the REAL site — it is where the marketing site is reviewed
+  # before launch. Production serves a holding page (site_mode there).
   site_enabled = true
+  site_mode    = "full"
 
   # The SSR waitlist action brokers through the API (docs/adr/0001) — the
   # staging API, so staging submissions never touch the prod table.

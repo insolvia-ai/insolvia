@@ -1,11 +1,15 @@
 import type { MetaFunction } from "react-router";
 
+import type { Route } from "./+types/_index";
+
 import { Cta } from "../components/cta";
 import { Faq } from "../components/faq";
 import { Hero } from "../components/hero";
 import { Jobs } from "../components/jobs";
 import { Pillars } from "../components/pillars";
+import { Holding } from "../components/holding";
 import { seo } from "../lib/seo";
+import { isPlaceholderSite } from "../lib/site-mode.server";
 
 export const meta: MetaFunction = () =>
   seo({
@@ -17,7 +21,16 @@ export const meta: MetaFunction = () =>
     path: "/",
   });
 
-export default function Home() {
+export function loader() {
+  return { placeholder: isPlaceholderSite() };
+}
+
+export default function Home({ loaderData }: Route.ComponentProps) {
+  // Placeholder mode: occupy the domain, say nothing about the product. See
+  // lib/site-mode.server.ts for why an environment might need to resolve
+  // before its positioning is public.
+  if (loaderData.placeholder) return <Holding />;
+
   return (
     <>
       <Hero />
