@@ -379,13 +379,13 @@ repositories up with `data "aws_ecr_repository"`. Both hard-fail until
 before then — and `shared` itself can't be CI-applied until the `ci-trust`
 role exists.
 
-Note that CI does **not** order `shared` against `staging`:
-`shared-infra-deploy.yml` uses concurrency group `insolvia-shared-infra` while
-the staging deploys use `insolvia-terraform-staging`, so on a merge that
-touches both they run concurrently. `shared` normally wins comfortably
-(creating a repository takes seconds; staging spends far longer in
-`terraform init` before it resolves any data source), but a staging run that
-loses the race fails on the lookup and simply needs re-running. The first `shared` apply must be preceded by a manual
+CI orders `shared` against everything downstream: `shared-infra-deploy.yml`
+has no push trigger of its own — release.yml calls it (path-filtered) as the
+first leg of its staging stage, ahead of the staging apply, so a merge that
+adds a shared resource plus its consumer can never have the consumer's `data`
+lookup race the apply that creates it. (It used to run concurrently from its
+own trigger, and a staging run that lost the race failed on the lookup.) The
+first `shared` apply must be preceded by a manual
 `terraform import aws_route53_zone.main Z01038711J6IZ68FD6ZDW` (#13) — that
 import is done in this account.
 

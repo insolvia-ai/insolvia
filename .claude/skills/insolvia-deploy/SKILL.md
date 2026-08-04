@@ -39,7 +39,7 @@ commit, and an unapproved run ending `cancelled` is normal, not a failure.
 |---|---|
 | **staging** (infra + api, app, mailer, marketing) | automatic on merge to `main` — the staging stage of `release.yml` |
 | **prod** (infra + all services) | approving the `promote` gate of a green `release.yml` run |
-| **shared infra** | automatic on merge to `main` (`shared-infra-deploy.yml`, paths `infra/envs/shared/**`) |
+| **shared infra** | automatic on merge to `main` — the first leg of `release.yml`'s staging stage (path-filtered on `infra/envs/shared/**` + `infra/modules/**`), ahead of the gate because both envs consume it; `shared-infra-deploy.yml` stays dispatchable out of band |
 | **one prod service, out of band** | dispatch its `*-prod.yml` (emergency path: staging-green check + its own approval) |
 | **prod infra, out of band** | dispatch `infra-prod.yml` — `mode: plan` (default, read-only → job summary) or `mode: apply` |
 
