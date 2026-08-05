@@ -280,3 +280,46 @@ class TestEvasionsFoundInReview:
 
 
 TYPED_SOURCE = {"source": "staff_typed"}
+
+
+class TestLocator:
+    """Accepted as any mapping at all until a review pointed out where those
+    values go: straight into DynamoDB, and back out in a response body."""
+
+    def test_a_well_formed_locator_is_accepted(self) -> None:
+        entries = parse_provenance(
+            {
+                "a": {
+                    **CONFIRMED,
+                    "locator": {
+                        "document_id": "d1",
+                        "page": 3,
+                        "region": {"x": 0.1, "y": 0.2, "width": 0.5, "height": 0.05},
+                    },
+                }
+            }
+        )
+        assert entries["a"].locator is not None
+
+    def test_a_non_finite_number_is_refused(self) -> None:
+        # stdlib JSON accepts `Infinity` and `NaN`, so these arrive as real
+        # floats. DynamoDB refuses {"N": "inf"}, and a response echoing
+        # `Infinity` is not JSON any strict parser will read.
+        for bad in (float("inf"), float("nan")):
+            with pytest.raises(FieldValidationError):
+                parse_provenance(
+                    {"a": {**CONFIRMED, "locator": {"region": {"x": bad}}}}
+                )
+
+    def test_a_region_outside_the_page_is_refused(self) -> None:
+        # Fractions of the page box, origin top-left — not points.
+        with pytest.raises(FieldValidationError):
+            parse_provenance({"a": {**CONFIRMED, "locator": {"region": {"x": 1.5}}}})
+
+    def test_pages_are_one_based(self) -> None:
+        with pytest.raises(FieldValidationError):
+            parse_provenance({"a": {**CONFIRMED, "locator": {"page": 0}}})
+
+    def test_a_non_finite_confidence_is_refused(self) -> None:
+        with pytest.raises(FieldValidationError):
+            parse_provenance({"a": {**CONFIRMED, "confidence": float("nan")}})

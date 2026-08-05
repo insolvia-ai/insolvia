@@ -29,6 +29,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from typing import Final
 
 from .errors import FieldValidationError
@@ -101,6 +102,61 @@ def _is_utc_timestamp(value: object) -> bool:
     return True
 
 
+def _check_locator(value: object, path: str, errors: dict[str, str]) -> bool:
+    """Where on a page a value was read from — validated, not just typed.
+
+    docs/reference/case-data-model.md defines it as `{document_id, page,
+    region: {x, y, width, height}}` with the region in FRACTIONS of the page
+    box (0.0-1.0, origin top-left) rather than points, because the review UI
+    renders pages at whatever width the viewport gives it.
+
+    It was previously accepted as any mapping at all, which was not merely
+    loose. The values ride straight into DynamoDB, and stdlib JSON accepts
+    `Infinity` and `NaN` as numbers — so `{"page": Infinity}` stored fine in
+    the memory store, blew up the real one with a ClientError, and came back
+    out in a 201 response body as a token no strict JSON parser accepts. A
+    field nothing writes yet is exactly where that sits unnoticed.
+    """
+    if not isinstance(value, Mapping):
+        errors[f"{path}.locator"] = "locator must be an object."
+        return False
+
+    document_id = value.get("document_id")
+    if document_id is not None and not isinstance(document_id, str):
+        errors[f"{path}.locator.document_id"] = "document_id must be a string."
+        return False
+
+    page = value.get("page")
+    if page is not None and (
+        isinstance(page, bool) or not isinstance(page, int) or page < 1
+    ):
+        # 1-based, as the spec says and as a reader counts pages.
+        errors[f"{path}.locator.page"] = "page must be a whole number, 1 or more."
+        return False
+
+    region = value.get("region")
+    if region is None:
+        return True
+    if not isinstance(region, Mapping):
+        errors[f"{path}.locator.region"] = "region must be an object."
+        return False
+    for member in ("x", "y", "width", "height"):
+        size = region.get(member)
+        if size is None:
+            continue
+        if (
+            isinstance(size, bool)
+            or not isinstance(size, (int, float))
+            or not isfinite(float(size))
+            or not 0.0 <= float(size) <= 1.0
+        ):
+            errors[f"{path}.locator.region.{member}"] = (
+                "Must be a fraction of the page between 0 and 1."
+            )
+            return False
+    return True
+
+
 def _parse_entry(
     path: str, value: object, errors: dict[str, str]
 ) -> ProvenanceEntry | None:
@@ -149,7 +205,7 @@ def _parse_entry(
         if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
             errors[f"provenance.{path}.confidence"] = "confidence must be a number."
             return None
-        if not 0.0 <= float(confidence) <= 1.0:
+        if not isfinite(float(confidence)) or not 0.0 <= float(confidence) <= 1.0:
             errors[f"provenance.{path}.confidence"] = (
                 "confidence must be between 0 and 1."
             )
@@ -157,8 +213,9 @@ def _parse_entry(
         confidence = float(confidence)
 
     locator = value.get("locator")
-    if locator is not None and not isinstance(locator, Mapping):
-        errors[f"provenance.{path}.locator"] = "locator must be an object."
+    if locator is not None and not _check_locator(
+        locator, f"provenance.{path}", errors
+    ):
         return None
 
     document_id = value.get("document_id")
