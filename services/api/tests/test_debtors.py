@@ -360,3 +360,34 @@ class TestRoleOrdering:
         # being wrong for the first role added that is not.
         assert role_order("debtor_1") == 0
         assert [role_order(role) for role in FILING_ROLES] == [0, 1, 2]
+
+
+class TestSignatureDate:
+    """A form date is a calendar fact, not an instant, and not free text — an
+    api-client review caught this one accepting "yesterday"."""
+
+    def test_accepts_an_iso_calendar_date(self) -> None:
+        assert (
+            draft(signed_at="2026-08-05", provenance={"signed_at": TYPED}).signed_at
+            == "2026-08-05"
+        )
+
+    def test_rejects_prose(self) -> None:
+        with pytest.raises(FieldValidationError) as caught:
+            draft(signed_at="yesterday")
+        assert "signed_at" in caught.value.fields
+
+    def test_rejects_a_day_the_calendar_does_not_have(self) -> None:
+        # 2019-02-30 matches every plausible regex and is not a day.
+        with pytest.raises(FieldValidationError):
+            draft(signed_at="2019-02-30")
+
+    def test_rejects_a_timestamp(self) -> None:
+        # No time and no zone: storing one would put a calendar fact in a
+        # timezone it does not have.
+        with pytest.raises(FieldValidationError):
+            draft(signed_at="2026-08-05T12:00:00Z")
+
+    def test_rejects_the_compact_form_so_storage_has_one_shape(self) -> None:
+        with pytest.raises(FieldValidationError):
+            draft(signed_at="20260805")

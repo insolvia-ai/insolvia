@@ -26,7 +26,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Final
 
 from .cases import partition_key
@@ -170,6 +170,36 @@ def _text(
         return None
     if "\n" in text or "\r" in text:
         errors[path] = "Must be a single line."
+        return None
+    return text
+
+
+def _form_date(value: object, path: str, errors: dict[str, str]) -> str | None:
+    """A calendar date, `YYYY-MM-DD`, or None when absent.
+
+    Checked rather than taken as free text. docs/reference/case-data-model.md:
+    a form date has no time and no zone because it is a calendar fact, not an
+    instant — and a signature date that reads "yesterday" is worse than an
+    empty one, because it looks filled in. Parsed rather than pattern-matched
+    for the same reason the provenance timestamp is: `2019-02-30` matches every
+    plausible regex and is not a day.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        errors[path] = "Must be a date."
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        errors[path] = "Must be a date in YYYY-MM-DD form."
+        return None
+    # `date.fromisoformat` also accepts "20190214"; the stored form is one shape.
+    if parsed.isoformat() != text:
+        errors[path] = "Must be a date in YYYY-MM-DD form."
         return None
     return text
 
@@ -360,7 +390,7 @@ def parse_debtor(
     credit_counseling = _parse_credit_counseling(
         payload.get("credit_counseling"), errors
     )
-    signed_at = _text(payload.get("signed_at"), "signed_at", errors, limit=40)
+    signed_at = _form_date(payload.get("signed_at"), "signed_at", errors)
 
     if errors:
         raise FieldValidationError(errors)
