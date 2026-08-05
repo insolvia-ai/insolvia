@@ -186,4 +186,22 @@ describe('the cases screen', () => {
     const levelOnes = headings.filter((node) => node.props['aria-level'] === 1);
     expect(levelOnes).toHaveLength(1);
   });
+  it("offers a way into each case's intake, named by the case", async () => {
+    // A list of identical "Open intake" links is the classic screen-reader
+    // failure here: WCAG 2.4.4 asks that a link make sense out of context.
+    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
+
+    const link = await screen.findByLabelText('Open intake for the chapter 7 case in NDCA');
+    expect(link).toBeTruthy();
+  });
+
+  it("offers a way into each case's documents, named distinctly", async () => {
+    // A row now carries TWO links. Both need names that stand alone AND
+    // differ from each other — two rows of "Open intake"/"Documents" read to a
+    // screen reader as four links with two names between them.
+    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
+
+    expect(await screen.findByLabelText(`Documents for case ${CASE.id}`)).toBeTruthy();
+    expect(screen.getByLabelText('Open intake for the chapter 7 case in NDCA')).toBeTruthy();
+  });
 });

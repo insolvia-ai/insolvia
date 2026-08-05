@@ -170,6 +170,14 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         run: npm run lint --workspace apps/insolvia_app
 
+      # The api-client and design-system workflows have always had this; the
+      # app's did not, so its formatting was unchecked anywhere. An unformatted
+      # file reached main that way. Scoped to the app rather than the root
+      # script, so a package this job does not own cannot fail it.
+      - name: Format
+        if: steps.filter.outputs.run == 'true'
+        run: npx prettier --check apps/insolvia_app
+
       - name: Typecheck
         if: steps.filter.outputs.run == 'true'
         run: npm run typecheck --workspace apps/insolvia_app
