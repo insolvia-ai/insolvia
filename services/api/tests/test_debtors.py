@@ -106,9 +106,27 @@ class TestOtherNames:
         )
         assert result.other_names_used[0].id == "n1"
 
-    def test_assigns_an_id_when_one_is_missing(self) -> None:
-        result = draft(other_names_used=[{}])
-        assert result.other_names_used[0].id
+    def test_an_alias_without_an_id_is_refused(self) -> None:
+        # Minting one server-side is the trap, not the kindness it looks like:
+        # the alias's fields then need provenance at
+        # `other_names_used[<fresh-uuid>].…`, a path the caller cannot have
+        # sent. It 400s — and because a new uuid is minted on every attempt,
+        # echoing back the path the error just named 400s again with a
+        # different uuid. That loop made the 8-year alias list unusable.
+        with pytest.raises(FieldValidationError) as caught:
+            draft(other_names_used=[{"surname": "Smith"}])
+        assert "other_names_used[0].id" in caught.value.fields
+
+    def test_the_refusal_is_stable_across_attempts(self) -> None:
+        # The point of the fix: the same request twice gets the SAME error, so
+        # a client can act on it. The old behaviour named a different uuid each
+        # time, which is what made the loop unescapable.
+        def fields() -> dict[str, str]:
+            with pytest.raises(FieldValidationError) as caught:
+                draft(other_names_used=[{"surname": "Smith"}])
+            return caught.value.fields
+
+        assert fields() == fields()
 
     def test_rejects_duplicate_ids(self) -> None:
         # Two rows with one id would make a provenance path ambiguous.
@@ -308,9 +326,13 @@ class TestAliasIdsStayAddressable:
         )
         assert result.other_names_used[0].id.startswith("3f9c")
 
-    def test_a_server_assigned_id_is_always_addressable(self) -> None:
-        result = draft(other_names_used=[{}])
-        assert ADDRESSABLE_ID_RE.match(result.other_names_used[0].id)
+    def test_an_accepted_id_is_always_addressable(self) -> None:
+        # The property that matters: every id that survives can appear in a
+        # provenance path this service will accept.
+        result = draft(other_names_used=[{"id": "n1"}, {"id": "3f9c-1a2b"}])
+        assert all(
+            ADDRESSABLE_ID_RE.match(alias.id) for alias in result.other_names_used
+        )
 
 
 class TestRoleOrdering:

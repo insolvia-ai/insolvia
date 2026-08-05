@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Final
 
+from .cases import partition_key
 from .errors import FieldValidationError
 from .provenance import (
     ADDRESSABLE_ID_RE,
@@ -228,26 +229,29 @@ def _parse_other_names(value: object, errors: dict[str, str]) -> tuple[OtherName
     for index, raw in enumerate(value):
         path = f"other_names_used[{index}]"
         entry = _mapping(raw, path, errors)
-        # The id is the caller's, not the server's, because the client creates
-        # the row and writes provenance for its fields in the same request —
-        # it has to be able to name the row it is describing. A server-assigned
-        # id would need a round trip between "add an alias" and "say where it
-        # came from", and progressive autosave has no such moment.
+        # REQUIRED, and supplied by the caller. The client creates the row and
+        # writes provenance for its fields in the same request, so it has to be
+        # able to name the row it is describing.
+        #
+        # Minting one here instead looks helpful and is a trap: the alias's
+        # fields then need provenance at `other_names_used[<fresh-uuid>].…`, a
+        # path the caller cannot possibly have sent. It 400s, and because a new
+        # uuid is minted on every attempt, echoing back the path the error just
+        # named 400s again with a different uuid. There is no escape from that
+        # loop, which made the whole 8-year alias list unusable. An earlier
+        # version of this function did exactly that.
+        #
+        # Refused rather than replaced for the same reason a malformed id is:
+        # handing back a different id silently leaves the client's provenance
+        # keys naming a row that does not exist.
         given_id = entry.get("id")
-        if given_id is not None and (
-            not isinstance(given_id, str) or not ADDRESSABLE_ID_RE.match(given_id)
-        ):
-            # Refused rather than replaced. An id with a '.' or a ']' in it goes
-            # into a provenance path this service then rejects as malformed, and
-            # the caller is stuck: their alias needs provenance and the only
-            # path that would describe it is refused. Handing back a different
-            # id silently would be worse — the client's provenance keys would
-            # name a row that no longer exists.
-            errors[f"{path}.id"] = "Must be letters, digits, hyphen or underscore."
+        if not isinstance(given_id, str) or not ADDRESSABLE_ID_RE.match(given_id):
+            errors[f"{path}.id"] = (
+                "Required, and must be letters, digits, hyphen or underscore — "
+                "generate one per row so provenance can name it."
+            )
             continue
-        alias_id = (
-            given_id if isinstance(given_id, str) and given_id else str(uuid.uuid4())
-        )
+        alias_id = given_id
         if alias_id in seen:
             errors[f"{path}.id"] = "Duplicate id."
             continue
@@ -315,7 +319,9 @@ def parse_filing_role(value: object) -> str:
     return role
 
 
-def parse_debtor(payload: Mapping[str, object]) -> DebtorDraft:
+def parse_debtor(
+    payload: Mapping[str, object], *, enforce_provenance: bool = True
+) -> DebtorDraft:
     """Validate a whole debtor body. Unknown keys are ignored; `tax_id` is not.
 
     WHOLE, not partial. The questionnaire PUTs the complete record on every
@@ -380,7 +386,15 @@ def parse_debtor(payload: Mapping[str, object]) -> DebtorDraft:
     # INVARIANT 1, against the record as it will be STORED rather than as it
     # arrived: `_text` collapses whitespace-only values to None, so checking the
     # raw payload would demand provenance for fields that are about to vanish.
-    require_provenance(debtor_body(draft), provenance)
+    #
+    # A WRITE rule, which is why reads switch it off. A stored record already
+    # passed it once; re-running it on the way out means the day the rule
+    # tightens, every record written under the old one becomes unreadable —
+    # and because a FieldValidationError is a 400, listing ONE bad debtor
+    # would fail the whole case's GET. Shape is still re-parsed on read; only
+    # the invariant is skipped.
+    if enforce_provenance:
+        require_provenance(debtor_body(draft), provenance)
     return draft
 
 
@@ -474,10 +488,16 @@ def _prune_body(body: Mapping[str, object]) -> dict[str, object]:
 
 
 def _prune(value: object) -> object:
-    """Drop None members recursively, and drop maps that end up empty.
+    """Drop absent members from a record, recursively.
 
-    `False` and `0` survive — they are answers, the same rule populated_paths
-    states at length. Only None is absence here.
+    Absent means None, and — inside a MAP — an empty string, list, tuple or
+    map, matching populated_paths so that what is stored and what invariant 1
+    validated agree. Two limits worth stating rather than discovering: a None
+    INSIDE a list survives (lists here hold records, never holes), and an empty
+    container nested in a list is not dropped.
+
+    `False` and `0` survive everywhere. They are answers, the same rule
+    populated_paths states at length.
     """
     if isinstance(value, Mapping):
         pruned = {
@@ -504,7 +524,7 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
     listed across cases, and the sparse by-owner index stays one entry per case.
     """
     return {
-        "PK": f"CASE#{debtor.case_id}",
+        "PK": partition_key(debtor.case_id),
         "SK": sort_key(debtor.filing_role),
         "id": debtor.id,
         "caseId": debtor.case_id,
@@ -517,16 +537,22 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
 
 
 def debtor_from_item(item: Mapping[str, object]) -> Debtor:
-    """Rebuild from a stored item. The body is re-parsed rather than trusted:
-    an item written by an older revision is exactly the case where a field has
-    since changed shape, and failing loudly here beats a `None` surfacing three
-    layers up."""
+    """Rebuild from a stored item.
+
+    The body is re-parsed rather than trusted: an item written by an older
+    revision is exactly the case where a field has since changed shape, and
+    failing loudly here beats a `None` surfacing three layers up.
+
+    Provenance is NOT re-enforced — see parse_debtor. Shape drift should be
+    loud; a tightened invariant should not retroactively make saved cases
+    unreadable."""
     body = item.get("body")
     draft = parse_debtor(
         {
             **(body if isinstance(body, Mapping) else {}),
             "provenance": item.get("provenance"),
-        }
+        },
+        enforce_provenance=False,
     )
     return Debtor(
         id=str(item.get("id", "")),

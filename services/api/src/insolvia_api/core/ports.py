@@ -389,7 +389,20 @@ class DebtorStore(Protocol):
     complete record.
     """
 
-    def put(self, debtor: Debtor) -> None: ...
+    def create(self, debtor: Debtor) -> bool:
+        """Write `debtor` ONLY if that case has no record for its role yet.
+        Returns False when one already exists, having written nothing.
+
+        Separate from `put` because the id has to be stable: the route hands
+        a freshly minted id back to the client, and provenance paths
+        elsewhere may already name it. Two overlapping first saves would
+        otherwise both see nothing stored, both mint an id, and the second
+        would erase the one the first already returned."""
+        ...
+
+    def put(self, debtor: Debtor) -> None:
+        """Replace the record for `debtor`'s role outright."""
+        ...
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...
 

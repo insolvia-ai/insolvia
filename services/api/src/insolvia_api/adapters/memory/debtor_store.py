@@ -26,6 +26,13 @@ class MemoryDebtorStore:
     def __init__(self) -> None:
         self.debtors: dict[tuple[str, str], Debtor] = {}
 
+    def create(self, debtor: Debtor) -> bool:
+        # setdefault is the conditional write: it is the dict equivalent of
+        # attribute_not_exists(SK), so this store refuses the same second
+        # first-save the real one does rather than being quietly looser.
+        key = (debtor.case_id, debtor.filing_role)
+        return self.debtors.setdefault(key, debtor) is debtor
+
     def put(self, debtor: Debtor) -> None:
         # Whole-record replacement, as put_item is. Merging into the stored
         # record here would make this store accept writes the real one refuses,

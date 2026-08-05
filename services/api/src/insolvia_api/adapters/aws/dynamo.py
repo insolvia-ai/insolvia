@@ -18,6 +18,7 @@ eventually disagree about a bool.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from math import isfinite
 from typing import Any
 
 
@@ -49,6 +50,14 @@ def _to_value(value: object) -> dict[str, Any]:
     if isinstance(value, str):
         return {"S": value}
     if isinstance(value, (int, float)):
+        # Infinity and NaN are stdlib-JSON extensions, so `request.get_json()`
+        # accepts them and they reach here as real floats. DynamoDB refuses
+        # `{"N": "inf"}`, and refusing it here turns a 500 from the real
+        # store — which the memory store would never have reproduced — into a
+        # failure at the boundary. It is also not JSON: a response echoing
+        # `Infinity` cannot be parsed by any strict client.
+        if isinstance(value, float) and not isfinite(value):
+            raise TypeError(f"cannot store a non-finite number: {value!r}")
         # str() of a float is the shortest form that reads back as the same
         # float, which is what makes the round trip below exact.
         return {"N": str(value)}

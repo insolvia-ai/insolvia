@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Final
 
 import boto3
+from botocore.exceptions import ClientError
 
 from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_api.core.cases import partition_key
@@ -36,13 +37,31 @@ class DynamoDbDebtorStore:
         self.table_name = table_name
         self.client = boto3.client("dynamodb")
 
+    def create(self, debtor: Debtor) -> bool:
+        # The one place a condition is load-bearing. Everything else about
+        # this store replaces outright, but a first save mints an id that the
+        # route returns to the client, so two overlapping first saves must not
+        # both succeed — the loser's id would already be in a client's hands.
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=to_attributes(debtor_item(debtor)),
+                ConditionExpression="attribute_not_exists(SK)",
+            )
+        except ClientError as error:
+            if (
+                error.response.get("Error", {}).get("Code")
+                == "ConditionalCheckFailedException"
+            ):
+                return False
+            raise
+        return True
+
     def put(self, debtor: Debtor) -> None:
-        # No ConditionExpression, unlike the case store's create — replacing is
-        # the point here. The questionnaire PUTs the whole record on every
-        # autosave (core/debtors.parse_debtor says why it must be whole), so an
-        # existing item is the normal case rather than the exceptional one, and
-        # the route has already resolved the case and its ownership before any
-        # of this runs. There is nothing left for a condition to protect.
+        # Unconditional, and correct because this path only ever runs after a
+        # read found an existing record whose id is being kept. Replacing is
+        # the point: the questionnaire PUTs the whole record on every autosave
+        # (core/debtors.parse_debtor says why it must be whole).
         self.client.put_item(
             TableName=self.table_name,
             Item=to_attributes(debtor_item(debtor)),

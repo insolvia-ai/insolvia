@@ -314,6 +314,47 @@ def test_a_rejected_body_records_nothing(client, access_log):
     assert len(access_log.events) == before
 
 
+def test_a_second_first_save_cannot_erase_the_first_ones_id(client):
+    """Two overlapping creates for the same role. The loser must not mint a
+    second id: the winner's is already on its way to a client, and provenance
+    paths elsewhere may name it."""
+
+    case_id = open_case(client)
+    first = put(
+        client, case_id, name={"given": "Ada"}, provenance={"name.given": TYPED}
+    )
+    assert first.status_code == 201
+
+    # The race, exactly: the FIRST read misses (as it would if it ran before
+    # the other request's write landed), the conditional create is refused, and
+    # the re-read then finds the winner.
+    app = client.application
+    deps: ApiDependencies = app.extensions["insolvia_api_dependencies"]
+    store = deps.debtor_store
+    real_get = store.get
+    misses = [True]
+
+    def get_once_stale(*args: object, **kwargs: object):
+        if misses:
+            misses.pop()
+            return None
+        return real_get(*args, **kwargs)  # type: ignore[arg-type]
+
+    store.get = get_once_stale  # type: ignore[method-assign]
+    try:
+        second = put(
+            client, case_id, name={"given": "Augusta"}, provenance={"name.given": TYPED}
+        )
+    finally:
+        store.get = real_get  # type: ignore[method-assign]
+
+    # Refused as a create, retried as a replace — same id, same created_at.
+    assert second.status_code == 200
+    assert second.get_json()["id"] == first.get_json()["id"]
+    assert second.get_json()["created_at"] == first.get_json()["created_at"]
+    assert second.get_json()["name"] == {"given": "Augusta"}
+
+
 # ── What firms changed here ─────────────────────────────────────
 
 

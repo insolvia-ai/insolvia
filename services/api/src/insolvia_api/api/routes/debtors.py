@@ -80,6 +80,16 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
         raise NotFoundError("case not found")
 
 
+def _log_saved(case_id: str, debtor_id: str, role: str) -> None:
+    """GLBA: ids and the role. Never a name, an address, or a field count —
+    even the number of populated fields leaks how much of someone's intake
+    is filled in."""
+    logger.info(
+        "debtor saved",
+        extra={"case_id": case_id, "debtor_id": debtor_id, "role": role},
+    )
+
+
 @blueprint.put("/v1/cases/<case_id>/debtors/<filing_role>")
 @require_auth
 @requires(INTAKE, ADD_EDIT)
@@ -111,20 +121,32 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     draft = parse_debtor(_json_body())
     _reachable_case_or_404(accessor, case_id, "case.update")
 
-    existing = debtor_store.get(case_id, filing_role=role)
-    debtor = (
-        create_debtor(draft, case_id=case_id, filing_role=role)
-        if existing is None
-        else replace_debtor(existing, draft)
-    )
-    debtor_store.put(debtor)
+    stored = debtor_store.get(case_id, filing_role=role)
+    if stored is None:
+        # A CONDITIONAL create, not a plain write. Two overlapping first saves
+        # would otherwise both find nothing, both mint an id, and the second
+        # would erase the one the first had already returned to a client —
+        # where provenance paths elsewhere may already name it. Autosave plus a
+        # double submit is all it takes.
+        fresh = create_debtor(draft, case_id=case_id, filing_role=role)
+        if debtor_store.create(fresh):
+            _log_saved(case_id, fresh.id, role)
+            return jsonify(debtor_json(fresh)), 201
+        # Lost the race. `fresh`'s id has not left this process, so dropping it
+        # costs nothing; the winner's record is the one to build on.
+        stored = debtor_store.get(case_id, filing_role=role)
 
-    # GLBA: ids and the role. Never a name, an address, or a field count that
-    # would leak how much of someone's intake is filled in.
-    logger.info(
-        "debtor saved", extra={"case_id": case_id, "debtor_id": debtor.id, "role": role}
-    )
-    return jsonify(debtor_json(debtor)), 200 if existing is not None else 201
+    if stored is None:
+        # The record would have to have been removed between the refused create
+        # and this read. Nothing deletes debtors, so this is a store that is
+        # not behaving as its Protocol says — louder is better than a 500 with
+        # an UnboundLocalError in it.
+        raise RuntimeError("debtor vanished between a refused create and a read")
+
+    debtor = replace_debtor(stored, draft)
+    debtor_store.put(debtor)
+    _log_saved(case_id, debtor.id, role)
+    return jsonify(debtor_json(debtor)), 200
 
 
 @blueprint.get("/v1/cases/<case_id>/debtors")
