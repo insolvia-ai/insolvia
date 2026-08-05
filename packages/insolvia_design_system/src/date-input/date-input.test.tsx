@@ -15,6 +15,24 @@ describe('DateInput', () => {
     expect(input).toHaveValue('2019-02-14');
   });
 
+  it('distinguishes a cleared field from one still being typed', async () => {
+    // The defect this exists for: a caller that autosaves cannot tell those
+    // apart from the value alone, so editing a SAVED date wiped it — one
+    // backspace on 2020-01-15 reports '' and the save lands.
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <DateInput defaultValue="2020-01-15" onValueChange={onValueChange} aria-label="Signed" />,
+    );
+    const input = screen.getByRole('textbox');
+
+    await user.type(input, '{Backspace}');
+    expect(onValueChange).toHaveBeenLastCalledWith('', 'incomplete');
+
+    await user.clear(input);
+    expect(onValueChange).toHaveBeenLastCalledWith('', 'empty');
+  });
+
   it('reports only complete, real dates', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
@@ -25,7 +43,7 @@ describe('DateInput', () => {
     expect(onValueChange.mock.calls.every(([v]) => v === '')).toBe(true);
 
     await user.type(screen.getByRole('textbox'), '4');
-    expect(onValueChange).toHaveBeenLastCalledWith('2019-02-14');
+    expect(onValueChange).toHaveBeenLastCalledWith('2019-02-14', 'valid');
   });
 
   it('does not mark a half-typed date invalid', async () => {
@@ -43,7 +61,7 @@ describe('DateInput', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, '20190230');
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(onValueChange).toHaveBeenLastCalledWith('');
+    expect(onValueChange).toHaveBeenLastCalledWith('', 'invalid');
   });
 
   it('accepts 29 February in a leap year', async () => {
@@ -51,7 +69,7 @@ describe('DateInput', () => {
     const onValueChange = vi.fn();
     render(<DateInput onValueChange={onValueChange} aria-label="Date incurred" />);
     await user.type(screen.getByRole('textbox'), '20200229');
-    expect(onValueChange).toHaveBeenLastCalledWith('2020-02-29');
+    expect(onValueChange).toHaveBeenLastCalledWith('2020-02-29', 'valid');
     expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-invalid');
   });
 
@@ -62,7 +80,8 @@ describe('DateInput', () => {
     const input = screen.getByRole('textbox');
     await user.type(input, '20200614');
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(onValueChange).toHaveBeenLastCalledWith('');
+    // Out of range, not malformed — the caller can tell those apart too.
+    expect(onValueChange).toHaveBeenLastCalledWith('', 'out-of-range');
   });
 
   it('removes exactly one digit per Backspace, separators included', async () => {

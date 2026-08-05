@@ -1,7 +1,7 @@
 # insolvia_design_system
 
 Insolvia's owned, cross-platform design system, published as
-`@insolvia-ai/design-system` (0.5.x). One set of component names serves both
+`@insolvia-ai/design-system` (0.6.x). One set of component names serves both
 front-end stacks: the marketing site (React DOM + Tailwind) and the app
 (React Native / Expo). Agent rules: [`CLAUDE.md`](CLAUDE.md).
 
@@ -18,7 +18,9 @@ primitives (equivalent behavior, zero Base UI dependency): `AlertDialog` ·
 `ToggleGroup`. 0.4.0 adds `Select`, the first anchored-popup component — see
 the note below on why it stopped being deferred. 0.5.0 adds `DateInput`, a
 masked `YYYY-MM-DD` text field with no calendar (the reasoning is at the top of
-`date-input.props.ts`). Compound components export their parts under one name
+`date-input.props.ts`); 0.6.0 gives its `onValueChange` a second argument, because
+`''` alone cannot distinguish "cleared" from "still typing" and an autosaving
+caller wiped saved dates on that ambiguity. Compound components export their parts under one name
 (`Dialog.Root`, `Dialog.Trigger`, …); input-taking components support both
 uncontrolled (`default*`) and controlled (`*` + change callback) modes via
 `src/lib/controllable.ts`.
