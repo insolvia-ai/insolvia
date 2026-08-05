@@ -35,9 +35,15 @@ import {
   isDocumentContentType,
   isDocumentKind,
   isUploadIncomplete,
+  staffTypedProvenance,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
-import type { FetchLike, WaitlistSubmission } from '@insolvia-ai/api-client';
+import type {
+  Debtor,
+  FetchLike,
+  PutDebtorRequest,
+  WaitlistSubmission,
+} from '@insolvia-ai/api-client';
 
 /**
  * An obviously-fake stand-in for a Cognito access token. This repo is public:
@@ -1841,6 +1847,719 @@ describe('uploadDocument', () => {
 
     expect(stub.callCount()).toBe(0);
     expect(error.source).toBe('client');
+  });
+});
+
+// The debtor endpoints are pinned against
+// services/api/src/insolvia_api/api/routes/debtors.py and
+// .../core/{debtors,provenance}.py. Two things about them differ from every
+// other endpoint above and are deliberate on both sides:
+//
+//   1. THE BODIES ARE snake_case. `case_json` emits `createdAt`; `debtor_json`
+//      emits `created_at` and `filing_role`. The models mirror the wire rather
+//      than translating, so these literals are the server's spelling verbatim.
+//   2. ABSENT MEANS ABSENT. The API omits empty values, empty sub-objects and
+//      empty lists entirely instead of sending nulls, because most of a
+//      progressive intake is empty most of the time. Several assertions below
+//      are `'k' in obj`, not `toBeUndefined()`, for exactly that reason.
+const DEBTOR_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+
+/**
+ * A saved debtor as `debtor_json` builds it: identity, an always-present
+ * `provenance` map, and only the case-data fields that hold something. The
+ * timestamps carry microseconds because the API formats them with
+ * `timespec="microseconds"`.
+ */
+const DEBTOR = {
+  id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  case_id: DEBTOR_CASE_ID,
+  filing_role: 'debtor_1',
+  created_at: '2026-08-05T09:15:00.123456Z',
+  updated_at: '2026-08-05T09:15:00.123456Z',
+  provenance: {
+    'name.given': { source: 'staff_typed' },
+    'name.surname': { source: 'staff_typed' },
+    'residence_address.city': { source: 'staff_typed' },
+    'residence_address.state': { source: 'staff_typed' },
+    'other_names_used[n1].surname': { source: 'staff_typed' },
+    'credit_counseling.status': { source: 'staff_typed' },
+  },
+  name: { given: 'Ada', surname: 'Lovelace' },
+  other_names_used: [{ id: 'n1', surname: 'Byron' }],
+  residence_address: { city: 'Wilmington', state: 'DE' },
+  credit_counseling: { status: 'completed_with_certificate' },
+};
+
+describe('putDebtor', () => {
+  const REQUEST: PutDebtorRequest = {
+    name: { given: 'Ada', surname: 'Lovelace' },
+    other_names_used: [{ id: 'n1', surname: 'Byron' }],
+    residence_address: { city: 'Wilmington', state: 'DE' },
+    credit_counseling: { status: 'completed_with_certificate' },
+    provenance: {
+      'name.given': { source: 'staff_typed' },
+      'name.surname': { source: 'staff_typed' },
+      'residence_address.city': { source: 'staff_typed' },
+      'residence_address.state': { source: 'staff_typed' },
+      'other_names_used[n1].surname': { source: 'staff_typed' },
+      'credit_counseling.status': { source: 'staff_typed' },
+    },
+  };
+
+  test('PUTs /v1/cases/{caseId}/debtors/{filingRole} and maps the 201 a first save returns', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(
+      `https://staging-api.insolvia.ai/v1/cases/${DEBTOR_CASE_ID}/debtors/debtor_1`,
+    );
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({
+      name: { given: 'Ada', surname: 'Lovelace' },
+      other_names_used: [{ id: 'n1', surname: 'Byron' }],
+      residence_address: { city: 'Wilmington', state: 'DE' },
+      credit_counseling: { status: 'completed_with_certificate' },
+      provenance: REQUEST.provenance,
+    });
+
+    expect(saved).toEqual(DEBTOR);
+  });
+
+  test('accepts the 200 a repeat save returns, not only the 201', async () => {
+    // The endpoint answers 201 when the role had no record and 200 when it
+    // replaced one. Autosave sends the same request either way, so a client
+    // that only accepted 201 would fail on every save after the first.
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)).resolves.toEqual(DEBTOR);
+  });
+
+  test('a 2xx that is neither 200 nor 201 is still a failure', async () => {
+    // "Any 2xx" would accept a 204 from a proxy that never reached the
+    // endpoint, and the failure would then surface as a malformed debtor
+    // rather than as the unexpected status it is.
+    // A 204 carries no body by definition — which is exactly why accepting it
+    // as a success would surface as "the debtor was malformed".
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(error.statusCode).toBe(204);
+  });
+
+  test('omits absent members entirely — including sub-objects and lists that hold nothing', async () => {
+    // The API prunes empties out of what it returns; the request mirrors that,
+    // so a record sent and the record returned are the same shape. `in` rather
+    // than toBeUndefined: a key present with an undefined value would still
+    // serialise differently and still answer true here.
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_2', {
+      name: { given: 'Ada', middle: undefined },
+      other_names_used: [],
+      employer_ids: [],
+      residence_address: {},
+      phone: undefined,
+      provenance: { 'name.given': { source: 'staff_typed' } },
+    });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({
+      name: { given: 'Ada' },
+      provenance: { 'name.given': { source: 'staff_typed' } },
+    });
+    expect('middle' in (body.name as Record<string, unknown>)).toBe(false);
+    expect('other_names_used' in body).toBe(false);
+    expect('employer_ids' in body).toBe(false);
+    expect('residence_address' in body).toBe(false);
+    expect('phone' in body).toBe(false);
+  });
+
+  test('an empty provenance map is omitted, and an empty body is a legal save', async () => {
+    // Progressive intake: a questionnaire the user has only opened must
+    // persist, and it has nothing to attribute.
+    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, provenance: {} }, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'non_filing_spouse', { provenance: {} });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({});
+  });
+
+  test('sends every body member under its exact snake_case wire name', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
+      other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
+      employer_ids: ['12-3456789'],
+      residence_address: { line1: '1 Main St', line2: 'Apt 2', postal_code: '19801' },
+      mailing_address: { city: 'Wilmington' },
+      phone: '302-555-0100',
+      mobile: '302-555-0101',
+      email: 'ada@lovelace.law',
+      venue: { basis: 'other', explanation: 'Moved 90 days ago.' },
+      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
+      signed_at: '2026-08-05',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      name: { given: 'Ada', middle: 'Augusta', surname: 'Lovelace', suffix: 'Jr.' },
+      other_names_used: [{ id: 'n1', given: 'Ada', business_name: 'Analytical Engines' }],
+      employer_ids: ['12-3456789'],
+      residence_address: { line1: '1 Main St', line2: 'Apt 2', postal_code: '19801' },
+      mailing_address: { city: 'Wilmington' },
+      phone: '302-555-0100',
+      mobile: '302-555-0101',
+      email: 'ada@lovelace.law',
+      venue: { basis: 'other', explanation: 'Moved 90 days ago.' },
+      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
+      signed_at: '2026-08-05',
+    });
+  });
+
+  test('sends a machine-sourced provenance entry whole, keeping an empty locator', async () => {
+    // `provenance_json` server-side drops nulls and nothing else, so an
+    // explicitly empty locator survives a round trip. Pruning it here would
+    // make a re-sent record differ from the one received.
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      name: { given: 'Ada' },
+      provenance: {
+        'name.given': {
+          source: 'ai_extracted',
+          confirmed_by: 'staff-1',
+          confirmed_at: '2026-08-05T12:00:00.000000Z',
+          document_id: 'd1',
+          extraction_id: 'x1',
+          confidence: 0.9,
+          locator: {},
+        },
+      },
+    });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body.provenance).toEqual({
+      'name.given': {
+        source: 'ai_extracted',
+        confirmed_by: 'staff-1',
+        confirmed_at: '2026-08-05T12:00:00.000000Z',
+        document_id: 'd1',
+        extraction_id: 'x1',
+        confidence: 0.9,
+        locator: {},
+      },
+    });
+  });
+
+  test('URL-encodes the caseId into the path', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor('id with spaces/slash', 'debtor_1', REQUEST);
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe(
+      '/v1/cases/id%20with%20spaces%2Fslash/debtors/debtor_1',
+    );
+  });
+
+  test('a 400 carries the dotted per-field keys through unsplit', async () => {
+    // The debtor endpoint keys its field errors by PATH, and provenance
+    // failures are keyed by `provenance.<path>`. A client that split on "." to
+    // group them would lose the one thing the form needs to find the input.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: {
+            'name.given': 'Must be 200 characters or fewer.',
+            'other_names_used[0].id': 'Must be letters, digits, hyphen or underscore.',
+            'provenance.residence_address.city': 'This field has a value but no provenance.',
+            tax_id:
+              'Tax identifiers are not accepted yet — they need field-level encryption, which is not built. Leave this out.',
+          },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(error.fields['name.given']).toBe('Must be 200 characters or fewer.');
+    expect(error.fields['provenance.residence_address.city']).toBe(
+      'This field has a value but no provenance.',
+    );
+    expect(error.fields['other_names_used[0].id']).toBe(
+      'Must be letters, digits, hyphen or underscore.',
+    );
+    expect(Object.keys(error.fields)).toHaveLength(4);
+  });
+
+  test("maps a 404 to a plain ApiException — the case is unknown or not the caller's", async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(error.statusCode).toBe(404);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+
+  test('a 200 whose filing_role is not one of the three roles is rejected, not cast', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, filing_role: 'debtor_3' }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(error.message).toContain('filing_role');
+  });
+
+  test('a malformed nested field is named by its dotted path, the way the API names it', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...DEBTOR, residence_address: { city: 7 } }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST)),
+    );
+
+    expect(error.message).toContain('residence_address.city');
+  });
+
+  test('the record sent and the record returned hold the same keys', async () => {
+    // The property that makes fetch-edit-save work: the client prunes its
+    // request exactly as `_prune` prunes the response, so a debtor can be read,
+    // changed and written back without growing or losing keys. The stub echoes
+    // the request the way the endpoint does.
+    const stub = stubFetch((seen) =>
+      jsonResponse(
+        {
+          id: DEBTOR.id,
+          case_id: DEBTOR_CASE_ID,
+          filing_role: 'debtor_1',
+          created_at: DEBTOR.created_at,
+          updated_at: DEBTOR.updated_at,
+          ...(JSON.parse(seen.body) as Record<string, unknown>),
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
+
+    const sent = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    const identity = ['id', 'case_id', 'filing_role', 'created_at', 'updated_at'];
+    expect(
+      Object.keys(saved)
+        .filter((key) => !identity.includes(key))
+        .sort(),
+    ).toEqual(Object.keys(sent).sort());
+
+    // And it survives a second pass: handing the decoded record straight back
+    // sends the same bytes.
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', saved);
+    expect(JSON.parse(stub.lastRequest().body)).toEqual(sent);
+  });
+});
+
+describe('listDebtors', () => {
+  const SECOND_DEBTOR = {
+    id: 'b7f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3c',
+    case_id: DEBTOR_CASE_ID,
+    filing_role: 'debtor_2',
+    created_at: '2026-08-05T09:16:00.000000Z',
+    updated_at: '2026-08-05T09:16:00.000000Z',
+    provenance: {},
+  };
+
+  test('GETs /v1/cases/{caseId}/debtors and unwraps the {"debtors": [...]} envelope', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR, SECOND_DEBTOR] }, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const debtors = await client.listDebtors(DEBTOR_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${DEBTOR_CASE_ID}/debtors`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+
+    expect(debtors).toEqual([DEBTOR, SECOND_DEBTOR]);
+    // The order is the order the forms print debtors in, and the API owns it.
+    expect(debtors.map((debtor) => debtor.filing_role)).toEqual(['debtor_1', 'debtor_2']);
+  });
+
+  test('a case with no debtors saved yet is an empty array, not a 404', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect(await client.listDebtors(DEBTOR_CASE_ID)).toEqual([]);
+  });
+
+  test('an empty record comes back with an empty provenance map and no body keys at all', async () => {
+    // `provenance` is the one member the API always sends; every case-data
+    // member is genuinely absent rather than null when it holds nothing.
+    const stub = stubFetch(() => jsonResponse({ debtors: [SECOND_DEBTOR] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
+
+    expect(debtor?.provenance).toEqual({});
+    expect(debtor !== undefined && 'name' in debtor).toBe(false);
+    expect(debtor !== undefined && 'phone' in debtor).toBe(false);
+    expect(debtor !== undefined && 'other_names_used' in debtor).toBe(false);
+  });
+
+  test('maps every field of a populated record, provenance included', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
+
+    expect(debtor?.name).toEqual({ given: 'Ada', surname: 'Lovelace' });
+    expect(debtor?.other_names_used).toEqual([{ id: 'n1', surname: 'Byron' }]);
+    expect(debtor?.credit_counseling).toEqual({ status: 'completed_with_certificate' });
+    expect(debtor?.provenance['other_names_used[n1].surname']).toEqual({ source: 'staff_typed' });
+  });
+
+  test('URL-encodes the caseId into the path', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.listDebtors('id with spaces/slash');
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe(
+      '/v1/cases/id%20with%20spaces%2Fslash/debtors',
+    );
+  });
+
+  test('a 200 without the "debtors" key throws ApiException naming it', async () => {
+    const stub = stubFetch(() => jsonResponse({}, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect(asApiException(await rejection(client.listDebtors(DEBTOR_CASE_ID))).message).toContain(
+      'debtors',
+    );
+  });
+
+  test('a malformed element is rejected per-element and named by its index', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { debtors: [{ ...DEBTOR, provenance: { 'name.given': { source: 'vibes' } } }] },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.listDebtors(DEBTOR_CASE_ID)));
+
+    expect(error.message).toContain('debtors[0].provenance.name.given.source');
+  });
+
+  test('maps a 404 to a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.listDebtors(DEBTOR_CASE_ID)));
+
+    expect(error.statusCode).toBe(404);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(await rejection(client.listDebtors(DEBTOR_CASE_ID)));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('staffTypedProvenance', () => {
+  // These cases are transcribed from services/api/tests/test_provenance.py —
+  // TestPopulatedPaths and TestEvasionsFoundInReview — one for one. The walk
+  // exists twice on purpose (the server is the authority and re-runs it on
+  // every write; this copy saves the caller from guessing), and this block is
+  // what stops the two from drifting apart silently: a change to
+  // `populated_paths` that is not made here fails HERE first, rather than as an
+  // unexplainable 400 in the app.
+  const paths = (body: Record<string, unknown>): string[] =>
+    Object.keys(staffTypedProvenance(body)).sort();
+
+  test('absent values are not populated', () => {
+    expect(paths({ a: null, b: '', c: [], d: {} })).toEqual([]);
+  });
+
+  test('an explicit undefined is absent too, the way a form hands one over', () => {
+    // The TypeScript half's own case: a form field that was never touched is
+    // `undefined` here where it would be `None` on the server.
+    expect(paths({ a: undefined, name: { given: undefined } })).toEqual([]);
+  });
+
+  test('false and zero are answers, not absences', () => {
+    // The classic bug this guards: `if (!value)` would treat "no, I do not rent
+    // my residence" as an unanswered question, and an extraction that got it
+    // wrong would then need no confirmation.
+    expect(paths({ rents_residence: false, dependents: 0 })).toEqual([
+      'dependents',
+      'rents_residence',
+    ]);
+  });
+
+  test('nested objects produce dotted paths', () => {
+    expect(paths({ name: { given: 'Ada', surname: null } })).toEqual(['name.given']);
+  });
+
+  test('list elements are addressed by id, not by position', () => {
+    expect(paths({ other_names_used: [{ id: 'n1', surname: 'Byron' }] })).toEqual([
+      'other_names_used[n1].surname',
+    ]);
+  });
+
+  test('reordering a list does not move a path', () => {
+    // The whole reason embedded list elements carry an id.
+    const first = {
+      aliases: [
+        { id: 'a', surname: 'X' },
+        { id: 'b', surname: 'Y' },
+      ],
+    };
+    const second = {
+      aliases: [
+        { id: 'b', surname: 'Y' },
+        { id: 'a', surname: 'X' },
+      ],
+    };
+    expect(paths(first)).toEqual(paths(second));
+  });
+
+  test('a list without element ids is attributed whole', () => {
+    // Positional paths would be a lie, so the list gets one path instead of
+    // element paths that reordering would silently reattach.
+    expect(paths({ employer_ids: ['12-3456789'] })).toEqual(['employer_ids']);
+  });
+
+  test('a mixed list does not discard the paths before the bad element', () => {
+    // Returning mid-loop threw away earlier elements' paths server-side, so one
+    // entry for the list covered them all — and which behaviour you got
+    // depended on the ORDER of the elements.
+    const goodFirst = { aliases: [{ id: 'n1', surname: 'Byron' }, { surname: 'X' }] };
+    const badFirst = { aliases: [{ surname: 'X' }, { id: 'n1', surname: 'Byron' }] };
+    expect(paths(goodFirst)).toEqual(['aliases']);
+    expect(paths(badFirst)).toEqual(['aliases']);
+  });
+
+  test('an id that cannot be addressed does not mint an illegal path', () => {
+    // An id containing '.' or ']' used to produce a path the server's
+    // provenance parser refused, and the caller was stuck.
+    expect(paths({ aliases: [{ id: 'n.1', surname: 'Byron' }] })).toEqual(['aliases']);
+  });
+
+  test('an element id is never itself a path — it is the address', () => {
+    expect(paths({ aliases: [{ id: 'n1' }] })).toEqual([]);
+  });
+
+  test('a key that is not a field name fails loudly, before any request', () => {
+    // These would otherwise produce a REQUIRED path that the server's
+    // provenance parser then refuses as a key: no payload could satisfy both,
+    // and the caller would be left with a 400 they could not fix.
+    for (const key of ['SSN', 'legalName', '1099_income', 'case-number', '']) {
+      expect(() => staffTypedProvenance({ [key]: 'value' })).toThrow(/not a field name/);
+    }
+  });
+
+  test('stamps staff_typed on every path, and nothing else', () => {
+    // `staff_typed` needs no confirmation — the person typing it IS the
+    // confirmation. Anything machine-sourced needs a confirmer and a moment,
+    // and inventing those is exactly what this helper must not do.
+    expect(staffTypedProvenance({ name: { given: 'Ada' } })).toEqual({
+      'name.given': { source: 'staff_typed' },
+    });
+  });
+
+  test('skips server-stamped identity, so a fetched debtor can be handed straight back', async () => {
+    // `debtor_body()` drops the same six keys before the server checks the
+    // rule, so asking for provenance on them would be asking where an id came
+    // from.
+    const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
+
+    expect(debtor).toBeDefined();
+    expect(Object.keys(staffTypedProvenance(debtor as Debtor)).sort()).toEqual(
+      Object.keys(DEBTOR.provenance).sort(),
+    );
+  });
+
+  test('every key it produces is a path the API accepts, and covers every populated field', () => {
+    // The property the two halves of the rule share, stated directly:
+    // `_FIELD_PATH_RE` in core/provenance.py is transcribed here, so a path
+    // this helper can mint but the server would refuse fails the test rather
+    // than the request.
+    const segment = '[a-z][a-z0-9_]*(?:\\[[A-Za-z0-9_-]+\\])?';
+    const fieldPath = new RegExp(`^${segment}(?:\\.${segment})*$`);
+
+    const body: PutDebtorRequest = {
+      name: { given: 'Ada', surname: 'Lovelace' },
+      other_names_used: [{ id: 'n1', surname: 'Byron' }],
+      employer_ids: ['12-3456789'],
+      residence_address: { city: 'Wilmington', state: 'DE' },
+      venue: { basis: 'lived_longest_180_days' },
+      credit_counseling: { status: 'not_required', exemption_reason: 'active_duty' },
+      email: 'ada@lovelace.law',
+    };
+
+    const provenance = staffTypedProvenance(body);
+
+    for (const path of Object.keys(provenance)) {
+      expect(path).toMatch(fieldPath);
+    }
+    expect(Object.keys(provenance).sort()).toEqual([
+      'credit_counseling.exemption_reason',
+      'credit_counseling.status',
+      'email',
+      'employer_ids',
+      'name.given',
+      'name.surname',
+      'other_names_used[n1].surname',
+      'residence_address.city',
+      'residence_address.state',
+      'venue.basis',
+    ]);
+  });
+
+  test('the map it builds satisfies the request it was built from', async () => {
+    // End to end: whatever the codec ends up sending, every value in it has an
+    // entry. That equality is invariant 1, checked before the request rather
+    // than by a 400 after it.
+    const body: PutDebtorRequest = {
+      name: { given: 'Ada' },
+      other_names_used: [{ id: 'n1', surname: 'Byron' }],
+      residence_address: { city: 'Wilmington' },
+    };
+    const stub = stubFetch(() => jsonResponse(DEBTOR, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      ...body,
+      provenance: staffTypedProvenance(body),
+    });
+
+    const sent = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    const { provenance: _sentProvenance, ...sentBody } = sent;
+    expect(Object.keys(staffTypedProvenance(sentBody)).sort()).toEqual(
+      Object.keys(_sentProvenance as Record<string, unknown>).sort(),
+    );
   });
 });
 
