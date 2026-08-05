@@ -217,13 +217,56 @@ resource "aws_dynamodb_table" "access_log" {
     type = "S"
   }
 
-  # Retention is a compliance decision rather than an engineering one, and the
-  # regulatory register owns the number. The default here is a placeholder that
-  # errs long; TTL deletes silently, so shortening it is a decision to make on
-  # purpose rather than to inherit.
+  # NO TTL, and it cannot be added here. This table had `ttl { attribute_name
+  # = "expires_at", enabled = true }` and it broke every staging deploy, for a
+  # reason that is structural rather than a missing permission:
+  #
+  #   DynamoDB's UpdateTimeToLive is authorised against the CALLER, and on a
+  #   CMK-encrypted table it needs kms:Decrypt on that key. This table is
+  #   encrypted under the case key on purpose (see below), and ci-trust's
+  #   DenyCaseDataDecryption denies the deploy role kms:Decrypt on exactly
+  #   alias/insolvia-cases-*. An explicit deny wins, so the create half-
+  #   succeeded — table made, TTL rejected — leaving a tainted resource that
+  #   every later run destroyed and failed to recreate. Four merges in a row.
+  #
+  # There is no condition key that separates "enable TTL" from "read a row":
+  # both are kms:ViaService = dynamodb. Granting Decrypt back would hand CI the
+  # case data the deny exists to withhold, and re-keying the log to an alias
+  # outside the pattern would hand it the access log. Both are worse than
+  # having no TTL.
+  #
+  # It is also the posture DenyAuditLogErasure already argues for the trail
+  # bucket: a retention rule the deploy pipeline can set is a delete button the
+  # deploy pipeline can press, and TTL deletes silently. Retention here is a
+  # compliance decision that belongs to the regulatory register and to a human
+  # apply, not to a Terraform default. Until it is made, rows are kept.
+  #
+  # PITR is fine on the same key and stays: enabling it needs no data-plane
+  # verb, which is why the case table has always applied cleanly.
+  #
+  # SPELLED OUT rather than deleted, and that is not style. `ttl` is
+  # optional+computed in the provider, so simply removing the block produces
+  # "No changes" against a table that already has TTL on — the config stops
+  # describing reality and never converges. Verified against a dev env that had
+  # it enabled: block deleted → no diff; block present and disabled → one
+  # in-place change. On a table being created this is the default, so the
+  # provider issues no UpdateTimeToLive and the deploy role needs nothing.
+  #
+  # The name must stay `expires_at`, and not because anything reads it. An
+  # attribute name is required even to disable (an empty one is a
+  # ValidationException) and DynamoDB will only accept the name TTL is
+  # CURRENTLY active on — anything else fails with "TimeToLive is active on a
+  # different AttributeName". Any dev env that applied the old config has it on
+  # `expires_at`, so this is what lets those converge instead of erroring
+  # forever. Both were found by running it; neither is in the provider docs.
+  #
+  # It is inert either way. Turning `enabled` on is not a one-line change: it
+  # needs an attribute something actually writes — nothing does, and the old
+  # writer used `expiresAt`, which is how this went unnoticed — AND it will
+  # fail in CI on the KMS deny above.
   ttl {
     attribute_name = "expires_at"
-    enabled        = true
+    enabled        = false
   }
 
   point_in_time_recovery { enabled = var.point_in_time_recovery }
