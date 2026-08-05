@@ -8,9 +8,14 @@ output "table_arn" {
   value       = aws_dynamodb_table.cases.arn
 }
 
-output "owner_index_name" {
-  description = "Sparse GSI backing 'list the cases I own' (GET /v1/cases)."
-  value       = "by-owner"
+output "firm_index_name" {
+  description = "Sparse GSI backing 'list my firm's cases' — the path for an admin or a user with access_all_cases."
+  value       = "by-firm"
+}
+
+output "assignee_index_name" {
+  description = "Sparse GSI backing 'list the cases I am assigned to' — the path for a user restricted to their own matters."
+  value       = "by-assignee"
 }
 
 # Issue 8.6 takes this rather than creating a second key: one key protects one
