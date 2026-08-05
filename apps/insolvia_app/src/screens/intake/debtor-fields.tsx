@@ -3,6 +3,7 @@ import type { Address, DebtorBody, OtherName, PersonName } from '@insolvia-ai/ap
 import { Button, DateInput, Field, Select } from '@insolvia-ai/design-system';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 import { newRowId } from './row-id';
@@ -57,10 +58,9 @@ export interface DebtorFieldsProps {
   readonly onChange: (next: DebtorBody) => void;
   /** Server messages, keyed by the field path they belong to. */
   readonly errors: Readonly<Record<string, string>>;
-  readonly disabled: boolean;
 }
 
-export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsProps) {
+export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
   const theme = useTheme();
 
   const setName = (part: keyof PersonName, value: string) =>
@@ -90,7 +90,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.name?.given}
           onChangeText={(value) => setName('given', value)}
           errors={errors}
-          disabled={disabled}
         />
         <TextField
           label="Middle name"
@@ -98,7 +97,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.name?.middle}
           onChangeText={(value) => setName('middle', value)}
           errors={errors}
-          disabled={disabled}
         />
         <TextField
           label="Last name"
@@ -106,7 +104,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.name?.surname}
           onChangeText={(value) => setName('surname', value)}
           errors={errors}
-          disabled={disabled}
         />
         <TextField
           label="Suffix"
@@ -114,7 +111,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.name?.suffix}
           onChangeText={(value) => setName('suffix', value)}
           errors={errors}
-          disabled={disabled}
         />
       </Section>
 
@@ -126,38 +122,41 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           </Text>
         ) : null}
         {(body.other_names_used ?? []).map((alias, index) => (
+          // Errors are looked up by INDEX, not by the row's id. They are
+          // different namespaces and mixing them shows nothing: the API keys
+          // BODY errors positionally (`other_names_used[0].given`) and
+          // PROVENANCE errors by id. Keying these fields by id meant every
+          // alias error rendered nowhere — the user saw only "Some answers
+          // need attention" with no field flagged, and every autosave after
+          // it failed the same way.
           <View key={alias.id} style={styles.aliasRow}>
             <Text style={[styles.aliasLabel, { color: theme.colors.muted }]}>
               Other name {index + 1}
             </Text>
             <TextField
               label="First name"
-              path={`other_names_used[${alias.id}].given`}
+              path={`other_names_used[${index}].given`}
               value={alias.given}
               onChangeText={(value) => setAlias(alias.id, 'given', value)}
               errors={errors}
-              disabled={disabled}
             />
             <TextField
               label="Last name"
-              path={`other_names_used[${alias.id}].surname`}
+              path={`other_names_used[${index}].surname`}
               value={alias.surname}
               onChangeText={(value) => setAlias(alias.id, 'surname', value)}
               errors={errors}
-              disabled={disabled}
             />
             <TextField
               label="Business name"
-              path={`other_names_used[${alias.id}].business_name`}
+              path={`other_names_used[${index}].business_name`}
               value={alias.business_name}
               onChangeText={(value) => setAlias(alias.id, 'business_name', value)}
               errors={errors}
-              disabled={disabled}
             />
             <Button
               size="lg"
               intent="secondary"
-              disabled={disabled}
               onPress={() =>
                 onChange({
                   ...body,
@@ -174,7 +173,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
         <Button
           size="lg"
           intent="secondary"
-          disabled={disabled}
           onPress={() =>
             // The id is minted HERE, not by the server — see row-id.ts. Without
             // one the API cannot accept the row at all.
@@ -194,7 +192,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           address={body.residence_address}
           onChange={setAddress('residence_address')}
           errors={errors}
-          disabled={disabled}
         />
       </Section>
 
@@ -207,7 +204,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           address={body.mailing_address}
           onChange={setAddress('mailing_address')}
           errors={errors}
-          disabled={disabled}
         />
       </Section>
 
@@ -218,7 +214,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.phone}
           onChangeText={(value) => onChange({ ...body, phone: value })}
           errors={errors}
-          disabled={disabled}
         />
         <TextField
           label="Mobile"
@@ -226,7 +221,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.mobile}
           onChangeText={(value) => onChange({ ...body, mobile: value })}
           errors={errors}
-          disabled={disabled}
         />
         <TextField
           label="Email"
@@ -234,7 +228,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           value={body.email}
           onChangeText={(value) => onChange({ ...body, email: value })}
           errors={errors}
-          disabled={disabled}
         />
       </Section>
 
@@ -251,7 +244,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
               })
             }
             placeholder="Choose a reason"
-            disabled={disabled}
           />
           {errors['venue.basis'] ? <Field.Error match>{errors['venue.basis']}</Field.Error> : null}
         </Field.Root>
@@ -264,7 +256,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
               onChange({ ...body, venue: { ...body.venue, explanation: value } })
             }
             errors={errors}
-            disabled={disabled}
           />
         ) : null}
       </Section>
@@ -285,7 +276,6 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
               })
             }
             placeholder="Choose a status"
-            disabled={disabled}
           />
           {errors['credit_counseling.status'] ? (
             <Field.Error match>{errors['credit_counseling.status']}</Field.Error>
@@ -309,8 +299,10 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
                 })
               }
               placeholder="Choose a reason"
-              disabled={disabled}
             />
+            {errors['credit_counseling.exemption_reason'] ? (
+              <Field.Error match>{errors['credit_counseling.exemption_reason']}</Field.Error>
+            ) : null}
           </Field.Root>
         ) : null}
       </Section>
@@ -320,8 +312,15 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
           <Field.Label>Date signed</Field.Label>
           <DateInput
             value={body.signed_at ?? ''}
-            onValueChange={(next) => onChange({ ...body, signed_at: next })}
-            disabled={disabled}
+            // `incomplete` is IGNORED, and that is what the second argument
+            // (design system 0.6.0) exists for. A half-typed date reports `''`,
+            // and writing that through would have the debounced autosave clear
+            // a date the moment someone edits it — one backspace on a saved
+            // 2020-01-15 and it is gone, the box still reading 2020-01-1.
+            onValueChange={(next, status) => {
+              if (status === 'incomplete') return;
+              onChange({ ...body, signed_at: next });
+            }}
           />
           <Field.Description>The date on the petition, not today&apos;s date.</Field.Description>
           {errors.signed_at ? <Field.Error match>{errors.signed_at}</Field.Error> : null}
@@ -332,17 +331,20 @@ export function DebtorFields({ body, onChange, errors, disabled }: DebtorFieldsP
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const theme = useTheme();
   return (
+    // A REAL HEADING, level 3. An earlier version used a bold `Text` inside a
+    // `View` carrying `aria-label`, reasoning that a third level would be
+    // structure invented for visual weight. Both halves of that were wrong:
+    // `aria-label` on an element with no role is prohibited by ARIA 1.2 and
+    // announces nothing, so the eight section titles were invisible to a screen
+    // reader — and heading navigation is the primary way one moves through a
+    // form this long. `Heading` takes `level` for structure and `size` for
+    // appearance precisely so an h3 need not look like one.
     <View style={styles.section}>
-      {/* A plain Text, not a Heading: these sit under the screen's <h2> and a
-          third level here would be structure invented for visual weight. The
-          group is named by aria-label instead, which is what a screen reader
-          announces on entering it. */}
-      <View aria-label={title} style={styles.sectionBody}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.ink }]}>{title}</Text>
-        {children}
-      </View>
+      <Heading level={3} size="body">
+        {title}
+      </Heading>
+      {children}
     </View>
   );
 }
@@ -352,13 +354,11 @@ function AddressFields({
   address,
   onChange,
   errors,
-  disabled,
 }: {
   which: 'residence_address' | 'mailing_address';
   address: Address | undefined;
   onChange: (part: keyof Address, value: string) => void;
   errors: Readonly<Record<string, string>>;
-  disabled: boolean;
 }) {
   const parts: readonly (readonly [keyof Address, string])[] = [
     ['line1', 'Street'],
@@ -377,7 +377,6 @@ function AddressFields({
           value={address?.[part]}
           onChangeText={(value) => onChange(part, value)}
           errors={errors}
-          disabled={disabled}
         />
       ))}
     </>
@@ -390,25 +389,18 @@ function TextField({
   value,
   onChangeText,
   errors,
-  disabled,
 }: {
   label: string;
   path: string;
   value: string | undefined;
   onChangeText: (value: string) => void;
   errors: Readonly<Record<string, string>>;
-  disabled: boolean;
 }) {
   const message = errors[path];
   return (
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{label}</Field.Label>
-      <Field.Control
-        value={value ?? ''}
-        onChangeText={onChangeText}
-        editable={!disabled}
-        autoCorrect={false}
-      />
+      <Field.Control value={value ?? ''} onChangeText={onChangeText} autoCorrect={false} />
       {message ? <Field.Error match>{message}</Field.Error> : null}
     </Field.Root>
   );
@@ -420,6 +412,4 @@ const styles = StyleSheet.create({
   form: { gap: spacing.lg },
   help: { fontSize: fontSizes.label },
   section: { gap: spacing.sm },
-  sectionBody: { gap: spacing.sm },
-  sectionTitle: { fontSize: fontSizes.body, fontWeight: '600' },
 });

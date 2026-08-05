@@ -154,4 +154,109 @@ describe('the intake screen', () => {
 
     expect(await screen.findByText('Changes save automatically')).toBeTruthy();
   });
+  describe('the ways it used to lose work', () => {
+    // Every one of these passed the old suite while being broken. They are
+    // grouped so the next reader can see what an adversarial pass found.
+
+    it('flushes a pending edit when the screen goes away', async () => {
+      // Typing and then navigating within 800ms produced ZERO requests: the
+      // cleanup cleared the debounce timer and dropped the keystrokes, with
+      // the status region still reading "Changes save automatically".
+      const fetchMock = signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: savedOk,
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('First name'), 'Ada');
+      screen.unmount();
+
+      await waitFor(() => expect(lastSave(fetchMock).name).toEqual({ given: 'Ada' }));
+    });
+
+    it('shows a save error against the debtor it belongs to', async () => {
+      // The flush on switching resolves AFTER the switch, so a single shared
+      // slot rendered debtor 1's error under debtor 2's empty field — and
+      // someone correcting it would type the fix into the wrong record.
+      signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
+          jsonResponse(400, {
+            error: 'validation failed',
+            fields: { 'name.given': 'Must be a single line.' },
+          }),
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('First name'), 'Ada');
+      await user.press(screen.getByRole('tab', { name: 'Debtor 2' }));
+
+      // Debtor 2 is on screen and is not the record that failed.
+      await waitFor(() => expect(screen.queryByText('Must be a single line.')).toBeNull());
+      expect(screen.queryByText('Some answers need attention.')).toBeNull();
+
+      // It is still there when you go back to the record it is about.
+      await user.press(screen.getByRole('tab', { name: 'Debtor 1' }));
+      expect(await screen.findByText('Must be a single line.')).toBeTruthy();
+    });
+
+    it('does not re-send a record just because a tab was pressed', async () => {
+      // The debounce handle was never nulled, so after the first edit of the
+      // session every tab press flushed an identical record again.
+      const fetchMock = signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: savedOk,
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('First name'), 'Ada');
+      await screen.findByText('Saved');
+      const before = fetchMock.mock.calls.filter(([url]) => url.includes('/debtors/')).length;
+
+      await user.press(screen.getByRole('tab', { name: 'Debtor 2' }));
+      await user.press(screen.getByRole('tab', { name: 'Debtor 1' }));
+
+      const after = fetchMock.mock.calls.filter(([url]) => url.includes('/debtors/')).length;
+      expect(after).toBe(before);
+    });
+
+    it('puts an alias error on the alias row', async () => {
+      // The fields were keyed by the row's id and the API keys body errors by
+      // INDEX, so every alias error rendered nowhere at all — the user saw
+      // only the summary, with no field flagged and every save still failing.
+      signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
+          jsonResponse(400, {
+            error: 'validation failed',
+            fields: { 'other_names_used[0].surname': 'Must be a single line.' },
+          }),
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.press(await screen.findByText('Add another name'));
+      await user.type(screen.getAllByLabelText('Last name')[1]!, 'Byron');
+
+      expect(await screen.findByText('Must be a single line.')).toBeTruthy();
+    });
+
+    it('reaches the role picker through the design system Tabs', async () => {
+      // A `Text` with `onPress` renders as a plain div — react-native-web gives
+      // a tabIndex only to the six roles it auto-focuses, and `tab` is not one,
+      // so two of the three records were mouse-only (WCAG 2.1.1, Level A).
+      // Focusability is a property of the Tabs native leaf and is tested in the
+      // design system; what this asserts is that the screen uses it, which is
+      // the part that regressed.
+      signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: noDebtors });
+
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('tab', { name: 'Debtor 2' }));
+
+      // The panel actually follows the tab — a real tab/panel pairing, which
+      // the hand-rolled tablist never had at all.
+      expect(
+        screen.getAllByRole('heading').some((node) => node.props.children === 'Debtor 2'),
+      ).toBe(true);
+    });
+  });
 });

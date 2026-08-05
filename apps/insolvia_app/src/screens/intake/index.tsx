@@ -1,15 +1,16 @@
 import { ApiValidationException, staffTypedProvenance } from '@insolvia-ai/api-client';
 import type { Debtor, DebtorBody, FilingRole } from '@insolvia-ai/api-client';
+import { Tabs } from '@insolvia-ai/design-system';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
 import { appEnvironment, environmentInfo } from '@/config/environment';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, useTheme } from '@/theme';
 
 import { DebtorFields } from './debtor-fields';
 
@@ -82,10 +83,19 @@ export function Intake() {
   const [role, setRole] = useState<FilingRole>('debtor_1');
   const [bodies, setBodies] = useState<Partial<Record<FilingRole, DebtorBody>>>({});
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
-  const [save, setSave] = useState<SaveState>({ kind: 'idle' });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // KEYED BY ROLE, both of them. A flush fired by switching debtor resolves
+  // AFTER the switch, so a single shared slot renders the outgoing record's
+  // result under the incoming one: "Saved" announced for a record that was not
+  // saved, and a field error pointing at an empty box belonging to someone
+  // else. Someone correcting that types the fix into the wrong debtor.
+  const [save, setSave] = useState<Partial<Record<FilingRole, SaveState>>>({});
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<FilingRole, Record<string, string>>>
+  >({});
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // What the timer is holding, so it can be flushed rather than dropped.
+  const pending = useRef<{ role: FilingRole; body: DebtorBody } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +118,8 @@ export function Intake() {
 
   const persist = useCallback(
     async (which: FilingRole, body: DebtorBody) => {
-      setSave({ kind: 'saving' });
+      pending.current = null;
+      setSave((current) => ({ ...current, [which]: { kind: 'saving' } }));
       try {
         // The provenance map is built from the body rather than tracked
         // alongside it: a person typed every value on this screen, so
@@ -117,18 +128,32 @@ export function Intake() {
         const result = await call((client) =>
           client.putDebtor(caseId, which, { ...body, provenance: staffTypedProvenance(body) }),
         );
-        if (!result.ok) return;
-        setFieldErrors({});
-        setSave({ kind: 'saved' });
+        if (!result.ok) {
+          // The session ended and useApi has already navigated. Leaving this on
+          // "Saving…" would announce a request that will never finish.
+          setSave((current) => ({ ...current, [which]: { kind: 'idle' } }));
+          return;
+        }
+        setFieldErrors((current) => ({ ...current, [which]: {} }));
+        setSave((current) => ({ ...current, [which]: { kind: 'saved' } }));
       } catch (cause) {
         if (cause instanceof ApiValidationException) {
           // The server is the source of truth for validation (ADR 0001), so
           // its per-field messages are rendered as-is against the same dotted
           // paths the fields write to.
-          setFieldErrors(cause.fields);
-          setSave({ kind: 'error', message: 'Some answers need attention.' });
+          setFieldErrors((current) => ({ ...current, [which]: cause.fields }));
+          setSave((current) => ({
+            ...current,
+            [which]: { kind: 'error', message: 'Some answers need attention.' },
+          }));
         } else {
-          setSave({ kind: 'error', message: 'Could not save. Retrying on your next change.' });
+          setSave((current) => ({
+            ...current,
+            [which]: {
+              kind: 'error',
+              message: 'Could not save. Retrying on your next change.',
+            },
+          }));
         }
       }
     },
@@ -138,102 +163,116 @@ export function Intake() {
   const change = (next: DebtorBody) => {
     setBodies((current) => ({ ...current, [role]: next }));
     if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void persist(role, next), AUTOSAVE_DELAY_MS);
+    pending.current = { role, body: next };
+    timer.current = setTimeout(() => {
+      // Cleared here, not only on the next edit. Leaving it set made the guard
+      // in switchRole permanently true after the first edit of the session, so
+      // every tab press re-sent an identical record.
+      timer.current = null;
+      void persist(role, next);
+    }, AUTOSAVE_DELAY_MS);
   };
 
   // Switching roles flushes first. Waiting out the debounce would mean the
   // pending edit lands under whichever role happened to be selected when the
   // timer fired — writing one debtor's name onto another's record.
-  const switchRole = (next: FilingRole) => {
+  const flush = useCallback(() => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
-      const pending = bodies[role];
-      if (pending !== undefined) void persist(role, pending);
     }
-    setFieldErrors({});
-    setSave({ kind: 'idle' });
+    const outstanding = pending.current;
+    if (outstanding !== null) void persist(outstanding.role, outstanding.body);
+  }, [persist]);
+
+  const switchRole = (next: FilingRole) => {
+    // Flush first: waiting out the debounce would land the edit under whichever
+    // role was selected when the timer fired. Nothing shared is reset here —
+    // save state and errors are keyed by role, so the flush's answer arrives at
+    // the record it belongs to however late it is.
+    flush();
     setRole(next);
   };
 
-  useEffect(
-    () => () => {
-      if (timer.current !== null) clearTimeout(timer.current);
-    },
-    [],
-  );
+  // FLUSHES on unmount rather than discarding. Clearing the timer alone lost
+  // every keystroke typed in the last 800ms whenever the user navigated away —
+  // back to the case list, or any in-app link — with the status region still
+  // reading "Changes save automatically" as the work went.
+  useEffect(() => flush, [flush]);
 
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  const saveState: SaveState = save[role] ?? { kind: 'idle' };
 
   return (
     <AppShell actions={<EnvBadge env={env.name} />}>
       <Heading level={1}>Intake</Heading>
 
-      {load.kind === 'loading' ? (
-        <Text aria-live="polite" style={[styles.status, muted]}>
-          Loading this intake…
-        </Text>
-      ) : load.kind === 'error' ? (
-        <Text aria-live="assertive" style={[styles.status, { color: theme.colors.danger }]}>
-          {load.message}
-        </Text>
-      ) : (
-        <>
-          {/* Whole records, not columns: a joint filing is two debtor records
-              and a non-filing spouse may appear on 106I without filing. */}
-          <View role="tablist" aria-label="Who this is about" style={styles.roles}>
+      {/* ONE region, always mounted, whose text changes. aria-live announces a
+          CHANGE to a region already in the DOM — a region that appears at the
+          same moment as its message is silent, which made the load error the
+          one message most worth hearing and the one guaranteed not to be. */}
+      <Text
+        aria-live={load.kind === 'error' ? 'assertive' : 'polite'}
+        style={[styles.status, load.kind === 'error' ? { color: theme.colors.danger } : muted]}
+      >
+        {load.kind === 'loading'
+          ? 'Loading this intake…'
+          : load.kind === 'error'
+            ? load.message
+            : ''}
+      </Text>
+
+      {load.kind === 'ready' ? (
+        // The design system's Tabs, not a hand-rolled one. A `Text` with
+        // `onPress` renders as a plain div: react-native-web assigns a tabIndex
+        // only to the six roles it auto-focuses, and `tab` is not among them —
+        // so the first version of this could not be reached by keyboard at all,
+        // and two of the three records this screen exists to collect were
+        // mouse-only. WCAG 2.1.1, Level A. Tabs' native leaf is a Pressable,
+        // which RNW does focus and activate on Enter, and it brings the
+        // tabpanel pairing the hand-rolled version also lacked.
+        //
+        // Whole records, not columns: a joint filing is two debtor records, and
+        // a non-filing spouse may appear on 106I without filing.
+        <Tabs.Root
+          defaultValue="debtor_1"
+          value={role}
+          onValueChange={(next) => switchRole(next as FilingRole)}
+          aria-label="Who this is about"
+        >
+          <Tabs.List>
             {ROLES.map((option) => (
-              <Text
-                key={option.value}
-                role="tab"
-                aria-selected={option.value === role}
-                onPress={() => switchRole(option.value)}
-                style={[
-                  styles.role,
-                  {
-                    color: option.value === role ? theme.colors.ink : theme.colors.muted,
-                    borderBottomColor: option.value === role ? theme.colors.primary : 'transparent',
-                  },
-                ]}
-              >
+              <Tabs.Tab key={option.value} value={option.value}>
                 {option.label}
-              </Text>
+              </Tabs.Tab>
             ))}
-          </View>
+          </Tabs.List>
 
-          <Heading level={2}>{ROLES.find((option) => option.value === role)?.label}</Heading>
+          <Tabs.Panel value={role}>
+            <Heading level={2}>{ROLES.find((option) => option.value === role)?.label}</Heading>
 
-          <Text aria-live="polite" style={[styles.status, muted]}>
-            {save.kind === 'saving'
-              ? 'Saving…'
-              : save.kind === 'saved'
-                ? 'Saved'
-                : save.kind === 'error'
-                  ? save.message
-                  : 'Changes save automatically'}
-          </Text>
+            <Text aria-live="polite" style={[styles.status, muted]}>
+              {saveState.kind === 'saving'
+                ? 'Saving…'
+                : saveState.kind === 'saved'
+                  ? 'Saved'
+                  : saveState.kind === 'error'
+                    ? saveState.message
+                    : 'Changes save automatically'}
+            </Text>
 
-          <DebtorFields
-            body={bodies[role] ?? {}}
-            onChange={change}
-            errors={fieldErrors}
-            disabled={false}
-          />
-        </>
-      )}
+            <DebtorFields
+              body={bodies[role] ?? {}}
+              onChange={change}
+              errors={fieldErrors[role] ?? {}}
+            />
+          </Tabs.Panel>
+        </Tabs.Root>
+      ) : null}
     </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  role: {
-    borderBottomWidth: 2,
-    fontSize: fontSizes.label,
-    fontWeight: '600',
-    // 44dp, the WCAG 2.5.5 target the app enforces everywhere it can be pressed.
-    lineHeight: 44,
-    paddingHorizontal: spacing.sm,
-  },
-  roles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   status: { fontSize: fontSizes.label },
 });
