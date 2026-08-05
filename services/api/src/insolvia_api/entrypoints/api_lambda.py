@@ -5,6 +5,7 @@ from mangum import Mangum
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
@@ -101,6 +102,9 @@ app = create_app(
         # partition, no second table — while the bytes live in the bucket.
         document_store=DynamoDbDocumentStore(config.case_table_name),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
+        # Same table as the case store, deliberately: a debtor is stored in
+        # its case's partition, so this needs no configuration of its own.
+        debtor_store=DynamoDbDebtorStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

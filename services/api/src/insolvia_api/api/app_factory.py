@@ -9,6 +9,7 @@ from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
+from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
@@ -41,6 +42,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(cases_blueprint)
     app.register_blueprint(firm_blueprint)
     app.register_blueprint(documents_blueprint)
+    app.register_blueprint(debtors_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

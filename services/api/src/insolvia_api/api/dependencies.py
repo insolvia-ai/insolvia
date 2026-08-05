@@ -9,6 +9,7 @@ from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,
+    DebtorStore,
     DocumentBlobStore,
     DocumentStore,
     FirmStore,
@@ -57,6 +58,10 @@ class ApiDependencies:
     # and the Lambda entrypoint refuses to boot without the bucket.
     document_store: DocumentStore | None = None
     document_blobs: DocumentBlobStore | None = None
+    # Shares the case table rather than taking one of its own — a debtor
+    # lives in its case's partition (SK=DEBTOR#<role>), so there is no
+    # second table, no new environment variable, and nothing to provision.
+    debtor_store: DebtorStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint
