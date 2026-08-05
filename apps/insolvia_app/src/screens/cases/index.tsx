@@ -1,0 +1,264 @@
+import { ApiValidationException } from '@insolvia-ai/api-client';
+import type { Case, CaseChapter } from '@insolvia-ai/api-client';
+import { Button, Field, RadioGroup } from '@insolvia-ai/design-system';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { useApi } from '@/api/use-api';
+import { AppShell } from '@/components/app-shell';
+import { EnvBadge } from '@/components/env-badge';
+import { Heading } from '@/components/heading';
+import { appEnvironment, environmentInfo } from '@/config/environment';
+import { fontSizes, spacing, useTheme } from '@/theme';
+
+const CHAPTERS: readonly { readonly value: CaseChapter; readonly label: string }[] = [
+  { value: 7, label: 'Chapter 7' },
+  { value: 13, label: 'Chapter 13' },
+  { value: 11, label: 'Chapter 11' },
+  { value: 12, label: 'Chapter 12' },
+];
+
+type ListState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly cases: readonly Case[] }
+  | { readonly kind: 'error'; readonly message: string };
+
+/**
+ * The case list, and the form that opens one — the screen that closes issue
+ * 8.3's loop: sign in, `POST /v1/cases`, `GET /v1/cases`, a case on screen.
+ *
+ * Deliberately not the intake questionnaire. This creates the case *record* —
+ * chapter and district — and nothing else; the multi-step questionnaire that
+ * fills a case is 8.5, and building a thin version of it here would be
+ * something 8.5 has to unpick.
+ *
+ * Everything visual is ours: {@link AppShell}, {@link Heading}, and the design
+ * system's `Button`, `Field` and `RadioGroup` leaves. Chapter is a radio group
+ * rather than a select because the package has no `Select` yet (8.4) and,
+ * with four options, a radio group is the better control regardless — every
+ * option is visible and reachable without opening anything.
+ */
+export function Cases() {
+  const theme = useTheme();
+  const env = environmentInfo(appEnvironment);
+  const { call } = useApi();
+
+  const [list, setList] = useState<ListState>({ kind: 'loading' });
+  const [chapter, setChapter] = useState<CaseChapter>(7);
+  const [district, setDistrict] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const result = await call((client) => client.listCases({}));
+      if (result.ok) {
+        setList({ kind: 'ready', cases: result.value.cases });
+      }
+      // !ok means the session ended and useApi already navigated; leaving the
+      // screen in `loading` is correct — it is about to unmount.
+    } catch {
+      setList({ kind: 'error', message: 'Could not load your cases.' });
+    }
+  }, [call]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const submit = async () => {
+    setSubmitting(true);
+    setFieldErrors({});
+    setFormError(null);
+    try {
+      const result = await call((client) => client.createCase({ chapter, district }));
+      if (result.ok) {
+        setDistrict('');
+        await load();
+      }
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        // The server is the source of truth for validation (ADR 0001), so its
+        // per-field messages are rendered as-is rather than restated here.
+        setFieldErrors(cause.fields);
+      } else {
+        setFormError('Could not open the case. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  return (
+    <AppShell actions={<EnvBadge env={env.name} />}>
+      <Heading level={1}>Your cases</Heading>
+
+      {/* level={2}: the screen owns the one <h1>; a heading picked for size
+          rather than structure is what produces a `heading-order` failure. */}
+      <Heading level={2}>Open a case</Heading>
+
+      <View style={styles.form}>
+        {/*
+          RadioGroup.Item IS the 20dp circle — the package's own tests render it
+          self-closing. Putting the label inside it makes four 20dp circles each
+          try to contain a word, and they overlap into an unreadable pile. The
+          label is a SIBLING; the only thing that belongs inside the Item is the
+          Indicator dot.
+
+          Two consequences that have to be handled here rather than assumed:
+          `aria-label`, because a circle containing only a dot has no accessible
+          name; and `hitSlop`, because 20dp is far under the 44dp WCAG 2.5.5
+          target this app enforces — 12 on each side takes the tappable area to
+          44 without changing the visual.
+        */}
+        <RadioGroup.Root
+          aria-label="Chapter"
+          value={String(chapter)}
+          onValueChange={(next) => setChapter(Number(next) as CaseChapter)}
+          style={styles.chapters}
+        >
+          {CHAPTERS.map((option) => (
+            <View key={option.value} style={styles.chapterOption}>
+              <RadioGroup.Item
+                value={String(option.value)}
+                aria-label={option.label}
+                hitSlop={12}
+              >
+                <RadioGroup.Indicator />
+              </RadioGroup.Item>
+              <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>
+                {option.label}
+              </Text>
+            </View>
+          ))}
+        </RadioGroup.Root>
+        {fieldErrors.chapter ? (
+          <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+            {fieldErrors.chapter}
+          </Text>
+        ) : null}
+
+        <Field.Root name="district" invalid={Boolean(fieldErrors.district)}>
+          <Field.Label>Filing district</Field.Label>
+          <Field.Control
+            value={district}
+            onChangeText={setDistrict}
+            placeholder="e.g. NDCA"
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+          <Field.Description>The bankruptcy court district this case will be filed in.</Field.Description>
+          {fieldErrors.district ? <Field.Error match>{fieldErrors.district}</Field.Error> : null}
+        </Field.Root>
+
+        <View style={styles.actions}>
+          {/* size="lg" (48dp): the package's md is 40dp, under the 44dp
+              WCAG 2.5.5 target-size floor this app enforces. */}
+          <Button size="lg" onPress={submit} disabled={submitting}>
+            {submitting ? 'Opening…' : 'Open case'}
+          </Button>
+        </View>
+
+        {formError === null ? null : (
+          <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+            {formError}
+          </Text>
+        )}
+      </View>
+
+      <Heading level={2}>Existing cases</Heading>
+      {list.kind === 'ready' ? (
+        <CaseList cases={list.cases} />
+      ) : (
+        <Text
+          aria-live={list.kind === 'error' ? 'assertive' : 'polite'}
+          style={[styles.body, muted]}
+        >
+          {list.kind === 'loading' ? 'Loading your cases…' : list.message}
+        </Text>
+      )}
+    </AppShell>
+  );
+}
+
+function CaseList({ cases }: { cases: readonly Case[] }) {
+  const theme = useTheme();
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  if (cases.length === 0) {
+    return <Text style={[styles.body, muted]}>No cases yet. Open one above to get started.</Text>;
+  }
+
+  return (
+    // `role`, not `accessibilityRole`: RN's AccessibilityRole union has no
+    // list/listitem, but the ARIA `role` prop passes straight through
+    // react-native-web to a real <ul>/<li> pair.
+    <View role="list" style={styles.list}>
+      {cases.map((item) => (
+        <View role="listitem" key={item.id} style={styles.listItem}>
+          <Text style={[styles.caseTitle, { color: theme.colors.ink }]}>
+            Chapter {item.chapter} · {item.district}
+          </Text>
+          {/*
+            The case id is shown because it is the only handle a user has on a
+            case until 8.5 gives them a debtor name to recognise it by. It is a
+            server-generated uuid and identifies nothing about a person.
+          */}
+          <Text style={[styles.caseMeta, muted]}>
+            {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} · {item.id}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  actions: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+  },
+  body: {
+    fontSize: fontSizes.body,
+    lineHeight: fontSizes.body * 1.5,
+  },
+  caseMeta: {
+    fontSize: fontSizes.caption,
+  },
+  caseTitle: {
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
+  chapterLabel: {
+    fontSize: fontSizes.label,
+  },
+  chapterOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  chapters: {
+    // Overrides the Root's own column default — four short options read better
+    // across than stacked, and wrap when the column is narrow.
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  error: {
+    fontSize: fontSizes.label,
+  },
+  form: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  list: {
+    gap: spacing.md,
+  },
+  listItem: {
+    gap: spacing.xs,
+  },
+});

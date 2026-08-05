@@ -1,5 +1,5 @@
 import { Button } from '@insolvia-ai/design-system';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
@@ -27,10 +27,10 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 export function Home() {
   const theme = useTheme();
   const env = environmentInfo(appEnvironment);
-  const [notice, setNotice] = useState<string | null>(null);
+  const router = useRouter();
 
-  const showSoon = () => {
-    setNotice('Case tools arrive in a later release.');
+  const openCases = () => {
+    router.push('/cases');
   };
 
   return (
@@ -50,27 +50,13 @@ export function Home() {
           `aria-label` pins the accessible name to exactly the visible label,
           so a screen reader never announces "Start a case right arrow".
         */}
-        <Button size="lg" aria-label="Start a case" onPress={showSoon}>
+        <Button size="lg" aria-label="Start a case" onPress={openCases}>
           Start a case <Text aria-hidden>→</Text>
         </Button>
-        <Button size="lg" intent="secondary" onPress={showSoon}>
-          Open a case
+        <Button size="lg" intent="secondary" onPress={openCases}>
+          Your cases
         </Button>
       </View>
-
-      {/*
-        A toast would be the wrong shape for a message a keyboard or
-        screen-reader user has to notice: `aria-live="polite"` announces it in
-        place without stealing focus.
-      */}
-      {notice === null ? null : (
-        <Text
-          aria-live="polite"
-          style={[styles.notice, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
-        >
-          {notice}
-        </Text>
-      )}
 
       {/* The authenticated round trip, proven on screen (issue #77). */}
       <MePanel />
@@ -96,8 +82,5 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: fontSizes.caption,
     marginTop: spacing.lg,
-  },
-  notice: {
-    fontSize: fontSizes.label,
   },
 });
