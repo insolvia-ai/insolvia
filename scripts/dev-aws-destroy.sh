@@ -61,6 +61,7 @@ remove_env "$api_env" AWS_PROFILE
 # confusing failure against a destroyed pool.
 remove_env "$api_env" AUTH_ISSUER_URL
 remove_env "$api_env" AUTH_CLIENT_ID
+remove_env "$api_env" AUTH_USER_POOL_ID
 
 # Same for the app: a stale domain/client id would send sign-in to a pool that
 # no longer exists. Cleared, the app renders "sign-in is not configured", which

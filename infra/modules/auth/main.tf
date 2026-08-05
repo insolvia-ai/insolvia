@@ -39,6 +39,29 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
+  # KNOWN AND NOT FIXED HERE: there is no `username_configuration` block, so
+  # this pool uses Cognito's legacy default and usernames are CASE-SENSITIVE.
+  # Measured against the dev pool, not inferred: creating `a@example.invalid`
+  # and then `A@EXAMPLE.INVALID` produces two separate accounts.
+  #
+  # What that costs: an attorney who types their address with a capital on the
+  # hosted sign-in page is told the user does not exist. Cognito owns that
+  # input, so nothing on our side can normalise it.
+  #
+  # Why it is not fixed in this change: `username_configuration` is IMMUTABLE.
+  # Adding `case_sensitive = false` forces the pool to be REPLACED, which
+  # deletes every account in it — on prod that is every attorney, and
+  # deletion_protection is ACTIVE there precisely to stop a plan doing it. It
+  # is cheap now (staging and prod hold test accounts) and gets more expensive
+  # every week, so it is a decision to take deliberately rather than a line to
+  # slip into an unrelated PR.
+  #
+  # Mitigated meanwhile, one layer only: services/api lower-cases every address
+  # before it reaches the pool (core/firms._parse_email), so nothing we create
+  # carries a capital and the invitation email quotes the lower-cased form back
+  # to the user. That closes the duplicate-account path and not the
+  # typed-with-a-capital one.
+
   # ACTIVE on prod (via the variable): deleting the pool deletes every
   # attorney account, so prod requires a two-step (flip this off, then
   # destroy) with a plan diff at each step.
@@ -307,4 +330,60 @@ resource "aws_cognito_user_pool_client" "web" {
     feature                    = "ENABLED"
     retry_grace_period_seconds = 30
   }
+}
+
+# ── The API's invite grant ──────────────────────────────────────
+# Self-signup is off (`allow_admin_create_user_only` above), so when a firm
+# admin adds a colleague through POST /v1/firm/users the API has to mint the
+# pool account. This is the grant that lets it, and it is deliberately the
+# narrowest one that works.
+#
+# WHAT THIS WIDENS, stated plainly because it is a real increase in what a
+# compromised API Lambda can do: it can create accounts in this pool. Three
+# things bound that.
+#
+#   - ONE ACTION. AdminCreateUser and nothing else. No AdminSetUserPassword,
+#     no AdminInitiateAuth, no AdminDeleteUser, no AdminUpdateUserAttributes,
+#     no AdminAddUserToGroup. Cognito emails the temporary password to the
+#     invited address and nothing in the service ever sees it, so creating an
+#     account is not a way to BECOME one — which is the difference between a
+#     provisioning grant and an impersonation primitive.
+#   - ONE POOL. Scoped to this pool's ARN, not a wildcard. The account's other
+#     pools — a future customer-facing one, another environment's — are out of
+#     reach.
+#   - AN ACCOUNT ALONE GRANTS NOTHING. A pool user with no firm-user row can
+#     sign in and is refused by every route (services/api's current_accessor).
+#     Reaching data needs a row in insolvia-firms-<env>, which is a different
+#     grant on a different table.
+#
+# The alternative considered and rejected: a separate, narrower invite Lambda,
+# so the API role holds no Cognito write at all. It is the stronger design and
+# it costs a second function, a second deploy path and an internal call for one
+# endpoint. Revisit if this grant ever needs a second action — that is the
+# signal that the invite flow has outgrown living here.
+data "aws_iam_role" "api" {
+  count = var.api_role_name == null ? 0 : 1
+  name  = var.api_role_name
+}
+
+resource "aws_iam_role_policy" "api_invite" {
+  count = var.api_role_name == null ? 0 : 1
+
+  name = "invite-${aws_cognito_user_pool.main.name}"
+  role = data.aws_iam_role.api[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "InviteFirmUser"
+        Effect   = "Allow"
+        Action   = ["cognito-idp:AdminCreateUser"]
+        Resource = aws_cognito_user_pool.main.arn
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+    ]
+  })
 }

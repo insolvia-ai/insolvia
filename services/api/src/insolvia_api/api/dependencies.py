@@ -12,6 +12,7 @@ from insolvia_api.core.ports import (
     FirmStore,
     JwksProvider,
     Mailer,
+    UserDirectory,
     WaitlistStore,
 )
 
@@ -40,6 +41,11 @@ class ApiDependencies:
     # absent means no authenticated request can establish which firm the caller
     # belongs to, and every case route answers 403 rather than degrading.
     firm_store: FirmStore | None = None
+    # The identity provider, needed by exactly one endpoint: adding a colleague
+    # has to mint their Cognito account first. Separate from firm_store so the
+    # READ routes work without it — a deployment missing the pool id should
+    # fail on that one endpoint rather than take the staff list down too.
+    user_directory: UserDirectory | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

@@ -8,6 +8,7 @@ from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
+from insolvia_api.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.api.app_factory import create_app
@@ -52,6 +53,13 @@ if not config.case_table_name or not config.case_access_log_table_name:
 if not config.firm_table_name:
     raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
 
+# Hard-required, and it is the pool this deployment already verifies tokens
+# against — published alongside the issuer as /insolvia/<env>/api/auth-user-pool-id.
+# Booting without it would leave POST /v1/firm/users answering 500, which a
+# firm admin discovers while trying to add their first colleague.
+if not config.auth_user_pool_id:
+    raise RuntimeError("AUTH_USER_POOL_ID must be set for the Lambda entrypoint")
+
 # AWS adapters are composed here, mirroring mailer's api_lambda entrypoint.
 # mailer_api_url is unset only if the mailer's SSM param hasn't been deployed
 # yet in this environment — fall back to the in-memory client rather than
@@ -77,6 +85,7 @@ app = create_app(
         # Its own table, not the case table — read on every authenticated
         # request, with a grant of its own (infra/modules/firm_store).
         firm_store=DynamoDbFirmStore(config.firm_table_name),
+        user_directory=CognitoUserDirectory(config.auth_user_pool_id),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

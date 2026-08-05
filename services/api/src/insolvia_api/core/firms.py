@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Final
@@ -266,6 +266,47 @@ def permission_for(user: FirmUser, feature: str) -> str:
     # fail-closed rule, applied to a value rather than a key. A row written by
     # a newer version with a level we cannot rank must not be ranked wrong.
     return level if level in LEVELS else HIDDEN
+
+
+def is_active_admin(user: FirmUser) -> bool:
+    return user.is_admin and user.status == "active"
+
+
+def would_leave_no_admin(
+    users: Iterable[FirmUser],
+    *,
+    changed: FirmUser | None = None,
+    removed: str | None = None,
+) -> bool:
+    """Whether applying this edit leaves the firm with nobody who can administer it.
+
+    THE ONE IRRECOVERABLE MISTAKE A FIRM ADMIN CAN MAKE, and the reason this
+    check exists rather than being left to good sense: self-signup is disabled
+    on the pool (`allow_admin_create_user_only`), so a firm with no active
+    admin cannot add one back. Nobody inside the firm can fix it. It becomes a
+    support ticket and a hand-run script against production data.
+
+    It is easy to reach by accident, too. The admin who set the firm up demotes
+    themselves after promoting a colleague — except they promoted the wrong
+    person, or that colleague is `disabled`. Or they remove their own account
+    because they are leaving the firm, on their last day, with nobody left
+    holding the flag.
+
+    Takes the WHOLE staff list rather than a count, because the caller is not
+    necessarily the person being changed: an admin may demote another admin,
+    and the answer depends on who else is left. Both edits are expressed the
+    same way — `changed` is the post-edit record, `removed` is a subject that
+    will no longer be there.
+    """
+    remaining = [
+        user
+        for user in users
+        if user.subject != removed
+        and (changed is None or user.subject != changed.subject)
+    ]
+    if changed is not None and changed.subject != removed:
+        remaining.append(changed)
+    return not any(is_active_admin(user) for user in remaining)
 
 
 def permits(user: FirmUser, feature: str, required: str) -> bool:
@@ -682,6 +723,27 @@ def firm_json(firm: Firm) -> dict[str, object]:
         "status": firm.status,
         "createdAt": firm.created_at,
         "updatedAt": firm.updated_at,
+    }
+
+
+def firm_user_summary_json(user: FirmUser) -> dict[str, object]:
+    """A colleague, as anyone in the firm may see them.
+
+    DELIBERATELY THINNER THAN `firm_user_json`, and the difference is the whole
+    reason there are two. A case carries `createdBy` as a Cognito subject and
+    an assignment list is a list of subjects, so every member of a firm needs
+    to be able to turn a subject into a name — otherwise the case list reads
+    "opened by 00000000-0000-4000-8000-…".
+
+    That need is satisfied by three fields. It does NOT justify handing every
+    paralegal their colleagues' email addresses, permission maps, or whether
+    somebody has been disabled — those are the firm's administration, and
+    `firm_user_json` is what an administrator gets.
+    """
+    return {
+        "subject": user.subject,
+        "displayName": user.display_name,
+        "role": user.role,
     }
 
 

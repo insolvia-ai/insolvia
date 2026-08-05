@@ -4,11 +4,13 @@ from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_api.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.access_log import MemoryAccessLog
 from insolvia_api.adapters.memory.case_store import MemoryCaseStore
 from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
+from insolvia_api.adapters.memory.user_directory import MemoryUserDirectory
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -19,6 +21,7 @@ from insolvia_api.core.ports import (
     CaseStore,
     FirmStore,
     JwksProvider,
+    UserDirectory,
     WaitlistStore,
 )
 
@@ -80,6 +83,18 @@ jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
 
+# Its own condition, not the store group's: adding a colleague is the one
+# operation that reaches Cognito, and with a real pool named it should reach
+# THIS machine's real pool — an invitation that lands in a developer's own
+# inbox is the only way to check the flow locally. Unset, the in-memory
+# directory mints a subject and sends nothing, which is honest: there is no
+# mail here.
+user_directory: UserDirectory
+if config.auth_user_pool_id:
+    user_directory = CognitoUserDirectory(config.auth_user_pool_id)
+else:
+    user_directory = MemoryUserDirectory()
+
 app = create_app(
     ApiDependencies(
         config=config,
@@ -89,5 +104,6 @@ app = create_app(
         case_store=case_store,
         access_log=access_log,
         firm_store=firm_store,
+        user_directory=user_directory,
     )
 )
