@@ -13,6 +13,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
+| `scripts/dev-aws-create-user.sh` | Per-machine AWS layer | Creates a sign-in account in this machine's dev Cognito pool. There is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; `--check` verifies |
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
@@ -146,6 +147,12 @@ reach for when a previous session left a port held.
 
 Two things worth knowing:
 
+- **You need an account before you can sign in.** The hosted UI has no sign-up
+  link and is not going to grow one — every pool sets
+  `allow_admin_create_user_only`, because a public sign-up form on a
+  bankruptcy-filing platform is an invitation to junk accounts. Run
+  `./scripts/dev-aws-create-user.sh` once; it prompts for a password without
+  echoing it and never stores it.
 - **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
   and no fake Cognito: the API talks to this machine's real per-developer
   tables and the app signs in against its real pool. Preflight says so by name

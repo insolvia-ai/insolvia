@@ -285,7 +285,13 @@ banner() {
   for name in $SERVICES; do
     printf '  %-10s %s\n' "$name" "$(service_url "$name")"
   done
+  # The sign-in pointer names the account script on purpose. Every pool sets
+  # allow_admin_create_user_only, so the hosted UI has NO sign-up link — which
+  # reads as a broken page rather than a deliberate policy, and the first
+  # person to hit it lost real time to exactly that.
   printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
+  printf '%s  No account yet? There is no sign-up screen by design:%s\n' "$c_dim" "$c_reset"
+  printf '%s      ./scripts/dev-aws-create-user.sh%s\n' "$c_dim" "$c_reset"
   printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
 }
 

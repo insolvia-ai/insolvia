@@ -65,6 +65,7 @@ already working.
 | Want to… | Run |
 |---|---|
 | Provision this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito) and wire `services/api/.env` | `scripts/dev-aws-setup.sh` (`--check` verifies) |
+| Create a sign-in account in this machine's dev Cognito pool — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one | `scripts/dev-aws-create-user.sh` (`--check`) |
 | Wipe this machine's dev **data** (table delete+recreate, Cognito users); resources survive | `scripts/dev-aws-reset.sh` (`--dry-run`, `--skip-cognito`) |
 | `terraform destroy` this machine's dev resources + unwind `.env` | `scripts/dev-aws-destroy.sh` |
 | Destroy a **previous** machine-id's orphaned dev resources (leftovers a lost/regenerated `~/.config/insolvia/machine-id` strands, which destroy can't reach) | `scripts/dev-aws-destroy-orphan.sh <short-id>` |
