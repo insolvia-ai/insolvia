@@ -381,7 +381,19 @@ locator  { document_id, page,                    // 1-based
 Fractional coordinates rather than points, because the review UI renders pages
 at whatever width the viewport gives it and a point-based box would need the
 render scale to be stored alongside. `storage_ref` is opaque here — how bytes
-are stored, and how access is brokered, belong to the document-upload work.
+are stored, and how access is brokered, belong to the document-upload work
+(issue 8.6), which settled both: the object key is
+`cases/<case_id>/<document_id>` in the bucket
+[`infra/modules/case_documents`](../../infra/modules/case_documents/main.tf)
+creates, and access is brokered by short-lived, server-minted presigned URLs —
+`services/api/src/insolvia_api/api/routes/documents.py` argues that against
+[ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md).
+
+The identifier rule above applies to that key without exception: **the
+uploader's file name is metadata on the record and never appears in the key**,
+because a key is visible in bucket inventories, S3 access logs, CloudTrail data
+events and every presigned URL, none of which are access-controlled the way the
+record is.
 
 ## Storage validation is not filing completeness
 

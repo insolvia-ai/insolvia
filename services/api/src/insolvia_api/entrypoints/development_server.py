@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.access_log import MemoryAccessLog
 from insolvia_api.adapters.memory.case_store import MemoryCaseStore
+from insolvia_api.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_api.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.user_directory import MemoryUserDirectory
@@ -19,6 +23,8 @@ from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,
+    DocumentBlobStore,
+    DocumentStore,
     FirmStore,
     JwksProvider,
     UserDirectory,
@@ -54,11 +60,16 @@ mailer = InMemoryMailerClient()
 # the public routes, and auth fails CLOSED rather than waving requests
 # through. This is the ONE entrypoint that tolerates missing auth config;
 # api_lambda.py refuses to boot without it.
-# Same shape as the waitlist store above: with this machine's real tables
-# named (scripts/dev-aws-setup.sh writes both into services/api/.env) the
-# DynamoDB adapters run against them, and the bare dev server falls back to
-# in-memory. The pair moves together — an in-memory store with a real access
-# log, or the reverse, would be a confusing half-state to debug.
+# Same shape as the waitlist store above: with this machine's real stores named
+# (scripts/dev-aws-setup.sh writes all of them into services/api/.env) the AWS
+# adapters run against them, and the bare dev server falls back to in-memory.
+# The GROUP moves together — an in-memory store with a real access log, or a
+# real document row pointing at a bucket that only exists in this process,
+# would be a confusing half-state to debug. That is also why the document
+# bucket is in this condition rather than in one of its own: dev-aws-setup.sh
+# provisions the table and the bucket in the same apply, so "some but not all"
+# means a stale .env, and falling back wholesale is the state a developer can
+# actually reason about.
 case_store: CaseStore
 access_log: AccessLog
 firm_store: FirmStore
@@ -78,6 +89,24 @@ else:
     # developer with no firm is exactly the "authenticated but not provisioned"
     # case, and inventing a firm here would hide it until staging.
     firm_store = MemoryFirmStore()
+document_store: DocumentStore
+document_blobs: DocumentBlobStore
+if (
+    config.case_table_name
+    and config.case_access_log_table_name
+    and config.case_document_bucket
+):
+    case_store = DynamoDbCaseStore(config.case_table_name)
+    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+    document_store = DynamoDbDocumentStore(config.case_table_name)
+    document_blobs = S3DocumentBlobStore(config.case_document_bucket)
+else:
+    case_store = MemoryCaseStore()
+    access_log = MemoryAccessLog()
+    document_store = MemoryDocumentStore()
+    # Mints URLs nothing can fetch, which is the honest local shape: there is
+    # no S3 emulator here. Run scripts/dev-aws-setup.sh to get a real bucket.
+    document_blobs = MemoryDocumentBlobStore()
 
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
@@ -105,5 +134,7 @@ app = create_app(
         access_log=access_log,
         firm_store=firm_store,
         user_directory=user_directory,
+        document_store=document_store,
+        document_blobs=document_blobs,
     )
 )

@@ -59,6 +59,15 @@ def test_case_access_log_table_name_is_read():
     assert config.case_access_log_table_name == name
 
 
+def test_case_document_bucket_defaults_to_none():
+    assert load_config({}).case_document_bucket is None
+
+
+def test_case_document_bucket_is_read():
+    config = load_config({"CASE_DOCUMENT_BUCKET": "insolvia-case-documents-staging"})
+    assert config.case_document_bucket == "insolvia-case-documents-staging"
+
+
 def test_mailer_api_url_defaults_to_none():
     assert load_config({}).mailer_api_url is None
 
