@@ -191,4 +191,33 @@ describe('Select (native leaf)', () => {
       expect(root.className).not.toMatch(/r-zIndex-/);
     });
   });
+
+  it('carries its accessible name on the combobox and not on a wrapper', async () => {
+    // THE DEFECT THIS GUARDS. `aria-label` used to stay in `...props` and land
+    // on the root View as well as the combobox, so one control answered to its
+    // own name twice: React Native Testing Library reported two matches, and a
+    // screen reader met a name on a node with no role to attach it to.
+    //
+    // Asserting `getByLabelText` throws on a duplicate is what catches it —
+    // `getByRole` alone passes either way, because the combobox was always
+    // labelled correctly.
+    render(<Select aria-label="Filing district" options={DISTRICTS} />);
+
+    // Exactly one node answers to the name. `getAllBy` rather than `getBy`
+    // because `getBy` throwing on a duplicate would be a less legible failure
+    // than a length assertion.
+    expect(screen.getAllByLabelText('Filing district')).toHaveLength(1);
+    expect(screen.getByRole('combobox', { name: 'Filing district' })).toBeTruthy();
+  });
+
+  it('names the open listbox after the control', async () => {
+    // A listbox with no accessible name is announced as an unlabelled group.
+    // The web leaf names its <ul>; this makes the native leaf agree.
+    const user = userEvent.setup();
+    render(<Select aria-label="Filing district" options={DISTRICTS} />);
+
+    await user.click(screen.getByRole('combobox'));
+
+    expect(screen.getByRole('listbox', { name: 'Filing district' })).toBeTruthy();
+  });
 });

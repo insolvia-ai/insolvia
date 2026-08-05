@@ -51,6 +51,18 @@ export const Select = ({
   disabled = false,
   name: _name,
   style,
+  // PULLED OUT OF `props` ON PURPOSE, and the omission is the fix. Everything
+  // left in `props` is spread onto the ROOT View below, so leaving the label
+  // there put the accessible name on TWO nodes: a roleless container and the
+  // combobox. React Native Testing Library found two matches for one control;
+  // a screen reader gets a name on a wrapper that has no business having one.
+  //
+  // The web leaf never had this — it spreads `props` straight onto the
+  // <button>, so there is only ever one carrier. This makes the native leaf
+  // agree, and hands the name to the two nodes that should have it: the
+  // combobox, and the listbox it controls (which is what the web leaf does
+  // with its <ul>).
+  'aria-label': ariaLabel,
   ...props
 }: SelectProps) => {
   const field = React.useContext(FieldContext);
@@ -137,7 +149,7 @@ export const Select = ({
         // Field's native leaf establishes (the web leaf points label -> control
         // with htmlFor instead).
         aria-labelledby={field?.labelId}
-        aria-label={props['aria-label']}
+        aria-label={ariaLabel}
         aria-invalid={invalid}
         aria-disabled={disabled}
         disabled={disabled}
@@ -186,6 +198,9 @@ export const Select = ({
           // unmount between pointerdown and pointerup and the press would never
           // complete. Cancelling the default on mousedown stops focus leaving
           // the trigger at all, which is the same fix the web leaf uses.
+          // Named after the control, matching the web leaf's <ul>. A listbox
+          // with no accessible name is announced as an unlabelled group.
+          aria-label={ariaLabel}
           {...({
             role: 'listbox',
             onMouseDown: (event: { preventDefault: () => void }) => event.preventDefault(),
