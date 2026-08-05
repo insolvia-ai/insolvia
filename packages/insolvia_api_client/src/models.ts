@@ -769,7 +769,6 @@ export interface DebtorBody {
   readonly email?: string | undefined;
   readonly venue?: Venue | undefined;
   readonly credit_counseling?: CreditCounseling | undefined;
-  /** When the debtor signed, as a string. Max 40 characters. */
   /**
    * The signature date, `YYYY-MM-DD` — a calendar fact, not an instant, so
    * no time and no zone (see docs/reference/case-data-model.md). The API
