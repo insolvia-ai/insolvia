@@ -9,6 +9,7 @@ from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,
+    FirmStore,
     JwksProvider,
     Mailer,
     WaitlistStore,
@@ -33,6 +34,12 @@ class ApiDependencies:
     # pretending, and the Lambda entrypoint refuses to boot without them.
     case_store: CaseStore | None = None
     access_log: AccessLog | None = None
+    # The tenancy layer. Optional for the same reason as the pair above — the
+    # existing public-route tests build an ApiDependencies without one — but it
+    # is the field with the shortest fuse: once accessor resolution lands,
+    # absent means no authenticated request can establish which firm the caller
+    # belongs to, and every case route answers 403 rather than degrading.
+    firm_store: FirmStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

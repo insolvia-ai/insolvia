@@ -62,6 +62,7 @@ class AppConfig:
     waitlist_table_name: str | None = None
     case_table_name: str | None = None
     case_access_log_table_name: str | None = None
+    firm_table_name: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -91,6 +92,12 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     it and nothing else, so this service can write an entry and can never read,
     amend or delete one — see modules/case_store. Same unset-means-in-memory
     shape as the two above.
+    FIRM_TABLE_NAME names the DynamoDB table holding firms, the people in them,
+    and what each of them may do (infra/modules/firm_store). Same SSM
+    derivation and the same unset-means-in-memory shape as the three above. It
+    is separate from CASE_TABLE_NAME even though both are encrypted under the
+    same key, because it is read on every authenticated request and carries a
+    different IAM grant — the module's header has the argument.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -123,6 +130,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         waitlist_table_name=source.get("WAITLIST_TABLE_NAME") or None,
         case_table_name=source.get("CASE_TABLE_NAME") or None,
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
+        firm_table_name=source.get("FIRM_TABLE_NAME") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
