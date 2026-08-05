@@ -1,7 +1,7 @@
 # insolvia_design_system
 
 Insolvia's owned, cross-platform design system, published as
-`@insolvia-ai/design-system` (0.3.x). One set of component names serves both
+`@insolvia-ai/design-system` (0.5.x). One set of component names serves both
 front-end stacks: the marketing site (React DOM + Tailwind) and the app
 (React Native / Expo). Agent rules: [`CLAUDE.md`](CLAUDE.md).
 
@@ -16,8 +16,9 @@ primitives (equivalent behavior, zero Base UI dependency): `AlertDialog` ·
 `Avatar` · `Checkbox` · `CheckboxGroup` · `Collapsible` · `Dialog` · `Meter` ·
 `Progress` · `RadioGroup` · `Separator` · `Switch` · `Tabs` · `Toggle` ·
 `ToggleGroup`. 0.4.0 adds `Select`, the first anchored-popup component — see
-the note below on why it stopped being deferred. Compound components export
-their parts under one name
+the note below on why it stopped being deferred. 0.5.0 adds `DateInput`, a
+masked `YYYY-MM-DD` text field with no calendar (the reasoning is at the top of
+`date-input.props.ts`). Compound components export their parts under one name
 (`Dialog.Root`, `Dialog.Trigger`, …); input-taking components support both
 uncontrolled (`default*`) and controlled (`*` + change callback) modes via
 `src/lib/controllable.ts`.
@@ -55,11 +56,11 @@ src/button/
 The per-component `index.ts` deliberately imports `"./button"` with no
 extension — **the consumer's bundler picks the leaf**:
 
-| Consumer | Bundler | Leaf | Why |
-|---|---|---|---|
-| Marketing site | Vite | `.web.tsx` | Tailwind classes over `theme.css` |
-| App (native, later) | Metro | `.native.tsx` | RN primitives, tokens values |
-| App (web, today) | Metro | `.native.tsx` | react-native-web renders the RN tree — the app has no Tailwind (ADR 0004), so the `.web` leaf would be unstyled there |
+| Consumer            | Bundler | Leaf          | Why                                                                                                                   |
+| ------------------- | ------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Marketing site      | Vite    | `.web.tsx`    | Tailwind classes over `theme.css`                                                                                     |
+| App (native, later) | Metro   | `.native.tsx` | RN primitives, tokens values                                                                                          |
+| App (web, today)    | Metro   | `.native.tsx` | react-native-web renders the RN tree — the app has no Tailwind (ADR 0004), so the `.web` leaf would be unstyled there |
 
 The native leaves resolve their **colors at render time** through
 `src/lib/native-theme.native.ts` (`useNativeColors()` — anything but `'dark'`
@@ -83,9 +84,9 @@ platforms' event and a11y models do not unify.
 
 ## Two consumers, two channels
 
-| Consumer | Resolves the package via |
-|---|---|
-| `apps/insolvia_app` | workspace symlink (root npm workspace member) |
+| Consumer                  | Resolves the package via                       |
+| ------------------------- | ---------------------------------------------- |
+| `apps/insolvia_app`       | workspace symlink (root npm workspace member)  |
 | `apps/insolvia_marketing` | the **published version** from GitHub Packages |
 
 The app's channel is live: it consumes this package as **source**, through the

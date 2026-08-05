@@ -13,6 +13,8 @@ export { Card } from './card';
 export { Checkbox } from './checkbox';
 export { CheckboxGroup } from './checkbox-group';
 export { Collapsible } from './collapsible';
+export { DateInput } from './date-input';
+export type { DateStatus } from './date-input';
 export { Dialog } from './dialog';
 export { Field } from './field';
 export { Footer } from './footer';
