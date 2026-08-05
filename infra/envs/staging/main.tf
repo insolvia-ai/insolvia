@@ -292,6 +292,22 @@ module "case_store" {
   tags                        = local.common_tags
 }
 
+# ── Firms ───────────────────────────────────────────────────────
+# Tenancy: which firm a signed-in user belongs to and what they may do. Takes
+# the case store's key rather than minting one — firm membership decides who
+# reads case data, and one deny should cover both.
+module "firm_store" {
+  source = "../../modules/firm_store"
+
+  project                = "insolvia"
+  environment            = local.environment
+  aws_region             = var.aws_region
+  kms_key_arn            = module.case_store.kms_key_arn
+  api_role_name          = module.api_service.lambda_role_name
+  point_in_time_recovery = false
+  deletion_protection    = false
+  tags                   = local.common_tags
+}
 # Publish the case table name into the API's SSM config namespace, env-level
 # for the same reason mailer_api_url and the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
@@ -319,6 +335,14 @@ resource "aws_ssm_parameter" "case_access_log_table_name" {
   tags  = local.common_tags
 }
 
+# The firm table's name, same namespace and same reasoning as the case tables
+# above — the API derives it as FIRM_TABLE_NAME.
+resource "aws_ssm_parameter" "firm_table_name" {
+  name  = "/insolvia/${local.environment}/api/firm-table-name"
+  type  = "String"
+  value = module.firm_store.table_name
+  tags  = local.common_tags
+}
 # Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
 # into an insolvia-audit-<env> bucket under its own key. Declared after
 # module.case_store because it records that module's table.
