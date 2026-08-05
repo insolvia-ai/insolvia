@@ -299,7 +299,12 @@ main() {
 
   local name
   for name in $SERVICES; do
-    log "Starting $name…"
+    # ${name} braced, not bare. The next character is a multibyte ellipsis,
+    # and bash can absorb those bytes into the IDENTIFIER — it then looks up a
+    # variable that does not exist and `set -u` kills the script with
+    # "name<mojibake>: unbound variable". Brace any expansion that touches a
+    # non-ASCII character.
+    log "Starting ${name}…"
     start_service "$name"
   done
 
