@@ -43,6 +43,144 @@ The stored DynamoDB item preserves the marketing implementation's schema
 exactly (`PK="WAITLIST"`, `SK="<submittedAt>#<id>"`, optional fields omitted
 rather than empty) — see `core/waitlist.py::record_item`.
 
+### `GET /v1/me`
+
+Authenticated. The app's "is my token still good?" probe, and the identity it
+displays. Answers from the claims this request's token already proved —
+**there is no call back to Cognito**, no `GetUser`, no AWS call at all.
+
+Responses:
+
+- `200` — `{subject, username, clientId, scopes, expiresAt}`. `username` is the
+  Cognito-generated UUID, **not** an email address, and clients must not
+  display it as one; no address appears in any access-token claim (see
+  [Authentication](#authentication)).
+- `401` — as every protected route (see [Authentication](#authentication)).
+
+### `POST /v1/unsubscribe`
+
+Public (deliberately unauthenticated) like `POST /v1/waitlist`, and for the
+same reason: the caller is the marketing site's SSR Lambda forwarding a click
+server-to-server, and the person clicking holds no credentials. The token *is*
+the authentication — an HMAC over the address signed with a secret only this
+service holds — and verifying it is why this endpoint exists rather than the
+marketing site calling the mailer directly.
+
+Request body (JSON object, max 4 KiB):
+
+| Field | Required |
+|---|---|
+| `token` | yes (a token this service minted) |
+
+Responses:
+
+- `202` — `{"status": "unsubscribed"}`, always exactly that. The response never
+  reveals the address, never says whether it was already suppressed, and never
+  says whether it matches a known account — anyone holding a link can call it.
+- `400` — `{"error": "ValidationError", "message": "…"}` for a token that is
+  invalid, forged or truncated, a missing `token`, a body that isn't a JSON
+  object, or one over 4 KiB. Nothing is suppressed.
+- `500` — no `UNSUBSCRIBE_SECRET` configured. Correct rather than unfortunate:
+  without a key there is no way to tell a real token from a made-up one, and
+  answering `202` would be a lie.
+
+### Cases
+
+Four routes backed by `core/cases.py` (the `case` root entity of [the case data
+model](../../docs/reference/case-data-model.md)). All four are protected, so all
+four can answer the `401` described under [Authentication](#authentication).
+Three further things hold across them:
+
+- **The owner comes from the verified token, never from the body.** There is no
+  request a client can make that creates or reads a case belonging to someone
+  else.
+- **Someone else's case answers `404`, identically to one that does not
+  exist.** A `403` would confirm the id is real, which turns these routes into
+  an oracle for enumerating other firms' case ids — `core/errors.py`'s
+  `NotFoundError` owns that reasoning.
+- **`ownerPrincipal` is absent from every response.** The caller is the owner
+  by construction, so returning it would leak a subject identifier for no
+  purpose.
+
+A case object is `{id, chapter, district, status, createdAt, updatedAt}`, with
+`id`, `status`, `createdAt` and `updatedAt` all server-generated.
+
+#### `POST /v1/cases`
+
+Opens a case owned by the caller.
+
+Request body (JSON object, max 64 KiB; unknown keys ignored):
+
+| Field | Required | Accepted |
+|---|---|---|
+| `chapter` | yes | `7`, `11`, `12`, `13` (9 and 15 are municipal and cross-border — never this product) |
+| `district` | yes | 2–64 characters of `A–Z a–z 0–9 space . - /` |
+
+`status` is deliberately **not** accepted: every case starts at `intake`, and
+letting a client create one already marked `filed` would be a lie the server
+told on its behalf.
+
+Responses:
+
+- `201` — the case object.
+- `400` — `{"error": "ValidationError", "fields": {"<field>": "<message>", …}}`
+  for per-field failures, or `{"error": "ValidationError", "message": "…"}` when
+  the body isn't a JSON object or exceeds 64 KiB.
+
+#### `GET /v1/cases`
+
+The caller's cases, newest first.
+
+Query parameters: `limit` (1–100, default 50) and `cursor` (opaque, echoed from
+a previous response — base64 rather than the raw key so clients cannot come to
+depend on the table's attribute names).
+
+Responses:
+
+- `200` — `{"cases": [<case>, …]}`, plus `nextCursor` when there is another
+  page. It is **absent rather than null** on the last page; the client contract
+  distinguishes the two.
+- `400` — a `limit` that isn't a number or falls outside 1–100, or a cursor this
+  service did not mint.
+
+Deliberately **not** written to the access log: that table is keyed by case, and
+a list touches no case in particular. Recording enumeration properly wants a
+by-principal index that `infra/modules/case_store` defers.
+
+#### `GET /v1/cases/<case_id>`
+
+Responses:
+
+- `200` — the case object.
+- `404` — `{"error": "NotFoundError", "message": "case not found"}`, for a case
+  that does not exist and for one owned by someone else alike. The refused read
+  *is* recorded in the access log: someone walking case ids is exactly what that
+  log should show.
+
+#### `PATCH /v1/cases/<case_id>`
+
+Changes a case's chapter, district or status.
+
+Request body (JSON object, max 64 KiB; unknown keys ignored) — any subset of:
+
+| Field | Accepted |
+|---|---|
+| `chapter` | as `POST /v1/cases` |
+| `district` | as `POST /v1/cases` |
+| `status` | `intake`, `ready_to_file`, `filed` |
+
+Only supplied keys are validated, so a caller changing the district alone is not
+forced to resend the chapter.
+
+Responses:
+
+- `200` — the updated case object.
+- `400` — per-field failures in the `fields` shape above, or a `message` body
+  for an empty update. An empty body is **rejected rather than treated as a
+  no-op**: it is far more likely a client bug than an intent, and a silent `200`
+  would hide it.
+- `404` — as `GET /v1/cases/<case_id>`, and likewise recorded.
+
 ## Local development
 
 Local dev runs against **this machine's real AWS dev table** — there is no
@@ -80,14 +218,23 @@ directory; ruff config is the repo-root `ruff.toml`).
 |---|---|
 | `INSOLVIA_ENV` | `local` (default) \| `staging` \| `production`; also selects the CORS allowlist (`core/config.py`) |
 | `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
+| `CASE_TABLE_NAME` | DynamoDB table holding case data, encrypted under a customer-managed key. Same local shape as `WAITLIST_TABLE_NAME`; unset → in-memory store. Required by the Lambda entrypoint, in the pair below |
+| `CASE_ACCESS_LOG_TABLE_NAME` | Append-only table recording who read or changed which case. The API's role holds `PutItem` on it and nothing else, so this service can write an entry and can never read, amend or delete one. Required by the Lambda entrypoint **together with** `CASE_TABLE_NAME` — one without the other would serve case data while recording nobody reading it |
+| `MAILER_API_URL` | The mailer service's public HTTPS base URL; unset → in-memory mailer. Alone among these, that fallback survives into the Lambda: an environment whose mailer isn't deployed yet still boots |
+| `UNSUBSCRIBE_SECRET` | HMAC key for unsubscribe tokens. Unset is **not** a fallback: `POST /v1/unsubscribe` answers 500 and outgoing mail carries no unsubscribe link, rather than degrading to unsigned tokens |
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
 
-Both auth variables are published to SSM as `/insolvia/<env>/api/auth-issuer-url`
-and `.../auth-client-id` and re-derived into the Lambda's environment by the
-deploy workflow. **Unset never means "skip the check"**: `GET /v1/me` and every
-future protected route answer 401 without them (`core/auth.py`), the same
-fail-closed rule `UNSUBSCRIBE_SECRET` follows. Locally, `infra/envs/dev` outputs
+The reasoning for each — which fall back, which fail closed, and why the case
+pair is required as a pair — is `core/config.py`'s `load_config` docstring. This
+table is the index; that docstring is the owner. Everything except
+`WAITLIST_TABLE_NAME` (whose table sits in the same environment stack) is
+published to SSM as `/insolvia/<env>/api/<kebab-cased-name>` and re-derived into
+the Lambda's environment by the deploy workflow.
+
+**For the auth pair, unset never means "skip the check"**: `GET /v1/me` and the
+case routes answer 401 without them (`core/auth.py`), the same fail-closed rule
+`UNSUBSCRIBE_SECRET` follows. Locally, `infra/envs/dev` outputs
 `auth_issuer_url` and `auth_web_client_id` for this machine's own pool.
 
 CORS (issue #68) is an exact-origin allowlist — production:
