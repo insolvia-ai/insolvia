@@ -20,6 +20,8 @@ export { Meter } from './meter';
 export { NavBar } from './nav-bar';
 export { Progress } from './progress';
 export { RadioGroup } from './radio-group';
+export { Select } from './select';
+export type { SelectOption, SelectValue } from './select';
 export { Separator } from './separator';
 export { Switch } from './switch';
 export { Tabs } from './tabs';

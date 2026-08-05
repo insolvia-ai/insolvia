@@ -15,18 +15,30 @@ The original surfaces: `Accordion` · `Button` · `Card` · `Field` · `Footer` 
 primitives (equivalent behavior, zero Base UI dependency): `AlertDialog` ·
 `Avatar` · `Checkbox` · `CheckboxGroup` · `Collapsible` · `Dialog` · `Meter` ·
 `Progress` · `RadioGroup` · `Separator` · `Switch` · `Tabs` · `Toggle` ·
-`ToggleGroup`. Compound components export their parts under one name
+`ToggleGroup`. 0.4.0 adds `Select`, the first anchored-popup component — see
+the note below on why it stopped being deferred. Compound components export
+their parts under one name
 (`Dialog.Root`, `Dialog.Trigger`, …); input-taking components support both
 uncontrolled (`default*`) and controlled (`*` + change callback) modes via
 `src/lib/controllable.ts`.
 
 Deliberately not ported, and why: hover-only surfaces (Tooltip, Preview Card —
 inaccessible on touch, per Base UI's own docs) and desktop-menu surfaces
-(Menubar, Navigation Menu); anchored-popup components (Popover, Menu, Select,
-Combobox, Autocomplete, Number Field, Scroll Area, Context Menu) need a
-positioning primitive and mobile idioms (sheets, native pickers) that deserve
-their own design pass; Toast needs an app-level provider architecture; Form /
-Fieldset / Input overlap with `Field`, which already owns form-control wiring.
+(Menubar, Navigation Menu); anchored-popup components (Popover, Menu, Combobox,
+Autocomplete, Number Field, Scroll Area, Context Menu) need a positioning
+primitive and mobile idioms (sheets, native pickers) that deserve their own
+design pass; Toast needs an app-level provider architecture; Form / Fieldset /
+Input overlap with `Field`, which already owns form-control wiring.
+
+**`Select` came off that list in 0.4.0**, because the intake questionnaire
+needs it and a form cannot route around a missing select. The two reasons it
+was deferred were answered rather than waived: positioning is an absolute
+anchor under a full-width trigger, which needs no positioning primitive because
+the popup is exactly as wide as the control; and the mobile sheet idiom is not
+needed while the only target is web — the native leaf's popup renders inline,
+with a comment saying what a real device would want instead. Anything that has
+to float free of its trigger (Popover, Menu) still needs the deferred design
+pass; a select does not.
 
 ## The pattern: one props module, two leaves
 
