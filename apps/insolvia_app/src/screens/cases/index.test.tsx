@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -80,6 +80,29 @@ describe('the cases screen', () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
 
     expect(await screen.findByText(/No cases yet/)).toBeTruthy();
+  });
+
+  it('renders one named radio per chapter, with the label outside the circle', async () => {
+    // The regression this guards: RadioGroup.Item IS the 20dp circle (its own
+    // package tests render it self-closing), so a label nested inside it makes
+    // four circles overlap into an unreadable pile. Asserting the accessible
+    // NAME rather than the visible text is what catches it — a nested label
+    // would still render, just on top of its neighbours.
+    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
+    await screen.findByText(/No cases yet/);
+
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(4);
+
+    for (const label of ['Chapter 7', 'Chapter 13', 'Chapter 11', 'Chapter 12']) {
+      const radio = screen.getByRole('radio', { name: label });
+      // The discriminating assertion. Checking the accessible NAME alone would
+      // pass either way — react-native-web derives it from nested content just
+      // as happily as from aria-label. What only the correct structure
+      // satisfies is the label being OUTSIDE the circle.
+      expect(within(radio).queryByText(label)).toBeNull();
+      expect(screen.getByText(label)).toBeTruthy();
+    }
   });
 
   it('sends the chosen chapter and district to the API', async () => {

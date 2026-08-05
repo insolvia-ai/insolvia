@@ -101,21 +101,39 @@ export function Cases() {
       <Heading level={2}>Open a case</Heading>
 
       <View style={styles.form}>
+        {/*
+          RadioGroup.Item IS the 20dp circle — the package's own tests render it
+          self-closing. Putting the label inside it makes four 20dp circles each
+          try to contain a word, and they overlap into an unreadable pile. The
+          label is a SIBLING; the only thing that belongs inside the Item is the
+          Indicator dot.
+
+          Two consequences that have to be handled here rather than assumed:
+          `aria-label`, because a circle containing only a dot has no accessible
+          name; and `hitSlop`, because 20dp is far under the 44dp WCAG 2.5.5
+          target this app enforces — 12 on each side takes the tappable area to
+          44 without changing the visual.
+        */}
         <RadioGroup.Root
           aria-label="Chapter"
           value={String(chapter)}
           onValueChange={(next) => setChapter(Number(next) as CaseChapter)}
+          style={styles.chapters}
         >
-          <View style={styles.chapters}>
-            {CHAPTERS.map((option) => (
-              <RadioGroup.Item key={option.value} value={String(option.value)}>
+          {CHAPTERS.map((option) => (
+            <View key={option.value} style={styles.chapterOption}>
+              <RadioGroup.Item
+                value={String(option.value)}
+                aria-label={option.label}
+                hitSlop={12}
+              >
                 <RadioGroup.Indicator />
-                <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>
-                  {option.label}
-                </Text>
               </RadioGroup.Item>
-            ))}
-          </View>
+              <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>
+                {option.label}
+              </Text>
+            </View>
+          ))}
         </RadioGroup.Root>
         {fieldErrors.chapter ? (
           <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
@@ -217,10 +235,17 @@ const styles = StyleSheet.create({
   chapterLabel: {
     fontSize: fontSizes.label,
   },
+  chapterOption: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
   chapters: {
+    // Overrides the Root's own column default — four short options read better
+    // across than stacked, and wrap when the column is narrow.
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   error: {
     fontSize: fontSizes.label,
