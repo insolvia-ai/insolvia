@@ -129,6 +129,7 @@ Milestone 0; the intake data model keeps a sync seam open (issue 8.1).
 | [`Product · Intake & AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.10 | Standalone intake behind auth; Claude extracting credit reports and pay stubs, human-confirmed before case entry. Includes the intake form widgets (risk 4) and the design-partner web-first test (risk 3). |
 | [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) | M3 / P2 | 9.1–9.8 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. Opens with the effective-date model the register demands from day one. |
 | [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register. |
+| [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
 
 **Worth flagging now:** `business/regulatory-source-register.html` describes a
 maintenance calendar (§522 dollar amounts every 3 years, Census median income
