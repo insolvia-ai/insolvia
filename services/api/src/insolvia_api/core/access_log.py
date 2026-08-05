@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 # What happened. Kept coarse — this records that an access occurred and by
 # whom, not a diff. Reconstructing what changed is the case record's job.
@@ -30,10 +30,18 @@ ACTIONS = ("case.create", "case.read", "case.update")
 # of the two: it is what someone probing for other people's cases looks like.
 OUTCOMES = ("allowed", "denied")
 
-# Kept in step with the table's TTL attribute. The number is a compliance
-# decision the regulatory register owns rather than an engineering one; this
-# constant is where to change it once that decision exists.
-RETENTION_DAYS = 2555
+# NOTHING EXPIRES. This module used to stamp an `expiresAt` on every row for a
+# TTL the table does not have and cannot be given — enabling TTL on a table
+# encrypted under the case key needs kms:Decrypt by the caller, which the
+# deploy role is explicitly denied (infra/modules/case_store/main.tf spells out
+# why that deny stays). Retention is a compliance decision the regulatory
+# register owns; until it is made, rows are kept.
+#
+# The stamp was inert regardless, and worth recording as the reason not to
+# reintroduce one speculatively: it was written as `expiresAt` while the table
+# was configured for `expires_at`, so even where TTL was enabled — a developer's
+# own dev env, applied by a principal the deny does not name — nothing was ever
+# going to expire. It read exactly like working retention.
 
 
 @dataclass(frozen=True)
@@ -62,17 +70,14 @@ def record_access(
     )
 
 
-def access_item(event: AccessEvent) -> dict[str, str | int]:
+def access_item(event: AccessEvent) -> dict[str, str]:
     """The stored item shape, shared by both AccessLog implementations.
 
-      PK  CASE#<case_id>                 keyed by case, because "who saw this
-      SK  <recordedAt>#<eventId>         file" is the question actually asked
+    PK  CASE#<case_id>                 keyed by case, because "who saw this
+    SK  <recordedAt>#<eventId>         file" is the question actually asked
 
-    `expiresAt` is the table's TTL attribute and must be an epoch-seconds
-    NUMBER — DynamoDB silently ignores a TTL attribute of any other type,
-    which would look exactly like retention working.
+    No expiry attribute — see the note above.
     """
-    expires_at = datetime.now(UTC) + timedelta(days=RETENTION_DAYS)
     return {
         "PK": f"CASE#{event.case_id}",
         "SK": f"{event.recorded_at}#{event.event_id}",
@@ -82,5 +87,4 @@ def access_item(event: AccessEvent) -> dict[str, str | int]:
         "action": event.action,
         "outcome": event.outcome,
         "recordedAt": event.recorded_at,
-        "expiresAt": int(expires_at.timestamp()),
     }

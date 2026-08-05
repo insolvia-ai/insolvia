@@ -264,6 +264,18 @@ where the API writes it down. **Reads are logged, not just writes**; the
 provenance fields on the case record already answer "who changed this", and
 who *saw* it is the question with no other source.
 
+**Nothing in it expires, and TTL cannot be turned on from the pipeline.**
+DynamoDB authorises `UpdateTimeToLive` against the caller, and on a
+CMK-encrypted table that needs `kms:Decrypt` on the key — which `ci-trust`
+explicitly denies the deploy role on `alias/insolvia-cases-*`. There is no
+condition key separating "enable TTL" from "read a row"; both are
+`kms:ViaService = dynamodb`. So the choice is retention or a deploy role that
+can read case data, and the deny wins. That also matches the posture
+`DenyAuditLogErasure` takes for the trail bucket: a retention rule the pipeline
+can set is a delete button the pipeline can press, and TTL deletes silently.
+Retention here is a compliance decision for the regulatory register and a human
+apply, not a Terraform default.
+
 The API's grant on it is **`PutItem` and nothing else** — no `GetItem`, no
 `Query`, no update, no delete. The audited service cannot read, amend or
 remove its own audit trail. The consequence is real and intended: no endpoint
