@@ -1,6 +1,6 @@
 {
   "name": "@insolvia-ai/design-system",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "description": "Insolvia's owned, platform-split design system: one props module per component, a React DOM + Tailwind web leaf, and a React Native leaf over @insolvia-ai/tokens.",
   "type": "module",
   "license": "UNLICENSED",
@@ -13,20 +13,20 @@
     "registry": "https://npm.pkg.github.com"
   },
   "//": [
-    "Each component is three files: <name>.props.ts (shared logic/variants —",
+    "Each component is three files: <name>.props.ts (shared logic/variants \u2014",
     "imports NOTHING from react-native/react-dom/base-ui, ESLint-enforced),",
     "<name>.web.tsx (React DOM + Tailwind) and <name>.native.tsx (React Native",
     "primitives over @insolvia-ai/tokens). The per-component index re-exports",
     "the extensionless './<name>' and the CONSUMER'S bundler picks the leaf:",
     "Vite resolves .web.tsx, Metro resolves .native.tsx (and react-native-web",
-    "renders the .native leaf on app-web — the app has no Tailwind, ADR 0004).",
+    "renders the .native leaf on app-web \u2014 the app has no Tailwind, ADR 0004).",
     "",
     "Litmus test for new components: pure data/styling maps may later collapse",
     "to a single shared file; anything with events, state, or a11y wiring is a",
-    "leaf pair from day one — the platforms' event and accessibility models do",
+    "leaf pair from day one \u2014 the platforms' event and accessibility models do",
     "not unify.",
     "",
-    "This package PUBLISHES SOURCE — `files: [\"src\"]`, exports point at .ts,",
+    "This package PUBLISHES SOURCE \u2014 `files: [\"src\"]`, exports point at .ts,",
     "and there is deliberately NO build step. Leaf resolution happens in the",
     "consumer's bundler, so the .web.tsx/.native.tsx pairs must survive into",
     "the published artifact verbatim; a package-side build (tsup, tsc --emit)",
@@ -44,8 +44,8 @@
     "peerDependenciesMeta from registry metadata (the tarball carries it; the",
     "registry document does not), so npm treats an 'optional' peer as required",
     "and a web consumer's install 404s on the unpublished tokens package. The",
-    "native leaves' imports resolve from the CONSUMER's own dependencies — the",
-    "app has react-native and tokens as workspace deps — so declaring them here",
+    "native leaves' imports resolve from the CONSUMER's own dependencies \u2014 the",
+    "app has react-native and tokens as workspace deps \u2014 so declaring them here",
     "bought documentation and broke installs. This comment is that",
     "documentation instead."
   ],
@@ -93,7 +93,7 @@
     "root workspace devDependencies, like insolvia_api_client.",
     "react-native-web is the native tests' renderer: the vitest `native`",
     "project aliases react-native to it, which is exactly the pair the app",
-    "ships on web — pinned to the version the app installs so the workspace",
+    "ships on web \u2014 pinned to the version the app installs so the workspace",
     "dedupes to one copy."
   ],
   "devDependencies": {

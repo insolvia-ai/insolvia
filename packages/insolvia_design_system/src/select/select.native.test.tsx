@@ -154,4 +154,41 @@ describe('Select (native leaf)', () => {
     render(<Select options={DISTRICTS} value="ny" aria-label="District" />);
     expect(rgb(screen.getByText('New York').style.color)).toEqual(rgb(colors.light.ink));
   });
+  describe('stacking', () => {
+    // Reported from a real browser, not found by this suite: the open list
+    // rendered BEHIND the description text, the file button and the submit
+    // button that followed the Select in the form. react-native-web gives every
+    // View `position: relative`, so a form is a run of positioned siblings
+    // painting in DOM order — and a z-index on the popup alone cannot lift it
+    // past a sibling that comes after the whole Select.
+    it('lifts the whole control above what follows it while open', async () => {
+      const user = userEvent.setup();
+      // `testID` rides the spread onto the root View, which is the element
+      // whose stacking matters — the popup's own z-index cannot help it.
+      render(<Select options={DISTRICTS} aria-label="District" testID="select-root" />);
+
+      // Asserted on the CLASS, not `style.zIndex`: react-native-web compiles a
+      // StyleSheet rule into an atomic class (`r-zIndex-…`) and sets no inline
+      // style, so reading `.style` here reports nothing whether or not the fix
+      // is present — which is exactly how a test can pass against the bug.
+      const root = screen.getByTestId('select-root');
+      expect(root.className).not.toMatch(/r-zIndex-/);
+
+      await user.click(screen.getByRole('combobox'));
+      expect(root.className).toMatch(/r-zIndex-/);
+    });
+
+    it('creates no stacking context once closed', async () => {
+      // A closed Select must not shadow anything of its own accord.
+      const user = userEvent.setup();
+      render(<Select options={DISTRICTS} aria-label="District" testID="select-root" />);
+      const root = screen.getByTestId('select-root');
+
+      await user.click(screen.getByRole('combobox'));
+      expect(root.className).toMatch(/r-zIndex-/);
+
+      await user.keyboard('{Escape}');
+      expect(root.className).not.toMatch(/r-zIndex-/);
+    });
+  });
 });

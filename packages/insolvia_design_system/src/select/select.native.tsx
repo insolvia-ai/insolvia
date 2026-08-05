@@ -118,7 +118,17 @@ export const Select = ({
   } as Partial<PressableProps>;
 
   return (
-    <View style={[styles.root, style]} {...props}>
+    // The ROOT carries the elevation, not just the popup, and that is the
+    // whole fix. react-native-web gives every View `position: relative`, so a
+    // form is a run of positioned siblings painting in DOM order — and a
+    // z-index on the popup alone cannot lift it past a sibling that comes
+    // AFTER this Select. The open list rendered behind the description text,
+    // the file button and the submit button below it: legible enough to look
+    // like a rendering glitch, and impossible to click through.
+    //
+    // Applied only while open, so a closed Select creates no stacking context
+    // and cannot shadow anything of its own accord.
+    <View style={[styles.root, open && styles.rootOpen, style]} {...props}>
       <Pressable
         nativeID={field?.controlId}
         role="combobox"
@@ -222,6 +232,10 @@ export const Select = ({
 
 const styles = StyleSheet.create({
   root: { position: 'relative' },
+  // Above the form controls that follow it. Not a large number on purpose —
+  // it has to beat sibling content, never a Dialog or an AlertDialog, which
+  // render through RN's Modal and sit above the whole tree regardless.
+  rootOpen: { zIndex: 30 },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
