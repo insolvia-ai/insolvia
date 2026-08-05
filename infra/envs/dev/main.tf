@@ -133,6 +133,15 @@ module "case_documents" {
   aws_region    = var.aws_region
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = null
+
+  # The origin module.auth below already registers for this machine, and the
+  # one the app is served from locally (`npx expo start --web --port 3000` —
+  # the port is pinned, see that module's note). Without it a local browser
+  # upload fails its preflight and the whole feature is untestable on a
+  # developer's machine, which is the failure mode this repo refuses to defer
+  # to staging.
+  cors_allowed_origins = ["http://localhost:3000"]
+
   # A developer's bucket must be destroyable without emptying it by hand.
   force_destroy = true
   tags          = local.common_tags

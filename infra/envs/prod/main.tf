@@ -303,6 +303,13 @@ module "case_documents" {
   aws_region    = var.aws_region
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = module.api_service.lambda_role_name
+
+  # The deployed app, and nothing else. No localhost — the same line prod's
+  # auth module takes, and for the same reason: nothing running on a laptop
+  # should be able to put bytes into the bucket holding real clients' tax
+  # returns.
+  cors_allowed_origins = ["https://${var.subdomain}"]
+
   # NOT destroyable while it holds objects. These are the source documents
   # behind signed petitions; a `terraform destroy` that silently emptied them
   # is the failure this flag exists to prevent.

@@ -336,6 +336,17 @@ module "case_documents" {
   aws_region    = var.aws_region
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = module.api_service.lambda_role_name
+
+  # Both origins staging already admits elsewhere: the deployed app, and the
+  # localhost dev server module.auth registers above and the API's own CORS
+  # allowlist permits outside production. A developer running the app against
+  # staging must be able to complete an upload, or "it works locally" and "it
+  # works on staging" stop being the same statement.
+  cors_allowed_origins = [
+    "https://${var.subdomain}",
+    "http://localhost:3000",
+  ]
+
   # Synthetic documents only, and a teardown must not need the bucket emptied
   # by hand first. Prod inverts this.
   force_destroy = true
