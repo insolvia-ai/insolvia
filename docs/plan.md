@@ -69,6 +69,7 @@ died in — this plan no longer carries their bodies.
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
 | D6 | Backend is **Python + Flask + Mangum on Lambda** | house pattern, shipped |
 | D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`email.md`](reference/email.md) |
+| D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
 
 (D8 — "desktop built but not promoted" — is gone with desktop itself; ADR 0004
@@ -161,7 +162,24 @@ In order of likely bite:
    the trade and its revisit trigger (component count).
 5. **SES production access left open-ended.** See the outstanding item above —
    the deferral was correct and its preconditions are now met.
-6. **Design-system leaf-pair cost.** Two renderings of one design still exist,
+6. **Nothing in the pipeline provisions a firm.** Self-signup is disabled on
+   the pool by design, so a firm and its first administrator are created by us
+   — and the only thing that exists today is a hand-run script. Onboarding a
+   design partner is therefore a manual step with no audit trail and no
+   second pair of eyes. The bounded version of the risk: a firm that loses its
+   last administrator cannot appoint one (the API refuses the edit that would
+   cause it, so the reachable path is us provisioning wrongly, not a user).
+   Relief is a small provisioning surface, and the trigger is the second firm.
+7. **The user pool is case-sensitive**, so `Alice@firm.com` and
+   `alice@firm.com` are two accounts and an attorney who types a capital on
+   the sign-in page is told they do not exist. Measured against the real pool,
+   not inferred. `username_configuration` is immutable, so fixing it REPLACES
+   the pool and deletes every account in it — cheap now, more expensive every
+   week. Mitigated one layer only: the API lower-cases every address before it
+   reaches the pool, which closes the duplicate-account path and not the
+   typed-with-a-capital one. [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)
+   and `infra/modules/auth` carry the detail.
+8. **Design-system leaf-pair cost.** Two renderings of one design still exist,
    but as `.web`/`.native` leaves of one component in one package — drift is a
    single-PR diff, not cross-package skew. What remains is the per-component
    authoring cost; [ADR 0006](adr/0006-owned-cross-platform-design-system.md)

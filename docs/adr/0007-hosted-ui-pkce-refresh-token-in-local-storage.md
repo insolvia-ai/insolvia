@@ -55,9 +55,25 @@ worth knowing before the first endpoint lands: because the pool uses
 `username_attributes = ["email"]`, the access token's `username` claim is a
 Cognito-generated UUID and carries no email at all. So **`GET /me` returns
 claims-derived identity only, and the app renders the user's email from the ID
-token it already holds.** Server-side authorization decisions read only
-verified access-token claims — ADR 0001's client stays dumb, and a client-sent
+token it already holds.** ADR 0001's client stays dumb, and a client-sent
 identity is an input, not a fact.
+
+> **Amended by [ADR 0009](0009-a-case-belongs-to-a-firm.md).** This paragraph
+> originally continued: *"Server-side authorization decisions read only
+> verified access-token claims."* That is no longer true, and the change is
+> deliberate rather than a drift. AUTHENTICATION still reads only verified
+> claims — nothing about token verification has changed. AUTHORIZATION now
+> reads a store: the token carries a Cognito `sub` and nothing else
+> authorization-bearing (this pool has no groups, no custom attributes and no
+> pre-token Lambda), so "which firm, and what may they do" has to be a lookup.
+>
+> The property the original sentence was protecting is intact and is worth
+> restating in the form that survives: **no authorization input comes from the
+> client.** The subject is verified from the signature; everything derived
+> from it is read server-side from a table the client cannot write. A
+> claims-based alternative would have put the firm and the permission set in a
+> token that outlives a revocation by up to an hour — which is the reason
+> membership was *not* pushed into claims. ADR 0009 has the full argument.
 
 **Sign-out does both legs, always.** Clear the in-memory tokens, remove the
 persisted refresh token, then redirect to the hosted UI's `/logout` endpoint.
