@@ -71,6 +71,29 @@ class DynamoDbDocumentStore:
             ConditionExpression="attribute_not_exists(SK)",
         )
 
+    def update(self, document: Document) -> Document | None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=_to_attributes(document_item(document)),
+                # The mirror of create's attribute_not_exists(SK). Without it a
+                # confirm racing a delete would PUT the row back — a `stored`
+                # document, pointing at an object the delete already marked,
+                # that the case lists and nobody can open. No owner check to
+                # pair with it, unlike the case store: this table's key is
+                # (case, document) and the route has already resolved the case
+                # through CaseStore, which is where ownership lives.
+                ConditionExpression="attribute_exists(SK)",
+            )
+        except ClientError as error:
+            if (
+                error.response.get("Error", {}).get("Code")
+                == "ConditionalCheckFailedException"
+            ):
+                return None
+            raise
+        return document
+
     def get(self, case_id: str, document_id: str) -> Document | None:
         response = self.client.get_item(
             TableName=self.table_name,

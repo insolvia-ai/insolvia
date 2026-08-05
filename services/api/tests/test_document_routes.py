@@ -17,6 +17,7 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 import time
+from urllib.parse import quote
 
 import jwt
 import pytest
@@ -36,7 +37,12 @@ from insolvia_api.api.routes.documents import (
     UPLOAD_URL_TTL_SECONDS,
 )
 from insolvia_api.core.config import load_config
-from insolvia_api.core.documents import MAX_BYTE_SIZE
+from insolvia_api.core.documents import (
+    MAX_BYTE_SIZE,
+    UPLOAD_TAG,
+    UPLOAD_TAG_KEY,
+    UPLOAD_TAG_VALUE,
+)
 from insolvia_api.core.firms import Firm, FirmUser, default_permissions
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
@@ -338,6 +344,58 @@ def test_the_upload_headers_are_the_ones_the_signature_demands(client):
     # Without this the bucket policy's DenyEncryptionDowngrade refuses the PUT
     # even with a valid signature.
     assert headers["x-amz-server-side-encryption"] == "aws:kms"
+    # And without this the object is written UNTAGGED, which is worse than a
+    # refusal: the PUT succeeds, the bucket's expire-unconfirmed-uploads rule
+    # has nothing to match, and an abandoned upload becomes bytes no lifecycle
+    # rule and no code path in this service can ever reach.
+    assert headers["x-amz-tagging"] == UPLOAD_TAG
+
+
+def test_the_advertised_headers_are_exactly_the_signed_ones_the_client_can_set(
+    client,
+):
+    """Every header here is one S3 checks, and a header the client does not
+    send is a SignatureDoesNotMatch it cannot interpret.
+
+    Content-Length is signed too and is deliberately NOT advertised: browsers
+    refuse to let JavaScript set it and every HTTP client sets it anyway.
+    Pinning the whole set is what makes that omission a decision rather than
+    something that quietly drifted."""
+    case_id = open_case(client)
+    headers = upload(client, case_id).get_json()["upload"]["headers"]
+    assert set(headers) == {
+        "Content-Type",
+        "x-amz-server-side-encryption",
+        "x-amz-tagging",
+    }
+
+
+def test_the_upload_is_tagged_unconfirmed_so_abandoned_bytes_are_reapable(
+    client, blobs
+):
+    """The capability outlives the row that authorised it.
+
+    POST, delete the document, then PUT through the still-valid URL and the
+    object lands under a key no row names — `list_for_case` reads the case
+    store, a second DELETE has nothing to delete, and the API holds no
+    s3:ListBucket. The tag bound into the signature is the only handle
+    anything has on those bytes, and the bucket's expire-unconfirmed-uploads
+    lifecycle rule is what uses it.
+    """
+    case_id = open_case(client)
+    upload(client, case_id)
+    assert blobs.minted[-1].tag == UPLOAD_TAG
+
+
+def test_the_tag_is_a_wire_safe_key_value_pair(client):
+    """`x-amz-tagging` is a URL-encoded query string, and the value below is
+    also written into a Terraform lifecycle filter by hand
+    (infra/modules/case_documents/main.tf). A character needing escaping in
+    either place would make the header and the filter disagree silently — the
+    upload would succeed and never be reaped."""
+    key, _, value = UPLOAD_TAG.partition("=")
+    assert (key, value) == (UPLOAD_TAG_KEY, UPLOAD_TAG_VALUE)
+    assert quote(key, safe="") + "=" + quote(value, safe="") == UPLOAD_TAG
 
 
 def test_the_capability_is_bound_to_the_validated_size_and_type(client, blobs):
@@ -383,6 +441,131 @@ def test_a_capability_lives_for_minutes_not_hours(ttl):
     assert 0 < ttl <= 15 * 60
 
 
+# ── Completing an upload ────────────────────────────────────────
+# The half of the mechanism that makes the bucket's expire-unconfirmed-uploads
+# rule safe. Every test here is guarding that invariant from one side or
+# another: an object nobody completed keeps its tag and gets reaped, and an
+# object somebody completed does not.
+
+
+def complete(client, case_id, document_id, subject=ALICE):
+    return client.post(
+        f"/v1/cases/{case_id}/documents/{document_id}/complete", headers=auth(subject)
+    )
+
+
+def uploaded(client, blobs, case_id, *, byte_size=2048, etag="abc123", **overrides):
+    """Create a document and have the "client" actually PUT its bytes."""
+    document = added(client, case_id, **overrides)
+    blobs.accept_upload(
+        f"cases/{case_id}/{document['id']}", byte_size=byte_size, etag=etag
+    )
+    return document
+
+
+def test_completing_an_upload_that_never_landed_is_refused(client, blobs, documents):
+    """THE CASE THE ENDPOINT EXISTS FOR.
+
+    Nothing PUT anything, so the client is claiming an upload that did not
+    happen. Confirming it would clear the tag on an object that is not there
+    and mark the row `stored`, which is the one lie this design must not be
+    able to tell — the case would present a document as filed with no bytes
+    behind it and no reaper coming for the mistake.
+    """
+    case_id = open_case(client)
+    document = added(client, case_id)
+
+    response = complete(client, case_id, document["id"])
+
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "ConflictError"
+    # Nothing moved: not the tag, not the row.
+    assert blobs.cleared == []
+    assert documents.documents[(case_id, document["id"])].status == "pending"
+
+
+def test_completing_clears_the_tag_that_would_have_reaped_the_object(client, blobs):
+    """The whole point. While the object carries `upload=unconfirmed` the
+    bucket's lifecycle rule deletes it after a day; this call is the only
+    thing in the system that takes it out of that filter."""
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id)
+    storage_ref = f"cases/{case_id}/{document['id']}"
+    # Precondition, asserted rather than assumed: the PUT tagged it.
+    assert storage_ref in blobs.tagged
+
+    assert complete(client, case_id, document["id"]).status_code == 200
+
+    assert blobs.cleared == [storage_ref]
+    assert storage_ref not in blobs.tagged
+
+
+def test_a_completed_document_reports_the_size_s3_gave_not_the_one_asked_for(
+    client, blobs
+):
+    """The declared size is an input to minting a capability; this is the fact.
+
+    They agree in practice because content-length is bound into the signature,
+    so S3 refuses a body of any other length — this is defence in depth. What
+    it rules out is a record that goes on asserting a number nothing ever
+    checked.
+    """
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id, byteSize=2048, byte_size=1999)
+    assert document["byteSize"] == 2048
+
+    body = complete(client, case_id, document["id"]).get_json()["document"]
+
+    assert body["byteSize"] == 1999
+    assert body["status"] == "stored"
+
+
+def test_another_firms_case_cannot_be_completed(client, blobs):
+    """Through _owned_case_or_404 like every other document route. Without it
+    this would be a write endpoint with no authorisation on it at all."""
+    case_id = open_case(client, ALICE)
+    document = uploaded(client, blobs, case_id)
+
+    response = complete(client, case_id, document["id"], subject=BOB)
+
+    assert response.status_code == 404
+    # And Bob's failed attempt changed nothing about Alice's object.
+    assert blobs.cleared == []
+    assert f"cases/{case_id}/{document['id']}" in blobs.tagged
+
+
+def test_completing_is_idempotent(client, blobs):
+    """A client that lost the response retries. It must not be punished with a
+    409 for an upload that plainly did land."""
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id)
+
+    first = complete(client, case_id, document["id"])
+    second = complete(client, case_id, document["id"])
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert first.get_json()["document"] == second.get_json()["document"]
+
+
+def test_completing_a_deleted_document_is_404_and_resurrects_nothing(
+    client, blobs, documents
+):
+    """A row that is gone must not come back as a `stored` document.
+
+    The route refuses at the document lookup here; the store's conditional
+    update is what closes the narrower window between that lookup and the
+    write, and it is tested where it lives (tests/test_document_store.py).
+    """
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id)
+    client.delete(
+        f"/v1/cases/{case_id}/documents/{document['id']}", headers=auth(ALICE)
+    )
+
+    assert complete(client, case_id, document["id"]).status_code == 404
+    assert documents.documents == {}
+
+
 # ── Listing ─────────────────────────────────────────────────────
 
 
@@ -404,6 +587,37 @@ def test_listing_shows_only_this_cases_documents(client):
         f"/v1/cases/{second}/documents", headers=auth(ALICE)
     ).get_json()["documents"]
     assert listed == []
+
+
+def test_listing_shows_which_uploads_finished_and_which_did_not(client, blobs):
+    """Both are listed, and they are TELLABLE APART.
+
+    A pending row is not noise to filter out: it is the case's own record of a
+    file the user tried to add, and the bucket will reap its half-uploaded
+    object within a day. Hiding it would leave the user with a document they
+    cannot see, cannot open and cannot retry — so the listing carries both and
+    `status` is what the UI branches on.
+    """
+    case_id = open_case(client)
+    finished = uploaded(client, blobs, case_id, fileName="arrived.pdf")
+    abandoned = added(client, case_id, fileName="never-finished.pdf")
+    complete(client, case_id, finished["id"])
+
+    listed = client.get(
+        f"/v1/cases/{case_id}/documents", headers=auth(ALICE)
+    ).get_json()["documents"]
+
+    assert {d["id"]: d["status"] for d in listed} == {
+        finished["id"]: "stored",
+        abandoned["id"]: "pending",
+    }
+
+
+def test_a_new_document_is_pending_until_it_is_completed(client):
+    """The create response says so too, so a client never has to infer the
+    state of a row it just made."""
+    case_id = open_case(client)
+    assert added(client, case_id)["status"] == "pending"
 
 
 def test_listing_mints_nothing(client, blobs):

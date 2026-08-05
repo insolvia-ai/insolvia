@@ -40,17 +40,30 @@ signature, so a client cannot upload something larger or of a different
 declared type — but a PDF that is really a photograph of a cat is a PDF, and
 finding that out belongs to extraction (8.7/8.8), which reads the bytes anyway.
 
-ONE MORE GAP, NAMED BECAUSE IT IS THE OBVIOUS FOLLOW-UP. There is no upload
-completion callback in this issue, so the record is written when the upload is
-AUTHORISED and nothing here ever learns whether the bytes landed. A document
-row therefore means "somebody was told to upload this", not "this exists". The
-bucket takes the same position from the other side — no ListBucket for this
-service, because the case store is the record of what SHOULD be there — and
-the failure mode is a row whose download URL 404s, which is visible and
-harmless. The alternatives were worse: a `pending` status nothing ever clears
-would be a lie in the schema, and a completion endpoint the client may simply
-not call is the same gap with more code. Extraction needs to know the bytes
-arrived and will have to ask S3; that is where the answer belongs.
+THE UPLOAD IS A TWO-STEP TRANSACTION, AND THE SECOND STEP IS NOT OPTIONAL.
+POST creates the row and mints the capability; POST .../complete is where this
+server finds out whether the bytes actually landed. Between the two, a
+document row means "somebody was told to upload this" and says so —
+`status: pending`, with a `byteSize` that is still the client's own claim.
+
+This is not bookkeeping. Every presigned PUT is signed with an
+`upload=unconfirmed` tag, and the bucket expires objects still carrying that
+tag after a day, which is the only mechanism that can reach the two states
+this design otherwise leaves stranded: an object written through a capability
+that outlived its row, and the extra versions a replayed PUT parks. That rule
+is safe precisely because completion clears the tag — so an object it deletes
+is one that never completed. The two halves are one mechanism, and neither is
+correct alone.
+
+A client that never calls complete leaves a pending row and an object that is
+reaped the next day, which is the truthful outcome: the upload did not finish,
+the case says so, and the user can retry. The state that is NOT reachable is
+the dangerous one — a document the case presents as filed whose bytes quietly
+disappeared.
+
+Pending rows are listed, not hidden. A document whose upload failed is a real
+thing the user needs to see and retry, and filtering it out of the listing
+would leave them with a file that is neither there nor recoverable.
 """
 
 from __future__ import annotations
@@ -65,13 +78,15 @@ from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import record_access
 from insolvia_api.core.documents import (
+    UPLOAD_TAG,
     Document,
+    confirm_document,
     create_document,
     document_json,
     expiry_timestamp,
     parse_document_upload,
 )
-from insolvia_api.core.errors import NotFoundError, ValidationError
+from insolvia_api.core.errors import ConflictError, NotFoundError, ValidationError
 from insolvia_api.core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
 from insolvia_api.core.ports import (
     AccessLog,
@@ -112,12 +127,26 @@ DOWNLOAD_URL_TTL_SECONDS = 5 * 60
 # DenyEncryptionDowngrade statement is written against, so a PUT without it is
 # refused by the bucket even with a valid signature.
 #
+# `x-amz-tagging` is signed for a different reason: it is what makes the bytes
+# reapable. The capability outlives the record that authorised it, so an object
+# can land under a key no row names, and the bucket's
+# `expire-unconfirmed-uploads` lifecycle rule finds it by this tag. The VALUE
+# comes from core/documents.py rather than being spelled again here — the
+# adapter signs that same constant, and a client told to send anything else
+# gets a SignatureDoesNotMatch it cannot interpret.
+#
 # Content-Length is signed too and is deliberately absent from what we send
 # back: every HTTP client sets it from the body it is about to send, and
 # browsers refuse to let JavaScript set it at all. It is listed here in words
 # so nobody adds it in code.
+#
+# All three are in the bucket's CORS allowed-headers list. That is not a
+# formality: `x-amz-*` headers are not CORS-safelisted, so a browser preflights
+# this PUT, and an allowed-header list missing one of them fails the request
+# before the signature is ever checked.
 SSE_HEADER = "x-amz-server-side-encryption"
 SSE_VALUE = "aws:kms"
+TAGGING_HEADER = "x-amz-tagging"
 
 
 def _stores() -> tuple[CaseStore, DocumentStore, DocumentBlobStore, AccessLog]:
@@ -216,8 +245,11 @@ def _document_or_404(case_id: str, document_id: str) -> Document:
 def create_document_route(case_id: str) -> ResponseReturnValue:
     """Record a document and hand back a capability to upload its bytes.
 
-    Returns the record and an `upload` block: the URL, the verb, the headers
-    the signature demands, and when it stops working.
+    Returns the record — `status: pending`, because nothing has landed yet —
+    and an `upload` block: the URL, the verb, the headers the signature
+    demands, and when it stops working. The client PUTs, then calls
+    POST .../complete, which is what turns the row `stored` and stops the
+    bucket reaping the object a day later.
     """
     _, document_store, blobs, _ = _stores()
     accessor = current_accessor()
@@ -265,6 +297,7 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
                     "headers": {
                         "Content-Type": document.content_type,
                         SSE_HEADER: SSE_VALUE,
+                        TAGGING_HEADER: UPLOAD_TAG,
                     },
                     "expiresAt": expiry_timestamp(UPLOAD_URL_TTL_SECONDS),
                 },
@@ -272,6 +305,81 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
         ),
         201,
     )
+
+
+@blueprint.post("/v1/cases/<case_id>/documents/<document_id>/complete")
+@require_auth
+@requires(DOCUMENTS, ADD_EDIT)
+def complete_document_route(case_id: str, document_id: str) -> ResponseReturnValue:
+    """The client says the PUT finished; the server checks and records it.
+
+    THIS IS WHAT MAKES THE BUCKET'S REAPER SAFE, and it is worth being blunt
+    about the coupling. Every presigned PUT is signed with
+    `upload=unconfirmed`, and the bucket expires objects still carrying that
+    tag after a day. That rule is correct only because the sole way to leave
+    the tag in place is an upload that never reached here — so an object it
+    deletes genuinely is an orphan. Delete this route and the rule starts
+    deleting real documents twenty-four hours after they arrive.
+
+    Three things happen, in an order chosen so no failure leaves a lie:
+
+      1. HeadObject. If the object is not there the client is claiming an
+         upload that did not land, and nothing else happens.
+      2. Clear the tag. The object leaves the reaper's filter.
+      3. Write the row back as `stored`, with the size and etag S3 reported.
+
+    Tag before row, for the same reason the create path writes the row before
+    minting the capability: whichever half fails, the survivable state is the
+    one that is visible. A cleared tag with a pending row is a document the
+    user can see, still marked unfinished, that a retry fixes — and the object
+    simply outlives the day it would otherwise have been reaped. The reverse —
+    a `stored` row over an object still counting down to deletion — would look
+    finished, right up until the bytes vanished.
+
+    Idempotent throughout. A client that retries because it lost the response
+    re-reads the same object, clears tags that are already clear, and writes
+    the same row.
+    """
+    _, document_store, blobs, _ = _stores()
+    accessor = current_accessor()
+
+    # `document.create` rather than a fifth verb, and the access log's own
+    # coarseness note is the argument: this is the second half of one
+    # authorised transfer, not a separate disclosure. A `document.complete`
+    # row would make every upload appear twice in the table whose value is
+    # that one row means one thing happened.
+    _reachable_case_or_404(accessor, case_id, "document.create")
+    document = _document_or_404(case_id, document_id)
+
+    stored = blobs.stat(document.storage_ref)
+    if stored is None:
+        # 409 AND NOT 404. By this line the caller owns the case and the row
+        # resolved, so there is no id to hide and nothing left for a 404 to
+        # protect — see core/errors.py, where 404 is specifically the
+        # anti-oracle answer. What failed is a precondition on the record's
+        # state, and the honest client's next move is to upload again, not to
+        # forget a document its own listing still shows.
+        raise ConflictError(
+            "the object for this document is not in the bucket; "
+            "the upload did not complete"
+        )
+
+    blobs.clear_upload_tag(document.storage_ref)
+    confirmed = confirm_document(document, stored)
+    if document_store.update(confirmed) is None:
+        # Deleted while this request was in flight. The same 404 a foreign
+        # document id gets, rather than resurrecting the row.
+        raise NotFoundError("document not found")
+
+    logger.info(
+        "document completed",
+        extra={
+            "case_id": case_id,
+            "document_id": document_id,
+            "byte_size": confirmed.byte_size,
+        },
+    )
+    return jsonify({"document": document_json(confirmed)}), 200
 
 
 @blueprint.get("/v1/cases/<case_id>/documents")
@@ -283,6 +391,13 @@ def list_documents_route(case_id: str) -> ResponseReturnValue:
     Not paginated, unlike GET /v1/cases: the answer is bounded by one case's
     paperwork rather than by an account's whole history, and the store promises
     all of them.
+
+    ALL OF THEM INCLUDES PENDING ONES. A row whose upload never completed is
+    not noise to be filtered out here — it is the case's own record of a file
+    the user tried to add, and `status` is what lets the UI show it as "upload
+    didn't finish" with a retry rather than silently losing it. Hiding it would
+    leave the user with a document they cannot see, cannot open and cannot
+    delete.
     """
     _, document_store, _, _ = _stores()
     accessor = current_accessor()
@@ -328,7 +443,23 @@ def document_url_route(case_id: str, document_id: str) -> ResponseReturnValue:
 @require_auth
 @requires(DOCUMENTS, ADD_EDIT)
 def delete_document_route(case_id: str, document_id: str) -> ResponseReturnValue:
-    """Remove a document from a case, and its bytes from the bucket."""
+    """Remove a document from a case, and make its bytes unreachable.
+
+    NOT "delete the bytes", which is what this said and is not what happens.
+    The bucket is versioned, so the object delete writes a DELETE MARKER: the
+    document stops resolving — every path into it goes through the row that is
+    now gone, and a presigned GET for the key returns 404 — while the bytes
+    remain as a noncurrent version. adapters/aws/document_blobs.py says the
+    same thing from the other side, and it is deliberate: versioning is the
+    bucket's answer to a delete that should not have happened, which is why
+    this service needs no soft-delete of its own.
+
+    The bytes do go, 30 days later, when the bucket's
+    `expire-noncurrent-versions` lifecycle rule reaps the version. That is the
+    honest answer to "is it deleted", and it is the one a client asking under a
+    retention or erasure obligation needs — an endpoint that claimed immediate
+    destruction would be the wrong answer to that question by a month.
+    """
     _, document_store, blobs, _ = _stores()
     accessor = current_accessor()
 

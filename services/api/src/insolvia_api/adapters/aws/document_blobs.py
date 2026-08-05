@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
+
+from insolvia_api.core.documents import UPLOAD_TAG, StoredBlob
+
+logger = logging.getLogger(__name__)
 
 # SIGNATURE VERSION 4, EXPLICITLY, AND THIS LINE IS LOAD-BEARING.
 #
@@ -62,7 +69,23 @@ class S3DocumentBlobStore:
           DenyEncryptionDowngrade statement is written against. The KEY is not
           named: S3 resolves the customer-managed key from the bucket's default
           encryption, so this service never holds a key id and its KMS grant
-          stays fenced to `kms:ViaService = s3`.
+          stays fenced to `kms:ViaService = s3`. Naming a key would also have
+          to satisfy the bucket's DenyForeignEncryptionKey statement, which
+          exists precisely because a key id is a thing a policy has to fence.
+        - `Tagging` marks the object `upload=unconfirmed`, which is what makes
+          the bytes REAPABLE. This capability outlives the record that
+          authorised it and its payload is not signed, so it can be replayed
+          and it still works after the document is deleted — and the API holds
+          no s3:ListBucket, so an object under a key no row names is one
+          nothing in this system can ever find. The tag is the handle the
+          bucket's `expire-unconfirmed-uploads` lifecycle rule reaps by. See
+          core/documents.py: UPLOAD_TAG, which both this and the route read so
+          the signature and the header the client is told to send cannot drift.
+
+        The tag is why the API role carries s3:PutObjectTagging: S3 evaluates a
+        presigned request against the SIGNER's permissions, and a PutObject
+        bearing `x-amz-tagging` needs that action as well as s3:PutObject.
+        Without it the URL is valid and every upload is a 403.
 
         Note what is NOT a parameter: the bucket and the key. Both come from
         this instance and from the record, never from a caller.
@@ -76,6 +99,7 @@ class S3DocumentBlobStore:
                     "ContentType": content_type,
                     "ContentLength": byte_size,
                     "ServerSideEncryption": "aws:kms",
+                    "Tagging": UPLOAD_TAG,
                 },
                 ExpiresIn=expires_in,
             )
@@ -100,6 +124,73 @@ class S3DocumentBlobStore:
                 Params={"Bucket": self.bucket_name, "Key": storage_ref},
                 ExpiresIn=expires_in,
             )
+        )
+
+    def stat(self, storage_ref: str) -> StoredBlob | None:
+        """HeadObject, mapped to "here are the facts" or "it is not there".
+
+        A MISSING OBJECT IN THIS BUCKET ANSWERS 403, NOT 404, and treating that
+        as an error would make the confirm route fail closed on the ordinary
+        case it exists to detect. S3's rule: HeadObject on a key that does not
+        exist returns 404 if the caller holds s3:ListBucket on the bucket and
+        403 if it does not. This service deliberately holds no ListBucket — the
+        case store is the record of what should be there, and listing would
+        make an orphaned object look like a document — so the 403 branch is the
+        NORMAL answer for "the client never uploaded", not an anomaly.
+
+        What that costs, said plainly rather than discovered later: a genuine
+        permission failure — a broken IAM grant, a KMS deny — is
+        indistinguishable here from an absent object, and would present to the
+        user as "your upload did not finish". Granting ListBucket would
+        separate them and would cost the property above, which is worse. So the
+        403 branch logs at warning instead: a burst of them is the signature of
+        a misconfiguration, and a steady trickle is users abandoning uploads.
+
+        NOT VERIFIED AGAINST A REAL BUCKET. Every other claim in this module
+        was probed against the dev bucket; this one could not be, and the
+        403-vs-404 split is exactly the kind of behaviour that only appears
+        with real IAM. It is the documented behaviour and the branch handles
+        both codes, but the first dev-environment run of the confirm route is
+        what actually confirms it.
+        """
+        try:
+            response = self.client.head_object(Bucket=self.bucket_name, Key=storage_ref)
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code == "403":
+                logger.warning(
+                    "head_object was denied; treating the object as absent",
+                    extra={"bucket": self.bucket_name},
+                )
+            if code in ("403", "404", "NoSuchKey"):
+                return None
+            raise
+        return StoredBlob(
+            byte_size=int(response["ContentLength"]),
+            # S3 quotes the etag in the header. Stripped here so the stored
+            # value is the digest itself rather than a quoted string that every
+            # later comparison would have to remember to unwrap.
+            etag=str(response["ETag"]).strip('"'),
+        )
+
+    def clear_upload_tag(self, storage_ref: str) -> None:
+        """Replace the tag set with an empty one.
+
+        PutObjectTagging WITH AN EMPTY SET RATHER THAN DeleteObjectTagging, and
+        the reason is the IAM grant rather than the API. Both do the same thing
+        to the object. DeleteObjectTagging needs `s3:DeleteObjectTagging`,
+        which would be a SECOND tagging action on this role; this needs
+        `s3:PutObjectTagging`, which the role must already hold, because a
+        presigned PUT carrying `x-amz-tagging` is evaluated against the
+        signer's permissions and is refused without it. So the narrower grant
+        is the one that adds nothing: the role can already write this object's
+        tags, and clearing them is strictly less than it can already do.
+
+        This is what takes the object out of the bucket's
+        expire-unconfirmed-uploads filter, and it is the only thing that does.
+        """
+        self.client.put_object_tagging(
+            Bucket=self.bucket_name, Key=storage_ref, Tagging={"TagSet": []}
         )
 
     def delete(self, storage_ref: str) -> None:

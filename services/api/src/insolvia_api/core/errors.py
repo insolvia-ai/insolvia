@@ -26,9 +26,11 @@ class ConflictError(ApiError):
     NotFoundError draws below. 404 is this codebase's anti-oracle answer: it
     hides whether a resource exists from a caller who has not proven they may
     know. By the time this is raised the caller has already proven it — they
-    are an administrator of the firm they are acting on — so there is nothing
-    left to hide, and answering 404 would tell an honest client that a record
-    it can see in its own listing is gone.
+    are an administrator of the firm they are acting on, or they own the case
+    and the row resolved — so there is nothing left to hide, and answering 404
+    would tell an honest client that a record it can see in its own listing is
+    gone. It would then drop the record instead of retrying the step that
+    failed.
     """
 
 

@@ -16,7 +16,11 @@ from insolvia_api.core.documents import (
     KINDS,
     MAX_BYTE_SIZE,
     MAX_FILE_NAME,
+    STATUS_PENDING,
+    STATUS_STORED,
     Document,
+    StoredBlob,
+    confirm_document,
     create_document,
     document_from_item,
     document_item,
@@ -61,6 +65,38 @@ def payload(**overrides: object) -> dict[str, object]:
         ({"fileName": "../../etc/passwd"}, "fileName"),
         ({"fileName": "sub\\dir.pdf"}, "fileName"),
         ({"fileName": "line\nbreak.pdf"}, "fileName"),
+        # ── Names that lie about themselves ─────────────────────
+        # A control-character class does not see any of these. Each is
+        # accepted by every parser and misread by every human. Written as
+        # escapes rather than as the characters themselves for exactly the
+        # reason they are refused: pasted literally they are invisible, and a
+        # test nobody can read is a test nobody can check.
+        #
+        # U+202E, the right-to-left override. This is `invoice<RLO>fdp.exe`,
+        # and it RENDERS as `invoiceexe.pdf` — in the document list, and as
+        # the name a browser saves it under. The bytes say .exe and the screen
+        # says .pdf.
+        ({"fileName": "invoice\u202efdp.exe"}, "fileName"),
+        ({"fileName": "report\u202dsomething.pdf"}, "fileName"),
+        # The bidi ISOLATES are a separate block doing the same job, so a
+        # check that stopped at U+202E would miss them.
+        ({"fileName": "invoice\u2067fdp.exe"}, "fileName"),
+        # Zero-width characters: invisible, so two names can look identical
+        # and differ, and a name can carry padding nobody can select.
+        ({"fileName": "state\u200bment.pdf"}, "fileName"),
+        ({"fileName": "state\u200dment.pdf"}, "fileName"),
+        ({"fileName": "\ufeffstatement.pdf"}, "fileName"),
+        ({"fileName": "soft\u00adhyphen.pdf"}, "fileName"),
+        # Not characters, so no character class can catch them, and they are
+        # the two names a path-shaped check is actually for: a browser
+        # resolves either against the download directory rather than saving a
+        # file. `..` survived the separator check because it contains no
+        # separator.
+        ({"fileName": "."}, "fileName"),
+        ({"fileName": ".."}, "fileName"),
+        # Whitespace is stripped before the check, so a padded one must fail
+        # for the same reason rather than sneaking through.
+        ({"fileName": "  ..  "}, "fileName"),
         ({"contentType": None}, "contentType"),
         ({"contentType": "application/zip"}, "contentType"),
         # An SVG is script-bearing markup wearing an image's content type.
@@ -138,11 +174,41 @@ def test_no_file_name_can_reach_the_object_key():
 
 @pytest.mark.parametrize(
     "case_id",
-    ["../other-case", "smith-jane.pdf", "", "CASE#" + CASE_ID, CASE_ID + "/x"],
+    [
+        "../other-case",
+        "smith-jane.pdf",
+        "",
+        "CASE#" + CASE_ID,
+        CASE_ID + "/x",
+        # A TRAILING NEWLINE, which the `$`-anchored pattern accepted.
+        #
+        # In Python `$` matches at the end of the string OR immediately before
+        # a final newline, so `"<uuid>\n"` passed a check whose entire purpose
+        # is that a key contains nothing but two server-minted uuids — and
+        # object_key would have returned `cases/<uuid>\n/<uuid>`. `\Z` is the
+        # anchor that means what this pattern meant all along.
+        CASE_ID + "\n",
+        CASE_ID + "\r\n",
+    ],
 )
 def test_a_key_is_refused_for_anything_that_is_not_a_uuid(case_id):
     with pytest.raises(ValidationError):
         object_key(case_id, DOCUMENT_ID)
+
+
+@pytest.mark.parametrize("suffix", ["\n", "\r\n", "\n\n"])
+def test_neither_half_of_a_key_may_end_in_a_newline(suffix):
+    """Both halves, because the anchor bug was in one pattern used twice and a
+    test covering only the case id would have left the document id open."""
+    with pytest.raises(ValidationError):
+        object_key(CASE_ID, DOCUMENT_ID + suffix)
+
+
+def test_no_accepted_key_can_contain_a_newline():
+    """The property the docstring claims, asserted rather than inferred from
+    the pattern — a key with a newline in it breaks every log line, inventory
+    row and CloudTrail event that key ever appears in."""
+    assert "\n" not in object_key(CASE_ID, DOCUMENT_ID)
 
 
 # ── Identity and the stored shape ───────────────────────────────
@@ -183,6 +249,98 @@ def test_item_lands_in_the_cases_partition():
     assert item["SK"] == f"DOCUMENT#{document.id}"
     # No new table and no index keys: documents are reached through their case.
     assert "GSI1PK" not in item
+
+
+# ── Pending and stored ──────────────────────────────────────────
+
+
+def test_a_new_record_is_pending_and_has_no_etag():
+    """Because nothing has looked at the object. The row records that an
+    upload was AUTHORISED, and until confirmation that is all it records."""
+    document = create_document(
+        parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+    )
+    assert document.status == STATUS_PENDING
+    assert document.etag is None
+
+
+def test_confirming_replaces_the_claimed_size_with_the_real_one():
+    """The declared size is what the client asked to be allowed to send; this
+    is what arrived. Keeping the claim would leave the record asserting a
+    number nothing ever checked."""
+    document = create_document(
+        parse_document_upload(payload(byteSize=2048)),
+        case_id=CASE_ID,
+        uploaded_by=ALICE,
+    )
+    confirmed = confirm_document(document, StoredBlob(byte_size=1999, etag="abc"))
+    assert (confirmed.status, confirmed.byte_size, confirmed.etag) == (
+        STATUS_STORED,
+        1999,
+        "abc",
+    )
+    # Everything the server stamped at create time is untouched.
+    assert confirmed.id == document.id
+    assert confirmed.storage_ref == document.storage_ref
+    assert confirmed.uploaded_at == document.uploaded_at
+
+
+def test_confirming_twice_produces_the_same_record():
+    """The route is idempotent for a client that retries a lost response, and
+    it can only be if this is."""
+    document = create_document(
+        parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+    )
+    blob = StoredBlob(byte_size=1999, etag="abc")
+    assert confirm_document(confirm_document(document, blob), blob) == confirm_document(
+        document, blob
+    )
+
+
+def test_a_pending_item_carries_no_etag_attribute():
+    """Absent rather than empty — "nothing has looked at this object" is what
+    a missing attribute already means."""
+    document = create_document(
+        parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+    )
+    assert "etag" not in document_item(document)
+    assert document_item(document)["status"] == STATUS_PENDING
+
+
+def test_a_confirmed_item_round_trips():
+    document = confirm_document(
+        create_document(
+            parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+        ),
+        StoredBlob(byte_size=7, etag="cafe"),
+    )
+    assert document_from_item(document_item(document)) == document
+
+
+def test_a_row_written_before_confirmation_existed_reads_as_pending():
+    """A dev table has rows from the version of this service that could not
+    confirm anything. `pending` is not a fallback for them, it is the true
+    reading: nothing ever checked that their bytes arrived."""
+    document = create_document(
+        parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+    )
+    older = {k: v for k, v in document_item(document).items() if k != "status"}
+    assert document_from_item(older).status == STATUS_PENDING
+
+
+def test_json_exposes_the_status_and_not_the_etag():
+    """`status` is the one field a client must branch on — it is the
+    difference between a file it can open and a file that is not there.
+    `etag` joins storageRef as the storage layer's business."""
+    document = confirm_document(
+        create_document(
+            parse_document_upload(payload()), case_id=CASE_ID, uploaded_by=ALICE
+        ),
+        StoredBlob(byte_size=7, etag="cafe"),
+    )
+    body = document_json(document)
+    assert body["status"] == STATUS_STORED
+    assert "etag" not in body
 
 
 def test_from_item_rejects_a_malformed_row():

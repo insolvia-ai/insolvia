@@ -370,8 +370,10 @@ throws that away.
 ## Documents and locators
 
 ```
-document { id, case_id, kind, content_type, byte_size, page_count,
-           uploaded_by, uploaded_at, storage_ref, sha256 }
+document { id, case_id, kind, file_name, content_type, byte_size, page_count,
+           uploaded_by, uploaded_at, storage_ref, sha256,
+           status,                               // pending | stored
+           etag }                                // set once the bytes are seen
 
 locator  { document_id, page,                    // 1-based
            region: { x, y, width, height } }     // fractions of the page box,
@@ -393,7 +395,23 @@ The identifier rule above applies to that key without exception: **the
 uploader's file name is metadata on the record and never appears in the key**,
 because a key is visible in bucket inventories, S3 access logs, CloudTrail data
 events and every presigned URL, none of which are access-controlled the way the
-record is.
+record is. That is what `file_name` is for, and it is one of only two fields
+here the caller supplies — `kind` is the other. Both are the uploader's own
+claim about a file they are handing us, which is why a document record carries
+no provenance map: `uploaded_by` already attributes them, and a document is
+provenance's object rather than its subject.
+
+**A document row is created before its bytes exist, and `status` is what says
+so.** An upload is two steps — the API records the document and mints a
+presigned PUT, the client uploads, and a second call confirms it — so a row is
+`pending` until this server has done a HeadObject and seen the object, then
+`stored`. The distinction is load-bearing in three places: `byte_size` is the
+client's *declared* size while pending and the size S3 counted once stored;
+`etag` exists only in the second state; and the bucket expires objects still
+carrying an `upload=unconfirmed` tag after a day, which is safe only because
+confirmation is the one thing that clears it. Pending rows are returned by the
+listing like any other — a document whose upload failed is something the user
+needs to see and retry, not something to hide.
 
 ## Storage validation is not filing completeness
 

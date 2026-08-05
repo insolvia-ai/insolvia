@@ -5,7 +5,7 @@ from typing import Any, Protocol
 from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import AccessEvent
 from insolvia_api.core.cases import Case, CaseAssignment, CasePage
-from insolvia_api.core.documents import Document
+from insolvia_api.core.documents import Document, StoredBlob
 from insolvia_api.core.firms import Firm, FirmUser
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
@@ -276,6 +276,21 @@ class DocumentStore(Protocol):
 
     def get(self, case_id: str, document_id: str) -> Document | None: ...
 
+    def update(self, document: Document) -> Document | None:
+        """Write `document` back, but only over a row that still exists.
+
+        Returns None if it does not — the confirm route turns that into the
+        same 404 a foreign document id gets, so a document deleted between the
+        route's read and this write is not silently resurrected as a `stored`
+        row whose case no longer lists it.
+
+        The one caller is confirmation. `create` still refuses to overwrite,
+        and that is unchanged: this is not a general "write a document row"
+        method, and a second caller should be a reason to re-read the note on
+        `create` before adding one.
+        """
+        ...
+
     def list_for_case(self, case_id: str) -> tuple[Document, ...]:
         """Every document of one case, newest first (core/documents.list_order
         — the sort key is a random uuid, so neither implementation gets this
@@ -318,6 +333,36 @@ class DocumentBlobStore(Protocol):
 
     def download_url(self, storage_ref: str, *, expires_in: int) -> str:
         """A URL that serves exactly this object, once it exists."""
+        ...
+
+    def stat(self, storage_ref: str) -> StoredBlob | None:
+        """What the store reports about this object, or None if it is not
+        there.
+
+        The ONLY way this service ever learns that an upload actually landed.
+        Nothing else in the feature reads the object store — the case store is
+        the record of what should be there — so an implementation that guessed
+        here would be inventing the one fact the confirm route exists to
+        establish.
+
+        None means absent, and an implementation MUST NOT distinguish "no such
+        object" from "not allowed to see it" by raising for one and returning
+        None for the other: without s3:ListBucket, S3 itself answers 403 for a
+        missing key, so the two are not separable at this boundary. See
+        adapters/aws/document_blobs.py for what that costs.
+        """
+        ...
+
+    def clear_upload_tag(self, storage_ref: str) -> None:
+        """Remove the `upload=unconfirmed` tag, taking the object out of the
+        bucket's expire-unconfirmed-uploads filter.
+
+        THE ONLY THING THAT MAKES THAT LIFECYCLE RULE SAFE. Every presigned PUT
+        writes the tag, and the rule deletes tagged objects after a day, so an
+        object nothing calls this for is an object that will be reaped —
+        correct for an abandoned upload, and data loss for a real document.
+        Idempotent, because the confirm route is.
+        """
         ...
 
     def delete(self, storage_ref: str) -> None:

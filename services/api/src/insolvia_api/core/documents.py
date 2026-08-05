@@ -38,7 +38,7 @@ from __future__ import annotations
 import re
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
@@ -105,16 +105,120 @@ MAX_BYTE_SIZE: Final = 50 * 1024 * 1024
 # field cannot be used as free storage.
 MAX_FILE_NAME: Final = 255
 
+# THE TAG EVERY PRESIGNED PUT CARRIES, and the only handle anything has on
+# bytes this service can no longer name.
+#
+# A presigned PUT is valid for its whole window and its payload is not signed,
+# so the URL can be replayed — and it outlives the record that authorised it.
+# POST a document, DELETE it, then PUT through the still-valid URL, and the
+# object lands under a key no row names: `list_for_case` reads the case store
+# so it never appears, a second DELETE has nothing to delete, and the API holds
+# no s3:ListBucket, so nothing in this system can even find it. Replaying the
+# PUT parks versions with the same property.
+#
+# So the capability itself tags what it writes, and the bucket's
+# `expire-unconfirmed-uploads` lifecycle rule filters on exactly this pair
+# (infra/modules/case_documents/main.tf). It lives in `core` rather than in the
+# adapter because two layers need it and they may not import each other: the
+# adapter binds it into the signature, and the route has to tell the client
+# which header to send. A drifted copy would be an upload S3 refuses, or worse,
+# one it accepts and nothing ever reaps.
+#
+# READ THE LIFECYCLE RULE'S COMMENT BEFORE THIS SHIPS. Nothing clears the tag
+# yet — 8.6 has no upload-completion callback (api/routes/documents.py names
+# that gap) — so today a confirmed document wears it exactly as an orphan does.
+UPLOAD_TAG_KEY: Final = "upload"
+UPLOAD_TAG_VALUE: Final = "unconfirmed"
+
+# WHAT A DOCUMENT ROW MEANS, which was the ambiguity the tag exposed.
+#
+#   pending  the server authorised an upload and minted a capability. Nothing
+#            here knows whether the bytes ever landed. `byte_size` is the
+#            client's DECLARED size and there is no etag.
+#   stored   the server did a HeadObject and saw the object. `byte_size` and
+#            `etag` are what S3 reports, and the object no longer carries the
+#            unconfirmed tag, so the bucket's reaper will not touch it.
+#
+# Both are listed. A pending row is not a half-written record to be hidden —
+# it is the case's own account of an upload that did not finish, and a UI that
+# dropped it would leave the user with a document they cannot see and cannot
+# retry. That is why this is a status on the record rather than a filter in
+# the store.
+STATUS_PENDING: Final = "pending"
+STATUS_STORED: Final = "stored"
+STATUSES: Final = (STATUS_PENDING, STATUS_STORED)
+
+
+@dataclass(frozen=True)
+class StoredBlob:
+    """What the object store reports about an object that exists.
+
+    The FACTS, as against the claims on a pending record. `byte_size` is what
+    S3 counted, not what the client said it would send, and `etag` identifies
+    the bytes it counted them from.
+    """
+
+    byte_size: int
+    etag: str
+
+
+# The `x-amz-tagging` header value: a URL-encoded query string, which is the
+# wire format S3 defines for tags on a PUT. Neither half contains a character
+# that needs escaping, and the test asserts that rather than trusting it.
+UPLOAD_TAG: Final = f"{UPLOAD_TAG_KEY}={UPLOAD_TAG_VALUE}"
+
 # What may appear in an object key, and the reason it is a UUID pattern rather
 # than a sanitiser. See object_key.
+#
+# `\Z` AND NOT `$`, WHICH IS THE WHOLE POINT OF THE PATTERN. In Python `$`
+# matches at the end of the string OR immediately before a trailing newline, so
+# `"<uuid>\n"` satisfies a `$`-anchored match — and object_key would then build
+# a key with a newline in it, contradicting the docstring three functions down
+# that says a key holds nothing but two server-minted uuids. `\Z` matches only
+# at the true end of the string.
 _UUID_RE: Final = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z"
 )
 
 # A file name is displayed and used as a download name, never as a path and
 # never as a key. Separators and control characters are still refused: they
 # make a nonsense of both uses, and refusing them here costs nothing.
-_FILE_NAME_FORBIDDEN: Final = re.compile(r"[/\\\x00-\x1f\x7f]")
+#
+# The three additions past the obvious set are each a rendering attack rather
+# than a parsing one, which is why a control-character class alone missed them:
+#
+#   U+202A-U+202E, U+2066-U+2069  the bidirectional overrides and isolates.
+#     `invoice‮fdp.exe` RENDERS as `invoiceexe.pdf` — in the document
+#     list, and in whatever name the browser saves it under. The bytes say one
+#     thing and every human who looks says another, which is the definition of
+#     a name we must not accept.
+#   U+200B-U+200F, U+2060, U+FEFF  zero-width space/joiner/non-joiner, the
+#     left-to-right and right-to-left marks, word joiner, BOM. Invisible, so
+#     two visually identical names can differ, and a name can carry padding
+#     nobody can see or select.
+#   U+00AD  soft hyphen — invisible in most renderers, same problem.
+#
+# Written as escapes rather than as the characters themselves for the reason
+# the characters exist: pasted literally, this class would be an unreadable
+# blank stretch in the middle of a security check.
+_FILE_NAME_FORBIDDEN: Final = re.compile(
+    r"[/\\"
+    r"\x00-\x1f\x7f"  # C0 controls and DEL
+    r"\u00ad"  # soft hyphen
+    r"\u200b-\u200f"  # zero-width space/joiner/non-joiner, LRM, RLM
+    r"\u202a-\u202e"  # bidi embeddings and overrides
+    r"\u2060"  # word joiner
+    r"\u2066-\u2069"  # bidi isolates
+    r"\ufeff"  # BOM / zero-width no-break space
+    r"]"
+)
+
+# `.` and `..` are not characters, so the class above cannot see them, and they
+# are the two names a path-shaped check is actually for. Neither is a file
+# name: as a download name a browser resolves them against the download
+# directory, and as a displayed name they are meaningless. Refused whole rather
+# than by character, since every character in them is legitimate on its own.
+_FILE_NAME_RESERVED: Final = frozenset({".", ".."})
 
 
 @dataclass(frozen=True)
@@ -130,6 +234,12 @@ class Document:
     storage_ref: str
     uploaded_by: str
     uploaded_at: str
+    # Defaulted, and both defaults describe a row that has just been created:
+    # an authorised upload nobody has confirmed, whose size is still the
+    # client's own claim. A record only leaves this state by going through
+    # `confirm_document`, which is the one place that has seen the object.
+    status: str = STATUS_PENDING
+    etag: str | None = None
 
 
 @dataclass(frozen=True)
@@ -214,7 +324,17 @@ def _parse_file_name(value: object, errors: dict[str, str]) -> str | None:
         errors["fileName"] = f"Must be {MAX_FILE_NAME} characters or fewer."
         return None
     if _FILE_NAME_FORBIDDEN.search(file_name):
-        errors["fileName"] = "Must not contain path separators or control characters."
+        # One message for the whole class, deliberately. Naming the offending
+        # codepoint would be the helpful thing for a legitimate caller and a
+        # confirmation for the other kind, and the legitimate caller cannot see
+        # the character anyway — that is what it was chosen for.
+        errors["fileName"] = (
+            "Must not contain path separators, control characters, or "
+            "invisible or direction-changing characters."
+        )
+        return None
+    if file_name in _FILE_NAME_RESERVED:
+        errors["fileName"] = "Must be a file name."
         return None
     return file_name
 
@@ -324,6 +444,33 @@ def create_document(
     )
 
 
+def confirm_document(document: Document, blob: StoredBlob) -> Document:
+    """Move a record to `stored`, recording what S3 reports rather than what
+    the client claimed.
+
+    THE SIZE IS REPLACED, NOT COMPARED. The number on a pending record is what
+    the caller asked to be allowed to upload — an input to minting a
+    capability. This one is what arrived. Keeping the claim after the fact
+    would leave the record asserting something no part of this system ever
+    checked.
+
+    In practice the two agree, and they agree for a reason worth stating so
+    this does not read as the primary control: `content-length` is bound into
+    the presigned signature (adapters/aws/document_blobs.py), so S3 refuses a
+    PUT whose body is any other length. A mismatch here would mean the
+    signature stopped constraining the request, which is exactly the silent
+    failure the signed-header test guards against. This is defence in depth,
+    and it is also the only place a size becomes a FACT rather than a claim.
+
+    Idempotent: confirming an already-stored record re-reads the same object
+    and produces the same row. The client that retries a dropped response must
+    not be punished for it.
+    """
+    return replace(
+        document, status=STATUS_STORED, byte_size=blob.byte_size, etag=blob.etag
+    )
+
+
 def sort_key(document_id: str) -> str:
     return f"DOCUMENT#{document_id}"
 
@@ -356,7 +503,7 @@ def document_item(document: Document) -> dict[str, str | int]:
     case, never listed across cases, and the sparse by-owner index on the case
     table stays one entry per case.
     """
-    return {
+    item: dict[str, str | int] = {
         "PK": partition_key(document.case_id),
         "SK": sort_key(document.id),
         "id": document.id,
@@ -368,7 +515,15 @@ def document_item(document: Document) -> dict[str, str | int]:
         "storageRef": document.storage_ref,
         "uploadedBy": document.uploaded_by,
         "uploadedAt": document.uploaded_at,
+        "status": document.status,
     }
+    # Omitted rather than written empty. DynamoDB has no empty-string type
+    # worth using here, and "the attribute is absent" is the honest encoding of
+    # "nothing has looked at this object yet" — which is exactly what a pending
+    # row means.
+    if document.etag is not None:
+        item["etag"] = document.etag
+    return item
 
 
 def document_from_item(item: Mapping[str, str | int]) -> Document:
@@ -386,6 +541,14 @@ def document_from_item(item: Mapping[str, str | int]) -> Document:
             storage_ref=str(item["storageRef"]),
             uploaded_by=str(item["uploadedBy"]),
             uploaded_at=str(item["uploadedAt"]),
+            # `.get` for these two, where every field above is required, and
+            # the asymmetry is deliberate. A row written before this service
+            # knew about confirmation is not a corrupt row — it is a row from
+            # a version that could not have confirmed anything, so `pending`
+            # is not a fallback, it is the true reading of it. A developer's
+            # dev table has such rows today.
+            status=str(item.get("status", STATUS_PENDING)),
+            etag=str(item["etag"]) if "etag" in item else None,
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored document item is malformed: {error}") from error
@@ -405,6 +568,17 @@ def document_json(document: Document) -> dict[str, object]:
     Neither can be known without reading the bytes, which nothing does until
     extraction (8.7/8.8) — inventing them from the client's word would put two
     unverified numbers on a record whose other fields the server checked.
+
+    `etag` is stored and not exposed, joining `storageRef` for the same reason:
+    it identifies the object inside the bucket, and a client has nothing to do
+    with it that does not amount to depending on the storage layout.
+
+    `status` IS exposed, and it is the one field here a client must branch on.
+    Without it a document whose upload never finished is indistinguishable in
+    the list from one that did, and the difference is the difference between a
+    file the user can open and a file that is not there. `byteSize` changes
+    meaning with it: on a pending record it is what the client said it would
+    send, on a stored one it is what S3 counted.
     """
     return {
         "id": document.id,
@@ -414,4 +588,5 @@ def document_json(document: Document) -> dict[str, object]:
         "contentType": document.content_type,
         "byteSize": document.byte_size,
         "uploadedAt": document.uploaded_at,
+        "status": document.status,
     }
