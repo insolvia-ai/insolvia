@@ -1,5 +1,5 @@
 import { ApiValidationException } from '@insolvia-ai/api-client';
-import type { Case, CaseChapter } from '@insolvia-ai/api-client';
+import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
 import { Button, Field, RadioGroup } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -45,6 +45,10 @@ export function Cases() {
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
+  // Subject -> name, so `createdBy` renders as a colleague rather than a uuid.
+  // Loaded once and separately from the cases: it fails independently, and a
+  // directory this screen could not fetch should cost names, not the list.
+  const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
   const [chapter, setChapter] = useState<CaseChapter>(7);
   const [district, setDistrict] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -67,6 +71,22 @@ export function Cases() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const loadDirectory = async () => {
+      try {
+        const result = await call((client) => client.listFirmDirectory());
+        if (result.ok) {
+          setColleagues(result.value);
+        }
+      } catch {
+        // Names are a nicety here; the list is not. Falling back to the
+        // subject is worse than a name and much better than an error screen
+        // over a case list that loaded perfectly.
+      }
+    };
+    void loadDirectory();
+  }, [call]);
 
   const submit = async () => {
     setSubmitting(true);
@@ -168,7 +188,7 @@ export function Cases() {
 
       <Heading level={2}>Existing cases</Heading>
       {list.kind === 'ready' ? (
-        <CaseList cases={list.cases} />
+        <CaseList cases={list.cases} colleagues={colleagues} />
       ) : (
         <Text
           aria-live={list.kind === 'error' ? 'assertive' : 'polite'}
@@ -181,9 +201,20 @@ export function Cases() {
   );
 }
 
-function CaseList({ cases }: { cases: readonly Case[] }) {
+function CaseList({
+  cases,
+  colleagues,
+}: {
+  cases: readonly Case[];
+  colleagues: readonly FirmColleague[];
+}) {
   const theme = useTheme();
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  // A subject the directory does not carry still renders — as the subject. A
+  // case opened by somebody since removed from the firm is history, and hiding
+  // who opened it would be a worse answer than an unfamiliar id.
+  const openedBy = (subject: string) =>
+    colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject;
 
   if (cases.length === 0) {
     return <Text style={[styles.body, muted]}>No cases yet. Open one above to get started.</Text>;
@@ -205,7 +236,8 @@ function CaseList({ cases }: { cases: readonly Case[] }) {
             server-generated uuid and identifies nothing about a person.
           */}
           <Text style={[styles.caseMeta, muted]}>
-            {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} · {item.id}
+            {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} by{' '}
+            {openedBy(item.createdBy)} · {item.id}
           </Text>
           {/*
             `Link`s, not `Text` with `onPress`: react-native-web gives a
@@ -228,6 +260,16 @@ function CaseList({ cases }: { cases: readonly Case[] }) {
             ]}
           >
             Open intake
+          </Link>
+          <Link
+            href={`/cases/${item.id}/team`}
+            aria-label={`Who is on case ${item.id}`}
+            style={[
+              styles.caseLink,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            Who is on it
           </Link>
           <Link
             href={`/cases/${item.id}/documents`}
