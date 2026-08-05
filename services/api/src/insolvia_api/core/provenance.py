@@ -28,6 +28,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Final
 
 from .errors import FieldValidationError
@@ -49,10 +50,20 @@ MACHINE_SOURCES: Final = frozenset({"ai_extracted", "imported"})
 # does not silently reattach provenance to the wrong value — which is also why
 # embedded list elements carry an id at all. A positional path would make
 # "delete the first alias" quietly relabel every alias after it.
-_SEGMENT = r"[a-z][a-z0-9_]*(?:\[[A-Za-z0-9_-]+\])?"
-_FIELD_PATH_RE: Final = re.compile(rf"^{_SEGMENT}(?:\.{_SEGMENT})*$")
+_FIELD_NAME = r"[a-z][a-z0-9_]*"
+# Exported because entity parsers take list-element ids FROM THE CLIENT (see
+# core/debtors.py's other_names_used) and interpolate them into paths. An id
+# outside this set produces a path this module then refuses as a key, and the
+# caller is stuck: their value demands provenance, and the only path that would
+# describe it is rejected. Validate ids against this at the entity boundary.
+ADDRESSABLE_ID_RE: Final = re.compile(r"^[A-Za-z0-9_-]+$")
+_FIELD_NAME_RE: Final = re.compile(rf"^{_FIELD_NAME}$")
 
-_TIMESTAMP_RE: Final = re.compile(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z$")
+# Stamped by the server, never supplied, so there is nothing to record the
+# origin of. Matched as whole paths — see require_provenance.
+_SERVER_OWNED: Final = frozenset({"id", "case_id", "created_at", "updated_at"})
+_SEGMENT = rf"{_FIELD_NAME}(?:\[[A-Za-z0-9_-]+\])?"
+_FIELD_PATH_RE: Final = re.compile(rf"^{_SEGMENT}(?:\.{_SEGMENT})*$")
 
 
 @dataclass(frozen=True)
@@ -74,6 +85,22 @@ class ProvenanceEntry:
     confidence: float | None = None
 
 
+def _is_utc_timestamp(value: object) -> bool:
+    """A real instant, parsed rather than pattern-matched.
+
+    A regex of the right SHAPE is not a check: `0000-00-00T........Z` matches
+    `\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z` and is not a moment. This is the audit
+    record for invariant 2, so it has to be a date that exists.
+    """
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return False
+    try:
+        datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return False
+    return True
+
+
 def _parse_entry(
     path: str, value: object, errors: dict[str, str]
 ) -> ProvenanceEntry | None:
@@ -89,9 +116,7 @@ def _parse_entry(
         return None
 
     confirmed_at = value.get("confirmed_at")
-    if confirmed_at is not None and (
-        not isinstance(confirmed_at, str) or not _TIMESTAMP_RE.match(confirmed_at)
-    ):
+    if confirmed_at is not None and not _is_utc_timestamp(confirmed_at):
         errors[f"provenance.{path}.confirmed_at"] = (
             "confirmed_at must be a UTC timestamp."
         )
@@ -101,6 +126,10 @@ def _parse_entry(
     if confirmed_by is not None and not isinstance(confirmed_by, str):
         errors[f"provenance.{path}.confirmed_by"] = "confirmed_by must be a string."
         return None
+    # Blank is nobody. Kept distinct from absent so the check below can treat
+    # them the same without the empty string sneaking through `is not None`.
+    if isinstance(confirmed_by, str) and not confirmed_by.strip():
+        confirmed_by = None
 
     # INVARIANT 2. A machine-supplied value that no human has confirmed does not
     # get to exist on a case record. Unconfirmed extraction output lives in
@@ -203,6 +232,16 @@ def populated_paths(record: object, prefix: str = "") -> list[str]:
     is NOT itself emitted as a path: it is already the address — the element's
     paths all read ``aliases[n1].…`` — so ``aliases[n1].id`` would be asking
     for the provenance of an address rather than of a fact about the case.
+
+    EVERY EMITTED PATH IS ONE ``parse_provenance`` WILL ACCEPT, and that is a
+    correctness property rather than tidiness. The two functions are the halves
+    of one rule: if this one can mint a path the other rejects, the caller is
+    trapped — their value demands provenance and the only path describing it is
+    refused. So a key that is not a legal field name raises here, at the
+    boundary, instead of becoming an unsatisfiable requirement. That also
+    forecloses collisions: without it, a literal key ``"name.given"`` and a
+    nested ``name: {given: …}`` produce the same path, and one provenance entry
+    would cover two different values.
     """
     paths: list[str] = []
 
@@ -212,6 +251,17 @@ def populated_paths(record: object, prefix: str = "") -> list[str]:
                 continue
             if key == "id" and prefix.endswith("]"):
                 continue
+            if not _FIELD_NAME_RE.match(key):
+                raise FieldValidationError(
+                    {
+                        f"provenance.{prefix}.{key}"
+                        if prefix
+                        else f"provenance.{key}": (
+                            "Not a field name, so nothing can record where it "
+                            "came from."
+                        )
+                    }
+                )
             paths.extend(populated_paths(value, f"{prefix}.{key}" if prefix else key))
         return paths
 
@@ -219,12 +269,24 @@ def populated_paths(record: object, prefix: str = "") -> list[str]:
         return [prefix] if record and prefix else []
 
     if isinstance(record, Sequence):
-        for element in record:
-            # An element without an id cannot be addressed stably, so the whole
-            # list is attributed to its own path rather than silently indexed.
-            element_id = element.get("id") if isinstance(element, Mapping) else None
-            if not isinstance(element_id, str) or not element_id:
-                return [prefix] if prefix else []
+        # Decided BEFORE walking. An earlier version returned mid-loop the
+        # moment it met an element without a usable id, silently discarding the
+        # paths already collected from the elements before it — so a list of
+        # one good element and one bad one demanded a single entry covering
+        # both, and which behaviour you got depended on the order.
+        ids = [
+            element.get("id") if isinstance(element, Mapping) else None
+            for element in record
+        ]
+        addressable = all(
+            isinstance(value, str) and ADDRESSABLE_ID_RE.match(value) for value in ids
+        )
+        if not addressable:
+            # No stable address for the elements, so the list is attributed
+            # whole rather than indexed by position — a positional path would
+            # reattach provenance on the next reorder.
+            return [prefix] if prefix else []
+        for element, element_id in zip(record, ids, strict=True):
             paths.extend(populated_paths(element, f"{prefix}[{element_id}]"))
         return paths
 
@@ -243,15 +305,20 @@ def require_provenance(
     omitting the key, which is the loophole that would make invariant 2
     decorative.
 
-    `id` and `case_id` are exempt: they are assigned by the server, not
-    supplied by anyone, so "where did this come from" has one answer and it is
-    not a fact about the case.
+    The four server-assigned fields in `_SERVER_OWNED` are exempt: they are
+    stamped here, not supplied by anyone, so "where did this come from" has one
+    answer and it is not a fact about the case.
+
+    The exemption matches the WHOLE path, never its first segment. Matching the
+    first segment exempted an entire subtree, so a record with case data parked
+    under one of those names — `created_at: {ssn: …}` — passed invariant 1 with
+    no provenance at all. These are scalars by definition; nothing legitimate
+    nests under them.
     """
     missing = [
         path
         for path in populated_paths(record)
-        if path not in entries
-        and path.split(".", 1)[0].split("[", 1)[0] not in _SERVER_OWNED
+        if path not in entries and path not in _SERVER_OWNED
     ]
     if missing:
         raise FieldValidationError(
@@ -260,9 +327,6 @@ def require_provenance(
                 for path in missing
             }
         )
-
-
-_SERVER_OWNED: Final = frozenset({"id", "case_id", "created_at", "updated_at"})
 
 
 def provenance_json(

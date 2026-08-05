@@ -192,3 +192,91 @@ class TestProvenanceJson:
     def test_round_trips_through_parse(self) -> None:
         entries = parse_provenance({"a": CONFIRMED})
         assert parse_provenance(provenance_json(entries)) == entries
+
+
+class TestEvasionsFoundInReview:
+    """Each of these passed before the fix beside it. They are grouped so the
+    next reader can see what an adversarial pass actually found, rather than
+    reading six unrelated regression tests."""
+
+    def test_a_blank_confirmer_is_nobody(self) -> None:
+        # `confirmed_by: ""` satisfied "is not None" and so satisfied
+        # invariant 2 — a confirmation with nobody attached, which is the exact
+        # thing the rule exists to prevent.
+        for blank in ("", "   "):
+            with pytest.raises(FieldValidationError):
+                parse_provenance({"a": {**CONFIRMED, "confirmed_by": blank}})
+
+    def test_a_timestamp_must_be_a_real_instant(self) -> None:
+        # The old check was a regex of the right SHAPE, which "0000-00-00" and
+        # "9999-99-99" both match.
+        for fake in ("0000-00-00T........Z", "9999-99-99T99:99:99Z", "2026-08-05T.Z"):
+            with pytest.raises(FieldValidationError):
+                parse_provenance({"a": {**CONFIRMED, "confirmed_at": fake}})
+
+    def test_case_data_cannot_hide_under_a_server_owned_name(self) -> None:
+        # The exemption matched the FIRST segment, so an object parked under
+        # `created_at` was exempt in its entirety.
+        for record in (
+            {"created_at": {"ssn": "smuggled"}},
+            {"id": {"nested": {"ssn": "smuggled"}}},
+        ):
+            with pytest.raises(FieldValidationError):
+                require_provenance(record, {})
+
+    def test_the_server_owned_scalars_are_still_exempt(self) -> None:
+        require_provenance({"id": "c1", "case_id": "c1", "created_at": "t"}, {})
+
+    def test_a_key_that_is_not_a_field_name_fails_loudly(self) -> None:
+        # Previously these produced a REQUIRED path that parse_provenance then
+        # refused as a key — no payload could satisfy both, and the caller was
+        # stuck with a 400 they could not fix.
+        for key in ("SSN", "legalName", "1099_income", "case-number", ""):
+            with pytest.raises(FieldValidationError):
+                require_provenance({key: "value"}, {})
+
+    def test_a_value_under_the_empty_key_is_not_invisible(self) -> None:
+        # It produced no path at all, so no provenance was ever required.
+        with pytest.raises(FieldValidationError):
+            require_provenance({"": "smuggled"}, {})
+
+    def test_a_literal_dotted_key_cannot_collide_with_a_nested_path(self) -> None:
+        # `{"name.given": x}` and `{"name": {"given": y}}` both produced
+        # `name.given`, so one entry covered two different values.
+        with pytest.raises(FieldValidationError):
+            require_provenance({"name.given": "forged"}, typed("name.given"))
+
+    def test_a_mixed_list_does_not_discard_the_paths_before_the_bad_element(
+        self,
+    ) -> None:
+        # Returning mid-loop threw away earlier elements' paths, so one entry
+        # for the list covered them all — and which behaviour you got depended
+        # on the ORDER of the elements.
+        good_first = {"aliases": [{"id": "n1", "surname": "Byron"}, {"surname": "X"}]}
+        bad_first = {"aliases": [{"surname": "X"}, {"id": "n1", "surname": "Byron"}]}
+        assert populated_paths(good_first) == populated_paths(bad_first) == ["aliases"]
+        # And the whole list still needs an entry — it is not exempt.
+        with pytest.raises(FieldValidationError):
+            require_provenance(good_first, {})
+
+    def test_an_id_that_cannot_be_addressed_does_not_mint_an_illegal_path(self) -> None:
+        # A client-supplied id containing '.' or ']' used to produce a path
+        # parse_provenance refused. Now such a list is attributed whole, and
+        # every path this emits is one parse_provenance accepts.
+        record = {"aliases": [{"id": "n.1", "surname": "Byron"}]}
+        assert populated_paths(record) == ["aliases"]
+        parse_provenance(dict.fromkeys(populated_paths(record), TYPED_SOURCE))
+
+    def test_every_emitted_path_is_one_parse_provenance_accepts(self) -> None:
+        # The property the two halves have to share, stated directly.
+        record = {
+            "name": {"given": "Ada"},
+            "aliases": [{"id": "n1", "surname": "Byron"}],
+            "rents_residence": False,
+        }
+        paths = populated_paths(record)
+        entries = parse_provenance(dict.fromkeys(paths, TYPED_SOURCE))
+        assert entries.keys() == set(paths)
+
+
+TYPED_SOURCE = {"source": "staff_typed"}
