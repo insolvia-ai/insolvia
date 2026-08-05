@@ -15,8 +15,7 @@ import { useSession } from '@/session';
  * and flattening them into one "failed" would throw the field errors away.
  */
 export type ApiResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly reason: 'auth' };
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'auth' };
 
 /**
  * The authenticated API client, plus the one 401 policy every screen shares.
@@ -51,7 +50,7 @@ export function useApi() {
   );
 
   const call = useCallback(
-    async <T,>(request: (client: InsolviaApiClient) => Promise<T>): Promise<ApiResult<T>> => {
+    async <T>(request: (client: InsolviaApiClient) => Promise<T>): Promise<ApiResult<T>> => {
       try {
         return { ok: true, value: await request(client) };
       } catch (cause) {

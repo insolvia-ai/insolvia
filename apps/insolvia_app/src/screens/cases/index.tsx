@@ -1,6 +1,7 @@
 import { ApiValidationException } from '@insolvia-ai/api-client';
 import type { Case, CaseChapter } from '@insolvia-ai/api-client';
 import { Button, Field, RadioGroup } from '@insolvia-ai/design-system';
+import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -122,16 +123,10 @@ export function Cases() {
         >
           {CHAPTERS.map((option) => (
             <View key={option.value} style={styles.chapterOption}>
-              <RadioGroup.Item
-                value={String(option.value)}
-                aria-label={option.label}
-                hitSlop={12}
-              >
+              <RadioGroup.Item value={String(option.value)} aria-label={option.label} hitSlop={12}>
                 <RadioGroup.Indicator />
               </RadioGroup.Item>
-              <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>
-                {option.label}
-              </Text>
+              <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>{option.label}</Text>
             </View>
           ))}
         </RadioGroup.Root>
@@ -150,7 +145,9 @@ export function Cases() {
             autoCapitalize="characters"
             autoCorrect={false}
           />
-          <Field.Description>The bankruptcy court district this case will be filed in.</Field.Description>
+          <Field.Description>
+            The bankruptcy court district this case will be filed in.
+          </Field.Description>
           {fieldErrors.district ? <Field.Error match>{fieldErrors.district}</Field.Error> : null}
         </Field.Root>
 
@@ -210,6 +207,29 @@ function CaseList({ cases }: { cases: readonly Case[] }) {
           <Text style={[styles.caseMeta, muted]}>
             {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} · {item.id}
           </Text>
+          {/*
+            A `Link`, not a `Text` with `onPress`: react-native-web gives a
+            tabIndex only to elements that ask for a role it recognises, and a
+            link is one of them — this renders a real <a href> the keyboard can
+            reach and the browser can open in a new tab.
+
+            The accessible name names the case. "Documents", repeated once per
+            row, tells a screen-reader user the verb and never the case
+            (WCAG 2.4.4); the visible word stays the start of the name, which is
+            what WCAG 2.5.3 asks for. The id is the disambiguator because it is
+            the only thing here guaranteed unique, and it is already on screen
+            in the line above.
+          */}
+          <Link
+            href={`/cases/${item.id}/documents`}
+            aria-label={`Documents for case ${item.id}`}
+            style={[
+              styles.caseLink,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            Documents
+          </Link>
         </View>
       ))}
     </View>
@@ -224,6 +244,9 @@ const styles = StyleSheet.create({
   body: {
     fontSize: fontSizes.body,
     lineHeight: fontSizes.body * 1.5,
+  },
+  caseLink: {
+    fontSize: fontSizes.label,
   },
   caseMeta: {
     fontSize: fontSizes.caption,
