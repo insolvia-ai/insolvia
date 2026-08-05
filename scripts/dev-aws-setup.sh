@@ -57,7 +57,8 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   access_log_table="$(jq -r '.outputs.case_access_log_table_name.value // empty' <<<"$state_json")"
   firm_table="$(jq -r '.outputs.firm_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
+  document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
+  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
     die "Development DynamoDB table '$table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
@@ -66,12 +67,15 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Development case access-log table '$access_log_table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$firm_table" >/dev/null ||
     die "Development firm table '$firm_table' is unavailable."
+  aws_dev s3api head-bucket --bucket "$document_bucket" >/dev/null ||
+    die "Development case document bucket '$document_bucket' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
     die "Development Cognito pool '$pool_id' is unavailable."
   if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
     ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
+    ! grep -q "^CASE_DOCUMENT_BUCKET=$document_bucket\$" "$API_DIR/.env" ||
     ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
@@ -89,6 +93,7 @@ table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
 firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
+document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
@@ -123,6 +128,7 @@ upsert_env "$api_env" WAITLIST_TABLE_NAME "$table"
 upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
 upsert_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
 upsert_env "$api_env" FIRM_TABLE_NAME "$firm_table"
+upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"

@@ -120,6 +120,24 @@ module "firm_store" {
   deletion_protection    = false
   tags                   = local.common_tags
 }
+# ── Case documents ──────────────────────────────────────────────
+# The same module staging and prod instantiate, encrypting under the same case
+# key, so local development exercises the real bucket policy — TLS-only,
+# KMS-only writes, ACLs off — rather than a folder on disk. api_role_name is
+# null here for the same reason the case store's is: there is no Lambda.
+module "case_documents" {
+  source = "../../modules/case_documents"
+
+  project       = "insolvia"
+  environment   = local.environment
+  aws_region    = var.aws_region
+  kms_key_arn   = module.case_store.kms_key_arn
+  api_role_name = null
+  # A developer's bucket must be destroyable without emptying it by hand.
+  force_destroy = true
+  tags          = local.common_tags
+}
+
 # ── Auth ────────────────────────────────────────────────────────
 # The same module staging and prod instantiate, with the machine environment
 # name. The Cognito hosted-domain prefix the module derives

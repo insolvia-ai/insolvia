@@ -291,6 +291,25 @@ module "firm_store" {
   deletion_protection    = true
   tags                   = local.common_tags
 }
+# ── Case documents ──────────────────────────────────────────────
+# Takes the case store's key rather than minting one: one key protects one
+# case, rows and documents alike, and the deploy role's data-plane deny is
+# written against that key's alias.
+module "case_documents" {
+  source = "../../modules/case_documents"
+
+  project       = "insolvia"
+  environment   = local.environment
+  aws_region    = var.aws_region
+  kms_key_arn   = module.case_store.kms_key_arn
+  api_role_name = module.api_service.lambda_role_name
+  # NOT destroyable while it holds objects. These are the source documents
+  # behind signed petitions; a `terraform destroy` that silently emptied them
+  # is the failure this flag exists to prevent.
+  force_destroy = false
+  tags          = local.common_tags
+}
+
 # Publish the case table name into the API's SSM config namespace, env-level
 # for the same reason mailer_api_url and the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
@@ -326,6 +345,17 @@ resource "aws_ssm_parameter" "firm_table_name" {
   value = module.firm_store.table_name
   tags  = local.common_tags
 }
+# The document bucket's name, same namespace and same reasoning as the two
+# above — the API derives it as CASE_DOCUMENT_BUCKET. The KEY ARN is
+# deliberately not published here either: S3 resolves the key from the bucket's
+# default encryption, so nothing in services/api ever names it.
+resource "aws_ssm_parameter" "case_document_bucket" {
+  name  = "/insolvia/${local.environment}/api/case-document-bucket"
+  type  = "String"
+  value = module.case_documents.bucket_name
+  tags  = local.common_tags
+}
+
 # Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
 # into an insolvia-audit-<env> bucket under its own key. Declared after
 # module.case_store because it records that module's table.
