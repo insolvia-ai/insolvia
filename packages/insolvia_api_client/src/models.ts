@@ -67,6 +67,216 @@ export interface Principal {
    * it is the JWT claim verbatim), or `null` when absent.
    */
   readonly expiresAt: number | null;
+  /**
+   * The caller's firm and standing in it, or **absent** when nobody has added
+   * them to one. See {@link FirmMembership} — `undefined` here is what a
+   * client should render as "ask your firm's administrator to add you", and it
+   * is the only endpoint that reports that state rather than refusing.
+   */
+  readonly firm?: FirmMembership;
+}
+
+/**
+ * A feature the firm grants access to, per user. The list is Insolvia's, not
+ * a general RBAC vocabulary — adding one is a server change.
+ */
+export type FirmFeature =
+  'cases' | 'intake' | 'documents' | 'extraction_review' | 'firm_administration';
+
+/**
+ * How much of a feature a firm user may reach. Ordered weakest to strongest:
+ * `add_edit` satisfies anything `view_only` does.
+ */
+export type PermissionLevel = 'hidden' | 'view_only' | 'add_edit';
+
+/** A firm user's job title. Drives server-side DEFAULTS and decides nothing. */
+export type FirmRole = 'attorney' | 'paralegal' | 'staff';
+
+/** Whether a firm user's account is usable. */
+export type FirmUserStatus = 'active' | 'disabled';
+
+/**
+ * The caller's own firm and standing in it — the `firm` block of `GET /v1/me`.
+ *
+ * **Absent, not null, when the caller is in no firm.** A person can sign in
+ * before anyone adds them to a firm; every other endpoint answers 403 for
+ * them, and this is the one place that says so as an answer rather than an
+ * error. `undefined` here is the state a client should render as "ask your
+ * firm's administrator to add you", never as a failure.
+ */
+export interface FirmMembership {
+  /** The firm's id. */
+  readonly id: string;
+  /** The firm's name, for the header. */
+  readonly name: string;
+  /** This user's job title. */
+  readonly role: FirmRole;
+  /** This user's display name, as their firm recorded it. */
+  readonly displayName: string;
+  /** Full access to every feature, every case, and the firm's user list. */
+  readonly isAdmin: boolean;
+  /**
+   * Every case in the firm, without being linked to them one by one.
+   * Independent of {@link isAdmin} on purpose — a supervising attorney can
+   * have this without also being able to manage users.
+   */
+  readonly accessAllCases: boolean;
+  /**
+   * The EFFECTIVE level per feature, not the stored map: an administrator's
+   * record says `firm_administration: 'hidden'` and they can nonetheless
+   * manage users, so this is what the server will actually allow. Use
+   * {@link permits} rather than comparing strings.
+   */
+  readonly permissions: Readonly<Record<FirmFeature, PermissionLevel>>;
+}
+
+/** Weakest to strongest. `permits` compares by position. */
+const PERMISSION_ORDER: readonly PermissionLevel[] = ['hidden', 'view_only', 'add_edit'];
+
+/**
+ * Whether `held` is enough for `required`.
+ *
+ * Exists so no caller writes `permissions.documents === 'add_edit'` and
+ * thereby treats an `add_edit` holder as unable to view. It is a client-side
+ * CONVENIENCE and never a control: the server decides, and a client that
+ * showed a button it should not have gets a 403 rather than access.
+ */
+export function permits(held: PermissionLevel, required: PermissionLevel): boolean {
+  return PERMISSION_ORDER.indexOf(held) >= PERMISSION_ORDER.indexOf(required);
+}
+
+/**
+ * A colleague as `GET /v1/firm/directory` returns them — three fields, for
+ * every member of the firm.
+ *
+ * Deliberately thinner than {@link FirmUser}. It exists so a subject
+ * ({@link Case.createdBy}, an assignee) can be rendered as a name, and that
+ * need does not extend to a colleague's email address or permission map.
+ */
+export interface FirmColleague {
+  /** The Cognito subject other endpoints address them by. */
+  readonly subject: string;
+  /** Their name, for display. */
+  readonly displayName: string;
+  /** Their job title. */
+  readonly role: FirmRole;
+}
+
+/**
+ * A firm user as `GET /v1/firm/users` returns them — the whole record, for
+ * administrators only.
+ *
+ * `permissions` here is the STORED map, unlike {@link FirmMembership}'s: an
+ * administrator editing somebody's record needs to see the stored value and
+ * the admin override as two separate facts, or turning off `isAdmin` looks
+ * like it grants nothing back.
+ */
+export interface FirmUser {
+  /** The Cognito subject — the id every other endpoint addresses them by. */
+  readonly subject: string;
+  /** Their email address, which is also their sign-in username. */
+  readonly email: string;
+  /** Their name, for display. */
+  readonly displayName: string;
+  /** Their job title. */
+  readonly role: FirmRole;
+  /** Full access to every feature, every case, and the firm's user list. */
+  readonly isAdmin: boolean;
+  /** Every case in the firm, without per-case linking. */
+  readonly accessAllCases: boolean;
+  /** The stored per-feature map — see the note above. */
+  readonly permissions: Readonly<Record<FirmFeature, PermissionLevel>>;
+  /** Whether the account is usable. */
+  readonly status: FirmUserStatus;
+  /** The server's UTC creation timestamp, verbatim. */
+  readonly createdAt: string;
+  /** The server's UTC last-update timestamp, verbatim. */
+  readonly updatedAt: string;
+}
+
+/**
+ * The `POST /v1/firm/users` request body.
+ *
+ * `permissions` is MERGED over the role's defaults rather than replacing them,
+ * so sending one feature does not silently revoke the rest. That is the
+ * opposite of {@link UpdateFirmUserRequest}, and both are the server's
+ * behaviour rather than this client's.
+ */
+export interface AddFirmUserRequest {
+  /** The colleague's email address. Lower-cased by the server. */
+  readonly email: string;
+  /** Their name, for display. */
+  readonly displayName: string;
+  /** Their job title, which chooses the default permission map. */
+  readonly role: FirmRole;
+  /** Full access, including the firm's user list. Defaults to `false`. */
+  readonly isAdmin?: boolean;
+  /** Every case in the firm. Defaults to `false`. */
+  readonly accessAllCases?: boolean;
+  /** Overrides merged over the role defaults. */
+  readonly permissions?: Partial<Record<FirmFeature, PermissionLevel>>;
+}
+
+/** The `POST /v1/firm/users` body, with absent optionals omitted entirely. */
+export function addFirmUserRequestToJson(request: AddFirmUserRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    email: request.email,
+    displayName: request.displayName,
+    role: request.role,
+  };
+  // Omitted rather than sent as `undefined`: the server treats an absent key
+  // as "use the default" and a present one as an instruction, and
+  // JSON.stringify would drop `undefined` anyway — being explicit here means
+  // the request test can assert the exact body.
+  if (request.isAdmin !== undefined) body.isAdmin = request.isAdmin;
+  if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
+  if (request.permissions !== undefined) body.permissions = request.permissions;
+  return body;
+}
+
+/**
+ * The `PATCH /v1/firm/users/{subject}` request body. Every field optional;
+ * an empty body is a 400 rather than a no-op.
+ *
+ * **`permissions` REPLACES the stored map**, unlike
+ * {@link AddFirmUserRequest}'s. A merging PATCH could only ever grant — there
+ * would be no way to express "take documents away" — so send the map you want.
+ *
+ * **`email` is absent on purpose.** The address is the one Cognito
+ * authenticates and sends to; changing it in our store alone would leave two
+ * systems disagreeing about who somebody is.
+ */
+export interface UpdateFirmUserRequest {
+  readonly displayName?: string;
+  readonly role?: FirmRole;
+  readonly isAdmin?: boolean;
+  readonly accessAllCases?: boolean;
+  readonly permissions?: Readonly<Record<FirmFeature, PermissionLevel>>;
+  readonly status?: FirmUserStatus;
+}
+
+/** The `PATCH /v1/firm/users/{subject}` body, absent fields omitted. */
+export function updateFirmUserRequestToJson(
+  request: UpdateFirmUserRequest,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (request.displayName !== undefined) body.displayName = request.displayName;
+  if (request.role !== undefined) body.role = request.role;
+  if (request.isAdmin !== undefined) body.isAdmin = request.isAdmin;
+  if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
+  if (request.permissions !== undefined) body.permissions = request.permissions;
+  if (request.status !== undefined) body.status = request.status;
+  return body;
+}
+
+/** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */
+export interface CaseAssignee {
+  /** The colleague's Cognito subject — resolve it through the directory. */
+  readonly subject: string;
+  /** When the link was made, verbatim. */
+  readonly assignedAt: string;
+  /** The subject of whoever made it. */
+  readonly assignedBy: string;
 }
 
 /**
@@ -162,11 +372,26 @@ export type CaseStatus = 'intake' | 'ready_to_file' | 'filed';
 
 /**
  * A case, as returned by every `/v1/cases` endpoint:
- * `{"id", "chapter", "district", "status", "createdAt", "updatedAt"}`.
+ * `{"id", "createdBy", "chapter", "district", "status", "createdAt",
+ * "updatedAt"}`.
+ *
+ * **There is no `firmId`.** Every caller who can see a case is in its firm by
+ * construction, so the id would echo the reader's own tenant back at them.
  */
 export interface Case {
   /** The server-generated case id. */
   readonly id: string;
+  /**
+   * The subject of the firm user who OPENED the matter — an audit fact, not a
+   * permission. It grants nothing: reaching a case means being in its firm and
+   * either an admin, or carrying {@link FirmMembership.accessAllCases}, or
+   * being linked to it.
+   *
+   * Keyed the same way {@link FirmColleague.subject} is, so
+   * `listFirmDirectory` turns it into a name. Rendering it raw is a bug — it
+   * is a UUID.
+   */
+  readonly createdBy: string;
   /** The bankruptcy chapter. */
   readonly chapter: CaseChapter;
   /** The filing district. */

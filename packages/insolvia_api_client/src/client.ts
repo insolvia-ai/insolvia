@@ -6,18 +6,30 @@ import {
   FILING_ROLES,
   PROVENANCE_SOURCES,
   VENUE_BASES,
+  addFirmUserRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
   listCasesQuery,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
+  updateFirmUserRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
+  AddFirmUserRequest,
   Address,
   Case,
+  CaseAssignee,
   CaseChapter,
   CaseStatus,
+  FirmColleague,
+  FirmFeature,
+  FirmMembership,
+  FirmRole,
+  FirmUser,
+  FirmUserStatus,
+  PermissionLevel,
+  UpdateFirmUserRequest,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -206,12 +218,18 @@ export class InsolviaApiClient {
       headers,
     });
     const decoded = await decodeExpected(response, 200);
+    // `firm` is absent — not null — for a caller nobody has added to a firm
+    // yet. That is a state, not a failure: every other authenticated endpoint
+    // answers 403 for them, and this is the one that says so as an answer, so
+    // a client can render "ask your administrator" instead of an error screen.
+    const firm = optionalFirmMembership(decoded);
     return {
       subject: requireString(decoded, 'subject'),
       username: requireNullableString(decoded, 'username'),
       clientId: requireString(decoded, 'clientId'),
       scopes: requireStringArray(decoded, 'scopes'),
       expiresAt: requireNullableNumber(decoded, 'expiresAt'),
+      ...(firm === undefined ? {} : { firm }),
     };
   }
 
@@ -584,6 +602,198 @@ export class InsolviaApiClient {
     const decoded = await decodeExpected(response, 200);
     return requireDebtorArray(decoded, 'debtors');
   }
+
+  /**
+   * `GET /v1/firm/directory` — everyone in the caller's firm, as names.
+   *
+   * Available to anyone who can view cases, not only administrators, because
+   * this is what turns a subject into a person: {@link Case.createdBy} and
+   * every {@link CaseAssignee} are Cognito subjects, and without this the case
+   * list reads "opened by 00000000-0000-…".
+   *
+   * Includes colleagues whose accounts are DISABLED. A case opened by somebody
+   * who has since left still names them, and dropping them here would turn
+   * that into an unresolvable id — this is for rendering history, not for
+   * populating a picker.
+   *
+   * Throws {@link ApiException} (403) when the caller is in no firm, or their
+   * firm has not granted them `cases`.
+   */
+  async listFirmDirectory(): Promise<readonly FirmColleague[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/directory`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'people', 'FirmColleague', (element) => ({
+      subject: requireString(element, 'subject'),
+      displayName: requireString(element, 'displayName'),
+      role: requireFirmRole(element, 'role'),
+    }));
+  }
+
+  /**
+   * `GET /v1/firm/users` — the firm's whole staff list, with everything on it.
+   *
+   * Administrators only (`firm_administration`). For rendering a name, use
+   * {@link listFirmDirectory} instead: it needs no administrative permission
+   * and carries no email addresses.
+   */
+  async listFirmUsers(): Promise<readonly FirmUser[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/users`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'users', 'FirmUser', firmUserFromJson);
+  }
+
+  /**
+   * `POST /v1/firm/users` — add a colleague to the caller's firm.
+   *
+   * The server creates their Cognito account and emails them a temporary
+   * password; **nothing in this flow returns or reveals it**, here or on the
+   * server. There is no firm id in the request — the colleague joins the
+   * caller's own firm, which is not a value a client gets to choose.
+   *
+   * Throws {@link ApiValidationException} on a 400 (per-field: `email`,
+   * `displayName`, `role`, `isAdmin`, `accessAllCases`, `permissions`), and a
+   * plain {@link ApiException} with status 409 when the address already has an
+   * Insolvia account.
+   */
+  async addFirmUser(request: AddFirmUserRequest): Promise<FirmUser> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/users`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(addFirmUserRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return firmUserFromJson(decoded);
+  }
+
+  /**
+   * `PATCH /v1/firm/users/{subject}` — change a colleague's standing.
+   *
+   * **`permissions` replaces the stored map** — see
+   * {@link UpdateFirmUserRequest}.
+   *
+   * Throws {@link ApiException} with status **409** when the change would
+   * leave the firm with no active administrator. That is not a permission
+   * failure and should not be reported as one: self-signup is disabled, so
+   * such a firm could not appoint one back. Surface it as "appoint another
+   * administrator first".
+   *
+   * A 404 means the subject is not in the caller's firm *or* does not exist —
+   * the two are deliberately indistinguishable.
+   */
+  async updateFirmUser(subject: string, request: UpdateFirmUserRequest): Promise<FirmUser> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmUserUrl(subject), {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateFirmUserRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmUserFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/firm/users/{subject}` — remove a colleague from the firm.
+   *
+   * **Removes the membership, not the person.** Their Cognito account
+   * survives, so what they get is a working sign-in and a 403 everywhere —
+   * the same state as somebody who has not been added yet. Disabling
+   * (`updateFirmUser(subject, { status: 'disabled' })`) is usually what a firm
+   * actually wants, because it keeps the record and the history.
+   *
+   * 409 when it would leave the firm with no active administrator; 404 when
+   * the subject is not in the caller's firm.
+   */
+  async removeFirmUser(subject: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmUserUrl(subject), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /** `/v1/firm/users/{subject}`, with the subject encoded exactly once. */
+  #firmUserUrl(subject: string): string {
+    return `${this.#baseUrl}/v1/firm/users/${encodeURIComponent(subject)}`;
+  }
+
+  /** `/v1/cases/{caseId}/assignees/{subject}`, each segment encoded once. */
+  #assigneeUrl(caseId: string, subject: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/assignees/${encodeURIComponent(subject)}`;
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/assignees` — who is linked to this case.
+   *
+   * Subjects, not names: resolve them through {@link listFirmDirectory}.
+   * Copying a display name onto an assignment would go stale the moment
+   * somebody is renamed.
+   *
+   * A 404 means the case is unknown, another firm's, *or* one the caller is
+   * not linked to — see {@link getCase}.
+   */
+  async listCaseAssignees(caseId: string): Promise<readonly CaseAssignee[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/assignees`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'assignees', 'CaseAssignee', (element) => ({
+      subject: requireString(element, 'subject'),
+      assignedAt: requireString(element, 'assignedAt'),
+      assignedBy: requireString(element, 'assignedBy'),
+    }));
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/assignees/{subject}` — put a colleague on a case.
+   *
+   * **Idempotent.** Linking somebody already on the matter succeeds, which is
+   * why it is a PUT: a client that lost a response can simply repeat it.
+   *
+   * Needs `cases: add_edit`, not an administrative permission — putting a
+   * colleague on a matter is case work. A 404 covers a case the caller cannot
+   * reach *and* a subject who is not in their firm, deliberately: telling them
+   * apart would be a probe for who works where.
+   */
+  async assignCase(caseId: string, subject: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#assigneeUrl(caseId, subject), {
+      method: 'PUT',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/assignees/{subject}` — take a colleague off.
+   *
+   * **A caller can unlink themselves and lose the case they were just
+   * editing.** That is the honest consequence of "I am no longer on this
+   * matter"; a client should confirm before doing it to the signed-in user.
+   *
+   * Unlinking the LAST person is allowed — the firm's administrators still
+   * reach the case, so it can always be reassigned. 404 when the subject is
+   * not on the case.
+   */
+  async unassignCase(caseId: string, subject: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#assigneeUrl(caseId, subject), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
 }
 
 /**
@@ -894,6 +1104,7 @@ function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
 function caseFromJson(response: DecodedResponse): Case {
   return {
     id: requireString(response, 'id'),
+    createdBy: requireString(response, 'createdBy'),
     chapter: requireCaseChapter(response, 'chapter'),
     district: requireString(response, 'district'),
     status: requireCaseStatus(response, 'status'),
@@ -1338,4 +1549,135 @@ function requireDebtorArray(response: DecodedResponse, key: string): readonly De
       path: label,
     });
   });
+}
+
+/**
+ * An array field whose every element must decode as `T` — checked per-element,
+ * never cast, the same rule {@link requireCaseArray} follows. Generic because
+ * three firm endpoints need it and copying the element-shape check three times
+ * is how one of them ends up not doing it.
+ */
+function requireArrayOf<T>(
+  response: DecodedResponse,
+  key: string,
+  typeName: string,
+  decode: (element: DecodedResponse) => T,
+): readonly T[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, `${typeName}[]`);
+  }
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, `${key}[${index}]`, 'object');
+    }
+    return decode({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: response.path === undefined ? `${key}[${index}]` : `${response.path}.${key}[${index}]`,
+    });
+  });
+}
+
+const FIRM_ROLES: readonly FirmRole[] = ['attorney', 'paralegal', 'staff'];
+const PERMISSION_LEVELS: readonly PermissionLevel[] = ['hidden', 'view_only', 'add_edit'];
+const FIRM_USER_STATUSES = ['active', 'disabled'] as const;
+const FIRM_FEATURES = [
+  'cases',
+  'intake',
+  'documents',
+  'extraction_review',
+  'firm_administration',
+] as const;
+
+function requireFirmRole(response: DecodedResponse, key: string): FirmRole {
+  const value = response.json[key];
+  if (typeof value !== 'string' || !FIRM_ROLES.includes(value as FirmRole)) {
+    throw malformedField(response, key, FIRM_ROLES.join(' | '));
+  }
+  return value as FirmRole;
+}
+
+/**
+ * The permission map, checked key by key.
+ *
+ * A FEATURE THIS VERSION DOES NOT KNOW IS DROPPED, and an unknown LEVEL makes
+ * the whole map malformed. The asymmetry is deliberate and matches the
+ * server's: a new feature added server-side must not break an older client, so
+ * an unrecognised key is skipped and reads as `hidden` through
+ * {@link permits}' caller — fail closed. An unrecognised LEVEL on a feature we
+ * DO know cannot be ranked at all, and guessing would be the one direction
+ * that can over-grant.
+ */
+function requirePermissions(
+  response: DecodedResponse,
+  key: string,
+): Readonly<Record<FirmFeature, PermissionLevel>> {
+  const value = response.json[key];
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw malformedField(response, key, 'object');
+  }
+  const source = value as Record<string, unknown>;
+  const permissions: Partial<Record<FirmFeature, PermissionLevel>> = {};
+  for (const feature of FIRM_FEATURES) {
+    const level = source[feature];
+    if (level === undefined) continue;
+    if (typeof level !== 'string' || !PERMISSION_LEVELS.includes(level as PermissionLevel)) {
+      throw malformedField(response, `${key}.${feature}`, PERMISSION_LEVELS.join(' | '));
+    }
+    permissions[feature] = level as PermissionLevel;
+  }
+  // Anything the server did not send is `hidden`. A client that treated a
+  // missing key as permissive would show a button the server refuses.
+  for (const feature of FIRM_FEATURES) {
+    permissions[feature] ??= 'hidden';
+  }
+  return permissions as Record<FirmFeature, PermissionLevel>;
+}
+
+function firmUserFromJson(response: DecodedResponse): FirmUser {
+  const status = response.json.status;
+  if (typeof status !== 'string' || !(FIRM_USER_STATUSES as readonly string[]).includes(status)) {
+    throw malformedField(response, 'status', FIRM_USER_STATUSES.join(' | '));
+  }
+  return {
+    subject: requireString(response, 'subject'),
+    email: requireString(response, 'email'),
+    displayName: requireString(response, 'displayName'),
+    role: requireFirmRole(response, 'role'),
+    isAdmin: requireBoolean(response, 'isAdmin'),
+    accessAllCases: requireBoolean(response, 'accessAllCases'),
+    permissions: requirePermissions(response, 'permissions'),
+    status: status as FirmUserStatus,
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
+/**
+ * The `firm` block of `GET /v1/me`, or `undefined` when the caller is in no
+ * firm — absent, not null. See {@link FirmMembership}.
+ */
+function optionalFirmMembership(response: DecodedResponse): FirmMembership | undefined {
+  const nested = optionalObject(response, 'firm');
+  if (nested === undefined) return undefined;
+  return {
+    id: requireString(nested, 'id'),
+    name: requireString(nested, 'name'),
+    role: requireFirmRole(nested, 'role'),
+    displayName: requireString(nested, 'displayName'),
+    isAdmin: requireBoolean(nested, 'isAdmin'),
+    accessAllCases: requireBoolean(nested, 'accessAllCases'),
+    permissions: requirePermissions(nested, 'permissions'),
+  };
+}
+
+/** A boolean field that must be present and must be a boolean. */
+function requireBoolean(response: DecodedResponse, key: string): boolean {
+  const value = response.json[key];
+  if (typeof value !== 'boolean') {
+    throw malformedField(response, key, 'boolean');
+  }
+  return value;
 }

@@ -21,6 +21,9 @@ jest.mock('@/config/environment', () => ({
 
 const CASE = {
   id: '00000000-0000-4000-8000-0000000000c1',
+  // Who OPENED the matter. A subject, not a name — the firm directory is what
+  // resolves it, and a case list that rendered this raw would show a UUID.
+  createdBy: '00000000-0000-4000-8000-00000000a11c',
   chapter: 7,
   district: 'NDCA',
   status: 'intake',
