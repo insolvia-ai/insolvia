@@ -3,7 +3,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
 
-from insolvia_api.api.auth import current_principal, require_auth
+from insolvia_api.api.auth import current_principal, require_auth, resolve_accessor
+from insolvia_api.core.firms import FEATURES, permission_for
 
 blueprint = Blueprint("me", __name__)
 
@@ -30,14 +31,45 @@ def read_me() -> ResponseReturnValue:
 
     `username` is that UUID, not an address — it is returned for support and
     correlation, and clients must not display it as one.
+
+    ## The `firm` block, and why it is optional
+
+    THE ONE ROUTE THAT RESOLVES THE ACCESSOR WITHOUT REQUIRING ONE. Everywhere
+    else, a signed-in caller with no firm is a 403; here it is an ANSWER —
+    `firm` is simply absent. That is what makes "signed in but not provisioned"
+    a state the client can render, instead of an error screen with nothing on
+    it. It is also the reason accessor resolution is a separate step from
+    `require_auth` at all (see api/auth.py).
+
+    `permissions` is the EFFECTIVE map, not the stored one — the opposite
+    choice from core/firms.firm_user_json, and deliberately. That response is
+    an admin looking at somebody's record, where the stored value and the admin
+    override are two different facts they need to see apart. This one is a
+    client asking "what may I do", and the honest answer to that is what the
+    server will actually allow: an admin's row says `firm_administration:
+    hidden` and they can nonetheless manage users. A client rendering the
+    stored map would hide the button and then be surprised the endpoint works.
     """
     principal = current_principal()
-    return jsonify(
-        {
-            "subject": principal.subject,
-            "username": principal.username,
-            "clientId": principal.client_id,
-            "scopes": list(principal.scopes),
-            "expiresAt": principal.expires_at,
+    body: dict[str, object] = {
+        "subject": principal.subject,
+        "username": principal.username,
+        "clientId": principal.client_id,
+        "scopes": list(principal.scopes),
+        "expiresAt": principal.expires_at,
+    }
+
+    accessor = resolve_accessor()
+    if accessor is not None:
+        body["firm"] = {
+            "id": accessor.firm.id,
+            "name": accessor.firm.name,
+            "role": accessor.user.role,
+            "displayName": accessor.user.display_name,
+            "isAdmin": accessor.user.is_admin,
+            "accessAllCases": accessor.user.access_all_cases,
+            "permissions": {
+                feature: permission_for(accessor.user, feature) for feature in FEATURES
+            },
         }
-    )
+    return jsonify(body)

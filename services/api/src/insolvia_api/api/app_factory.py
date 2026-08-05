@@ -17,6 +17,7 @@ from insolvia_api.core.cors import origin_allowed
 from insolvia_api.core.errors import (
     ApiError,
     FieldValidationError,
+    ForbiddenError,
     NotFoundError,
     ValidationError,
 )
@@ -95,6 +96,15 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     @app.errorhandler(ValidationError)
     def validation_error(error: ValidationError) -> ResponseReturnValue:
         return jsonify({"error": "ValidationError", "message": str(error)}), 400
+
+    @app.errorhandler(ForbiddenError)
+    def forbidden_error(error: ForbiddenError) -> ResponseReturnValue:
+        # Registered above the ApiError handler on purpose, like NotFoundError
+        # below: Flask dispatches to the most specific registered class, and
+        # ForbiddenError IS an ApiError, so without this it would answer 400.
+        # 403 rather than 404, and core/errors.py argues the distinction: this
+        # is a fact about the caller's own account, not somebody else's data.
+        return jsonify({"error": "ForbiddenError", "message": str(error)}), 403
 
     @app.errorhandler(NotFoundError)
     def not_found_error(error: NotFoundError) -> ResponseReturnValue:

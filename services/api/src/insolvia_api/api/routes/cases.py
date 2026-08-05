@@ -5,7 +5,7 @@ import logging
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
-from insolvia_api.api.auth import current_principal, require_auth
+from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.access_log import record_access
 from insolvia_api.core.cases import (
@@ -17,6 +17,7 @@ from insolvia_api.core.cases import (
     parse_list_limit,
 )
 from insolvia_api.core.errors import NotFoundError, ValidationError
+from insolvia_api.core.firms import ADD_EDIT, CASES, VIEW_ONLY
 from insolvia_api.core.ports import AccessLog, CaseStore
 
 logger = logging.getLogger(__name__)
@@ -55,32 +56,52 @@ def _json_body() -> dict[str, object]:
 
 @blueprint.post("/v1/cases")
 @require_auth
+@requires(CASES, ADD_EDIT)
 def create_case_route() -> ResponseReturnValue:
-    """Open a case owned by the caller.
+    """Open a case for the caller's firm.
 
-    The owner is taken from the verified token and is never read from the
-    body, so there is no request a client can make that creates a case
-    belonging to someone else.
+    The firm comes from the caller's resolved accessor and is never read from
+    the body, so there is no request a client can make that creates a case in
+    another firm.
+
+    The creator is LINKED to the case in the same transaction. Without that a
+    paralegal without `access_all_cases` would open a matter they cannot see,
+    cannot list and cannot reach by id — indistinguishable, from the outside,
+    from the request having failed. core/cases.create_case returns the pair.
     """
     store, access_log = _stores()
     draft = parse_case_creation(_json_body())
-    principal = current_principal().subject
+    accessor = current_accessor()
 
-    case = create_case(draft, owner_principal=principal)
-    store.create(case)
+    case, assignment = create_case(
+        draft, firm_id=accessor.firm_id, created_by=accessor.subject
+    )
+    store.create(case, assignment)
     access_log.record(
-        record_access(case_id=case.id, principal=principal, action="case.create")
+        record_access(case_id=case.id, principal=accessor.subject, action="case.create")
     )
 
-    # GLBA: the case id and nothing about its contents.
+    # GLBA: the case id and nothing about its contents. The FIRM id is not
+    # logged either — a request log that accumulated tenant ids would be a
+    # per-firm activity record sitting in CloudWatch.
     logger.info("case created", extra={"case_id": case.id})
     return jsonify(case_json(case)), 201
 
 
 @blueprint.get("/v1/cases")
 @require_auth
+@requires(CASES, VIEW_ONLY)
 def list_cases_route() -> ResponseReturnValue:
-    """The caller's cases, newest first.
+    """The cases the caller may see, newest first.
+
+    WHICH CASES THAT IS depends on the caller: a firm admin or anyone with
+    `access_all_cases` gets the whole firm's, and everyone else gets the
+    matters they are linked to. The store picks the index; see
+    CaseStore.list_for_accessor.
+
+    A cursor is only valid against the listing that minted it, so flipping a
+    user's `access_all_cases` mid-pagination answers 400 rather than silently
+    skipping the cases in between.
 
     Deliberately NOT written to the access log. That table is keyed by case,
     and a list touches no case in particular; the question it exists to answer
@@ -92,7 +113,7 @@ def list_cases_route() -> ResponseReturnValue:
     limit = parse_list_limit(request.args.get("limit"))
     cursor = request.args.get("cursor") or None
 
-    page = store.list_for_owner(current_principal().subject, limit=limit, cursor=cursor)
+    page = store.list_for_accessor(current_accessor(), limit=limit, cursor=cursor)
 
     body: dict[str, object] = {"cases": [case_json(case) for case in page.cases]}
     # Absent rather than null when there is no next page — the client contract
@@ -104,22 +125,29 @@ def list_cases_route() -> ResponseReturnValue:
 
 @blueprint.get("/v1/cases/<case_id>")
 @require_auth
+@requires(CASES, VIEW_ONLY)
 def get_case_route(case_id: str) -> ResponseReturnValue:
-    """One case, if it is the caller's.
+    """One case, if the caller may see it.
 
-    A case owned by someone else answers 404, identically to one that does not
-    exist — see core/errors.py's NotFoundError for why that is not politeness.
+    Another firm's case answers 404, identically to one that does not exist —
+    and so does the caller's OWN firm's case that they are not linked to. All
+    three are the same answer on purpose: see core/errors.py's NotFoundError,
+    and note that the third is not only about enumeration. Distinguishing "not
+    linked" from "no such case" would tell any member of a firm which matters
+    exist and which colleagues are on them, which is the thing per-case linking
+    is for.
+
     The refused read IS recorded: someone walking case ids is exactly what the
     access log should show.
     """
     store, access_log = _stores()
-    principal = current_principal().subject
+    accessor = current_accessor()
 
-    case = store.get(case_id, owner_principal=principal)
+    case = store.get(case_id, accessor=accessor)
     access_log.record(
         record_access(
             case_id=case_id,
-            principal=principal,
+            principal=accessor.subject,
             action="case.read",
             outcome="allowed" if case is not None else "denied",
         )
@@ -131,18 +159,24 @@ def get_case_route(case_id: str) -> ResponseReturnValue:
 
 @blueprint.patch("/v1/cases/<case_id>")
 @require_auth
+@requires(CASES, ADD_EDIT)
 def update_case_route(case_id: str) -> ResponseReturnValue:
     """Change a case's chapter, district or status.
 
-    Read-modify-write. The store's conditional write closes the gap between
-    the two, so a case cannot be reassigned out from under the caller between
-    the read and the write.
+    Read-modify-write. The read applies the whole access rule; the store's
+    conditional write closes the gap between the two, so a case cannot move
+    firms out from under the caller between the read and the write.
+
+    A `view_only` caller never reaches here — `@requires` refuses with 403,
+    which is the right answer rather than a 404: they can see this case, and
+    telling them it does not exist while it sits in their own listing would be
+    a lie their client cannot act on.
     """
     store, access_log = _stores()
     changes = parse_case_update(_json_body())
-    principal = current_principal().subject
+    accessor = current_accessor()
 
-    existing = store.get(case_id, owner_principal=principal)
+    existing = store.get(case_id, accessor=accessor)
     updated = (
         None if existing is None else store.update(apply_changes(existing, changes))
     )
@@ -150,7 +184,7 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
     access_log.record(
         record_access(
             case_id=case_id,
-            principal=principal,
+            principal=accessor.subject,
             action="case.update",
             outcome="allowed" if updated is not None else "denied",
         )

@@ -40,6 +40,15 @@ def test_case_table_name_is_read():
     assert config.case_table_name == "insolvia-cases-staging"
 
 
+def test_firm_table_name_defaults_to_none():
+    assert load_config({}).firm_table_name is None
+
+
+def test_firm_table_name_is_read():
+    config = load_config({"FIRM_TABLE_NAME": "insolvia-firms-staging"})
+    assert config.firm_table_name == "insolvia-firms-staging"
+
+
 def test_case_access_log_table_name_defaults_to_none():
     assert load_config({}).case_access_log_table_name is None
 
