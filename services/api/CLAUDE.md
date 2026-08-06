@@ -16,6 +16,15 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
   **fails closed**: missing `AUTH_ISSUER_URL`/`AUTH_CLIENT_ID` is a 401 on
   every protected route, never a bypass. `/health`, `POST /v1/waitlist`, and
   `POST /v1/unsubscribe` are deliberately public.
+- **There is a third state: authenticated *and permitted*.** A case belongs to
+  a **firm**, not to whoever opened it. `current_accessor()` resolves the
+  caller's firm user (`core/firms.py`) and answers **403** when there is none —
+  a different failure from 401, and not hidden behind a 404 because it is a
+  fact about the caller's own account. `@requires(FEATURE, LEVEL)` goes below
+  `@require_auth`, same "or it never runs" rule. Everything about who may see
+  which case is `core/access.may_see_case`, in one place on purpose.
+  `/v1/me` is the ONE route that resolves without requiring — it reports the
+  firm, or reports its absence, so a new user has something to render.
 - **Logs are one JSON line per request, metadata only** — never bodies or PII
   (GLBA). A failed auth logs a category (`AuthFailureReason`), never the token
   or a claim.

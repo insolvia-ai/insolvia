@@ -20,6 +20,7 @@ import time
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_api.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
@@ -101,7 +102,7 @@ def config(**overrides: str):
     return load_config(environ)
 
 
-def make_client(*, app_config=None, provider=None):
+def make_client(*, app_config=None, provider=None, firm_store=None):
     """A test client with auth composed, mirroring test_unsubscribe.py's
     local helper for cases that need config the shared fixture does not have.
     """
@@ -115,6 +116,12 @@ def make_client(*, app_config=None, provider=None):
                 if provider is not None
                 else StaticJwksProvider({KID: _PUBLIC_KEY})
             ),
+            # Composed even when empty. /v1/me resolves the accessor to report
+            # a firm, and `resolve_accessor` RAISES rather than degrading when
+            # the store is absent — a deployment that cannot resolve anyone
+            # must not look like every user being unprovisioned. An empty store
+            # is the honest "signed in, not yet in a firm" case.
+            firm_store=MemoryFirmStore() if firm_store is None else firm_store,
         )
     )
     return app.test_client()
@@ -158,6 +165,69 @@ def test_me_body_has_exactly_the_contract_keys(auth_client):
         "scopes",
         "expiresAt",
     }
+    # `firm` is absent rather than null for a caller who is in no firm — the
+    # same absent-not-null contract nextCursor follows.
+
+
+def test_me_omits_the_firm_for_someone_not_in_one():
+    """SIGNED IN, NOT PROVISIONED — a state, not an error.
+
+    Every other authenticated route answers 403 for this caller. Here the
+    absence of `firm` is the answer, which is what lets a client render
+    "ask your firm's admin to add you" instead of an error screen. It is also
+    the whole reason accessor resolution is separate from require_auth.
+    """
+    body = get_me(make_client(), make_token()).get_json()
+    assert "firm" not in body
+
+
+def test_me_reports_the_firm_and_the_effective_permissions():
+    from insolvia_api.core.firms import (
+        ADD_EDIT,
+        FIRM_ADMINISTRATION,
+        Firm,
+        FirmUser,
+        default_permissions,
+    )
+
+    firms = MemoryFirmStore()
+    firm_id = "00000000-0000-4000-8000-00000000f18a"
+    firms.create_firm(
+        Firm(
+            id=firm_id,
+            name="Example & Partners",
+            status="active",
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    firms.add_user(
+        FirmUser(
+            firm_id=firm_id,
+            subject=SUBJECT,
+            email="admin@example.test",
+            display_name="Example Admin",
+            role="attorney",
+            is_admin=True,
+            access_all_cases=False,
+            permissions=default_permissions("attorney"),
+            status="active",
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+
+    body = get_me(make_client(firm_store=firms), make_token()).get_json()
+    assert body["firm"]["id"] == firm_id
+    assert body["firm"]["name"] == "Example & Partners"
+    assert body["firm"]["isAdmin"] is True
+    # EFFECTIVE, not stored. The row says firm_administration: hidden and this
+    # admin can nonetheless manage users — a client rendering the stored map
+    # would hide the button and then be surprised the endpoint works. That is
+    # the opposite choice from firm_user_json, which is an admin looking at
+    # somebody's record and needs the two facts apart.
+    assert default_permissions("attorney")[FIRM_ADMINISTRATION] != ADD_EDIT
+    assert body["firm"]["permissions"][FIRM_ADMINISTRATION] == ADD_EDIT
 
 
 def test_me_never_returns_an_email():

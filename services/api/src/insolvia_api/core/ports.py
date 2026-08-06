@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import AccessEvent
-from insolvia_api.core.cases import Case, CasePage
+from insolvia_api.core.cases import Case, CaseAssignment, CasePage
 from insolvia_api.core.firms import Firm, FirmUser
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
@@ -128,28 +129,88 @@ class CaseStore(Protocol):
     """Persists case records (issue 8.3). Implemented by adapters/aws
     (DynamoDB) and adapters/memory (tests and the plain development server).
 
-    Every method takes the owner explicitly and every implementation MUST
-    enforce it rather than trusting the route to have checked. The route does
-    check, and this is still not belt-and-braces: ownership is the only thing
-    standing between one firm's cases and another's, and a scoping rule that
-    lives in exactly one place is one refactor away from not existing.
+    Every read takes an `Accessor` explicitly and every implementation MUST
+    apply `core/access.may_see_case` rather than trusting the route to have
+    checked. The route does check, and this is still not belt-and-braces: it is
+    the only thing standing between one firm's cases and another's, and a
+    scoping rule that lives in exactly one place is one refactor away from not
+    existing.
 
-    `get` and `update` return None for "no such case" AND for "not yours" —
-    the distinction must not reach the caller, because a route that can tell
-    them apart is an oracle for other firms' case ids.
+    `get` and `update` return None for "no such case", for "another firm's
+    case", AND for "your firm's case that you are not linked to". The three
+    must not be distinguishable from outside, because a route that could tell
+    them apart is an oracle for other firms' case ids — and, worse, for which
+    matters a colleague is working.
     """
 
-    def create(self, case: Case) -> None: ...
+    def create(self, case: Case, assignment: CaseAssignment) -> None:
+        """Store a new case AND link its creator, atomically.
 
-    def get(self, case_id: str, *, owner_principal: str) -> Case | None: ...
+        BOTH OR NEITHER, and it must be a transaction rather than two writes.
+        A case whose assignment write failed is invisible to the person who
+        just created it — they cannot list it, cannot open it, and cannot tell
+        it apart from the request having failed — while still occupying its id.
+        core/cases.create_case returns the pair for exactly this reason.
+        """
+        ...
 
-    def list_for_owner(
-        self, owner_principal: str, *, limit: int, cursor: str | None
-    ) -> CasePage: ...
+    def get(self, case_id: str, *, accessor: Accessor) -> Case | None:
+        """One case, if this accessor may see it.
+
+        Implementations read the case AND the caller's assignment row in ONE
+        round trip — they share a partition — and hand both to `may_see_case`.
+        Reading the case, deciding, and only then checking linkage would be two
+        round trips on the hottest path in the service.
+        """
+        ...
+
+    def list_for_accessor(
+        self, accessor: Accessor, *, limit: int, cursor: str | None
+    ) -> CasePage:
+        """The cases this accessor may see, newest first.
+
+        TWO DIFFERENT INDEXES depending on the caller — `by-firm` when
+        `sees_every_case`, `by-assignee` otherwise — which is the one genuinely
+        awkward consequence of this model and is why cursors carry the index
+        they were minted against (core/cases.encode_cursor). An implementation
+        MUST pass its index through to encode/decode so a permission change
+        mid-pagination fails loudly instead of skipping rows.
+        """
+        ...
 
     def update(self, case: Case) -> Case | None:
-        """Write `case` back, but only if it is still owned by
-        `case.owner_principal`. Returns None if that no longer holds."""
+        """Write `case` back, but only if it still belongs to `case.firm_id`.
+
+        Returns None if that no longer holds — closing the window between the
+        route's read and this write, so a case cannot move firms underneath a
+        caller mid-request.
+
+        NO ASSIGNMENT CHECK HERE, deliberately: the route has already resolved
+        the case through `get`, which applied the whole rule. Re-deriving
+        linkage in the write would be a second copy of an authorization
+        decision, and two copies eventually disagree.
+        """
+        ...
+
+    def assign(self, assignment: CaseAssignment) -> None:
+        """Link someone to a case. Idempotent — re-linking somebody already on
+        the matter must succeed rather than raising, because the firm-admin UI
+        cannot tell whether its first request landed."""
+        ...
+
+    def unassign(self, case_id: str, subject: str) -> bool:
+        """Unlink someone. True if this call removed the link, False if there
+        was nothing there."""
+        ...
+
+    def assignees(self, case_id: str) -> tuple[CaseAssignment, ...]:
+        """Everyone linked to this case, oldest link first.
+
+        Case-scoped and takes no accessor: the one caller resolves the case
+        through `get` first, on every path. Same rule DocumentStore states —
+        two authorisation checks that must agree are two checks that will
+        eventually disagree.
+        """
         ...
 
 

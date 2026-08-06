@@ -80,6 +80,7 @@ directory; ruff config is the repo-root `ruff.toml`).
 |---|---|
 | `INSOLVIA_ENV` | `local` (default) \| `staging` \| `production`; also selects the CORS allowlist (`core/config.py`) |
 | `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
+| `FIRM_TABLE_NAME` | DynamoDB table holding firms, their people, and what each may do (`infra/modules/firm_store`). **Read on every authenticated request** — resolving the caller's firm is what makes a case reachable — so the Lambda entrypoint refuses to boot without it. Same local/in-memory shape as the others |
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
 
@@ -107,6 +108,34 @@ not checked. `GET /v1/me` answers from those verified claims alone; there is no
 call back to Cognito, and no email (the pool's `username_attributes` is
 `["email"]`, so an access token's `username` is a generated UUID — the app
 displays the address from the ID token it already holds).
+
+## Authorization
+
+Authentication answers *who*; a second step answers *what they may see*. A case
+belongs to a **firm**, not to the person who opened it, so every case route
+resolves the caller's firm user through the `by-subject` index on the firm
+table (`current_accessor()`), and a signed-in caller who is **not in an active
+firm answers 403** — not 401 (their token is fine, signing in again will not
+help) and not 404 (it is a fact about their own account, with nothing to
+enumerate).
+
+`GET /v1/me` is the one route that resolves without requiring. It reports a
+`firm` block, or omits it, so a user who has signed up and not yet been added
+to a firm has something to render instead of an error. Its `permissions` are
+the **effective** ones — a firm admin's stored map says
+`firm_administration: hidden` and they can nonetheless manage users.
+
+Which cases a caller sees depends on them: a firm admin, or anyone carrying
+`accessAllCases`, lists their whole firm's; everyone else lists the matters
+they are **linked** to. Those are two different indexes, so a pagination cursor
+is only valid against the listing that minted it — flip a permission
+mid-pagination and the next page is a 400 rather than a silent gap. The whole
+visibility rule is `core/access.may_see_case`, deliberately in one place.
+
+Per-feature permissions (`cases`, `intake`, `documents`, `extraction_review`,
+`firm_administration`) sit on top as `@requires(FEATURE, LEVEL)`, below
+`@require_auth`. They fail closed: a feature missing from a user's map, or a
+level this version does not recognise, reads as `hidden`.
 
 Routes are public unless decorated: `@require_auth` from `api/auth.py`, applied
 **below** the route decorator. `/health`, `POST /v1/waitlist`, and

@@ -44,15 +44,50 @@ DEFAULT_LIST_LIMIT = 50
 
 @dataclass(frozen=True)
 class Case:
-    """A case record — the META item of its partition."""
+    """A case record — the META item of its partition.
+
+    A CASE BELONGS TO A FIRM, not to whoever opened it. `owner_principal` used
+    to be a Cognito `sub` and that was the single-user assumption in its purest
+    form: a colleague at the same firm got a 404 on their own firm's matter,
+    and two people could not work one case at all.
+
+    `created_by` keeps the individual, and keeps it as what it actually is — an
+    audit fact about who opened the matter, not a permission. It grants nothing
+    on its own; the creator reaches the case through the assignment written
+    alongside it (see `create_case`), exactly as any other colleague does.
+    """
 
     id: str
-    owner_principal: str
+    firm_id: str
+    created_by: str
     chapter: int
     district: str
     status: str
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True)
+class CaseAssignment:
+    """One person linked to one case — MyCase's "linked to a case".
+
+    An item in the CASE's partition rather than a list on the case record, and
+    that is the design rather than an implementation detail: the row IS the
+    entry in the `by-assignee` index, so linking somebody to a matter and
+    making it appear in their listing are a single write. A list attribute
+    would need a second write to an index that could then disagree with it.
+    """
+
+    case_id: str
+    subject: str
+    # Denormalised from the case, and it has to be: GSI2SK is
+    # "<created_at>#<case_id>", so an assignment must carry the CASE's creation
+    # time to sort into the same order the firm-wide listing uses. Its own
+    # timestamp would order somebody's list by when they were added to matters
+    # rather than by when the matters were opened.
+    case_created_at: str
+    assigned_at: str
+    assigned_by: str
 
 
 @dataclass(frozen=True)
@@ -76,7 +111,7 @@ class CaseChanges:
 
 @dataclass(frozen=True)
 class CasePage:
-    """One page of a principal's cases, newest first."""
+    """One page of the cases a caller may see, newest first."""
 
     cases: tuple[Case, ...]
     next_cursor: str | None
@@ -182,19 +217,54 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
     return CaseChanges(**changes)  # type: ignore[arg-type]
 
 
-def create_case(draft: CaseDraft, *, owner_principal: str) -> Case:
-    """Stamp a draft with server-generated identity. The owner comes from the
-    verified token, never from the request body — a client cannot create a
-    case belonging to someone else because it has no way to say so."""
+def create_case(
+    draft: CaseDraft, *, firm_id: str, created_by: str
+) -> tuple[Case, CaseAssignment]:
+    """Stamp a draft with server-generated identity, and link its creator.
+
+    Both keys come from the caller's resolved accessor, never from the request
+    body — a client cannot create a case in another firm because it has no way
+    to say so.
+
+    THE ASSIGNMENT IS NOT OPTIONAL AND IT IS RETURNED HERE, not left to the
+    route, because the failure it prevents is silent and total: a paralegal
+    without `access_all_cases` who opens a matter and is not linked to it has
+    created a case they cannot see, cannot list, and cannot reach by id. It
+    would look exactly like the case never being saved.
+
+    They are returned as a pair for the store to write TOGETHER. Two separate
+    writes have a window in which the first succeeded and the second did not,
+    and that window produces precisely the invisible case above — so
+    CaseStore.create takes both and writes them in one transaction.
+
+    An admin gets one too. It costs one small item and it means "who is on
+    this matter" has one answer rather than "the assignees, plus whoever
+    created it, plus anyone with access_all_cases".
+    """
     now = _timestamp()
-    return Case(
+    case = Case(
         id=str(uuid.uuid4()),
-        owner_principal=owner_principal,
+        firm_id=firm_id,
+        created_by=created_by,
         chapter=draft.chapter,
         district=draft.district,
         status="intake",
         created_at=now,
         updated_at=now,
+    )
+    return case, assign_case(case, subject=created_by, assigned_by=created_by)
+
+
+def assign_case(case: Case, *, subject: str, assigned_by: str) -> CaseAssignment:
+    """Link `subject` to `case`. `assigned_by` is the person doing the linking
+    — the same value as `subject` when a case is being opened, and a firm
+    admin's when someone is added to an existing matter."""
+    return CaseAssignment(
+        case_id=case.id,
+        subject=subject,
+        case_created_at=case.created_at,
+        assigned_at=_timestamp(),
+        assigned_by=assigned_by,
     )
 
 
@@ -216,8 +286,23 @@ def partition_key(case_id: str) -> str:
     return f"CASE#{case_id}"
 
 
-def owner_key(owner_principal: str) -> str:
-    return f"OWNER#{owner_principal}"
+def firm_key(firm_id: str) -> str:
+    return f"FIRM#{firm_id}"
+
+
+def assignee_key(subject: str) -> str:
+    return f"ASSIGNEE#{subject}"
+
+
+def listing_sort_key(created_at: str, case_id: str) -> str:
+    """The value BOTH listing indexes sort on, defined once.
+
+    GSI1SK on the case and GSI2SK on its assignments must be built the same
+    way, or the two listings order differently and a user whose
+    `access_all_cases` is flipped sees their cases jump around. Sorting is
+    lexicographic, which is why `_timestamp` is fixed-width and Z-suffixed.
+    """
+    return f"{created_at}#{case_id}"
 
 
 def case_item(case: Case) -> dict[str, str | int]:
@@ -226,16 +311,21 @@ def case_item(case: Case) -> dict[str, str | int]:
     PK      CASE#<id>
     SK      META                    the case root; child entities take
                                     DEBTOR#<id>, CLAIM#<id>, ... later
-    GSI1PK  OWNER#<principal>       sparse: only this item carries them, so
-    GSI1SK  <createdAt>#<id>        the index holds one entry per case
+    GSI1PK  FIRM#<firm_id>          the by-firm listing. Sparse: only this
+    GSI1SK  <createdAt>#<id>        item carries them, one entry per case.
+
+    NO GSI2 KEYS. The by-assignee index is fed by the assignment items below,
+    which is what makes it sparse in the opposite direction — a case with no
+    assignees simply is not in it.
     """
     return {
         "PK": partition_key(case.id),
         "SK": "META",
-        "GSI1PK": owner_key(case.owner_principal),
-        "GSI1SK": f"{case.created_at}#{case.id}",
+        "GSI1PK": firm_key(case.firm_id),
+        "GSI1SK": listing_sort_key(case.created_at, case.id),
         "id": case.id,
-        "ownerPrincipal": case.owner_principal,
+        "firmId": case.firm_id,
+        "createdBy": case.created_by,
         "chapter": case.chapter,
         "district": case.district,
         "status": case.status,
@@ -247,11 +337,20 @@ def case_item(case: Case) -> dict[str, str | int]:
 def case_from_item(item: Mapping[str, str | int]) -> Case:
     """Inverse of case_item. Raises ValidationError on an item this service
     did not write — a corrupt row should fail loudly here rather than become
-    a half-populated Case that reaches a caller."""
+    a half-populated Case that reaches a caller.
+
+    `firmId` IS REQUIRED, with no fallback to the old `ownerPrincipal`. A row
+    written before firms existed has no firm, and the tempting reading —
+    "treat the old owner as the firm" — would put a Cognito subject where a
+    firm id goes and quietly build a one-person tenant whose id is somebody's
+    identity. Loud is right: those rows are dev probe data, and
+    scripts/dev-aws-reset.sh is the answer.
+    """
     try:
         return Case(
             id=str(item["id"]),
-            owner_principal=str(item["ownerPrincipal"]),
+            firm_id=str(item["firmId"]),
+            created_by=str(item["createdBy"]),
             chapter=int(item["chapter"]),
             district=str(item["district"]),
             status=str(item["status"]),
@@ -262,12 +361,68 @@ def case_from_item(item: Mapping[str, str | int]) -> Case:
         raise ValidationError(f"stored case item is malformed: {error}") from error
 
 
+def assignment_sort_key(subject: str) -> str:
+    return f"ASSIGNEE#{subject}"
+
+
+def assignment_item(assignment: CaseAssignment) -> dict[str, str | int]:
+    """The exact stored item shape for a case assignment.
+
+    PK      CASE#<case_id>              the case's own partition, so reading a
+    SK      ASSIGNEE#<subject>          case and "am I linked to it" is one
+                                        BatchGetItem rather than two queries
+    GSI2PK  ASSIGNEE#<subject>          the by-assignee listing
+    GSI2SK  <caseCreatedAt>#<case_id>   the CASE's timestamp — see the entity
+
+    The projection is ALL, so a query on by-assignee returns these rows in
+    full. They are not cases: the store reads the ids out of them and fetches
+    the case records. Projecting the case onto the assignment instead would be
+    a copy that goes stale the moment a district changes.
+    """
+    return {
+        "PK": partition_key(assignment.case_id),
+        "SK": assignment_sort_key(assignment.subject),
+        "GSI2PK": assignee_key(assignment.subject),
+        "GSI2SK": listing_sort_key(assignment.case_created_at, assignment.case_id),
+        "caseId": assignment.case_id,
+        "subject": assignment.subject,
+        "caseCreatedAt": assignment.case_created_at,
+        "assignedAt": assignment.assigned_at,
+        "assignedBy": assignment.assigned_by,
+    }
+
+
+def assignment_from_item(item: Mapping[str, str | int]) -> CaseAssignment:
+    try:
+        return CaseAssignment(
+            case_id=str(item["caseId"]),
+            subject=str(item["subject"]),
+            case_created_at=str(item["caseCreatedAt"]),
+            assigned_at=str(item["assignedAt"]),
+            assigned_by=str(item["assignedBy"]),
+        )
+    except KeyError as error:
+        raise ValidationError(
+            f"stored case assignment item is malformed: {error}"
+        ) from error
+
+
 def case_json(case: Case) -> dict[str, object]:
-    """The API representation. `ownerPrincipal` is deliberately absent: the
-    caller is the owner by construction, so returning it would leak a subject
-    identifier into a response body for no purpose."""
+    """The API representation.
+
+    `firmId` is absent because every caller who can see this case is in that
+    firm by construction, so it would echo their own tenant id back at them.
+
+    `createdBy` IS present, and it is new. It was absent when it was
+    `ownerPrincipal` — a single-owner model made it the caller's own subject
+    and therefore worthless — but with several colleagues on one matter "who
+    opened this" is a thing the case list has to show, and the subject is what
+    the firm's own staff list is keyed by (core/firms.firm_user_json), so the
+    client can resolve it to a name without a second endpoint.
+    """
     return {
         "id": case.id,
+        "createdBy": case.created_by,
         "chapter": case.chapter,
         "district": case.district,
         "status": case.status,
@@ -288,15 +443,39 @@ def parse_list_limit(raw: str | None) -> int:
     return limit
 
 
-def encode_cursor(key: Mapping[str, str]) -> str:
+# The two listing indexes, and which one a caller reads depends on their
+# permissions (core/access.Accessor.sees_every_case). A cursor names the index
+# it was minted against for the reason the infra module's comment gives from
+# the other side: the two return DIFFERENT SETS, so a start key from one is
+# meaningless against the other.
+#
+# The failure this prevents is quiet. Flip a user's `access_all_cases` between
+# two pages and, without the tag, page two resumes a by-assignee scan position
+# inside a by-firm query: DynamoDB accepts the key, returns whatever sorts
+# after it, and the user silently never sees the cases in between. With the
+# tag it is a 400 and the client starts the listing again — which is the
+# correct answer, because their listing genuinely changed.
+INDEX_BY_FIRM = "by-firm"
+INDEX_BY_ASSIGNEE = "by-assignee"
+
+
+def encode_cursor(key: Mapping[str, str], *, index: str) -> str:
     """Opaque pagination cursor. Base64 rather than the raw key so the client
-    cannot come to depend on the table's attribute names."""
-    raw = json.dumps(dict(sorted(key.items())), separators=(",", ":"))
+    cannot come to depend on the table's attribute names.
+
+    Opaque, NOT signed. A caller can decode and rewrite one, and that buys
+    them nothing: the start key only chooses where a query begins, and the
+    query itself is already pinned to their own firm or their own subject. It
+    is not an authorization token and must never become one.
+    """
+    payload = {"i": index, "k": dict(sorted(key.items()))}
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
-def decode_cursor(cursor: str) -> dict[str, str]:
-    """Inverse of encode_cursor, rejecting anything this service did not mint.
+def decode_cursor(cursor: str, *, index: str) -> dict[str, str]:
+    """Inverse of encode_cursor, rejecting anything this service did not mint
+    and anything minted against a different index.
 
     The value is attacker-controlled and goes on to become a DynamoDB
     ExclusiveStartKey, so it is validated to a flat string map here rather
@@ -308,9 +487,15 @@ def decode_cursor(cursor: str) -> dict[str, str]:
         decoded = json.loads(raw)
     except (ValueError, binascii.Error) as error:
         raise ValidationError("cursor is not valid") from error
-    if not isinstance(decoded, dict) or not all(
-        isinstance(key, str) and isinstance(value, str)
-        for key, value in decoded.items()
+    if not isinstance(decoded, dict) or decoded.get("i") != index:
+        # One message for both failures. "That cursor is for the other index"
+        # would tell a caller something about how their own permissions are
+        # evaluated, and the client's action is the same either way: start the
+        # listing again.
+        raise ValidationError("cursor is not valid")
+    key = decoded.get("k")
+    if not isinstance(key, dict) or not all(
+        isinstance(name, str) and isinstance(value, str) for name, value in key.items()
     ):
         raise ValidationError("cursor is not valid")
-    return decoded
+    return key
