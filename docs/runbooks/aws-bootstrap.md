@@ -50,6 +50,22 @@ only legitimate local applies:
 scripts/apply-ci-trust.sh
 ```
 
+### Human IAM users
+
+The admin user this runbook's steps are executed *as* is itself codified, in
+`infra/envs/account-access` — also human-applied, and in a fresh account it is
+the one root that must be stood up by whoever holds the root credentials, since
+there is no admin user yet to run anything else. It is otherwise outside the
+apply order: nothing depends on it. See
+[`../reference/terraform.md`](../reference/terraform.md#human-account-access)
+for what it does and does not model, and
+[`iam-mfa-rotation.md`](iam-mfa-rotation.md) for MFA, which is not a Terraform
+resource on purpose.
+
+```bash
+scripts/apply-account-access.sh
+```
+
 ## 1. Terraform state bucket — the first action in the entire plan
 Every `backend.tf` in the repo points at this bucket, so `terraform init` cannot
 run anywhere until it exists. Verified absent 2026-07-21.

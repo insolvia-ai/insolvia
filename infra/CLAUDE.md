@@ -38,6 +38,15 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
 - **The `ci-trust` root** (OIDC provider + `insolvia-github-actions` deploy role
   + its policy) is applied by a **human, never CI** (`DenySelfPrivilegeEscalation`)
   — `scripts/apply-ci-trust.sh`; skill `insolvia-deploy-role-permissions`.
+- **The `account-access` root** holds the **human** IAM users and groups —
+  `scripts/apply-account-access.sh`, human-applied. CI cannot apply it: the
+  deploy role has no `iam:*User*`/`iam:*Group*` action at all, deliberately, so
+  merged code can never mint an admin. **Do not add MFA devices, login profiles
+  or access keys to it** — all three write the credential into the state
+  bucket; `docs/reference/terraform.md` § "Human account access" has the table
+  and `docs/runbooks/iam-mfa-rotation.md` the procedure that replaces them. Do
+  not add a self-service "manage your own MFA" policy either: every user is in
+  `Admin`, so it grants nothing that isn't already held.
 - **The GitHub org login is lowercase `insolvia-ai`.** GitHub emits the stored
   casing in the OIDC `sub`, and the IAM `StringLike` condition is case-sensitive
   — a mismatch fails `AssumeRoleWithWebIdentity` with an unhelpful error. Keep it

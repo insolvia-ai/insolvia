@@ -74,6 +74,8 @@ before you touch anything:
 | deploying / shipping / applying to staging or prod | `insolvia-deploy` skill — **deploys run in CI, never from your CLI** |
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
+| adding/removing a **human** IAM user or changing their groups | [`infra/envs/account-access/`](infra/envs/account-access/main.tf) — human-applied; CI holds no IAM user/group permissions at all |
+| rotating an IAM user's **MFA device** | [`docs/runbooks/iam-mfa-rotation.md`](docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) |

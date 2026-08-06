@@ -21,6 +21,9 @@ infra/
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex)
 └── envs/
+    ├── account-access/       # the account's HUMAN IAM principals — users,
+    │                         #   groups, their attached policies. CI cannot
+    │                         #   apply it (see below)
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
     │                         #   • ACM wildcard cert    *.insolvia.ai + apex SAN (us-east-1)
@@ -40,6 +43,7 @@ infra/
 | Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
 |---|---|---|
 | ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-github-actions` deploy role + its policy — **human-applied only**, never by CI (see below) |
+| account-access | `insolvia/account-access/terraform.tfstate` | The human IAM users, the groups they belong to, and the policies attached to them — **human-applied only**, and CI *cannot* apply it at all (see below) |
 | shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-api`, `insolvia-marketing`, `insolvia-mailer` — one per service, shared by every env) |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
@@ -62,6 +66,62 @@ data "aws_acm_certificate" "wildcard" {
   most_recent = true
 }
 ```
+
+## Human account access
+
+`infra/envs/account-access/` — the account's **human** IAM principals: the
+users, the groups they belong to, and the policies attached to them. Machines are elsewhere by construction: the
+pipeline's identity is `ci-trust`, and every service role is created by the env
+root that owns the service.
+
+**CI cannot apply this root, and that is the control rather than an oversight.**
+The deploy role holds no `iam:*User*` or `iam:*Group*` action anywhere in its
+policy — `ServiceRoleManagement` is fenced to `role/insolvia-*` and nothing
+else — so a CI apply fails on the first call. A pipeline that could create an
+IAM user with `AdministratorAccess` could mint itself an admin, which is exactly
+what `DenySelfPrivilegeEscalation` exists to prevent; keeping human principals
+in a root CI cannot reach makes that property structural instead of a
+permission someone forgot to add.
+
+**It is separate from `ci-trust`, which is also human-applied,** for blast
+radius and cadence. `ci-trust` holds the trust anchor every deploy
+authenticates through — a botched plan there takes the pipeline offline. This
+root changes when a person joins, leaves or moves group. Two states means a bad
+edit to the user map can never propose a change to the deploy role.
+
+Apply with `scripts/apply-account-access.sh` (credential dance → plan → confirm).
+
+**What it deliberately does not model**, all for the same reason — the
+credential would be written to `s3://insolvia-terraform-state` in plaintext:
+
+| Not modelled | Why | Where it lives instead |
+|---|---|---|
+| `aws_iam_virtual_mfa_device` | Exposes `base_32_string_seed` — the TOTP shared secret — as an attribute | Console enrolment: [`iam-mfa-rotation.md`](../runbooks/iam-mfa-rotation.md) |
+| `aws_iam_user_login_profile` | Generated password lands in state without a PGP key, and with one you have only moved the problem to key custody | Set by the person at first sign-in |
+| `aws_iam_access_key` | Writes the secret access key to state | Created out of band; rotate by create → cut over → delete |
+
+A self-service *"manage your own MFA"* policy is also absent, and the module
+header says so explicitly so it is not re-added from a search result: every
+user here is in `Admin`, so `AdministratorAccess` already allows every MFA
+action (verified with `aws iam simulate-principal-policy`). It starts doing
+work the day a non-admin user exists. MFA **enforcement**
+(`aws:MultiFactorAuthPresent`) is a real open gap rather than a settled
+decision — left out because a badly scoped version locks the account's only
+human out, so it wants its own plan.
+
+Two behaviours worth knowing before editing the user map:
+
+- **Group membership is exclusive.** `aws_iam_user_group_membership` manages
+  the full set, so a group added in the console is removed on the next apply.
+- **Policy attachment is not.** There is no exclusive variant for users, so a
+  policy attached by hand survives; catching that drift means reading
+  `aws iam list-attached-user-policies`, not trusting the plan.
+
+Offboarding is deliberately two applies: `aws_iam_user` carries
+`prevent_destroy`, so removing someone means deleting that line and applying,
+then removing them from the map and applying again. The account has one human
+user and no other console path in — an accidental destroy locks everyone out
+short of root recovery, and a real departure can afford a second plan.
 
 ## Backend API (`infra/modules/api_service/`)
 
@@ -474,6 +534,12 @@ Changing the deploy role's permissions is a `ci-trust` apply, and it must be
 run by a human admin (`scripts/apply-ci-trust.sh`) — CI cannot, by the
 self-deny above. This is why adding an IAM permission the pipeline needs is
 never a "just merge it" change.
+
+`account-access` is **outside this ordering entirely** — nothing depends on it
+and it depends on nothing, because IAM users are principals a human uses, not
+inputs any deploy reads. Apply it whenever the people change
+(`scripts/apply-account-access.sh`); it is never a step in standing up an
+environment.
 
 ## Destruction safety
 
