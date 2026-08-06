@@ -75,6 +75,7 @@ before you touch anything:
 | hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding a new package/app/service | `insolvia-new-package` skill |
+| **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) |
 | **changing `packages/insolvia_design_system`** — the shared components (Button, Field) both surfaces render | `insolvia-design-system-pr` skill — **its own PR + a version bump** · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
 | changing the app-local components (`apps/insolvia_app/src/components/`) / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field live in the package, row above |
