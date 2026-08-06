@@ -26,9 +26,9 @@ describe('DateInput (native leaf)', () => {
     const onValueChange = vi.fn();
     render(<DateInput onValueChange={onValueChange} aria-label="Date incurred" />);
     await user.type(screen.getByRole('textbox'), '2019021');
-    expect(onValueChange).toHaveBeenLastCalledWith('');
+    expect(onValueChange).toHaveBeenLastCalledWith('', 'incomplete');
     await user.type(screen.getByRole('textbox'), '4');
-    expect(onValueChange).toHaveBeenLastCalledWith('2019-02-14');
+    expect(onValueChange).toHaveBeenLastCalledWith('2019-02-14', 'valid');
   });
 
   it('marks an impossible date invalid', async () => {

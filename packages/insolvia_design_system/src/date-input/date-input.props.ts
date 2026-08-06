@@ -131,8 +131,16 @@ export interface DateInputOwnProps {
    * Fires with a complete, real, in-range ISO date — or `''` for anything else,
    * including a half-typed one. A caller therefore never has to parse, and
    * cannot accidentally store `2019-02-3`.
+   *
+   * THE SECOND ARGUMENT IS NOT OPTIONAL DETAIL. `''` means two different
+   * things: the field is empty, or the user is still typing. A caller that
+   * autosaves cannot tell them apart from the value alone, and treating
+   * "still typing" as "cleared" wipes a date the moment someone edits it —
+   * one backspace on a saved `2020-01-15` reports `''`, and the save lands.
+   * `status` is what distinguishes them: persist on `valid` and `empty`,
+   * ignore `incomplete`.
    */
-  onValueChange?: ((next: string) => void) | undefined;
+  onValueChange?: ((next: string, status: DateStatus) => void) | undefined;
   /** Earliest allowed ISO date, inclusive. */
   min?: string | undefined;
   /** Latest allowed ISO date, inclusive. */
@@ -179,7 +187,7 @@ export function useDateInputState({
       const masked = maskDate(next);
       setTextState(masked);
       const status = dateStatus(masked, min, max);
-      onChangeRef.current?.(status === 'valid' ? masked : '');
+      onChangeRef.current?.(status === 'valid' ? masked : '', status);
     },
     [min, max],
   );
