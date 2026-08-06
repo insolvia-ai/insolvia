@@ -35,6 +35,7 @@ import {
   isDocumentContentType,
   isDocumentKind,
   isUploadIncomplete,
+  permits,
   staffTypedProvenance,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
@@ -51,6 +52,12 @@ import type {
  * the client treats the token as an opaque string and never parses it.
  */
 const ACCESS_TOKEN = 'test-access-token';
+
+// Obviously-fake identity values for the firm suites at the end of this file.
+const BASE_URL = 'https://staging-api.insolvia.ai';
+const SUBJECT = 'a11c0000-0000-4000-8000-00000000a11c';
+const USERNAME = '11111111-2222-3333-4444-555555555555';
+const CLIENT_ID = 'exampleappclientid000000';
 
 /** What the stub captured about a request, flattened for assertions. */
 interface SeenRequest {
@@ -671,6 +678,7 @@ describe('createCase', () => {
   // full Case.
   const CASE = {
     id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 7,
     district: 'D. Del.',
     status: 'intake',
@@ -696,6 +704,7 @@ describe('createCase', () => {
 
     expect(created).toEqual({
       id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
       chapter: 7,
       district: 'D. Del.',
       status: 'intake',
@@ -777,6 +786,7 @@ describe('createCase', () => {
 describe('listCases', () => {
   const CASE_A = {
     id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 7,
     district: 'D. Del.',
     status: 'intake',
@@ -785,6 +795,7 @@ describe('listCases', () => {
   };
   const CASE_B = {
     id: 'b4a2f0e1-5c3d-4e2f-8b6a-7d9f1e2a3b4c',
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 13,
     district: 'N.D. Ga.',
     status: 'ready_to_file',
@@ -892,6 +903,7 @@ describe('getCase', () => {
   const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
   const CASE = {
     id: CASE_ID,
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 11,
     district: 'S.D.N.Y.',
     status: 'filed',
@@ -964,6 +976,7 @@ describe('updateCase', () => {
   const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
   const UPDATED_CASE = {
     id: CASE_ID,
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 13,
     district: 'D. Del.',
     status: 'ready_to_file',
@@ -2624,5 +2637,448 @@ describe('public endpoints stay public', () => {
 
     await expect(client.health()).resolves.toMatchObject({ status: 'ok' });
     expect(stub.lastRequest().headers.has('authorization')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Firms: the tenancy surface.
+//
+// A case belongs to a FIRM, not to whoever opened it. These pin the wire shape
+// of that model — the `firm` block on /v1/me, the two staff representations,
+// and case assignment. Every response body below is copied from what the route
+// handler actually returns, per this package's rule.
+// ---------------------------------------------------------------------------
+
+describe('the firm block on /v1/me', () => {
+  const PERMISSIONS = {
+    cases: 'add_edit',
+    intake: 'add_edit',
+    documents: 'add_edit',
+    extraction_review: 'add_edit',
+    firm_administration: 'add_edit',
+  };
+
+  test('maps the firm block through, with the EFFECTIVE permissions', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: ['aws.cognito.signin.user.admin'],
+          expiresAt: 1893456000,
+          firm: {
+            id: 'f1a2b3c4-0000-4000-8000-000000000001',
+            name: 'Example & Partners',
+            role: 'attorney',
+            displayName: 'Alice Attorney',
+            isAdmin: true,
+            accessAllCases: false,
+            permissions: PERMISSIONS,
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const me = await client.me();
+
+    expect(me.firm).toEqual({
+      id: 'f1a2b3c4-0000-4000-8000-000000000001',
+      name: 'Example & Partners',
+      role: 'attorney',
+      displayName: 'Alice Attorney',
+      isAdmin: true,
+      accessAllCases: false,
+      permissions: PERMISSIONS,
+    });
+  });
+
+  test('a caller in no firm has NO firm key — absent, not null', async () => {
+    // The state a client renders as "ask your administrator to add you". A
+    // `null` here would be indistinguishable from a decode that dropped it,
+    // and `'firm' in me` is what a caller will actually write.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: 1893456000,
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const me = await client.me();
+
+    expect(me.firm).toBeUndefined();
+    expect('firm' in me).toBe(false);
+  });
+
+  test('a feature the server did not send reads as hidden, never as permissive', async () => {
+    // `extraction_review` ships later. A client that treated a missing key as
+    // permissive would show a button the server refuses — fail closed, the
+    // same rule the server applies to its own stored map.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: null,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: null,
+          firm: {
+            id: 'f1a2b3c4-0000-4000-8000-000000000001',
+            name: 'Example & Partners',
+            role: 'staff',
+            displayName: 'Sam Staff',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'view_only' },
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const me = await client.me();
+
+    expect(me.firm?.permissions.extraction_review).toBe('hidden');
+    expect(me.firm?.permissions.cases).toBe('view_only');
+  });
+
+  test('a level this version cannot rank is malformed, not guessed', async () => {
+    // The asymmetry with the case above, and it is the one that matters: an
+    // unknown FEATURE is skipped (fail closed), an unknown LEVEL on a feature
+    // we do know cannot be ranked at all, and guessing is the one direction
+    // that can over-grant.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: null,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: null,
+          firm: {
+            id: 'f1a2b3c4-0000-4000-8000-000000000001',
+            name: 'Example & Partners',
+            role: 'attorney',
+            displayName: 'Alice',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'full_control' },
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.me()).rejects.toThrow(ApiException);
+  });
+});
+
+describe('permits', () => {
+  test('add_edit satisfies view_only, and hidden satisfies nothing', () => {
+    // Exists so no caller writes `permissions.documents === 'add_edit'` and
+    // thereby treats an add_edit holder as unable to view.
+    expect(permits('add_edit', 'view_only')).toBe(true);
+    expect(permits('add_edit', 'add_edit')).toBe(true);
+    expect(permits('view_only', 'add_edit')).toBe(false);
+    expect(permits('hidden', 'view_only')).toBe(false);
+  });
+});
+
+describe('listFirmDirectory', () => {
+  test('GETs /v1/firm/directory and maps the three-field people', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          people: [
+            { subject: 'a-1', displayName: 'Alice Attorney', role: 'attorney' },
+            { subject: 'b-2', displayName: 'Bob Paralegal', role: 'paralegal' },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const people = await client.listFirmDirectory();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/directory`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(people).toEqual([
+      { subject: 'a-1', displayName: 'Alice Attorney', role: 'attorney' },
+      { subject: 'b-2', displayName: 'Bob Paralegal', role: 'paralegal' },
+    ]);
+  });
+
+  test('carries no email and no permissions — the thin representation', async () => {
+    // If this ever starts returning more, it is a server change that widened
+    // what every paralegal can see about their colleagues, and it should fail
+    // here first.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          people: [{ subject: 'a-1', displayName: 'Alice', role: 'attorney' }],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const people = await client.listFirmDirectory();
+
+    expect(people).toHaveLength(1);
+    expect(Object.keys(people[0]!).sort()).toEqual(['displayName', 'role', 'subject']);
+  });
+});
+
+describe('the firm user endpoints', () => {
+  const SUBJECT_ID = 'b0b00000-0000-4000-8000-00000000b0b0';
+  const USER = {
+    subject: SUBJECT_ID,
+    email: 'bob@example.test',
+    displayName: 'Bob Paralegal',
+    role: 'paralegal',
+    isAdmin: false,
+    accessAllCases: false,
+    permissions: {
+      cases: 'add_edit',
+      intake: 'add_edit',
+      documents: 'add_edit',
+      extraction_review: 'add_edit',
+      firm_administration: 'hidden',
+    },
+    status: 'active',
+    createdAt: '2026-07-23T09:15:00.123Z',
+    updatedAt: '2026-07-23T09:15:00.123Z',
+  };
+
+  test('GETs /v1/firm/users and maps the whole record', async () => {
+    const stub = stubFetch(() => jsonResponse({ users: [USER] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const users = await client.listFirmUsers();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/users`);
+    expect(users).toEqual([USER]);
+  });
+
+  test('POSTs only the fields that were supplied — no undefined keys', async () => {
+    const stub = stubFetch(() => jsonResponse(USER, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addFirmUser({
+      email: 'bob@example.test',
+      displayName: 'Bob Paralegal',
+      role: 'paralegal',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/users`);
+    // The server treats an absent key as "use the role default" and a present
+    // one as an instruction, so sending `isAdmin: undefined` would be a
+    // different request from omitting it.
+    expect(JSON.parse(seen.body)).toEqual({
+      email: 'bob@example.test',
+      displayName: 'Bob Paralegal',
+      role: 'paralegal',
+    });
+  });
+
+  test('sends the optional flags when they are given', async () => {
+    const stub = stubFetch(() => jsonResponse(USER, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addFirmUser({
+      email: 'dana@example.test',
+      displayName: 'Dana',
+      role: 'attorney',
+      isAdmin: false,
+      accessAllCases: true,
+      permissions: { documents: 'view_only' },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      email: 'dana@example.test',
+      displayName: 'Dana',
+      role: 'attorney',
+      isAdmin: false,
+      accessAllCases: true,
+      permissions: { documents: 'view_only' },
+    });
+  });
+
+  test('an address that already has an account is a 409', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message: 'that email address already has an Insolvia account',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .addFirmUser({ email: 'taken@example.test', displayName: 'X', role: 'staff' })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+
+  test('PATCHes the subject into the path, encoded once, with only the sent fields', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...USER, isAdmin: true }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateFirmUser(SUBJECT_ID, { isAdmin: true });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PATCH');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/users/${SUBJECT_ID}`);
+    expect(JSON.parse(seen.body)).toEqual({ isAdmin: true });
+    expect(updated.isAdmin).toBe(true);
+  });
+
+  test('the last-administrator refusal is a 409, not a 403', async () => {
+    // It is not a permission failure: the caller HAS the permission, and it is
+    // the firm's state that does not admit the change. A client that reported
+    // it as "you may not do this" would be telling the one person who may.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message: 'a firm must keep at least one active administrator',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .updateFirmUser(SUBJECT_ID, { isAdmin: false })
+      .catch((thrown: unknown) => thrown);
+
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+
+  test('DELETEs the subject and resolves on 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.removeFirmUser(SUBJECT_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/users/${SUBJECT_ID}`);
+  });
+});
+
+describe('case assignment', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const SUBJECT_ID = 'b0b00000-0000-4000-8000-00000000b0b0';
+
+  test('GETs the assignees and maps subjects, not names', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          assignees: [
+            {
+              subject: SUBJECT_ID,
+              assignedAt: '2026-07-23T09:15:00.123Z',
+              assignedBy: 'a11c0000-0000-4000-8000-00000000a11c',
+            },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const assignees = await client.listCaseAssignees(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/assignees`);
+    // Names come from listFirmDirectory. A display name copied onto an
+    // assignment would go stale the moment somebody is renamed.
+    expect(Object.keys(assignees[0]!).sort()).toEqual(['assignedAt', 'assignedBy', 'subject']);
+  });
+
+  test('PUTs to link, with both path segments encoded exactly once', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.assignCase('case/with slash', 'sub ject');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/case%2Fwith%20slash/assignees/sub%20ject`);
+  });
+
+  test('DELETEs to unlink', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.unassignCase(CASE_ID, SUBJECT_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/assignees/${SUBJECT_ID}`);
   });
 });
