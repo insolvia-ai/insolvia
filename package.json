@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "//": [
-    "Root of the Insolvia npm workspace. NOT a shippable package — it declares",
+    "Root of the Insolvia npm workspace. NOT a shippable package \u2014 it declares",
     "the members and pins the shared toolchain.",
     "",
-    "The member list is EXPLICIT and must stay that way — never `packages/*`.",
+    "The member list is EXPLICIT and must stay that way \u2014 never `packages/*`.",
     "apps/insolvia_marketing is deliberately NOT a member: globbing (or adding",
     "it) would put it on this root's lockfile, and its own lockfile is what",
     "proves a clean registry install works.",
@@ -15,32 +15,35 @@
     "@insolvia-ai/tokens live in github.com/insolvia-ai/design-system and are",
     "consumed BY PUBLISHED VERSION, like any third-party dependency. They were",
     "workspace members until the extraction, and the app read the design",
-    "system's SOURCE through the resulting symlink — so a change was live for",
+    "system's SOURCE through the resulting symlink \u2014 so a change was live for",
     "the app and invisible to marketing at the same time. Do not add them back",
     "as members, and do not add a `file:`/`link:` path to a local checkout:",
     "that recreates exactly the split channel the extraction removed. To try an",
     "unpublished change, publish a prerelease from that repo.",
     "",
-    "CAUTION — Node resolution walks UP the tree. A missing dependency in",
+    "CAUTION \u2014 Node resolution walks UP the tree. A missing dependency in",
     "apps/insolvia_marketing can resolve from this root's node_modules and pass",
     "CI, then fail in a clean install. It keeps its own package-lock.json and",
-    "its own CI job installs from it, which is what catches this — do not",
+    "its own CI job installs from it, which is what catches this \u2014 do not",
     "consolidate it here."
   ],
   "engines": {
     "node": ">=24"
   },
-  "workspaces": ["apps/insolvia_app", "packages/insolvia_api_client"],
+  "workspaces": [
+    "apps/insolvia_app",
+    "packages/insolvia_api_client"
+  ],
   "scripts": {
     "//tokens": [
-      "The token SOURCE is no longer here — tokens.json and its generator left",
+      "The token SOURCE is no longer here \u2014 tokens.json and its generator left",
       "with the design system. What remains is the one output that was always",
       "this repo's own: Cognito's managed-login branding under infra/, which is",
       "reconciled against the installed @insolvia-ai/tokens rather than",
       "rendered from a tokens.json we no longer have.",
       "",
-      "So `tokens:check` still answers a real question — 'do the sign-in page's",
-      "colours match the tokens version this repo has installed?' — and now",
+      "So `tokens:check` still answers a real question \u2014 'do the sign-in page's",
+      "colours match the tokens version this repo has installed?' \u2014 and now",
       "also fails when a tokens bump lands without the branding being",
       "regenerated. To change a colour: change it in the design-system repo,",
       "publish, bump @insolvia-ai/tokens here, then `npm run tokens`.",
@@ -52,7 +55,7 @@
     "tokens:check": "node tool/reconcile-cognito-branding.ts --check",
     "//lint": [
       "Fans out per member rather than running ESLint once from the root, and",
-      "there is deliberately NO `eslint.config.js` at the repo root — the rules",
+      "there is deliberately NO `eslint.config.js` at the repo root \u2014 the rules",
       "live in `eslint.base.js`, which each member re-exports. ESLint discovers",
       "a flat config by walking UP from its cwd, so a root one is also found by",
       "any subdirectory with its own ESLint setup, once breaking a version-gated",
@@ -60,14 +63,14 @@
     ],
     "lint": "npm run lint --workspaces --if-present && npm run lint:tool",
     "//tool": [
-      "`tool/` is not a workspace member — it is one script this repo runs",
+      "`tool/` is not a workspace member \u2014 it is one script this repo runs",
       "against its own infra, with no package boundary to justify. It still",
       "gets linted and typechecked like everything else, which is what these",
       "two entries buy; without them the fan-out above would skip it silently.",
       "",
       "`lint:tool` cd's first, and must keep doing so. ESLint resolves its flat",
       "config from its CWD, not from the paths it is given, so `eslint tool`",
-      "from the root finds no config at all and dies — there is deliberately",
+      "from the root finds no config at all and dies \u2014 there is deliberately",
       "none at the repo root (see eslint.base.js). Running from inside tool/ is",
       "the same shape as every workspace member's own `eslint .`."
     ],
@@ -94,7 +97,7 @@
     "ci": "npm run tokens:check && npm run format && npm run lint && npm run typecheck && npm run test"
   },
   "//devDependencies": [
-    "ESLint/Prettier versions match apps/insolvia_marketing deliberately — a",
+    "ESLint/Prettier versions match apps/insolvia_marketing deliberately \u2014 a",
     "second ESLint major in the repo would be a trap, not a choice.",
     "TypeScript is 5.9 rather than the 7.x line: `erasableSyntaxOnly` (5.8+) is",
     "the feature this workspace depends on, and adopting the rewritten 7.x",
@@ -102,7 +105,7 @@
   ],
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia-ai/tokens": "^0.2.0",
+    "@insolvia-ai/tokens": "^0.2.1",
     "@types/node": "^24.13.3",
     "eslint": "^9.17.0",
     "globals": "^15.14.0",

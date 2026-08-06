@@ -45,7 +45,7 @@ if (!transformIgnorePatterns.some((pattern) => pattern.includes('@insolvia-ai'))
     "jest-expo's transformIgnorePatterns no longer starts with " +
       `"${NEEDLE}", so @insolvia-ai was never added and every test importing ` +
       '@insolvia-ai/design-system will fail with "Unexpected token \'export\'". ' +
-      'Re-derive the injection from the preset\'s current shape — do not paste ' +
+      "Re-derive the injection from the preset's current shape — do not paste " +
       "a literal list here, or the preset's own entries (standard-navigation in " +
       'particular) will be silently dropped.',
   );
