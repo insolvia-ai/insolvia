@@ -5,10 +5,10 @@
 // error bodies — are the authoritative record of what `services/api`
 // actually speaks. If the API's contract changes, these tests must fail;
 // keep every literal in sync with:
-//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases}.py (cases.py expected — not yet added as of this change)
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,documents}.py
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (UNAUTHORIZED_BODY, the 401)
-//   services/api/src/insolvia_api/core/{waitlist,auth}.py
+//   services/api/src/insolvia_api/core/{waitlist,auth,documents}.py
 //
 // No real credentials appear here — this repo is public. The access token is
 // the literal string `test-access-token`; the client treats it as opaque and
@@ -27,7 +27,14 @@ import {
   ApiException,
   ApiUnauthorizedException,
   ApiValidationException,
+  DOCUMENT_CONTENT_TYPES,
+  DOCUMENT_KINDS,
+  DOCUMENT_STATUSES,
   InsolviaApiClient,
+  MAX_DOCUMENT_BYTE_SIZE,
+  isDocumentContentType,
+  isDocumentKind,
+  isUploadIncomplete,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
 import type { FetchLike, WaitlistSubmission } from '@insolvia-ai/api-client';
@@ -45,6 +52,12 @@ interface SeenRequest {
   readonly url: string;
   readonly headers: Headers;
   readonly body: string;
+  /**
+   * The body exactly as it was handed to `fetch`, undecoded. `body` above
+   * flattens a non-string to `''`, which is right for every JSON endpoint and
+   * useless for the presigned upload, whose body is the `Blob` itself.
+   */
+  readonly rawBody: RequestInit['body'];
 }
 
 /**
@@ -54,10 +67,14 @@ interface SeenRequest {
  *
  * `callCount()` exists for the assertion that matters most on the protected
  * path: that a call with no token never reaches the transport at all.
+ *
+ * `requests()` exposes the whole sequence, for the multi-request upload
+ * sequence where the ORDER is part of the contract.
  */
 function stubFetch(respond: (seen: SeenRequest) => Response): {
   fetch: FetchLike;
   lastRequest: () => SeenRequest;
+  requests: () => readonly SeenRequest[];
   callCount: () => number;
 } {
   const requests: SeenRequest[] = [];
@@ -68,6 +85,7 @@ function stubFetch(respond: (seen: SeenRequest) => Response): {
         url: input,
         headers: new Headers(init?.headers),
         body: typeof init?.body === 'string' ? init.body : '',
+        rawBody: init?.body,
       };
       requests.push(seen);
       return Promise.resolve(respond(seen));
@@ -79,6 +97,7 @@ function stubFetch(respond: (seen: SeenRequest) => Response): {
       }
       return seen;
     },
+    requests: () => requests,
     callCount: () => requests.length,
   };
 }
@@ -1043,6 +1062,781 @@ describe('updateCase', () => {
 
     const error = asApiUnauthorizedException(
       await rejection(client.updateCase(CASE_ID, { status: 'filed' })),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Documents. Pinned against services/api/.../routes/documents.py and
+// core/documents.py: `document_json`'s eight fields, the `upload` block on the
+// 201, the 204 on delete, and the 409 that means the bytes never arrived.
+// ---------------------------------------------------------------------------
+
+const DOC_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+const DOCUMENT_ID = 'c5d3a1b2-6e4f-4a3b-9c8d-2e1f0a9b8c7d';
+
+/** A pending record: the bytes are not known to have landed. */
+const PENDING_DOCUMENT = {
+  id: DOCUMENT_ID,
+  caseId: DOC_CASE_ID,
+  kind: 'bank_statement',
+  fileName: 'statement-june.pdf',
+  contentType: 'application/pdf',
+  byteSize: 24,
+  uploadedAt: '2026-07-28T11:02:03.456Z',
+  status: 'pending',
+};
+
+/** The same record after completion: `stored`, with the size S3 counted. */
+const STORED_DOCUMENT = { ...PENDING_DOCUMENT, status: 'stored', byteSize: 25 };
+
+/**
+ * The `upload` block. The URL is an obvious fake — no real bucket, no real
+ * signature; this repo is public and a presigned URL is a bearer capability.
+ */
+const UPLOAD_BLOCK = {
+  url: 'https://documents.example.invalid/cases/x/y?X-Amz-Signature=not-a-real-signature',
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/pdf',
+    'x-amz-server-side-encryption': 'aws:kms',
+    'x-amz-tagging': 'upload=unconfirmed',
+  },
+  expiresAt: '2026-07-28T11:17:03.456Z',
+};
+
+/** The bytes. `Blob.size` is what the client must declare — see uploadDocument. */
+const FILE = new Blob(['%PDF-1.7 pretend bytes'], { type: 'application/pdf' });
+
+function headerMap(headers: Headers): Record<string, string> {
+  return Object.fromEntries(headers.entries());
+}
+
+describe('document model constants', () => {
+  // The types are DERIVED from these arrays, so the arrays are the contract:
+  // they are what a picker renders, and what the API's own allowlists say.
+  test('kinds, content types and statuses match the API allowlists verbatim', () => {
+    expect(DOCUMENT_KINDS).toEqual([
+      'credit_report',
+      'pay_stub',
+      'bank_statement',
+      'tax_return',
+      'identification',
+      'court_notice',
+      'other',
+    ]);
+    expect(DOCUMENT_CONTENT_TYPES).toEqual([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/heic',
+      'image/tiff',
+    ]);
+    expect(DOCUMENT_STATUSES).toEqual(['pending', 'stored']);
+    expect(MAX_DOCUMENT_BYTE_SIZE).toBe(50 * 1024 * 1024);
+  });
+
+  test('the narrowing guards accept members and refuse everything else', () => {
+    // The point of the guards: a File.type is a plain string, and the caller
+    // has to find out at the picker rather than from a 400.
+    expect(isDocumentKind('pay_stub')).toBe(true);
+    expect(isDocumentKind('PAY_STUB')).toBe(false);
+    expect(isDocumentKind('mortgage')).toBe(false);
+    expect(isDocumentContentType('image/heic')).toBe(true);
+    // Refused server-side on purpose: script-bearing markup wearing an image
+    // content type.
+    expect(isDocumentContentType('image/svg+xml')).toBe(false);
+    // Media types are case-insensitive, but the API signs the lowercased
+    // spelling — sending anything else is an opaque signature failure.
+    expect(isDocumentContentType('Application/PDF')).toBe(false);
+    expect(isDocumentContentType('')).toBe(false);
+  });
+});
+
+describe('createDocument', () => {
+  test('POSTs /v1/cases/{caseId}/documents and maps the 201 {document, upload}', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ document: PENDING_DOCUMENT, upload: UPLOAD_BLOCK }, 201),
+    );
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.createDocument(DOC_CASE_ID, {
+      kind: 'bank_statement',
+      fileName: 'statement-june.pdf',
+      contentType: 'application/pdf',
+      byteSize: 24,
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    // All four fields, under their exact wire names, and nothing else — the
+    // API refuses a `provenance` key outright.
+    expect(JSON.parse(seen.body)).toEqual({
+      kind: 'bank_statement',
+      fileName: 'statement-june.pdf',
+      contentType: 'application/pdf',
+      byteSize: 24,
+    });
+
+    expect(created.document).toEqual(PENDING_DOCUMENT);
+    expect(created.upload.url).toBe(UPLOAD_BLOCK.url);
+    expect(created.upload.method).toBe('PUT');
+    expect(created.upload.expiresAt).toBe('2026-07-28T11:17:03.456Z');
+  });
+
+  test('passes the upload headers through as an open map, keys and all', async () => {
+    // THE REGRESSION THIS GUARDS. The server chooses which headers it signs.
+    // A client that enumerated the three it knows would silently drop a fourth
+    // added server-side, and every upload would 403 with nothing to explain it.
+    const withAnExtraSignedHeader = {
+      ...UPLOAD_BLOCK,
+      headers: { ...UPLOAD_BLOCK.headers, 'x-amz-checksum-algorithm': 'CRC32' },
+    };
+    const stub = stubFetch(() =>
+      jsonResponse({ document: PENDING_DOCUMENT, upload: withAnExtraSignedHeader }, 201),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.createDocument(DOC_CASE_ID, {
+      kind: 'other',
+      fileName: 'scan.pdf',
+      contentType: 'application/pdf',
+      byteSize: 1,
+    });
+
+    expect(created.upload.headers).toEqual({
+      'Content-Type': 'application/pdf',
+      'x-amz-server-side-encryption': 'aws:kms',
+      'x-amz-tagging': 'upload=unconfirmed',
+      'x-amz-checksum-algorithm': 'CRC32',
+    });
+  });
+
+  test('a non-string header value is rejected rather than stringified', async () => {
+    // `String(undefined)` in a signed header is a 403 from S3 that looks like
+    // nothing. Fail here, where the message names the field.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          document: PENDING_DOCUMENT,
+          upload: { ...UPLOAD_BLOCK, headers: { 'Content-Type': 7 } },
+        },
+        201,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(
+        client.createDocument(DOC_CASE_ID, {
+          kind: 'other',
+          fileName: 'scan.pdf',
+          contentType: 'application/pdf',
+          byteSize: 1,
+        }),
+      ),
+    );
+
+    expect(error.message).toContain('headers.Content-Type');
+  });
+
+  test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: { byteSize: 'A document must be 50 MB or smaller.' },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(
+        client.createDocument(DOC_CASE_ID, {
+          kind: 'tax_return',
+          fileName: 'return.pdf',
+          contentType: 'application/pdf',
+          byteSize: MAX_DOCUMENT_BYTE_SIZE + 1,
+        }),
+      ),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(error.fields).toEqual({ byteSize: 'A document must be 50 MB or smaller.' });
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ document: PENDING_DOCUMENT, upload: UPLOAD_BLOCK }, 201),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(
+        client.createDocument(DOC_CASE_ID, {
+          kind: 'other',
+          fileName: 'scan.pdf',
+          contentType: 'application/pdf',
+          byteSize: 1,
+        }),
+      ),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('listDocuments', () => {
+  test('GETs /v1/cases/{caseId}/documents and returns the array itself', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ documents: [STORED_DOCUMENT, PENDING_DOCUMENT] }, 200),
+    );
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const documents = await client.listDocuments(DOC_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+
+    // Not paginated: no cursor, no result wrapper.
+    expect(documents).toEqual([STORED_DOCUMENT, PENDING_DOCUMENT]);
+  });
+
+  test('pending documents survive the decode — they are not filtered out', async () => {
+    // The API lists them deliberately: a row whose upload never finished is
+    // the case's record of a file the user tried to add, and dropping it here
+    // would leave them unable to see or retry it.
+    const stub = stubFetch(() => jsonResponse({ documents: [PENDING_DOCUMENT] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const documents = await client.listDocuments(DOC_CASE_ID);
+
+    expect(documents).toHaveLength(1);
+    expect(documents[0]?.status).toBe('pending');
+  });
+
+  test('an empty case is an empty array', async () => {
+    const stub = stubFetch(() => jsonResponse({ documents: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    expect(await client.listDocuments(DOC_CASE_ID)).toEqual([]);
+  });
+
+  test('an unknown status is rejected, not cast', async () => {
+    // `status` is the one field a client branches on: an unrecognised value
+    // means it cannot tell "you can open this" from "this never uploaded".
+    const stub = stubFetch(() =>
+      jsonResponse({ documents: [{ ...PENDING_DOCUMENT, status: 'uploading' }] }, 200),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.listDocuments(DOC_CASE_ID)));
+
+    expect(error.message).toContain('status');
+    expect(error.message).toContain('"pending" | "stored"');
+  });
+
+  test('an unfamiliar kind or content type is NOT rejected', async () => {
+    // The deliberate asymmetry with `status`: the request types are unions so
+    // a call site cannot invent one, but a server that grows its allowlist
+    // must not break a deployed client's whole document list.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          documents: [
+            { ...STORED_DOCUMENT, kind: 'mortgage_statement', contentType: 'image/webp' },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const documents = await client.listDocuments(DOC_CASE_ID);
+
+    expect(documents[0]?.kind).toBe('mortgage_statement');
+    expect(documents[0]?.contentType).toBe('image/webp');
+  });
+
+  test('a 404 on the case is a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.listDocuments(DOC_CASE_ID)));
+
+    expect(error.statusCode).toBe(404);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse({ documents: [] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(await rejection(client.listDocuments(DOC_CASE_ID)));
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('getDocumentUrl', () => {
+  const DOWNLOAD = {
+    url: 'https://documents.example.invalid/cases/x/y?X-Amz-Signature=not-a-real-signature',
+    method: 'GET',
+    expiresAt: '2026-07-28T11:07:03.456Z',
+  };
+
+  test('GETs /v1/cases/{caseId}/documents/{documentId}/url and maps the three fields', async () => {
+    const stub = stubFetch(() => jsonResponse(DOWNLOAD, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const download = await client.getDocumentUrl(DOC_CASE_ID, DOCUMENT_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(
+      `https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents/${DOCUMENT_ID}/url`,
+    );
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(download).toEqual(DOWNLOAD);
+  });
+
+  test('URL-encodes both ids into the path', async () => {
+    const stub = stubFetch(() => jsonResponse(DOWNLOAD, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.getDocumentUrl('case/one', 'doc two');
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe(
+      '/v1/cases/case%2Fone/documents/doc%20two/url',
+    );
+  });
+
+  test('a 404 for an unknown document is a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'document not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.getDocumentUrl(DOC_CASE_ID, DOCUMENT_ID)));
+
+    expect(error.statusCode).toBe(404);
+    expect(error.message).toContain('document not found');
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(DOWNLOAD, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.getDocumentUrl(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('completeDocument', () => {
+  test('POSTs .../complete with no body and maps the 200 {document}', async () => {
+    const stub = stubFetch(() => jsonResponse({ document: STORED_DOCUMENT }, 200));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const confirmed = await client.completeDocument(DOC_CASE_ID, DOCUMENT_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(
+      `https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents/${DOCUMENT_ID}/complete`,
+    );
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    // No request body, so no content type either.
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+
+    expect(confirmed.status).toBe('stored');
+    // The size is REPLACED by what S3 counted, not the 24 that was declared.
+    expect(confirmed.byteSize).toBe(25);
+  });
+
+  test('a 409 means the bytes never arrived, and isUploadIncomplete says so', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message: 'the object for this document is not in the bucket; the upload did not complete',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.completeDocument(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(error.statusCode).toBe(409);
+    expect(isUploadIncomplete(error)).toBe(true);
+    // The action is "upload again", not "retry this call", so the message has
+    // to survive to the caller.
+    expect(error.message).toContain('the upload did not complete');
+  });
+
+  test('isUploadIncomplete is false for every other failure', async () => {
+    expect(isUploadIncomplete(new ApiException({ statusCode: 404, body: '' }))).toBe(false);
+    expect(isUploadIncomplete(new TypeError('Connection refused'))).toBe(false);
+    expect(isUploadIncomplete(undefined)).toBe(false);
+  });
+
+  test('a 404 (deleted mid-flight) stays a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'document not found' }, 404),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.completeDocument(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(error.statusCode).toBe(404);
+    expect(isUploadIncomplete(error)).toBe(false);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse({ document: STORED_DOCUMENT }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.completeDocument(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('deleteDocument', () => {
+  test('DELETEs the document and resolves on a 204 with no body', async () => {
+    // The assertion that matters: a 204 carries no JSON, and the client must
+    // not try to parse one. A decoder that assumed a body would turn every
+    // successful delete into "response body was not valid JSON".
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.deleteDocument(DOC_CASE_ID, DOCUMENT_ID)).resolves.toBeUndefined();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(
+      `https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents/${DOCUMENT_ID}`,
+    );
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(seen.headers.has('content-type')).toBe(false);
+  });
+
+  test('a 404 still maps to a plain ApiException with the body', async () => {
+    // The no-body path must not lose the error path: a failure here has a JSON
+    // envelope like every other.
+    const body = JSON.stringify({ error: 'NotFoundError', message: 'document not found' });
+    const stub = stubFetch(() => new Response(body, { status: 404 }));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.deleteDocument(DOC_CASE_ID, DOCUMENT_ID)));
+
+    expect(error.statusCode).toBe(404);
+    expect(error.body).toBe(body);
+    expect(error.message).toContain('document not found');
+  });
+
+  test('a 401 on the delete is still ApiUnauthorizedException', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'Unauthorized' }, 401));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.deleteDocument(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(error.source).toBe('server');
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.deleteDocument(DOC_CASE_ID, DOCUMENT_ID)),
+    );
+
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('uploadDocument', () => {
+  /**
+   * The happy-path transport: the API's two calls plus the presigned PUT,
+   * dispatched on what the client actually asked for — so a wrong URL or verb
+   * fails as an unrecognised request rather than passing quietly.
+   */
+  function uploadStub(overrides: { readonly putStatus?: number } = {}) {
+    return stubFetch((seen) => {
+      if (seen.url.startsWith(UPLOAD_BLOCK.url)) {
+        return new Response(overrides.putStatus === undefined ? '' : 'AccessDenied', {
+          status: overrides.putStatus ?? 200,
+        });
+      }
+      if (seen.url.endsWith('/complete')) {
+        return jsonResponse({ document: STORED_DOCUMENT }, 200);
+      }
+      if (seen.url.endsWith('/documents') && seen.method === 'POST') {
+        return jsonResponse({ document: PENDING_DOCUMENT, upload: UPLOAD_BLOCK }, 201);
+      }
+      return jsonResponse({ error: 'unexpected request', url: seen.url }, 418);
+    });
+  }
+
+  const OPTIONS = {
+    file: FILE,
+    fileName: 'statement-june.pdf',
+    kind: 'bank_statement',
+    contentType: 'application/pdf',
+  } as const;
+
+  test('runs create → PUT → complete and returns the confirmed document', async () => {
+    const stub = uploadStub();
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const document = await client.uploadDocument(DOC_CASE_ID, OPTIONS);
+
+    const [create, put, complete] = stub.requests();
+    expect(stub.callCount()).toBe(3);
+    expect(create?.method).toBe('POST');
+    expect(create?.url).toBe(`https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents`);
+    expect(put?.method).toBe('PUT');
+    expect(put?.url).toBe(UPLOAD_BLOCK.url);
+    expect(complete?.method).toBe('POST');
+    expect(complete?.url).toBe(
+      `https://staging-api.insolvia.ai/v1/cases/${DOC_CASE_ID}/documents/${DOCUMENT_ID}/complete`,
+    );
+
+    // The confirmed record, not the pending one it started from.
+    expect(document).toEqual(STORED_DOCUMENT);
+    expect(document.status).toBe('stored');
+  });
+
+  test('declares the size from the bytes, never from the caller', async () => {
+    // byteSize is bound into the presigned signature: a declared size that
+    // disagreed with the body would be a 403 with nothing in it to explain
+    // why. There is deliberately no option to override this.
+    const stub = uploadStub();
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.uploadDocument(DOC_CASE_ID, OPTIONS);
+
+    const body = JSON.parse(stub.requests()[0]?.body ?? '') as Record<string, unknown>;
+    expect(body).toEqual({
+      kind: 'bank_statement',
+      fileName: 'statement-june.pdf',
+      contentType: 'application/pdf',
+      byteSize: FILE.size,
+    });
+  });
+
+  test('the PUT sends exactly the returned headers — no Authorization, nothing added', async () => {
+    // THE ASSERTION THIS WHOLE METHOD EXISTS FOR. Those headers are signed, and
+    // the URL is itself the credential: an Authorization header alongside it
+    // makes S3 authenticate the request that way instead, and the signature
+    // check fails.
+    const stub = uploadStub();
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.uploadDocument(DOC_CASE_ID, OPTIONS);
+
+    const put = stub.requests()[1];
+    expect(put).toBeDefined();
+    expect(headerMap(put?.headers ?? new Headers())).toEqual({
+      'content-type': 'application/pdf',
+      'x-amz-server-side-encryption': 'aws:kms',
+      'x-amz-tagging': 'upload=unconfirmed',
+    });
+    expect(put?.headers.has('authorization')).toBe(false);
+    expect(put?.headers.has('accept')).toBe(false);
+    // The bytes themselves, not a re-encoding of them.
+    expect(put?.rawBody).toBe(FILE);
+  });
+
+  test('a header the server starts signing rides along untouched', async () => {
+    const extended = {
+      ...UPLOAD_BLOCK,
+      headers: { ...UPLOAD_BLOCK.headers, 'x-amz-checksum-crc32': 'AAAAAA==' },
+    };
+    const stub = stubFetch((seen) => {
+      if (seen.url.startsWith(UPLOAD_BLOCK.url)) {
+        return new Response('', { status: 200 });
+      }
+      if (seen.url.endsWith('/complete')) {
+        return jsonResponse({ document: STORED_DOCUMENT }, 200);
+      }
+      return jsonResponse({ document: PENDING_DOCUMENT, upload: extended }, 201);
+    });
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.uploadDocument(DOC_CASE_ID, OPTIONS);
+
+    expect(stub.requests()[1]?.headers.get('x-amz-checksum-crc32')).toBe('AAAAAA==');
+  });
+
+  test('a failed PUT throws with S3’s status and body, and does NOT complete', async () => {
+    // The pending record is deliberately left in place: the case still shows
+    // the file as "upload didn't finish", the user can retry, and the bucket
+    // reaps it within a day if they do not.
+    const stub = uploadStub({ putStatus: 403 });
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.uploadDocument(DOC_CASE_ID, OPTIONS)));
+
+    expect(error.statusCode).toBe(403);
+    expect(error.body).toBe('AccessDenied');
+    expect(error.message).toContain('presigned upload failed');
+    // Two calls, not three: nothing claims an upload that did not land.
+    expect(stub.callCount()).toBe(2);
+  });
+
+  test('a 409 from the confirm step surfaces as isUploadIncomplete', async () => {
+    const stub = stubFetch((seen) => {
+      if (seen.url.startsWith(UPLOAD_BLOCK.url)) {
+        return new Response('', { status: 200 });
+      }
+      if (seen.url.endsWith('/complete')) {
+        return jsonResponse(
+          { error: 'ConflictError', message: 'the upload did not complete' },
+          409,
+        );
+      }
+      return jsonResponse({ document: PENDING_DOCUMENT, upload: UPLOAD_BLOCK }, 201);
+    });
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await rejection(client.uploadDocument(DOC_CASE_ID, OPTIONS));
+
+    expect(isUploadIncomplete(error)).toBe(true);
+    expect(stub.callCount()).toBe(3);
+  });
+
+  test('a 400 on the create step never reaches the network for the PUT', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ValidationError', fields: { fileName: 'Must be a file name.' } }, 400),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.uploadDocument(DOC_CASE_ID, { ...OPTIONS, fileName: '..' })),
+    );
+
+    expect(error.fields).toEqual({ fileName: 'Must be a file name.' });
+    expect(stub.callCount()).toBe(1);
+  });
+
+  test('no access token throws ApiUnauthorizedException without calling fetch at all', async () => {
+    const stub = uploadStub();
+    const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.uploadDocument(DOC_CASE_ID, OPTIONS)),
     );
 
     expect(stub.callCount()).toBe(0);

@@ -5,10 +5,10 @@
 // The JSON contract it encodes is pinned by this package's tests, not by
 // codegen — see README.md for why there is no OpenAPI step. Keep every wire
 // literal in this package in sync with:
-//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases}.py (cases.py expected — not yet added as of this change)
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,documents}.py
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (the 401 body)
-//   services/api/src/insolvia_api/core/{waitlist,auth}.py
+//   services/api/src/insolvia_api/core/{waitlist,auth,documents}.py
 //
 // The module split is one file per concern — `models.ts`, `exceptions.ts`,
 // `client.ts` — so a contract review can read the wire shapes without the
@@ -17,7 +17,7 @@
 // This barrel is the package's only entry point (package.json exports
 // `./src/index.ts`), so what is re-exported here is the public surface.
 
-export { InsolviaApiClient } from './client.ts';
+export { InsolviaApiClient, isUploadIncomplete } from './client.ts';
 export type { AccessTokenProvider, FetchLike, InsolviaApiClientOptions } from './client.ts';
 
 export { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
@@ -29,7 +29,14 @@ export type {
 } from './exceptions.ts';
 
 export {
+  DOCUMENT_CONTENT_TYPES,
+  DOCUMENT_KINDS,
+  DOCUMENT_STATUSES,
+  MAX_DOCUMENT_BYTE_SIZE,
   createCaseRequestToJson,
+  createDocumentRequestToJson,
+  isDocumentContentType,
+  isDocumentKind,
   listCasesQuery,
   submittedAtUtc,
   updateCaseChangesToJson,
@@ -40,11 +47,20 @@ export type {
   CaseChapter,
   CaseStatus,
   CreateCaseRequest,
+  CreateDocumentRequest,
+  CreateDocumentResult,
+  Document,
+  DocumentContentType,
+  DocumentDownload,
+  DocumentKind,
+  DocumentStatus,
+  DocumentUpload,
   HealthStatus,
   ListCasesOptions,
   ListCasesResult,
   Principal,
   UpdateCaseChanges,
+  UploadDocumentOptions,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
