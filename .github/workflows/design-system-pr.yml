@@ -135,6 +135,27 @@ jobs:
             exit 1
           fi
 
+          # AND IT MUST GO UP, not merely change. "Different" was the original
+          # test and it has a hole big enough to walk through: two PRs branched
+          # from the same base, each bumping, and whichever merges SECOND
+          # carries a version lower than what is already on main. The guard sees
+          # a difference and passes; the publish then ships the older version
+          # and moves the `latest` dist-tag BACKWARDS, so the marketing site
+          # installs a package that has gone back in time.
+          #
+          # Reached exactly that way here: #154 (0.6.0) and #162 (0.7.0) both
+          # branched from 0.5.0, in two different stacks. Merging them in the
+          # wrong order would have published 0.6.0 over 0.7.0.
+          #
+          # `sort -V` rather than a semver library: this runs before `npm ci`,
+          # so there is no node_modules yet, and version sort is exactly what
+          # coreutils does correctly.
+          HIGHEST="$(printf '%s\n%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | tail -1)"
+          if [ "$HIGHEST" != "$HEAD_VERSION" ]; then
+            echo "::error file=packages/insolvia_design_system/package.json::Version goes BACKWARDS: base is $BASE_VERSION, this PR is $HEAD_VERSION. Another PR has already raised it — rebase and bump above $BASE_VERSION. Publishing this would move the \`latest\` tag backwards."
+            exit 1
+          fi
+
           echo "Version bumped: $BASE_VERSION -> $HEAD_VERSION."
 
       # `ci`, never `install`: the lockfile is committed precisely so CI
