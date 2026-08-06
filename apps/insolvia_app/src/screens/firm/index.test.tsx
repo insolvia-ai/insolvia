@@ -194,9 +194,7 @@ describe('the firm screen', () => {
     });
     await screen.findByText('Bob Paralegal');
 
-    await userEvent
-      .setup()
-      .press(screen.getByRole('button', { name: 'Make administrator' }));
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Make administrator' }));
 
     expect(await screen.findByText(/at least one active administrator/i)).toBeTruthy();
   });
