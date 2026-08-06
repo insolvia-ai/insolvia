@@ -109,18 +109,33 @@ resource "aws_kms_alias" "case" {
 #   SK = META                     the case record itself
 #      | <ENTITY>#<id>            DEBTOR#…, CLAIM#…, ASSET#…, SOFA#…, …
 #
-# The one genuinely cross-case read is "list the cases I own", which 8.3 needs
-# for GET /v1/cases. That is the GSI, and it is SPARSE ON PURPOSE: only the
-# META item carries the index attributes, so the index holds exactly one entry
-# per case rather than one per row.
+# TWO cross-case reads, because "list the cases I may see" has two answers.
+# Both indexes are SPARSE: only the item that carries the key attributes
+# appears, so neither holds one entry per row.
 #
-#   GSI1PK = OWNER#<principal>
-#   GSI1SK = <created_at>#<case_id>       newest-first without a sort in the API
+#   by-firm       GSI1PK = FIRM#<firm_id>              on the META item
+#                 GSI1SK = <created_at>#<case_id>
 #
-# GSI1SK sorts lexicographically, so created_at must be fixed-width RFC 3339
-# with a literal Z — a "+00:00" offset is the same instant and sorts wrong,
-# silently misordering GET /v1/cases. DynamoDB cannot enforce that; 8.3 owes
-# it a contract test.
+#   by-assignee   GSI2PK = ASSIGNEE#<subject>          on ASSIGNEE#… items
+#                 GSI2SK = <created_at>#<case_id>
+#
+# WHICH ONE A REQUEST USES DEPENDS ON THE CALLER, and that is the awkward part
+# of this design rather than a detail to discover later. A firm admin, or
+# anyone whose firm user carries `access_all_cases`, lists through by-firm. A
+# user restricted to their assigned matters lists through by-assignee. The two
+# indexes return different sets by construction, so a pagination cursor minted
+# against one is meaningless against the other — services/api must refuse a
+# mismatched cursor rather than silently skip cases.
+#
+# It was GSI1PK = OWNER#<principal> until firms existed, which made a case the
+# property of one Cognito subject: a colleague at the same firm got a 404, and
+# two people could not work one matter. Renaming the index is what forces the
+# rest of the system to stop pretending otherwise.
+#
+# Both sort keys sort lexicographically, so created_at must be fixed-width
+# RFC 3339 with a literal Z — a "+00:00" offset is the same instant and sorts
+# wrong, silently misordering the listing. DynamoDB cannot enforce that; the
+# core layer owes it a contract test.
 #
 # Item-shape conventions are enforced in services/api's core layer, not here —
 # DynamoDB validates only the key attributes below.
@@ -146,13 +161,36 @@ resource "aws_dynamodb_table" "cases" {
     name = "GSI1SK"
     type = "S"
   }
+  attribute {
+    name = "GSI2PK"
+    type = "S"
+  }
+  attribute {
+    name = "GSI2SK"
+    type = "S"
+  }
 
   # key_schema rather than the GSI's hash_key/range_key: the provider
   # deprecated those in 6.29.0 when it added multi-attribute index keys, and
   # `terraform validate` warns on them. Order matters — DynamoDB requires HASH
   # before RANGE, and this list is passed through verbatim.
+  #
+  # RENAMING AN INDEX REPLACES IT. `by-owner` -> `by-firm` is a destroy and a
+  # create, not an update, and DynamoDB backfills a new GSI from the table
+  # rather than from the old index. Staging and prod hold zero items so there
+  # is nothing to backfill; a developer machine may hold probe rows, which
+  # scripts/dev-aws-reset.sh clears. Read the plan before applying this to
+  # anything holding real cases — after which it is a migration, not an edit.
+  #
+  # AND IT TAKES TWO APPLIES, which is DynamoDB's constraint rather than
+  # Terraform's: **one index may be created or deleted per UpdateTable call**.
+  # Going from one index to two therefore needs the first apply to finish and
+  # the new index to reach ACTIVE before the second can start. Observed on dev:
+  # the first apply dropped by-owner and created by-firm, a re-run created
+  # by-assignee. A CI apply that appears to succeed while leaving an index
+  # missing is this, and re-running is the fix.
   global_secondary_index {
-    name            = "by-owner"
+    name            = "by-firm"
     projection_type = "ALL"
 
     key_schema {
@@ -161,6 +199,23 @@ resource "aws_dynamodb_table" "cases" {
     }
     key_schema {
       attribute_name = "GSI1SK"
+      key_type       = "RANGE"
+    }
+  }
+
+  # The restricted-access listing. Its entries are ASSIGNEE#<subject> items in
+  # the case's own partition — the assignment IS the index entry, so linking a
+  # user to a case and making it appear in their list are one write.
+  global_secondary_index {
+    name            = "by-assignee"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "GSI2PK"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "GSI2SK"
       key_type       = "RANGE"
     }
   }
