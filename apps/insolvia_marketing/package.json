@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia-ai/design-system": "^0.6.0",
+    "@insolvia-ai/design-system": "^0.7.1",
     "@react-router/dev": "^7.18.1",
     "@react-router/fs-routes": "^7.18.1",
     "@react-router/serve": "^7.18.1",

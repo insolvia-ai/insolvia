@@ -131,6 +131,7 @@ jobs:
             # arrives here as an edit to package.json/package-lock.json, which
             # the two lines below already cover — there is no longer a source
             # path in this repo that could change them behind the gate's back.
+            #
             # insolvia_api_client is a declared dependency of the app resolved by
             # workspace symlink, so its source is compiled into this build's
             # typecheck. Nothing imports it *yet* — it sits beside `apiBaseUrl`
