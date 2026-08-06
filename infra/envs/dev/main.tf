@@ -103,6 +103,23 @@ module "case_store" {
   tags                        = local.common_tags
 }
 
+# ── Firms ───────────────────────────────────────────────────────
+# The same module staging and prod instantiate, on the same case key, so local
+# development resolves a caller through the real sparse index rather than a
+# stub. api_role_name is null for the same reason the case store's is: there is
+# no Lambda here.
+module "firm_store" {
+  source = "../../modules/firm_store"
+
+  project                = "insolvia"
+  environment            = local.environment
+  aws_region             = var.aws_region
+  kms_key_arn            = module.case_store.kms_key_arn
+  api_role_name          = null
+  point_in_time_recovery = false
+  deletion_protection    = false
+  tags                   = local.common_tags
+}
 # ── Auth ────────────────────────────────────────────────────────
 # The same module staging and prod instantiate, with the machine environment
 # name. The Cognito hosted-domain prefix the module derives

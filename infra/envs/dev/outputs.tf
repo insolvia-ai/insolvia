@@ -52,3 +52,7 @@ output "auth_issuer_url" {
   description = "OIDC issuer for tokens from this machine's pool."
   value       = module.auth.issuer_url
 }
+output "firm_table_name" {
+  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
+  value       = module.firm_store.table_name
+}
