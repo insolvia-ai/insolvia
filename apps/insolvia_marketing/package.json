@@ -15,8 +15,14 @@
     "`dependencies` is what lets the Docker image's `npm ci --omit=dev` skip",
     "it (and its clsx/tailwind-merge subtree, bundled at build time too) and",
     "stay free of GitHub Packages registry auth. Installing it here DOES need",
-    "auth (see .npmrc). A file: path override for local design-system hacking",
-    "is fine, but never commit it \u2014 the committed dep is the published package."
+    "auth (see .npmrc).",
+    "",
+    "Never point this at a local checkout \u2014 not a file: path, not a link:. The",
+    "package lives in github.com/insolvia-ai/design-system and reaches this",
+    "site by published version only. That was already true here; it is now true",
+    "for apps/insolvia_app as well, which used to read the package's source",
+    "through a workspace symlink. Restoring a path override for either would",
+    "recreate the split channel the extraction removed."
   ],
   "scripts": {
     "dev": "react-router dev",
@@ -36,7 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia-ai/design-system": "^0.2.1",
+    "@insolvia-ai/design-system": "^0.6.0",
     "@react-router/dev": "^7.18.1",
     "@react-router/fs-routes": "^7.18.1",
     "@react-router/serve": "^7.18.1",

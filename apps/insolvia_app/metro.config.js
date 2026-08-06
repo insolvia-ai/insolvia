@@ -1,9 +1,9 @@
 // Metro configuration for the Insolvia app.
 //
 // The app is an npm workspace member, so its dependencies are hoisted to the
-// repo root and @insolvia-ai/tokens is a symlink into packages/. Metro does not
-// walk up the tree the way Node's resolver does, so a default config finds
-// neither. The three settings below are Expo's documented monorepo recipe:
+// repo root. Metro does not walk up the tree the way Node's resolver does, so a
+// default config finds them. The three settings below are Expo's documented
+// monorepo recipe:
 //
 //   watchFolders          — watch the whole repo, so an edit to a workspace
 //                           package triggers a rebuild (and Metro is allowed to
@@ -15,8 +15,11 @@
 //                           fails here instead of silently resolving from the
 //                           root — the trap the root package.json warns about.
 //
-// @insolvia-ai/tokens exports `./src/tokens.ts` — TypeScript source, no build
-// step — which Metro transforms like any other source file.
+// @insolvia-ai/tokens and @insolvia-ai/design-system export TypeScript source
+// with no build step, which Metro transforms like any other source file. Both
+// are now PUBLISHED packages installed into node_modules rather than workspace
+// members symlinked into packages/ — see the design-system block below, which
+// is the one place that distinction changes the config.
 
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
@@ -51,7 +54,12 @@ config.resolver.disableHierarchicalLookup = true;
 // barrel) falls through to normal resolution. Package `exports` conditions
 // cannot express this — conditions select entry points, not the platform
 // suffix of the package's internal relative imports.
-const packageDir = `${path.sep}insolvia_design_system${path.sep}`;
+// The package now installs into node_modules/@insolvia-ai/design-system rather
+// than being a workspace member at packages/insolvia_design_system, so this
+// match moved with it. Both segments are matched together: `design-system`
+// alone would also match a directory of that name anywhere in the tree, and
+// this override must apply to exactly one package's internal imports.
+const packageDir = `${path.sep}@insolvia-ai${path.sep}design-system${path.sep}`;
 const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const resolve = defaultResolveRequest ?? context.resolveRequest;

@@ -1,0 +1,11 @@
+{
+  "//": [
+    "`tool/` is not a workspace member — it is one script, with no package",
+    "boundary to justify. It extends the shared options anyway so it is held to",
+    "the same rules as the members, `erasableSyntaxOnly` included: this script",
+    "runs as plain `node tool/reconcile-cognito-branding.ts` on Node's native",
+    "type-stripping, so an `enum` here would typecheck and then fail at runtime."
+  ],
+  "extends": "../tsconfig.base.json",
+  "include": ["**/*.ts"]
+}

@@ -52,10 +52,13 @@ Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):
 | API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose) → `dev-test.sh` (ruff+pytest, matches CI) |
 | Mailer | `services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh` |
 
-`packages/insolvia_tokens`, `packages/insolvia_api_client` and
-`packages/insolvia_design_system` deliberately have no scripts — the root
-workspace install covers them, and the design system has no dev server of its
-own (its `.web` leaves render in marketing, its `.native` leaves in the app).
+`packages/insolvia_api_client` deliberately has no scripts — the root workspace
+install covers it.
+
+The design system and the design tokens are **not in this repo** at all; they
+live in `insolvia-ai/design-system` and install from GitHub Packages. If an
+install here 401s on `@insolvia-ai/*`, that is registry auth, not a missing
+setup script: run `./scripts/github-packages-auth.sh`.
 
 ## Per-machine dev AWS resources (the API's real dev DB — there is no emulator)
 

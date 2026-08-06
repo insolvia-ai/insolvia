@@ -60,7 +60,7 @@
   ],
   "dependencies": {
     "@insolvia-ai/api-client": "*",
-    "@insolvia-ai/tokens": "*",
+    "@insolvia-ai/tokens": "^0.2.0",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.7",
     "expo-linking": "~57.0.4",
@@ -71,8 +71,21 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "^0.21.2",
-    "@insolvia-ai/design-system": "*"
+    "@insolvia-ai/design-system": "^0.6.0"
   },
+  "//insolvia-ai-dependencies": [
+    "@insolvia-ai/design-system and @insolvia-ai/tokens are PUBLISHED packages",
+    "from github.com/insolvia-ai/design-system, pinned by range like any other",
+    "dependency. They were `*` while they were workspace members of this repo,",
+    "which meant this app read the design system's SOURCE through a symlink and",
+    "saw every merge instantly — while the marketing site, installing the",
+    "published version, saw nothing until a release. Extracting them ended that",
+    "split. Take a change by bumping the range here, never by pointing it at a",
+    "local checkout.",
+    "",
+    "@insolvia-ai/api-client stays `*`: it IS still a workspace member of this",
+    "repo, and the symlink is correct for it."
+  ],
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
@@ -90,25 +103,17 @@
     "react."
   ],
   "//jest": [
-    "jest-expo's native preset. Tests assert accessibility PROPS (role,",
-    "aria-level, aria-labelledby); that those props become real <h1>/<button>/",
-    "<label>-equivalent tags is react-native-web's own mapping, re-verified",
-    "against the built DOM in the deploy checks rather than mocked here.",
+    "The config moved to jest.config.js — it has to COMPUTE",
+    "`transformIgnorePatterns` from jest-expo's own, which package.json cannot",
+    "do. @insolvia-ai/design-system publishes untranspiled source and now lives",
+    "under node_modules (it was a workspace member before the extraction), so",
+    "Jest skips transforming it and every route test dies on `export`. That",
+    "file explains why the list is derived rather than pasted; the preset's own",
+    "entries — `standard-navigation` above all — must survive.",
     "",
-    "`transformIgnorePatterns` is deliberately NOT overridden. The preset's own",
-    "list is what has to win: expo-router 57 pulls in `standard-navigation`,",
-    "which ships untransformed ESM and appears only in the preset's list. A",
-    "hand-copied list (they circulate widely) silently drops it and every route",
-    "test dies with \"Cannot use import statement outside a module\".",
-    "",
-    "`moduleNameMapper` restates the `@/*` alias from tsconfig.json. Metro reads",
-    "the tsconfig paths itself; Jest does not, so without this every `@/`",
-    "import fails to resolve under test while building fine."
-  ],
-  "jest": {
-    "preset": "jest-expo",
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
-    }
-  }
+    "Tests assert accessibility PROPS (role, aria-level, aria-labelledby); that",
+    "those props become real <h1>/<button>/<label>-equivalent tags is",
+    "react-native-web's own mapping, re-verified against the built DOM in the",
+    "deploy checks rather than mocked here."
+  ]
 }

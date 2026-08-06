@@ -16,6 +16,11 @@ on:
 
 permissions:
   contents: read
+  # The root `npm ci` below installs @insolvia-ai/design-system and
+  # @insolvia-ai/tokens from GitHub Packages. Both were workspace members of
+  # this repo until the extraction, when npm linked them from source and no
+  # registry was involved; they are ordinary published dependencies now.
+  packages: read
 
 jobs:
   app:
@@ -120,10 +125,12 @@ jobs:
         with:
           paths: |
             apps/insolvia_app/**
-            # insolvia_tokens is a workspace member the app consumes
-            # directly, co-installed by the root `npm ci` below, so a token
-            # change reaches this build with no version bump in between.
-            packages/insolvia_tokens/**
+            # No packages/insolvia_tokens line any more, and none for the
+            # design system: both live in github.com/insolvia-ai/design-system
+            # and reach this build as PUBLISHED versions. A change to either
+            # arrives here as an edit to package.json/package-lock.json, which
+            # the two lines below already cover — there is no longer a source
+            # path in this repo that could change them behind the gate's back.
             # insolvia_api_client is a declared dependency of the app resolved by
             # workspace symlink, so its source is compiled into this build's
             # typecheck. Nothing imports it *yet* — it sits beside `apiBaseUrl`
@@ -162,6 +169,8 @@ jobs:
       - name: Install
         if: steps.filter.outputs.run == 'true'
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # The app is addressed as `--workspace apps/insolvia_app` — a path, not a
       # package name — throughout this file, so renaming the package in its

@@ -16,13 +16,18 @@ insolvia/
 │   │       └── theme.ts               StyleSheet helpers over the tokens
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
-│   ├── insolvia_tokens/               @insolvia-ai/tokens — tokens.json + generator
-│   ├── insolvia_design_system/        @insolvia-ai/design-system — platform-split, published
 │   └── insolvia_api_client/           @insolvia-ai/api-client
 ├── services/                          api · mailer (Python on Lambda)
 ├── infra/                             Terraform — ci-trust / shared / staging / prod
+├── tool/                              reconcile-cognito-branding.ts
 └── docs/                              business plan + runbooks
 ```
+
+The design system is **not** in this tree. `@insolvia-ai/design-system` and
+`@insolvia-ai/tokens` live in
+[`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) and
+install from GitHub Packages —
+[ADR 0010](../adr/0010-design-system-moves-to-its-own-repository.md).
 
 Everything is TypeScript. The app follows the layout Expo itself publishes —
 `src/app/` is routes-only, screen bodies live in `src/screens/` — see
@@ -32,28 +37,31 @@ Everything is TypeScript. The app follows the layout Expo itself publishes —
 behind all of it, including the measurements that ruled out a component library.
 
 - **Workspace resolution:** npm workspaces, root `package.json`. The member
-  list is **explicit** — `packages/insolvia_design_system` is deliberately
-  *both* a member (the app consumes its source through the symlink) and
-  published (marketing consumes it by version). The reasoning is in the root
-  `package.json`'s own comments; read them before adding a member.
+  list is **explicit**; the reasoning is in the root `package.json`'s own
+  comments, so read them before adding a member.
 - **Not a member, deliberately:** `apps/insolvia_marketing`. It keeps its own
   lockfile and its own CI job that installs from it, because Node resolution
   walks *up* the tree and would otherwise let a missing dependency resolve
-  from the root — and a member symlink would build it against local source
-  instead of the published package.
-- **One design system, one token source.** `packages/insolvia_design_system`
-  (`@insolvia-ai/design-system`) is platform-split — per component, a shared
+  from the root.
+- **One design system, consumed by version on both surfaces.**
+  `@insolvia-ai/design-system` is platform-split — per component, a shared
   props module plus a `.web` and a `.native` leaf, with the consumer's bundler
-  picking the leaf. **Both surfaces consume it:** marketing installs the
-  published version and Vite picks the `.web` leaves; the app consumes source
-  through the workspace, and a scoped `resolveRequest` override in its
-  `metro.config.js` prefers the `.native` leaves on every platform, web
-  included — react-native-web renders them, and no Tailwind enters the app.
-  [ADR 0006](../adr/0006-owned-cross-platform-design-system.md) is the decision
-  record, with the measurements. Token *values* still generate from
-  `packages/insolvia_tokens/tokens.json`: the package's `theme.css` for web, a
-  typed `tokens.ts` for native — see
-  [`package-publishing.md`](package-publishing.md) and the package's own docs.
+  picking the leaf. Marketing's Vite picks the `.web` leaves; the app's Metro
+  picks `.native` on **every** platform, web included, via a scoped
+  `resolveRequest` override in its `metro.config.js` — react-native-web renders
+  them, and no Tailwind enters the app.
+  [ADR 0006](../adr/0006-owned-cross-platform-design-system.md) is the design
+  decision, with the measurements;
+  [ADR 0010](../adr/0010-design-system-moves-to-its-own-repository.md) is why
+  the package is no longer here. **Never give either consumer a path
+  dependency on it** — the app had one, through a workspace symlink, and one
+  package with two simultaneous truths is what ADR 0010 removed.
+- **Tokens generate elsewhere, with one output left behind.** The token values
+  render in the design-system repo. Cognito's managed-login branding
+  (`infra/modules/auth/managed-login-settings.json`) is this repo's
+  infrastructure, so it stayed: `tool/reconcile-cognito-branding.ts` reconciles
+  it against the installed `@insolvia-ai/tokens`, gated by the `Cognito
+  branding` check. See [`package-publishing.md`](package-publishing.md).
 
 ## Toolchain
 
@@ -284,7 +292,7 @@ Red CI blocks a merge to `main`. The `protect-main` ruleset requires these
 | Check name | Workflow |
 |---|---|
 | `App` | `app-pr.yml` |
-| `Design system` | `design-system-pr.yml` |
+| `Cognito branding` | `branding-pr.yml` |
 | `Marketing site` | `marketing-pr.yml` |
 | `API service` | `api-pr.yml` |
 | `Mailer service` | `mailer-pr.yml` |

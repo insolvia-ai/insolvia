@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 #
-# Grant this environment read access to the @insolvia-ai/design-system package
-# on GitHub Packages (npm.pkg.github.com), which apps/insolvia_marketing
-# depends on. GitHub Packages requires a token for EVERY npm read — even for
+# Grant this environment read access to the @insolvia-ai packages on GitHub
+# Packages (npm.pkg.github.com) — @insolvia-ai/design-system and
+# @insolvia-ai/tokens, both published from github.com/insolvia-ai/design-system.
+#
+# This used to matter only for apps/insolvia_marketing. It now matters for the
+# ROOT install too: both packages were workspace members until the design
+# system was extracted (ADR 0009), so `npm ci` at the root linked them from
+# source and never contacted a registry. It does now, and fails with a 401
+# without a token.
+#
+# The reachability probe below checks design-system only. That is deliberate
+# and sufficient: both packages live in the same repository and inherit the
+# same access, so a token that can read one can read the other, and probing
+# two would double the round trips to prove the same fact.
+#
+# GitHub Packages requires a token for EVERY npm read — even for
 # public packages — carrying the `read:packages` scope (classic PAT) /
 # "Packages: read" permission (fine-grained PAT / GitHub App). The default
 # GH_TOKEN in CI/sandboxes does NOT have it — `npm ci` fails with a 401/403.

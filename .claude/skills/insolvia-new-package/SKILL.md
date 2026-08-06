@@ -43,11 +43,17 @@ layout (`core/api/adapters/entrypoints`) with a per-service `pyproject.toml`
 (pytest) plus the shared root `ruff.toml`, and its own `tests/test_architecture.py`
 enforcing the dependency direction. Steps 3–5 above still apply.
 
-## The design system is special
+## The design system is in another repository
 
-If the new thing is a design-system surface, this skill is the wrong door:
-read the `insolvia-design-system-pr` skill and
-`packages/insolvia_design_system/CLAUDE.md` first. That package is version
-gated (own PR + bump), platform-split (`.props.ts`/`.web.tsx`/`.native.tsx`
-per component), and both a workspace member and published — the one package
-where "just add a directory" is never the whole job.
+If the new thing is a shared component or a design token, this skill is the
+wrong door — and so is this repository. `@insolvia-ai/design-system` and
+`@insolvia-ai/tokens` live in
+[`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) and
+reach this repo only as published versions
+([ADR 0010](../../../docs/adr/0010-design-system-moves-to-its-own-repository.md)).
+Add the component there, publish, then use the
+`insolvia-design-system-bump` skill to take the version.
+
+Do not create a local package to hold shared UI as a way around that. The app
+had a source-level channel to the design system once, through a workspace
+symlink, and removing it is the whole point of ADR 0010.

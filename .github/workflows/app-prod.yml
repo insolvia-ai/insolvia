@@ -82,6 +82,10 @@ permissions:
   contents: read
   # Reading the insolvia/staging-release commit status.
   statuses: read
+  # The root `npm ci` below installs @insolvia-ai/design-system and
+  # @insolvia-ai/tokens from GitHub Packages — published dependencies since the
+  # design system was extracted, not workspace members linked from source.
+  packages: read
 
 jobs:
   # Resolve + verify once, with no credentials and no environment — see the
@@ -143,6 +147,8 @@ jobs:
       # `ci`, never `install`: it installs exactly the committed lockfile, which
       # is the other half of the reproducibility guarantee in the header.
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Infra outputs are read BEFORE the build, not after ────────────────
       #

@@ -34,8 +34,8 @@ the linked owner has the detail:
 | Human email | Google Workspace inbound, SES outbound `no-reply@` | [`email.md`](reference/email.md) |
 | Marketing site | React Router v7 SSR Lambda, `www.insolvia.ai` (+ noindexed staging), Lighthouse-gated in CI | [`apps/insolvia_marketing/CLAUDE.md`](../apps/insolvia_marketing/CLAUDE.md) |
 | Web app | Expo / React Native SPA, `app.insolvia.ai`, S3 + CloudFront | [ADR 0004](adr/0004-react-native-replaces-flutter.md) · [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) |
-| Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
-| Tokens | One `tokens.json` → generated `theme.css` (web) + `tokens.ts` (native), drift-gated in CI | [`packages/insolvia_tokens/README.md`](../packages/insolvia_tokens/README.md) |
+| Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency. Lives in [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system); consumed here by published version | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) · [ADR 0010](adr/0010-design-system-moves-to-its-own-repository.md) |
+| Tokens | One `tokens.json` → generated `theme.css` (web) + `tokens.ts` (native), drift-gated in CI — in the design-system repo. What is generated *here* is Cognito's sign-in branding, from the installed `@insolvia-ai/tokens` | [`reference/package-publishing.md`](reference/package-publishing.md) |
 | API | Python/Flask on Lambda, `api.insolvia.ai` — health + waitlist; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
 | Mailer | SES-backed transactional service with unsubscribe path | [`services/mailer/CLAUDE.md`](../services/mailer/CLAUDE.md) |
