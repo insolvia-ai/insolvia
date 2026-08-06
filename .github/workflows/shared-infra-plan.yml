@@ -25,13 +25,16 @@ jobs:
       # a re-run is the only way to learn anything.
       fail-fast: false
       matrix:
-        # `dev` (per-developer machine) and `ci-trust` (the trust anchor —
-        # OIDC provider + deploy role, applied only by a human) are validated
-        # offline here like the others but never applied by CI. Their
-        # "Terraform validate (dev)" / "(ci-trust)" checks are NOT part of the
+        # `dev` (per-developer machine), `ci-trust` (the trust anchor — OIDC
+        # provider + deploy role) and `account-access` (the human IAM users and
+        # groups) are validated offline here like the others but never applied
+        # by CI. The last two are human-applied on purpose; `account-access`
+        # additionally cannot be applied by CI at all, because the deploy role
+        # holds no IAM user/group permissions. Their "Terraform validate (dev)"
+        # / "(ci-trust)" / "(account-access)" checks are NOT part of the
         # required-checks contract in CLAUDE.md (the ruleset requires
         # shared/staging/prod); they run for coverage, not as gates.
-        env: [shared, staging, prod, ci-trust, dev]
+        env: [shared, staging, prod, ci-trust, account-access, dev]
     steps:
       - uses: actions/checkout@v5
         with:
