@@ -64,6 +64,7 @@ class AppConfig:
     case_access_log_table_name: str | None = None
     firm_table_name: str | None = None
     auth_user_pool_id: str | None = None
+    case_document_bucket: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -106,6 +107,15 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     is verified against, one is called — they happen to agree, and neither is
     derived from the other. Only POST /v1/firm/users needs it; unset means the
     in-memory directory, same shape as the stores above.
+    CASE_DOCUMENT_BUCKET names the S3 bucket holding a case's source documents
+    — credit reports, pay stubs, bank statements (issue 8.6). Same SSM
+    derivation and the same unset-means-in-memory shape as the three above; in
+    local dev it is likewise this machine's real per-developer bucket
+    (scripts/dev-aws-setup.sh writes it into services/api/.env) rather than an
+    emulator. The bucket's KMS key is deliberately NOT configuration: it is the
+    case key, S3 resolves it from the bucket's default encryption, and nothing
+    in this service ever names it — which is what keeps this service's only
+    KMS reach fenced to `kms:ViaService = s3` (modules/case_documents).
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -140,6 +150,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         firm_table_name=source.get("FIRM_TABLE_NAME") or None,
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
+        case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,

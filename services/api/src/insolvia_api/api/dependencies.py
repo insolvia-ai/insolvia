@@ -9,6 +9,8 @@ from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,
+    DocumentBlobStore,
+    DocumentStore,
     FirmStore,
     JwksProvider,
     Mailer,
@@ -46,6 +48,15 @@ class ApiDependencies:
     # READ routes work without it — a deployment missing the pool id should
     # fail on that one endpoint rather than take the staff list down too.
     user_directory: UserDirectory | None = None
+    # Two ports rather than one, because they are two pieces of infrastructure
+    # with two IAM grants and two failure modes: the row lives in the case
+    # table, the bytes live in the bucket. Folding them together would put a
+    # DynamoDB client and an S3 client in one adapter and force the in-memory
+    # store to fake presigning as well as storage. Optional for the same reason
+    # as the pair above — api/routes/documents.py raises rather than degrading,
+    # and the Lambda entrypoint refuses to boot without the bucket.
+    document_store: DocumentStore | None = None
+    document_blobs: DocumentBlobStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

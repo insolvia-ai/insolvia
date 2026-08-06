@@ -9,6 +9,7 @@ from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
+from insolvia_api.api.routes.documents import blueprint as documents_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
@@ -39,6 +40,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.extensions["insolvia_api_dependencies"] = dependencies
     app.register_blueprint(cases_blueprint)
     app.register_blueprint(firm_blueprint)
+    app.register_blueprint(documents_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)
@@ -65,13 +67,13 @@ def create_app(dependencies: ApiDependencies) -> Flask:
         origin = request.headers.get("Origin")
         if origin and origin_allowed(config, origin):
             response.headers["Access-Control-Allow-Origin"] = origin
-            # PUT and DELETE arrived with case assignment
-            # (PUT/DELETE /v1/cases/<id>/assignees/<subject>). Both are
-            # non-simple methods, so a browser preflights them and a missing
-            # entry here is not a subtle degradation — it is the request never
-            # being sent, with a CORS error in the console and a 200 in our
-            # logs for the OPTIONS. Adding the route without adding the method
-            # is a two-file change that looks like a one-file change.
+            # DELETE is here for the document routes (issue 8.6) and PUT for
+            # case assignment (PUT/DELETE /v1/cases/<id>/assignees/<subject>).
+            # Both are non-simple methods, so a browser preflights them and a
+            # missing entry is not a subtle degradation — it is the request
+            # never being sent, with a CORS error in the console and a 200 in
+            # our own logs for the OPTIONS. Adding a route without adding its
+            # method is a two-file change that looks like a one-file change.
             response.headers["Access-Control-Allow-Methods"] = (
                 "GET, POST, PATCH, PUT, DELETE, OPTIONS"
             )

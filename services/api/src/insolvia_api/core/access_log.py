@@ -24,7 +24,30 @@ from datetime import UTC, datetime
 
 # What happened. Kept coarse — this records that an access occurred and by
 # whom, not a diff. Reconstructing what changed is the case record's job.
-ACTIONS = ("case.create", "case.read", "case.update")
+#
+# The `document.*` verbs (issue 8.6) EXTEND the tuple rather than reusing
+# case.read/case.update, and the coarseness rule above is what argues for it
+# rather than against it. Coarse means "no diffs", not "one row looks like
+# every other row": these four are the events where the actual bytes of a
+# client's tax return are handed out or destroyed, and folding them into
+# case.read would make a download indistinguishable from opening the case list.
+# The question this table exists to answer is "who saw this file", and under
+# the reused verb the answer for the file that matters most would be "someone
+# looked at the case, possibly".
+#
+# document.download is separate from document.read for the same reason at
+# smaller scale: reading the list learns what documents exist, and downloading
+# is the one that produces a decryptable copy outside this account. They are
+# different disclosures and should not share a row.
+ACTIONS = (
+    "case.create",
+    "case.read",
+    "case.update",
+    "document.create",
+    "document.read",
+    "document.download",
+    "document.delete",
+)
 
 # Whether the caller got the data. A denied read is the more interesting row
 # of the two: it is what someone probing for other people's cases looks like.

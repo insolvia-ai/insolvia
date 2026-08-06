@@ -142,7 +142,7 @@ preflight() {
     failures=$((failures + 1))
   else
     local missing="" key
-    for key in WAITLIST_TABLE_NAME CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME; do
+    for key in WAITLIST_TABLE_NAME CASE_TABLE_NAME CASE_ACCESS_LOG_TABLE_NAME CASE_DOCUMENT_BUCKET; do
       grep -q "^$key=" "$api_env" || missing="$missing $key"
     done
     if [[ -n "$missing" ]]; then

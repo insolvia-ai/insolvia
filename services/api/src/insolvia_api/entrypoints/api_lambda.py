@@ -5,6 +5,8 @@ from mangum import Mangum
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -59,6 +61,15 @@ if not config.firm_table_name:
 # firm admin discovers while trying to add their first colleague.
 if not config.auth_user_pool_id:
     raise RuntimeError("AUTH_USER_POOL_ID must be set for the Lambda entrypoint")
+# Hard-required for the same reason, and separately so the message names the
+# one thing that is missing (issue 8.6). Booting without it would leave every
+# document route answering 500 through _stores() — discovered by a user
+# uploading a bank statement. Refusing to boot is discovered by the deploy.
+# infra/envs/<env>/main.tf publishes the name as
+# /insolvia/<env>/api/case-document-bucket, which the deploy workflow derives
+# into CASE_DOCUMENT_BUCKET along with the rest of that namespace.
+if not config.case_document_bucket:
+    raise RuntimeError("CASE_DOCUMENT_BUCKET must be set for the Lambda entrypoint")
 
 # AWS adapters are composed here, mirroring mailer's api_lambda entrypoint.
 # mailer_api_url is unset only if the mailer's SSM param hasn't been deployed
@@ -86,6 +97,10 @@ app = create_app(
         # request, with a grant of its own (infra/modules/firm_store).
         firm_store=DynamoDbFirmStore(config.firm_table_name),
         user_directory=CognitoUserDirectory(config.auth_user_pool_id),
+        # The document ROW lives in the case table — same table, same
+        # partition, no second table — while the bytes live in the bucket.
+        document_store=DynamoDbDocumentStore(config.case_table_name),
+        document_blobs=S3DocumentBlobStore(config.case_document_bucket),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]
