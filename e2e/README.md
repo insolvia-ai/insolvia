@@ -11,7 +11,9 @@ promotion. Agent rules: [`CLAUDE.md`](CLAUDE.md). One-time setup:
 |---|---|
 | `playwright.config.ts` | Runner config — retries, timeouts, and the artifact policy that keeps a password out of a public repo's build artifacts. |
 | `support/env.ts` | The one place credentials enter the suite. No defaults, no fixtures, nothing echoed. |
+| `support/sign-in.ts` | The sign-in dance, for specs whose subject is something else. `auth-round-trip.spec.ts` deliberately does not use it — the steps it skips past are that spec's whole point. |
 | `tests/auth-round-trip.spec.ts` | Sign in via the Cognito hosted UI → `/auth/callback` → the signed-in identity renders → sign out. |
+| `tests/intake-persists.spec.ts` | Type into a case's intake, watch it save, reload, find it still there. The only test that proves the app's request body is one the API accepts and the store keeps. |
 
 ## Running it
 
