@@ -5,6 +5,7 @@ from mangum import Mangum
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
@@ -43,6 +44,14 @@ if not config.case_table_name or not config.case_access_log_table_name:
         "for the Lambda entrypoint"
     )
 
+# Hard-required, and of everything on this list it is the one with no partial
+# failure at all. Without the firm table nothing can establish which firm a
+# signed-in person belongs to, so every authenticated route is unreachable —
+# not degraded, unreachable. infra/envs/<env>/main.tf publishes the name as
+# /insolvia/<env>/api/firm-table-name.
+if not config.firm_table_name:
+    raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
+
 # AWS adapters are composed here, mirroring mailer's api_lambda entrypoint.
 # mailer_api_url is unset only if the mailer's SSM param hasn't been deployed
 # yet in this environment — fall back to the in-memory client rather than
@@ -65,6 +74,9 @@ app = create_app(
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
         case_store=DynamoDbCaseStore(config.case_table_name),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+        # Its own table, not the case table — read on every authenticated
+        # request, with a grant of its own (infra/modules/firm_store).
+        firm_store=DynamoDbFirmStore(config.firm_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

@@ -4,6 +4,7 @@ from typing import Any, Protocol
 
 from insolvia_api.core.access_log import AccessEvent
 from insolvia_api.core.cases import Case, CasePage
+from insolvia_api.core.firms import Firm, FirmUser
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
 
@@ -34,6 +35,93 @@ class WaitlistStore(Protocol):
     and adapters/memory (tests and the plain development server)."""
 
     def add(self, record: WaitlistRecord) -> None: ...
+
+
+class FirmStore(Protocol):
+    """Firms, the people in them, and what each of them may do.
+
+    THE HOTTEST READ IN THE SERVICE. `find_user` runs before any case is
+    touched, on every authenticated request, because an access token carries a
+    Cognito `sub` and nothing else authorization-bearing — no groups, no custom
+    attributes, no pre-token Lambda. Resolving the firm IS the read.
+
+    That is also why its IAM grant cannot be scoped to one tenant's partition
+    (infra/modules/firm_store spells this out): there is nothing to scope by
+    until the read has happened. Tenant isolation here is an APPLICATION
+    property, exactly as ADR 0001 has it for case data.
+    """
+
+    def create_firm(self, firm: Firm) -> None:
+        """Store a new firm. MUST refuse to overwrite an existing id."""
+        ...
+
+    def get_firm(self, firm_id: str) -> Firm | None: ...
+
+    def add_user(self, user: FirmUser) -> None:
+        """Attach someone to a firm. MUST refuse to overwrite an existing
+        (firm_id, subject) rather than replacing it — an overwrite would reset
+        a colleague's permissions to whatever the caller sent, and the caller
+        believes they are adding a new person."""
+        ...
+
+    def get_user(self, firm_id: str, subject: str) -> FirmUser | None:
+        """One user, by primary key. Firm-scoped, so an admin of firm A cannot
+        read a user of firm B by knowing their subject."""
+        ...
+
+    def find_user(self, subject: str) -> FirmUser | None:
+        """Which firm this Cognito subject belongs to, and what they may do.
+
+        The by-subject index, and the ONLY method that is not firm-scoped —
+        necessarily, since its whole job is to discover the firm.
+
+        EVENTUALLY CONSISTENT, unavoidably: DynamoDB global secondary indexes
+        do not support ConsistentRead. A user added a moment ago may not
+        resolve yet, which is why the administration route reads its own write
+        back by primary key (`get_user`) rather than through this.
+
+        An implementation MUST raise rather than choose if a subject resolves
+        to more than one firm. One person, one firm is an application
+        invariant — nothing in the key schema enforces it, because DynamoDB
+        conditions cannot span partitions — and picking a row would make
+        someone's tenancy depend on index ordering. A loud 500 for one user
+        beats a silent, unstable answer.
+        """
+        ...
+
+    def list_users(self, firm_id: str) -> tuple[FirmUser, ...]:
+        """A firm's whole staff list, ordered by display name then subject.
+
+        All of them: a caller cannot page, so an implementation that can
+        truncate must not. A firm is 2-15 seats (the business plan's own
+        sizing), so this is a small query by construction — and if a firm ever
+        outgrows it, the fix is a cursor, not a silent cap.
+        """
+        ...
+
+    def update_user(self, user: FirmUser) -> FirmUser | None:
+        """Write `user` back, but only over a row that still exists AND still
+        belongs to `user.firm_id`.
+
+        Returns None if either no longer holds — the administration route turns
+        that into the same 404 a foreign subject gets. Both halves matter: the
+        existence check stops a deleted user being resurrected by a PATCH that
+        was in flight, and the firm check closes the window between the route's
+        read and this write.
+        """
+        ...
+
+    def remove_user(self, firm_id: str, subject: str) -> bool:
+        """Detach someone from a firm. True if this call removed them, False if
+        there was nothing there.
+
+        Removes the membership row ONLY. The Cognito user survives, and so does
+        every case assignment naming this subject — those live in the case
+        table and are cleaned by the administration route, which is the one
+        place that can see both. A store that reached across would be a second
+        thing to keep in step.
+        """
+        ...
 
 
 class CaseStore(Protocol):
