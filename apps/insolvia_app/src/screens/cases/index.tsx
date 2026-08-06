@@ -208,18 +208,27 @@ function CaseList({ cases }: { cases: readonly Case[] }) {
             {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} · {item.id}
           </Text>
           {/*
-            A `Link`, not a `Text` with `onPress`: react-native-web gives a
+            `Link`s, not `Text` with `onPress`: react-native-web gives a
             tabIndex only to elements that ask for a role it recognises, and a
-            link is one of them — this renders a real <a href> the keyboard can
+            link is one of them — these render real <a href>s the keyboard can
             reach and the browser can open in a new tab.
 
-            The accessible name names the case. "Documents", repeated once per
-            row, tells a screen-reader user the verb and never the case
-            (WCAG 2.4.4); the visible word stays the start of the name, which is
-            what WCAG 2.5.3 asks for. The id is the disambiguator because it is
-            the only thing here guaranteed unique, and it is already on screen
-            in the line above.
+            EACH ACCESSIBLE NAME CARRIES THE CASE. Two rows of "Open intake"
+            and "Documents" is the classic screen-reader failure, and WCAG
+            2.4.4 is about a link making sense out of context. The visible
+            word stays the start of each name, which is what WCAG 2.5.3 asks
+            for.
           */}
+          <Link
+            href={`/cases/${item.id}/intake`}
+            aria-label={`Open intake for the chapter ${item.chapter} case in ${item.district}`}
+            style={[
+              styles.caseLink,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            Open intake
+          </Link>
           <Link
             href={`/cases/${item.id}/documents`}
             aria-label={`Documents for case ${item.id}`}
@@ -247,6 +256,10 @@ const styles = StyleSheet.create({
   },
   caseLink: {
     fontSize: fontSizes.label,
+    fontWeight: '600',
+    // 44dp, the WCAG 2.5.5 target size this app enforces on anything
+    // pressable — a text link is no exception.
+    lineHeight: 44,
   },
   caseMeta: {
     fontSize: fontSizes.caption,
