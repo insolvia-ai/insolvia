@@ -172,9 +172,18 @@ needing a second action.
 - `/v1/me` is the one route that resolves an accessor without requiring one. It
   reports the firm, or reports its absence, so a person who has signed up and
   not been added yet has something to render instead of an error screen.
-- The pool's `username_configuration` is absent, so usernames are
-  **case-sensitive** — measured, not inferred. Fixing it replaces the pool and
-  deletes every account in it, so it is a deliberate decision rather than part
-  of this change. `modules/auth` records what it costs; the API lower-cases
-  every address before it reaches the pool, which closes the duplicate-account
-  path and not the typed-with-a-capital one.
+- The pool's usernames are **case-insensitive**, and were not when this ADR
+  was first written. Cognito's legacy default — an absent
+  `username_configuration` — is case-SENSITIVE, so `Alice@firm.com` and
+  `alice@firm.com` were two accounts and an attorney who typed a capital on
+  the hosted sign-in page was told they did not exist. Measured against the
+  real staging pool.
+
+  It was fixed rather than accepted, and the timing was the whole argument.
+  The block is immutable, so setting it REPLACES the pool — which deletes
+  every account **and** orphans every row keyed on a Cognito subject:
+  `firm_user`, `case.created_by`, every assignment. Prod had zero users and
+  both those tables were empty, so the change cost nothing. After the first
+  firm onboards it stops being a replacement and becomes a data migration.
+  The lesson generalises: an immutable identity setting is cheapest to get
+  wrong on the day you notice.

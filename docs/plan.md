@@ -171,16 +171,7 @@ In order of likely bite:
    last administrator cannot appoint one (the API refuses the edit that would
    cause it, so the reachable path is us provisioning wrongly, not a user).
    Relief is a small provisioning surface, and the trigger is the second firm.
-7. **The user pool is case-sensitive**, so `Alice@firm.com` and
-   `alice@firm.com` are two accounts and an attorney who types a capital on
-   the sign-in page is told they do not exist. Measured against the real pool,
-   not inferred. `username_configuration` is immutable, so fixing it REPLACES
-   the pool and deletes every account in it — cheap now, more expensive every
-   week. Mitigated one layer only: the API lower-cases every address before it
-   reaches the pool, which closes the duplicate-account path and not the
-   typed-with-a-capital one. [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)
-   and `infra/modules/auth` carry the detail.
-8. **Design-system leaf-pair cost.** Two renderings of one design still exist,
+7. **Design-system leaf-pair cost.** Two renderings of one design still exist,
    but as `.web`/`.native` leaves of one component in one package — drift is a
    single-PR diff, not cross-package skew. What remains is the per-component
    authoring cost; [ADR 0006](adr/0006-owned-cross-platform-design-system.md)

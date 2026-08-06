@@ -39,28 +39,30 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  # KNOWN AND NOT FIXED HERE: there is no `username_configuration` block, so
-  # this pool uses Cognito's legacy default and usernames are CASE-SENSITIVE.
-  # Measured against the dev pool, not inferred: creating `a@example.invalid`
-  # and then `A@EXAMPLE.INVALID` produces two separate accounts.
+  # USERNAMES ARE MATCHED CASE-INSENSITIVELY, and this block is the only way to
+  # say so. Cognito's LEGACY default — what you get when this block is absent —
+  # is case-SENSITIVE, which for a pool whose username IS an email address
+  # means `Alice@firm.com` and `alice@firm.com` are two different accounts and
+  # an attorney who types a capital on the sign-in page is told they do not
+  # exist. Measured against the real staging pool rather than inferred:
+  # creating `a@example.invalid` and then `A@EXAMPLE.INVALID` produced two
+  # accounts, no exception, each with its own subject.
   #
-  # What that costs: an attorney who types their address with a capital on the
-  # hosted sign-in page is told the user does not exist. Cognito owns that
-  # input, so nothing on our side can normalise it.
+  # THIS BLOCK IS IMMUTABLE. AWS accepts it only at creation, so the provider
+  # marks it ForceNew — adding it REPLACES the pool and deletes every account
+  # in it. That is why it was not simply set when the pool was written, and why
+  # it is being set now rather than later: the cost is every account plus every
+  # row keyed on a Cognito subject, and both of those only grow.
   #
-  # Why it is not fixed in this change: `username_configuration` is IMMUTABLE.
-  # Adding `case_sensitive = false` forces the pool to be REPLACED, which
-  # deletes every account in it — on prod that is every attorney, and
-  # deletion_protection is ACTIVE there precisely to stop a plan doing it. It
-  # is cheap now (staging and prod hold test accounts) and gets more expensive
-  # every week, so it is a decision to take deliberately rather than a line to
-  # slip into an unrelated PR.
-  #
-  # Mitigated meanwhile, one layer only: services/api lower-cases every address
-  # before it reaches the pool (core/firms._parse_email), so nothing we create
-  # carries a capital and the invitation email quotes the lower-cased form back
-  # to the user. That closes the duplicate-account path and not the
-  # typed-with-a-capital one.
+  # What "every row keyed on a subject" means, because it is the half that is
+  # easy to miss: a replaced pool mints NEW subs, so `firm_user` rows
+  # (insolvia-firms-<env>, keyed on the subject), `case.createdBy` and every
+  # case assignment would all point at identities that no longer exist. Those
+  # tables are empty today. After the first firm is onboarded this stops being
+  # a pool replacement and becomes a data migration.
+  username_configuration {
+    case_sensitive = false
+  }
 
   # ACTIVE on prod (via the variable): deleting the pool deletes every
   # attorney account, so prod requires a two-step (flip this off, then
