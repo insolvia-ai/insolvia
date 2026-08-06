@@ -18,6 +18,20 @@ class FieldValidationError(ValidationError):
         self.fields = fields
 
 
+class ConflictError(ApiError):
+    """The resource exists and the caller may see it, but its current state
+    does not admit the request.
+
+    Deliberately NOT a 404, and the distinction is the opposite of the one
+    NotFoundError draws below. 404 is this codebase's anti-oracle answer: it
+    hides whether a resource exists from a caller who has not proven they may
+    know. By the time this is raised the caller has already proven it — they
+    are an administrator of the firm they are acting on — so there is nothing
+    left to hide, and answering 404 would tell an honest client that a record
+    it can see in its own listing is gone.
+    """
+
+
 class ForbiddenError(ApiError):
     """The caller is authenticated, and still may not do this.
 

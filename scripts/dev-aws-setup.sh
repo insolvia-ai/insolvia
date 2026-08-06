@@ -71,7 +71,8 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
-    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env"; then
+    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
+    ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
   ok "Per-machine AWS resources and services/api/.env are ready."
@@ -127,6 +128,10 @@ upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
 upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
+# The pool the API CALLS, as against the issuer it verifies against. Both end
+# in the same id and neither is derived from the other — see services/api's
+# core/config.py for why parsing one out of the other is refused.
+upsert_env "$api_env" AUTH_USER_POOL_ID "$pool_id"
 
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only

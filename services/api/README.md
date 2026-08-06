@@ -82,6 +82,7 @@ directory; ruff config is the repo-root `ruff.toml`).
 | `WAITLIST_TABLE_NAME` | DynamoDB table for `POST /v1/waitlist`; required by the Lambda entrypoint. Locally it names this machine's real dev table (written to `.env` by `dev-aws-setup.sh`); unset → in-memory store (test seam) |
 | `FIRM_TABLE_NAME` | DynamoDB table holding firms, their people, and what each may do (`infra/modules/firm_store`). **Read on every authenticated request** — resolving the caller's firm is what makes a case reachable — so the Lambda entrypoint refuses to boot without it. Same local/in-memory shape as the others |
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
+| `AUTH_USER_POOL_ID` | The pool this environment **calls** (`AdminCreateUser`, when a firm admin adds a colleague) — as against `AUTH_ISSUER_URL`, which it **verifies against**. Both end in the same id and neither is derived from the other: parsing an id out of a URL would make that URL's format load-bearing in a way Cognito never promised. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
 
 Both auth variables are published to SSM as `/insolvia/<env>/api/auth-issuer-url`
@@ -136,6 +137,32 @@ Per-feature permissions (`cases`, `intake`, `documents`, `extraction_review`,
 `firm_administration`) sit on top as `@requires(FEATURE, LEVEL)`, below
 `@require_auth`. They fail closed: a feature missing from a user's map, or a
 level this version does not recognise, reads as `hidden`.
+
+## Firm administration
+
+`/v1/firm/users` (list, add, `PATCH`, `DELETE`) is the firm's own staff
+management, gated on `firm_administration`. Adding a colleague mints their
+Cognito account first — the pool has self-signup disabled — and the API holds
+**`AdminCreateUser` and nothing else** on that pool: no password setting, no
+delete, no auth. Cognito emails the temporary password to the invited address
+and nothing here ever sees it, which is what keeps creating an account from
+being a way to become one.
+
+`/v1/firm/directory` is the thin one, gated on `cases` instead: subject,
+display name, role. A case carries `createdBy` as a subject and an assignment
+list is a list of subjects, so every member of a firm needs to turn one into a
+name — and that need does not justify handing every paralegal their
+colleagues' email addresses and permission maps.
+
+**A firm cannot lock itself out.** Any edit that would leave it with no active
+administrator answers 409, because self-signup is disabled and nobody inside
+such a firm could appoint one. Unlinking the *last person from a case* is
+allowed, by contrast — a case with nobody on it is still the firm's, and its
+admins can always assign somebody new.
+
+Assignment lives on the case (`PUT`/`DELETE /v1/cases/<id>/assignees/<subject>`)
+and needs `cases: add_edit`, not `firm_administration`: putting a colleague on
+a matter is case work, done by the attorney running it.
 
 Routes are public unless decorated: `@require_auth` from `api/auth.py`, applied
 **below** the route decorator. `/health`, `POST /v1/waitlist`, and

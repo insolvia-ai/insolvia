@@ -10,6 +10,7 @@ from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.access_log import record_access
 from insolvia_api.core.cases import (
     apply_changes,
+    assign_case,
     case_json,
     create_case,
     parse_case_creation,
@@ -18,7 +19,7 @@ from insolvia_api.core.cases import (
 )
 from insolvia_api.core.errors import NotFoundError, ValidationError
 from insolvia_api.core.firms import ADD_EDIT, CASES, VIEW_ONLY
-from insolvia_api.core.ports import AccessLog, CaseStore
+from insolvia_api.core.ports import AccessLog, CaseStore, FirmStore
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,20 @@ def _stores() -> tuple[CaseStore, AccessLog]:
     if deps.case_store is None or deps.access_log is None:
         raise RuntimeError("case store and access log are not composed")
     return deps.case_store, deps.access_log
+
+
+def _firm_store() -> FirmStore:
+    """The firm store, for the one thing the case routes need it for directly:
+    checking that an assignment names somebody in the caller's own firm.
+
+    Everything else about firms reaches these routes through the resolved
+    accessor, which is why this is a helper on two endpoints rather than a
+    dependency of the module.
+    """
+    deps = dependencies()
+    if deps.firm_store is None:
+        raise RuntimeError("firm store is not composed")
+    return deps.firm_store
 
 
 def _json_body() -> dict[str, object]:
@@ -194,3 +209,121 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
 
     logger.info("case updated", extra={"case_id": updated.id})
     return jsonify(case_json(updated)), 200
+
+
+# ── Assignment: who in the firm is on this matter ───────────────
+#
+# These live here rather than in routes/firm.py because the resource is the
+# CASE. Every one of them resolves the case through `store.get` first, which
+# applies the whole access rule — so a caller who cannot see a matter cannot
+# discover who is on it, and cannot put themselves on it either.
+#
+# WHO MAY CHANGE AN ASSIGNMENT is `cases: add_edit` rather than
+# `firm_administration`, and that is a product decision worth stating. Linking
+# a colleague to a matter is case work — the attorney running it does it, not
+# whoever manages the firm's user accounts. An admin can do it too, because an
+# admin can do everything; they just are not the only one.
+
+
+@blueprint.get("/v1/cases/<case_id>/assignees")
+@require_auth
+@requires(CASES, VIEW_ONLY)
+def list_assignees_route(case_id: str) -> ResponseReturnValue:
+    """Who is linked to this case, oldest link first.
+
+    Subjects, not names: turning one into a person is GET /v1/firm/directory's
+    job, and duplicating the display name here would be a copy that goes stale
+    the moment somebody is renamed.
+    """
+    store, _ = _stores()
+    accessor = current_accessor()
+
+    if store.get(case_id, accessor=accessor) is None:
+        raise NotFoundError("case not found")
+
+    return jsonify(
+        {
+            "assignees": [
+                {
+                    "subject": a.subject,
+                    "assignedAt": a.assigned_at,
+                    "assignedBy": a.assigned_by,
+                }
+                for a in store.assignees(case_id)
+            ]
+        }
+    ), 200
+
+
+@blueprint.put("/v1/cases/<case_id>/assignees/<subject>")
+@require_auth
+@requires(CASES, ADD_EDIT)
+def assign_case_route(case_id: str, subject: str) -> ResponseReturnValue:
+    """Link a colleague to this case.
+
+    PUT rather than POST because it is idempotent — the firm-admin UI cannot
+    tell whether its first request landed, and re-linking somebody already on
+    the matter must succeed rather than 409.
+
+    THE SUBJECT MUST BE SOMEBODY IN THE CALLER'S FIRM, checked here against the
+    firm store. Without that check this endpoint writes an assignment row for
+    an arbitrary Cognito subject — which grants nothing today, because
+    `may_see_case` tests the firm first and a stranger has no firm — but it
+    would be a row in our case table naming a person who is not our tenant's,
+    and it would put them on the case the moment they joined some firm.
+    A 404, not a 403: a subject in another firm and a subject that does not
+    exist are the same answer, or this becomes a probe for who works where.
+    """
+    store, access_log = _stores()
+    accessor = current_accessor()
+    firm_store = _firm_store()
+
+    case = store.get(case_id, accessor=accessor)
+    if case is None:
+        raise NotFoundError("case not found")
+
+    colleague = firm_store.get_user(accessor.firm_id, subject)
+    if colleague is None or colleague.status != "active":
+        raise NotFoundError("firm user not found")
+
+    store.assign(assign_case(case, subject=subject, assigned_by=accessor.subject))
+    # Recorded as an update to the case, because it is one: it changes who may
+    # read the file. The actor is the person doing the linking, which is the
+    # question this log exists to answer.
+    access_log.record(
+        record_access(case_id=case_id, principal=accessor.subject, action="case.update")
+    )
+    logger.info("case assignee added", extra={"case_id": case_id})
+    return "", 204
+
+
+@blueprint.delete("/v1/cases/<case_id>/assignees/<subject>")
+@require_auth
+@requires(CASES, ADD_EDIT)
+def unassign_case_route(case_id: str, subject: str) -> ResponseReturnValue:
+    """Unlink a colleague from this case.
+
+    UNLINKING THE LAST PERSON IS ALLOWED, unlike removing a firm's last admin,
+    and the asymmetry is the point. A case with nobody on it is still the
+    firm's: its admins and anyone with `access_all_cases` still reach it, so
+    the firm can always assign somebody new. A firm with no admin has no such
+    route back, which is why that one is refused.
+
+    A caller CAN unlink themselves, and then lose access to the case they were
+    just editing. That is the honest consequence of "I am no longer on this
+    matter" and the alternative — refusing it — would leave someone unable to
+    hand a case over without asking an admin.
+    """
+    store, access_log = _stores()
+    accessor = current_accessor()
+
+    if store.get(case_id, accessor=accessor) is None:
+        raise NotFoundError("case not found")
+    if not store.unassign(case_id, subject):
+        raise NotFoundError("assignee not found")
+
+    access_log.record(
+        record_access(case_id=case_id, principal=accessor.subject, action="case.update")
+    )
+    logger.info("case assignee removed", extra={"case_id": case_id})
+    return "", 204

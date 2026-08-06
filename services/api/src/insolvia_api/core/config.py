@@ -63,6 +63,7 @@ class AppConfig:
     case_table_name: str | None = None
     case_access_log_table_name: str | None = None
     firm_table_name: str | None = None
+    auth_user_pool_id: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -98,6 +99,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     is separate from CASE_TABLE_NAME even though both are encrypted under the
     same key, because it is read on every authenticated request and carries a
     different IAM grant — the module's header has the argument.
+    AUTH_USER_POOL_ID names the Cognito pool this environment authenticates
+    against. It is NOT redundant with AUTH_ISSUER_URL, which ends in the same
+    id: parsing an id out of a URL to make an AWS API call would make the
+    format of that URL load-bearing in a way Cognito never promised. One value
+    is verified against, one is called — they happen to agree, and neither is
+    derived from the other. Only POST /v1/firm/users needs it; unset means the
+    in-memory directory, same shape as the stores above.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -131,6 +139,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         case_table_name=source.get("CASE_TABLE_NAME") or None,
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         firm_table_name=source.get("FIRM_TABLE_NAME") or None,
+        auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,

@@ -79,3 +79,17 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ── The API's invite grant ──────────────────────────────────────
+# Name of the API's Lambda execution role, or null where there is no Lambda
+# (infra/envs/dev — the local API runs as a dev server under the developer's
+# own IAM user). Same optional shape, and the same reason, as
+# modules/case_store's.
+#
+# Looked up by name rather than passed as an ARN so this module does not gain a
+# dependency on api_service, which already depends on it.
+variable "api_role_name" {
+  description = "API Lambda execution role name to grant AdminCreateUser on this pool, or null."
+  type        = string
+  default     = null
+}

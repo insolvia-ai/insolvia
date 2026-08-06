@@ -38,6 +38,43 @@ class WaitlistStore(Protocol):
     def add(self, record: WaitlistRecord) -> None: ...
 
 
+class UserDirectory(Protocol):
+    """Creates the Cognito account behind a new firm user.
+
+    THE ONLY PORT IN THIS SERVICE THAT WRITES TO THE IDENTITY PROVIDER, and it
+    has exactly one method for that reason. Self-signup is off
+    (`allow_admin_create_user_only`), so somebody has to mint the pool user
+    when a firm admin adds a colleague, and it cannot be the client.
+
+    ONE METHOD, AND NOTHING THAT SETS A PASSWORD. The AWS implementation holds
+    `cognito-idp:AdminCreateUser` and nothing else — no AdminSetUserPassword,
+    no AdminInitiateAuth — so a compromised API can create accounts it still
+    cannot authenticate as: the temporary password goes only to the invited
+    address, in Cognito's own invitation email. That is a deliberately narrower
+    grant than "provision a user" suggests, and it is what keeps this from
+    being an impersonation primitive.
+
+    Removing somebody from a firm is NOT here either. It deletes the membership
+    row and leaves the pool account alone (see FirmStore.remove_user), so this
+    port never needs delete — and the grant never needs AdminDeleteUser.
+    """
+
+    def create_user(self, email: str) -> str:
+        """Create the account and return its subject (the Cognito `sub`).
+
+        The subject is the value everything else keys on, so an implementation
+        MUST return the one the provider assigned rather than minting its own —
+        a made-up subject produces a firm user nobody can ever sign in as.
+
+        MUST raise `insolvia_api.core.errors.ConflictError` when the address
+        already has an account. Swallowing it and carrying on would attach a
+        firm-user row to whatever subject a second create returned, which for
+        Cognito is the EXISTING account — silently adding somebody else's
+        user to this firm.
+        """
+        ...
+
+
 class FirmStore(Protocol):
     """Firms, the people in them, and what each of them may do.
 

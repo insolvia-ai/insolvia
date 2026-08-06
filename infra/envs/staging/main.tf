@@ -175,6 +175,11 @@ module "auth" {
   # Staging pool holds only test accounts; keep it destroyable.
   deletion_protection = false
 
+  # Lets POST /v1/firm/users mint a colleague's Cognito account. ONE action on
+  # ONE pool — the module's own comment has the argument for why that is the
+  # whole grant, and what it deliberately excludes.
+  api_role_name = module.api_service.lambda_role_name
+
   tags = local.common_tags
 }
 
@@ -220,6 +225,17 @@ resource "aws_ssm_parameter" "auth_issuer_url" {
   name  = "/insolvia/${local.environment}/api/auth-issuer-url"
   type  = "String"
   value = module.auth.issuer_url
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "auth_user_pool_id" {
+  # NOT redundant with auth-issuer-url, which ends in the same id. One value is
+  # verified against and one is called; parsing an id out of a URL to make an
+  # AWS API call would make that URL's format load-bearing in a way Cognito
+  # never promised. See services/api's core/config.py.
+  name  = "/insolvia/${local.environment}/api/auth-user-pool-id"
+  type  = "String"
+  value = module.auth.user_pool_id
   tags  = local.common_tags
 }
 
