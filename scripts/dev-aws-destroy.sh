@@ -54,6 +54,7 @@ remove_env "$api_env" WAITLIST_TABLE_NAME
 remove_env "$api_env" CASE_TABLE_NAME
 remove_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME
 remove_env "$api_env" FIRM_TABLE_NAME
+remove_env "$api_env" CASE_DOCUMENT_BUCKET
 remove_env "$api_env" AWS_PROFILE
 # The Cognito pool is gone too, so an issuer/client id left behind would point
 # token verification at nothing. The API fails closed on absent auth config, so
