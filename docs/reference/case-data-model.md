@@ -73,7 +73,7 @@ unaddressable.
 
 ```
 case {
-  id, owner_principal
+  id, firm_id, created_by
   chapter: 7 | 11 | 12 | 13
   district, status: intake | ready_to_file | filed, filed_at
   exemption_set: state_and_federal_nonbankruptcy | federal   // 106C line 1
@@ -126,14 +126,25 @@ debtor {
 }
 ```
 
-Widening ownership later — a firm with staff, rather than one signed-in user —
-should not require touching this. Ownership lives on `case` as a single
-`owner_principal`, and nothing else references the owner.
+**A case belongs to a FIRM.** `firm_id` is the tenant; `created_by` is the
+Cognito subject of whoever opened the matter and is an audit fact rather than a
+permission — it grants nothing on its own. Reaching a case means being in its
+firm **and** being an administrator, or carrying `access_all_cases`, or being
+linked to that particular matter through a `case_assignment`. See
+[ADR 0009](../adr/0009-a-case-belongs-to-a-firm.md).
+
+This paragraph used to say the opposite — that ownership was a single
+`owner_principal` and widening it later would not require touching the model.
+Half of that was true and the half that was not is worth recording: ownership
+is not in the primary key, so it *was* an attribute rewrite rather than a
+re-key. But the `by-owner` index **was** the list path, and renaming an index
+replaces it. Empty tables made that free; it would not have been.
 
 `filing_professional` holds the attorney block (printed name, firm, address,
 phone, email, bar number **and** bar state, signature date) or a bankruptcy
-petition preparer (→ Form 119). It is not `owner_principal`: the person who
-signs the petition and the account that owns the record are different facts.
+petition preparer (→ Form 119). It is not `created_by`, and it is not the
+firm: the person who signs the petition, the person who opened the record, and
+the tenant that owns it are three different facts.
 
 ### Value types
 
@@ -479,8 +490,10 @@ later is additive, and the reverse is not.
 
 Handing these constraints, not a decision, to the encrypted-case-store work:
 
-- Every entity is case-scoped, and every read is both case-scoped and
-  owner-scoped. There is no cross-case read path in this model.
+- Every entity is case-scoped, and every read is case-scoped and
+  **firm-scoped** — plus, for a user without `access_all_cases`, restricted to
+  the matters they are linked to. The only cross-case read paths are the two
+  listings, and which one a caller uses depends on their permissions.
 - The dominant access patterns are *fetch a whole case* and *list one entity
   type within a case*. Cross-case queries are administrative and rare.
 - Twenty-three entity types, all small, most of them lists — no single record
@@ -501,6 +514,48 @@ design keyed on the case — but that compatibility depends on there being no
 ad-hoc cross-case reporting, and that assumption should be made explicitly
 rather than inherited.
 
+## Tenancy
+
+A case belongs to a firm, and the entities that express that are:
+
+```
+firm {
+  id, name, status: active | suspended, created_at, updated_at
+}
+
+firm_user {                        // keyed (firm_id, subject) — no id of its own
+  firm_id, subject                 // subject is the Cognito sub
+  email, display_name
+  role: attorney | paralegal | staff        // drives DEFAULTS, decides nothing
+  is_admin: bool                            // every feature, every case, the staff list
+  access_all_cases: bool                    // every case, without per-case linking
+  permissions: { <feature>: add_edit | view_only | hidden }
+  status: active | disabled, created_at, updated_at
+}
+
+case_assignment {                  // an item in the CASE's partition
+  case_id, subject, case_created_at, assigned_at, assigned_by
+}
+```
+
+`firm_user` has no id of its own because `subject` already is one:
+server-minted, unique, immutable, and the only thing an access token carries. A
+surrogate would be a third name for one row. That is **not** the debtor
+situation in reverse — a debtor arrives with no server-owned identifier, so a
+key there has to be invented from the data.
+
+`role`, `is_admin`, `access_all_cases` and `permissions` are four independent
+axes on purpose. Collapsing role into access is the trap where "attorney"
+quietly comes to mean "can see everything"; collapsing `is_admin` into
+`access_all_cases` would mean the only way to see every matter is also to be
+able to change everyone's permissions.
+
+The feature list is ours — `cases`, `intake`, `documents`,
+`extraction_review`, `firm_administration` — and the default for anything not
+in a user's map is `hidden`. That is what lets a feature be listed before it
+exists (`extraction_review` is) without arriving already granted to every row
+written before it was named.
+
 ## Not here, on purpose
 
 - **Means-test forms 122A/B/C.** Their own milestone. `pay_period_record`
@@ -509,8 +564,6 @@ rather than inherited.
   form line, per revision — including the completeness check and the constant
   sets above. That is the forms milestone's artifact.
 - **MyCase sync itself** — seam only, above.
-- **Firms, staff, and shared case access.** Ownership is a single principal.
-  Not built speculatively, but nothing else references the owner.
 - **Claims filing.** A separate CM/ECF specification from the petition IEPD,
   and a later concern.
 

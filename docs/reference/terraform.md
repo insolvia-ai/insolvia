@@ -429,7 +429,7 @@ What it owns is deliberately only what local dev consumes today:
   **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
 - **Case store** via the same `modules/case_store` as staging/prod —
   `insolvia-cases-dev-<short-id>` and its access-log table under this
-  machine's own customer-managed key, so the owner index and the encrypted read path behave here exactly as
+  machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as
   they do deployed. PITR and deletion protection are **off** and the key
   deletion window is the minimum 7 days, so a teardown does not leave a
   month-long pending key behind. `api_role_name` is null — there is no Lambda,
