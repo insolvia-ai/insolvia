@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
@@ -10,6 +11,7 @@ from insolvia_api.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.access_log import MemoryAccessLog
 from insolvia_api.adapters.memory.case_store import MemoryCaseStore
+from insolvia_api.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_api.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_api.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
@@ -23,6 +25,7 @@ from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,
+    DebtorStore,
     DocumentBlobStore,
     DocumentStore,
     FirmStore,
@@ -107,6 +110,15 @@ else:
     # Mints URLs nothing can fetch, which is the honest local shape: there is
     # no S3 emulator here. Run scripts/dev-aws-setup.sh to get a real bucket.
     document_blobs = MemoryDocumentBlobStore()
+debtor_store: DebtorStore
+if config.case_table_name and config.case_access_log_table_name:
+    case_store = DynamoDbCaseStore(config.case_table_name)
+    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+    debtor_store = DynamoDbDebtorStore(config.case_table_name)
+else:
+    case_store = MemoryCaseStore()
+    access_log = MemoryAccessLog()
+    debtor_store = MemoryDebtorStore()
 
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
@@ -136,5 +148,6 @@ app = create_app(
         user_directory=user_directory,
         document_store=document_store,
         document_blobs=document_blobs,
+        debtor_store=debtor_store,
     )
 )

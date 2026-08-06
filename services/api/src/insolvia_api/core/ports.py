@@ -5,6 +5,7 @@ from typing import Any, Protocol
 from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import AccessEvent
 from insolvia_api.core.cases import Case, CaseAssignment, CasePage
+from insolvia_api.core.debtors import Debtor
 from insolvia_api.core.documents import Document, StoredBlob
 from insolvia_api.core.firms import Firm, FirmUser
 from insolvia_api.core.mail import OutboundEmail
@@ -369,6 +370,45 @@ class DocumentBlobStore(Protocol):
         """Delete the object. Idempotent — deleting an object that is not there
         succeeds, because the route reaches here only after removing the row
         that was the record of it."""
+        ...
+
+
+class DebtorStore(Protocol):
+    """Persists the debtor records of a case (issue 8.5).
+
+    Ownership is NOT a parameter here, and that is the one thing to understand
+    before implementing it. A debtor is reached only through its case, so the
+    route resolves the case through `CaseStore` first — which enforces
+    ownership and answers None for "not yours" — and a debtor call happens only
+    after that succeeded. Threading `owner_principal` down here too would imply
+    a second, independent authorisation path, and two paths that must agree are
+    how they stop agreeing.
+
+    `put` replaces the whole record for one filing role. See parse_debtor for
+    why whole rather than partial: invariant 1 can only be checked against a
+    complete record.
+    """
+
+    def create(self, debtor: Debtor) -> bool:
+        """Write `debtor` ONLY if that case has no record for its role yet.
+        Returns False when one already exists, having written nothing.
+
+        Separate from `put` because the id has to be stable: the route hands
+        a freshly minted id back to the client, and provenance paths
+        elsewhere may already name it. Two overlapping first saves would
+        otherwise both see nothing stored, both mint an id, and the second
+        would erase the one the first already returned."""
+        ...
+
+    def put(self, debtor: Debtor) -> None:
+        """Replace the record for `debtor`'s role outright."""
+        ...
+
+    def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...
+
+    def list_for_case(self, case_id: str) -> tuple[Debtor, ...]:
+        """Every debtor of one case, ordered by filing role so debtor_1 comes
+        before debtor_2 — the order the forms print them in."""
         ...
 
 

@@ -5,6 +5,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
+from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_api.core.access import Accessor, may_see_case
 from insolvia_api.core.cases import (
     INDEX_BY_ASSIGNEE,
@@ -30,23 +31,6 @@ FIRM_INDEX = INDEX_BY_FIRM
 ASSIGNEE_INDEX = INDEX_BY_ASSIGNEE
 
 _CONDITION_FAILED = "ConditionalCheckFailedException"
-
-
-def _to_attributes(item: dict[str, str | int]) -> dict[str, Any]:
-    return {
-        key: {"N": str(value)} if isinstance(value, int) else {"S": value}
-        for key, value in item.items()
-    }
-
-
-def _from_attributes(item: dict[str, Any]) -> dict[str, str | int]:
-    plain: dict[str, str | int] = {}
-    for key, value in item.items():
-        if "N" in value:
-            plain[key] = int(value["N"])
-        elif "S" in value:
-            plain[key] = value["S"]
-    return plain
 
 
 class DynamoDbCaseStore:
@@ -75,14 +59,14 @@ class DynamoDbCaseStore:
                 {
                     "Put": {
                         "TableName": self.table_name,
-                        "Item": _to_attributes(case_item(case)),
+                        "Item": to_attributes(case_item(case)),
                         "ConditionExpression": "attribute_not_exists(PK)",
                     }
                 },
                 {
                     "Put": {
                         "TableName": self.table_name,
-                        "Item": _to_attributes(assignment_item(assignment)),
+                        "Item": to_attributes(assignment_item(assignment)),
                         # SK, not PK: the case's own META item shares this
                         # partition and is written in the same transaction, so
                         # conditioning on PK would refuse the pair outright.
@@ -119,7 +103,7 @@ class DynamoDbCaseStore:
         case: Case | None = None
         assigned = False
         for raw in items:
-            plain = _from_attributes(raw)
+            plain = from_attributes(raw)
             if plain.get("SK") == "META":
                 case = case_from_item(plain)
             else:
@@ -147,7 +131,7 @@ class DynamoDbCaseStore:
             cursor=cursor,
         )
         cases = tuple(
-            case_from_item(_from_attributes(item)) for item in response.get("Items", [])
+            case_from_item(from_attributes(item)) for item in response.get("Items", [])
         )
         return CasePage(
             cases=cases,
@@ -171,7 +155,7 @@ class DynamoDbCaseStore:
         # read path that costs a second round trip, and it is bounded by the
         # page size rather than by the firm's caseload.
         case_ids = [
-            str(_from_attributes(item)["caseId"]) for item in response.get("Items", [])
+            str(from_attributes(item)["caseId"]) for item in response.get("Items", [])
         ]
         by_id = self._cases_by_id(case_ids)
         cases = tuple(
@@ -213,7 +197,7 @@ class DynamoDbCaseStore:
                 }
             )
             for raw in response.get("Responses", {}).get(self.table_name, []):
-                case = case_from_item(_from_attributes(raw))
+                case = case_from_item(from_attributes(raw))
                 found[case.id] = case
             # UnprocessedKeys is DynamoDB throttling a partial batch, not an
             # error. Ignoring it is a listing that quietly loses rows under
@@ -267,7 +251,7 @@ class DynamoDbCaseStore:
         try:
             self.client.put_item(
                 TableName=self.table_name,
-                Item=_to_attributes(case_item(case)),
+                Item=to_attributes(case_item(case)),
                 # Both halves matter. attribute_exists rejects an update to a
                 # case that has since been deleted; the firm check closes the
                 # window between the route's read and this write, so a case
@@ -288,7 +272,7 @@ class DynamoDbCaseStore:
         # rewrites is `assignedAt`/`assignedBy`, which is the honest record of
         # the most recent linking.
         self.client.put_item(
-            TableName=self.table_name, Item=_to_attributes(assignment_item(assignment))
+            TableName=self.table_name, Item=to_attributes(assignment_item(assignment))
         )
 
     def unassign(self, case_id: str, subject: str) -> bool:
@@ -326,7 +310,7 @@ class DynamoDbCaseStore:
                 kwargs["ExclusiveStartKey"] = start_key
             response = self.client.query(**kwargs)
             assignments.extend(
-                assignment_from_item(_from_attributes(item))
+                assignment_from_item(from_attributes(item))
                 for item in response.get("Items", [])
             )
             start_key = response.get("LastEvaluatedKey")
