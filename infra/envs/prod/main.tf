@@ -164,23 +164,15 @@ module "auth" {
   #   certificate_arn = data.aws_acm_certificate.wildcard.arn
   #   hosted_zone_id  = data.aws_route53_zone.main.zone_id
 
-  # TEMPORARILY FALSE, FOR EXACTLY ONE APPLY. Restored to `true` in the very
-  # next PR, which is the one that replaces this pool to make usernames
-  # case-insensitive (#179).
+  # RESTORED, in the same apply that replaces the pool. The PR below this one
+  # set it to `false` so the OLD pool could be destroyed; this value lands on
+  # the NEW one, which is a separate resource and so takes it at creation
+  # rather than needing a third apply.
   #
-  # WHY IT HAS TO BE ITS OWN APPLY, rather than being flipped in that PR: when
-  # Terraform REPLACES a resource it does not first apply attribute updates to
-  # the old instance — it destroys and creates. So a plan that both disarmed
-  # protection and changed `username_configuration` would still hit a pool with
-  # DeletionProtection=ACTIVE in AWS at destroy time, and fail with
-  # `InvalidParameterException`. The disarm has to have already reached prod.
-  #
-  # This is safe to sit in for one release only because THE PROD POOL HAS ZERO
-  # USERS — verified, not assumed — so the guard is currently protecting
-  # nothing. It stops being safe the moment the first attorney account exists,
-  # which is also when the change it exists for becomes a data migration rather
-  # than a replacement.
-  deletion_protection = false
+  # If you are reading this while prod is mid-sequence and the pool is
+  # unprotected, that PR applied and this one has not. Applying this one is the
+  # fix.
+  deletion_protection = true
 
   # Lets POST /v1/firm/users mint a colleague's Cognito account. ONE action on
   # ONE pool — the module's own comment has the argument for why that is the

@@ -20,24 +20,24 @@ class CognitoUserDirectory:
         self.client = boto3.client("cognito-idp")
 
     def create_user(self, email: str) -> str:
-        """`email` MUST already be lower-cased. core/firms._parse_email does it.
+        """`email` arrives already lower-cased. core/firms._parse_email does it.
 
-        THIS POOL IS CASE-SENSITIVE, which is not what "email is the username"
-        leads you to expect and is not something a fake can tell you. Measured
-        against the real dev pool: creating `a@example.invalid` and then
-        `A@EXAMPLE.INVALID` produces TWO accounts, no exception, both with
-        their own subject.
+        THE POOL NO LONGER DEPENDS ON THAT, and the history is worth keeping
+        because it is what the lower-casing was originally load-bearing for.
 
-        The pool has no `username_configuration` block at all, and Cognito's
-        behaviour for an unset one is the legacy default — case sensitive. It
-        cannot be changed after creation: the block is immutable, so fixing it
-        replaces the pool and every account in it.
+        Cognito's legacy default is case-SENSITIVE usernames, which for a pool
+        whose username is an email address meant `a@example.invalid` and
+        `A@EXAMPLE.INVALID` were two accounts — measured against the real
+        staging pool, not inferred. `infra/modules/auth` now sets
+        `username_configuration { case_sensitive = false }`, so Cognito matches
+        case-insensitively and this method's duplicate detection is correct for
+        any casing.
 
-        So normalisation is the parser's job and there is exactly one place
-        that does it. It is NOT repeated here, because two normalisers that
-        must agree are two normalisers that will eventually disagree — and the
-        failure would be silent, a second Insolvia account for one human, each
-        in a different firm.
+        The parser still normalises, for a smaller and still-good reason: it is
+        what makes the address we STORE deterministic, so the firm's staff list
+        and any future lookup of ours agree with each other. It is deliberately
+        not repeated here — two normalisers that must agree are two normalisers
+        that will eventually disagree.
         """
         try:
             response = self.client.admin_create_user(
