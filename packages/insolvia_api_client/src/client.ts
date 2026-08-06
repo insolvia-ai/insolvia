@@ -1,13 +1,20 @@
 import { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
 import {
   DOCUMENT_STATUSES,
+  COUNSELING_EXEMPTIONS,
+  COUNSELING_STATUSES,
+  FILING_ROLES,
+  PROVENANCE_SOURCES,
+  VENUE_BASES,
   createCaseRequestToJson,
   createDocumentRequestToJson,
   listCasesQuery,
+  putDebtorRequestToJson,
   updateCaseChangesToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
+  Address,
   Case,
   CaseChapter,
   CaseStatus,
@@ -18,12 +25,21 @@ import type {
   DocumentDownload,
   DocumentStatus,
   DocumentUpload,
+  CreditCounseling,
+  Debtor,
+  FilingRole,
   HealthStatus,
   ListCasesOptions,
   ListCasesResult,
+  OtherName,
+  PersonName,
   Principal,
+  ProvenanceEntry,
+  ProvenanceMap,
+  PutDebtorRequest,
   UpdateCaseChanges,
   UploadDocumentOptions,
+  Venue,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
@@ -500,6 +516,74 @@ export class InsolviaApiClient {
 
     return this.completeDocument(caseId, created.document.id);
   }
+
+  /**
+   * `PUT /v1/cases/{caseId}/debtors/{filingRole}` — save one debtor of a case,
+   * whole, and get the saved record back.
+   *
+   * **The whole record, every time.** This replaces rather than merges, so a
+   * field left out of `debtor` is cleared. See {@link PutDebtorRequest} for why
+   * the endpoint is a PUT.
+   *
+   * Every populated field needs a `provenance` entry or the API answers 400;
+   * {@link staffTypedProvenance} builds that map.
+   *
+   * **Accepts 200 and 201, and nothing else in between.** The API answers 201
+   * when the role had no record yet and 200 when it replaced one — the same
+   * request either way, since an autosave neither knows nor cares which it is
+   * doing. The two are listed explicitly rather than testing `response.ok`,
+   * because "any 2xx" would quietly swallow a 202 or a 204 from a proxy that
+   * never reached this endpoint, and then fail on the missing body with a
+   * message about a malformed debtor.
+   *
+   * The distinction is deliberately not returned: nothing in the app branches
+   * on it, and the record carries `created_at` and `updated_at` for anything
+   * that would.
+   *
+   * Like {@link getCase}, a 404 means the case is unknown *or* not the
+   * caller's; see that method's note.
+   */
+  async putDebtor(
+    caseId: string,
+    filingRole: FilingRole,
+    debtor: PutDebtorRequest,
+  ): Promise<Debtor> {
+    const headers = await this.#protectedHeaders();
+    // `filingRole` is a union of three URL-safe literals, so encoding it is a
+    // no-op today. It is encoded anyway: this client is consumed from
+    // JavaScript too, where the type says nothing at runtime, and a path
+    // segment that reaches a URL unencoded is a rule with no exceptions.
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors/${encodeURIComponent(filingRole)}`;
+    const response = await this.#fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(putDebtorRequestToJson(debtor)),
+    });
+    const decoded = await decodeExpectedOneOf(response, [200, 201]);
+    return debtorFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/debtors` — every debtor of one case, in the order
+   * the forms print them (`debtor_1`, `debtor_2`, `non_filing_spouse`).
+   *
+   * The wire body is `{"debtors": [...]}`; this returns the array. There is no
+   * pagination and no second key to carry — a case has at most three debtors —
+   * so a result object would be an envelope with one thing in it, unlike
+   * {@link ListCasesResult}, which exists to carry `nextCursor`.
+   *
+   * A case with no debtors saved yet is an empty array, not a 404. Like
+   * {@link getCase}, a 404 means the case is unknown *or* not the caller's.
+   */
+  async listDebtors(caseId: string): Promise<readonly Debtor[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireDebtorArray(decoded, 'debtors');
+  }
 }
 
 /**
@@ -542,6 +626,17 @@ interface DecodedResponse {
   readonly statusCode: number;
   readonly body: string;
   readonly json: JsonObject;
+  /**
+   * The dotted path of the object {@link json} sits at within the response
+   * body, or `undefined` at the top level. Only {@link malformedField} reads
+   * it, so a top-level read's message is unchanged.
+   *
+   * It exists for debtors, whose fields nest three deep. The API keys its own
+   * 400 bodies and its provenance map by exactly these dotted paths, so
+   * reporting `residence_address.city` rather than a bare `city` means a
+   * decode failure and a server-side complaint name the same thing.
+   */
+  readonly path?: string | undefined;
 }
 
 function parseJsonBody(body: string): JsonBody {
@@ -565,11 +660,27 @@ async function decodeExpected(
   response: Response,
   expectedStatus: number,
 ): Promise<DecodedResponse> {
+  return decodeExpectedOneOf(response, [expectedStatus]);
+}
+
+/**
+ * {@link decodeExpected} for an endpoint with more than one success status —
+ * today only `putDebtor`, which is 201 on create and 200 on update.
+ *
+ * The statuses are ENUMERATED rather than matched as a range. "Any 2xx" would
+ * accept a 204 or a 202 that some proxy produced without ever reaching the
+ * endpoint, and the failure would then surface as a malformed body rather than
+ * as the unexpected status it is.
+ */
+async function decodeExpectedOneOf(
+  response: Response,
+  expectedStatuses: readonly number[],
+): Promise<DecodedResponse> {
   // Read once, as text: the raw body has to survive onto the exception, and
   // a response body can only be consumed a single time.
   const body = await response.text();
   const statusCode = response.status;
-  if (statusCode !== expectedStatus) {
+  if (!expectedStatuses.includes(statusCode)) {
     throw errorFor(statusCode, body);
   }
   const parsed = parseJsonBody(body);
@@ -731,10 +842,11 @@ function requireStringArray(response: DecodedResponse, key: string): readonly st
  * token or a case field, and a message is a thing that gets logged.
  */
 function malformedField(response: DecodedResponse, key: string, expected: string): ApiException {
+  const path = response.path === undefined ? key : `${response.path}.${key}`;
   return new ApiException({
     statusCode: response.statusCode,
     body: response.body,
-    message: `response body was missing the ${expected} field "${key}"`,
+    message: `response body was missing the ${expected} field "${path}"`,
   });
 }
 
@@ -928,6 +1040,302 @@ function requireDocumentArray(response: DecodedResponse, key: string): readonly 
       statusCode: response.statusCode,
       body: response.body,
       json: item as JsonObject,
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Debtor decoding. Mirrors `debtor_json` in
+// `services/api/src/insolvia_api/core/debtors.py`: server-stamped identity and
+// `provenance` are always present, and every case-data member is absent when
+// it holds nothing — including nested objects and lists, which the API prunes
+// away entirely rather than sending empty.
+//
+// So almost everything here is an `optional*` reader, and each one distinguishes
+// "absent" from "present but the wrong type": the first is the ordinary state
+// of a half-finished intake, the second is a contract violation and throws.
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds an object out of only the members that have a value.
+ *
+ * A member whose value is `undefined` is left OUT rather than set to
+ * `undefined`, for the reason `listCases` states about `nextCursor`: a present
+ * key with an undefined value still answers `true` to `'k' in obj`, and a
+ * decoded {@link Debtor} is handed straight back to `putDebtor`, so "the API
+ * did not send a name" and "the name is empty" have to stay distinguishable.
+ *
+ * The argument type demands every member of `T` — misspell one and it is a
+ * compile error, not a silently missing field — while allowing each to be
+ * `undefined`. The cast at the end is sound by construction: every member was
+ * produced by a reader on the line above, and a *required* member of `T` comes
+ * from a `require*` reader, which throws rather than returning `undefined`.
+ */
+function definedMembers<T extends object>(members: {
+  readonly [K in keyof T]: T[K] | undefined;
+}): T {
+  const built: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(members)) {
+    if (value !== undefined) {
+      built[key] = value;
+    }
+  }
+  return built as T;
+}
+
+/**
+ * A nested JSON object read as a {@link DecodedResponse} of its own, so every
+ * reader in this file works on it unchanged, and `undefined` when the key is
+ * absent. `path` carries the dotted prefix so a failure inside names the field
+ * the way the API does.
+ */
+function optionalObject(response: DecodedResponse, key: string): DecodedResponse | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw malformedField(response, key, 'object');
+  }
+  return {
+    statusCode: response.statusCode,
+    body: response.body,
+    json: value as JsonObject,
+    path: response.path === undefined ? key : `${response.path}.${key}`,
+  };
+}
+
+/** A number field that may be absent. `NaN`/`Infinity` cannot appear in JSON. */
+function optionalNumber(response: DecodedResponse, key: string): number | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'number') {
+    throw malformedField(response, key, 'number');
+  }
+  return value;
+}
+
+/** An array of strings that may be absent — the API omits it when empty. */
+function optionalStringArray(
+  response: DecodedResponse,
+  key: string,
+): readonly string[] | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw malformedField(response, key, 'string[]');
+  }
+  return value as readonly string[];
+}
+
+/**
+ * A field that must be one of `allowed`, or absent.
+ *
+ * Generic where {@link requireCaseChapter} and {@link requireCaseStatus} are
+ * hand-written: a debtor carries four of these, and each `allowed` list is the
+ * exported constant that also derives the union type — so the check and the
+ * type cannot drift, and neither can drift from `core/debtors.py` without a
+ * test here failing.
+ */
+function optionalChoice<T extends string>(
+  response: DecodedResponse,
+  key: string,
+  allowed: readonly T[],
+): T | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+    throw malformedField(response, key, `one of ${allowed.map((one) => `"${one}"`).join(' | ')}`);
+  }
+  return value as T;
+}
+
+/** {@link optionalChoice} for a field the API always sends. */
+function requireChoice<T extends string>(
+  response: DecodedResponse,
+  key: string,
+  allowed: readonly T[],
+): T {
+  const value = optionalChoice(response, key, allowed);
+  if (value === undefined) {
+    throw malformedField(response, key, `one of ${allowed.map((one) => `"${one}"`).join(' | ')}`);
+  }
+  return value;
+}
+
+function optionalPersonName(response: DecodedResponse, key: string): PersonName | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return definedMembers<PersonName>({
+    given: optionalString(nested, 'given'),
+    middle: optionalString(nested, 'middle'),
+    surname: optionalString(nested, 'surname'),
+    suffix: optionalString(nested, 'suffix'),
+  });
+}
+
+function optionalAddress(response: DecodedResponse, key: string): Address | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return definedMembers<Address>({
+    line1: optionalString(nested, 'line1'),
+    line2: optionalString(nested, 'line2'),
+    city: optionalString(nested, 'city'),
+    state: optionalString(nested, 'state'),
+    postal_code: optionalString(nested, 'postal_code'),
+  });
+}
+
+function optionalVenue(response: DecodedResponse, key: string): Venue | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return definedMembers<Venue>({
+    basis: optionalChoice(nested, 'basis', VENUE_BASES),
+    explanation: optionalString(nested, 'explanation'),
+  });
+}
+
+function optionalCreditCounseling(
+  response: DecodedResponse,
+  key: string,
+): CreditCounseling | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return definedMembers<CreditCounseling>({
+    status: optionalChoice(nested, 'status', COUNSELING_STATUSES),
+    exemption_reason: optionalChoice(nested, 'exemption_reason', COUNSELING_EXEMPTIONS),
+  });
+}
+
+/**
+ * The alias rows, checked per element. Elements are reported by INDEX here
+ * (`other_names_used[0]`) rather than by the id provenance addresses them
+ * with: a malformed row is exactly the case where the id may be the thing
+ * that is wrong, and the API's own per-row 400 keys are indexed the same way.
+ */
+function optionalOtherNames(
+  response: DecodedResponse,
+  key: string,
+): readonly OtherName[] | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'OtherName[]');
+  }
+  return value.map((item, index) => {
+    const label = `${key}[${index}]`;
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, label, 'object');
+    }
+    const row: DecodedResponse = {
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: response.path === undefined ? label : `${response.path}.${label}`,
+    };
+    return definedMembers<OtherName>({
+      id: requireString(row, 'id'),
+      given: optionalString(row, 'given'),
+      middle: optionalString(row, 'middle'),
+      surname: optionalString(row, 'surname'),
+      business_name: optionalString(row, 'business_name'),
+    });
+  });
+}
+
+/**
+ * The `provenance` map — always present on a debtor, `{}` on a record with
+ * nothing in it.
+ *
+ * **The keys are not validated against the field-path grammar.** The server
+ * refused anything malformed on the way in, and re-deriving the grammar here
+ * would put it in two places and produce a client that cannot read a record
+ * the API was happy to store. What is checked is the shape of each entry,
+ * which the app reads.
+ */
+function requireProvenanceMap(response: DecodedResponse, key: string): ProvenanceMap {
+  const map = optionalObject(response, key);
+  if (map === undefined) {
+    throw malformedField(response, key, 'object');
+  }
+  const entries: Record<string, ProvenanceEntry> = {};
+  for (const path of Object.keys(map.json)) {
+    const entry = optionalObject(map, path);
+    if (entry === undefined) {
+      throw malformedField(map, path, 'object');
+    }
+    entries[path] = definedMembers<ProvenanceEntry>({
+      source: requireChoice(entry, 'source', PROVENANCE_SOURCES),
+      confirmed_by: optionalString(entry, 'confirmed_by'),
+      confirmed_at: optionalString(entry, 'confirmed_at'),
+      document_id: optionalString(entry, 'document_id'),
+      locator: optionalObject(entry, 'locator')?.json,
+      extraction_id: optionalString(entry, 'extraction_id'),
+      confidence: optionalNumber(entry, 'confidence'),
+    });
+  }
+  return entries;
+}
+
+/** Decodes a {@link Debtor} from a response body — `debtor_json`'s exact shape. */
+function debtorFromJson(response: DecodedResponse): Debtor {
+  return definedMembers<Debtor>({
+    id: requireString(response, 'id'),
+    case_id: requireString(response, 'case_id'),
+    filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    provenance: requireProvenanceMap(response, 'provenance'),
+    name: optionalPersonName(response, 'name'),
+    other_names_used: optionalOtherNames(response, 'other_names_used'),
+    employer_ids: optionalStringArray(response, 'employer_ids'),
+    residence_address: optionalAddress(response, 'residence_address'),
+    mailing_address: optionalAddress(response, 'mailing_address'),
+    phone: optionalString(response, 'phone'),
+    mobile: optionalString(response, 'mobile'),
+    email: optionalString(response, 'email'),
+    venue: optionalVenue(response, 'venue'),
+    credit_counseling: optionalCreditCounseling(response, 'credit_counseling'),
+    signed_at: optionalString(response, 'signed_at'),
+  });
+}
+
+/**
+ * The `{"debtors": [...]}` envelope's array, checked per element — the same
+ * shape as {@link requireCaseArray}, and for the same reason: a cast would
+ * check nothing at runtime.
+ */
+function requireDebtorArray(response: DecodedResponse, key: string): readonly Debtor[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'Debtor[]');
+  }
+  return value.map((item, index) => {
+    const label = `${key}[${index}]`;
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, label, 'object');
+    }
+    return debtorFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: label,
     });
   });
 }

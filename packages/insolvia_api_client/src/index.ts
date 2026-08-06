@@ -6,9 +6,11 @@
 // codegen — see README.md for why there is no OpenAPI step. Keep every wire
 // literal in this package in sync with:
 //   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,documents}.py
+//   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,debtors}.py
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (the 401 body)
 //   services/api/src/insolvia_api/core/{waitlist,auth,documents}.py
+//   services/api/src/insolvia_api/core/{waitlist,auth,cases,debtors,provenance}.py
 //
 // The module split is one file per concern — `models.ts`, `exceptions.ts`,
 // `client.ts` — so a contract review can read the wire shapes without the
@@ -38,14 +40,29 @@ export {
   isDocumentContentType,
   isDocumentKind,
   listCasesQuery,
+  putDebtorRequestToJson,
+  staffTypedProvenance,
   submittedAtUtc,
   updateCaseChangesToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
+// The four debtor enums are exported as VALUES, not only as types: each one is
+// a picker in the questionnaire, so the app needs the options at runtime, and
+// re-declaring them there would put the same list in two repositories of truth.
+export {
+  COUNSELING_EXEMPTIONS,
+  COUNSELING_STATUSES,
+  FILING_ROLES,
+  PROVENANCE_SOURCES,
+  VENUE_BASES,
+} from './models.ts';
 export type {
+  Address,
   Case,
   CaseChapter,
   CaseStatus,
+  CounselingExemption,
+  CounselingStatus,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -55,12 +72,25 @@ export type {
   DocumentKind,
   DocumentStatus,
   DocumentUpload,
+  CreditCounseling,
+  Debtor,
+  DebtorBody,
+  DebtorBodyLike,
+  FilingRole,
   HealthStatus,
   ListCasesOptions,
   ListCasesResult,
+  OtherName,
+  PersonName,
   Principal,
+  ProvenanceEntry,
+  ProvenanceMap,
+  ProvenanceSource,
+  PutDebtorRequest,
   UpdateCaseChanges,
   UploadDocumentOptions,
+  Venue,
+  VenueBasis,
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
