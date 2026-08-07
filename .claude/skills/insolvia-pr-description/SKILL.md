@@ -98,8 +98,9 @@ date field, no calendar (0.5.0)`.
   this ahead of asking for review; here it is the only review there is.
 - **One PR, one responsibility.** Unrelated fixes bundled together are harder
   to revert and harder to bisect. Split the branch instead.
-- **A design-system file forces its own PR + version bump** —
-  `insolvia-design-system-pr`, no exceptions, including its README.
+- **Design-system changes are not made in this repo** — they land in
+  `insolvia-ai/design-system` and arrive here as a version bump, which is
+  ordinary work and needs no PR of its own (`insolvia-design-system-bump`).
 - **Dependent PRs go on a stack** — see below.
 - **Never push to `main`.** Branch `claude/<name>-<id>`, then PR.
 

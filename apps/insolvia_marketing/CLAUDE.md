@@ -3,10 +3,14 @@
 React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
 [`README.md`](README.md). Run it with `scripts/dev-up.sh`.
 
-- **Consume the published `@insolvia-ai/design-system`**, never a committed
-  `file:` path. A local `file:` override is an uncommitted debugging aid only —
-  land the design-system change, publish a new version, then bump the range here
-  (that `package.json`/lockfile bump is what re-runs this app's PR gate).
+- **Consume the published `@insolvia-ai/design-system`** — and there is now no
+  local override at all, not even an uncommitted one. The package lives in
+  [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system):
+  land the change there, publish, then bump the range here (that
+  `package.json`/lockfile bump is what re-runs this app's PR gate). The app was
+  the one consumer that resolved the package by path, through a workspace
+  symlink, and [ADR 0010](../../docs/adr/0010-design-system-moves-to-its-own-repository.md)
+  removed it — don't reintroduce the pattern on this side.
 - **The design system is the cross-platform package** (0.2.x+): it publishes
   SOURCE — per-component `.web.tsx` / `.native.tsx` leaf pairs behind
   extensionless imports, with the consumer's bundler picking the leaf. The web

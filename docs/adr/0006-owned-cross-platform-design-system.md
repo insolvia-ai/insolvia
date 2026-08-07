@@ -1,6 +1,13 @@
 # ADR 0006 — One owned, platform-split design system serves both surfaces
 
-- **Status:** Accepted
+- **Status:** Accepted; **consumption superseded by
+  [ADR 0010](0010-design-system-moves-to-its-own-repository.md)** (2026-08-06).
+  The design itself stands entirely — three files per component, the
+  props/`.web`/`.native` split, no build step, one owned design system for both
+  surfaces. What changed is *where the package lives and how it is consumed*:
+  it moved to `insolvia-ai/design-system`, and the app no longer reads its
+  source through a workspace symlink. Every path below beginning
+  `packages/insolvia_design_system` is historical.
 - **Date:** 2026-07-31
 - **Relates to:** revises the *Marketing stays put* section of
   [ADR 0004](0004-react-native-replaces-flutter.md) (that section only — the

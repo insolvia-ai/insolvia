@@ -16,6 +16,11 @@ on:
 
 permissions:
   contents: read
+  # The ROOT `npm ci` below installs @insolvia-ai/design-system and
+  # @insolvia-ai/tokens from GitHub Packages — they are ordinary published
+  # dependencies now, not workspace members — so this job's GITHUB_TOKEN needs
+  # read access even though this package uses neither.
+  packages: read
 
 jobs:
   api-client:
@@ -60,6 +65,8 @@ jobs:
       - name: Install
         if: steps.filter.outputs.run == 'true'
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Scoped to this package, not the repo. The root `lint`/`format` scripts
       # cover every workspace member, and this gate must not go red because a

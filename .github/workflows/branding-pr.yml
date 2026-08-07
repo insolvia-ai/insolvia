@@ -1,0 +1,103 @@
+name: Cognito branding · PR
+
+# The drift gate for infra/modules/auth/managed-login-settings.json — the
+# colours of Cognito's hosted sign-in page.
+#
+# It used to be a step inside design-system-pr.yml, because the token generator
+# that wrote this file lived in packages/insolvia_tokens next door. Both left
+# for github.com/insolvia-ai/design-system, and the gate could not go with
+# them: the file they gate is this repo's infrastructure, and a published
+# package must not reach into a consumer's tree. So the reconciler stayed
+# (tool/reconcile-cognito-branding.ts) and it now checks the committed document
+# against the INSTALLED @insolvia-ai/tokens rather than against a tokens.json
+# this repo no longer has.
+#
+# That makes the gate strictly stronger than the one it replaces. It fails on a
+# hand-edit, as before — and it also fails when @insolvia-ai/tokens is bumped
+# in package.json without regenerating, which is the new way for the sign-in
+# page to silently fall out of step with the app.
+#
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is a required status
+# check on `protect-main`, so it must trigger and report on *every* PR; the
+# `steps.filter` guard is what keeps an unrelated PR cheap. Re-adding a
+# `paths:` filter would silently deadlock every PR that does not touch these
+# paths, and there is no job-level `if:` for the same reason — a skipped job's
+# standing with a required check is a subtlety this repo refuses to rest on.
+#
+# The ruleset matches the job name `Cognito branding` by EXACT name (see the
+# insolvia-branch-protection skill), so renaming the job silently orphans the
+# gate.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  # The root `npm ci` installs @insolvia-ai/tokens from GitHub Packages, which
+  # is the whole input to this check.
+  packages: read
+
+jobs:
+  branding:
+    name: Cognito branding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            # The document under gate, and the tool that writes it.
+            infra/modules/auth/managed-login-settings.json
+            tool/**
+            # The root manifest and lockfile ARE the input now: they pin which
+            # @insolvia-ai/tokens version the colours are checked against. A
+            # tokens bump with no regeneration changes nothing else in the
+            # tree, so without these two lines it would skip this gate
+            # entirely — which is precisely the failure this workflow exists
+            # to catch.
+            package.json
+            package-lock.json
+            # Shared config the tool's typecheck and lint resolve through.
+            tsconfig.base.json
+            eslint.base.js
+            .prettierrc
+            .npmrc
+            .github/workflows/branding-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      # Must match the root package.json's `engines.node` (">=24").
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Typecheck and lint before the drift check: `tool/` is not a workspace
+      # member, so the per-member fan-out in app-pr.yml/api-client-pr.yml never
+      # covers it. This job is its only gate.
+      - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
+        run: npm run typecheck:tool
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: npm run lint:tool
+
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: npx prettier --check tool
+
+      - name: Branding drift check
+        if: steps.filter.outputs.run == 'true'
+        run: npm run tokens:check

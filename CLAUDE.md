@@ -36,11 +36,18 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React SSR)
-packages/   insolvia_tokens · insolvia_design_system · insolvia_api_client
+packages/   insolvia_api_client
 services/   api · mailer            (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
+tool/       reconcile-cognito-branding.ts  (the sign-in page's colours)
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
 ```
+
+**The design system is not in this repo.** `@insolvia-ai/design-system` and
+`@insolvia-ai/tokens` live in
+[`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) and
+arrive here as published dependencies. See
+[ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md).
 
 Every app / package / service, plus `infra/` and `docs/`, has its **own
 `CLAUDE.md`** (that area's rules — it auto-loads when you work there; read it
@@ -53,12 +60,15 @@ never restate.
 adding a member** — they own the reasoning; two consequences are worth knowing
 before you touch anything:
 
-- **The member list is explicit, and marketing is not on it.**
-  `packages/insolvia_design_system` is deliberately *both* a member (the app
-  consumes its source through the symlink) and published (marketing consumes
-  `@insolvia-ai/design-system` *by published version*). Adding
-  `apps/insolvia_marketing` would symlink it to local source too — a broken
-  package would then pass CI and only break after publishing.
+- **The member list is explicit, and marketing is not on it.** Adding
+  `apps/insolvia_marketing` would put it on this root's lockfile; its own
+  lockfile is what proves a clean registry install works.
+- **Never add the design system back as a member**, and never point it at a
+  local checkout with `file:`/`link:`. It *was* both a member and published —
+  the app read its source through the symlink while marketing installed the
+  published version — which gave one package two simultaneous truths, and is
+  exactly what [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md)
+  removed. To try an unpublished change, publish a prerelease from that repo.
 - **Node resolution walks UP the tree.** A dependency that
   `apps/insolvia_marketing` forgot to declare can resolve from the root
   `node_modules` and pass locally. It is deliberately outside the workspace,
@@ -79,8 +89,10 @@ before you touch anything:
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) |
-| **changing `packages/insolvia_design_system`** — the shared components (Button, Field) both surfaces render | `insolvia-design-system-pr` skill — **its own PR + a version bump** · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
-| changing the app-local components (`apps/insolvia_app/src/components/`) / tokens | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field live in the package, row above |
+| **changing a shared component (Button, Field, …) or a design token** | **Not in this repo** — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system). Change it there, publish, then bump the dependency here · [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md) · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
+| **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump both consumers' manifests and both lockfiles, and regenerate the Cognito branding |
+| changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
+| **the sign-in page's colours** (`infra/modules/auth/managed-login-settings.json`) | [`tool/reconcile-cognito-branding.ts`](tool/reconcile-cognito-branding.ts) — generated from the installed `@insolvia-ai/tokens`; `npm run tokens` regenerates, `npm run tokens:check` gates it |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/reference/package-publishing.md`](docs/reference/package-publishing.md) |
 | touching env model, hosting, or PR-gate design | [`docs/reference/architecture.md`](docs/reference/architecture.md) |

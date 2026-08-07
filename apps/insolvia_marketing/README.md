@@ -21,11 +21,15 @@ API instead of logging waitlist submissions, start the API
 
 Other commands: `npm run build` (production), `npm run typecheck`, `npm run lint`.
 
-## Local design-system debugging
+## Changing a design-system component
 
-To hack on `packages/insolvia_design_system` and see it live here, temporarily
-point the dep at the local package
-(`npm install ../../packages/insolvia_design_system`, or a `file:` path) —
-there is nothing to build first, the package publishes its source. **Never
-commit that state**; the rules for landing a design-system change are in
-[`CLAUDE.md`](CLAUDE.md).
+The package is not in this repository. It lives in
+[`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) and
+reaches this site only as a published version.
+
+Change it there, publish (a prerelease is fine), then bump the range here.
+There is deliberately **no local link loop** — not a `file:` path, not a
+`link:`, not even uncommitted. The app used to have exactly that, as a
+workspace symlink, and one package with two live states is what
+[ADR 0010](../../docs/adr/0010-design-system-moves-to-its-own-repository.md)
+removed.

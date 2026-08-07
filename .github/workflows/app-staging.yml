@@ -11,6 +11,10 @@ on:
 permissions:
   id-token: write
   contents: read
+  # The root `npm ci` below installs @insolvia-ai/design-system and
+  # @insolvia-ai/tokens from GitHub Packages — published dependencies since the
+  # design system was extracted, not workspace members linked from source.
+  packages: read
 
 # Held while this workflow deploys, and shared with infra-staging.yml so a
 # hand-dispatched single-service deploy cannot overlap a Terraform apply.
@@ -115,6 +119,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── The Metro cache trap — this is why `--clear` is here ──────────────
       #

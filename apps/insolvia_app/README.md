@@ -68,7 +68,7 @@ Actions and served from the existing S3 + CloudFront distribution.
 `src/screens/`, app-specific components in `src/components/`, tokens-derived
 styling helpers in `src/theme.ts`. `public/` is copied verbatim to the export root
 (favicon, icons, `manifest.json`). Button and Field come from the shared
-[`@insolvia-ai/design-system`](../../packages/insolvia_design_system) — the app
+[`@insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system) — the app
 renders the package's React Native leaves on every platform, web included, via a
 resolver override explained in [`metro.config.js`](metro.config.js).
 

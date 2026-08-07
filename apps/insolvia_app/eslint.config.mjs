@@ -15,8 +15,16 @@ export default [
   ...base,
   { ignores: ['.expo/**', 'dist/**', 'expo-env.d.ts'] },
   {
-    // Metro loads this file with `require()`, so it cannot be ESM.
-    files: ['metro.config.js'],
+    // The two CommonJS config files. Both are loaded by a tool that `require()`s
+    // them, and this package.json has no `"type": "module"`, so neither can be
+    // ESM — Metro loads metro.config.js, Jest loads jest.config.js.
+    //
+    // jest.config.js has to `require('jest-expo/jest-preset')` specifically:
+    // it COMPUTES `transformIgnorePatterns` from the preset's own array rather
+    // than restating it, because the preset carries entries (standard-navigation)
+    // that hand-copied lists silently drop. That computation is why the config
+    // is a .js file at all instead of a `jest` key in package.json.
+    files: ['metro.config.js', 'jest.config.js'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {

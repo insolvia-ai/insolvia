@@ -5,7 +5,7 @@ description: >-
   and the per-stack conventions that are easy to get subtly wrong. Use this
   BEFORE writing or changing any test in this repo: a pytest test under
   services/api or services/mailer, a Jest test in apps/insolvia_app, a Vitest
-  test in packages/insolvia_design_system or packages/insolvia_api_client, or a
+  test in packages/insolvia_api_client, or a
   Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
   have just added an endpoint, a component, a route, or a config value and owe
@@ -25,7 +25,8 @@ that decision and the reasoning. This file owns *how* to write one.
 |---|---|---|
 | `services/api`, `services/mailer` | pytest | `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI) |
 | `apps/insolvia_app` | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` |
-| `packages/insolvia_design_system`, `packages/insolvia_api_client` | Vitest | `npm run test --workspace <pkg>` |
+| `packages/insolvia_api_client` | Vitest | `npm run test --workspace <pkg>` |
+| `tool/` | none — it is gated by `npm run tokens:check`, which compares its output against the installed tokens | `npm run tokens:check` |
 | `e2e/` | Playwright | staging only — see `docs/runbooks/staging-e2e-setup.md` |
 
 ## Before you write it

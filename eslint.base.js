@@ -15,8 +15,9 @@
 // lint` fans out via `--workspaces`, the same way `typecheck` and `test` do.
 //
 // Generated output is deliberately NOT ignored — see .prettierignore for that
-// reasoning. `packages/insolvia_tokens/src/tokens.ts` is linted like any other
-// source, and the generator emits bytes that satisfy it.
+// reasoning. The generated file this once named lived in the tokens package,
+// which is now published from insolvia-ai/design-system; what remains generated
+// here is Cognito's branding JSON, which ESLint does not read anyway.
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';

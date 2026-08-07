@@ -28,10 +28,10 @@ Two layers — a shared base plus thin per-package scripts:
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
-`packages/insolvia_tokens` and `packages/insolvia_api_client` have no scripts,
-deliberately: they are npm workspace members with no setup beyond the root
-`npm ci` the app's script already performs, so a script there would be a third
-name for the same command.
+`packages/insolvia_api_client` has no scripts, deliberately: it is an npm
+workspace member with no setup beyond the root `npm ci` the app's script
+already performs, so a script there would be a second name for the same
+command.
 
 Every `dev-setup.sh` takes `--check` to report status without installing
 anything; per-package scripts pass it through to the shared base.
