@@ -7,7 +7,7 @@ and arrive here as ordinary published dependencies, like `react` or `expo`.
 
 | Package | Published as | Consumed by |
 |---|---|---|
-| `@insolvia-ai/design-system` | GitHub Packages, `0.6.x` | `apps/insolvia_app`, `apps/insolvia_marketing` |
+| `@insolvia-ai/design-system` | GitHub Packages, `0.10.x` | `apps/insolvia_app`, `apps/insolvia_marketing` |
 | `@insolvia-ai/tokens` | GitHub Packages, `0.2.x` | `apps/insolvia_app`, `tool/reconcile-cognito-branding.ts` |
 
 **One rule: every consumer installs a published, versioned artifact — never
