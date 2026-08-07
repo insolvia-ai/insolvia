@@ -166,6 +166,45 @@ environment** — two attempts, one transient and one hard refusal. The function
 above needs nothing installed, so reach for it first rather than re-litigating
 the install.
 
+### The branch trick, and why it is not the shortcut it looks like
+
+There is an obvious-looking alternative: commit the PNGs to a branch and link
+`raw.githubusercontent.com/<owner>/<repo>/<branch>/<file>`. It needs no
+endpoint, no token handling, and no undocumented anything — just `git push`. It
+is the first idea most people have, and it works.
+
+It works until the branch is deleted. Then every image in the body 404s at
+once, including in merged PRs, and nothing warns you: the PR still renders, just
+with broken-image icons where the evidence was.
+
+**This is not hypothetical.** `insolvia-ai/design-system` PR #2 did exactly
+this — an orphan `assets/pr-2` branch holding seven screenshots. The commit
+creating it wrote its own epitaph:
+
+> Nothing here is referenced by main or by the PR's own branch; deleting this
+> branch would break the images in the PR description and nothing else.
+
+The branch was deleted in ordinary cleanup. All seven images in that merged PR
+are `404` today, and that repo's skill calls exactly those screenshots *"the
+only record of what the change looked like"* — there is no visual-regression
+tooling behind them. The files survived only because one machine still had a
+stale `origin/assets/pr-2` tracking ref.
+
+Two things follow, and the second is the one that matters:
+
+- The method needs one branch per visual PR, none of which can ever be deleted.
+  That is a permanent, growing set of refs whose only job is to not be tidied
+  up — a rule that has to hold forever, against a `git branch -d` that looks
+  entirely reasonable at the time.
+- **An upload is attached to the repository, not to a ref.** That is the real
+  argument for the endpoint above, more than any property of the endpoint
+  itself. There is nothing to delete, so cleanup cannot reach it.
+
+Weigh it honestly if the endpoint ever breaks: the branch method is a
+legitimate fallback, and versioning evidence in git has real appeal. Just take
+it knowing the failure mode is silent, arrives long after merge, and destroys
+precisely the thing a PR body exists to preserve.
+
 ## Before you open it
 
 - **Self-review the diff first** — `git diff main...HEAD`. Catch the stray
