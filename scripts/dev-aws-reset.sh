@@ -8,7 +8,7 @@
 # expected names before anything is touched.
 #
 # AFTERWARDS YOU HAVE NEITHER AN ACCOUNT NOR A FIRM. Re-run
-# scripts/dev-aws-create-user.sh and then scripts/dev-aws-create-firm.sh, in
+# scripts/dev-aws-create-user.sh and then scripts/dev-aws-seed.sh firm, in
 # that order — the second reads the subject the first creates.
 #
 set -euo pipefail
@@ -122,12 +122,12 @@ aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
 # reset: its user rows are keyed by a Cognito subject, and its firm rows own the
 # cases deleted just above. Keeping it while deleting the pool's users would
 # leave a firm whose every member is an id that no longer resolves — nobody can
-# sign in to administer it, and the next `dev-aws-create-firm.sh` meets a
+# sign in to administer it, and the next `dev-aws-seed.sh firm` meets a
 # subject it has never seen and creates a SECOND firm beside the derelict one.
 #
 # UNCONDITIONAL, including under --skip-cognito. That flag preserves accounts,
 # not their tenancy: the cases above are gone either way, so a surviving firm
-# would be an empty shell, and re-running `dev-aws-create-firm.sh` for the
+# would be an empty shell, and re-running `dev-aws-seed.sh firm` for the
 # accounts that still exist is one command. The reverse default — firms
 # outliving the cases they own — is the state with no obvious fix.
 log "Deleting $firm_table..."
