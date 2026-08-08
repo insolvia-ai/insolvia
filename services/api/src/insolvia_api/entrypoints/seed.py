@@ -38,17 +38,40 @@ malformed fixture fails with the same field errors the API would give, and a new
 required field breaks seeding loudly instead of writing rows the service has
 stopped agreeing with.
 
+## Accounts as well as rows, and why that is the same job
+
+A firm row is keyed on a Cognito `sub`, so seeding a firm means knowing who its
+people are in the pool. A fixture person carrying a `password` says "this
+environment owns its accounts" and the loader creates them; one without says
+the account must already exist. Staging owns its accounts. Dev does not —
+`dev-aws-create-user.sh` prompts for a password interactively, and no fixture
+should ever carry one that a human typed.
+
+Doing both here is what makes a second test user cost a fixture edit rather
+than a script run, two secrets and a slot in `e2e/support/env.ts`. That matters
+because the tenancy model is *about* multiple people: `may_see_case`,
+`access_all_cases`, another firm's case answering 404, and the 409 that stops a
+firm removing its last admin are all untestable with one account.
+
+SUBJECTS ARE RESOLVED, NEVER PINNED. An earlier version stored the sub as a CI
+secret to avoid granting `AdminGetUser`. That tied the secret to the pool's
+lifetime — replace the pool and the sub changes, the secret rots in silence,
+and seeding writes a firm for somebody who cannot sign in. One scoped grant
+beats a stale secret per person.
+
 ## `${VAR}` in a fixture, and why it is not a convenience
 
-THIS REPO IS PUBLIC. `e2e/CLAUDE.md` forbids the staging test user's address in
-any committed file — not as a default, not in a fixture, not in a comment. So
-`seeds/staging.json` names that user as `${E2E_TEST_USER_EMAIL}` and the value
-arrives from the environment at load time. Expansion FAILS on an unset variable
-rather than substituting empty: a fixture that silently seeded a firm for ""
-would be a broken environment that looks provisioned.
+THIS REPO IS PUBLIC, so nothing here may carry a credential. Passwords are
+`${E2E_TEST_USER_PASSWORD}` and arrive from the environment at load time.
+Expansion FAILS on an unset variable rather than substituting empty: a fixture
+that set an account's password to "" would be worse than one that refused.
 
-`seeds/dev.json` needs none of this — `dev@insolvia.test` is a reserved TLD
-(RFC 2606), unroutable by construction, and safe to commit.
+ADDRESSES, though, are committed on purpose. Every seeded address ends in
+`@insolvia.test` — a reserved TLD (RFC 2606) that can never be a real mailbox,
+which is what `e2e/CLAUDE.md`'s rule is protecting against. Nothing is emailed
+to them anyway (`MessageAction=SUPPRESS`). Keeping them in the fixture is what
+lets the e2e suite and the seeder agree on who exists by reading one file,
+instead of drifting through two sets of secrets.
 
 ## WHAT THIS IS NOT: a unit-test fixture factory
 
@@ -84,7 +107,7 @@ import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.core.firms import (
@@ -106,49 +129,122 @@ _OK: Final = 0
 _NOT_SEEDED: Final = 1
 _REFUSED: Final = 2
 
-# email -> Cognito sub, raising RefusedError when there is no such account.
-#
-# Not `core.ports.UserDirectory`: that port is deliberately AdminCreateUser and
-# nothing else, because it is the API's grant and widening it would make it an
-# impersonation primitive. This is a different principal with a different,
-# read-only need, so it gets its own seam — and the refusal is part of the
-# contract rather than whatever the implementation happens to throw, so a fake
-# that raises KeyError is a broken fake, not a passing test.
-SubjectResolver = Callable[[str], str]
-
 
 class RefusedError(Exception):
     """A guard or the fixture rejected the run. Nothing has been written."""
 
 
-def _cognito_subjects(pool_id: str) -> SubjectResolver:
-    import boto3
+class Accounts(Protocol):
+    """The pool half of seeding: make sure a person can sign in, and say who
+    they are.
 
-    client = boto3.client("cognito-idp")
+    Not `core.ports.UserDirectory`. That port is deliberately AdminCreateUser
+    and NOTHING else — no password, no lookup — because it is the API's grant,
+    and a service that could set a password would be an impersonation
+    primitive rather than an invitation mechanism. This is a different
+    principal with different needs, so widening that port to serve a seeder
+    would quietly hand the API a capability it was designed not to have.
 
-    def resolve(email: str) -> str:
-        try:
-            user = client.admin_get_user(UserPoolId=pool_id, Username=email)
-        except client.exceptions.UserNotFoundException:
-            raise RefusedError(
-                f"no pool user for {email} — create the account before seeding "
-                "the firm it belongs to"
-            ) from None
+    `RefusedError` is part of the contract, not whatever an implementation
+    happens to throw, so a fake that raises KeyError is a broken fake rather
+    than a passing test.
+    """
+
+    def subject_of(self, email: str) -> str:
+        """The Cognito sub, raising RefusedError if there is no such account."""
+        ...
+
+    def ensure(self, email: str, password: str) -> str:
+        """Create the account if absent, then return its sub.
+
+        Converges rather than creates: re-running must not fail on an account
+        that is already there, because this runs on every staging deploy.
+        """
+        ...
+
+
+class CognitoAccounts:
+    """`Accounts` against a real pool.
+
+    RESOLVED FRESH, NEVER PINNED. An earlier design stored the sub as a CI
+    secret to avoid granting AdminGetUser. That coupled the secret to the
+    pool's lifetime: replace the pool and the sub changes, the secret goes
+    stale in silence, and seeding writes a firm for somebody who cannot sign
+    in — which presents as the 403 this whole module exists to prevent, from a
+    value nobody would suspect. One scoped grant is cheaper than that failure.
+    """
+
+    def __init__(self, pool_id: str) -> None:
+        import boto3
+
+        self.pool_id = pool_id
+        self.client = boto3.client("cognito-idp")
+
+    def _sub(self, user: dict[str, Any]) -> str:
         for attribute in user["UserAttributes"]:
             if attribute["Name"] == "sub":
                 return str(attribute["Value"])
-        raise RefusedError(f"pool user {email} has no sub attribute")
+        raise RefusedError("pool user has no sub attribute")
 
-    return resolve
+    def subject_of(self, email: str) -> str:
+        try:
+            return self._sub(
+                self.client.admin_get_user(UserPoolId=self.pool_id, Username=email)
+            )
+        except self.client.exceptions.UserNotFoundException:
+            raise RefusedError(
+                f"no pool user for {email}, and the fixture gives no password "
+                "to create one with"
+            ) from None
+
+    def ensure(self, email: str, password: str) -> str:
+        try:
+            existing = self.client.admin_get_user(
+                UserPoolId=self.pool_id, Username=email
+            )
+        except self.client.exceptions.UserNotFoundException:
+            existing = None
+
+        if existing is None:
+            # SUPPRESS is not optional. Without it Cognito emails a temporary
+            # password to the address; these are `.test` addresses that can
+            # never receive it, and SES is still sandboxed, so the mail would
+            # only ever bounce. email_verified spares the account a
+            # verification step nothing can complete.
+            self.client.admin_create_user(
+                UserPoolId=self.pool_id,
+                Username=email,
+                UserAttributes=[
+                    {"Name": "email", "Value": email},
+                    {"Name": "email_verified", "Value": "true"},
+                ],
+                MessageAction="SUPPRESS",
+            )
+
+        # ALWAYS, even for an account that already existed. admin_create_user
+        # leaves the user in FORCE_CHANGE_PASSWORD, and the hosted UI answers
+        # that with a "set a new password" screen a browser test cannot
+        # complete — it hangs until the job times out. Setting it every run
+        # also makes a rotated password secret converge instead of drifting
+        # away from the account it names.
+        self.client.admin_set_user_password(
+            UserPoolId=self.pool_id,
+            Username=email,
+            Password=password,
+            Permanent=True,
+        )
+        return self._sub(
+            self.client.admin_get_user(UserPoolId=self.pool_id, Username=email)
+        )
 
 
 @dataclass(frozen=True)
 class Dependencies:
-    """The seams tests replace. Factories, because a table name is only
-    legitimate after `_require_seedable_table` has accepted it."""
+    """The seams tests replace. Factories, because neither a table name nor a
+    pool id is legitimate until the guards below have accepted it."""
 
     firm_store: Callable[[str], FirmStore] = DynamoDbFirmStore
-    subjects: Callable[[str], SubjectResolver] = _cognito_subjects
+    accounts: Callable[[str], Accounts] = CognitoAccounts
 
 
 def _require_seedable_table(table: str, *, kind: str) -> None:
@@ -198,8 +294,27 @@ def load_fixture(path: Path, env: Mapping[str, str]) -> dict[str, Any]:
 # ── firms ───────────────────────────────────────────────────────────
 
 
+def _subject_for(user: Mapping[str, Any], accounts: Accounts, *, check: bool) -> str:
+    """The pool sub for one fixture person, creating the account if asked to.
+
+    A `password` in the fixture is what says "this environment owns its
+    accounts, make them". Without one the account must already exist — which is
+    how dev works, where `dev-aws-create-user.sh` prompts for a password
+    interactively and no fixture should ever carry one.
+
+    Under --check nothing is created; an absent account reports as missing
+    rather than being provisioned by a command whose whole promise is that it
+    writes nothing.
+    """
+    email = str(user["email"])
+    password = user.get("password")
+    if not password or check:
+        return accounts.subject_of(email)
+    return accounts.ensure(email, str(password))
+
+
 def _seed_firms(
-    entries: list[Any], store: FirmStore, resolve: SubjectResolver, *, check: bool
+    entries: list[Any], store: FirmStore, accounts: Accounts, *, check: bool
 ) -> int:
     """Converge each fixture firm. Returns 0 if nothing is missing.
 
@@ -220,23 +335,11 @@ def _seed_firms(
                 "sign in to is the derelict state ADR 0009 refuses"
             )
 
-        # Resolve first: a fixture naming an account that does not exist should
-        # fail before any row is written, not halfway through the firm.
-        #
-        # A fixture MAY carry the subject itself, and staging does. The sub is
-        # server-minted but constant once the account exists, so looking it up
-        # buys nothing — and it costs a Cognito grant that cannot be scoped to
-        # one pool, because ci-trust is applied before the pools exist and
-        # cannot know their opaque ids. `AdminGetUser` on `userpool/*` would
-        # include PROD's pool, which is customer email addresses. Supplying the
-        # value removes that grant from the pipeline entirely.
+        # Accounts first, and all of them, before a single row is written. A
+        # fixture naming somebody who cannot be provisioned should fail while
+        # the table is still untouched, rather than half a firm in.
         drafts = [
-            (
-                parse_firm_user_creation(user),
-                str(user["subject"])
-                if user.get("subject")
-                else resolve(str(user["email"])),
-            )
+            (parse_firm_user_creation(user), _subject_for(user, accounts, check=check))
             for user in users
         ]
 
@@ -290,8 +393,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--firm-table", required=True)
     parser.add_argument(
         "--user-pool-id",
-        help="the pool to resolve subjects in; unnecessary if the fixture "
-        "supplies a subject for every person",
+        required=True,
+        help="the pool the fixture's people live in",
     )
     parser.add_argument(
         "--check",
@@ -307,19 +410,10 @@ def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> 
     try:
         _require_seedable_table(args.firm_table, kind="firms")
         fixture = load_fixture(args.fixture, os.environ)
-
-        def unavailable(email: str) -> str:
-            raise RefusedError(
-                f"{email} has no subject in the fixture and there is no "
-                "--user-pool-id to resolve it in"
-            )
-
         missing = _seed_firms(
             fixture.get("firms") or [],
             dependencies.firm_store(args.firm_table),
-            dependencies.subjects(args.user_pool_id)
-            if args.user_pool_id
-            else unavailable,
+            dependencies.accounts(args.user_pool_id),
             check=args.check,
         )
     except RefusedError as refusal:

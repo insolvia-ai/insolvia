@@ -30,3 +30,27 @@ variable "github_immutable_sub_prefix" {
   type        = string
   default     = "repo:insolvia-ai@305033818/insolvia@1312821833"
 }
+
+variable "staging_user_pool_arn" {
+  description = <<-EOT
+    ARN of the STAGING Cognito user pool, so the seed role can provision the
+    e2e test accounts in it — and in nothing else.
+
+    OPTIONAL, AND THAT IS A BOOTSTRAP CONCESSION rather than laziness. A pool's
+    ARN contains a generated id, and this root is applied by a human BEFORE
+    `staging` exists (docs/runbooks/aws-bootstrap.md's apply order). A
+    `terraform_remote_state` lookup would therefore fail on a fresh account, so
+    the grant is conditional instead: leave this empty on first bootstrap and
+    the statement is simply absent, then set it once staging has applied.
+
+    Get it with:
+      terraform -chdir=infra/envs/staging output -raw auth_user_pool_arn
+
+    WHY NOT A WILDCARD. `userpool/*` would reach PROD's pool, and the actions
+    below include AdminSetUserPassword — which on a prod pool is the ability to
+    take over any customer account. There is no scoping condition that fixes
+    that; only the exact ARN does, which is why this variable exists at all.
+  EOT
+  type        = string
+  default     = ""
+}

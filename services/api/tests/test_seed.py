@@ -61,24 +61,43 @@ def one_firm(tmp_path: Path, *users: dict[str, object]) -> Path:
     )
 
 
+class FakeAccounts:
+    """A pool that starts with `known` in it and records what gets created.
+
+    RefusedError rather than KeyError on a miss: the real adapter turns
+    UnknownUser into a refusal, and a fake that threw something else would let
+    a bug through by honouring a contract nobody implements.
+    """
+
+    def __init__(self, known: dict[str, str] | None = None) -> None:
+        self.subjects = dict(DIRECTORY if known is None else known)
+        self.created: list[str] = []
+        self.passwords: dict[str, str] = {}
+        self._next = 0
+
+    def subject_of(self, email: str) -> str:
+        if email not in self.subjects:
+            raise RefusedError(f"no pool user for {email}")
+        return self.subjects[email]
+
+    def ensure(self, email: str, password: str) -> str:
+        if email not in self.subjects:
+            self._next += 1
+            self.subjects[email] = f"aaaaaaaa-bbbb-cccc-dddd-{self._next:012d}"
+            self.created.append(email)
+        self.passwords[email] = password
+        return self.subjects[email]
+
+
 def run(
     path: Path,
     store: FirmStore,
     *,
     table: str = DEV_TABLE,
     check: bool = False,
-    directory: dict[str, str] | None = None,
+    accounts: FakeAccounts | None = None,
 ) -> int:
-    known = DIRECTORY if directory is None else directory
-
-    def resolve(email: str) -> str:
-        # RefusedError, not KeyError: the real Cognito resolver turns
-        # UserNotFoundException into a refusal, and a fake that threw something
-        # else would let a bug through by testing a contract nobody implements.
-        if email not in known:
-            raise RefusedError(f"no pool user for {email}")
-        return known[email]
-
+    pool = accounts if accounts is not None else FakeAccounts()
     argv = [
         "--fixture",
         str(path),
@@ -91,7 +110,7 @@ def run(
         argv.append("--check")
     return main(
         argv,
-        deps=Dependencies(firm_store=lambda _: store, subjects=lambda _: resolve),
+        deps=Dependencies(firm_store=lambda _: store, accounts=lambda _: pool),
     )
 
 
@@ -207,44 +226,122 @@ def test_two_people_in_one_fixture_firm_share_it(tmp_path: Path) -> None:
 # ── a fixture that supplies its own subjects ────────────────────────
 
 
-def test_a_supplied_subject_is_used_without_consulting_the_pool(
-    tmp_path: Path,
-) -> None:
-    """What keeps AdminGetUser out of the CI pipeline entirely.
+def test_a_password_in_the_fixture_creates_the_account(tmp_path: Path) -> None:
+    """A password is what says "this environment owns its accounts".
 
-    ci-trust is applied before any pool exists, so it cannot scope a Cognito
-    grant to one pool — it would have to be `userpool/*`, which reaches prod's
-    pool and its customer addresses. A fixture that carries the sub needs no
-    such grant, and the sub is constant once the account exists.
+    Staging's does; dev's does not, because dev-aws-create-user.sh prompts a
+    human for one and a fixture must never carry that.
     """
     store = MemoryFirmStore()
-    path = one_firm(tmp_path, user("someone@insolvia.test", subject=ALICE))
+    pool = FakeAccounts(known={})
+    path = one_firm(tmp_path, user("e2e-admin@insolvia.test", password="hunter2ABCDEF"))
 
-    def explode(email: str) -> str:
-        raise AssertionError(f"the pool was consulted for {email}")
+    assert run(path, store, table=STAGING_TABLE, accounts=pool) == 0
 
-    status = main(
-        ["--fixture", str(path), "--firm-table", STAGING_TABLE],
-        deps=Dependencies(firm_store=lambda _: store, subjects=lambda _: explode),
-    )
-
-    assert status == 0
-    assert store.find_user(ALICE) is not None
+    assert pool.created == ["e2e-admin@insolvia.test"]
+    assert pool.passwords["e2e-admin@insolvia.test"] == "hunter2ABCDEF"
+    seeded = store.find_user(pool.subjects["e2e-admin@insolvia.test"])
+    assert seeded is not None
 
 
-def test_a_missing_subject_with_no_pool_to_resolve_it_is_refused(
+def test_the_password_is_reset_on_an_account_that_already_exists(
     tmp_path: Path,
 ) -> None:
-    store = MemoryFirmStore()
-    path = one_firm(tmp_path, user())
+    """Converging the password is what makes a rotated secret take effect.
 
-    status = main(
-        ["--fixture", str(path), "--firm-table", STAGING_TABLE],
-        deps=Dependencies(firm_store=lambda _: store),
+    It also clears FORCE_CHANGE_PASSWORD, which admin_create_user leaves
+    behind and which hangs the hosted UI on a screen a browser test cannot
+    answer.
+    """
+    store = MemoryFirmStore()
+    pool = FakeAccounts(known={"alice@insolvia.test": ALICE})
+    path = one_firm(tmp_path, user(password="rotatedABCDEF1"))
+
+    assert run(path, store, table=STAGING_TABLE, accounts=pool) == 0
+
+    assert pool.created == []
+    assert pool.passwords["alice@insolvia.test"] == "rotatedABCDEF1"
+
+
+def test_without_a_password_the_account_must_already_exist(tmp_path: Path) -> None:
+    store = MemoryFirmStore()
+    pool = FakeAccounts(known={})
+
+    assert run(one_firm(tmp_path, user()), store, accounts=pool) == 2
+
+    assert pool.created == []
+    assert store.get_firm("any") is None
+
+
+def test_check_never_creates_an_account(tmp_path: Path) -> None:
+    """--check promises to write nothing, and a pool account is a write.
+
+    Without this the report itself would provision the thing it is reporting
+    on, and the second run would say everything is fine.
+    """
+    store = MemoryFirmStore()
+    pool = FakeAccounts(known={})
+    path = one_firm(tmp_path, user("e2e-admin@insolvia.test", password="hunter2ABCDEF"))
+
+    assert run(path, store, table=STAGING_TABLE, check=True, accounts=pool) == 2
+
+    assert pool.created == []
+    assert pool.passwords == {}
+
+
+def test_several_people_across_two_firms_are_all_provisioned(
+    tmp_path: Path,
+) -> None:
+    """The shape seeds/staging.json actually has, and the reason for all this.
+
+    Cross-tenant isolation cannot be tested from inside one firm, and the
+    per-user cost of a second firm has to be an edit to a fixture rather than
+    two more secrets and another script run.
+    """
+    store = MemoryFirmStore()
+    pool = FakeAccounts(known={})
+    path = fixture(
+        tmp_path,
+        {
+            "firms": [
+                {
+                    "name": "Insolvia E2E",
+                    "users": [
+                        user("e2e-admin@insolvia.test", password="hunter2ABCDEF"),
+                        user(
+                            "e2e-paralegal@insolvia.test",
+                            password="hunter2ABCDEF",
+                            role="paralegal",
+                            isAdmin=False,
+                            accessAllCases=False,
+                        ),
+                    ],
+                },
+                {
+                    "name": "Other Firm LLP",
+                    "users": [
+                        user("e2e-outsider@insolvia.test", password="hunter2ABCDEF")
+                    ],
+                },
+            ]
+        },
     )
 
-    assert status == 2
-    assert store.get_firm("any") is None
+    assert run(path, store, table=STAGING_TABLE, accounts=pool) == 0
+
+    assert len(pool.created) == 3
+    admin = store.find_user(pool.subjects["e2e-admin@insolvia.test"])
+    paralegal = store.find_user(pool.subjects["e2e-paralegal@insolvia.test"])
+    outsider = store.find_user(pool.subjects["e2e-outsider@insolvia.test"])
+    assert admin is not None
+    assert paralegal is not None
+    assert outsider is not None
+    # Colleagues share a firm; the outsider must not, or the 404 that proves
+    # cross-tenant isolation would be untestable.
+    assert admin.firm_id == paralegal.firm_id
+    assert outsider.firm_id != admin.firm_id
+    assert paralegal.is_admin is False
+    assert paralegal.access_all_cases is False
 
 
 # ── convergence ─────────────────────────────────────────────────────

@@ -22,24 +22,26 @@
 # round trip possible locally at all. The app's dev server is pinned to port
 # 3000 for the same reason; Expo's own default of 8081 would not be allowed.
 #
-# NO CREDENTIALS HERE, EVER. The repo is public. The test user's email and
-# password come from the environment with no defaults and no fixture file, the
-# same rule support/env.ts enforces. Create the account with
-# scripts/dev-aws-create-user.sh — there is no sign-up screen on any pool.
+# NO CREDENTIALS HERE, EVER. The repo is public. The PASSWORD comes from the
+# environment with no default, the same rule support/env.ts enforces. The
+# ADDRESS is a different matter and comes from seeds/dev.json: it ends in
+# `.test`, a reserved TLD that can never be a real mailbox, and keeping it in
+# the fixture is what stops "who this machine seeded" and "who the suite signs
+# in as" becoming two answers.
 #
-# THE ACCOUNT ALSO NEEDS A FIRM — scripts/dev-aws-seed.sh. Signing in is
-# not enough for intake-persists.spec.ts, which drives /cases: without a firm
-# the account resolves to no accessor and that route answers 403, so the spec
-# fails on a missing case link and reads as an app regression rather than an
-# unprovisioned test user. Staging's user was provisioned once, by hand, which
-# is why this only bites the local run.
+# THE ACCOUNT ALSO NEEDS A FIRM — scripts/dev-aws-seed.sh. Signing in is not
+# enough for intake-persists.spec.ts, which drives /cases: without a firm the
+# account resolves to no accessor and that route answers 403, so the spec fails
+# on a missing case link and reads as an app regression rather than an
+# unprovisioned test user. Staging seeds itself on every deploy; a laptop does
+# not, which is why this is a step here and not there.
 #
 # This stays an explicit, separate invocation — it needs the stack running and
 # a provisioned dev account, so it does not belong in any aggregate check. Same
 # reasoning that keeps E2E out of the required PR checks (e2e/CLAUDE.md).
 #
 # Usage:
-#   export E2E_TEST_USER_EMAIL=...  E2E_TEST_USER_PASSWORD=...
+#   export E2E_TEST_USER_PASSWORD=...        # the address comes from seeds/dev.json
 #   ./e2e/scripts/dev-test.sh                 # headless
 #   ./e2e/scripts/dev-test.sh --headed        # watch it drive the browser
 #
@@ -59,16 +61,19 @@ HEADED=0
 [[ "${1:-}" == "--headed" ]] && HEADED=1
 
 # ── Credentials: named, never echoed ────────────────────────────────────────
-missing=()
-[[ -n "${E2E_TEST_USER_EMAIL:-}"    ]] || missing+=(E2E_TEST_USER_EMAIL)
-[[ -n "${E2E_TEST_USER_PASSWORD:-}" ]] || missing+=(E2E_TEST_USER_PASSWORD)
-if [[ "${#missing[@]}" -ne 0 ]]; then
-  die "Not set: ${missing[*]}
-       These have no defaults on purpose — this repo is public.
-       Create a dev account with ./scripts/dev-aws-create-user.sh, put it in a
-       firm with ./scripts/dev-aws-seed.sh, then export both variables
-       in your shell before running this."
-fi
+# Only the password. The ADDRESS comes from seeds/dev.json below — the same
+# file ./scripts/dev-aws-seed.sh loads — so who this machine seeded and who the
+# suite signs in as cannot drift apart.
+[[ -n "${E2E_TEST_USER_PASSWORD:-}" ]] ||
+  die "E2E_TEST_USER_PASSWORD is not set.
+       It has no default on purpose — this repo is public. Use the password you
+       gave ./scripts/dev-aws-create-user.sh for the account in seeds/dev.json,
+       and make sure ./scripts/dev-aws-seed.sh has put it in a firm."
+
+# Which fixture describes THIS target. Staging is the suite's default, so a run
+# against a laptop has to say so or it would look for people who only exist in
+# staging and fail naming a handle rather than the environment.
+export E2E_SEED_FIXTURE="seeds/dev.json"
 
 # ── The dev pool's hosted domain ────────────────────────────────────────────
 # Read from the .env that dev-aws-setup.sh writes rather than calling

@@ -1090,12 +1090,40 @@ data "aws_iam_policy_document" "github_seed_permissions" {
     }
   }
 
-  # NO cognito-idp GRANT, deliberately. Resolving the test user's `sub` would
-  # need AdminGetUser, and this root cannot scope that to the staging pool —
-  # pool ids are opaque and none of them exist when this is applied, so it
-  # would have to be `userpool/*`, which reaches prod's pool and its customer
-  # addresses. seeds/staging.json supplies the subject instead; it is constant
-  # once the account exists. See that file's header.
+  # The staging pool's accounts — the people seeds/staging.json names.
+  #
+  # WHY THE PIPELINE CREATES THEM. Every test account used to be a human run of
+  # a script plus two secrets, and adding a second one meant doing that again.
+  # The tenancy model is about several people with different reach, so a suite
+  # that can only sign in as one of them cannot test what the model is for.
+  # Now the fixture is the list and this grant is what lets CI converge on it.
+  #
+  # WHY AdminSetUserPassword IS HERE, which is the uncomfortable action: an
+  # account created by AdminCreateUser sits in FORCE_CHANGE_PASSWORD, and the
+  # hosted UI answers that with a screen a browser test cannot complete — the
+  # job hangs to its timeout. Setting a permanent password is the only way to
+  # make a created account signable-in. It is an impersonation primitive, and
+  # it is bounded by the ARN: staging holds no customer data, and CI already
+  # holds that password as a secret, so the marginal capability is over
+  # throwaway identities in a throwaway environment.
+  #
+  # CONDITIONAL ON THE ARN BEING KNOWN. Empty on a fresh bootstrap, because
+  # this root is applied before staging exists; the statement then does not
+  # exist and the seed step fails loudly on AccessDenied rather than reaching
+  # anything it should not. See the variable's own description.
+  dynamic "statement" {
+    for_each = var.staging_user_pool_arn == "" ? [] : [var.staging_user_pool_arn]
+
+    content {
+      sid = "StagingPoolTestAccounts"
+      actions = [
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword",
+      ]
+      resources = [statement.value]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "github_seed_permissions" {

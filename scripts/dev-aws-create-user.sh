@@ -16,9 +16,10 @@
 #
 # That is correct for staging and prod and merely puzzling on a laptop, where
 # it presents as "I ran dev-up.sh, I have a sign-in page, and no way past it."
-# This is the way past it. It is the dev counterpart of
-# scripts/staging-aws-create-test-user.sh, which does the same job for the
-# staging pool.
+# This is the way past it. Staging has no counterpart script any more: its
+# accounts are created by the seed step in app-staging.yml from
+# seeds/staging.json. A laptop keeps this one because a dev password is typed
+# by a human and must never reach a committed fixture.
 #
 # ## Why there is a SECOND call
 #
@@ -47,10 +48,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/dev-aws-common.sh"
 
-# DEV ONLY, and not parameterised on purpose — the same reasoning
-# staging-aws-create-test-user.sh gives for being staging-only. A "create me an
-# account" script that could be pointed at the prod pool by changing one
-# argument is a script that eventually is.
+# DEV ONLY, and not parameterised on purpose. A "create me an account" script
+# that could be pointed at the prod pool by changing one argument is a script
+# that eventually is — which is also why the seeder refuses any table or pool
+# that is not this machine's or staging's.
 CHECK_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in

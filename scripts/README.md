@@ -21,13 +21,12 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the four scripts above and `dev-up.sh` |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/update-ruleset.sh` | Repo protection | Adds/removes a required status check on the `protect-main` ruleset — `show`, `add "<name>"`, `remove "<name>"`. Read-modify-write, because the ruleset `PUT` replaces whatever array you send it. See the `insolvia-branch-protection` skill. |
-| `scripts/staging-aws-create-test-user.sh` | Staging E2E setup (one-time) | Creates the dedicated test user in the **staging** Cognito pool (self-signup is disabled, so `admin-create-user` is the only path) and gives it a permanent password so the first sign-in is not a password-change challenge. Pool id from `terraform output`, never a literal; password from the environment or a no-echo prompt, never a file. `--check`. Needs a staging AWS session — see the `insolvia-aws-auth` skill. |
-| `scripts/staging-github-set-secrets.sh` | Staging E2E setup (one-time) | Sets `E2E_TEST_USER_EMAIL` / `E2E_TEST_USER_PASSWORD` as **`insolvia-staging` environment** secrets (the same scope as `AWS_ROLE_ARN`, not repo-level), read from the environment and piped on stdin. Re-running rotates, and says so first. `--check`, `--yes`. |
+| `scripts/staging-github-set-secrets.sh` | Staging E2E setup (one-time) | Sets `E2E_TEST_USER_PASSWORD` as an **`insolvia-staging` environment** secret (the same scope as `AWS_ROLE_ARN`, not repo-level), read from the environment or a no-echo prompt and piped on stdin. **The only secret staging's test data needs** — the addresses are in [`seeds/staging.json`](../seeds/staging.json) and the accounts are created by the seed step in `app-staging.yml`, so adding a test user comes nowhere near this script. Re-running rotates, and the next deploy converges every seeded account onto the new value. `--check`, `--yes`. |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/runbooks/aws-bootstrap.md` § "The ci-trust anchor". |
 | `scripts/apply-account-access.sh` | Human-gated IAM apply | Applies `infra/envs/account-access` (the human IAM users, their groups, their attached policies). Same credential dance + plan review + confirm, plus guards for the two ways this root can lock you out. Use when someone joins, leaves or changes group. **Not** for rotating your own MFA — that is `docs/runbooks/iam-mfa-rotation.md`, and no Terraform resource is involved on purpose. |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
-| `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs the Playwright suite against `http://localhost:3000` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running, an account from `scripts/dev-aws-create-user.sh`, and `E2E_TEST_USER_EMAIL` / `E2E_TEST_USER_PASSWORD` exported — no defaults, the repo is public. `--headed` to watch it. The staging run in `app-staging.yml` is unchanged and stays authoritative |
+| `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs the Playwright suite against `http://localhost:3000` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running, an account from `scripts/dev-aws-create-user.sh` seeded by `scripts/dev-aws-seed.sh`, and `E2E_TEST_USER_PASSWORD` exported — no default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it. The staging run in `app-staging.yml` is unchanged and stays authoritative |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
 `packages/insolvia_api_client` has no scripts, deliberately: it is an npm
@@ -70,9 +69,8 @@ scheme applied for its own sake produces `github-update-ruleset.sh`.
 `dev-aws-common.sh` (machine-id identity, the per-machine state key, the
 credential export), so the prefix marks family membership, not just a target.
 A script that does not source it should not borrow the prefix —
-`bootstrap-ecr-images.sh` and `staging-aws-create-test-user.sh` both
-deliberately re-implement the credential dance for non-per-machine targets, and
-both say so where they do it.
+`bootstrap-ecr-images.sh` deliberately re-implements the credential dance for a
+non-per-machine target, and says so where it does it.
 
 ## Targets (both use Homebrew)
 
@@ -290,25 +288,27 @@ emergency paths (single-service `*-prod.yml`, `infra-prod.yml` plan/apply) are
 plain `workflow_dispatch` in the Actions UI or `gh workflow run`. The
 `insolvia-deploy` skill owns the full picture.
 
-## Staging E2E setup (`e2e-*.sh`)
+## Staging E2E setup (`staging-*.sh`)
 
-Two one-time scripts that give the post-deploy auth round trip in
-`.github/workflows/app-staging.yml` something to sign in as. Run them in this
-order, once; the order, the expected output and how to tell it worked are in
+One one-time script that gives the post-deploy auth round trip in
+`.github/workflows/app-staging.yml` something to sign in as. The expected output
+and how to tell it worked are in
 [`../docs/runbooks/staging-e2e-setup.md`](../docs/runbooks/staging-e2e-setup.md).
 
 ```bash
-export E2E_TEST_USER_EMAIL='…'      # a dedicated synthetic address, never a real mailbox
-./scripts/staging-aws-create-test-user.sh   # prompts for the password, without echo
-./scripts/staging-github-set-secrets.sh        # same two values → the insolvia-staging environment
-
-./scripts/staging-aws-create-test-user.sh --check
-./scripts/staging-github-set-secrets.sh --check
+./scripts/staging-github-set-secrets.sh            # prompts for the password, without echo
+./scripts/staging-github-set-secrets.sh --check    # verify, change nothing
 ```
 
-Neither script accepts, writes, or generates a password into a file: this repo
-is public, and the value exists only in your shell and in GitHub's encrypted
-secret store. The test user must never enrol MFA — the pool allows it
+The accounts themselves are created by the seed step in `app-staging.yml` from
+[`../seeds/staging.json`](../seeds/staging.json), so **adding a test user is an
+edit to that fixture** — no script, no extra secret. The other human step is a
+one-off `apply-ci-trust.sh` that lets the seed role into the staging pool; the
+runbook has it.
+
+The script neither writes nor generates a password into a file: this repo is
+public, and the value exists only in your shell and in GitHub's encrypted secret
+store. A seeded account must never enrol MFA — the pool allows it
 (`mfa_configuration = "OPTIONAL"`), and a TOTP challenge is something a browser
 test cannot answer, so the E2E job would hang and redden staging.
 

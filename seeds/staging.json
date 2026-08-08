@@ -1,42 +1,77 @@
 {
   "//": [
-    "What staging holds so the e2e suite has something to sign in to.",
+    "Who exists in staging, and what they may do. Loaded by app-staging.yml",
+    "before the e2e suite runs, idempotently, on every deploy — so a pool or a",
+    "table recreated tomorrow is restored by the next run rather than found a",
+    "week later as a mystery app regression.",
     "",
-    "THE ADDRESS IS NOT HERE, AND MUST NOT BE. This repo is public and",
-    "e2e/CLAUDE.md forbids the test user's address in any committed file — not",
-    "as a default, not in a fixture, not in a comment. ${E2E_TEST_USER_EMAIL}",
-    "is the same environment secret the Playwright run reads, so the firm and",
-    "the sign-in cannot drift onto two different people. Loading fails loudly",
-    "if it is unset rather than seeding a firm for the empty string.",
+    "ADDING A TEST USER IS AN EDIT TO THIS FILE. No script run, no secret, no",
+    "slot in e2e/support/env.ts. That is the whole point: the tenancy model is",
+    "about several people with different reach, so a suite that can only ever",
+    "sign in as one of them cannot test the thing the model exists for —",
+    "may_see_case, access_all_cases, another firm's case answering 404, or the",
+    "409 that stops a firm removing its last administrator.",
     "",
-    "The account itself is created once by scripts/e2e-create-test-user.sh;",
-    "this only puts it in a firm. Seeding is idempotent and runs on every",
-    "staging deploy, so if staging's tables are ever recreated the next run",
-    "restores this instead of failing a week later as a mystery app regression.",
+    "THE ADDRESSES ARE COMMITTED AND THAT IS DELIBERATE. Every one ends in",
+    ".test, a reserved TLD (RFC 2606) that can never be a real mailbox — which",
+    "is exactly what e2e/CLAUDE.md's no-addresses rule protects against.",
+    "Nothing is mailed to them either (the loader passes MessageAction",
+    "SUPPRESS). Keeping them here is what lets the suite and the seeder agree",
+    "on who exists by reading one file rather than drifting through two sets of",
+    "secrets. A real mailbox must never appear here.",
     "",
-    "THE SUBJECT IS SUPPLIED, NOT LOOKED UP, and that is a security decision",
-    "rather than an optimisation. A Cognito sub is server-minted but constant",
-    "once the account exists, so resolving it at seed time buys nothing — and",
-    "it would cost the pipeline an AdminGetUser grant that cannot be scoped to",
-    "one pool: ci-trust is applied before any pool exists and cannot know their",
-    "opaque ids, so the grant would have to be userpool/*, which includes",
-    "PROD's pool and therefore customer email addresses. Supplying the value",
-    "keeps that grant out of CI entirely. Read it once with",
-    "  aws cognito-idp admin-get-user --user-pool-id <staging pool> \\",
-    "    --username \"$E2E_TEST_USER_EMAIL\" \\",
-    "    --query 'UserAttributes[?Name==`sub`].Value' --output text",
-    "and store it as the E2E_TEST_USER_SUBJECT environment secret. It is not a",
-    "credential, but it identifies a person, so it does not belong in this file",
-    "either."
+    "The password is the ONE secret left, shared by every account: these are",
+    "throwaway identities in an environment with no customer data, and one",
+    "value that rotates cleanly beats one per person that rotates by hand.",
+    "The loader sets it on every run, so rotating the secret converges the",
+    "accounts instead of locking the suite out.",
+    "",
+    "`handle` is how e2e/support/env.ts names a user; it is ignored by the API's",
+    "own parser. Keep handles stable — a spec refers to them."
   ],
   "firms": [
     {
       "name": "Insolvia E2E",
       "users": [
         {
-          "email": "${E2E_TEST_USER_EMAIL}",
-          "subject": "${E2E_TEST_USER_SUBJECT}",
-          "displayName": "E2E Test User",
+          "handle": "admin",
+          "email": "e2e-admin@insolvia.test",
+          "password": "${E2E_TEST_USER_PASSWORD}",
+          "displayName": "E2E Admin",
+          "role": "attorney",
+          "isAdmin": true,
+          "accessAllCases": true
+        },
+        {
+          "//": [
+            "Deliberately NOT an admin and NOT access-all-cases: the pair with",
+            "the row above is what makes per-case linking and the",
+            "FIRM_ADMINISTRATION refusals testable at all."
+          ],
+          "handle": "paralegal",
+          "email": "e2e-paralegal@insolvia.test",
+          "password": "${E2E_TEST_USER_PASSWORD}",
+          "displayName": "E2E Paralegal",
+          "role": "paralegal",
+          "isAdmin": false,
+          "accessAllCases": false
+        }
+      ]
+    },
+    {
+      "//": [
+        "A SECOND FIRM, with one person in it, and it earns its place: cross-",
+        "tenant isolation is the one property that cannot be tested from inside",
+        "a single firm. ADR 0009 has another firm's case answering 404 rather",
+        "than 403, and nothing else in the suite can tell those apart."
+      ],
+      "name": "Other Firm LLP",
+      "users": [
+        {
+          "handle": "outsider",
+          "email": "e2e-outsider@insolvia.test",
+          "password": "${E2E_TEST_USER_PASSWORD}",
+          "displayName": "E2E Outsider",
           "role": "attorney",
           "isAdmin": true,
           "accessAllCases": true
