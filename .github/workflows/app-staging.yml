@@ -54,8 +54,11 @@ jobs:
   # ── 1. Infra: apply, and freeze the outputs the rest of the run uses ───
   terraform:
     runs-on: ubuntu-latest
-    # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
-    # that don't declare the environment — they resolve silently to "".
+    # Required even though AWS_ROLE_ARN happens to be a REPOSITORY secret
+    # today: `environment:` is also what gates the deployment itself, and any
+    # secret that is environment-scoped — E2E_TEST_USER_PASSWORD,
+    # AWS_SEED_ROLE_ARN — is invisible without it and resolves silently to "".
+    # Borrowing another environment's name has the same effect.
     environment: insolvia-staging
     outputs:
       bucket: ${{ steps.tf.outputs.bucket }}
@@ -332,6 +335,31 @@ jobs:
       # deliberately control-plane only — "manages tables, never their
       # contents" — and a firm-user row IS an access grant. See the seed role's
       # header in infra/envs/ci-trust/main.tf for what it can and cannot reach.
+      #
+      # NAME THE MISSING INPUT BEFORE AWS SWALLOWS IT. An unset environment
+      # secret resolves to an empty string in silence, and an empty
+      # `role-to-assume` makes configure-aws-credentials fail with "Could not
+      # load credentials from any providers" — which names neither the secret
+      # nor the environment, and reads like a broken action. This is the same
+      # discipline support/env.ts applies to the suite's own inputs: fail on the
+      # missing NAME, never on what it contained.
+      - name: Check the seed step has its inputs
+        env:
+          SEED_ROLE_ARN: ${{ secrets.AWS_SEED_ROLE_ARN }}
+          SEED_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+        run: |
+          missing=()
+          [ -n "$SEED_ROLE_ARN" ] || missing+=(AWS_SEED_ROLE_ARN)
+          [ -n "$SEED_PASSWORD" ] || missing+=(E2E_TEST_USER_PASSWORD)
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Not set on the insolvia-staging environment: ${missing[*]}"
+            echo "Either the secret is unset, or this job lost its"
+            echo "'environment: insolvia-staging' key — an environment-scoped secret"
+            echo "resolves to an empty string in silence when the environment is"
+            echo "missing or borrowed. docs/runbooks/staging-e2e-setup.md has both."
+            exit 1
+          fi
+
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_SEED_ROLE_ARN }}

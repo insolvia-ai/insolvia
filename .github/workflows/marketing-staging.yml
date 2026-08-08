@@ -63,8 +63,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Required: environment-scoped secrets (AWS_ROLE_ARN) are invisible to jobs
-    # that don't declare the environment — they resolve silently to "".
+    # Required even though AWS_ROLE_ARN happens to be a REPOSITORY secret
+    # today: `environment:` is also what gates the deployment itself, and any
+    # secret that is environment-scoped — E2E_TEST_USER_PASSWORD,
+    # AWS_SEED_ROLE_ARN — is invisible without it and resolves silently to "".
+    # Borrowing another environment's name has the same effect.
     environment: insolvia-staging
     steps:
       - uses: actions/checkout@v5
