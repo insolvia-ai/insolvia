@@ -79,22 +79,18 @@ environment**. Not the repository: the role's trust policy only accepts tokens
 minted for that environment, so a repo-level secret would be a value no job
 could use.
 
-**The test user's Cognito `sub`.** The fixture names the person by subject
-rather than looking them up, because the pipeline holds no `cognito-idp` grant
-— `ci-trust` is applied before any pool exists, so it cannot scope
-`AdminGetUser` to staging, and the wildcard would reach prod's pool and its
-customer addresses. Read it once:
+**The test user's Cognito `sub`.** Step 2 sets this as `E2E_TEST_USER_SUBJECT`
+alongside the other two — it reads the value from the pool rather than asking,
+so there is nothing extra to run and nothing to retype. It is not a credential,
+but it identifies a person, so it stays out of committed files.
 
-```bash
-aws cognito-idp admin-get-user \
-  --user-pool-id "$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)" \
-  --username "$E2E_TEST_USER_EMAIL" \
-  --query 'UserAttributes[?Name==`sub`].Value' --output text
-```
+The fixture names its person by subject rather than resolving one at seed time
+because the pipeline holds **no `cognito-idp` grant at all**: `ci-trust` is
+applied before any pool exists, so it cannot scope `AdminGetUser` to staging,
+and the wildcard would reach prod's pool and its customer addresses.
 
-Store it as `E2E_TEST_USER_SUBJECT`, same environment scope. It is not a
-credential, but it identifies a person, so it does not belong in a committed
-file either.
+If you set up staging before this existed, re-run step 2 — it is an upsert, and
+`--check` tells you which of the three are missing.
 
 ### What step 1 should print
 
