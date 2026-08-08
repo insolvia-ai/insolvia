@@ -1,0 +1,33 @@
+{
+  "//": [
+    "What is on a developer's machine after scripts/dev-aws-seed.sh.",
+    "",
+    "The address is dev@insolvia.test to match scripts/dev-aws-create-user.sh's",
+    "default, and it is safe to commit: .test is a reserved TLD (RFC 2606), so",
+    "it can never be a real mailbox and Cognito can never mail a stranger.",
+    "seeds/staging.json cannot do the same and says why.",
+    "",
+    "isAdmin and accessAllCases are both true because this is the only seat in",
+    "the firm: an admin who could not see its cases would have to add a second",
+    "person before doing anything, and a non-admin would reproduce the lockout",
+    "the seeder exists to break.",
+    "",
+    "The account must already exist in the pool — run dev-aws-create-user.sh",
+    "first. Seeding resolves the email to its Cognito sub and refuses if there",
+    "is nobody to resolve."
+  ],
+  "firms": [
+    {
+      "name": "Dev Firm",
+      "users": [
+        {
+          "email": "dev@insolvia.test",
+          "displayName": "Dev User",
+          "role": "attorney",
+          "isAdmin": true,
+          "accessAllCases": true
+        }
+      ]
+    }
+  ]
+}

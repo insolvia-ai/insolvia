@@ -27,6 +27,13 @@
 # same rule support/env.ts enforces. Create the account with
 # scripts/dev-aws-create-user.sh — there is no sign-up screen on any pool.
 #
+# THE ACCOUNT ALSO NEEDS A FIRM — scripts/dev-aws-seed.sh. Signing in is
+# not enough for intake-persists.spec.ts, which drives /cases: without a firm
+# the account resolves to no accessor and that route answers 403, so the spec
+# fails on a missing case link and reads as an app regression rather than an
+# unprovisioned test user. Staging's user was provisioned once, by hand, which
+# is why this only bites the local run.
+#
 # This stays an explicit, separate invocation — it needs the stack running and
 # a provisioned dev account, so it does not belong in any aggregate check. Same
 # reasoning that keeps E2E out of the required PR checks (e2e/CLAUDE.md).
@@ -58,8 +65,9 @@ missing=()
 if [[ "${#missing[@]}" -ne 0 ]]; then
   die "Not set: ${missing[*]}
        These have no defaults on purpose — this repo is public.
-       Create a dev account with ./scripts/dev-aws-create-user.sh, then export
-       both variables in your shell before running this."
+       Create a dev account with ./scripts/dev-aws-create-user.sh, put it in a
+       firm with ./scripts/dev-aws-seed.sh, then export both variables
+       in your shell before running this."
 fi
 
 # ── The dev pool's hosted domain ────────────────────────────────────────────

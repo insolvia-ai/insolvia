@@ -52,6 +52,18 @@ output "auth_user_pool_id" {
   value       = module.auth.user_pool_id
 }
 
+# Also published to SSM (main.tf) for the API to read at runtime. This output
+# exists for a different reader: app-staging.yml's seed step, which loads
+# seeds/staging.json before the E2E suite runs and needs the table name in the
+# workflow, not in a Lambda's environment. Reading SSM from the workflow would
+# work too and was rejected — it needs an extra IAM grant on the seed role to
+# fetch a value Terraform already knows and every other value in that job
+# already comes from `terraform output`.
+output "firm_table_name" {
+  description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
+  value       = module.firm_store.table_name
+}
+
 output "auth_user_pool_arn" {
   description = "Staging Cognito user pool ARN."
   value       = module.auth.user_pool_arn

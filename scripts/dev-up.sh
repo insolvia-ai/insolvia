@@ -292,6 +292,11 @@ banner() {
   printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
   printf '%s  No account yet? There is no sign-up screen by design:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-create-user.sh%s\n' "$c_dim" "$c_reset"
+  # The second line matters as much as the first and is easier to miss: an
+  # account gets you PAST sign-in, and every route then answers 403 until the
+  # firm exists. That failure looks like a broken build, not a missing step.
+  printf '%s  Signed in but everything 403s? You are in no firm yet:%s\n' "$c_dim" "$c_reset"
+  printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
   printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
 }
 

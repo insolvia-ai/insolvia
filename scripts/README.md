@@ -13,8 +13,9 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
-| `scripts/dev-aws-create-user.sh` | Per-machine AWS layer | Creates a sign-in account in this machine's dev Cognito pool. There is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; `--check` verifies |
-| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** (table delete + recreate, Cognito users) — resources survive; `--dry-run`, `--skip-cognito` |
+| `scripts/dev-aws-create-user.sh` | Per-machine AWS layer | Creates a sign-in account in this machine's dev Cognito pool. There is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; `--check` verifies. Gets you as far as signing in — pair it with the next row |
+| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev tables — today a firm with your dev account as its **admin**. Without it a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `app-staging.yml`, so the two environments differ in fixture and tables, never in the code path that built the rows. `--check` verifies |
+| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — waitlist, case, access-log and firm tables (delete + recreate) plus the pool's users — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-create-user.sh` **and** `dev-aws-seed.sh` again (only the latter with `--skip-cognito`) |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the four scripts above and `dev-up.sh` |
@@ -155,6 +156,14 @@ Two things worth knowing:
   bankruptcy-filing platform is an invitation to junk accounts. Run
   `./scripts/dev-aws-create-user.sh` once; it prompts for a password without
   echoing it and never stores it.
+- **And a firm before that account can do anything.** These are two separate
+  steps because they are two separate systems: the account lives in Cognito,
+  the firm membership lives in DynamoDB, and signing in only proves the first.
+  Skip `./scripts/dev-aws-seed.sh` and the app renders, `/v1/me` reports
+  no firm, and everything else answers 403 — which reads as a broken build
+  rather than a missing step, so it is worth doing both before you conclude
+  anything. `dev-aws-reset.sh` undoes both — it deletes the pool's users and
+  recreates the firm table — so re-run the pair after every reset.
 - **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
   and no fake Cognito: the API talks to this machine's real per-developer
   tables and the app signs in against its real pool. Preflight says so by name

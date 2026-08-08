@@ -971,3 +971,135 @@ resource "aws_iam_role_policy" "github_permissions" {
   policy = data.aws_iam_policy_document.github_permissions.json
 }
 
+# ── The staging seed role ───────────────────────────────────────────
+#
+# A SECOND ROLE, and the separation is the whole point. app-staging.yml loads
+# seeds/staging.json into the staging firm table before the E2E suite runs,
+# because the first firm cannot come from the API (ADR 0009: POST
+# /v1/firm/users is itself behind FIRM_ADMINISTRATION) and an unseeded staging
+# fails intake-persists.spec.ts on a case list that can never populate.
+#
+# WHY NOT WIDEN THE DEPLOY ROLE. Its policy says, deliberately, that it
+# "manages tables, never their contents — control-plane actions only, no
+# PutItem/GetItem/Query/Scan", and it carries DenyCaseDataDecryption to keep it
+# away from the case KMS key. Adding a data-plane grant there would hand every
+# job in every workflow the ability to write tenancy rows — and a firm-user row
+# IS an access grant. A separate role keeps that property intact: the deploy
+# role's deny is untouched, because a deny in one role's policy has nothing to
+# do with another role's.
+#
+# WHY IT NEEDS THE CASE KEY AT ALL. infra/envs/staging/main.tf gives the firm
+# store the case store's key on purpose — "firm membership decides who reads
+# case data, and one deny should cover both" — so writing a firm row requires
+# GenerateDataKey on `alias/insolvia-cases-staging`. That is the uncomfortable
+# part of this design and it is bounded rather than waved away: the grant is
+# staging's key only, usable only through DynamoDB, and this role has no
+# DynamoDB access to the CASE table, so the key buys nothing it can decrypt.
+# Splitting the firm store onto its own key would remove even that and is the
+# better long-term answer; it changes a decision that has an ADR behind it, so
+# it is not smuggled in here.
+data "aws_iam_policy_document" "github_seed_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    # NARROWER THAN THE DEPLOY ROLE'S TRUST, which accepts any `sub` from this
+    # repo. This one accepts only tokens minted for the `insolvia-staging`
+    # ENVIRONMENT, so a job that does not declare `environment:
+    # insolvia-staging` cannot assume it — the same gate that already guards
+    # the E2E credentials. Both subject forms, for the reason github_assume
+    # records: the org enforces immutable subject claims today, and the mutable
+    # form is kept so this survives that being turned off.
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values = [
+        "${var.github_immutable_sub_prefix}:environment:insolvia-staging",
+        "repo:${var.github_repo}:environment:insolvia-staging",
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_seed" {
+  name               = "insolvia-github-actions-seed"
+  assume_role_policy = data.aws_iam_policy_document.github_seed_assume.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "github_seed_permissions" {
+  # The firm table and its by-subject index, in staging, and nothing else. No
+  # Scan: the loader converges by looking up the people the fixture names, so
+  # it never needs to enumerate a firm it was not told about. No DeleteItem:
+  # unseeding is dev's `dev-aws-reset.sh`, which is a different principal.
+  statement {
+    sid = "StagingFirmTableRows"
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+    ]
+    resources = [
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-firms-staging",
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-firms-staging/index/*",
+    ]
+  }
+
+  # The key the firm table is encrypted with, reachable ONLY through DynamoDB.
+  #
+  # Scoped by alias for the same reason DenyCaseDataDecryption is: this root is
+  # applied by a human before staging exists, so it cannot know the key ARN.
+  # The pattern must track infra/modules/case_store's `alias/${local.name}` —
+  # renaming there without renaming here does not fail the apply, it silently
+  # stops this matching and the seed step starts failing with AccessDenied.
+  #
+  # `-staging` exactly, not `-*`: a wildcard would reach the prod case key.
+  statement {
+    sid = "StagingCaseKeyThroughDynamoDbOnly"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "ForAnyValue:StringEquals"
+      variable = "kms:ResourceAliases"
+      values   = ["alias/insolvia-cases-staging"]
+    }
+
+    # Without this the grant would be usable from anywhere — the CLI, a Lambda,
+    # any service. With it, the only way to exercise it is a DynamoDB call, and
+    # the statement above bounds those to one table.
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  # NO cognito-idp GRANT, deliberately. Resolving the test user's `sub` would
+  # need AdminGetUser, and this root cannot scope that to the staging pool —
+  # pool ids are opaque and none of them exist when this is applied, so it
+  # would have to be `userpool/*`, which reaches prod's pool and its customer
+  # addresses. seeds/staging.json supplies the subject instead; it is constant
+  # once the account exists. See that file's header.
+}
+
+resource "aws_iam_role_policy" "github_seed_permissions" {
+  name   = "insolvia-seed-staging"
+  role   = aws_iam_role.github_seed.id
+  policy = data.aws_iam_policy_document.github_seed_permissions.json
+}

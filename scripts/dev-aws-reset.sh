@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 #
 # Reset this machine's AWS-backed Insolvia development data: delete and
-# recreate the waitlist table (cheaper and simpler than item-level scans for
-# throwaway data) and, unless --skip-cognito, delete
+# recreate the waitlist, case, access-log and firm tables (cheaper and simpler
+# than item-level scans for throwaway data) and, unless --skip-cognito, delete
 # every user in this machine's Cognito pool. The resources themselves survive;
 # only data is wiped. Every resource is asserted against this machine's
 # expected names before anything is touched.
+#
+# AFTERWARDS YOU HAVE NEITHER AN ACCOUNT NOR A FIRM. Re-run
+# scripts/dev-aws-create-user.sh and then scripts/dev-aws-seed.sh, in
+# that order — the second reads the subject the first creates.
 #
 set -euo pipefail
 
@@ -46,6 +50,7 @@ output_machine_id="$(jq -r '.machine_id.value' <<<"$outputs")"
 table="$(jq -r '.waitlist_table_name.value' <<<"$outputs")"
 case_table="$(jq -r '.case_table_name.value' <<<"$outputs")"
 access_log_table="$(jq -r '.case_access_log_table_name.value' <<<"$outputs")"
+firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 [[ "$table" == "$WAITLIST_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected DynamoDB table '$table' (expected '$WAITLIST_TABLE_NAME_EXPECTED')."
@@ -53,6 +58,8 @@ pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
   die "Refusing reset: unexpected case table '$case_table' (expected '$CASE_TABLE_NAME_EXPECTED')."
 [[ "$access_log_table" == "$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing reset: unexpected access-log table '$access_log_table' (expected '$CASE_ACCESS_LOG_TABLE_NAME_EXPECTED')."
+[[ "$firm_table" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
+  die "Refusing reset: unexpected firm table '$firm_table' (expected '$FIRM_TABLE_NAME_EXPECTED')."
 pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" --query 'UserPool.Name' --output text)"
 [[ "$pool_name" == "$USER_POOL_NAME_EXPECTED" ]] ||
   die "Refusing reset: Cognito pool is named '$pool_name', not '$USER_POOL_NAME_EXPECTED'."
@@ -63,6 +70,7 @@ printf '  Machine ID:  %s\n' "$MACHINE_ID"
 printf '  Table:       %s (delete + recreate)\n' "$table"
 printf '  Case table:  %s (delete + recreate)\n' "$case_table"
 printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
+printf '  Firm table:  %s (delete + recreate)\n' "$firm_table"
 if [[ "$SKIP_COGNITO" -eq 1 ]]; then
   printf '  Cognito:     skipped\n\n'
 else
@@ -109,6 +117,22 @@ aws_dev dynamodb wait table-not-exists --table-name "$case_table"
 log "Deleting $access_log_table..."
 aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
+
+# The firms go too, and this table is the one with a foot in both halves of the
+# reset: its user rows are keyed by a Cognito subject, and its firm rows own the
+# cases deleted just above. Keeping it while deleting the pool's users would
+# leave a firm whose every member is an id that no longer resolves — nobody can
+# sign in to administer it, and the next `dev-aws-seed.sh` meets a
+# subject it has never seen and creates a SECOND firm beside the derelict one.
+#
+# UNCONDITIONAL, including under --skip-cognito. That flag preserves accounts,
+# not their tenancy: the cases above are gone either way, so a surviving firm
+# would be an empty shell, and re-running `dev-aws-seed.sh` for the
+# accounts that still exist is one command. The reverse default — firms
+# outliving the cases they own — is the state with no obvious fix.
+log "Deleting $firm_table..."
+aws_dev dynamodb delete-table --table-name "$firm_table" >/dev/null
+aws_dev dynamodb wait table-not-exists --table-name "$firm_table"
 
 if [[ "$SKIP_COGNITO" -eq 0 ]]; then
   users_json="$(aws_dev cognito-idp list-users --user-pool-id "$pool_id" --output json)"
