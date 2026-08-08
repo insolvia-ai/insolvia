@@ -63,6 +63,7 @@ jobs:
       url: ${{ steps.tf.outputs.url }}
       auth_domain: ${{ steps.tf.outputs.auth_domain }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
+      firm_table: ${{ steps.tf.outputs.firm_table }}
     steps:
       - uses: actions/checkout@v5
 
@@ -98,6 +99,7 @@ jobs:
             echo "url=$(tf url)"
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
+            echo "firm_table=$(tf firm_table_name)"
           } >> "$GITHUB_OUTPUT"
 
   # ── 2. Build + publish the artifact (no AWS credentials needed) ────
@@ -309,6 +311,53 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
         working-directory: e2e
+
+      # ── Seed, before the suite that depends on it ──────────────────────
+      #
+      # WITHOUT THIS THE SUITE CANNOT PASS. A case belongs to a firm (ADR 0009)
+      # and the E2E user resolves to none, so `/v1/cases` answers 403,
+      # `intake-persists.spec.ts` finds no case to open, and it fails claiming
+      # "the list did not load or the link lost its accessible name" — neither
+      # of which is true. The first firm cannot come from the API either:
+      # POST /v1/firm/users is itself behind FIRM_ADMINISTRATION.
+      #
+      # It runs on EVERY deploy rather than once by hand, and that is the point
+      # — it is idempotent (it converges on the people seeds/staging.json
+      # names), so if staging's tables are ever recreated the next run restores
+      # this instead of failing a week later as a mystery app regression.
+      #
+      # A SECOND, NARROWER ROLE than the deploy one. The deploy role is
+      # deliberately control-plane only — "manages tables, never their
+      # contents" — and a firm-user row IS an access grant. See the seed role's
+      # header in infra/envs/ci-trust/main.tf for what it can and cannot reach.
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_SEED_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # From requirements.txt rather than a bare `pip install boto3`, so the
+      # seeder resolves the same pinned boto3 the service does — the version is
+      # pinned there precisely so local, CI and Lambda agree, and a second
+      # unpinned install here would be a second answer.
+      - name: Install the API's runtime dependencies
+        run: pip install -r services/api/requirements.txt
+
+      # E2E_TEST_USER_SUBJECT, not a Cognito lookup: this job holds no
+      # cognito-idp grant, because ci-trust cannot scope AdminGetUser to one
+      # pool and the wildcard would reach prod's. seeds/staging.json says more.
+      - name: Seed the staging firm
+        env:
+          PYTHONPATH: services/api/src
+          E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
+          E2E_TEST_USER_SUBJECT: ${{ secrets.E2E_TEST_USER_SUBJECT }}
+        run: |
+          python -m insolvia_api.entrypoints.seed \
+            --fixture seeds/staging.json \
+            --firm-table "${{ needs.terraform.outputs.firm_table }}"
 
       # No artifact upload, deliberately, and no trace: a Playwright trace
       # records `fill()` arguments verbatim — including the password typed into

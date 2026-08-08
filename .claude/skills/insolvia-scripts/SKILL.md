@@ -69,7 +69,7 @@ already working.
 |---|---|
 | Provision this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito) and wire `services/api/.env` | `scripts/dev-aws-setup.sh` (`--check` verifies) |
 | Create a sign-in account in this machine's dev Cognito pool — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one | `scripts/dev-aws-create-user.sh` (`--check`) |
-| Fix **"signed in, but every route 403s"** (`accessor unresolved / no_active_firm_user` in the API log) — the account exists in Cognito but belongs to no firm, and the first firm cannot come from the API because `POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`. Always the second half of the step above | `scripts/dev-aws-seed.sh firm` (`--check`) |
+| Fix **"signed in, but every route 403s"** (`accessor unresolved / no_active_firm_user` in the API log) — the account exists in Cognito but belongs to no firm, and the first firm cannot come from the API because `POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`. Always the second half of the step above | `scripts/dev-aws-seed.sh` (`--check`) |
 | Wipe this machine's dev **data** (table delete+recreate incl. firms, Cognito users); resources survive. Leaves you with **neither an account nor a firm** — re-run the two rows above, in order | `scripts/dev-aws-reset.sh` (`--dry-run`, `--skip-cognito`) |
 | `terraform destroy` this machine's dev resources + unwind `.env` | `scripts/dev-aws-destroy.sh` |
 | Destroy a **previous** machine-id's orphaned dev resources (leftovers a lost/regenerated `~/.config/insolvia/machine-id` strands, which destroy can't reach) | `scripts/dev-aws-destroy-orphan.sh <short-id>` |

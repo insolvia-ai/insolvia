@@ -204,6 +204,49 @@ def test_two_people_in_one_fixture_firm_share_it(tmp_path: Path) -> None:
     assert alice.firm_id == bob.firm_id
 
 
+# ── a fixture that supplies its own subjects ────────────────────────
+
+
+def test_a_supplied_subject_is_used_without_consulting_the_pool(
+    tmp_path: Path,
+) -> None:
+    """What keeps AdminGetUser out of the CI pipeline entirely.
+
+    ci-trust is applied before any pool exists, so it cannot scope a Cognito
+    grant to one pool — it would have to be `userpool/*`, which reaches prod's
+    pool and its customer addresses. A fixture that carries the sub needs no
+    such grant, and the sub is constant once the account exists.
+    """
+    store = MemoryFirmStore()
+    path = one_firm(tmp_path, user("someone@insolvia.test", subject=ALICE))
+
+    def explode(email: str) -> str:
+        raise AssertionError(f"the pool was consulted for {email}")
+
+    status = main(
+        ["--fixture", str(path), "--firm-table", STAGING_TABLE],
+        deps=Dependencies(firm_store=lambda _: store, subjects=lambda _: explode),
+    )
+
+    assert status == 0
+    assert store.find_user(ALICE) is not None
+
+
+def test_a_missing_subject_with_no_pool_to_resolve_it_is_refused(
+    tmp_path: Path,
+) -> None:
+    store = MemoryFirmStore()
+    path = one_firm(tmp_path, user())
+
+    status = main(
+        ["--fixture", str(path), "--firm-table", STAGING_TABLE],
+        deps=Dependencies(firm_store=lambda _: store),
+    )
+
+    assert status == 2
+    assert store.get_firm("any") is None
+
+
 # ── convergence ─────────────────────────────────────────────────────
 
 

@@ -171,5 +171,5 @@ ok "Sign-in ready: $USERNAME in $pool_name"
 # Sign-in is half of it. Without a firm this account resolves to no accessor
 # and every route behind current_accessor() answers 403 — see ADR 0009, and
 # dev-aws-seed.sh's header for why the API cannot make the first one.
-log "Next: ./scripts/dev-aws-seed.sh firm — without a firm every API route answers 403."
+log "Next: ./scripts/dev-aws-seed.sh — without a firm every API route answers 403."
 log "Then start the system with ./scripts/dev-up.sh, open http://localhost:3000, and sign in with that address."

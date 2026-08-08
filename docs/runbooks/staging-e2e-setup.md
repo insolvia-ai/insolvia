@@ -51,6 +51,51 @@ export E2E_TEST_USER_EMAIL='…'          # the synthetic address
 **Step 1 must come first.** Step 2 only stores strings; it cannot tell you
 whether they name a user that exists.
 
+### 3. Two more secrets, and why they are not optional
+
+Signing in is only half of it. A case belongs to a **firm** (ADR 0009), so a
+user in none resolves to no accessor and every route behind
+`current_accessor()` answers 403 — which shows up as `intake-persists.spec.ts`
+failing on a case list that can never populate, blaming the accessible name of
+a link that was never rendered.
+
+`app-staging.yml` seeds that firm from
+[`../../seeds/staging.json`](../../seeds/staging.json) before the suite runs,
+idempotently, on every deploy. It needs two things this runbook has to put in
+place once.
+
+**The seed role's ARN.** `infra/envs/ci-trust` grows a second, narrower role
+(`insolvia-github-actions-seed`) that may write the staging firm table and
+nothing else. **CI cannot apply that root** — see the
+`insolvia-deploy-role-permissions` skill — so a human runs:
+
+```bash
+./scripts/apply-ci-trust.sh
+terraform -chdir=infra/envs/ci-trust output -raw github_seed_role_arn
+```
+
+Store the result as `AWS_SEED_ROLE_ARN` on the **`insolvia-staging`
+environment**. Not the repository: the role's trust policy only accepts tokens
+minted for that environment, so a repo-level secret would be a value no job
+could use.
+
+**The test user's Cognito `sub`.** The fixture names the person by subject
+rather than looking them up, because the pipeline holds no `cognito-idp` grant
+— `ci-trust` is applied before any pool exists, so it cannot scope
+`AdminGetUser` to staging, and the wildcard would reach prod's pool and its
+customer addresses. Read it once:
+
+```bash
+aws cognito-idp admin-get-user \
+  --user-pool-id "$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)" \
+  --username "$E2E_TEST_USER_EMAIL" \
+  --query 'UserAttributes[?Name==`sub`].Value' --output text
+```
+
+Store it as `E2E_TEST_USER_SUBJECT`, same environment scope. It is not a
+credential, but it identifies a person, so it does not belong in a committed
+file either.
+
 ### What step 1 should print
 
 The pool id it read from Terraform, then `Created.`, then a permanent-password

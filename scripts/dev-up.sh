@@ -296,7 +296,7 @@ banner() {
   # account gets you PAST sign-in, and every route then answers 403 until the
   # firm exists. That failure looks like a broken build, not a missing step.
   printf '%s  Signed in but everything 403s? You are in no firm yet:%s\n' "$c_dim" "$c_reset"
-  printf '%s      ./scripts/dev-aws-seed.sh firm%s\n' "$c_dim" "$c_reset"
+  printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
   printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
 }
 

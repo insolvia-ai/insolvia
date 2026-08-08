@@ -222,8 +222,21 @@ def _seed_firms(
 
         # Resolve first: a fixture naming an account that does not exist should
         # fail before any row is written, not halfway through the firm.
+        #
+        # A fixture MAY carry the subject itself, and staging does. The sub is
+        # server-minted but constant once the account exists, so looking it up
+        # buys nothing — and it costs a Cognito grant that cannot be scoped to
+        # one pool, because ci-trust is applied before the pools exist and
+        # cannot know their opaque ids. `AdminGetUser` on `userpool/*` would
+        # include PROD's pool, which is customer email addresses. Supplying the
+        # value removes that grant from the pipeline entirely.
         drafts = [
-            (parse_firm_user_creation(user), resolve(str(user["email"])))
+            (
+                parse_firm_user_creation(user),
+                str(user["subject"])
+                if user.get("subject")
+                else resolve(str(user["email"])),
+            )
             for user in users
         ]
 
@@ -277,8 +290,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--firm-table", required=True)
     parser.add_argument(
         "--user-pool-id",
-        required=True,
-        help="the pool the fixture's people already exist in",
+        help="the pool to resolve subjects in; unnecessary if the fixture "
+        "supplies a subject for every person",
     )
     parser.add_argument(
         "--check",
@@ -294,10 +307,19 @@ def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> 
     try:
         _require_seedable_table(args.firm_table, kind="firms")
         fixture = load_fixture(args.fixture, os.environ)
+
+        def unavailable(email: str) -> str:
+            raise RefusedError(
+                f"{email} has no subject in the fixture and there is no "
+                "--user-pool-id to resolve it in"
+            )
+
         missing = _seed_firms(
             fixture.get("firms") or [],
             dependencies.firm_store(args.firm_table),
-            dependencies.subjects(args.user_pool_id),
+            dependencies.subjects(args.user_pool_id)
+            if args.user_pool_id
+            else unavailable,
             check=args.check,
         )
     except RefusedError as refusal:

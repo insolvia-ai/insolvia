@@ -27,7 +27,7 @@
 # same rule support/env.ts enforces. Create the account with
 # scripts/dev-aws-create-user.sh — there is no sign-up screen on any pool.
 #
-# THE ACCOUNT ALSO NEEDS A FIRM — scripts/dev-aws-seed.sh firm. Signing in is
+# THE ACCOUNT ALSO NEEDS A FIRM — scripts/dev-aws-seed.sh. Signing in is
 # not enough for intake-persists.spec.ts, which drives /cases: without a firm
 # the account resolves to no accessor and that route answers 403, so the spec
 # fails on a missing case link and reads as an app regression rather than an
@@ -66,7 +66,7 @@ if [[ "${#missing[@]}" -ne 0 ]]; then
   die "Not set: ${missing[*]}
        These have no defaults on purpose — this repo is public.
        Create a dev account with ./scripts/dev-aws-create-user.sh, put it in a
-       firm with ./scripts/dev-aws-seed.sh firm, then export both variables
+       firm with ./scripts/dev-aws-seed.sh, then export both variables
        in your shell before running this."
 fi
 

@@ -12,7 +12,22 @@
     "The account itself is created once by scripts/e2e-create-test-user.sh;",
     "this only puts it in a firm. Seeding is idempotent and runs on every",
     "staging deploy, so if staging's tables are ever recreated the next run",
-    "restores this instead of failing a week later as a mystery app regression."
+    "restores this instead of failing a week later as a mystery app regression.",
+    "",
+    "THE SUBJECT IS SUPPLIED, NOT LOOKED UP, and that is a security decision",
+    "rather than an optimisation. A Cognito sub is server-minted but constant",
+    "once the account exists, so resolving it at seed time buys nothing — and",
+    "it would cost the pipeline an AdminGetUser grant that cannot be scoped to",
+    "one pool: ci-trust is applied before any pool exists and cannot know their",
+    "opaque ids, so the grant would have to be userpool/*, which includes",
+    "PROD's pool and therefore customer email addresses. Supplying the value",
+    "keeps that grant out of CI entirely. Read it once with",
+    "  aws cognito-idp admin-get-user --user-pool-id <staging pool> \\",
+    "    --username \"$E2E_TEST_USER_EMAIL\" \\",
+    "    --query 'UserAttributes[?Name==`sub`].Value' --output text",
+    "and store it as the E2E_TEST_USER_SUBJECT environment secret. It is not a",
+    "credential, but it identifies a person, so it does not belong in this file",
+    "either."
   ],
   "firms": [
     {
@@ -20,6 +35,7 @@
       "users": [
         {
           "email": "${E2E_TEST_USER_EMAIL}",
+          "subject": "${E2E_TEST_USER_SUBJECT}",
           "displayName": "E2E Test User",
           "role": "attorney",
           "isAdmin": true,
