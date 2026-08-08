@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
 #
-# Put the staging E2E test user's credentials into GitHub Actions as
-# ENVIRONMENT secrets on `insolvia-staging`, where the E2E job in
-# .github/workflows/app-staging.yml can see them. One-time setup; run it after
-# ./scripts/staging-aws-create-test-user.sh has created the user those values name.
+# Put the staging E2E password into GitHub Actions as an ENVIRONMENT secret on
+# `insolvia-staging`, where the E2E job in .github/workflows/app-staging.yml can
+# see it. One-time setup, and re-run to rotate.
 #
-#   E2E_TEST_USER_EMAIL='e2e@…' ./scripts/staging-github-set-secrets.sh
+#   ./scripts/staging-github-set-secrets.sh              # prompts, without echo
 #   ./scripts/staging-github-set-secrets.sh --check      # list what is set, change nothing
+#
+# ## ONE secret, where there used to be three
+#
+# The addresses live in seeds/staging.json — they end in `.test`, a reserved TLD
+# that can never be a real mailbox, so they are safe to commit and belong next
+# to the firms they are seeded into. The subjects are resolved from the pool at
+# seed time rather than pinned, because a pinned sub rots the moment the pool is
+# replaced. What is left is a password, shared by every seeded account: they are
+# throwaway identities in an environment with no customer data, and one value
+# that rotates cleanly beats one per person that rotates by hand.
+#
+# ADDING A TEST USER DOES NOT COME BACK HERE. It is an edit to
+# seeds/staging.json; the next staging deploy creates the account with this same
+# password. That is the whole reason the other two secrets went away.
 #
 # ## Why the ENVIRONMENT and not the repository
 #
@@ -37,22 +50,13 @@
 set -euo pipefail
 
 REPO="${INSOLVIA_REPO:-insolvia-ai/insolvia}"
-# Only used to reach infra/envs/staging for the sub lookup below. Same
-# derivation e2e-create-test-user.sh uses, so both work from any directory.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Must match `environment:` on the e2e job in app-staging.yml, and the names the
-# suite reads in e2e/support/env.ts. All of it is one contract; renaming any of
-# them without the others makes the job see empty strings.
-#
-# E2E_TEST_USER_SUBJECT is read by the SEED step rather than by the suite —
-# seeds/staging.json names its person by Cognito sub, because ci-trust cannot
-# scope an AdminGetUser grant to the staging pool (it is applied before any pool
-# exists) and the wildcard would reach prod's. It lives here because it is the
-# same person as the two above, and three secrets set by one script cannot
-# drift onto two different identities.
+# Must match `environment:` on the e2e job in app-staging.yml, the name the
+# suite reads in e2e/support/env.ts, and the one the seed step passes through to
+# expand ${E2E_TEST_USER_PASSWORD} in seeds/staging.json. All four are one
+# contract; renaming any without the others makes the job see an empty string.
 readonly ENVIRONMENT="insolvia-staging"
-readonly SECRETS=(E2E_TEST_USER_EMAIL E2E_TEST_USER_PASSWORD E2E_TEST_USER_SUBJECT)
+readonly SECRETS=(E2E_TEST_USER_PASSWORD)
 
 log()  { printf '\033[1;34m[e2e-secrets]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[ ok ]\033[0m %s\n' "$*"; }
@@ -67,9 +71,7 @@ while [[ $# -gt 0 ]]; do
     --yes|-y) ASSUME_YES=1 ;;
     --help|-h)
       printf 'Usage: %s [--check] [--yes]\n\n' "$0"
-      printf '  E2E_TEST_USER_EMAIL     required — the staging E2E user'"'"'s address\n'
       printf '  E2E_TEST_USER_PASSWORD  optional — prompted for, without echo, when unset\n'
-      printf '  E2E_TEST_USER_SUBJECT   optional — read from the pool when unset\n'
       printf '  INSOLVIA_REPO           optional — defaults to %s\n' "$REPO"
       exit 0 ;;
     *) die "Unknown option: $1" ;;
@@ -104,7 +106,7 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   for name in "${SECRETS[@]}"; do
     grep -qx "$name" <<<"$existing" || exit 1
   done
-  ok "Both E2E secrets are set on $ENVIRONMENT."
+  ok "The E2E password is set on $ENVIRONMENT."
   exit 0
 fi
 
@@ -119,46 +121,29 @@ for name in "${SECRETS[@]}"; do
 done
 if [[ ${#already[@]} -ne 0 && "$ASSUME_YES" -ne 1 ]]; then
   warn "About to OVERWRITE: ${already[*]}"
-  warn "The values must match a user that exists in the staging pool (./scripts/staging-aws-create-test-user.sh)."
+  warn "The next staging deploy resets every seeded account to the new value, so"
+  warn "a rotation here converges rather than locking the suite out."
   read -rp "Continue? [y/N] " reply
   [[ "$reply" == [yY]* ]] || die "Aborted; nothing was changed."
 fi
 
-EMAIL="${E2E_TEST_USER_EMAIL:-}"
-[[ -n "$EMAIL" ]] || die "E2E_TEST_USER_EMAIL is not set. Export the staging E2E user's address."
-[[ "$EMAIL" == *@*.* ]] || die "E2E_TEST_USER_EMAIL ('$EMAIL') is not an email address."
-
 PASSWORD="${E2E_TEST_USER_PASSWORD:-}"
 if [[ -z "$PASSWORD" ]]; then
-  read -rsp "Password for $EMAIL (not echoed, not stored): " PASSWORD
+  read -rsp "Password for the seeded staging accounts (not echoed, not stored): " PASSWORD
   printf '\n'
 fi
 [[ -n "$PASSWORD" ]] || die "No password given."
 
-# The sub is derivable rather than chosen, so this reads it instead of asking —
-# a value a human retypes is a value that eventually gets retyped wrong, and a
-# wrong sub seeds a firm for nobody while looking like it worked. Needs a
-# staging AWS session; export E2E_TEST_USER_SUBJECT to skip the lookup (that is
-# what CI-less environments and the --check path do).
-SUBJECT="${E2E_TEST_USER_SUBJECT:-}"
-if [[ -z "$SUBJECT" ]]; then
-  command -v aws >/dev/null ||
-    die "aws CLI not installed, and E2E_TEST_USER_SUBJECT is not set to skip the lookup."
-  command -v terraform >/dev/null ||
-    die "terraform not installed, and E2E_TEST_USER_SUBJECT is not set to skip the lookup."
-  log "Reading $EMAIL's Cognito sub from the staging pool"
-  pool_id="$(terraform -chdir="$REPO_ROOT/infra/envs/staging" output -raw auth_user_pool_id 2>/dev/null)" ||
-    die "Could not read the staging pool id. Run scripts/e2e-create-test-user.sh first — it
-       inits that root — or export E2E_TEST_USER_SUBJECT yourself."
-  # shellcheck disable=SC2016  # the backticks are JMESPath, not a subshell
-  SUBJECT="$(aws --no-cli-pager cognito-idp admin-get-user \
-    --user-pool-id "$pool_id" --username "$EMAIL" \
-    --query 'UserAttributes[?Name==`sub`].Value' --output text 2>/dev/null)" ||
-    die "admin-get-user failed for '$EMAIL'. Does the account exist? See
-       scripts/e2e-create-test-user.sh --check."
-fi
-[[ "$SUBJECT" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] ||
-  die "'$SUBJECT' is not a Cognito sub (expected a uuid)."
+# Checked against the pool's own policy here (12+, upper, lower, digit —
+# infra/modules/auth/main.tf) so a weak one fails in one line, rather than as an
+# InvalidPasswordException inside a seed step on the next deploy.
+{
+  [[ ${#PASSWORD} -ge 12 ]] &&
+    [[ "$PASSWORD" == *[[:lower:]]* ]] &&
+    [[ "$PASSWORD" == *[[:upper:]]* ]] &&
+    [[ "$PASSWORD" == *[[:digit:]]* ]]
+} || die "Password does not meet the pool policy: 12+ characters with at least one
+       lower-case letter, one upper-case letter and one digit."
 
 # `printf` (a shell builtin) into gh's stdin: the value never becomes an argv
 # entry, so it cannot be read out of `ps` by another user on this machine.
@@ -169,9 +154,7 @@ set_secret() {
   log "Set $name"
 }
 
-set_secret E2E_TEST_USER_EMAIL "$EMAIL"
 set_secret E2E_TEST_USER_PASSWORD "$PASSWORD"
-set_secret E2E_TEST_USER_SUBJECT "$SUBJECT"
 
 existing="$(gh secret list --env "$ENVIRONMENT" --repo "$REPO" --json name --jq '.[].name')"
 report
@@ -179,5 +162,5 @@ for name in "${SECRETS[@]}"; do
   grep -qx "$name" <<<"$existing" || die "$name is still missing after being set — check $REPO's settings."
 done
 
-ok "All three E2E secrets are set on the $ENVIRONMENT environment."
+ok "The E2E password is set on the $ENVIRONMENT environment."
 log "Next: merge to main (or dispatch App · Deploy · Staging) and watch the 'e2e' job."

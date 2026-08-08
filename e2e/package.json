@@ -20,7 +20,7 @@
     "NOT A REQUIRED PR CHECK, deliberately — see CLAUDE.md in this directory.",
     "",
     "NO CREDENTIALS LIVE HERE. The repo is public. The test user's email and",
-    "password come from E2E_TEST_USER_EMAIL / E2E_TEST_USER_PASSWORD in the",
+    "password comes from E2E_TEST_USER_PASSWORD in the",
     "environment, with no defaults and no fixture file."
   ],
   "engines": {

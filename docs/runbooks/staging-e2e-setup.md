@@ -1,132 +1,124 @@
 # Staging E2E — one-time setup
 
-**State:** open — actionable now. Run once; after that the E2E job runs itself
-on every staging deploy.
+**State:** open — actionable now. Two steps by hand, once; after that the
+pipeline provisions its own test data on every staging deploy.
 
 The post-deploy suite in [`e2e/`](../../e2e/README.md) signs in against real
-staging through the Cognito hosted UI. It needs two things that cannot be
-created by merging code: a **user in the staging pool**, and **that user's
-credentials in GitHub Actions**. This runbook is the order to create them in and
-how to tell it worked.
+staging through the Cognito hosted UI, and a signed-in user is useless to it
+without a **firm** — a case belongs to one (ADR 0009), so a user in none
+resolves to no accessor and every route behind `current_accessor()` answers
+403.
+
+**Both of those are now the pipeline's job.** `app-staging.yml` loads
+[`../../seeds/staging.json`](../../seeds/staging.json) before the suite runs:
+it creates each account in the pool, sets its password, and puts it in the firm
+the fixture names — idempotently, every deploy. A pool or a table recreated
+tomorrow is restored by the next run rather than found a week later as a
+mystery app regression.
+
+What is left for a human is what CI cannot grant itself: **one IAM apply and
+one secret.**
 
 Why it is worth doing: production only ships behind a green staging stage of
 `release.yml` (in-run via `needs`, or via the `insolvia/staging-release`
-commit status for a hand-dispatched deploy) — so the strength of the
-production gate is exactly the strength of what the staging run asserts. Until this suite existed, the App staging run asserted nothing at
-all. See issue #40 for the shape of the suite and #80 for this first test.
+commit status for a hand-dispatched deploy) — so the strength of the production
+gate is exactly the strength of what the staging run asserts. See issue #40 for
+the shape of the suite and #80 for the first test.
+
+## Adding a test user is not in this runbook
+
+It is an edit to [`../../seeds/staging.json`](../../seeds/staging.json), and
+nothing else — no script, no secret, no change to `e2e/support/env.ts`. The
+next deploy creates the account and seeds the membership.
+
+That matters because the tenancy model is *about* several people with different
+reach. `may_see_case`, `access_all_cases`, another firm's case answering 404
+rather than 403, and the 409 that stops a firm removing its last administrator
+are all untestable with a single account. The fixture ships with three people
+across two firms for exactly that reason.
+
+The addresses are committed on purpose: every one ends in `.test`, a reserved
+TLD (RFC 2606) that can never be a real mailbox — which is what
+`e2e/CLAUDE.md`'s no-addresses rule protects against — and nothing is mailed to
+them anyway. **A real mailbox must never appear there.**
 
 ## Before you start
 
 - A **staging-capable AWS session**. If it is not working, read the
   `insolvia-aws-auth` skill; the credential mechanics live there.
 - A `gh` login with write access to the repository's Actions secrets.
-- A **dedicated synthetic email address** for the test user — never a real
-  person's mailbox, and never an address you would mind seeing in a Cognito
-  console. Nothing sends mail to it (the create script suppresses Cognito's
-  invitation email), so it does not have to receive anything.
 - A password you generate yourself, meeting the pool policy: **12+ characters
   with a lower-case letter, an upper-case letter and a digit** (symbols allowed,
-  not required — `infra/modules/auth/main.tf`).
+  not required — `infra/modules/auth/main.tf`). One value, shared by every
+  seeded account: they are throwaway identities in an environment with no
+  customer data, and one password that rotates cleanly beats one per person
+  that rotates by hand.
 
-**The repo is public.** Neither value goes into a file here, a commit message,
-or a PR description. Both scripts read them from your environment or prompt for
-them without echo.
+**The repo is public.** The password goes into no file here, no commit message,
+no PR description. The script reads it from your environment or prompts without
+echo.
 
 ## The order
 
-Two scripts, catalogued in [`../../scripts/README.md`](../../scripts/README.md)
-— run them from the repo root. Their `--help` and their header comments own the
-detail; this is only the order and the checkpoints.
+### 1. Let the pipeline into the staging pool
+
+The seed role (`insolvia-github-actions-seed`) needs to create accounts in the
+staging pool. That pool's ARN is not knowable when `ci-trust` is first applied —
+a pool ARN contains a generated id — so it is passed in as a variable once
+staging exists.
+
+**CI cannot apply this root.** `DenySelfPrivilegeEscalation` means an apply run
+as the deploy role fails by design; see the `insolvia-deploy-role-permissions`
+skill. A human runs:
 
 ```bash
-export E2E_TEST_USER_EMAIL='…'          # the synthetic address
-
-# 1. Create the user in the STAGING Cognito pool.
-./scripts/staging-aws-create-test-user.sh       # prompts for the password, without echo
-
-# 2. Put the same two values in the insolvia-staging ENVIRONMENT secrets.
-./scripts/staging-github-set-secrets.sh            # prompts again; or export E2E_TEST_USER_PASSWORD
+terraform -chdir=infra/envs/staging output -raw auth_user_pool_arn
 ```
 
-**Step 1 must come first.** Step 2 only stores strings; it cannot tell you
-whether they name a user that exists.
-
-### 3. Two more secrets, and why they are not optional
-
-Signing in is only half of it. A case belongs to a **firm** (ADR 0009), so a
-user in none resolves to no accessor and every route behind
-`current_accessor()` answers 403 — which shows up as `intake-persists.spec.ts`
-failing on a case list that can never populate, blaming the accessible name of
-a link that was never rendered.
-
-`app-staging.yml` seeds that firm from
-[`../../seeds/staging.json`](../../seeds/staging.json) before the suite runs,
-idempotently, on every deploy. It needs two things this runbook has to put in
-place once.
-
-**The seed role's ARN.** `infra/envs/ci-trust` grows a second, narrower role
-(`insolvia-github-actions-seed`) that may write the staging firm table and
-nothing else. **CI cannot apply that root** — see the
-`insolvia-deploy-role-permissions` skill — so a human runs:
+Put that value in `infra/envs/ci-trust/terraform.tfvars` as
+`staging_user_pool_arn`, then:
 
 ```bash
 ./scripts/apply-ci-trust.sh
-terraform -chdir=infra/envs/ci-trust output -raw github_seed_role_arn
 ```
 
-Store the result as `AWS_SEED_ROLE_ARN` on the **`insolvia-staging`
-environment**. Not the repository: the role's trust policy only accepts tokens
-minted for that environment, so a repo-level secret would be a value no job
-could use.
+Expect **one** added statement on the seed role's policy, and nothing destroyed
+or replaced.
 
-**The test user's Cognito `sub`.** Step 2 sets this as `E2E_TEST_USER_SUBJECT`
-alongside the other two — it reads the value from the pool rather than asking,
-so there is nothing extra to run and nothing to retype. It is not a credential,
-but it identifies a person, so it stays out of committed files.
+Also set `AWS_SEED_ROLE_ARN` on the **`insolvia-staging` environment** if it is
+not already there — `terraform -chdir=infra/envs/ci-trust output -raw
+github_seed_role_arn`. Environment-scoped, not repository: the role's trust
+policy only accepts tokens minted for that environment, so a repo-level secret
+would be a value no job could use.
 
-The fixture names its person by subject rather than resolving one at seed time
-because the pipeline holds **no `cognito-idp` grant at all**: `ci-trust` is
-applied before any pool exists, so it cannot scope `AdminGetUser` to staging,
-and the wildcard would reach prod's pool and its customer addresses.
+### 2. The password
 
-If you set up staging before this existed, re-run step 2 — it is an upsert, and
-`--check` tells you which of the three are missing.
-
-### What step 1 should print
-
-The pool id it read from Terraform, then `Created.`, then a permanent-password
-line, then:
-
-```
-[ ok ] E2E user is ready in us-east-1_XXXXXXXXX (CONFIRMED, no MFA).
+```bash
+./scripts/staging-github-set-secrets.sh          # prompts, without echo
 ```
 
-`CONFIRMED` is the checkpoint. A user left in `FORCE_CHANGE_PASSWORD` makes the
-hosted UI serve a "set a new password" screen that the browser test cannot
-answer, so the E2E job would hang until its timeout.
+One secret, `E2E_TEST_USER_PASSWORD`, on the `insolvia-staging` environment.
+Re-running rotates it, and the next deploy resets every seeded account to the
+new value — so a rotation converges rather than locking the suite out.
 
-### What step 2 should print
-
-A ✓ against both `E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD`, scoped to
-the **`insolvia-staging` environment** — not the repository. Repo-level secrets
-would be visible to every workflow; environment secrets are visible only to a
-job that declares `environment: insolvia-staging`, which is what the `e2e` job
-in `app-staging.yml` does (which release.yml calls as its last staging leg).
+**Why the environment and not the repository:** a repository secret is visible
+to every workflow; an environment secret only to a job that declares
+`environment: insolvia-staging`. The flip side is the trap `infra/CLAUDE.md`
+warns about — a job that forgets the `environment:` key sees an empty string in
+silence.
 
 ### Verify without changing anything
 
-Both scripts take `--check` and exit non-zero if their half is not in place:
-
 ```bash
-./scripts/staging-aws-create-test-user.sh --check
 ./scripts/staging-github-set-secrets.sh --check
 ```
 
 ## Then: prove it end to end
 
 Trigger a staging deploy — merge to `main`, or dispatch **App · Deploy ·
-Staging** — and watch the `e2e` job, which runs last, after the S3 sync and the
-CloudFront invalidation.
+Staging** — and watch the `e2e` job. The seed step runs before Playwright, so a
+provisioning problem fails there with a named error rather than as a mystery
+assertion afterwards.
 
 Green means a real Chromium signed in against real staging, came back through
 `/auth/callback`, and saw the test user's own email address rendered by the app.
@@ -135,28 +127,25 @@ if the token exchange and the `/v1/me` call both worked.
 
 ## Done when
 
-- Both `--check` commands pass.
+- `./scripts/staging-github-set-secrets.sh --check` passes.
 - One `App · Deploy · Staging` run has a green `e2e` job.
 - A production promotion of that commit is no longer blessed by a deploy that
   asserted nothing.
 
 ## When it goes wrong
 
-The E2E job's failure output names what it expected. The three failures worth
+The seed step and the E2E job both name what they expected. The failures worth
 recognising on sight:
 
 | Symptom | Cause |
 |---|---|
-| Config load fails naming `E2E_TEST_USER_EMAIL` or `E2E_TEST_USER_PASSWORD` | The secret is unset, **or** the job lost its `environment: insolvia-staging` key — an environment-scoped secret resolves to an empty string in silence when the environment is missing or borrowed (`infra/CLAUDE.md`). |
+| Seed step: `AccessDenied` on `cognito-idp:AdminCreateUser` | Step 1 has not been done, or `staging_user_pool_arn` is empty in `ci-trust` — the grant is conditional on it, so the statement is simply absent. |
+| Seed step: `refusing: fixture references ${E2E_TEST_USER_PASSWORD}` | The secret is unset, **or** the job lost its `environment: insolvia-staging` key — an environment-scoped secret resolves to an empty string in silence when the environment is missing or borrowed (`infra/CLAUDE.md`). |
+| Seed step: `InvalidPasswordException` | The stored password no longer meets the pool policy. Re-run step 2. |
+| Suite: `No user with handle 'x' in …/seeds/staging.json` | A spec names a handle the fixture does not define. Add the person to the fixture, or fix the handle. |
 | `"Sign in" should redirect to the Cognito hosted UI` | The build shipped without a usable `EXPO_PUBLIC_COGNITO_DOMAIN` / `EXPO_PUBLIC_COGNITO_CLIENT_ID` pair. The build step guards against them being *empty*, so look for a wrong value: a pool recreated since the last apply. |
 | `the hosted UI should redirect back to /auth/callback` | Cognito matches callback URLs **exactly**. The app client no longer lists this origin's `/auth/callback` — check `web_origins` in `infra/envs/staging/main.tf` and the route's location in the app. |
-| The job hangs, then times out at the sign-in form | The test user is in `FORCE_CHANGE_PASSWORD`, or has enrolled a TOTP factor. MFA is `OPTIONAL` on the pool, so enrolment is possible and it is fatal to this flow. Re-run step 1; never enrol MFA on this account. |
+| The job hangs, then times out at the sign-in form | The account has enrolled a TOTP factor. MFA is `OPTIONAL` on the pool, so enrolment is possible and it is fatal to this flow. Never enrol MFA on a seeded account. (`FORCE_CHANGE_PASSWORD` no longer causes this — the seeder sets a permanent password on every run.) |
 
-**Rotating the password** is a re-run of both scripts with the new value, in the
-same order. Step 2 warns before overwriting.
-
-**Do not add this to the required status checks on `main`.** It needs a deployed
-environment, so as a merge gate it would put staging's availability on every
-PR's critical path — see `docs/reference/architecture.md` § Required status
-checks, and the `insolvia-branch-protection` skill if the required set genuinely
-needs to change.
+**Rotating the password** is a re-run of step 2. The next deploy converges every
+seeded account onto the new value.

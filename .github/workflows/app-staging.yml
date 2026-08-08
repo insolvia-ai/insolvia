@@ -64,6 +64,7 @@ jobs:
       auth_domain: ${{ steps.tf.outputs.auth_domain }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
       firm_table: ${{ steps.tf.outputs.firm_table }}
+      auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -100,6 +101,7 @@ jobs:
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
             echo "firm_table=$(tf firm_table_name)"
+            echo "auth_pool_id=$(tf auth_user_pool_id)"
           } >> "$GITHUB_OUTPUT"
 
   # ── 2. Build + publish the artifact (no AWS credentials needed) ────
@@ -346,18 +348,19 @@ jobs:
       - name: Install the API's runtime dependencies
         run: pip install -r services/api/requirements.txt
 
-      # E2E_TEST_USER_SUBJECT, not a Cognito lookup: this job holds no
-      # cognito-idp grant, because ci-trust cannot scope AdminGetUser to one
-      # pool and the wildcard would reach prod's. seeds/staging.json says more.
-      - name: Seed the staging firm
+      # Accounts AND firms, from one fixture. Adding a test user is an edit to
+      # seeds/staging.json — no secret per person, no script run, nothing here
+      # to change. The addresses are committed (they are unroutable `.test`
+      # ones); the shared password is the only secret involved.
+      - name: Seed the staging accounts and firms
         env:
           PYTHONPATH: services/api/src
-          E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
-          E2E_TEST_USER_SUBJECT: ${{ secrets.E2E_TEST_USER_SUBJECT }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: |
           python -m insolvia_api.entrypoints.seed \
             --fixture seeds/staging.json \
-            --firm-table "${{ needs.terraform.outputs.firm_table }}"
+            --firm-table "${{ needs.terraform.outputs.firm_table }}" \
+            --user-pool-id "${{ needs.terraform.outputs.auth_pool_id }}"
 
       # No artifact upload, deliberately, and no trace: a Playwright trace
       # records `fill()` arguments verbatim — including the password typed into
@@ -372,6 +375,8 @@ jobs:
         env:
           E2E_BASE_URL: ${{ needs.terraform.outputs.url }}
           E2E_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
-          E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
+          # No address here any more: the suite reads it from
+          # seeds/staging.json, the same file the seed step above loaded, so
+          # who exists and who signs in cannot drift onto two different people.
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: npx playwright test

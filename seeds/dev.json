@@ -12,15 +12,24 @@
     "person before doing anything, and a non-admin would reproduce the lockout",
     "the seeder exists to break.",
     "",
-    "The account must already exist in the pool — run dev-aws-create-user.sh",
-    "first. Seeding resolves the email to its Cognito sub and refuses if there",
-    "is nobody to resolve."
+    "NO PASSWORD HERE, unlike seeds/staging.json, and that is the difference",
+    "between the two environments rather than an omission. A fixture person",
+    "with a password is one the loader will CREATE; without one, the account",
+    "must already exist. dev-aws-create-user.sh prompts for a dev password",
+    "without echo and never stores it, so there is nothing for this file to",
+    "carry — and a password a human typed must never end up in a committed",
+    "fixture. Run that script first; seeding then resolves the address to its",
+    "Cognito sub and refuses if there is nobody to resolve.",
+    "",
+    "`handle` names this person for anything that needs to refer to them; the",
+    "API's own parser ignores it."
   ],
   "firms": [
     {
       "name": "Dev Firm",
       "users": [
         {
+          "handle": "admin",
           "email": "dev@insolvia.test",
           "displayName": "Dev User",
           "role": "attorney",

@@ -33,10 +33,22 @@ The design constraints these obey come from issue #40; #80 is the first test.
   `.github/actions/verified-commit` blesses a commit for production only if the
   staging run concluded successfully. A `continue-on-error` on the E2E job would
   silently un-gate production.
-- **The repo is public. No credential, address, pool id or client id in any file
-  here** — not as a default, not in a fixture, not in a comment, not in a test
-  title. Credentials arrive as `E2E_TEST_USER_EMAIL` / `E2E_TEST_USER_PASSWORD`
-  and are read in exactly one module, `support/env.ts`.
+- **The repo is public. No credential, pool id or client id in any file here** —
+  not as a default, not in a fixture, not in a comment, not in a test title. The
+  password arrives as `E2E_TEST_USER_PASSWORD` and is read in exactly one
+  module, `support/env.ts`.
+- **Addresses are the one carve-out, and only `.test` ones.** The seeded users
+  live in `seeds/staging.json` and the suite reads their addresses from there,
+  by `handle`. That is safe *because* every one ends in `.test` — a reserved TLD
+  (RFC 2606) that can never be a real mailbox, which is what the rule above was
+  protecting against — and because nothing is mailed to them. **A real
+  mailbox must never appear in that fixture**, and if one ever does, the rule
+  above applies to it in full. Keeping the addresses there is what stops "who
+  the environment seeded" and "who a spec signs in as" becoming two answers.
+- **Adding a test user is an edit to `seeds/staging.json`.** Not a script, not a
+  secret, not a new slot in `support/env.ts`. The tenancy model is about several
+  people with different reach, so a suite that can only sign in as one of them
+  cannot test what the model exists for.
 - **Do not upload Playwright artifacts from CI, and do not turn traces on
   there.** A trace records `fill()` arguments verbatim — including the password
   — and Actions artifacts on a public repo are downloadable by anyone with the

@@ -25,7 +25,6 @@ cd e2e
 npm ci
 npm run browser                     # playwright install --with-deps chromium
 
-export E2E_TEST_USER_EMAIL='…'      # the staging test user
 read -rs E2E_TEST_USER_PASSWORD && export E2E_TEST_USER_PASSWORD
 npm test
 ```
@@ -37,7 +36,7 @@ Optional overrides, both public values with sane defaults:
 | `E2E_BASE_URL` | `https://staging-app.insolvia.ai` | Origin under test. CI passes the Terraform `url` output. |
 | `E2E_COGNITO_DOMAIN` | — | Exact hosted-UI hostname to assert. CI passes the Terraform `auth_domain` output; unset falls back to asserting any `*.amazoncognito.com` host. |
 
-`E2E_TEST_USER_EMAIL` and `E2E_TEST_USER_PASSWORD` have **no defaults** and the
+`E2E_TEST_USER_PASSWORD` has **no default** and the
 run fails at config load if either is missing.
 
 ## Two things to know before changing a test
