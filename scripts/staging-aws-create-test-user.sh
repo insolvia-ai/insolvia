@@ -5,8 +5,8 @@
 # an identity to sign in as. One-time setup; see
 # docs/runbooks/staging-e2e-setup.md for where it sits in the order.
 #
-#   E2E_TEST_USER_EMAIL='e2e@…' ./scripts/e2e-create-test-user.sh
-#   ./scripts/e2e-create-test-user.sh --check      # verify, change nothing
+#   E2E_TEST_USER_EMAIL='e2e@…' ./scripts/staging-aws-create-test-user.sh
+#   ./scripts/staging-aws-create-test-user.sh --check      # verify, change nothing
 #
 # ## Why an admin creates it
 #
@@ -197,4 +197,4 @@ assert_no_mfa "$final"
 
 ok "E2E user is ready in $POOL_ID (CONFIRMED, no MFA)."
 warn "Never enrol MFA on this account — the E2E flow cannot answer a TOTP challenge."
-log "Next: ./scripts/e2e-set-secrets.sh  (puts the same two values in the insolvia-staging environment)"
+log "Next: ./scripts/staging-github-set-secrets.sh  (puts the same two values in the insolvia-staging environment)"

@@ -17,7 +17,8 @@
 # That is correct for staging and prod and merely puzzling on a laptop, where
 # it presents as "I ran dev-up.sh, I have a sign-in page, and no way past it."
 # This is the way past it. It is the dev counterpart of
-# scripts/e2e-create-test-user.sh, which does the same job for the staging pool.
+# scripts/staging-aws-create-test-user.sh, which does the same job for the
+# staging pool.
 #
 # ## Why there is a SECOND call
 #
@@ -47,7 +48,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/dev-aws-common.sh"
 
 # DEV ONLY, and not parameterised on purpose — the same reasoning
-# e2e-create-test-user.sh gives for being staging-only. A "create me an
+# staging-aws-create-test-user.sh gives for being staging-only. A "create me an
 # account" script that could be pointed at the prod pool by changing one
 # argument is a script that eventually is.
 CHECK_ONLY=0
