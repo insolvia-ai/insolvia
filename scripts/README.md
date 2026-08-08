@@ -49,11 +49,22 @@ Playwright runner is `e2e/scripts/dev-test.sh` while the two scripts that
 provision staging for it are here. The test is not "is this about e2e?" but
 "does this act on the e2e package, or on an environment?"
 
-**Name — `<environment>-<system>-<verb>`, not the consumer.** These two were
-once `e2e-create-test-user.sh` and `e2e-set-secrets.sh`, named after who
-*needs* them, which read as though they had been left in the wrong directory.
-`staging-github-set-secrets.sh` touches no AWS at all — only `gh` — and the
-system in the name is what says so without opening the file.
+**Name — for what it acts on, never for who needs it.** These two were once
+`e2e-create-test-user.sh` and `e2e-set-secrets.sh`, named after their consumer,
+which read as though they had been left in the wrong directory. That is the
+whole rule, and it is the only part of it that is absolute.
+
+The optional parts are an **environment** and a **system** token, in the order
+`<environment>-<system>-<verb>`. Include one when it disambiguates and leave it
+out when it does not — this directory is not on a single mechanical scheme and
+should not be forced onto one. `github-packages-auth.sh` and
+`staging-github-set-secrets.sh` both earn their `github`, because "packages"
+could be npm's and "secrets" could be AWS Secrets Manager's, and in this repo
+both of those are real. `update-ruleset.sh` needs no such token: GitHub is the
+only thing here with rulesets. `dev-up.sh` names no system because it runs all
+of them, and `apply-ci-trust.sh` reads `<verb>-<environment>` because the
+environment *is* the object. A token that resolves no ambiguity is noise, and a
+scheme applied for its own sake produces `github-update-ruleset.sh`.
 
 `dev-aws-*` is a step stronger than the scheme: those scripts share
 `dev-aws-common.sh` (machine-id identity, the per-machine state key, the
