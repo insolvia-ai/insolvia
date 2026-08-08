@@ -50,9 +50,19 @@ prod table fails before boto3 is constructed rather than seeding into a shared
 environment. Neither guard alone is enough: the script's is stronger but
 bypassable by calling this directly; this one is weaker but unconditional.
 
-Staging and prod are provisioned another way, deliberately not here — see #178.
-A tool whose target could be changed by one argument is a tool that eventually
-is, which is the reasoning `dev-aws-create-user.sh` already records.
+STAGING AND PROD ARE NOT PROVISIONED AT ALL, and it is worth being exact about
+that rather than implying some other mechanism covers them. Nothing anywhere
+creates a firm outside this module; #178 is the open issue for doing it
+properly, and as of this writing staging's E2E user is in no firm, so
+`intake-persists.spec.ts` fails there for precisely the reason a laptop without
+`dev-aws-seed.sh` fails.
+
+This module is still not the fix for them. A tool whose target could be changed
+by one argument is a tool that eventually is — the reasoning
+`dev-aws-create-user.sh` already records — so whatever provisions staging
+should be its own deliberate, staging-only thing, the way
+`e2e-create-test-user.sh` is the staging counterpart of
+`dev-aws-create-user.sh` rather than a flag on it.
 
 ## Adding a subcommand
 
