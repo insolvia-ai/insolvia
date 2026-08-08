@@ -1,4 +1,4 @@
-"""Write the rows a developer machine needs and the API refuses to create itself.
+"""Load a seed fixture into an environment's data stores.
 
 ## Why anything outside the API writes rows at all
 
@@ -11,85 +11,83 @@ admin to add an admin; self-signup is off on every pool
 a firm without an active administrator. All three are correct, and together they
 mean the first firm has to be written from OUTSIDE the API.
 
-`scripts/dev-aws-create-user.sh` is the Cognito half of the same gap and stops
-where this starts: it leaves a person who can sign in and has no firm, which
-`/v1/me` reports and every other route refuses.
+That is true of a laptop and of staging alike. A developer hits it as "I signed
+in and everything 403s"; CI hits it as `intake-persists.spec.ts` failing on a
+case list that can never populate.
 
-## Why it goes through core/ rather than writing items
+## Why a fixture file rather than flags
 
-The item shapes live in `core/` — `firms.py` says so in its own docstring —
-precisely so the DynamoDB and in-memory stores cannot drift apart. A seeding
-tool that hand-rolled `{"PK": "FIRM#…", "SK": "META"}` would be a THIRD writer
-of that shape and the one nobody re-reads when a field is added, quietly
-producing valid-looking rows the service has stopped agreeing with.
+Because the next thing to seed is cases, and the one after that is whatever the
+test needs. A flag per field stops scaling at about six fields, and it puts the
+shape of the data in a shell script — where nobody reviews it and nothing
+validates it. A fixture is a reviewable artefact: `seeds/dev.json` is the answer
+to "what is on a developer's machine", in one place, in a diff.
 
-This matters more with every subcommand, not less. A firm has five fields; a
-case carries provenance and a confirm-before-entry invariant
-(`docs/reference/case-data-model.md`) that are not conventions but rules, and
-re-implementing them in a seeder is how they get violated first.
+It also makes the environments comparable. Dev and staging differ only in which
+fixture is loaded and which tables it is loaded into — not in which code path
+built the rows, which is what would otherwise drift.
 
-## WHAT THIS IS NOT: a test fixture factory
+## Why the rows still go through core/
 
-pytest tests build their own data through `core/` constructors and the
-`adapters/memory/` stores — no AWS, no table names, no subprocess. Reaching for
-this module from a unit or integration test would trade an in-process object
-for a network round trip and buy nothing.
+The item shapes live in `core/` precisely so the DynamoDB and in-memory stores
+cannot drift apart. A loader that turned fixture JSON straight into
+`{"PK": "FIRM#…"}` would be a THIRD writer of that shape and the one nobody
+re-reads when a field is added. So the fixture is parsed by the same
+`parse_firm_creation` / `parse_firm_user_creation` a route uses — which means a
+malformed fixture fails with the same field errors the API would give, and a new
+required field breaks seeding loudly instead of writing rows the service has
+stopped agreeing with.
 
-Two consumers genuinely need real rows in real tables, and they are the only
-two: bootstrapping a developer machine, and the e2e suite when it runs against
-that machine's dev stack (`e2e/scripts/dev-test.sh`). Both go through
-`scripts/dev-aws-seed.sh`, so they seed identically instead of drifting.
+## `${VAR}` in a fixture, and why it is not a convenience
 
-## Why it is dev-only, and how that is enforced
+THIS REPO IS PUBLIC. `e2e/CLAUDE.md` forbids the staging test user's address in
+any committed file — not as a default, not in a fixture, not in a comment. So
+`seeds/staging.json` names that user as `${E2E_TEST_USER_EMAIL}` and the value
+arrives from the environment at load time. Expansion FAILS on an unset variable
+rather than substituting empty: a fixture that silently seeded a firm for ""
+would be a broken environment that looks provisioned.
 
-Two independent guards, because one of them is an argument this process cannot
-check. `scripts/dev-aws-seed.sh` asserts every table it passes carries THIS
-machine's short id, resolved from this machine's Terraform state. This module
-re-asserts the name shape itself, so running it by hand against a staging or
-prod table fails before boto3 is constructed rather than seeding into a shared
-environment. Neither guard alone is enough: the script's is stronger but
-bypassable by calling this directly; this one is weaker but unconditional.
+`seeds/dev.json` needs none of this — `dev@insolvia.test` is a reserved TLD
+(RFC 2606), unroutable by construction, and safe to commit.
 
-STAGING AND PROD ARE NOT PROVISIONED AT ALL, and it is worth being exact about
-that rather than implying some other mechanism covers them. Nothing anywhere
-creates a firm outside this module; #178 is the open issue for doing it
-properly, and as of this writing staging's E2E user is in no firm, so
-`intake-persists.spec.ts` fails there for precisely the reason a laptop without
-`dev-aws-seed.sh` fails.
+## WHAT THIS IS NOT: a unit-test fixture factory
 
-This module is still not the fix for them. A tool whose target could be changed
-by one argument is a tool that eventually is — the reasoning
-`dev-aws-create-user.sh` already records — so whatever provisions staging
-should be its own deliberate, staging-only thing, the way
-`e2e-create-test-user.sh` is the staging counterpart of
-`dev-aws-create-user.sh` rather than a flag on it.
+pytest builds its own data through `core/` constructors and `adapters/memory/`
+— no files, no AWS, no subprocess. Reaching for this module from a unit test
+would trade an in-process object for a network round trip.
 
-## Adding a subcommand
+Its consumers are the two places that need real rows in real tables: a
+developer machine (`scripts/dev-aws-seed.sh`) and the staging e2e run.
 
-Three things, and the first is the one that carries the reasoning:
+## Why it is dev/staging only
 
-1. A `_seed_<entity>` handler that composes `core/` and returns an exit status.
-   It owns its own idempotency check — "already there" is a 0, never a write.
-2. Its parser in `_build_parser`, with `parents=[common]` so it inherits
-   `--check`, and a `--<entity>-table` flag per store it touches.
-3. A field on `StoreFactories`, so tests can pass the memory adapter.
+A tool whose target can be changed by one argument is a tool that eventually is
+— the reasoning `dev-aws-create-user.sh` records. `_require_seedable_table`
+refuses anything that is not this machine's dev table or a staging table, and
+prod is refused outright: provisioning a real customer firm wants an audit
+trail and a review, which is #178 and is not a CLI.
 
-Table names are flags rather than read from `services/api/.env`, because the
-guard below has to see the name before anything opens a connection with it.
+## Adding an entity
+
+A `_seed_<entity>` function that takes its slice of the fixture and the stores
+it needs, a key in the fixture schema, and a field on `Dependencies` so tests
+can pass a memory adapter. `cases` is the expected next one.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Final
+from pathlib import Path
+from typing import Any, Final
 
 from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_api.core.firms import (
-    ROLES,
     create_firm,
     create_firm_user,
     parse_firm_creation,
@@ -97,111 +95,174 @@ from insolvia_api.core.firms import (
 )
 from insolvia_api.core.ports import FirmStore
 
-# What infra/modules/* name a table for infra/envs/dev, where the suffix is the
-# machine short id from scripts/dev-aws-common.sh. Staging and prod are
-# `insolvia-<kind>-staging` / `-prod` and match none of these.
-_DEV_TABLE_TEMPLATE: Final = r"^insolvia-{kind}-dev-[0-9a-f]{{12}}\Z"
+# What infra/modules/* name a table, per environment. Dev carries the machine
+# short id from scripts/dev-aws-common.sh; staging is flat. Prod matches
+# neither, which is the point.
+_SEEDABLE_TABLE: Final = r"^insolvia-{kind}-(dev-[0-9a-f]{{12}}|staging)\Z"
 
-# Exit statuses, shared by every subcommand so a caller can branch on them
-# without knowing which one it ran.
+_VAR: Final = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+
 _OK: Final = 0
-_NOT_PROVISIONED: Final = 1
+_NOT_SEEDED: Final = 1
 _REFUSED: Final = 2
 
+# email -> Cognito sub, raising RefusedError when there is no such account.
+#
+# Not `core.ports.UserDirectory`: that port is deliberately AdminCreateUser and
+# nothing else, because it is the API's grant and widening it would make it an
+# impersonation primitive. This is a different principal with a different,
+# read-only need, so it gets its own seam — and the refusal is part of the
+# contract rather than whatever the implementation happens to throw, so a fake
+# that raises KeyError is a broken fake, not a passing test.
+SubjectResolver = Callable[[str], str]
 
-class _RefusedError(Exception):
-    """A guard rejected the arguments. Never a partial write — guards run first."""
+
+class RefusedError(Exception):
+    """A guard or the fixture rejected the run. Nothing has been written."""
+
+
+def _cognito_subjects(pool_id: str) -> SubjectResolver:
+    import boto3
+
+    client = boto3.client("cognito-idp")
+
+    def resolve(email: str) -> str:
+        try:
+            user = client.admin_get_user(UserPoolId=pool_id, Username=email)
+        except client.exceptions.UserNotFoundException:
+            raise RefusedError(
+                f"no pool user for {email} — create the account before seeding "
+                "the firm it belongs to"
+            ) from None
+        for attribute in user["UserAttributes"]:
+            if attribute["Name"] == "sub":
+                return str(attribute["Value"])
+        raise RefusedError(f"pool user {email} has no sub attribute")
+
+    return resolve
 
 
 @dataclass(frozen=True)
-class StoreFactories:
-    """How each subcommand reaches its store.
+class Dependencies:
+    """The seams tests replace. Factories, because a table name is only
+    legitimate after `_require_seedable_table` has accepted it."""
 
-    Factories rather than ready-made stores: a table name is only legitimate
-    after `_require_dev_table` has accepted it, and a caller passing a
-    constructed store would have bound one this module would have refused.
+    firm_store: Callable[[str], FirmStore] = DynamoDbFirmStore
+    subjects: Callable[[str], SubjectResolver] = _cognito_subjects
+
+
+def _require_seedable_table(table: str, *, kind: str) -> None:
+    if not re.match(_SEEDABLE_TABLE.format(kind=kind), table):
+        raise RefusedError(
+            f"'{table}' is not a seedable {kind} table (expected "
+            f"insolvia-{kind}-dev-<machine short id> or insolvia-{kind}-staging)"
+        )
+
+
+def _expand(value: str, env: Mapping[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        found = env.get(name)
+        if not found:
+            raise RefusedError(
+                f"fixture references ${{{name}}}, which is unset or empty. "
+                "It has no default on purpose — this repo is public."
+            )
+        return found
+
+    return _VAR.sub(replace, value)
+
+
+def _expanded(node: Any, env: Mapping[str, str]) -> Any:
+    if isinstance(node, str):
+        return _expand(node, env)
+    if isinstance(node, list):
+        return [_expanded(item, env) for item in node]
+    if isinstance(node, dict):
+        return {key: _expanded(item, env) for key, item in node.items()}
+    return node
+
+
+def load_fixture(path: Path, env: Mapping[str, str]) -> dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise RefusedError(f"no fixture at {path}") from None
+    except json.JSONDecodeError as error:
+        raise RefusedError(f"{path} is not valid JSON: {error}") from None
+    if not isinstance(raw, dict):
+        raise RefusedError(f"{path} must be a JSON object")
+    return dict(_expanded(raw, env))
+
+
+# ── firms ───────────────────────────────────────────────────────────
+
+
+def _seed_firms(
+    entries: list[Any], store: FirmStore, resolve: SubjectResolver, *, check: bool
+) -> int:
+    """Converge each fixture firm. Returns 0 if nothing is missing.
+
+    IDEMPOTENT, and per USER rather than per firm, because a firm has no
+    natural key — its id is a uuid minted at creation, so "is this firm already
+    here?" can only be answered through the people in it. A fixture that grows a
+    colleague therefore adds that colleague to the existing firm instead of
+    creating a second one beside it.
     """
+    missing = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RefusedError("each firm in the fixture must be an object")
+        users = entry.get("users") or []
+        if not users:
+            raise RefusedError(
+                f"firm '{entry.get('name')}' has no users — a firm nobody can "
+                "sign in to is the derelict state ADR 0009 refuses"
+            )
 
-    firm: Callable[[str], FirmStore] = DynamoDbFirmStore
+        # Resolve first: a fixture naming an account that does not exist should
+        # fail before any row is written, not halfway through the firm.
+        drafts = [
+            (parse_firm_user_creation(user), resolve(str(user["email"])))
+            for user in users
+        ]
 
+        placed = {
+            subject: found
+            for _, subject in drafts
+            if (found := store.find_user(subject)) is not None
+        }
+        firm_ids = {user.firm_id for user in placed.values()}
+        if len(firm_ids) > 1:
+            raise RefusedError(
+                f"the people in '{entry.get('name')}' are already split across "
+                f"{len(firm_ids)} firms; refusing to guess which one is meant"
+            )
 
-def _require_dev_table(table: str, *, kind: str) -> None:
-    if not re.match(_DEV_TABLE_TEMPLATE.format(kind=kind), table):
-        raise _RefusedError(
-            f"'{table}' is not a dev {kind} table "
-            f"(expected insolvia-{kind}-dev-<machine short id>)"
-        )
+        absent = [(draft, s) for draft, s in drafts if s not in placed]
+        if not absent:
+            print(f"firm '{entry.get('name')}': already seeded")
+            continue
 
+        missing += len(absent)
+        if check:
+            print(f"firm '{entry.get('name')}': {len(absent)} user(s) missing")
+            continue
 
-# ── firm ────────────────────────────────────────────────────────────
+        if firm_ids:
+            firm_id = firm_ids.pop()
+            print(f"firm '{entry.get('name')}': adding {len(absent)} user(s)")
+        else:
+            firm = create_firm(parse_firm_creation({"name": entry.get("name")}))
+            store.create_firm(firm)
+            firm_id = firm.id
+            print(f"created firm {firm.name} ({firm.id})")
 
+        for draft, subject in absent:
+            store.add_user(create_firm_user(draft, firm_id=firm_id, subject=subject))
+            print(f"  added {draft.email} ({draft.role}, admin={draft.is_admin})")
 
-def _seed_firm(args: argparse.Namespace, stores: StoreFactories) -> int:
-    _require_dev_table(args.firm_table, kind="firms")
-    store = stores.firm(args.firm_table)
-
-    # IDEMPOTENT, and keyed on the subject rather than the firm name on purpose:
-    # re-running must not give one person a second firm. The by-subject index is
-    # eventually consistent, which is harmless here — the worst case is a second
-    # run moments later reporting "not yet" and then failing on `add_user`'s
-    # condition, which is still a refusal rather than a duplicate.
-    existing = store.find_user(args.subject)
-    if existing is not None:
-        found = store.get_firm(existing.firm_id)
-        name = found.name if found is not None else "<firm row missing>"
-        print(
-            f"already provisioned: {existing.email} is "
-            f"{'an admin' if existing.is_admin else existing.role} of {name} "
-            f"({existing.firm_id}), status={existing.status}"
-        )
-        return _OK
-
-    if args.check:
-        print("not provisioned: this subject is in no firm — every route will 403")
-        return _NOT_PROVISIONED
-
-    missing = [
-        flag
-        for flag, value in (
-            ("--firm-name", args.firm_name),
-            ("--email", args.email),
-            ("--display-name", args.display_name),
-        )
-        if not value
-    ]
-    if missing:
-        raise _RefusedError("required without --check: " + ", ".join(missing))
-
-    firm = create_firm(parse_firm_creation({"name": args.firm_name}))
-    store.create_firm(firm)
-
-    # isAdmin and accessAllCases both true: this is the ONLY person in the firm,
-    # so an admin who could not see its cases would be a seat that has to add a
-    # second seat before it can do anything, and a non-admin would reproduce the
-    # lockout this command exists to break.
-    user = create_firm_user(
-        parse_firm_user_creation(
-            {
-                "email": args.email,
-                "displayName": args.display_name,
-                "role": args.role,
-                "isAdmin": True,
-                "accessAllCases": True,
-            }
-        ),
-        firm_id=firm.id,
-        subject=args.subject,
-    )
-    store.add_user(user)
-
-    print(f"created firm {firm.name} ({firm.id})")
-    print(f"added {user.email} as an admin {user.role} with access to all cases")
-    return _OK
-
-
-_HANDLERS: Final[dict[str, Callable[[argparse.Namespace, StoreFactories], int]]] = {
-    "firm": _seed_firm,
-}
+    return missing
 
 
 # ── plumbing ────────────────────────────────────────────────────────
@@ -210,46 +271,41 @@ _HANDLERS: Final[dict[str, Callable[[argparse.Namespace, StoreFactories], int]]]
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="seed",
-        description="Seed this machine's dev data stores. Never staging or prod.",
+        description="Load a seed fixture. Dev and staging only, never prod.",
     )
-    common = argparse.ArgumentParser(add_help=False)
-    common.add_argument(
+    parser.add_argument("--fixture", required=True, type=Path)
+    parser.add_argument("--firm-table", required=True)
+    parser.add_argument(
+        "--user-pool-id",
+        required=True,
+        help="the pool the fixture's people already exist in",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
-        help="report whether the rows exist; write nothing",
+        help="report what is missing; write nothing",
     )
-
-    entities = parser.add_subparsers(dest="entity", required=True, metavar="<what>")
-
-    firm = entities.add_parser(
-        "firm",
-        parents=[common],
-        help="a firm, with one person in it as its admin",
-    )
-    firm.add_argument("--firm-table", required=True)
-    firm.add_argument("--subject", required=True, help="the person's Cognito sub")
-    # Not `required`: --check needs none of them. `_seed_firm` enforces them at
-    # the point it is about to write, so a bare --check does not demand a firm
-    # name it will never use.
-    firm.add_argument("--firm-name")
-    firm.add_argument("--email")
-    firm.add_argument("--display-name")
-    firm.add_argument("--role", default="attorney", choices=list(ROLES))
-
     return parser
 
 
-def main(
-    argv: list[str] | None = None,
-    *,
-    stores: StoreFactories | None = None,
-) -> int:
+def main(argv: list[str] | None = None, *, deps: Dependencies | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    dependencies = deps or Dependencies()
     try:
-        return _HANDLERS[args.entity](args, stores or StoreFactories())
-    except _RefusedError as refusal:
+        _require_seedable_table(args.firm_table, kind="firms")
+        fixture = load_fixture(args.fixture, os.environ)
+        missing = _seed_firms(
+            fixture.get("firms") or [],
+            dependencies.firm_store(args.firm_table),
+            dependencies.subjects(args.user_pool_id),
+            check=args.check,
+        )
+    except RefusedError as refusal:
         print(f"refusing: {refusal}", file=sys.stderr)
         return _REFUSED
+    if args.check and missing:
+        return _NOT_SEEDED
+    return _OK
 
 
 if __name__ == "__main__":

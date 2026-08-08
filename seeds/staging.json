@@ -1,0 +1,31 @@
+{
+  "//": [
+    "What staging holds so the e2e suite has something to sign in to.",
+    "",
+    "THE ADDRESS IS NOT HERE, AND MUST NOT BE. This repo is public and",
+    "e2e/CLAUDE.md forbids the test user's address in any committed file — not",
+    "as a default, not in a fixture, not in a comment. ${E2E_TEST_USER_EMAIL}",
+    "is the same environment secret the Playwright run reads, so the firm and",
+    "the sign-in cannot drift onto two different people. Loading fails loudly",
+    "if it is unset rather than seeding a firm for the empty string.",
+    "",
+    "The account itself is created once by scripts/e2e-create-test-user.sh;",
+    "this only puts it in a firm. Seeding is idempotent and runs on every",
+    "staging deploy, so if staging's tables are ever recreated the next run",
+    "restores this instead of failing a week later as a mystery app regression."
+  ],
+  "firms": [
+    {
+      "name": "Insolvia E2E",
+      "users": [
+        {
+          "email": "${E2E_TEST_USER_EMAIL}",
+          "displayName": "E2E Test User",
+          "role": "attorney",
+          "isAdmin": true,
+          "accessAllCases": true
+        }
+      ]
+    }
+  ]
+}
