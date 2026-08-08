@@ -42,10 +42,10 @@ detail; this is only the order and the checkpoints.
 export E2E_TEST_USER_EMAIL='…'          # the synthetic address
 
 # 1. Create the user in the STAGING Cognito pool.
-./scripts/e2e-create-test-user.sh       # prompts for the password, without echo
+./scripts/staging-aws-create-test-user.sh       # prompts for the password, without echo
 
 # 2. Put the same two values in the insolvia-staging ENVIRONMENT secrets.
-./scripts/e2e-set-secrets.sh            # prompts again; or export E2E_TEST_USER_PASSWORD
+./scripts/staging-github-set-secrets.sh            # prompts again; or export E2E_TEST_USER_PASSWORD
 ```
 
 **Step 1 must come first.** Step 2 only stores strings; it cannot tell you
@@ -122,8 +122,8 @@ in `app-staging.yml` does (which release.yml calls as its last staging leg).
 Both scripts take `--check` and exit non-zero if their half is not in place:
 
 ```bash
-./scripts/e2e-create-test-user.sh --check
-./scripts/e2e-set-secrets.sh --check
+./scripts/staging-aws-create-test-user.sh --check
+./scripts/staging-github-set-secrets.sh --check
 ```
 
 ## Then: prove it end to end

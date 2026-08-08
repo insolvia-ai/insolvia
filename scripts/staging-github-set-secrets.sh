@@ -3,10 +3,10 @@
 # Put the staging E2E test user's credentials into GitHub Actions as
 # ENVIRONMENT secrets on `insolvia-staging`, where the E2E job in
 # .github/workflows/app-staging.yml can see them. One-time setup; run it after
-# ./scripts/e2e-create-test-user.sh has created the user those values name.
+# ./scripts/staging-aws-create-test-user.sh has created the user those values name.
 #
-#   E2E_TEST_USER_EMAIL='e2e@…' ./scripts/e2e-set-secrets.sh
-#   ./scripts/e2e-set-secrets.sh --check      # list what is set, change nothing
+#   E2E_TEST_USER_EMAIL='e2e@…' ./scripts/staging-github-set-secrets.sh
+#   ./scripts/staging-github-set-secrets.sh --check      # list what is set, change nothing
 #
 # ## Why the ENVIRONMENT and not the repository
 #
@@ -108,7 +108,7 @@ for name in "${SECRETS[@]}"; do
 done
 if [[ ${#already[@]} -ne 0 && "$ASSUME_YES" -ne 1 ]]; then
   warn "About to OVERWRITE: ${already[*]}"
-  warn "The values must match a user that exists in the staging pool (./scripts/e2e-create-test-user.sh)."
+  warn "The values must match a user that exists in the staging pool (./scripts/staging-aws-create-test-user.sh)."
   read -rp "Continue? [y/N] " reply
   [[ "$reply" == [yY]* ]] || die "Aborted; nothing was changed."
 fi
