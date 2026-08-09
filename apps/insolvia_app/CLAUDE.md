@@ -35,11 +35,12 @@ access token in CI, and no over-the-air updates package. Web builds run in GitHu
 Actions; hosting is the existing S3 + CloudFront (`infra/modules/web_hosting`).
 A CI guard step greps for those names and fails the build if one appears, which is
 why this paragraph describes them instead of spelling them out. Note that
-`.agents/skills/` contains six EAS skills for those **paid** services, and
-`gluestack-ui-v5` for a library this codebase deliberately does not have — see the
-root [`CLAUDE.md`](../../CLAUDE.md) for which of those skills apply. The four
-`design-system-*` skills in that same directory are **ours** and do apply: they
-are the consumer documentation for the package this app builds its UI from.
+`.agents/skills/` contains six EAS skills for those **paid** services — see the
+root [`CLAUDE.md`](../../CLAUDE.md) for which of those skills apply. (The
+`gluestack-ui-v5` skill, for a library this codebase deliberately does not have,
+has been uninstalled.) The four `design-system-*` skills in that same directory
+are **ours** and do apply: they are the consumer documentation for the package
+this app builds its UI from.
 
 ## Where code goes
 

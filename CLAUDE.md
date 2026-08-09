@@ -139,9 +139,9 @@ The directory holds **two kinds**, and they behave differently:
   package *as a consumer sees it*, which is exactly this repo's position.
   **Use them: they are what stops a screen hand-rolling a component the package
   already ships.** The catalog above says which to reach for when.
-- **Everything else is third-party** (Expo, gluestack). It is installed the same
-  way and symlinked the same way, so it is equally reachable — the table below
-  is what tells you which of it to ignore.
+- **Everything else is third-party** (Expo). It is installed the same way and
+  symlinked the same way, so it is equally reachable — the table below is what
+  tells you which of it to ignore.
 
 The third-party half is also confident, well-written, and — for a third of its
 contents — pointed directly away from the decisions in this repo. Hence the
@@ -164,7 +164,7 @@ invites the next agent to overrule it.
 | `eas-observe` | **Do not use** | Paid production metrics ingestion, and it wants `expo-observe` wired into the app root. Not on the free tier. |
 | `eas-simulator` | **Do not use** | Paid cloud simulators for native builds we do not produce. `allowed-tools: Bash(eas *)` — it will try to run the CLI. |
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
-| `gluestack-ui-v5` | **Do not use** | It describes a component library this codebase deliberately does not have, and its first principle is *"gluestack components over React Native primitives"* — the exact inversion of our decision. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) has the measurements, including two accessibility defects that came from this library. |
+| `gluestack-ui-v5` | **Uninstalled** — do not reinstall | It described a component library this codebase deliberately does not have, and its first principle was *"gluestack components over React Native primitives"* — the exact inversion of our decision. It is gone from `skills-lock.json`, so dev-setup no longer installs it. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) keeps the measurements that rejected the library, including two accessibility defects it caused. |
 | `expo-tailwind-setup` | **Do not use** | **There is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pins `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 
