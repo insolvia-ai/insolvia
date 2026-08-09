@@ -60,10 +60,12 @@ jobs:
       # Scoped to `git ls-files` so a stray `node_modules` or a local build
       # cannot trip it. Two paths are excluded, for opposite reasons:
       #
-      #   .agents/**  — vendor skill *documentation*. It describes EAS at
+      #   .agents/**  — third-party skill *documentation*. It describes EAS at
       #                 length; that is why the guard exists, not a violation of
-      #                 it. It is untracked today but is not gitignored, so it
-      #                 may be committed at any time and must not detonate this.
+      #                 it. These files are installed by scripts/dev-setup.sh and
+      #                 gitignored, so `git ls-files` cannot list them anyway —
+      #                 the exclusion is kept as belt-and-braces for a checkout
+      #                 that still has them tracked from before that change.
       #   this file   — it necessarily spells out the very strings it bans. The
       #                 self-check below covers it instead, matching EAS *usage*
       #                 rather than the bare words, so it cannot match itself.

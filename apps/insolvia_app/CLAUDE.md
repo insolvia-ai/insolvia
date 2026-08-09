@@ -35,9 +35,12 @@ access token in CI, and no over-the-air updates package. Web builds run in GitHu
 Actions; hosting is the existing S3 + CloudFront (`infra/modules/web_hosting`).
 A CI guard step greps for those names and fails the build if one appears, which is
 why this paragraph describes them instead of spelling them out. Note that
-`.agents/skills/` contains six EAS skills for those **paid** services, and
-`gluestack-ui-v5` for a library this codebase deliberately does not have — see the
-root [`CLAUDE.md`](../../CLAUDE.md) for which of those skills apply.
+`.agents/skills/` contains six EAS skills for those **paid** services — see the
+root [`CLAUDE.md`](../../CLAUDE.md) for which of those skills apply. (The
+`gluestack-ui-v5` skill, for a library this codebase deliberately does not have,
+has been uninstalled.) The four `design-system-*` skills in that same directory
+are **ours** and do apply: they are the consumer documentation for the package
+this app builds its UI from.
 
 ## Where code goes
 
@@ -88,13 +91,22 @@ Rules that follow from it:
 
 UI comes from two places, both rendering bare RN primitives:
 
-- **`Button` and `Field` come from `@insolvia-ai/design-system`** — specifically
-  its `.native` leaves, which a `resolveRequest` override in
+- **The shared components come from `@insolvia-ai/design-system`** — `Button`,
+  `Field`, `Input`, `Select`, `DateInput` and ~38 more, specifically its
+  `.native` leaves, which a `resolveRequest` override in
   [`metro.config.js`](metro.config.js) resolves on **every** platform, web
   included (the long comment there owns the reasoning: this app renders the RN
   dialect via react-native-web and has no Tailwind pipeline, so a `.web` leaf
   would arrive unstyled). Import them from `@insolvia-ai/design-system`, never
   by deep path.
+
+  **Check the `design-system-catalogue` skill before building any UI here.** The
+  package is much larger than the handful of components this file once named,
+  and the standing risk in this directory is writing an app-local component that
+  already exists in the package — which then misses its accessibility work and
+  its two-leaf tests. `components/` is for what marketing could never use, not
+  for a second copy of something shared. When a component resolves oddly or
+  renders unstyled, that is `design-system-platforms`.
 - **Everything else in `components/` is app-specific** — the shell chrome and
   branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`) that marketing has no
   use for. It stays here by decision
@@ -109,7 +121,8 @@ whole accessibility story, and it only fires if a component asks for it:
 | `Heading`    | app    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
 | `Button`     | design system | `Pressable accessibilityRole="button"` | `<button type="button">`       |
 | `AppShell`   | app    | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
-| `Field`      | design system | compound `Field.Root/Label/Control/Description/Error` | labelled input group |
+| `Field`      | design system | compound `Field.Root/Label/Description/Error` around a control | labelled input group |
+| `Input`      | design system | `TextInput` + the Field's ids, read from context | labelled `<input>`        |
 | `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
 
 Three rules:
@@ -117,10 +130,19 @@ Three rules:
 - **`Heading` takes `level` for document structure and a separate `size` for
   appearance.** Never derive the tag from how big the text should look — that is
   what produces `heading-order` failures.
-- **The design system's `Field` is the only way to render an input.** No bare
+- **Every input is a package control inside a `Field.Root`.** No bare
   `TextInput` in a screen, ever, so an unlabelled input cannot be written by
   accident. The package's own suite asserts the label/control wiring; screen
   tests assert this app's usage.
+
+  **`Field.Control` no longer renders a control** (design system 0.11.0). Put
+  `Input` — or `Select`, `DateInput`, `Textarea`, `Combobox` — directly inside
+  `Field.Root`; each reads `FieldContext` itself for the id, the
+  `aria-describedby` and the invalid flag. `Field.Control` now takes a required
+  `render` element and is only for a control the package does *not* own. Note
+  `Input` is `value` + **`onValueChange`**, not `onChangeText`, and takes
+  `type="email"` rather than a hand-set `keyboardType`/`autoCapitalize` — the
+  native leaf derives both from `type`, so spelling them out binds only one leaf.
 - **No `role="region"`.** A `<section>` without an accessible name is invalid ARIA
   and axe flags it. Open a block with a heading instead.
 

@@ -8,7 +8,7 @@ import type {
   PermissionLevel,
   UpdateFirmUserRequest,
 } from '@insolvia-ai/api-client';
-import { Button, Field, RadioGroup, Select } from '@insolvia-ai/design-system';
+import { Button, Field, Input, RadioGroup, Select } from '@insolvia-ai/design-system';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -203,7 +203,7 @@ function AddColleague({
 
       <Field.Root name="displayName" invalid={Boolean(fieldErrors.displayName)}>
         <Field.Label>Name</Field.Label>
-        <Field.Control value={displayName} onChangeText={setDisplayName} autoCorrect={false} />
+        <Input value={displayName} onValueChange={setDisplayName} autoCorrect={false} />
         {fieldErrors.displayName ? (
           <Field.Error match>{fieldErrors.displayName}</Field.Error>
         ) : null}
@@ -211,13 +211,11 @@ function AddColleague({
 
       <Field.Root name="email" invalid={Boolean(fieldErrors.email)}>
         <Field.Label>Work email</Field.Label>
-        <Field.Control
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-        />
+        {/* `type="email"` is the cross-platform spelling: the native leaf
+            derives the email keyboard and `autoCapitalize="none"` from it, the
+            web leaf emits `type="email"` plus the matching `inputMode`. Stating
+            the three RN props by hand would only bind the native half. */}
+        <Input value={email} onValueChange={setEmail} type="email" autoCorrect={false} />
         <Field.Description>
           They will get an email with a temporary password. This address is also their sign-in name.
         </Field.Description>

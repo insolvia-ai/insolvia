@@ -89,6 +89,10 @@ before you touch anything:
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
 | **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) |
+| **building or changing any UI** in the app or marketing — picking a component, calling it, wondering whether the package already has one | `design-system-catalogue` skill **first**, before writing the screen. The package ships 43 components; the habit to break is hand-rolling one it already owns |
+| a component **renders unstyled**, resolves to the wrong leaf, or `react-native` turns up in the marketing bundle | `design-system-platforms` skill — the `.web`/`.native` split, and why this app renders `.native` on web too |
+| **re-branding**: changing a brand colour or font the design system owns | `design-system-theming` skill — the override seams, and why `primaryHover` follows the base colour on web but is pre-computed on native |
+| wiring the packages into a **new** consumer (401/404 on the `@insolvia-ai` scope, Tailwind seeing `node_modules`, dark mode) | `design-system-setup` skill — both consumers here are already wired; this is for when one breaks |
 | **changing a shared component (Button, Field, …) or a design token** | **Not in this repo** — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system). Change it there, publish, then bump the dependency here · [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md) · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
 | **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump both consumers' manifests and both lockfiles, and regenerate the Cognito branding |
 | changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
@@ -103,19 +107,53 @@ before you touch anything:
 | **adding, moving, or rewriting anything in `docs/`** | [`docs/CLAUDE.md`](docs/CLAUDE.md) — four kinds, one per directory; and what belongs in a skill instead |
 | looking for any other runbook | [`docs/README.md`](docs/README.md) |
 
-## `.agents/skills/` — vendor Expo skills, and which ones apply here
+## `.agents/skills/` — installed skills, and which ones apply here
 
-That directory is **third-party, installed by the user, and not ours to edit.**
-It does **not** auto-load, so nothing in it reaches you unless you go and read
-it. Read freely; never modify.
+**These files are installed, not committed.** `skills-lock.json` is the tracked
+manifest; `scripts/dev-setup.sh` installs from it with the
+[`skills`](https://github.com/vercel-labs/skills) CLI; `.agents/skills/` and the
+symlinks it drops in `.claude/skills/` are gitignored. **A fresh clone has none
+of them until dev-setup runs** — if a skill you expect is missing, that is why:
 
-It is also confident, well-written, and — for a third of its contents — pointed
-directly away from the decisions in this repo. Hence the table. A "do not use"
-here always has a reason, because a bare prohibition invites the next agent to
-overrule it.
+```bash
+./scripts/dev-setup.sh
+```
+
+They were vendored once, and 131 files of other people's documentation sat in
+the tree being reviewed as though we owned it and updated by hand. One
+consequence is worth keeping in mind: the installer takes each source at its
+current HEAD, so **dev-setup can leave `skills-lock.json` dirty**. That diff is
+a real signal that an upstream skill moved — read it, don't discard it.
+
+Never edit anything under `.agents/skills/` — the next install overwrites it.
+Fix a *design-system* skill in
+[`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system);
+for a third-party one, note the disagreement here in the table instead.
+
+The directory holds **two kinds**, and they behave differently:
+
+- **The four `design-system-*` skills are ours**, published from
+  [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system)
+  alongside the packages themselves. Because they are symlinked into
+  `.claude/skills/`, they **do** load — invoke them by name. They document the
+  package *as a consumer sees it*, which is exactly this repo's position.
+  **Use them: they are what stops a screen hand-rolling a component the package
+  already ships.** The catalog above says which to reach for when.
+- **Everything else is third-party** (Expo). It is installed the same way and
+  symlinked the same way, so it is equally reachable — the table below is what
+  tells you which of it to ignore.
+
+The third-party half is also confident, well-written, and — for a third of its
+contents — pointed directly away from the decisions in this repo. Hence the
+table. A "do not use" here always has a reason, because a bare prohibition
+invites the next agent to overrule it.
 
 | Skill | Verdict | Why |
 |---|---|---|
+| `design-system-catalogue` | **Use — reach for it first on any UI change** | Ours. What the package ships and how to call it. Prevents writing a component the package already owns, in a repo whose own rules forbid a third-party one. |
+| `design-system-platforms` | **Use** | Ours. Why this app renders the `.native` leaves on web too, and what "renders unstyled" means — the invariant `apps/insolvia_app/metro.config.js` and marketing's `vite.config.ts` each hold up. |
+| `design-system-theming` | **Use** | Ours. The override seams for a re-brand. Note tokens stay the source here — the sign-in page's colours are generated from them (`npm run tokens`). |
+| `design-system-setup` | **Use**, rarely | Ours, but both consumers here are already wired (`.npmrc`, `@source`, bundler config). It is the reference when one of those breaks, or for a *new* consumer — not a checklist to re-run. |
 | `expo-router` | **Use** | We use Expo Router with `web.output: "single"`; this is the routing reference. |
 | `expo-project-structure` | **Use**, with two exceptions | It *is* our layout ([ADR 0005](docs/adr/0005-expo-app-layout.md)) — minus `eas.json` and minus `src/server`/`app/api`. See below. |
 | `expo-data-fetching` | **Use** | Fetching against `services/api`; the caching and error-handling guidance is stack-neutral and correct. |
@@ -126,7 +164,7 @@ overrule it.
 | `eas-observe` | **Do not use** | Paid production metrics ingestion, and it wants `expo-observe` wired into the app root. Not on the free tier. |
 | `eas-simulator` | **Do not use** | Paid cloud simulators for native builds we do not produce. `allowed-tools: Bash(eas *)` — it will try to run the CLI. |
 | `eas-update-insights` | **Do not use** | Reports on EAS Update, which we do not publish. Also `allowed-tools: Bash(eas *)`. |
-| `gluestack-ui-v5` | **Do not use** | It describes a component library this codebase deliberately does not have, and its first principle is *"gluestack components over React Native primitives"* — the exact inversion of our decision. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) has the measurements, including two accessibility defects that came from this library. |
+| `gluestack-ui-v5` | **Uninstalled** — do not reinstall | It described a component library this codebase deliberately does not have, and its first principle was *"gluestack components over React Native primitives"* — the exact inversion of our decision. It is gone from `skills-lock.json`, so dev-setup no longer installs it. [ADR 0004](docs/adr/0004-react-native-replaces-flutter.md) keeps the measurements that rejected the library, including two accessibility defects it caused. |
 | `expo-tailwind-setup` | **Do not use** | **There is no Tailwind in the app at all** (it stays on the web side: the design system's `.web` leaves and marketing). It also pins `react-native-css@0.0.0-nightly.5ce6396`, whose own npm metadata reads *"Outdated SDK 54 era nightly… cannot resolve on Expo SDK 55 or newer"* — we are on SDK 57. |
 | everything else | **Case by case** | Not evaluated. Check the frontmatter first: **"EAS service (paid)" or an `allowed-tools: Bash(eas *)` line means it is out of scope**, whatever the task looks like. |
 

@@ -184,16 +184,16 @@
       "darkMode": {
         "error": {
           "backgroundColor": "1a0000ff",
-          "borderColor": "b3352eff",
-          "indicatorColor": "b3352eff"
+          "borderColor": "e27f79ff",
+          "indicatorColor": "e27f79ff"
         },
         "pending": {
           "indicatorColor": "AAAAAAAA"
         },
         "success": {
           "backgroundColor": "001a02ff",
-          "borderColor": "2e7d5bff",
-          "indicatorColor": "2e7d5bff"
+          "borderColor": "39b17eff",
+          "indicatorColor": "39b17eff"
         },
         "warning": {
           "backgroundColor": "1d1906ff",
@@ -229,7 +229,7 @@
       "darkMode": {
         "error": {
           "backgroundColor": "1a0000ff",
-          "borderColor": "b3352eff"
+          "borderColor": "e27f79ff"
         }
       },
       "lightMode": {
