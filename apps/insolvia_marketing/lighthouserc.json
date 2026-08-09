@@ -37,9 +37,9 @@
   "ci": {
     "collect": {
       "url": [
-        "http://localhost:3000/",
-        "http://localhost:3000/waitlist",
-        "http://localhost:3000/privacy"
+        "http://localhost:3100/",
+        "http://localhost:3100/waitlist",
+        "http://localhost:3100/privacy"
       ],
       "numberOfRuns": 3,
       "startServerCommand": "node scripts/lhci-serve.mjs",
