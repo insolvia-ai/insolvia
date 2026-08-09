@@ -9,7 +9,7 @@ Two layers — a shared base plus thin per-package scripts:
 
 | Script | Scope | Does |
 |---|---|---|
-| `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check) |
+| `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check), **and the agent skills in `.agents/skills/`** — installed from `skills-lock.json`, not committed (see below) |
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
@@ -36,6 +36,39 @@ command.
 
 Every `dev-setup.sh` takes `--check` to report status without installing
 anything; per-package scripts pass it through to the shared base.
+
+## The agent skills are installed, not committed
+
+`.agents/skills/` and the symlinks in `.claude/skills/` are **gitignored**, so a
+fresh clone has none of them until `scripts/dev-setup.sh` runs. The tracked file
+is `skills-lock.json` — the manifest of which skills come from which source —
+and the installer is [`skills`](https://github.com/vercel-labs/skills), run via
+`npx` (no global install; Node is the only requirement).
+
+They were committed once: 131 files of third-party documentation in the tree,
+carried through reviews as if we owned it. The lock is the part worth tracking.
+
+Two things to know:
+
+- **The layout matters.** dev-setup installs with
+  `--agent universal --agent claude-code`, which puts the real directory at
+  `.agents/skills/<name>/` and symlinks `.claude/skills/<name>` to it. Targeting
+  claude-code alone *copies* into `.claude/skills/` and creates no `.agents/`
+  tree — which every path in `CLAUDE.md` and the ADRs would then miss.
+- **It can leave `skills-lock.json` dirty.** `skills add` takes each source at
+  its current HEAD; the CLI has no command that restores the exact hashes the
+  lock records. So the step is reproducible in *which* skills you get, not in
+  their content, and a changed lock means an upstream skill moved. Read that
+  diff rather than discarding it.
+
+To add one, install it and commit the resulting lock change:
+
+```bash
+npx skills add <owner/repo> --skill <name> --agent universal --agent claude-code -y
+```
+
+Root [`CLAUDE.md`](../CLAUDE.md) carries the applicability table — which of the
+installed skills this repo actually follows, and which it deliberately ignores.
 
 ## Where a script goes, and what it is called
 

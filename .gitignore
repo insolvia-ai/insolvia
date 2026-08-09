@@ -89,3 +89,18 @@ storybook-static/
 *.swp
 *~
 .vscode/
+
+# ── agent skills: installed, not vendored ───────────────────────
+# `skills-lock.json` (tracked) is the manifest; `scripts/dev-setup.sh` installs
+# from it with the `skills` CLI. The files themselves are third-party
+# documentation we neither wrote nor review, so they stay out of the tree — see
+# the `.agents/skills/` section in CLAUDE.md.
+#
+# `.claude/skills/` is NOT ignored wholesale: `insolvia-*` are OUR skills and
+# stay tracked. Only the symlinks the installer drops there are ignored, by the
+# names the lock installs.
+.agents/skills/
+.claude/skills/design-system-*
+.claude/skills/expo-*
+.claude/skills/eas-*
+.claude/skills/gluestack-*

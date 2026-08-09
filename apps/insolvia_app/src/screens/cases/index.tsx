@@ -1,6 +1,6 @@
 import { ApiValidationException } from '@insolvia-ai/api-client';
 import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
-import { Button, Field, RadioGroup } from '@insolvia-ai/design-system';
+import { Button, Field, Input, RadioGroup } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -34,10 +34,10 @@ type ListState =
  * something 8.5 has to unpick.
  *
  * Everything visual is ours: {@link AppShell}, {@link Heading}, and the design
- * system's `Button`, `Field` and `RadioGroup` leaves. Chapter is a radio group
- * rather than a select because the package has no `Select` yet (8.4) and,
- * with four options, a radio group is the better control regardless — every
- * option is visible and reachable without opening anything.
+ * system's `Button`, `Field`, `Input` and `RadioGroup` leaves. Chapter stays a
+ * radio group even though the package has shipped `Select` since 0.4.0: with
+ * four options a radio group is the better control regardless — every option is
+ * visible and reachable without opening anything.
  */
 export function Cases() {
   const theme = useTheme();
@@ -158,9 +158,9 @@ export function Cases() {
 
         <Field.Root name="district" invalid={Boolean(fieldErrors.district)}>
           <Field.Label>Filing district</Field.Label>
-          <Field.Control
+          <Input
             value={district}
-            onChangeText={setDistrict}
+            onValueChange={setDistrict}
             placeholder="e.g. NDCA"
             autoCapitalize="characters"
             autoCorrect={false}

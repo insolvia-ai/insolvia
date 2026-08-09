@@ -58,7 +58,7 @@ The parts of Expo we depend on — the SDK, Metro, Expo Router, `expo export`,
 service, and adopting one would put a vendor account on the critical path of a
 deploy that is otherwise entirely ours.
 
-This is easy to erode by accident: several vendor-supplied agent skills in
+This is easy to erode by accident: several third-party agent skills installed in
 `.agents/skills/` describe EAS as the normal way to ship an Expo app, and one
 carries `allowed-tools: Bash(eas *)`. So the constraint is enforced in CI
 rather than merely written down — the guard in `app-pr.yml` fails the build on

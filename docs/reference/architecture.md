@@ -82,7 +82,7 @@ on the critical path of a deploy that is otherwise entirely ours — and
 already does for free under Terraform. A guard step in `app-pr.yml` fails the
 build on an EAS config file, the EAS command-line tool as a dependency, an Expo
 access token, or the over-the-air update client, because this is a constraint
-that erodes by accident: several vendored agent skills in `.agents/skills/`
+that erodes by accident: several installed agent skills in `.agents/skills/`
 present EAS as the normal way to ship. (The guard greps tracked files for the
 exact package and secret names, so this paragraph avoids writing them.) Root
 [`CLAUDE.md`](../../CLAUDE.md) carries the applicability table for those.

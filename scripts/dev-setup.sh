@@ -157,6 +157,86 @@ if have node; then
   [[ "$major" -ge "$NODE_MAJOR_MIN" ]] || warn "node $(node --version) is below required v${NODE_MAJOR_MIN} (engines.node in the npm packages)"
 fi
 
+# --- agent skills ----------------------------------------------------------
+#
+# The skills in `.agents/skills/` are INSTALLED, not vendored: `skills-lock.json`
+# is the manifest, this step is what puts the files on disk, and the files
+# themselves are gitignored. They used to be committed — 131 files of somebody
+# else's documentation, reviewed as if we owned it and updated by hand — which
+# is the thing this replaces.
+#
+# The installer is `skills` (github.com/vercel-labs/skills), run through npx so
+# there is nothing global to pin; Node is ensured above and is its only
+# requirement.
+#
+# `--agent universal --agent claude-code` is what reproduces the layout the rest
+# of the repo assumes: the real directory at `.agents/skills/<name>/` (the
+# `universal` path, shared by Codex, Cursor, Copilot and the rest) with
+# `.claude/skills/<name>` as a symlink into it. Installing to claude-code ALONE
+# copies the files into `.claude/skills/` instead and no `.agents/` tree
+# appears — a layout every path in CLAUDE.md and the ADRs would then miss.
+#
+# One `add` per source, with every skill from that source named on it, because
+# `add` takes one source at a time. A token is passed when `gh` can supply one:
+# GitHub's API rate-limits anonymous requests hard enough to fail this step on a
+# shared IP, and insolvia-ai/design-system needs it if the repo is ever private.
+#
+# NOT PINNED TO THE LOCK'S HASHES. `skills add` installs each source at its
+# current HEAD and rewrites `skills-lock.json` with whatever it got; the CLI has
+# no "restore exactly what the lock says" command. So this step is reproducible
+# in the set of skills it installs, not in their content, and a dirty
+# `skills-lock.json` afterwards is the signal that an upstream skill moved —
+# review that diff, don't discard it. Revisit if the CLI grows a real restore.
+install_skills() {
+  local lock="$REPO_ROOT/skills-lock.json"
+  [[ -r "$lock" ]] || { warn "no skills-lock.json — skipping agent skills"; return 0; }
+  have node || { warn "node missing — skipping agent skills"; return 0; }
+
+  local token=""
+  have gh && token="$(gh auth token 2>/dev/null || true)"
+
+  # source -> space-separated skill names, emitted one line per source.
+  local sources
+  sources="$(node -e '
+    const lock = require(process.argv[1]);
+    const bySource = new Map();
+    for (const [name, meta] of Object.entries(lock.skills ?? {})) {
+      if (!meta?.source) continue;
+      if (!bySource.has(meta.source)) bySource.set(meta.source, []);
+      bySource.get(meta.source).push(name);
+    }
+    for (const [source, names] of bySource) console.log([source, ...names].join(" "));
+  ' "$lock")" || { warn "could not read skills-lock.json — skipping agent skills"; return 0; }
+
+  [[ -n "$sources" ]] || { skip "agent skills" "lock lists none"; return 0; }
+
+  while read -r source names; do
+    [[ -n "$source" ]] || continue
+    local args=() name count=0
+    for name in $names; do args+=(--skill "$name"); count=$((count + 1)); done
+    log "skills: $source ($count)"
+    # `</dev/null` is load-bearing: npx inherits this loop's stdin, and without
+    # it the first `add` swallows the remaining lines of "$sources" — one source
+    # gets installed and the rest vanish silently.
+    if ! GH_TOKEN="${token:-${GH_TOKEN:-}}" npx --yes skills@1 add "$source" \
+        "${args[@]}" --agent universal --agent claude-code -y </dev/null >/dev/null 2>&1; then
+      warn "could not install skills from $source — re-run, or: npx skills add $source --agent universal --agent claude-code"
+    fi
+  done <<< "$sources"
+
+  ok "agent skills installed from skills-lock.json."
+}
+
+if [[ "$CHECK_ONLY" -eq 1 ]]; then
+  if [[ -d "$REPO_ROOT/.agents/skills" ]]; then
+    skip "agent skills" "$REPO_ROOT/.agents/skills"
+  else
+    warn "agent skills not installed — run without --check, or: npx skills add <source> --agent universal --agent claude-code"
+  fi
+else
+  install_skills
+fi
+
 # Docker is a daemon/GUI concern — check only, never auto-install. services/api
 # local dev (docker compose) and its Lambda image build need it.
 if have docker; then skip docker "$(command -v docker)"; else

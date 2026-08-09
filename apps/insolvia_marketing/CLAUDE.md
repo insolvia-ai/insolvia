@@ -18,6 +18,19 @@ React Router v7 SSR marketing site for `www.insolvia.ai`. Human docs:
   Navigation styled as a button uses `buttonClass` on a
   `<Link>`/`<a>` — the web `Button` is a real `<button>` only, no `render`
   polymorphism.
+- **Read the `design-system-catalogue` skill before adding UI to this site**, and
+  `design-system-platforms` when a component resolves to the wrong leaf or comes
+  out unstyled. Both ship from the package's own repo and describe it as a
+  consumer sees it — this app's position exactly. The concrete win is not
+  writing a local component the package already owns: this site's job is
+  marketing copy and layout, not components.
+- **`Field.Control` does not render a control** (0.11.0). Put `Input` (or
+  `Textarea`, `Select`) directly inside `Field.Root` — it reads the Field's ids
+  and invalid flag from context. `Field.Control` now requires a `render`
+  element and is reserved for a control the package does not own, which is why
+  the `<select>` and `<textarea>` fields in
+  [`app/routes/waitlist.tsx`](app/routes/waitlist.tsx) still use it: they post
+  with the form and must keep working without JavaScript.
 - **Three pieces of wiring are load-bearing for that package; break any one and
   the site breaks quietly:**
   - `vite.config.ts` `resolve.extensions` (`.web.tsx` first) is the ONLY thing

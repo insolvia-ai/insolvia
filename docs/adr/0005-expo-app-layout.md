@@ -14,8 +14,8 @@
 reusable UI in `src/components/`, and filenames are kebab-case.** The reference
 is Expo's published
 [app folder structure guidance](https://expo.dev/blog/expo-app-folder-structure-best-practices),
-vendored into this repo as the read-only `.agents/skills/expo-project-structure`
-skill.
+installed into this repo as the read-only `.agents/skills/expo-project-structure`
+skill (by `scripts/dev-setup.sh` — the skill files are not tracked).
 
 ```
 apps/insolvia_app/
@@ -98,7 +98,7 @@ from decisions made in ADR 0004 rather than from taste:
   appear in this app; a capability the client needs is an endpoint on
   `services/api`, exactly as ADR 0001 requires.
 
-Both are worth writing down because the vendored skill describes them as
+Both are worth writing down because the installed skill describes them as
 ordinary parts of the layout, and an agent following it faithfully would add
 them.
 

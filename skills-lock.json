@@ -1,6 +1,30 @@
 {
   "version": 1,
   "skills": {
+    "design-system-catalogue": {
+      "source": "insolvia-ai/design-system",
+      "sourceType": "github",
+      "skillPath": "plugins/design-system/skills/design-system-catalogue/SKILL.md",
+      "computedHash": "87b552fa6af590652f844aad4cd251ba9942ebc16916a1f167a4f0f77b96798a"
+    },
+    "design-system-platforms": {
+      "source": "insolvia-ai/design-system",
+      "sourceType": "github",
+      "skillPath": "plugins/design-system/skills/design-system-platforms/SKILL.md",
+      "computedHash": "ccce1490e355152c164d88b49f22bfafa01e6a1b55594585e22826c1bf44dd8b"
+    },
+    "design-system-setup": {
+      "source": "insolvia-ai/design-system",
+      "sourceType": "github",
+      "skillPath": "plugins/design-system/skills/design-system-setup/SKILL.md",
+      "computedHash": "2befd7b346534eab14de517c43b662b21f5b0fcea79049324bfa5522cd9b53bf"
+    },
+    "design-system-theming": {
+      "source": "insolvia-ai/design-system",
+      "sourceType": "github",
+      "skillPath": "plugins/design-system/skills/design-system-theming/SKILL.md",
+      "computedHash": "1f58886c3acede94c1eecf9332efb918843b54b393f5ad3f441afaef0030b5ae"
+    },
     "eas-app-stores": {
       "source": "expo/skills",
       "sourceType": "github",

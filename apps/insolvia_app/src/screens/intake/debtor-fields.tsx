@@ -1,6 +1,6 @@
 import { COUNSELING_EXEMPTIONS, COUNSELING_STATUSES, VENUE_BASES } from '@insolvia-ai/api-client';
 import type { Address, DebtorBody, OtherName, PersonName } from '@insolvia-ai/api-client';
-import { Button, DateInput, Field, Select } from '@insolvia-ai/design-system';
+import { Button, DateInput, Field, Input, Select } from '@insolvia-ai/design-system';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Heading } from '@/components/heading';
@@ -400,7 +400,7 @@ function TextField({
   return (
     <Field.Root invalid={Boolean(message)}>
       <Field.Label>{label}</Field.Label>
-      <Field.Control value={value ?? ''} onChangeText={onChangeText} autoCorrect={false} />
+      <Input value={value ?? ''} onValueChange={onChangeText} autoCorrect={false} />
       {message ? <Field.Error match>{message}</Field.Error> : null}
     </Field.Root>
   );

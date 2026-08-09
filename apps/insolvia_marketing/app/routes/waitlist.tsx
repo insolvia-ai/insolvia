@@ -1,5 +1,5 @@
 import { Form, Link, data, redirect, useNavigation } from "react-router";
-import { Button, buttonClass, Field } from "@insolvia-ai/design-system";
+import { Button, buttonClass, Field, Input } from "@insolvia-ai/design-system";
 
 import { seo } from "../lib/seo";
 import { isPlaceholderSite } from "../lib/site-mode.server";
@@ -147,7 +147,7 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
         <div className="grid gap-lg sm:grid-cols-2">
           <Field.Root name="name" invalid={Boolean(errors?.name)}>
             <Field.Label>Name</Field.Label>
-            <Field.Control
+            <Input
               required
               maxLength={200}
               autoComplete="name"
@@ -159,7 +159,7 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
 
           <Field.Root name="firm" invalid={Boolean(errors?.firm)}>
             <Field.Label>Firm name</Field.Label>
-            <Field.Control
+            <Input
               required
               maxLength={200}
               autoComplete="organization"
@@ -172,7 +172,7 @@ export default function Waitlist({ actionData }: Route.ComponentProps) {
 
         <Field.Root name="email" invalid={Boolean(errors?.email)}>
           <Field.Label>Work email</Field.Label>
-          <Field.Control
+          <Input
             type="email"
             required
             maxLength={320}
