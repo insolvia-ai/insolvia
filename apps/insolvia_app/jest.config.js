@@ -54,6 +54,29 @@ if (!transformIgnorePatterns.some((pattern) => pattern.includes('@insolvia-ai'))
 module.exports = {
   preset: 'jest-expo',
 
+  // Jest's default is 5000ms, which is a UNIT-test number, and this suite's
+  // route-level tests are not unit tests: `renderRouter('src/app', …)` mounts
+  // the real route tree, which is the shape ADR 0008 chose on purpose
+  // (docs/adr/0008-testing-shape-follows-the-code-it-tests.md). That is paid by
+  // the FIRST
+  // `it()` in each route suite, which measurably costs ~10x its siblings:
+  // documents/index.test.tsx runs 172ms for its first test and 12-32ms for the
+  // seven after it.
+  //
+  // Locally that is nowhere near 5000ms. On a loaded CI runner it is: the same
+  // suite takes 15-21s of wall clock there, and the multiplier lands the first
+  // test around 7s. That is not a hang — the work still completes — so the
+  // default turned runner speed into a red build. Observed on one commit, with
+  // the tree byte-identical between runs: 14.8s → passed, 20.7s → failed on
+  // `documents`, 20.3s → failed on `documents` AND `intake`, each time on that
+  // block's first test. A sibling branch passed at 15.8s in the same minute as
+  // one of the failures, which is how thin the margin was.
+  //
+  // 20000ms is a ceiling for a genuinely stuck test, not a target. Nothing here
+  // should approach it; if something does, that is a real defect and this
+  // number should not be raised to accommodate it.
+  testTimeout: 20000,
+
   // Restates the `@/*` alias from tsconfig.json. Metro reads the tsconfig
   // paths itself; Jest does not, so without this every `@/` import fails to
   // resolve under test while building fine.
