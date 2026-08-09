@@ -4,7 +4,7 @@ import { Button, DateInput, Field, Input, Select } from '@insolvia-ai/design-sys
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Heading } from '@/components/heading';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, noStackingContext, spacing, useTheme } from '@/theme';
 
 import { newRowId } from './row-id';
 
@@ -411,5 +411,7 @@ const styles = StyleSheet.create({
   aliasRow: { gap: spacing.sm },
   form: { gap: spacing.lg },
   help: { fontSize: fontSizes.label },
-  section: { gap: spacing.sm },
+  // An open Select in one section must paint over the section below it —
+  // see noStackingContext's doc in @/theme.
+  section: { ...noStackingContext, gap: spacing.sm },
 });

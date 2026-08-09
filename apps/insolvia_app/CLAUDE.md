@@ -175,6 +175,15 @@ below the `<title>` and why this paragraph is here rather than in the file.
 
 ## Everything else
 
+- **A wrapper `View` around an overlay control must dissolve its stacking
+  context** — spread `noStackingContext` from [`src/theme.ts`](src/theme.ts)
+  into the style of every `View` between a `Select`/`DateInput` and the
+  siblings its open list must paint over. react-native-web makes every `View`
+  a stacking context, so a plain wrapper traps the elevation the design
+  system's overlays rely on and the open list paints (and hit-tests) under
+  whatever follows the wrapper. The helper's doc comment owns the mechanism;
+  the staging e2e intake spec asserts it end-to-end, clicking the option the
+  overlap covers.
 - **No hard-coded colors, radii, or spacing steps.** Everything comes from
   `@insolvia-ai/tokens` via [`src/theme.ts`](src/theme.ts), and only the
   **semantic** color layer is exported — the raw ink/brass/paper palette is

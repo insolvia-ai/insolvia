@@ -20,7 +20,7 @@ import { Heading } from '@/components/heading';
 import { appEnvironment, environmentInfo } from '@/config/environment';
 import { openDownload, pickFile } from '@/screens/documents/browser';
 import type { PickedFile } from '@/screens/documents/browser';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, noStackingContext, spacing, useTheme } from '@/theme';
 
 /**
  * Human labels for the API's `kind` claim. Keyed off `DOCUMENT_KINDS` so the
@@ -640,7 +640,11 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.label,
     fontWeight: '600',
   },
+  // The document-type Select's open list must paint over the upload chooser
+  // and the document list below the form — see noStackingContext's doc in
+  // @/theme.
   form: {
+    ...noStackingContext,
     gap: spacing.md,
     marginBottom: spacing.lg,
     marginTop: spacing.sm,

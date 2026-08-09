@@ -59,6 +59,38 @@ export const fontSizes = {
 export const contentMaxWidth = 720;
 
 /**
+ * Dissolves the stacking context react-native-web wraps every `View` in — its
+ * base class is `position: relative; z-index: 0`, replicating React Native's
+ * layering model on the web.
+ *
+ * The design system's overlay controls — `Select`'s list, `DateInput`'s
+ * picker — elevate themselves and their enclosing `Field.Root` with a z-index
+ * while open. A z-index orders an element against its SIBLINGS only, so that
+ * elevation stops dead at the first wrapper `View` a screen puts around the
+ * control: the wrapper is its own stacking context, and the open list paints
+ * — and hit-tests — underneath whatever follows the wrapper. That is the
+ * "select renders behind the next section and its options can't be clicked"
+ * bug, and it returns every time a screen adds a wrapper, which is why this
+ * is a named helper rather than another one-off fix. The design system
+ * documents this boundary explicitly (its Field elevates itself, and says a
+ * consumer wrapper is the consumer's job — see `field.props.ts` on
+ * `controlOpen`).
+ *
+ * Spread it into the static style of every `View` that sits between an
+ * overlay-bearing control and the siblings its overlay must cover. `'auto'`
+ * is what a plain `div` has: no stacking context, so the control's elevation
+ * carries up to the nearest ancestor that still declares one. The cast is
+ * because React Native's types say `number`; react-native-web passes the
+ * value through to CSS verbatim.
+ *
+ * A web-only concern by construction — this app ships web only (ADR 0004). A
+ * native client would need overlay layering solved wholesale (there is no CSS
+ * `auto` to dissolve into on native; the design system would render the list
+ * through a Modal or portal there).
+ */
+export const noStackingContext = { zIndex: 'auto' as unknown as number } as const;
+
+/**
  * The scheme-independent tokens, re-exported for `StyleSheet.create` blocks.
  *
  * A `StyleSheet.create` block runs once at module load, outside any component,

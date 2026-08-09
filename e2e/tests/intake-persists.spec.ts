@@ -27,6 +27,8 @@ import { signIn } from '../support/sign-in';
  *   - the case list's link : link named "Open intake for the chapter N case in D"
  *   - the intake's name box: textbox named "First name"
  *   - the autosave signal  : the text "Saved"
+ *   - the briefing select  : combobox named "Briefing status", its options by
+ *     their visible labels
  *
  * IT REUSES A CASE rather than opening one per run. A spec that creates a row
  * on every staging deploy is a spec that fills a table nobody prunes; opening
@@ -95,5 +97,41 @@ test.describe('staging intake', () => {
       'the intake should still hold what was typed after a reload — if it is ' +
         'empty, the save did not reach the store or the read did not find it',
     ).toHaveValue(typedName);
+
+    // ── 5. The select's open list is real where it overlaps the next section ─
+    //
+    // The Briefing status list opens over the "Signature" section that follows
+    // it. react-native-web makes every wrapper View a stacking context, so a
+    // regression in the app's layering (theme.ts's `noStackingContext`) leaves
+    // that list painting — and hit-testing — UNDER the following section:
+    // legible enough to look styled, impossible to click. Paint order is
+    // invisible to the jest suite, which is the reason this lives here.
+    //
+    // "Requesting a 30-day waiver" is the target because it is measurably the
+    // occluded one: rendered under the broken layering, hit-testing that row
+    // reaches the "Date signed" field wrapper instead (the bottom-most option
+    // falls past the Signature section's edge and stays clickable, so it would
+    // not catch the regression). Playwright refuses a click another element
+    // would intercept, so the click IS the assertion. Re-committing an
+    // already-selected value still fires a save, which keeps this
+    // deterministic on the reused case in later runs; and the reload in step 4
+    // means "Saved" below cannot be a leftover from an earlier save cycle.
+    const briefing = page.getByRole('combobox', { name: 'Briefing status' });
+    await briefing.click();
+    await page.getByRole('option', { name: 'Requesting a 30-day waiver' }).click();
+    await expect(
+      briefing,
+      'choosing an option should update the select — a timeout on the click ' +
+        'above means the open list is painting behind the section below it',
+    ).toContainText('Requesting a 30-day waiver');
+
+    await expect(page.getByText('Saved')).toBeVisible({ timeout: 15_000 });
+
+    // ── 6. The choice survives a reload like any other answer ────────────────
+    await page.reload();
+    await expect(
+      page.getByRole('combobox', { name: 'Briefing status' }),
+      'the briefing status should still hold its answer after a reload',
+    ).toContainText('Requesting a 30-day waiver');
   });
 });

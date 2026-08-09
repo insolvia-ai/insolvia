@@ -17,7 +17,7 @@ import { AppShell } from '@/components/app-shell';
 import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
 import { appEnvironment, environmentInfo } from '@/config/environment';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, noStackingContext, spacing, useTheme } from '@/theme';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
   { value: 'attorney', label: 'Attorney' },
@@ -137,7 +137,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
       {list.kind === 'ready' ? (
         <View role="list" style={styles.list}>
           {list.users.map((user) => (
-            <View role="listitem" key={user.subject}>
+            <View role="listitem" key={user.subject} style={styles.listItem}>
               <Colleague user={user} editable={mayChange} onChanged={load} onNotice={setNotice} />
             </View>
           ))}
@@ -391,17 +391,28 @@ const styles = StyleSheet.create({
   list: {
     gap: spacing.lg,
   },
+  // Every wrapper between a permission Select and the NEXT colleague's row —
+  // listItem, person, personControls, permissionRow — dissolves its stacking
+  // context, or the open list paints under the rows below. All four are
+  // needed: elevation stops at the first wrapper that keeps one. See
+  // noStackingContext's doc in @/theme.
+  listItem: {
+    ...noStackingContext,
+  },
   permissionLabel: {
     fontSize: fontSizes.caption,
   },
   permissionRow: {
+    ...noStackingContext,
     gap: spacing.xs,
     minWidth: 220,
   },
   person: {
+    ...noStackingContext,
     gap: spacing.xs,
   },
   personControls: {
+    ...noStackingContext,
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
