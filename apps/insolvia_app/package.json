@@ -71,7 +71,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "^0.21.2",
-    "@insolvia-ai/design-system": "^0.13.0"
+    "@insolvia-ai/design-system": "^0.14.0"
   },
   "//insolvia-ai-dependencies": [
     "@insolvia-ai/design-system and @insolvia-ai/tokens are PUBLISHED packages",
