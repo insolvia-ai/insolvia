@@ -3,7 +3,7 @@ from __future__ import annotations
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_core.errors import ConflictError
+from insolvia_core.errors import ConflictError, NotFoundError
 
 
 class CognitoUserDirectory:
@@ -83,3 +83,30 @@ class CognitoUserDirectory:
         # Cognito always returns `sub` on a created user; if it ever does not,
         # the row must not be written with a guess.
         raise RuntimeError("Cognito returned a created user with no subject")
+
+    def resend_invite(self, email: str) -> None:
+        """AdminCreateUser with MessageAction=RESEND — the same IAM action as
+        create_user, which is why the one-action grant covers both (the port's
+        docstring owns that argument). Cognito re-sends the invitation with a
+        FRESH temporary password; nothing here sees either one."""
+        try:
+            self.client.admin_create_user(
+                UserPoolId=self.user_pool_id,
+                Username=email,
+                MessageAction="RESEND",
+                DesiredDeliveryMediums=["EMAIL"],
+            )
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code == "UserNotFoundException":
+                raise NotFoundError("no account exists for that address") from error
+            if code == "UnsupportedUserStateException":
+                # Already CONFIRMED: they signed in at least once, so the
+                # invite did its job. A password problem now is the
+                # forgot-password flow's, and re-inviting would not help —
+                # RESEND is refused by Cognito for exactly this state.
+                raise ConflictError(
+                    "that user has already completed first sign-in; "
+                    "the forgot-password flow is the way back in"
+                ) from error
+            raise

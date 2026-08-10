@@ -8,7 +8,7 @@ pass on code the real pool refuses.
 
 import pytest
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
-from insolvia_core.errors import ConflictError
+from insolvia_core.errors import ConflictError, NotFoundError
 
 
 @pytest.mark.parametrize(
@@ -28,3 +28,26 @@ def test_distinct_addresses_each_get_their_own_subject():
     second = directory.create_user("b@example.test")
     assert first != second
     assert set(directory.subjects) == {"a@example.test", "b@example.test"}
+
+
+def test_resending_to_an_unknown_address_is_not_found():
+    with pytest.raises(NotFoundError):
+        MemoryUserDirectory().resend_invite("nobody@example.test")
+
+
+def test_resending_to_an_uncompleted_invite_records_the_resend():
+    directory = MemoryUserDirectory()
+    directory.create_user("invited@example.test")
+    directory.resend_invite("invited@example.test")
+    assert directory.resent == ["invited@example.test"]
+
+
+def test_resending_to_a_confirmed_user_is_refused():
+    """Cognito refuses RESEND for a CONFIRMED user (UnsupportedUserState); the
+    fake must be exactly as strict, or a route test would pass on a resend the
+    real pool rejects — forgot-password owns that user's way back in."""
+    directory = MemoryUserDirectory()
+    directory.create_user("active@example.test")
+    directory.confirmed.add("active@example.test")
+    with pytest.raises(ConflictError):
+        directory.resend_invite("active@example.test")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from insolvia_core.errors import ConflictError
+from insolvia_core.errors import ConflictError, NotFoundError
 
 
 class MemoryUserDirectory:
@@ -20,6 +20,8 @@ class MemoryUserDirectory:
 
     def __init__(self) -> None:
         self.subjects: dict[str, str] = {}
+        self.confirmed: set[str] = set()
+        self.resent: list[str] = []
 
     def create_user(self, email: str) -> str:
         # Case-INSENSITIVE, because the real pool is: `infra/modules/auth` sets
@@ -34,3 +36,16 @@ class MemoryUserDirectory:
         subject = str(uuid.uuid4())
         self.subjects[email] = subject
         return subject
+
+    def resend_invite(self, email: str) -> None:
+        """Mirrors the AWS adapter's two refusals. `confirmed` is public so a
+        test can put an account past first sign-in; `resent` is public so a
+        test can read back what a route re-sent."""
+        if email not in self.subjects:
+            raise NotFoundError("no account exists for that address")
+        if email in self.confirmed:
+            raise ConflictError(
+                "that user has already completed first sign-in; "
+                "the forgot-password flow is the way back in"
+            )
+        self.resent.append(email)

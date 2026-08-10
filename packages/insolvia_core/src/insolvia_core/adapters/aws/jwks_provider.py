@@ -59,11 +59,22 @@ class CognitoJwksProvider:
         self,
         issuer_url: str,
         *,
+        jwks_url: str | None = None,
         ttl_seconds: float = DEFAULT_TTL_SECONDS,
         min_refresh_seconds: float = DEFAULT_MIN_REFRESH_SECONDS,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        self.jwks_url = f"{issuer_url.rstrip('/')}/.well-known/jwks.json"
+        # Cognito publishes keys at <issuer>/.well-known/jwks.json, so the
+        # derived default serves it. Google does NOT — its jwks_uri lives on a
+        # different host (insolvia_core.auth.google_jwks_url) — hence the
+        # explicit override. Everything else about this adapter (cache, the
+        # rate-limited refetch, fail-closed on an empty cache) is
+        # provider-agnostic and shared.
+        self.jwks_url = (
+            jwks_url
+            if jwks_url is not None
+            else f"{issuer_url.rstrip('/')}/.well-known/jwks.json"
+        )
         self.ttl_seconds = ttl_seconds
         self.min_refresh_seconds = min_refresh_seconds
         self.timeout_seconds = timeout_seconds

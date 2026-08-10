@@ -1,0 +1,16 @@
+Flask==3.1.2
+gunicorn==23.0.0
+mangum==0.17.0
+asgiref==3.8.1
+# Pinned exact for the same reasons the API pins them: local, CI, and Lambda
+# must resolve one version of the code that talks to AWS and one version of
+# the code that decides whether a request is authenticated.
+boto3==1.40.66
+PyJWT[crypto]==2.13.0
+# The shared domain (issue #208): firms, token verification (including the
+# Google Workspace profile this service authenticates with), and their
+# adapters. pip resolves this path against the CURRENT WORKING DIRECTORY —
+# every installer runs from this directory (CI's working-directory does; the
+# Dockerfile cd's here first). Non-editable: after editing the package,
+# re-run pip install.
+../../packages/insolvia_core
