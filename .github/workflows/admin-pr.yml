@@ -12,6 +12,10 @@ on:
 
 permissions:
   contents: read
+  # The portal job installs @insolvia-ai/design-system from GitHub Packages;
+  # the job's GITHUB_TOKEN needs read access to pull it (same line, same
+  # reason, as marketing-pr.yml's).
+  packages: read
 
 jobs:
   admin:
