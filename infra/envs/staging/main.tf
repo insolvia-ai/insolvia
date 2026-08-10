@@ -183,6 +183,31 @@ module "auth" {
   tags = local.common_tags
 }
 
+# ── Staff auth (#209) ───────────────────────────────────────────
+# The staging STAFF pool — the admin portal's issuer, structurally separate
+# from the firm pool above (the module header owns the argument). Registers
+# the portal's staging host and the same localhost dev origin pattern the firm
+# pool registers, on the portal's own pinned port. No custom domain, ever —
+# the prefix domain serves an internal tool fine and skips the 15-20 minute
+# per-pool domain tax. Accounts are created by hand (admin-create-only pool
+# with required TOTP); prod's section notes where that procedure lives.
+module "staff_auth" {
+  source = "../../modules/staff_auth"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  web_origins = [
+    "https://${var.admin_subdomain}",
+    "http://localhost:3100",
+  ]
+
+  # Staging staff accounts are the maintainer's own test accounts.
+  deletion_protection = false
+
+  tags = local.common_tags
+}
+
 # One-time adoption of the branding style that already exists in staging.
 #
 # It was created by hand (`aws cognito-idp create-managed-login-branding`) to

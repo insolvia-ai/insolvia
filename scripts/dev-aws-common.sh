@@ -89,6 +89,7 @@ load_aws_identity() {
   CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-case-access-log-$DEV_ENVIRONMENT"
   FIRM_TABLE_NAME_EXPECTED="insolvia-firms-$DEV_ENVIRONMENT"
   USER_POOL_NAME_EXPECTED="insolvia-users-$DEV_ENVIRONMENT"
+  STAFF_POOL_NAME_EXPECTED="insolvia-staff-$DEV_ENVIRONMENT"
   STATE_KEY="insolvia/dev/$AWS_ACCOUNT_ID/$MACHINE_ID/terraform.tfstate"
 }
 

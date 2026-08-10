@@ -84,6 +84,26 @@ output "auth_issuer_url" {
   value       = module.auth.issuer_url
 }
 
+output "staff_auth_user_pool_id" {
+  description = "Staging STAFF Cognito pool ID (#209) — the admin portal's issuer, distinct from the firm pool above."
+  value       = module.staff_auth.user_pool_id
+}
+
+output "staff_auth_web_client_id" {
+  description = "Staging admin portal app client ID (authorization-code + PKCE)."
+  value       = module.staff_auth.web_client_id
+}
+
+output "staff_auth_domain" {
+  description = "Staging hosted staff auth domain (Cognito-provided prefix; the staff pool never gets a custom domain)."
+  value       = module.staff_auth.domain
+}
+
+output "staff_auth_issuer_url" {
+  description = "OIDC issuer the admin service will verify staff tokens against."
+  value       = module.staff_auth.issuer_url
+}
+
 # ── Mailer (issues 6.2, 6.3) — read by the deploy workflow and, in PR4, by
 # the API deploy workflow to derive its MAILER_* env vars ────────────────────
 output "mailer_api_url" {

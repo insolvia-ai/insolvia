@@ -67,6 +67,26 @@ output "auth_domain" {
   value       = module.auth.domain
 }
 
+output "staff_auth_user_pool_id" {
+  description = "Production STAFF Cognito pool ID (#209) — the admin portal's issuer, distinct from the attorney pool above."
+  value       = module.staff_auth.user_pool_id
+}
+
+output "staff_auth_web_client_id" {
+  description = "Production admin portal app client ID (authorization-code + PKCE)."
+  value       = module.staff_auth.web_client_id
+}
+
+output "staff_auth_domain" {
+  description = "Production hosted staff auth domain (Cognito-provided prefix; the staff pool never gets a custom domain)."
+  value       = module.staff_auth.domain
+}
+
+output "staff_auth_issuer_url" {
+  description = "OIDC issuer the admin service will verify staff tokens against."
+  value       = module.staff_auth.issuer_url
+}
+
 output "auth_issuer_url" {
   description = "OIDC issuer the API will validate production JWTs against (wired up with the first authenticated endpoint)."
   value       = module.auth.issuer_url

@@ -53,6 +53,26 @@ output "auth_issuer_url" {
   value       = module.auth.issuer_url
 }
 
+output "staff_auth_user_pool_id" {
+  description = "This machine's STAFF Cognito pool ID (#209) — the admin portal's issuer, distinct from the firm pool above."
+  value       = module.staff_auth.user_pool_id
+}
+
+output "staff_auth_web_client_id" {
+  description = "This machine's admin portal app client ID (authorization-code + PKCE)."
+  value       = module.staff_auth.web_client_id
+}
+
+output "staff_auth_domain" {
+  description = "This machine's hosted staff auth domain (Cognito-provided prefix; the staff pool never gets a custom domain)."
+  value       = module.staff_auth.domain
+}
+
+output "staff_auth_issuer_url" {
+  description = "OIDC issuer the admin service verifies staff tokens against."
+  value       = module.staff_auth.issuer_url
+}
+
 output "firm_table_name" {
   description = "Firms, firm users and their permissions (FIRM_TABLE_NAME for the API)."
   value       = module.firm_store.table_name

@@ -172,6 +172,29 @@ module "auth" {
   tags = local.common_tags
 }
 
+# ── Staff auth (#209) ───────────────────────────────────────────
+# This machine's own STAFF pool (insolvia-staff-dev-<machine_short_id>), so the
+# admin portal and admin service run locally against a real second issuer —
+# the cross-issuer refusal (a firm user's token 401ing on an admin route) is
+# only testable with two real pools. Port 3100 is the admin portal's dev
+# server, pinned for the same exact-match reason as the app's 3000 above.
+# Accounts come from ./scripts/dev-aws-create-staff-user.sh; note the staff
+# pool REQUIRES TOTP, so the first hosted-UI sign-in runs authenticator
+# enrollment.
+module "staff_auth" {
+  source = "../../modules/staff_auth"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  web_origins = ["http://localhost:3100"]
+
+  # Throwaway staff accounts on a throwaway pool.
+  deletion_protection = false
+
+  tags = local.common_tags
+}
+
 # ── API auth configuration ──────────────────────────────────────
 # The same /insolvia/<env>/api/<kebab-key> parameters staging and prod publish
 # (issue #79), under this machine's own environment name. No Lambda reads them

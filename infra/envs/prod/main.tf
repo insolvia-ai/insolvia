@@ -182,6 +182,30 @@ module "auth" {
   tags = local.common_tags
 }
 
+# ── Staff auth (#209) ───────────────────────────────────────────
+# The production STAFF pool — the admin portal's issuer, structurally separate
+# from the attorney pool above (the module header owns the argument). Registers
+# ONLY the production portal origin: nothing running on a laptop should be able
+# to complete a prod staff sign-in, the same rule the firm pool applies. No
+# custom domain, ever — an internal tool for a handful of staff does not repay
+# the 15-20 minute per-pool domain tax. Accounts are created by hand: an
+# admin-create-only pool with required TOTP, provisioned per the console
+# procedure (the pool never grants any service a Cognito write).
+module "staff_auth" {
+  source = "../../modules/staff_auth"
+
+  project     = "insolvia"
+  environment = local.environment
+
+  web_origins = ["https://${var.admin_subdomain}"]
+
+  # These accounts can provision and suspend every tenant; a destroy or a
+  # replacing plan must fail loudly, exactly as the attorney pool's does.
+  deletion_protection = true
+
+  tags = local.common_tags
+}
+
 # Publish the pool's issuer and web app client id into the API's own SSM
 # config namespace (issue #79) so the API Lambda can read them as
 # AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.

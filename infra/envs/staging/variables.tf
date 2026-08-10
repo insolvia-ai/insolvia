@@ -27,6 +27,16 @@ variable "api_subdomain" {
   default     = "staging-api.insolvia.ai"
 }
 
+# Same flat-label reasoning as `subdomain`: `*.insolvia.ai` covers
+# `staging-admin.insolvia.ai`, not a nested `admin.staging.…`. The admin
+# PORTAL's host (#209); the staff pool it signs into keeps the Cognito prefix
+# domain — modules/staff_auth deliberately has no custom-domain seam.
+variable "admin_subdomain" {
+  description = "Hostname the admin portal serves in this environment."
+  type        = string
+  default     = "staging-admin.insolvia.ai"
+}
+
 # Same flat-label reasoning again: `*.insolvia.ai` covers
 # `staging-mailer-api.insolvia.ai`, not a nested `mailer-api.staging.…`.
 variable "mailer_subdomain" {

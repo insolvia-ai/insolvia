@@ -22,6 +22,15 @@ variable "api_subdomain" {
   default     = "api.insolvia.ai"
 }
 
+# The admin PORTAL's host (#209); the staff pool it signs into keeps the
+# Cognito prefix domain — modules/staff_auth deliberately has no custom-domain
+# seam.
+variable "admin_subdomain" {
+  description = "Hostname the admin portal serves in this environment."
+  type        = string
+  default     = "admin.insolvia.ai"
+}
+
 variable "mailer_subdomain" {
   description = "Hostname the mailer API serves in this environment."
   type        = string

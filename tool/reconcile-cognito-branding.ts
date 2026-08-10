@@ -41,7 +41,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 
-const OUT = 'infra/modules/auth/managed-login-settings.json';
+// Both pools' documents, reconciled from the same tokens in one run: the
+// customer pool's sign-in page and the staff pool's (#209) must agree with the
+// app and therefore with each other. One entry per Cognito-auth module — a new
+// pool's module adds its path here and is gated by the same `--check`.
+const OUTS = [
+  'infra/modules/auth/managed-login-settings.json',
+  'infra/modules/staff_auth/managed-login-settings.json',
+] as const;
 const TOKENS_PACKAGE = '@insolvia-ai/tokens';
 const COLORS_SPECIFIER = `${TOKENS_PACKAGE}/colors.json`;
 const REGEN_COMMAND = 'npm run tokens';
@@ -150,30 +157,32 @@ type JsonObject = { [key: string]: JsonValue };
 function main(args: string[]): void {
   const check = args.includes('--check');
   const root = repoRoot();
-  const file = join(root, OUT);
-
   const colors = loadColors();
-  const current = readFileSync(file, 'utf8');
-  const reconciled = reconcile(colors, current);
 
-  if (current === reconciled) {
-    process.stdout.write(`${OUT} is in sync with ${TOKENS_PACKAGE}.\n`);
-    return;
+  for (const out of OUTS) {
+    const file = join(root, out);
+    const current = readFileSync(file, 'utf8');
+    const reconciled = reconcile(colors, current, out);
+
+    if (current === reconciled) {
+      process.stdout.write(`${out} is in sync with ${TOKENS_PACKAGE}.\n`);
+      continue;
+    }
+
+    if (check) {
+      process.stderr.write(`${out} has drifted from the installed ${TOKENS_PACKAGE}.\n\n`);
+      process.stderr.write(
+        'Either the file was hand-edited, or the tokens dependency was bumped\n' +
+          'without regenerating. Run:\n\n',
+      );
+      process.stderr.write(`  ${REGEN_COMMAND}\n`);
+      process.exitCode = 1;
+      continue;
+    }
+
+    writeFileSync(file, reconciled);
+    process.stdout.write(`wrote ${out}\n`);
   }
-
-  if (check) {
-    process.stderr.write(`${OUT} has drifted from the installed ${TOKENS_PACKAGE}.\n\n`);
-    process.stderr.write(
-      'Either the file was hand-edited, or the tokens dependency was bumped\n' +
-        'without regenerating. Run:\n\n',
-    );
-    process.stderr.write(`  ${REGEN_COMMAND}\n`);
-    process.exitCode = 1;
-    return;
-  }
-
-  writeFileSync(file, reconciled);
-  process.stdout.write(`wrote ${OUT}\n`);
 }
 
 /**
@@ -230,8 +239,12 @@ function loadColors(): Record<Mode, Record<string, string>> {
  * prevent — the sign-in page would quietly regain a patch of AWS blue and
  * nothing would say so.
  */
-function reconcile(colors: Record<Mode, Record<string, string>>, current: string): string {
-  const root = asObject(JSON.parse(current) as JsonValue, OUT);
+function reconcile(
+  colors: Record<Mode, Record<string, string>>,
+  current: string,
+  out: string,
+): string {
+  const root = asObject(JSON.parse(current) as JsonValue, out);
 
   for (const mode of MODES) {
     const values = colors[mode];
@@ -244,7 +257,7 @@ function reconcile(colors: Record<Mode, Record<string, string>>, current: string
             'The tokens package dropped or renamed it — update COGNITO_COLORS.',
         );
       }
-      setColor(root, template.replace('{mode}', key).split('.'), cognitoColor(hex));
+      setColor(root, template.replace('{mode}', key).split('.'), cognitoColor(hex), out);
     }
   }
 
@@ -252,18 +265,18 @@ function reconcile(colors: Record<Mode, Record<string, string>>, current: string
 }
 
 /** Walk a dotted path and assign, asserting every segment exists. */
-function setColor(root: JsonObject, path: readonly string[], value: string): void {
+function setColor(root: JsonObject, path: readonly string[], value: string, out: string): void {
   let node: JsonObject = root;
   for (let index = 0; index < path.length - 1; index += 1) {
     const segment = path[index] as string;
     if (!(segment in node)) {
-      throw new Error(`${OUT}: no such path segment "${segment}" in ${path.join('.')}`);
+      throw new Error(`${out}: no such path segment "${segment}" in ${path.join('.')}`);
     }
-    node = asObject(node[segment], `${OUT}:${path.slice(0, index + 1).join('.')}`);
+    node = asObject(node[segment], `${out}:${path.slice(0, index + 1).join('.')}`);
   }
   const leaf = path[path.length - 1] as string;
   if (!(leaf in node)) {
-    throw new Error(`${OUT}: no such colour slot "${path.join('.')}"`);
+    throw new Error(`${out}: no such colour slot "${path.join('.')}"`);
   }
   node[leaf] = value;
 }
