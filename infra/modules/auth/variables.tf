@@ -74,6 +74,33 @@ variable "deletion_protection" {
   type        = bool
 }
 
+# ── Outbound email (#210) ───────────────────────────────────────
+# Null → Cognito's default sender (no-reply@verificationemail.com, 50/day,
+# unaffected by the SES sandbox — the right answer for dev). Set → DEVELOPER
+# mode through the account's SES identity, so invites and reset codes leave as
+# no-reply@insolvia.ai. Constructed by the caller the way modules/mailer
+# builds its identity ARN — arn:aws:ses:<region>:<account>:identity/<domain> —
+# never remote state.
+#
+# The SES sandbox (until #211) is subtler than "cannot send": recipients on
+# the VERIFIED DOMAIN IDENTITY deliver even in the sandbox, so every
+# @insolvia.ai test account works everywhere today; only EXTERNAL recipients
+# fail, silently, at delivery. Staging and prod both set this — the risk that
+# gating prod would have bought protection from (a real firm invited before
+# #211) is handled by sequencing #211 ahead of provisioning, not by config
+# drift between environments.
+variable "ses_source_arn" {
+  description = "SES identity ARN Cognito sends through (DEVELOPER mode), or null for the Cognito default sender."
+  type        = string
+  default     = null
+}
+
+variable "from_email_address" {
+  description = "From header when ses_source_arn is set. Must be on the SES identity's domain."
+  type        = string
+  default     = "Insolvia <no-reply@insolvia.ai>"
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

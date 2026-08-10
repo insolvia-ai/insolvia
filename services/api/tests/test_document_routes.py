@@ -34,6 +34,7 @@ from insolvia_api.api.routes.documents import (
     DOWNLOAD_URL_TTL_SECONDS,
     UPLOAD_URL_TTL_SECONDS,
 )
+from insolvia_api.core import documents as core_documents
 from insolvia_api.core.config import load_config
 from insolvia_api.core.documents import (
     MAX_BYTE_SIZE,
@@ -569,7 +570,20 @@ def test_completing_a_deleted_document_is_404_and_resurrects_nothing(
 # ── Listing ─────────────────────────────────────────────────────
 
 
-def test_listing_returns_the_cases_documents_newest_first(client):
+def test_listing_returns_the_cases_documents_newest_first(client, monkeypatch):
+    """The clock is pinned to two distinct instants, because the design does
+    not promise creation order within one millisecond: two uploads stamped in
+    the same one tie on uploaded_at and fall to list_order's id tiebreak —
+    stable, but arbitrary. Left on the wall clock this test failed whenever
+    both POSTs landed in one millisecond and the random ids sorted the wrong
+    way. Same reasoning as test_cases.test_list_is_newest_first;
+    test_documents.test_ordering_is_by_time_then_id pins the tie rule itself.
+
+    The iterator is deliberately exactly two instants long: a third
+    _timestamp() call would mean this route stamps more than this test
+    believes, and StopIteration says so louder than a flake would."""
+    instants = iter(("2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.001Z"))
+    monkeypatch.setattr(core_documents, "_timestamp", lambda: next(instants))
     case_id = open_case(client)
     first = added(client, case_id, fileName="one.pdf")
     second = added(client, case_id, fileName="two.pdf")

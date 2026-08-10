@@ -22,12 +22,14 @@ class MemoryUserDirectory:
         self.subjects: dict[str, str] = {}
 
     def create_user(self, email: str) -> str:
-        # Exact-match, and that is FAITHFUL rather than lazy: the real pool is
-        # case-SENSITIVE (measured — see the AWS adapter), so `a@x.test` and
-        # `A@X.TEST` really are two accounts there too. Lower-casing here would
-        # make this fake stricter than production and hide the fact that the
-        # single normalisation lives in core/firms._parse_email.
-        if email in self.subjects:
+        # Case-INSENSITIVE, because the real pool is: `infra/modules/auth` sets
+        # `username_configuration { case_sensitive = false }` (issue #179), so
+        # Cognito refuses `A@X.TEST` when `a@x.test` already exists. In
+        # practice every address arrives lower-cased from
+        # insolvia_core.firms._parse_email — the AWS adapter's docstring owns
+        # that story — but an exact-match fake would still be weaker than
+        # production for any caller that skips the parser.
+        if any(existing.lower() == email.lower() for existing in self.subjects):
             raise ConflictError("that email address already has an Insolvia account")
         subject = str(uuid.uuid4())
         self.subjects[email] = subject
