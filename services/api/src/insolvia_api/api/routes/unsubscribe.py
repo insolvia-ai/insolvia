@@ -4,9 +4,9 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.errors import ValidationError
 
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.errors import ValidationError
 from insolvia_api.core.unsubscribe import verify_token
 
 logger = logging.getLogger(__name__)

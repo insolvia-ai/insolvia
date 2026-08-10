@@ -30,6 +30,9 @@ jobs:
         with:
           paths: |
             services/api/**
+            # The shared domain this service installs from a local path (issue
+            # #208) — a core change must re-run this suite and image build.
+            packages/insolvia_core/**
             # Shared root lint config — a rule change must re-lint this service.
             ruff.toml
             .github/workflows/api-pr.yml
@@ -64,7 +67,10 @@ jobs:
 
       # Packaging check: the exact image the deploy workflows ship must build.
       # A requirements pin that resolves on the runner but not in the Lambda
-      # base image should fail here, not on a push to main.
+      # base image should fail here, not on a push to main. Context is the repo
+      # root because the image installs packages/insolvia_core by relative path
+      # (see the Dockerfile header).
       - name: Build Lambda image
         if: steps.filter.outputs.run == 'true'
-        run: docker build --target lambda -t insolvia-api-pr-check .
+        working-directory: ${{ github.workspace }}
+        run: docker build --target lambda -f services/api/Dockerfile -t insolvia-api-pr-check .

@@ -175,7 +175,7 @@ env:
 
 ```
 terraform -chdir=infra/envs/shared apply          # creates insolvia-api
-docker build --target lambda -t <repo-url>:<env> services/api && docker push <repo-url>:<env>
+docker build --target lambda -f services/api/Dockerfile -t <repo-url>:<env> . && docker push <repo-url>:<env>
 terraform apply
 ```
 

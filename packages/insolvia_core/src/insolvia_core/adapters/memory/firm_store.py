@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_api.core.firms import Firm, FirmUser
+from insolvia_core.firms import Firm, FirmUser
 
 
 class MemoryFirmStore:

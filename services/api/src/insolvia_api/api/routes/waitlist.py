@@ -4,9 +4,9 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.errors import ValidationError
 
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.errors import ValidationError
 from insolvia_api.core.waitlist import create_waitlist_record, parse_waitlist_submission
 
 logger = logging.getLogger(__name__)

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from flask import current_app
+from insolvia_core.ports import FirmStore, JwksProvider, UserDirectory
 
 from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
@@ -12,10 +13,7 @@ from insolvia_api.core.ports import (
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
-    FirmStore,
-    JwksProvider,
     Mailer,
-    UserDirectory,
     WaitlistStore,
 )
 

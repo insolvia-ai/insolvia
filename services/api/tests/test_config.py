@@ -1,6 +1,6 @@
 import pytest
 from insolvia_api.core.config import AppConfig, load_config
-from insolvia_api.core.errors import ValidationError
+from insolvia_core.errors import ValidationError
 
 
 def test_environment_defaults_to_local():

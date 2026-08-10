@@ -32,7 +32,7 @@ from datetime import datetime
 from math import isfinite
 from typing import Final
 
-from .errors import FieldValidationError
+from insolvia_core.errors import FieldValidationError
 
 # Who supplied a value.
 #

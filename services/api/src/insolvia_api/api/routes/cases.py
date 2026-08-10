@@ -4,6 +4,9 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.firms import ADD_EDIT, CASES, VIEW_ONLY
+from insolvia_core.ports import FirmStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
@@ -17,9 +20,7 @@ from insolvia_api.core.cases import (
     parse_case_update,
     parse_list_limit,
 )
-from insolvia_api.core.errors import NotFoundError, ValidationError
-from insolvia_api.core.firms import ADD_EDIT, CASES, VIEW_ONLY
-from insolvia_api.core.ports import AccessLog, CaseStore, FirmStore
+from insolvia_api.core.ports import AccessLog, CaseStore
 
 logger = logging.getLogger(__name__)
 

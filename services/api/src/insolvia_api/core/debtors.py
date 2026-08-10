@@ -29,8 +29,9 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
 from typing import Final
 
+from insolvia_core.errors import FieldValidationError
+
 from .cases import partition_key
-from .errors import FieldValidationError
 from .provenance import (
     ADDRESSABLE_ID_RE,
     ProvenanceEntry,

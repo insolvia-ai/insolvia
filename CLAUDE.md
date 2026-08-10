@@ -36,7 +36,7 @@ not here.
 
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React SSR)
-packages/   insolvia_api_client
+packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
 services/   api · mailer            (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
 tool/       reconcile-cognito-branding.ts  (the sign-in page's colours)
@@ -94,6 +94,7 @@ before you touch anything:
 | **re-branding**: changing a brand colour or font the design system owns | `design-system-theming` skill — the override seams, and why `primaryHover` follows the base colour on web but is pre-computed on native |
 | wiring the packages into a **new** consumer (401/404 on the `@insolvia-ai` scope, Tailwind seeing `node_modules`, dark mode) | `design-system-setup` skill — both consumers here are already wired; this is for when one breaks |
 | **changing a shared component (Button, Field, …) or a design token** | **Not in this repo** — [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system). Change it there, publish, then bump the dependency here · [ADR 0010](docs/adr/0010-design-system-moves-to-its-own-repository.md) · [ADR 0006](docs/adr/0006-owned-cross-platform-design-system.md) |
+| **touching the firm domain, token verification, or their stores** — item shapes, permissions, `FirmStore`, JWKS | [`packages/insolvia_core/CLAUDE.md`](packages/insolvia_core/CLAUDE.md) — shared by the Python services; the item shapes have one owner · [ADR 0012](docs/adr/0012-shared-python-domain-package.md) |
 | **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump both consumers' manifests and both lockfiles, and regenerate the Cognito branding |
 | changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
 | **the sign-in page's colours** (`infra/modules/auth/managed-login-settings.json`) | [`tool/reconcile-cognito-branding.ts`](tool/reconcile-cognito-branding.ts) — generated from the installed `@insolvia-ai/tokens`; `npm run tokens` regenerates, `npm run tokens:check` gates it |

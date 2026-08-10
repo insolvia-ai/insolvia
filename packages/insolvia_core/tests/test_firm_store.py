@@ -23,10 +23,10 @@ from typing import Any
 
 import pytest
 from botocore.exceptions import ClientError
-from insolvia_api.adapters.aws import firm_store as aws_firm_store
-from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
-from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
-from insolvia_api.core.firms import (
+from insolvia_core.adapters.aws import firm_store as aws_firm_store
+from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
+from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
     Firm,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
+from insolvia_core.firms import FEATURES, permission_for
 
 from insolvia_api.api.auth import current_principal, require_auth, resolve_accessor
-from insolvia_api.core.firms import FEATURES, permission_for
 
 blueprint = Blueprint("me", __name__)
 

@@ -22,15 +22,24 @@ def _imports(path: Path) -> set[str]:
 
 def test_environment_dependency_boundaries() -> None:
     violations: list[str] = []
+    # `insolvia_core`'s domain modules count as core-direction imports and are
+    # allowed everywhere; its ADAPTERS are adapters, and the same layering
+    # applies to them as to our own (issue #208).
     forbidden = {
         "core": (
             "insolvia_api.api",
             "insolvia_api.adapters",
             "insolvia_api.entrypoints",
+            "insolvia_core.adapters",
             "boto3",
             "flask",
         ),
-        "api": ("insolvia_api.adapters", "insolvia_api.entrypoints", "boto3"),
+        "api": (
+            "insolvia_api.adapters",
+            "insolvia_api.entrypoints",
+            "insolvia_core.adapters",
+            "boto3",
+        ),
         "adapters": ("insolvia_api.api", "insolvia_api.entrypoints", "flask"),
         "entrypoints": ("flask",),
     }

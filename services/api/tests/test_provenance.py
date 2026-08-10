@@ -6,7 +6,6 @@ rule could be evaded rather than just a way it could be used.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.errors import FieldValidationError
 from insolvia_api.core.provenance import (
     ProvenanceEntry,
     parse_provenance,
@@ -14,6 +13,7 @@ from insolvia_api.core.provenance import (
     provenance_json,
     require_provenance,
 )
+from insolvia_core.errors import FieldValidationError
 
 CONFIRMED = {
     "source": "ai_extracted",

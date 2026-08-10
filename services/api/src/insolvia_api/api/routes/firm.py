@@ -30,15 +30,12 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-
-from insolvia_api.api.auth import current_accessor, require_auth, requires
-from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.errors import (
+from insolvia_core.errors import (
     ConflictError,
     NotFoundError,
     ValidationError,
 )
-from insolvia_api.core.firms import (
+from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
     FIRM_ADMINISTRATION,
@@ -52,7 +49,10 @@ from insolvia_api.core.firms import (
     parse_firm_user_update,
     would_leave_no_admin,
 )
-from insolvia_api.core.ports import FirmStore, UserDirectory
+from insolvia_core.ports import FirmStore, UserDirectory
+
+from insolvia_api.api.auth import current_accessor, require_auth, requires
+from insolvia_api.api.dependencies import dependencies
 
 logger = logging.getLogger(__name__)
 

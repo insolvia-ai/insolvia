@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from insolvia_api.core.errors import ValidationError
+from insolvia_core.errors import ValidationError
 
 SERVICE_NAME = "insolvia-api"
 

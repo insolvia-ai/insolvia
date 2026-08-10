@@ -41,7 +41,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Final
 
-from insolvia_api.core.errors import FieldValidationError, ValidationError
+from insolvia_core.errors import FieldValidationError, ValidationError
 
 # A job title, and — this is the part that is easy to get wrong — NOT a level
 # of access. MyCase keeps them independent and so do we: role drives the

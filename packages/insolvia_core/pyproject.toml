@@ -1,0 +1,46 @@
+[project]
+name = "insolvia-core"
+version = "0.1.0"
+description = "The shared domain both Python services import — firms, auth, and their adapters (issue #208)"
+requires-python = ">=3.12"
+# Loose floors, not pins, deliberately: this package is installed only by this
+# repo's own services, each of which pins the exact resolved version in its
+# requirements.txt (boto3 and PyJWT are pinned there today). A second set of
+# exact pins here would be a second truth to keep in step.
+dependencies = [
+  "boto3>=1.34",
+  "PyJWT[crypto]>=2.8",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# The py.typed marker is what lets a consumer's strict mypy see these types.
+insolvia_core = ["py.typed"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+# Same guards as services/api's pyproject, for the same reasons: an
+# unregistered mark or a typo in this block is an error, not a warning.
+addopts = "-q --strict-markers --strict-config"
+markers = []
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true

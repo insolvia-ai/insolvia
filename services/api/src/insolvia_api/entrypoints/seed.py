@@ -109,14 +109,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Protocol
 
-from insolvia_api.adapters.aws.firm_store import DynamoDbFirmStore
-from insolvia_api.core.firms import (
+from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
+from insolvia_core.firms import (
     create_firm,
     create_firm_user,
     parse_firm_creation,
     parse_firm_user_creation,
 )
-from insolvia_api.core.ports import FirmStore
+from insolvia_core.ports import FirmStore
 
 # What infra/modules/* name a table, per environment. Dev carries the machine
 # short id from scripts/dev-aws-common.sh; staging is flat. Prod matches

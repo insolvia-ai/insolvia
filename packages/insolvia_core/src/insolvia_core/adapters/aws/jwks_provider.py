@@ -35,7 +35,7 @@ from typing import Any
 
 import jwt
 
-from insolvia_api.core.auth import AuthenticationError, AuthFailureReason
+from insolvia_core.auth import AuthenticationError, AuthFailureReason
 
 # Cognito rotates pool keys rarely; an hour bounds how long a rotated-out key
 # lingers without making the happy path chatty.

@@ -22,7 +22,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
-from insolvia_api.core.errors import FieldValidationError, ValidationError
+from insolvia_core.errors import FieldValidationError, ValidationError
 
 # The chapters an individual debtor can file under. 9 and 15 are municipal and
 # cross-border and will never appear in this product.

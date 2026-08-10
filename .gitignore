@@ -67,6 +67,10 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+# setuptools drops this when a consumer pip-installs the shared package from
+# its local path (ADR 0012). Anchored, matching the Node rule below: a bare
+# `build/` would silently swallow any future build directory anywhere.
+/packages/insolvia_core/build/
 
 # ── Node (the npm workspace + the version-gated React packages) ─
 # package-lock.json IS committed (reproducible npm installs in CI).
