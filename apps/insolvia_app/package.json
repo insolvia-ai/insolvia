@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "//": [
-    "The Insolvia app \u2014 Expo / React Native, shipped as a web SPA.",
+    "The Insolvia app — Expo / React Native, shipped as a web SPA.",
     "",
     "A member of the root npm workspace, so `npm ci` at the repo root installs",
     "it and symlinks @insolvia-ai/tokens. There is NO component library and NO",
@@ -23,7 +23,7 @@
   ],
   "//scripts": [
     "`build`, `web`, `lint`, `typecheck` and `test` are a contract with",
-    ".github/workflows/app-*.yml \u2014 renaming one orphans a required check.",
+    ".github/workflows/app-*.yml — renaming one orphans a required check.",
     "",
     "`web` pins port 3000 because infra/envs/{dev,staging} register",
     "http://localhost:3000 as an EXACT-MATCH Cognito allowed origin; Expo's own",
@@ -54,12 +54,13 @@
     "Sign-in adds NO dependency: PKCE is Web Crypto and storage is the platform",
     "localStorage/sessionStorage, each read lazily behind a guard in",
     "src/session/browser.ts. expo-auth-session, expo-secure-store and",
-    "async-storage are deliberately absent \u2014 a future NATIVE client (custom-scheme",
+    "async-storage are deliberately absent — a future NATIVE client (custom-scheme",
     "redirect, system browser, platform secure store) is what would justify the",
     "first of them; on web it would buy nothing. See docs/adr/0007."
   ],
   "dependencies": {
     "@insolvia-ai/api-client": "*",
+    "@insolvia-ai/design-system": "^0.14.1",
     "@insolvia-ai/tokens": "^0.3.2",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.7",
@@ -70,15 +71,14 @@
     "react-native": "0.86.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-web": "^0.21.2",
-    "@insolvia-ai/design-system": "^0.14.0"
+    "react-native-web": "^0.21.2"
   },
   "//insolvia-ai-dependencies": [
     "@insolvia-ai/design-system and @insolvia-ai/tokens are PUBLISHED packages",
     "from github.com/insolvia-ai/design-system, pinned by range like any other",
     "dependency. They were `*` while they were workspace members of this repo,",
     "which meant this app read the design system's SOURCE through a symlink and",
-    "saw every merge instantly \u2014 while the marketing site, installing the",
+    "saw every merge instantly — while the marketing site, installing the",
     "published version, saw nothing until a release. Extracting them ended that",
     "split. Take a change by bumping the range here, never by pointing it at a",
     "local checkout.",
@@ -90,6 +90,7 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.1",
     "babel-preset-expo": "^57.0.4",
     "jest": "^29.7.0",
     "jest-expo": "~57.0.3",
@@ -103,13 +104,13 @@
     "react."
   ],
   "//jest": [
-    "The config moved to jest.config.js \u2014 it has to COMPUTE",
+    "The config moved to jest.config.js — it has to COMPUTE",
     "`transformIgnorePatterns` from jest-expo's own, which package.json cannot",
     "do. @insolvia-ai/design-system publishes untranspiled source and now lives",
     "under node_modules (it was a workspace member before the extraction), so",
     "Jest skips transforming it and every route test dies on `export`. That",
     "file explains why the list is derived rather than pasted; the preset's own",
-    "entries \u2014 `standard-navigation` above all \u2014 must survive.",
+    "entries — `standard-navigation` above all — must survive.",
     "",
     "Tests assert accessibility PROPS (role, aria-level, aria-labelledby); that",
     "those props become real <h1>/<button>/<label>-equivalent tags is",
