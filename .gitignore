@@ -36,6 +36,7 @@ coverage/
 crash.log
 crash.*.log
 *.tfvars                # real vars are secret; *.tfvars.example IS committed
+infra/envs/ci-trust/terraform.tfvars
 !*.tfvars.example
 override.tf
 override.tf.json
