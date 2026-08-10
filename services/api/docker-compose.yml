@@ -33,12 +33,19 @@ services:
       # presigned URLs the API mints are signed against this bucket, so a
       # KMS or bucket-policy mistake surfaces here rather than on staging.
       CASE_DOCUMENT_BUCKET: ${CASE_DOCUMENT_BUCKET:-}
+      # Firm store (ADR 0009 tenancy), read on every authenticated request.
+      # Unset composes the empty IN-MEMORY store, so a seeded, signed-in user
+      # still 403s "not active in a firm" — the seeder writes the real table.
+      FIRM_TABLE_NAME: ${FIRM_TABLE_NAME:-}
       # Auth (issue #79). Unset is safe and fails CLOSED: every protected
       # route answers 401 rather than skipping verification. Point them at
       # this machine's own Cognito pool (infra/envs/dev outputs
       # auth_issuer_url / auth_web_client_id) to exercise a real sign-in.
       AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      # The pool POST /v1/firm/users CALLS (AUTH_ISSUER_URL is what tokens are
+      # verified against); unset means the in-memory directory.
+      AUTH_USER_POOL_ID: ${AUTH_USER_POOL_ID:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
