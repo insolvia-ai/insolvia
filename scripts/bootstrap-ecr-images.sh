@@ -155,9 +155,12 @@ ecr_repo_exists() {
 # ── per-service build + push ───────────────────────────────────────
 build_api() {
   # Pure Python; --target lambda selects the public.ecr.aws/lambda stage (the
-  # other stage is the local development server).
+  # other stage is the local development server). Context is the REPO ROOT:
+  # the image installs the shared packages/insolvia_core by relative path
+  # (see services/api/Dockerfile's header).
   docker build --platform "$PLATFORM" --target lambda \
-    -t "$1:$ENV" "$REPO_ROOT/services/api"
+    -f "$REPO_ROOT/services/api/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
 }
 
 build_mailer() {

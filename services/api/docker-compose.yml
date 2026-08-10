@@ -16,7 +16,10 @@
 services:
   api:
     build:
-      context: .
+      # The repo root, not this directory: the image installs the shared
+      # packages/insolvia_core by relative path (see the Dockerfile header).
+      context: ../..
+      dockerfile: services/api/Dockerfile
       target: development
     environment:
       INSOLVIA_ENV: ${INSOLVIA_ENV:-local}

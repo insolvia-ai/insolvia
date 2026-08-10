@@ -15,7 +15,6 @@ from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import AppConfig, load_config
-from insolvia_api.core.errors import ValidationError
 from insolvia_api.core.unsubscribe import (
     UnsubscribeSecretMissingError,
     mint_token,
@@ -23,6 +22,7 @@ from insolvia_api.core.unsubscribe import (
     unsubscribe_url,
     verify_token,
 )
+from insolvia_core.errors import ValidationError
 
 SECRET = "test-unsubscribe-secret"
 OTHER_SECRET = "a-different-secret"

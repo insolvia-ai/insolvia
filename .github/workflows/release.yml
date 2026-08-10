@@ -166,10 +166,17 @@ jobs:
             fi
           }
 
-          emit api       '^(services/api/|infra/envs/staging/|infra/modules/api_service/|\.github/workflows/(api-staging|release)\.yml)'
+          # packages/insolvia_core is baked into the api image (issue #208), so
+          # a core change must rebuild and redeploy the service that ships it.
+          emit api       '^(services/api/|packages/insolvia_core/|infra/envs/staging/|infra/modules/api_service/|\.github/workflows/(api-staging|release)\.yml)'
           emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
-          emit app       '^(apps/|packages/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|\.github/workflows/(app-staging|release)\.yml)'
+          # apps/ and packages/ are named app-by-app rather than as whole
+          # directories: marketing has its own line above, and the Python
+          # packages/insolvia_core belongs to the api leg — a broad ^apps/ or
+          # ^packages/ here would rebuild and redeploy the app for changes it
+          # never consumes.
+          emit app       '^(apps/insolvia_app/|packages/insolvia_api_client/|package(-lock)?\.json|infra/envs/staging/|infra/modules/|e2e/|\.github/workflows/(app-staging|release)\.yml)'
           # The set shared-infra-deploy.yml carried as `on.push.paths` before
           # this workflow took its trigger over.
           emit shared    '^(infra/envs/shared/|infra/modules/|\.github/workflows/(shared-infra-deploy|release)\.yml)'

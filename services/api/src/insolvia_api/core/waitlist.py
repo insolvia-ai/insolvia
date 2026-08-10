@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from insolvia_api.core.errors import FieldValidationError
+from insolvia_core.errors import FieldValidationError
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

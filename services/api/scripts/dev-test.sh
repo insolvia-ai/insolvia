@@ -4,7 +4,8 @@
 # same order, as the `API service` job in .github/workflows/api-pr.yml:
 #   ruff check .  →  ruff format --check .  →  mypy  →  pytest
 # (CI additionally builds the Lambda image; run that separately with
-#  `docker build --target lambda services/api` when touching packaging.)
+#  `docker build --target lambda -f services/api/Dockerfile .` FROM THE REPO
+#  ROOT when touching packaging — the context must see packages/insolvia_core.)
 #
 # Uses the venv created by dev-setup.sh so the tool versions match the pinned
 # requirements-dev.txt, not whatever is on the machine.

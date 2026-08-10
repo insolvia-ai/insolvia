@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from insolvia_api.core.auth import AuthenticationError, AuthFailureReason
+from insolvia_core.auth import AuthenticationError, AuthFailureReason
 
 
 class StaticJwksProvider:

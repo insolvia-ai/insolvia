@@ -72,6 +72,8 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
+from insolvia_core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
@@ -86,8 +88,6 @@ from insolvia_api.core.documents import (
     expiry_timestamp,
     parse_document_upload,
 )
-from insolvia_api.core.errors import ConflictError, NotFoundError, ValidationError
-from insolvia_api.core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
 from insolvia_api.core.ports import (
     AccessLog,
     CaseStore,

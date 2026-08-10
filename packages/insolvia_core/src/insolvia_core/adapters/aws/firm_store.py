@@ -5,7 +5,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_api.core.firms import (
+from insolvia_core.firms import (
     Firm,
     FirmItemValue,
     FirmUser,

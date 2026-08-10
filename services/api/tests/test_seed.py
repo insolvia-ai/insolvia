@@ -25,9 +25,9 @@ import json
 from pathlib import Path
 
 import pytest
-from insolvia_api.adapters.memory.firm_store import MemoryFirmStore
-from insolvia_api.core.ports import FirmStore
 from insolvia_api.entrypoints.seed import Dependencies, RefusedError, main
+from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.ports import FirmStore
 
 DEV_TABLE = "insolvia-firms-dev-0123456789ab"
 STAGING_TABLE = "insolvia-firms-staging"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_api.core.errors import ConflictError
+from insolvia_core.errors import ConflictError
 
 
 class CognitoUserDirectory:

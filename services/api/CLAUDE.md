@@ -5,7 +5,13 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
 
 - **Layered `core / api / adapters / entrypoints`** with the dependency
   direction enforced by `tests/test_architecture.py`: `core` depends on nothing
-  else; `api` depends only on `core`.
+  else; `api` depends only on `core`. The firm domain, token verification, and
+  their adapters live in the shared
+  [`packages/insolvia_core`](../../packages/insolvia_core/CLAUDE.md)
+  ([ADR 0012](../../docs/adr/0012-shared-python-domain-package.md)) — its
+  domain modules count as core-direction imports, its `adapters` as adapters.
+  It is installed from `requirements.txt` by local path and is NOT editable:
+  after editing the package, re-run `pip install -r requirements.txt` here.
 - **The client stays dumb.** Every client capability is an API endpoint — no
   client (web, desktop, our own SSR Lambdas) ever talks to AWS data stores
   directly. Trust boundary:

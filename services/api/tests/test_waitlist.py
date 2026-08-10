@@ -1,7 +1,6 @@
 import uuid
 
 import pytest
-from insolvia_api.core.errors import FieldValidationError
 from insolvia_api.core.waitlist import (
     WaitlistRecord,
     WaitlistSubmission,
@@ -9,6 +8,7 @@ from insolvia_api.core.waitlist import (
     parse_waitlist_submission,
     record_item,
 )
+from insolvia_core.errors import FieldValidationError
 
 VALID_BODY = {
     "name": "Ada Lovelace",

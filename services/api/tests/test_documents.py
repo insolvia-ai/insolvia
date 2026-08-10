@@ -30,7 +30,7 @@ from insolvia_api.core.documents import (
     object_key,
     parse_document_upload,
 )
-from insolvia_api.core.errors import FieldValidationError, ValidationError
+from insolvia_core.errors import FieldValidationError, ValidationError
 
 CASE_ID = "00000000-0000-4000-8000-0000000000ca"
 DOCUMENT_ID = "00000000-0000-4000-8000-0000000000d0"

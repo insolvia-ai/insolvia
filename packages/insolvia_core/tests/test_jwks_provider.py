@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from insolvia_api.adapters.aws.jwks_provider import CognitoJwksProvider, parse_jwks
-from insolvia_api.adapters.memory.jwks_provider import StaticJwksProvider
-from insolvia_api.core.auth import AuthenticationError, AuthFailureReason
+from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider, parse_jwks
+from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.auth import AuthenticationError, AuthFailureReason
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 

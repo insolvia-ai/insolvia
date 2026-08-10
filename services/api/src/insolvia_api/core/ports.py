@@ -1,36 +1,21 @@
+"""The ports only this service composes.
+
+The firm domain's ports — FirmStore, UserDirectory, JwksProvider — live in
+`insolvia_core.ports` with the domain they serve (issue #208); everything here
+is tenant-API-specific.
+"""
+
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import AccessEvent
 from insolvia_api.core.cases import Case, CaseAssignment, CasePage
 from insolvia_api.core.debtors import Debtor
 from insolvia_api.core.documents import Document, StoredBlob
-from insolvia_api.core.firms import Firm, FirmUser
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
-
-
-class JwksProvider(Protocol):
-    """Supplies the public key a JWT's `kid` names (issue #79).
-
-    This port exists so `core/auth.py` can stay pure. Verification needs a
-    key; fetching one needs the network, and `core` may not have it. The real
-    implementation (adapters/aws/jwks_provider.py) reads the Cognito pool's
-    `<issuer>/.well-known/jwks.json` over stdlib urllib and caches by `kid`;
-    the static one (adapters/memory/jwks_provider.py) is handed keys directly
-    and is what the tests sign against.
-
-    Implementations MUST raise `insolvia_api.core.auth.AuthenticationError`
-    with `AuthFailureReason.UNKNOWN_KEY` for a `kid` they cannot resolve —
-    including after a refresh. Returning None or a placeholder would push a
-    "no key" case into the verifier, where the safe branch is easy to miss.
-    """
-
-    def signing_key(self, kid: str) -> Any:
-        """The key for `kid`, in whatever form PyJWT's `decode` accepts."""
-        ...
 
 
 class WaitlistStore(Protocol):
@@ -38,130 +23,6 @@ class WaitlistStore(Protocol):
     and adapters/memory (tests and the plain development server)."""
 
     def add(self, record: WaitlistRecord) -> None: ...
-
-
-class UserDirectory(Protocol):
-    """Creates the Cognito account behind a new firm user.
-
-    THE ONLY PORT IN THIS SERVICE THAT WRITES TO THE IDENTITY PROVIDER, and it
-    has exactly one method for that reason. Self-signup is off
-    (`allow_admin_create_user_only`), so somebody has to mint the pool user
-    when a firm admin adds a colleague, and it cannot be the client.
-
-    ONE METHOD, AND NOTHING THAT SETS A PASSWORD. The AWS implementation holds
-    `cognito-idp:AdminCreateUser` and nothing else — no AdminSetUserPassword,
-    no AdminInitiateAuth — so a compromised API can create accounts it still
-    cannot authenticate as: the temporary password goes only to the invited
-    address, in Cognito's own invitation email. That is a deliberately narrower
-    grant than "provision a user" suggests, and it is what keeps this from
-    being an impersonation primitive.
-
-    Removing somebody from a firm is NOT here either. It deletes the membership
-    row and leaves the pool account alone (see FirmStore.remove_user), so this
-    port never needs delete — and the grant never needs AdminDeleteUser.
-    """
-
-    def create_user(self, email: str) -> str:
-        """Create the account and return its subject (the Cognito `sub`).
-
-        The subject is the value everything else keys on, so an implementation
-        MUST return the one the provider assigned rather than minting its own —
-        a made-up subject produces a firm user nobody can ever sign in as.
-
-        MUST raise `insolvia_api.core.errors.ConflictError` when the address
-        already has an account. Swallowing it and carrying on would attach a
-        firm-user row to whatever subject a second create returned, which for
-        Cognito is the EXISTING account — silently adding somebody else's
-        user to this firm.
-        """
-        ...
-
-
-class FirmStore(Protocol):
-    """Firms, the people in them, and what each of them may do.
-
-    THE HOTTEST READ IN THE SERVICE. `find_user` runs before any case is
-    touched, on every authenticated request, because an access token carries a
-    Cognito `sub` and nothing else authorization-bearing — no groups, no custom
-    attributes, no pre-token Lambda. Resolving the firm IS the read.
-
-    That is also why its IAM grant cannot be scoped to one tenant's partition
-    (infra/modules/firm_store spells this out): there is nothing to scope by
-    until the read has happened. Tenant isolation here is an APPLICATION
-    property, exactly as ADR 0001 has it for case data.
-    """
-
-    def create_firm(self, firm: Firm) -> None:
-        """Store a new firm. MUST refuse to overwrite an existing id."""
-        ...
-
-    def get_firm(self, firm_id: str) -> Firm | None: ...
-
-    def add_user(self, user: FirmUser) -> None:
-        """Attach someone to a firm. MUST refuse to overwrite an existing
-        (firm_id, subject) rather than replacing it — an overwrite would reset
-        a colleague's permissions to whatever the caller sent, and the caller
-        believes they are adding a new person."""
-        ...
-
-    def get_user(self, firm_id: str, subject: str) -> FirmUser | None:
-        """One user, by primary key. Firm-scoped, so an admin of firm A cannot
-        read a user of firm B by knowing their subject."""
-        ...
-
-    def find_user(self, subject: str) -> FirmUser | None:
-        """Which firm this Cognito subject belongs to, and what they may do.
-
-        The by-subject index, and the ONLY method that is not firm-scoped —
-        necessarily, since its whole job is to discover the firm.
-
-        EVENTUALLY CONSISTENT, unavoidably: DynamoDB global secondary indexes
-        do not support ConsistentRead. A user added a moment ago may not
-        resolve yet, which is why the administration route reads its own write
-        back by primary key (`get_user`) rather than through this.
-
-        An implementation MUST raise rather than choose if a subject resolves
-        to more than one firm. One person, one firm is an application
-        invariant — nothing in the key schema enforces it, because DynamoDB
-        conditions cannot span partitions — and picking a row would make
-        someone's tenancy depend on index ordering. A loud 500 for one user
-        beats a silent, unstable answer.
-        """
-        ...
-
-    def list_users(self, firm_id: str) -> tuple[FirmUser, ...]:
-        """A firm's whole staff list, ordered by display name then subject.
-
-        All of them: a caller cannot page, so an implementation that can
-        truncate must not. A firm is 2-15 seats (the business plan's own
-        sizing), so this is a small query by construction — and if a firm ever
-        outgrows it, the fix is a cursor, not a silent cap.
-        """
-        ...
-
-    def update_user(self, user: FirmUser) -> FirmUser | None:
-        """Write `user` back, but only over a row that still exists AND still
-        belongs to `user.firm_id`.
-
-        Returns None if either no longer holds — the administration route turns
-        that into the same 404 a foreign subject gets. Both halves matter: the
-        existence check stops a deleted user being resurrected by a PATCH that
-        was in flight, and the firm check closes the window between the route's
-        read and this write.
-        """
-        ...
-
-    def remove_user(self, firm_id: str, subject: str) -> bool:
-        """Detach someone from a firm. True if this call removed them, False if
-        there was nothing there.
-
-        Removes the membership row ONLY. The Cognito user survives, and so does
-        every case assignment naming this subject — those live in the case
-        table and are cleaned by the administration route, which is the one
-        place that can see both. A store that reached across would be a second
-        thing to keep in step.
-        """
-        ...
 
 
 class CaseStore(Protocol):

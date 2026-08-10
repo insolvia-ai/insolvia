@@ -47,7 +47,7 @@ import hmac
 import time
 from hashlib import sha256
 
-from insolvia_api.core.errors import ValidationError
+from insolvia_core.errors import ValidationError
 
 TOKEN_VERSION = "v1"
 _PAYLOAD_VERSION = "1"

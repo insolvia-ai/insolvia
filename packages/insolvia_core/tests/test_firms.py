@@ -6,8 +6,8 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.errors import FieldValidationError, ValidationError
-from insolvia_api.core.firms import (
+from insolvia_core.errors import FieldValidationError, ValidationError
+from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
     DOCUMENTS,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from insolvia_api.core.errors import ConflictError
+from insolvia_core.errors import ConflictError
 
 
 class MemoryUserDirectory:
