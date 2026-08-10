@@ -25,6 +25,7 @@ from insolvia_core.firms import (
     default_permissions,
     firm_from_item,
     firm_item,
+    firm_json,
     firm_user_from_item,
     firm_user_item,
     firm_user_json,
@@ -33,6 +34,7 @@ from insolvia_core.firms import (
     parse_firm_user_update,
     permission_for,
     permits,
+    set_firm_status,
 )
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
@@ -355,3 +357,72 @@ def test_the_api_representation_shows_the_stored_map_not_the_effective_one():
     # The subject IS exposed, unlike a case's ownerPrincipal: every other
     # endpoint addresses a colleague by it.
     assert body["subject"] == ALICE
+
+
+# ── Provenance and status (#212) ────────────────────────────────────
+
+
+def test_provenance_is_recorded_when_the_creator_is_known():
+    firm = create_firm(
+        parse_firm_creation({"name": "Example"}),
+        created_by=ALICE,
+        created_by_email="staff@example.test",
+    )
+    assert firm.created_by == ALICE
+    assert firm.created_by_email == "staff@example.test"
+
+
+def test_provenance_is_sparse_in_the_item_and_none_reading_back():
+    """A seeded firm has no author, and the item says so by ABSENCE — the
+    console reading and the tolerant inverse then agree. A null-valued
+    attribute would be a third encoding of the same fact."""
+    seeded = firm_item(create_firm(parse_firm_creation({"name": "Example"})))
+    assert "createdBy" not in seeded
+    assert "createdByEmail" not in seeded
+    assert firm_from_item(seeded).created_by is None
+    assert firm_from_item(seeded).created_by_email is None
+
+
+def test_a_provisioned_firm_round_trips_with_its_provenance():
+    original = create_firm(
+        parse_firm_creation({"name": "Example"}),
+        created_by=ALICE,
+        created_by_email="staff@example.test",
+    )
+    item = firm_item(original)
+    assert item["createdBy"] == ALICE
+    assert firm_from_item(item) == original
+
+
+def test_firm_json_carries_explicit_nulls_for_unknown_provenance():
+    """null tells a JSON consumer "nobody recorded" (a seeded firm); an absent
+    key would read as "this API version does not carry the field"."""
+    payload = firm_json(create_firm(parse_firm_creation({"name": "Example"})))
+    assert payload["createdBy"] is None
+    assert payload["createdByEmail"] is None
+
+
+def test_suspending_a_firm_changes_status_and_refreshes_updated_at():
+    firm = create_firm(parse_firm_creation({"name": "Example"}))
+    suspended = set_firm_status(firm, "suspended")
+    assert suspended.status == "suspended"
+    assert suspended.updated_at >= firm.updated_at
+    assert suspended.id == firm.id
+
+
+def test_resuspending_is_idempotent_rather_than_an_error():
+    """The portal cannot tell whether its first request landed, so the second
+    must succeed — same rule CaseStore.assign states."""
+    firm = set_firm_status(
+        create_firm(parse_firm_creation({"name": "Example"})), "suspended"
+    )
+    again = set_firm_status(firm, "suspended")
+    assert again.status == "suspended"
+
+
+def test_an_unknown_status_is_refused_before_it_can_be_stored():
+    """Accessor resolution compares this value on every authenticated request;
+    a typo'd status must fail here, not fail open or closed at resolution."""
+    firm = create_firm(parse_firm_creation({"name": "Example"}))
+    with pytest.raises(ValidationError):
+        set_firm_status(firm, "disabled")

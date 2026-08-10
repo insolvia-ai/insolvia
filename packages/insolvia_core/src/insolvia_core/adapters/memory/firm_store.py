@@ -33,6 +33,18 @@ class MemoryFirmStore:
     def get_firm(self, firm_id: str) -> Firm | None:
         return self.firms.get(firm_id)
 
+    def list_firms(self) -> tuple[Firm, ...]:
+        # Same ordering contract as the DynamoDB adapter: name then id, so a
+        # suite passing against this store proves the ordering the portal
+        # renders.
+        return tuple(sorted(self.firms.values(), key=lambda firm: (firm.name, firm.id)))
+
+    def update_firm(self, firm: Firm) -> Firm | None:
+        if firm.id not in self.firms:
+            return None
+        self.firms[firm.id] = firm
+        return firm
+
     # ── Firm users ──────────────────────────────────────────────────
 
     def add_user(self, user: FirmUser) -> None:

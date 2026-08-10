@@ -94,6 +94,52 @@ class DynamoDbFirmStore:
         item = response.get("Item")
         return None if not item else firm_from_item(_from_attributes(item))
 
+    def list_firms(self) -> tuple[Firm, ...]:
+        # A paginated Scan filtered to META items — the port's docstring owns
+        # why a scan and not an index. The filter references SK, which is
+        # legal in a Scan FilterExpression (filters cannot appear in a Query's
+        # KeyConditionExpression, but a Scan has none). The pagination loop is
+        # the same "all of them" promise list_users keeps: a page boundary
+        # must not silently truncate the admin portal's firm list.
+        firms: list[Firm] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "FilterExpression": "SK = :meta",
+                "ExpressionAttributeValues": {":meta": {"S": "META"}},
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.scan(**kwargs)
+            firms.extend(
+                firm_from_item(_from_attributes(item))
+                for item in response.get("Items", [])
+            )
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        # Sorted here: scan order is partition-hash order, which reads as
+        # random to a human working down a list of firms.
+        return tuple(sorted(firms, key=lambda firm: (firm.name, firm.id)))
+
+    def update_firm(self, firm: Firm) -> Firm | None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=_to_attributes(firm_item(firm)),
+                # Existence only — no scope condition, because the firm IS the
+                # scope (see the port). Without this, an update racing a
+                # deletion would resurrect the firm from the caller's stale
+                # read.
+                ConditionExpression="attribute_exists(PK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return None
+            raise
+        return firm
+
     # ── Firm users ──────────────────────────────────────────────────
 
     def add_user(self, user: FirmUser) -> None:
