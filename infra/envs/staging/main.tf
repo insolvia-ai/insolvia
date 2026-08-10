@@ -12,7 +12,15 @@ locals {
     Environment = local.environment
     ManagedBy   = "terraform"
   }
+
+  # The account's SES domain identity (owned by infra/envs/shared's email
+  # module), CONSTRUCTED rather than read from remote state — the same
+  # cross-layer rule modules/mailer applies to the same ARN (#210). Both
+  # Cognito pools send invites and reset codes through it.
+  ses_identity_arn = "arn:aws:ses:us-east-1:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}"
 }
+
+data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "main" {
   name = var.domain_name
@@ -179,6 +187,14 @@ module "auth" {
   # ONE pool — the module's own comment has the argument for why that is the
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
+
+  # Invites and reset codes leave as no-reply@insolvia.ai (#210). Staging
+  # turns this on first: SES is sandboxed until #211, so manual tests here use
+  # sandbox-verified recipients, and prod stays on the default sender until
+  # production access lands. ONE-TIME PREREQUISITE for the first apply that
+  # carries this: the Cognito email service-linked role must exist —
+  # docs/runbooks/aws-bootstrap.md § "Cognito email service-linked role".
+  ses_source_arn = local.ses_identity_arn
 
   tags = local.common_tags
 }

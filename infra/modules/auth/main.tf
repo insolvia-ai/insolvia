@@ -20,6 +20,32 @@
 
 data "aws_region" "current" {}
 
+# The branded email bodies (#210). Inline HTML rather than templatefile():
+# each is one small paragraph-block whose only variables are Cognito's own
+# {username}/{####} placeholders — which must reach Cognito literally, so a
+# Terraform template would spend its complexity escaping them. Copy changes
+# are code-reviewed diffs here, same as everything else in this module.
+#
+# Kept deliberately spare: no images, no links to click. A credential email
+# that trains recipients to click buttons is phishing practice; this one tells
+# them what happened and what the temporary password is, and the sign-in page
+# is wherever their firm already goes.
+locals {
+  invite_email_message = join("", [
+    "<p>Hello,</p>",
+    "<p>An account has been created for you on <b>Insolvia</b>, the bankruptcy case preparation platform your firm uses.</p>",
+    "<p>Your sign-in name is {username} and your temporary password is <b>{####}</b>. It expires in 7 days — when you first sign in, you will choose a password of your own.</p>",
+    "<p>If you were not expecting this invitation, you can ignore this email.</p>",
+    "<p>— Insolvia</p>",
+  ])
+
+  verification_email_message = join("", [
+    "<p>Your Insolvia verification code is <b>{####}</b>.</p>",
+    "<p>If you did not request this code, you can ignore this email — nothing changes without it.</p>",
+    "<p>— Insolvia</p>",
+  ])
+}
+
 # ── User pool ───────────────────────────────────────────────────
 
 resource "aws_cognito_user_pool" "main" {
@@ -32,6 +58,51 @@ resource "aws_cognito_user_pool" "main" {
   # junk accounts, not a growth channel.
   admin_create_user_config {
     allow_admin_create_user_only = true
+
+    # The email that delivers a new user's temporary password (#210) — the
+    # first thing an invited attorney ever receives from Insolvia, replacing
+    # Cognito's stock "Your username is... your temporary password is..." text.
+    # Templates are independent of WHO SENDS (email_configuration below), so
+    # they land on every environment immediately, default sender included.
+    # Cognito requires both {username} and {####} in the message.
+    invite_message_template {
+      email_subject = "Welcome to Insolvia — your account is ready"
+      email_message = local.invite_email_message
+      # Never sent — no SMS delivery is configured anywhere — but the provider
+      # transmits an empty string when the attribute is omitted and Cognito
+      # rejects that ("length greater than or equal to 6"). Found by a real
+      # dev apply; validate cannot see it. Must contain both placeholders.
+      sms_message = "Insolvia: sign-in {username}, temporary password {####}"
+    }
+  }
+
+  # The code emails: attribute verification and — the one that matters today —
+  # the forgot-password code the managed login's own "Forgot your password?"
+  # flow sends. Same stock-text-to-branded upgrade as the invite above.
+  verification_message_template {
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject        = "Your Insolvia verification code"
+    email_message        = local.verification_email_message
+  }
+
+  # WHO SENDS (#210): unset, Cognito's default sender —
+  # no-reply@verificationemail.com, capped at 50 emails/day, and the right
+  # answer for dev, where the default sender delivers to any address with no
+  # SES sandbox in the way. Set, mail leaves as no-reply@insolvia.ai through
+  # the account's own SES identity (DEVELOPER mode). Two consequences the
+  # variable's docs spell out: SES sandbox rules then apply (an invite to an
+  # unverified address silently fails to deliver until production access,
+  # #211), and the FIRST DEVELOPER-mode pool in the account needs the Cognito
+  # email service-linked role to exist — a one-time human CLI, because the
+  # deploy role deliberately cannot create service-linked roles for Cognito
+  # (docs/runbooks/aws-bootstrap.md § "Cognito email service-linked role").
+  dynamic "email_configuration" {
+    for_each = var.ses_source_arn == null ? [] : [var.ses_source_arn]
+    content {
+      email_sending_account = "DEVELOPER"
+      from_email_address    = var.from_email_address
+      source_arn            = email_configuration.value
+    }
   }
 
   # Email is the username. auto_verified_attributes lets an admin-created
