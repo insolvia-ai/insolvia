@@ -44,7 +44,10 @@ override.tf.json
 *_override.tf.json
 # .terraform.lock.hcl IS committed — one per root under infra/envs/, so every
 # checkout and CI run installs the same provider build (infra/CLAUDE.md owns
-# the upgrade procedure).
+# the upgrade procedure). Module-level locks are different: running init in a
+# module dir (the pre-commit validate hook does) writes one, but only the env
+# roots' locks are the record — the module copies are noise.
+infra/modules/*/.terraform.lock.hcl
 .terraformrc
 terraform.rc
 # Lambda zips built by archive_file at plan time.
