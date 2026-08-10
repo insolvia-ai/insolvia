@@ -104,13 +104,24 @@ _SUBJECT_RE: Final = re.compile(
 
 @dataclass(frozen=True)
 class Firm:
-    """A law firm — the META item of its partition, and the tenant."""
+    """A law firm — the META item of its partition, and the tenant.
+
+    `created_by` / `created_by_email` are provisioning provenance (#212): the
+    staff principal who created the firm through the admin service, straight
+    off their verified token. TOLERATED-ABSENT, as None — firms seeded before
+    the portal existed carry neither, and a portal renders that honestly as
+    "seeded" rather than inventing an author. They are facts about creation,
+    not authorization: nothing anywhere grants on them (the same rule
+    `case.createdBy` follows).
+    """
 
     id: str
     name: str
     status: str
     created_at: str
     updated_at: str
+    created_by: str | None = None
+    created_by_email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -514,7 +525,18 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
 # ── Construction ────────────────────────────────────────────────────
 
 
-def create_firm(draft: FirmDraft) -> Firm:
+def create_firm(
+    draft: FirmDraft,
+    *,
+    created_by: str | None = None,
+    created_by_email: str | None = None,
+) -> Firm:
+    """A new firm from a validated draft.
+
+    Provenance is keyword-only and optional: the admin service passes the
+    staff caller's subject and email from its verified token (#212); the
+    seeder passes nothing, which is the truth about a fixture.
+    """
     now = _timestamp()
     return Firm(
         id=str(uuid.uuid4()),
@@ -522,7 +544,28 @@ def create_firm(draft: FirmDraft) -> Firm:
         status="active",
         created_at=now,
         updated_at=now,
+        created_by=created_by,
+        created_by_email=created_by_email,
     )
+
+
+def set_firm_status(firm: Firm, status: str) -> Firm:
+    """A new Firm with `status` applied and updated_at refreshed.
+
+    The ONLY legal write to a firm's status (#212) — suspend and reactivate,
+    nothing else. Validated here rather than trusted from a route so an
+    unknown status can never reach `firm_item`: accessor resolution reads
+    this value on every authenticated request, and a typo'd status would
+    fail OPEN or CLOSED depending on which side of the comparison it landed.
+    Idempotent — re-suspending a suspended firm refreshes updated_at and
+    nothing else, because the admin portal cannot tell whether its first
+    request landed.
+    """
+    if status not in FIRM_STATUSES:
+        raise ValidationError(
+            "Firm status must be one of " + ", ".join(FIRM_STATUSES) + "."
+        )
+    return replace(firm, status=status, updated_at=_timestamp())
 
 
 def create_firm_user(draft: FirmUserDraft, *, firm_id: str, subject: str) -> FirmUser:
@@ -611,7 +654,7 @@ def firm_item(firm: Firm) -> dict[str, FirmItemValue]:
     one entry per user and none for the firm, so a query on it returns people
     rather than a mix of people and the firm they belong to.
     """
-    return {
+    item: dict[str, FirmItemValue] = {
         "PK": partition_key(firm.id),
         "SK": "META",
         "id": firm.id,
@@ -620,6 +663,14 @@ def firm_item(firm: Firm) -> dict[str, FirmItemValue]:
         "createdAt": firm.created_at,
         "updatedAt": firm.updated_at,
     }
+    # Provenance is SPARSE, not null-valued: a pre-portal firm has no author,
+    # and an attribute that says so by absence reads the same in the console
+    # as it does through firm_from_item's tolerant read (#212).
+    if firm.created_by is not None:
+        item["createdBy"] = firm.created_by
+    if firm.created_by_email is not None:
+        item["createdByEmail"] = firm.created_by_email
+    return item
 
 
 def firm_from_item(item: Mapping[str, FirmItemValue]) -> Firm:
@@ -627,12 +678,20 @@ def firm_from_item(item: Mapping[str, FirmItemValue]) -> Firm:
     not write — a corrupt row should fail loudly here rather than become a
     half-populated Firm."""
     try:
+        created_by = item.get("createdBy")
+        created_by_email = item.get("createdByEmail")
         return Firm(
             id=str(item["id"]),
             name=str(item["name"]),
             status=str(item["status"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            # Absent is a real state (a firm seeded before the portal), so
+            # these two are the one part of this inverse that does not raise.
+            created_by=str(created_by) if created_by is not None else None,
+            created_by_email=(
+                str(created_by_email) if created_by_email is not None else None
+            ),
         )
     except KeyError as error:
         raise ValidationError(f"stored firm item is malformed: {error}") from error
@@ -717,12 +776,18 @@ def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
 
 
 def firm_json(firm: Firm) -> dict[str, object]:
+    """The API representation. Provenance is explicit-null rather than absent:
+    a JSON consumer reading `createdBy: null` learns "nobody recorded" (a
+    seeded firm), where a missing key would read as "this API version does not
+    carry the field"."""
     return {
         "id": firm.id,
         "name": firm.name,
         "status": firm.status,
         "createdAt": firm.created_at,
         "updatedAt": firm.updated_at,
+        "createdBy": firm.created_by,
+        "createdByEmail": firm.created_by_email,
     }
 
 

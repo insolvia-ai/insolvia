@@ -186,6 +186,9 @@ class FakeDynamoDb:
     def query(self, **kwargs: Any) -> Any:
         return self._record("query", kwargs)
 
+    def scan(self, **kwargs: Any) -> Any:
+        return self._record("scan", kwargs)
+
     def delete_item(self, **kwargs: Any) -> Any:
         return self._record("delete_item", kwargs)
 
@@ -359,3 +362,108 @@ def _written_item(monkeypatch, person: FirmUser) -> dict[str, Any]:
     recorder = FakeDynamoDb()
     dynamo_store(monkeypatch, recorder).add_user(person)
     return dict(recorder.calls[0][1]["Item"])
+
+
+# ── Firms cross-tenant (#212): list and update, both stores ─────────
+
+
+def test_the_memory_firm_list_is_ordered_by_name_then_id():
+    store = MemoryFirmStore()
+    store.create_firm(firm(OTHER_FIRM_ID, "Other Firm LLP"))
+    store.create_firm(firm(FIRM_ID, "Example & Partners"))
+    assert [f.name for f in store.list_firms()] == [
+        "Example & Partners",
+        "Other Firm LLP",
+    ]
+
+
+def test_updating_a_firm_that_is_not_there_is_none():
+    """A deletion racing an update must not resurrect the firm from the
+    caller's stale read — None, exactly as update_user answers."""
+    store = MemoryFirmStore()
+    assert store.update_firm(firm()) is None
+    assert store.firms == {}
+
+
+def test_updating_a_firm_writes_it_back():
+    from insolvia_core.firms import set_firm_status
+
+    store = MemoryFirmStore()
+    store.create_firm(firm())
+    suspended = set_firm_status(firm(), "suspended")
+    assert store.update_firm(suspended) == suspended
+    assert store.get_firm(FIRM_ID).status == "suspended"
+
+
+def _written_firm_item(monkeypatch, record: Firm) -> dict[str, Any]:
+    """Wire-format via the adapter's own converter, same rule as
+    _written_item above."""
+    recorder = FakeDynamoDb()
+    dynamo_store(monkeypatch, recorder).create_firm(record)
+    return dict(recorder.calls[0][1]["Item"])
+
+
+def test_the_scan_is_filtered_to_meta_and_paginates(monkeypatch):
+    """Two promises in one call shape: only firm META items come back (the
+    filter is what keeps users out of the firm list), and a page boundary
+    does not silently truncate — the adapter must follow LastEvaluatedKey."""
+    first = _written_firm_item(monkeypatch, firm(FIRM_ID, "Example & Partners"))
+    second = _written_firm_item(monkeypatch, firm(OTHER_FIRM_ID, "Other Firm LLP"))
+
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    pages = [
+        {"Items": [second], "LastEvaluatedKey": {"PK": second["PK"]}},
+        {"Items": [first]},
+    ]
+    fake.responses["scan"] = pages[0]
+
+    original_record = fake._record
+
+    def paged(name: str, kwargs: dict[str, Any]) -> Any:
+        if name == "scan" and "ExclusiveStartKey" in kwargs:
+            fake.responses["scan"] = pages[1]
+        return original_record(name, kwargs)
+
+    monkeypatch.setattr(fake, "_record", paged)
+
+    listed = store.list_firms()
+
+    scans = [call for call in fake.calls if call[0] == "scan"]
+    assert len(scans) == 2
+    assert scans[0][1]["FilterExpression"] == "SK = :meta"
+    assert scans[1][1]["ExclusiveStartKey"] == {"PK": second["PK"]}
+    # Sorted by name despite arriving in scan (hash) order.
+    assert [f.name for f in listed] == ["Example & Partners", "Other Firm LLP"]
+
+
+def test_a_refused_firm_update_is_none_not_an_exception(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    assert store.update_firm(firm()) is None
+
+
+def test_the_firm_update_is_conditioned_on_existence(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_firm(firm())
+    name, kwargs = fake.calls[0]
+    assert name == "put_item"
+    assert kwargs["ConditionExpression"] == "attribute_exists(PK)"
+
+
+def test_firm_provenance_survives_the_wire_format(monkeypatch):
+    """The sparse createdBy attributes through _to_attributes/_from_attributes
+    — a provisioned firm must read back with its author, and a seeded one
+    must not grow a fabricated author from the conversion."""
+    from dataclasses import replace as dc_replace
+
+    provisioned = dc_replace(
+        firm(), created_by=ALICE, created_by_email="staff@example.test"
+    )
+    item = _written_firm_item(monkeypatch, provisioned)
+    assert item["createdBy"] == {"S": ALICE}
+
+    fake = FakeDynamoDb({"get_item": {"Item": item}})
+    read_back = dynamo_store(monkeypatch, fake).get_firm(FIRM_ID)
+    assert read_back == provisioned

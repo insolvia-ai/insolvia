@@ -91,6 +91,33 @@ class FirmStore(Protocol):
 
     def get_firm(self, firm_id: str) -> Firm | None: ...
 
+    def list_firms(self) -> tuple[Firm, ...]:
+        """Every firm, ordered by name then id — the admin surface's index
+        view (#212), and deliberately the ONLY cross-tenant read of firm META.
+
+        A SCAN, and priced as one on purpose: firm META items carry no GSI
+        keys (that absence is what keeps the by-subject index sparse), so
+        listing them either scans or grows a second index with a backfill
+        migration and a new forget-the-key failure mode. At the business
+        plan's scale — tens of firms — a scan is one page. Revisit at ~1,000
+        firms; the fix then is an index AND a cursor, not a silent cap here.
+
+        The tenant API must never call this, and its IAM enforces that: the
+        API role's grant deliberately lacks dynamodb:Scan — only the admin
+        service's role can execute it.
+        """
+        ...
+
+    def update_firm(self, firm: Firm) -> Firm | None:
+        """Write `firm` back, but only over a row that still exists.
+
+        Returns None if it does not — the admin route turns that into a 404
+        rather than resurrecting a deleted firm from a stale read. The
+        firm-scope half of update_user's condition has no analogue here: the
+        firm IS the scope.
+        """
+        ...
+
     def add_user(self, user: FirmUser) -> None:
         """Attach someone to a firm. MUST refuse to overwrite an existing
         (firm_id, subject) rather than replacing it — an overwrite would reset
