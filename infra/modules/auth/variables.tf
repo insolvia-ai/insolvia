@@ -120,3 +120,12 @@ variable "api_role_name" {
   type        = string
   default     = null
 }
+
+# The admin service's Lambda execution role (#213), or null where there is no
+# admin Lambda (dev). Same lookup-by-name shape, and the same one-action
+# grant, as api_role_name — see the admin_invite resource.
+variable "admin_invite_role_name" {
+  description = "Admin Lambda execution role name to grant AdminCreateUser on this pool, or null."
+  type        = string
+  default     = null
+}

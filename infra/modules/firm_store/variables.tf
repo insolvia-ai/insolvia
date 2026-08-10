@@ -42,3 +42,13 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# The admin service's Lambda execution role (#213), or null where there is no
+# admin Lambda (dev — the local admin service runs under the developer's own
+# IAM user). Looked up by name for the same no-circular-dependency reason as
+# api_role_name.
+variable "admin_role_name" {
+  description = "Admin Lambda execution role name to grant firm-table CRUD + Scan, or null."
+  type        = string
+  default     = null
+}

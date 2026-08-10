@@ -42,7 +42,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "marketing", "mailer"])
+  for_each = toset(["api", "admin", "marketing", "mailer"])
 
   name = "insolvia-${each.key}"
 }
@@ -78,6 +78,37 @@ module "api_service" {
   ecr_repository_url  = data.aws_ecr_repository.service["api"].repository_url
   image_tag           = local.environment
   tags                = local.common_tags
+}
+
+
+# Admin service (#213): the cross-tenant provisioning surface (services/admin,
+# ADR 0011), deployed the way the API is — same cert-lookup reuse, same
+# image-before-apply bootstrap on the first apply (extend it with
+# scripts/bootstrap-ecr-images.sh --services admin). Declared after
+# api_service only by convention; its cross-module grants attach from
+# modules/firm_store (admin_role_name — CRUD + the Scan the API role
+# deliberately lacks) and modules/auth (admin_invite_role_name — the same
+# one-action AdminCreateUser shape as the API's invite grant).
+module "admin_service" {
+  source = "../../modules/admin_service"
+
+  project             = "insolvia"
+  environment         = local.environment
+  insolvia_env        = "staging"
+  domain_name         = var.admin_api_subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  ecr_repository_url  = data.aws_ecr_repository.service["admin"].repository_url
+  image_tag           = local.environment
+  firm_table_name     = module.firm_store.table_name
+  firm_user_pool_id   = module.auth.user_pool_id
+  google_client_id    = var.google_admin_client_id
+
+  # Staging's audit rows are test provisioning of test firms; the table must
+  # be destroyable with the environment.
+  audit_deletion_protection = false
+
+  tags = local.common_tags
 }
 
 # Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
@@ -187,6 +218,10 @@ module "auth" {
   # ONE pool — the module's own comment has the argument for why that is the
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
+
+  # Provisioning a firm's first administrator (#213) — same one-action grant
+  # on the admin service's own role.
+  admin_invite_role_name = module.admin_service.lambda_role_name
 
   # Invites and reset codes leave as no-reply@insolvia.ai (#210). SES is
   # sandboxed until #211, which for tests means: recipients on the verified
@@ -338,6 +373,7 @@ module "firm_store" {
   aws_region             = var.aws_region
   kms_key_arn            = module.case_store.kms_key_arn
   api_role_name          = module.api_service.lambda_role_name
+  admin_role_name        = module.admin_service.lambda_role_name
   point_in_time_recovery = false
   deletion_protection    = false
   tags                   = local.common_tags

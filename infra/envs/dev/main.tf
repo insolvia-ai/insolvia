@@ -147,6 +147,33 @@ module "case_documents" {
   tags          = local.common_tags
 }
 
+
+# ── Admin audit table (#213) ────────────────────────────────────
+# Hand-rolled like the waitlist table above, and for the same reason: dev has
+# no Lambda, so modules/admin_service (which owns the deployed table alongside
+# an image Lambda and an HTTP API) does not fit here. Schema matches
+# services/admin's core/audit.py item shape. PITR off, protection off —
+# throwaway rows a developer wipes; the DEPLOYED table is the durable record.
+resource "aws_dynamodb_table" "admin_audit" {
+  name         = "insolvia-admin-audit-${local.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  server_side_encryption { enabled = true }
+  tags = local.common_tags
+}
+
 # ── Auth ────────────────────────────────────────────────────────
 # The same module staging and prod instantiate, with the machine environment
 # name. The Cognito hosted-domain prefix the module derives

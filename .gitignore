@@ -60,6 +60,7 @@ infra/modules/*/.build/
 # creates per machine, so a copied template would name nothing. Run
 # `./scripts/dev-aws-setup.sh` and it writes both files.
 /services/api/.env
+/services/admin/.env
 /apps/insolvia_app/.env
 
 # ── Python ──────────────────────────────────────────────────────

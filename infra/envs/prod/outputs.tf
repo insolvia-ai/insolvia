@@ -158,3 +158,38 @@ output "marketing_ssr_alias_name" {
 output "marketing_url" {
   value = module.marketing_site.url
 }
+
+output "admin_ecr_repository_url" {
+  description = "Shared insolvia-admin repository the deploy workflow pushes to."
+  value       = data.aws_ecr_repository.service["admin"].repository_url
+}
+
+output "admin_lambda_function_name" {
+  description = "Admin Lambda function name (deploy target)."
+  value       = module.admin_service.lambda_function_name
+}
+
+output "admin_lambda_alias_name" {
+  description = "Alias serving admin traffic; the deploy workflow shifts it after the smoke test."
+  value       = module.admin_service.lambda_alias_name
+}
+
+output "admin_api_url" {
+  description = "Production admin service base URL."
+  value       = module.admin_service.url
+}
+
+output "admin_audit_table_name" {
+  description = "Append-only admin audit table (#178's provisioning record)."
+  value       = module.admin_service.audit_table_name
+}
+
+output "admin_alarms_topic_arn" {
+  description = "SNS topic for production admin alarms — subscribe by hand."
+  value       = module.admin_service.alarms_topic_arn
+}
+
+output "admin_domain" {
+  description = "Hostname the admin service serves (deploy smoke target)."
+  value       = module.admin_service.domain_name
+}
