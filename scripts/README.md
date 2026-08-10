@@ -11,6 +11,7 @@ Two layers — a shared base plus thin per-package scripts:
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check), **and the agent skills in `.agents/skills/`** — installed from `skills-lock.json`, not committed (see below) |
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
+| `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
 | `scripts/dev-aws-create-user.sh` | Per-machine AWS layer | Creates a sign-in account in this machine's dev Cognito pool. There is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; `--check` verifies. Gets you as far as signing in — pair it with the next row |
@@ -212,8 +213,11 @@ compose containers outlive their `up`, and a stray `npx` grandchild keeps
 holding 3000. The root script delegates to both and re-implements neither.
 
 Each `dev-down.sh` is idempotent and safe to run when nothing is up — teardown
-that can fail is teardown you stop trusting — so they are also the thing to
-reach for when a previous session left a port held.
+that can fail is teardown you stop trusting. When a previous session left
+things held — a closed terminal, a killed process, or a stack started from a
+different checkout — `./scripts/dev-down.sh` runs all four at once; it is the
+same code path `dev-up.sh`'s own Ctrl-C trap uses, so the clean exit and the
+recovery cannot drift apart. To stop just one area, run that area's script.
 
 Two things worth knowing:
 

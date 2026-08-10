@@ -34,7 +34,8 @@ installing).
 | Want to… | Run |
 |---|---|
 | Bring the whole system up in one terminal (API + mailer + app + marketing), prefixed logs, one Ctrl-C stops it all | `scripts/dev-up.sh` — **takes no arguments** |
-| Stop one area, or reclaim a port a previous session left held | that area's `scripts/dev-down.sh` (idempotent) |
+| Stop everything after a lost terminal or a killed dev-up, or reclaim ports/containers another **checkout**'s run left held | `scripts/dev-down.sh` (idempotent) |
+| Stop one area only | that area's `scripts/dev-down.sh` (idempotent) |
 
 `dev-up.sh` delegates to the per-area `dev-up.sh`/`dev-down.sh` pairs below
 rather than duplicating them — which is also why it has no `--only`: to run one
