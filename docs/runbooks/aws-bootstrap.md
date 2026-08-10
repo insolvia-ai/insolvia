@@ -161,6 +161,24 @@ manually. (Before the cert issues, every env-level `terraform plan` fails —
 each env looks the cert up with `statuses = ["ISSUED"]` — so there is nothing
 to switch on; the ordering itself is the gate.)
 
+## 7. Cognito email service-linked role — before any pool sends through SES
+
+One-time, account-wide, human-run. The first pool with `email_configuration`
+in DEVELOPER mode (`ses_source_arn` on `modules/auth` / `modules/staff_auth`,
+#210) needs `AWSServiceRoleForAmazonCognitoIdpEmailService` to exist, and the
+CI deploy role deliberately cannot create service-linked roles for Cognito
+(its `iam:CreateServiceLinkedRole` grant covers API Gateway only) — so a
+staging apply that carries the first DEVELOPER-mode pool fails without this:
+
+```bash
+aws iam create-service-linked-role --aws-service-name email.cognito-idp.amazonaws.com
+```
+
+Idempotent in effect: a second run fails with `InvalidInput` naming the role
+as already taken, which is the confirmation. Only the Cognito service itself
+can assume it — creating it grants nothing to any human or CI principal.
+*Done for account `521762924626` on 2026-08-10.*
+
 ## Order of operations
 1 (state bucket) → 2 (confirm no OIDC provider) → **3 (import the hosted zone)**
 → 4 (apply `shared`) → 5 (secrets) → 6 (verify delegation + cert) →

@@ -11,7 +11,13 @@ locals {
     Environment = local.environment
     ManagedBy   = "terraform"
   }
+
+  # The account's SES domain identity, constructed the way modules/mailer
+  # constructs the same ARN — never remote state.
+  ses_identity_arn = "arn:aws:ses:us-east-1:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}"
 }
+
+data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "main" {
   name = var.domain_name
@@ -178,6 +184,18 @@ module "auth" {
   # ONE pool — the module's own comment has the argument for why that is the
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
+
+  # Branded sender ON, ahead of SES production access (#211) — a deliberate
+  # decision, because "sandbox" is subtler than "cannot send": recipients on
+  # the VERIFIED DOMAIN (@insolvia.ai — every internal test account) deliver
+  # fine even here, and only external recipients fail until #211. Nothing in
+  # prod can attempt a send yet anyway — the pool has no users and no
+  # provisioning path exists (#212 is the first). What this deliberately
+  # accepts, written down so it is chosen rather than discovered: onboarding a
+  # REAL firm before #211 lands would mean their invite silently never
+  # arrives. #211 is a hard prerequisite on the provisioning checklist for
+  # exactly that reason; the mitigation is sequencing, not this file.
+  ses_source_arn = local.ses_identity_arn
 
   tags = local.common_tags
 }
