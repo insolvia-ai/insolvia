@@ -12,11 +12,20 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   `modules/case_store`'s `global_secondary_index.key_schema` first shipped in
   6.29.0 — but *working* `key_schema` is 6.37.0, because 6.32.1 fixed a
   perpetual diff on an index that has a range key (ours does) and 6.37.0 fixed
-  a removal that deletes **every** index on the table. **Since
-  `.terraform.lock.hcl` is gitignored, this constraint is the only floor there
-  is** — bump it whenever a root starts depending on a newer resource or a
-  data-loss fix. All five roots carry the same pin. **Region `us-east-1`
-  everywhere** (CloudFront ACM requirement).
+  a removal that deletes **every** index on the table. Bump the floor whenever
+  a root starts depending on a newer resource or a data-loss fix. All six roots
+  carry the same pin. **Region `us-east-1` everywhere** (CloudFront ACM
+  requirement).
+- **Each root's `.terraform.lock.hcl` is committed** — the constraint above is
+  the floor, the lock is the exact provider build every machine and CI run
+  installs. To move to a newer provider, regenerate the lock for **both**
+  platforms and commit the diff:
+  `terraform -chdir=infra/envs/<env> providers lock -platform=linux_amd64 -platform=darwin_arm64`
+  (linux_amd64 is CI, darwin_arm64 is developer machines). Never take the lock
+  a plain `terraform init -upgrade` writes: it records only the current
+  platform, so the other one fails checksum verification at init. If init ever
+  reports a lock/constraint conflict, fix the lock with that command — don't
+  delete the file.
 - **Naming `insolvia-<thing>-<env>`;** tags `{ Project = "insolvia",
   Environment, ManagedBy = "terraform" }`. Sensitive vars `sensitive = true`,
   never committed — commit `terraform.tfvars.example`, never real `*.tfvars`.

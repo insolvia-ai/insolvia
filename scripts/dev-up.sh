@@ -178,7 +178,7 @@ preflight() {
     done
     port="$(service_port "$name")"
     if port_open "$port"; then
-      warn "port $port is already in use — $name will fail to bind. Run $dir/scripts/dev-down.sh first."
+      warn "port $port is already in use — $name will fail to bind. Run ./scripts/dev-down.sh first (or $dir/scripts/dev-down.sh for just this one)."
       failures=$((failures + 1))
     fi
   done
@@ -215,17 +215,11 @@ cleanup() {
   done
 
   # Then each area's own dev-down.sh, because stopping the process that
-  # started a thing is not the same as stopping the thing. Every one of them
-  # is idempotent, so running all four unconditionally is correct even when
-  # some never started.
-  local name dir
-  for name in $SERVICES; do
-    dir="$(service_dir "$name")"
-    [[ -x "$dir/scripts/dev-down.sh" ]] || continue
-    "$dir/scripts/dev-down.sh" >/dev/null 2>&1 || warn "$name did not shut down cleanly — check $dir."
-  done
+  # started a thing is not the same as stopping the thing. The loop over the
+  # areas lives in scripts/dev-down.sh — the same script a lost terminal
+  # reaches for — so this trap and that recovery path cannot drift apart.
+  "$SCRIPT_DIR/dev-down.sh" || true
 
-  ok "Everything is down."
   exit "$status"
 }
 
