@@ -497,6 +497,14 @@ Every env declares the default `aws` provider (region `us-east-1`) and an aliase
 `aws.us_east_1` used for ACM/CloudFront (identical here, but kept explicit to
 match convention and stay portable if the default region ever changes).
 
+Each root commits its `.terraform.lock.hcl`, with hashes for both platforms
+that run Terraform here (linux_amd64 in CI, darwin_arm64 on developer
+machines), so every checkout applies the same provider build against the same
+state — the version constraint alone only sets a floor, and two machines
+resolving it at different times used to run different provider versions
+against `envs/dev`. The upgrade procedure lives in
+[`infra/CLAUDE.md`](../../infra/CLAUDE.md).
+
 ## Region
 
 **Everything is `us-east-1`.** CloudFront requires its ACM certificate in
