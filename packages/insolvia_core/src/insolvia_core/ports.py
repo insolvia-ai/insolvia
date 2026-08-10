@@ -35,20 +35,22 @@ class JwksProvider(Protocol):
 
 
 class UserDirectory(Protocol):
-    """Creates the Cognito account behind a new firm user.
+    """Creates — and re-invites — the Cognito account behind a firm user.
 
-    THE ONLY PORT IN THIS PACKAGE THAT WRITES TO THE IDENTITY PROVIDER, and it
-    has exactly one method for that reason. Self-signup is off
-    (`allow_admin_create_user_only`), so somebody has to mint the pool user
-    when a firm admin adds a colleague, and it cannot be the client.
+    THE ONLY PORT IN THIS PACKAGE THAT WRITES TO THE IDENTITY PROVIDER.
+    Self-signup is off (`allow_admin_create_user_only`), so somebody has to
+    mint the pool user when a firm admin adds a colleague or the admin
+    service provisions a firm's first administrator, and it cannot be the
+    client.
 
-    ONE METHOD, AND NOTHING THAT SETS A PASSWORD. The AWS implementation holds
-    `cognito-idp:AdminCreateUser` and nothing else — no AdminSetUserPassword,
-    no AdminInitiateAuth — so a compromised API can create accounts it still
-    cannot authenticate as: the temporary password goes only to the invited
-    address, in Cognito's own invitation email. That is a deliberately narrower
-    grant than "provision a user" suggests, and it is what keeps this from
-    being an impersonation primitive.
+    TWO METHODS, ONE IAM ACTION, AND NOTHING THAT SETS A PASSWORD. Both map
+    to `cognito-idp:AdminCreateUser` (resend is that call with
+    MessageAction=RESEND) — no AdminSetUserPassword, no AdminInitiateAuth —
+    so a compromised caller can create or re-invite accounts it still cannot
+    authenticate as: the temporary password goes only to the invited address,
+    in Cognito's own invitation email. That is a deliberately narrower grant
+    than "provision a user" suggests, and it is what keeps this from being an
+    impersonation primitive.
 
     Removing somebody from a firm is NOT here either. It deletes the membership
     row and leaves the pool account alone (see FirmStore.remove_user), so this
@@ -67,6 +69,21 @@ class UserDirectory(Protocol):
         firm-user row to whatever subject a second create returned, which for
         Cognito is the EXISTING account — silently adding somebody else's
         user to this firm.
+        """
+        ...
+
+    def resend_invite(self, email: str) -> None:
+        """Re-send the invitation, with a fresh temporary password, to an
+        account that has never completed first sign-in (issue #212).
+
+        The admin service's answer to "the invite never arrived" — expired
+        temporary password, sandbox-refused recipient, or a spam folder.
+
+        MUST raise `insolvia_core.errors.NotFoundError` for an address with
+        no account, and `ConflictError` for one that has already signed in —
+        Cognito only re-invites FORCE_CHANGE_PASSWORD users, and an active
+        user asking for a password is the forgot-password flow's job, not an
+        operator's.
         """
         ...
 

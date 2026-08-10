@@ -21,7 +21,7 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 | [`apps/insolvia_app/`](apps/insolvia_app/) | The Insolvia app — React Native on Expo, web today (themed hello-world). |
 | [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
 | [`packages/`](packages/) | Shared libraries: the API client (TypeScript) and `insolvia_core`, the Python services' shared domain. |
-| [`services/`](services/) | Backend services (Python on Lambda): `api`, `mailer`. |
+| [`services/`](services/) | Backend services (Python on Lambda): `api`, `admin`, `mailer`. |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
 | [`docs/`](docs/) | [Business plan](docs/business/business-plan.html) + engineering runbooks. |
 

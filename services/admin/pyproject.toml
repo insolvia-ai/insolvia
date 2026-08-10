@@ -1,0 +1,26 @@
+[project]
+name = "insolvia-admin"
+version = "0.1.0"
+description = "The Insolvia admin service — cross-tenant firm administration (#212), Flask + Mangum on Lambda"
+requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt, mailer-style; the
+# Docker image and CI install from there rather than from this metadata.
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+# Same guards as the sibling services' pyprojects, for the same reasons: an
+# unregistered mark or a typo in this block is an error, not a warning.
+addopts = "-q --strict-markers --strict-config"
+markers = []
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "mangum.*"]
+ignore_missing_imports = true

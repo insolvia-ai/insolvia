@@ -37,7 +37,7 @@
 # this wrapper and it fails with NoCredentialsError.
 #
 # Building rows does need the shape, so that is Python next to the code owning
-# it: services/api/src/insolvia_api/entrypoints/seed.py.
+# it: services/admin/src/insolvia_admin/entrypoints/seed.py.
 #
 # ## Scope
 #
@@ -113,8 +113,13 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
 # the service itself is not packaged into it (pyproject declares no dependencies
 # and nothing runs `pip install -e .`), so `src` has to be on the path the same
 # way pytest's `pythonpath` setting puts it there.
+#
+# The seeder lives in the ADMIN service (#212 — provisioning tooling has one
+# home), while the venv is still the API's: its pinned boto3 + insolvia_core
+# cover everything the seeder imports, and a second venv for one entrypoint
+# would be setup for setup's sake.
 seed() {
-  PYTHONPATH="$API_DIR/src" "$VENV_PYTHON" -m insolvia_api.entrypoints.seed \
+  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed \
     --fixture "$FIXTURE" \
     --firm-table "$FIRM_TABLE" \
     --user-pool-id "$POOL_ID" \

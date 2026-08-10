@@ -37,7 +37,7 @@ not here.
 ```
 apps/       insolvia_app (Expo / React Native, web) · insolvia_marketing (React SSR)
 packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
-services/   api · mailer            (Python on Lambda)
+services/   api · admin · mailer    (Python on Lambda)
 infra/      Terraform: ci-trust · shared · staging · prod
 tool/       reconcile-cognito-branding.ts  (the sign-in page's colours)
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/

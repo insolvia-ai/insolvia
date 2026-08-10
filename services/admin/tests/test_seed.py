@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 import pytest
-from insolvia_api.entrypoints.seed import Dependencies, RefusedError, main
+from insolvia_admin.entrypoints.seed import Dependencies, RefusedError, main
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.ports import FirmStore
 

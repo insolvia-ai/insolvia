@@ -264,3 +264,150 @@ def _scopes(raw: Any) -> tuple[str, ...]:
     if not isinstance(raw, str):
         return ()
     return tuple(raw.split())
+
+
+# ── Google Workspace ID tokens (issue #209) ─────────────────────────
+#
+# The admin service's principal class. Staff sign in directly against Google
+# (authorization-code + PKCE, a public per-environment client marked Internal
+# in the Workspace org), and the service verifies the ID TOKEN — Google's
+# access tokens are opaque, so for this first-party, single-audience internal
+# API the ID token is the credential. That is a deliberate deviation from the
+# Cognito profile above (which verifies access tokens and refuses ID tokens);
+# ADR 0011 records it.
+#
+# What is verified, and why exactly these things:
+#   - RS256 signature against Google's published JWKS (the adapter fetches
+#     https://www.googleapis.com/oauth2/v3/certs — note Google's jwks_uri is
+#     NOT derivable as <issuer>/.well-known/jwks.json, which is why
+#     CognitoJwksProvider takes an explicit jwks_url for this profile).
+#   - `iss` is one of Google's two documented forms. Both are Google; a token
+#     from any other issuer is somebody else's users.
+#   - `aud` equals the environment's client id. Cross-environment tokens
+#     (a dev sign-in replayed against prod) fail here.
+#   - `hd` equals the Workspace domain. This is the tenant gate restated on
+#     our side: the client being Internal means Google refuses outside
+#     accounts at sign-in, and this check means a verifier bug or console
+#     misconfiguration still cannot admit a personal Gmail. Deny-side
+#     redundancy — the two cannot disagree in the dangerous direction.
+#   - `email_verified` is true and `email` present: the audit trail records
+#     who provisioned what by address, and an unverified address is not an
+#     identity.
+#   - `exp`/`iat` via PyJWT, `sub` present — same rules as the profile above.
+
+GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
+
+_GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
+
+
+def google_jwks_url() -> str:
+    """Where Google publishes the keys `verify_google_id_token` needs."""
+    return _GOOGLE_JWKS_URL
+
+
+@dataclass(frozen=True)
+class GoogleAuthSettings:
+    """The two values that decide whether a Google ID token is ours."""
+
+    client_id: str
+    workspace_domain: str
+
+
+@dataclass(frozen=True)
+class StaffPrincipal:
+    """The authenticated staff caller, derived purely from verified claims.
+
+    `subject` is Google's `sub` — stable and immutable for the account, and
+    what audit rows key on. `email` is display + audit; it can be re-pointed
+    on Google's side, which is why it is never the key.
+    """
+
+    subject: str
+    email: str
+    expires_at: int | None
+
+
+def google_settings_or_raise(
+    client_id: str | None, workspace_domain: str | None
+) -> GoogleAuthSettings:
+    """Require both settings, or refuse to verify anything — same fail-closed
+    rule as `settings_or_raise`."""
+    if not client_id or not workspace_domain:
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    return GoogleAuthSettings(client_id=client_id, workspace_domain=workspace_domain)
+
+
+def verify_google_id_token(
+    token: str, *, signing_key: Any, settings: GoogleAuthSettings
+) -> StaffPrincipal:
+    """Verify a Google Workspace ID token and return the staff principal.
+
+    Same composition contract as `verify_access_token`: the key arrives from a
+    JwksProvider (pointed at Google's certs URL), this function only decides
+    whether the result is trustworthy.
+    """
+    try:
+        claims: Mapping[str, Any] = jwt.decode(
+            token,
+            key=signing_key,
+            algorithms=list(ALGORITHMS),
+            audience=settings.client_id,
+            options={
+                # `aud` IS verified here — the opposite of the Cognito
+                # profile, because Google ID tokens carry the client id there.
+                "verify_aud": True,
+                "require": ["exp", "iss", "sub", "aud"],
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_nbf": True,
+                "verify_signature": True,
+            },
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise AuthenticationError(AuthFailureReason.EXPIRED) from exc
+    except jwt.InvalidAudienceError as exc:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLIENT) from exc
+    except jwt.MissingRequiredClaimError as exc:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLAIMS) from exc
+    except jwt.PyJWTError as exc:
+        raise AuthenticationError(AuthFailureReason.INVALID_SIGNATURE) from exc
+
+    return staff_principal_from_claims(claims, settings=settings)
+
+
+def staff_principal_from_claims(
+    claims: Mapping[str, Any], *, settings: GoogleAuthSettings
+) -> StaffPrincipal:
+    """The claim checks PyJWT does not do, then the identity itself.
+
+    `iss` is checked here rather than via decode(issuer=...) because Google
+    documents two forms and PyJWT verifies against exactly one.
+    """
+    if claims.get("iss") not in GOOGLE_ISSUERS:
+        raise AuthenticationError(AuthFailureReason.INVALID_ISSUER)
+
+    # The Workspace-domain gate. `hd` is present only on Workspace accounts —
+    # a personal Gmail carries none and fails the comparison, which is the
+    # correct reading without a special case.
+    if claims.get("hd") != settings.workspace_domain:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLAIMS)
+
+    email = claims.get("email")
+    if (
+        claims.get("email_verified") is not True
+        or not isinstance(email, str)
+        or not email
+    ):
+        raise AuthenticationError(AuthFailureReason.INVALID_CLAIMS)
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLAIMS)
+
+    expires_at = claims.get("exp")
+
+    return StaffPrincipal(
+        subject=subject,
+        email=email,
+        expires_at=expires_at if isinstance(expires_at, int) else None,
+    )

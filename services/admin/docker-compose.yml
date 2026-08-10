@@ -1,0 +1,37 @@
+# Local dev for services/admin — `./services/admin/scripts/dev-up.sh`, then
+# `curl http://127.0.0.1:8090/health`. Port 8090: the tenant API owns 8080.
+#
+# Same posture as the API's compose file: no emulators — set the *_NAME vars
+# and the container talks to this machine's REAL per-developer AWS resources
+# (scripts/dev-aws-setup.sh writes services/admin/.env once the dev audit
+# table exists — issue #213); unset, the in-memory adapters run and the
+# service works standalone. AWS credentials arrive from the shell (dev-up.sh
+# exports short-lived ones), never from a file.
+services:
+  admin:
+    build:
+      # The repo root, not this directory: the image installs the shared
+      # packages/insolvia_core by relative path (see the Dockerfile header).
+      context: ../..
+      dockerfile: services/admin/Dockerfile
+      target: development
+    environment:
+      INSOLVIA_ENV: ${INSOLVIA_ENV:-local}
+      # The firm store + audit table move as a GROUP (the dev server's
+      # composition explains): both set → real AWS adapters, either unset →
+      # both in-memory.
+      FIRM_TABLE_NAME: ${FIRM_TABLE_NAME:-}
+      ADMIN_AUDIT_TABLE_NAME: ${ADMIN_AUDIT_TABLE_NAME:-}
+      # The FIRM pool provisioning mints first-administrator accounts in.
+      # Set it to exercise the real invite email locally; unset means the
+      # in-memory directory (subjects minted, nothing sent).
+      FIRM_USER_POOL_ID: ${FIRM_USER_POOL_ID:-}
+      # The environment's Google OAuth client id (#209) — a public value.
+      # Unset fails CLOSED: every staff route 401s, /health keeps working.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    ports:
+      - "127.0.0.1:8090:8090"

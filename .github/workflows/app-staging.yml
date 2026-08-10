@@ -382,10 +382,13 @@ jobs:
       # ones); the shared password is the only secret involved.
       - name: Seed the staging accounts and firms
         env:
-          PYTHONPATH: services/api/src
+          # The seeder lives in the ADMIN service (#212 — provisioning
+          # tooling has one home); the requirements installed above are the
+          # API's, whose pins cover everything the seeder imports.
+          PYTHONPATH: services/admin/src
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: |
-          python -m insolvia_api.entrypoints.seed \
+          python -m insolvia_admin.entrypoints.seed \
             --fixture seeds/staging.json \
             --firm-table "${{ needs.terraform.outputs.firm_table }}" \
             --user-pool-id "${{ needs.terraform.outputs.auth_pool_id }}"
