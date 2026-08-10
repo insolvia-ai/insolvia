@@ -13,12 +13,7 @@ locals {
   }
 
   # The account's SES domain identity, constructed the way modules/mailer
-  # constructs the same ARN — never remote state. Defined now, referenced only
-  # by the commented ses_source_arn lines on the two auth modules below, so
-  # that flipping them on after SES production access (#211) is genuinely a
-  # one-line uncomment — hence the lint suppression: "unused" is the gate
-  # working, not a leftover.
-  # tflint-ignore: terraform_unused_declarations
+  # constructs the same ARN — never remote state.
   ses_identity_arn = "arn:aws:ses:us-east-1:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}"
 }
 
@@ -190,14 +185,17 @@ module "auth" {
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
 
-  # Branded sender DELIBERATELY OFF until SES production access (#211): in the
-  # sandbox, an invite to an unverified prod mailbox is silently
-  # undeliverable — strictly worse than Cognito's default sender, which
-  # delivers anywhere. The branded TEMPLATES above (in the module) are live
-  # here already; only the sender waits. Enable by uncommenting once #211 is
-  # granted — staging's identical wiring is the proof it works:
-  #
-  #   ses_source_arn = local.ses_identity_arn
+  # Branded sender ON, ahead of SES production access (#211) — a deliberate
+  # decision, because "sandbox" is subtler than "cannot send": recipients on
+  # the VERIFIED DOMAIN (@insolvia.ai — every internal test account) deliver
+  # fine even here, and only external recipients fail until #211. Nothing in
+  # prod can attempt a send yet anyway — the pool has no users and no
+  # provisioning path exists (#212 is the first). What this deliberately
+  # accepts, written down so it is chosen rather than discovered: onboarding a
+  # REAL firm before #211 lands would mean their invite silently never
+  # arrives. #211 is a hard prerequisite on the provisioning checklist for
+  # exactly that reason; the mitigation is sequencing, not this file.
+  ses_source_arn = local.ses_identity_arn
 
   tags = local.common_tags
 }

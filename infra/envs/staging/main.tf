@@ -188,12 +188,14 @@ module "auth" {
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
 
-  # Invites and reset codes leave as no-reply@insolvia.ai (#210). Staging
-  # turns this on first: SES is sandboxed until #211, so manual tests here use
-  # sandbox-verified recipients, and prod stays on the default sender until
-  # production access lands. ONE-TIME PREREQUISITE for the first apply that
-  # carries this: the Cognito email service-linked role must exist —
-  # docs/runbooks/aws-bootstrap.md § "Cognito email service-linked role".
+  # Invites and reset codes leave as no-reply@insolvia.ai (#210). SES is
+  # sandboxed until #211, which for tests means: recipients on the verified
+  # insolvia.ai domain — any Workspace mailbox or alias, including
+  # plus-addressed variants — deliver fine; external recipients do not. Prod
+  # sets this too (module variables.tf owns the sequencing argument).
+  # ONE-TIME PREREQUISITE for the first apply that carries this: the Cognito
+  # email service-linked role must exist — docs/runbooks/aws-bootstrap.md
+  # § "Cognito email service-linked role".
   ses_source_arn = local.ses_identity_arn
 
   tags = local.common_tags
