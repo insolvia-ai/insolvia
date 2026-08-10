@@ -62,3 +62,13 @@ output "case_document_bucket" {
   description = "Bucket holding the source documents of a case (CASE_DOCUMENT_BUCKET for the API)."
   value       = module.case_documents.bucket_name
 }
+
+output "admin_audit_table_name" {
+  description = "This machine's append-only admin audit table (#213)."
+  value       = aws_dynamodb_table.admin_audit.name
+}
+
+output "google_admin_client_id" {
+  description = "The dev Google OAuth client id (public), for services/admin/.env and the portal dev server."
+  value       = var.google_admin_client_id
+}

@@ -33,3 +33,19 @@ variable "marketing_image_tag" {
   type        = string
   default     = "prod"
 }
+
+# The admin SERVICE's host (#213); the portal serves from admin_subdomain
+# when its hosting lands (#215).
+variable "admin_api_subdomain" {
+  description = "Hostname the admin service serves in this environment."
+  type        = string
+  default     = "admin-api.insolvia.ai"
+}
+
+# A PUBLIC value, committed on purpose — #209 records the decision. This is
+# production's client; nothing running elsewhere can satisfy its audience.
+variable "google_admin_client_id" {
+  description = "Google Workspace OAuth client id staff ID tokens must carry as their audience."
+  type        = string
+  default     = "925851246989-115l1fsln1ntv52uv3bhg29k819fram7.apps.googleusercontent.com"
+}

@@ -55,3 +55,14 @@ variable "enable_audit_trail" {
   type        = bool
   default     = false
 }
+
+# The DEV Google Workspace OAuth client (#209) — one client, shared by every
+# developer machine, redirecting to http://localhost:3100/auth/callback. A
+# PUBLIC value (it appears in every sign-in redirect), committed on purpose;
+# per-machine clients would mean a console procedure per laptop for no
+# isolation gain (the audience check is per-environment, not per-machine).
+variable "google_admin_client_id" {
+  description = "Google Workspace OAuth client id for local admin-portal sign-in."
+  type        = string
+  default     = "925851246989-tttlgepq8mjfhmtlkmgikrtv4kskv0pk.apps.googleusercontent.com"
+}

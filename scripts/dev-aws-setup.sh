@@ -98,6 +98,8 @@ pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
+admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
+google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 
 # ── Wire services/api at the real table ─────────────────────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
@@ -139,6 +141,22 @@ upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
 # core/config.py for why parsing one out of the other is refused.
 upsert_env "$api_env" AUTH_USER_POOL_ID "$pool_id"
 
+# ── Wire services/admin at the same resources (#213) ───────────
+# Same compose-substitution mechanism as the API's file above. FIRM_TABLE_NAME
+# is the SAME table the API reads — the admin service is the second principal
+# with access to it (ADR 0011); locally both run as the developer's own IAM
+# user. FIRM_USER_POOL_ID is the pool provisioning mints first-administrator
+# accounts in (the one the API verifies against — one dev pool serves both
+# jobs). GOOGLE_CLIENT_ID is the dev Workspace OAuth client, a public value.
+admin_env="$REPO_ROOT/services/admin/.env"
+upsert_env "$admin_env" FIRM_TABLE_NAME "$firm_table"
+upsert_env "$admin_env" FIRM_USER_POOL_ID "$pool_id"
+upsert_env "$admin_env" ADMIN_AUDIT_TABLE_NAME "$admin_audit_table"
+upsert_env "$admin_env" GOOGLE_CLIENT_ID "$google_admin_client_id"
+upsert_env "$admin_env" INSOLVIA_ENV "local"
+upsert_env "$admin_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
+upsert_env "$admin_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only
 # `EXPO_PUBLIC_*`-prefixed variables into the bundle, and it loads them from
@@ -158,7 +176,7 @@ upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
 
-ok "AWS development resources are ready; services/api/.env and apps/insolvia_app/.env were updated."
+ok "AWS development resources are ready; services/api/.env, services/admin/.env and apps/insolvia_app/.env were updated."
 
 # If setup is reapplied while the API container is already running, replace it
 # so it picks up the new table name and the freshly exported credentials —

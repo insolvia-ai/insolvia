@@ -460,3 +460,38 @@ resource "aws_iam_role_policy" "api_invite" {
     ]
   })
 }
+
+# ── The admin service's invite grant (#213, ADR 0011) ───────────
+# The same one-action shape as api_invite above, on the admin service's own
+# role: provisioning a firm's first administrator and re-sending a stranded
+# invitation are BOTH AdminCreateUser (resend is MessageAction=RESEND), so
+# the deliberately narrow grant survives a second consumer without widening —
+# the "second action" revisit trigger recorded on api_invite is not tripped.
+# Everything api_invite's comment says about what one action on one pool
+# cannot become (an impersonation primitive) holds here unchanged.
+data "aws_iam_role" "admin" {
+  count = var.admin_invite_role_name == null ? 0 : 1
+  name  = var.admin_invite_role_name
+}
+
+resource "aws_iam_role_policy" "admin_invite" {
+  count = var.admin_invite_role_name == null ? 0 : 1
+
+  name = "admin-invite-${aws_cognito_user_pool.main.name}"
+  role = data.aws_iam_role.admin[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ProvisionFirstAdministrator"
+        Effect   = "Allow"
+        Action   = ["cognito-idp:AdminCreateUser"]
+        Resource = aws_cognito_user_pool.main.arn
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+    ]
+  })
+}

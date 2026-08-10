@@ -39,7 +39,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "marketing", "mailer"])
+  for_each = toset(["api", "admin", "marketing", "mailer"])
 
   name = "insolvia-${each.key}"
 }
@@ -79,6 +79,32 @@ module "api_service" {
   ecr_repository_url  = data.aws_ecr_repository.service["api"].repository_url
   image_tag           = local.environment
   tags                = local.common_tags
+}
+
+
+# Admin service (#213): the cross-tenant provisioning surface (services/admin,
+# ADR 0011). Staging's block owns the shared commentary; prod differs only in
+# insolvia_env, the hostname, the client id, and the audit table keeping its
+# deletion protection — it is the durable record of who provisioned every
+# real firm (#178).
+module "admin_service" {
+  source = "../../modules/admin_service"
+
+  project             = "insolvia"
+  environment         = local.environment
+  insolvia_env        = "production"
+  domain_name         = var.admin_api_subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  ecr_repository_url  = data.aws_ecr_repository.service["admin"].repository_url
+  image_tag           = local.environment
+  firm_table_name     = module.firm_store.table_name
+  firm_user_pool_id   = module.auth.user_pool_id
+  google_client_id    = var.google_admin_client_id
+
+  audit_deletion_protection = true
+
+  tags = local.common_tags
 }
 
 # Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
@@ -184,6 +210,10 @@ module "auth" {
   # ONE pool — the module's own comment has the argument for why that is the
   # whole grant, and what it deliberately excludes.
   api_role_name = module.api_service.lambda_role_name
+
+  # Provisioning a firm's first administrator (#213) — same one-action grant
+  # on the admin service's own role.
+  admin_invite_role_name = module.admin_service.lambda_role_name
 
   # Branded sender ON, ahead of SES production access (#211) — a deliberate
   # decision, because "sandbox" is subtler than "cannot send": recipients on
@@ -313,6 +343,7 @@ module "firm_store" {
   aws_region             = var.aws_region
   kms_key_arn            = module.case_store.kms_key_arn
   api_role_name          = module.api_service.lambda_role_name
+  admin_role_name        = module.admin_service.lambda_role_name
   point_in_time_recovery = true
   deletion_protection    = true
   tags                   = local.common_tags

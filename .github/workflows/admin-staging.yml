@@ -1,0 +1,129 @@
+name: Admin · Deploy · Staging
+
+# Steady-state deploy for services/admin (#213) — the api-staging.yml shape,
+# whose comments own the shared reasoning; only the paths differ. The first
+# deploy in a fresh environment needs the image-before-apply bootstrap
+# (infra/modules/admin_service/main.tf header; scripts/bootstrap-ecr-images.sh
+# --services admin).
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-terraform-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Read staging infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          {
+            echo "repo=$(terraform -chdir=infra/envs/staging output -raw admin_ecr_repository_url)"
+            echo "function=$(terraform -chdir=infra/envs/staging output -raw admin_lambda_function_name)"
+            echo "domain=$(terraform -chdir=infra/envs/staging output -raw admin_domain)"
+            echo "alias=$(terraform -chdir=infra/envs/staging output -raw admin_lambda_alias_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # The registry host is everything before the first `/` of the repo URL.
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      - name: Build and push image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # sha-<sha> is the immutable identity a production promotion resolves
+          # to a digest; `staging` is this environment's moving marker tag.
+          # Context is the repo root: the image installs the shared
+          # packages/insolvia_core by relative path (see the Dockerfile header).
+          docker build --target lambda -f services/admin/Dockerfile \
+            -t "$REPO:sha-${{ github.sha }}" \
+            -t "$REPO:staging" \
+            .
+          docker push "$REPO:sha-${{ github.sha }}"
+          docker push "$REPO:staging"
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # Deliberately NOT --publish here — the next step rewrites the
+          # environment from SSM first (api-staging.yml records why).
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$REPO:sha-${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive Lambda environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          # /insolvia/staging/admin/<kebab-key> -> KEBAB_KEY, e.g.
+          #   firm-table-name  -> FIRM_TABLE_NAME
+          #   google-client-id -> GOOGLE_CLIENT_ID
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/staging/admin \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          # Refuse to ship nonsense: an empty or half-applied namespace would
+          # otherwise silently wipe every variable the service reads.
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Publish version and shift the live alias
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+        run: |
+          version="$(aws lambda publish-version \
+            --function-name "$FUNCTION" \
+            --query Version --output text)"
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$version"
+          echo "Staging admin now serving version $version via alias $ALIAS." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          curl -sSf "https://$DOMAIN/health" | tee health.json
+          jq -e '.environment == "staging"' health.json > /dev/null

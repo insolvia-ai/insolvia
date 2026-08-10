@@ -1,0 +1,227 @@
+name: Admin · Deploy · Production
+
+# PROMOTES the image staging validated — api-prod.yml's shape and its
+# comments own the shared reasoning (digest promotion, the two hand-dispatch
+# gates, traffic moving LAST behind a candidate smoke test). Only the output
+# names, SSM namespace, and smoke host differ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  statuses: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production admin deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          terraform_wrapper: false
+
+      - name: Read prod infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "repo=$(tf admin_ecr_repository_url)"
+            echo "function=$(tf admin_lambda_function_name)"
+            echo "domain=$(tf admin_domain)"
+            echo "alias=$(tf admin_lambda_alias_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
+        run: |
+          # No --publish: the next step rewrites the environment from SSM
+          # first (api-prod.yml records why).
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive Lambda environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/prod/admin \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Publish candidate version
+        id: candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          version="$(aws lambda publish-version \
+            --function-name "$FUNCTION" \
+            --query Version --output text)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo ":hourglass: Published version \`$version\` — not yet serving." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          cat > event.json <<'EOF'
+          {
+            "version": "2.0",
+            "routeKey": "$default",
+            "rawPath": "/health",
+            "rawQueryString": "",
+            "headers": { "host": "admin-api.insolvia.ai", "accept": "*/*" },
+            "requestContext": {
+              "http": {
+                "method": "GET", "path": "/health", "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1", "userAgent": "insolvia-deploy-smoke"
+              }
+            },
+            "isBase64Encoded": false
+          }
+          EOF
+
+          aws lambda invoke \
+            --function-name "$FUNCTION:$VERSION" \
+            --payload fileb://event.json \
+            --cli-read-timeout 60 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json
+
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::Candidate version $VERSION raised: $(jq -r '.FunctionError' invoke-meta.json)"
+            cat response.json
+            exit 1
+          fi
+
+          jq -e '.statusCode == 200' response.json > /dev/null
+          jq -r '.body' response.json | jq -e '.environment == "production"' > /dev/null
+
+      - name: Shift live traffic to the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          previous="$(aws lambda get-alias \
+            --function-name "$FUNCTION" --name "$ALIAS" \
+            --query FunctionVersion --output text)"
+
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$VERSION"
+
+          # Move the `prod` marker tag onto the promoted digest — the
+          # from-scratch-apply seed (var.image_tag).
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."
+
+          {
+            echo ":rocket: **Live.** Alias \`$ALIAS\` moved \`$previous\` → \`$VERSION\`."
+            echo
+            echo "Roll back without a rebuild:"
+            echo '```bash'
+            echo "aws lambda update-alias --function-name $FUNCTION --name $ALIAS --function-version $previous"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify through the public endpoint
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          curl -sSf --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://$DOMAIN/health" | tee health.json
+          jq -e '.environment == "production"' health.json > /dev/null

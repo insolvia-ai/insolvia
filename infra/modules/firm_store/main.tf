@@ -117,6 +117,11 @@ resource "aws_dynamodb_table" "firms" {
 # shape modules/case_store and modules/case_documents use, and for the same
 # reason: a resource reference across the boundary would make api_service depend
 # on this module.
+data "aws_iam_role" "admin" {
+  count = var.admin_role_name == null ? 0 : 1
+  name  = var.admin_role_name
+}
+
 resource "aws_iam_role_policy" "api_firm_access" {
   count = var.api_role_name == null ? 0 : 1
 
@@ -160,6 +165,63 @@ resource "aws_iam_role_policy" "api_firm_access" {
         # Fenced to DynamoDB as the calling service, so this grant can never
         # become a direct Decrypt of a case row or a case document. Both other
         # modules fence their own the same way, in their own directions.
+        Sid    = "FirmKeyUse"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+        ]
+        Resource = var.kms_key_arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "dynamodb.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}
+
+# ── The second application principal (#213, ADR 0011) ───────────
+# The admin service — the exception to "one application principal" that
+# ADR 0011 records. Same shape as the API's grant above with ONE deliberate
+# addition: dynamodb:Scan, which the API's grant deliberately lacks and must
+# keep lacking. Scan is what cross-tenant listing costs (firm META items
+# carry no GSI keys — that absence is what keeps the by-subject index
+# sparse), and granting it HERE and not THERE is what makes "the tenant hot
+# path cannot enumerate firms" an IAM fact rather than a code-review hope.
+resource "aws_iam_role_policy" "admin_firm_access" {
+  count = var.admin_role_name == null ? 0 : 1
+
+  name = "admin-access-${local.name}"
+  role = data.aws_iam_role.admin[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "FirmAdministration"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:BatchGetItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.firms.arn,
+          "${aws_dynamodb_table.firms.arn}/index/*",
+        ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # Same DynamoDB-only fence as the API's key statement.
         Sid    = "FirmKeyUse"
         Effect = "Allow"
         Action = [

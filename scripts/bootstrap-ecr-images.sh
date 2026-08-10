@@ -15,7 +15,7 @@
 #     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-<svc>:<env>
 #     does not exist. Provide a valid source image.
 #
-# The same note lives at the top of infra/modules/{api_service,mailer,
+# The same note lives at the top of infra/modules/{api_service,admin_service,mailer,
 # marketing_site}/main.tf and in each workflow header. This script is that
 # manual step, done once, for whatever services you name.
 #
@@ -88,7 +88,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|mailer|marketing) SERVICES+=("$arg") ;;
+    api|admin|mailer|marketing) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -97,7 +97,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api mailer marketing)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin mailer marketing)
 
 require_command aws
 require_command docker
@@ -160,6 +160,14 @@ build_api() {
   # (see services/api/Dockerfile's header).
   docker build --platform "$PLATFORM" --target lambda \
     -f "$REPO_ROOT/services/api/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
+}
+
+build_admin() {
+  # Same repo-root-context rule as build_api — the image installs the shared
+  # packages/insolvia_core by relative path.
+  docker build --platform "$PLATFORM" --target lambda \
+    -f "$REPO_ROOT/services/admin/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
 

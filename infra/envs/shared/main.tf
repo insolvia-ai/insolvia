@@ -128,7 +128,7 @@ module "email" {
 # an IAM change (infra/envs/ci-trust/main.tf) — that grant is human-applied, so
 # a rename here would strand the pipeline.
 locals {
-  container_repositories = toset(["api", "marketing", "mailer"])
+  container_repositories = toset(["api", "admin", "marketing", "mailer"])
 }
 
 resource "aws_ecr_repository" "service" {
