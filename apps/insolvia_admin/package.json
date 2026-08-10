@@ -1,0 +1,57 @@
+{
+  "name": "@insolvia/admin",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "//": [
+    "OUTSIDE the npm workspace, like apps/insolvia_marketing and for the same",
+    "reason: its own lockfile is what proves a clean registry install of the",
+    "published @insolvia-ai/design-system works, and keeps a second React tree",
+    "off the root lockfile. Never add it to the root `workspaces` list.",
+    "",
+    "@insolvia-ai/design-system is a devDependency because everything is",
+    "bundled at build time (this is a static SPA \u2014 nothing installs at",
+    "runtime); installing it needs GitHub Packages auth (see .npmrc).",
+    "Never point it at a local checkout \u2014 published versions only (ADR 0010).",
+    "",
+    "The dev server is PINNED to port 3100 (strictPort in vite.config.ts):",
+    "Google's OAuth redirect URIs are exact-match, the dev client registers",
+    "http://localhost:3100/auth/callback, and the tenant app owns :3000."
+  ],
+  "scripts": {
+    "dev": "vite --port 3100 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 3100 --strictPort",
+    "typecheck": "tsc",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^7.18.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@insolvia-ai/design-system": "^0.14.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.19.0",
+    "vite": "^8.1.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "@insolvia-ai/design-system/theme.css";
+
+/* Required: let Tailwind v4 scan the design system's SOURCE for the utility
+   classes its components use — node_modules is excluded from scanning by
+   default, and omitting this silently drops every component's styles.
+   (Same line, same reason, as apps/insolvia_marketing's entry css.) */
+@source "../../node_modules/@insolvia-ai/design-system/src/**/*.{ts,tsx}";

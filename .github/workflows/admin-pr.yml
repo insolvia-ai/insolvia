@@ -73,3 +73,65 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         working-directory: ${{ github.workspace }}
         run: docker build --target lambda -f services/admin/Dockerfile -t insolvia-admin-pr-check .
+
+  portal:
+    name: Admin portal
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/insolvia_admin
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            apps/insolvia_admin/**
+            .github/workflows/admin-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-node@v5
+        if: steps.filter.outputs.run == 'true'
+        with:
+          node-version: 24
+
+      # Own lockfile, own install — deliberately outside the npm workspace,
+      # like marketing: this `npm ci` from a clean registry is what proves the
+      # published design-system install works.
+      - name: Install
+        if: steps.filter.outputs.run == 'true'
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Typecheck
+        if: steps.filter.outputs.run == 'true'
+        run: npm run typecheck
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: npm run lint
+
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: npm test
+
+      - name: Build
+        if: steps.filter.outputs.run == 'true'
+        env:
+          VITE_INSOLVIA_ENV: staging
+        run: npm run build
+
+      # The same invariant marketing's grep guard holds: the design system's
+      # .web leaves keep react-native out of a web bundle. A resolve change
+      # that broke the platform split would surface here, not in a browser.
+      - name: Assert react-native stayed out of the bundle
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          if grep -rq "react-native" dist/assets/; then
+            echo "::error::react-native leaked into the admin portal bundle"
+            exit 1
+          fi
