@@ -13,6 +13,8 @@ on:
 permissions:
   id-token: write
   contents: read
+  # The portal build installs @insolvia-ai/design-system from GitHub Packages.
+  packages: read
 
 concurrency:
   group: insolvia-terraform-staging
@@ -46,6 +48,8 @@ jobs:
             echo "function=$(terraform -chdir=infra/envs/staging output -raw admin_lambda_function_name)"
             echo "domain=$(terraform -chdir=infra/envs/staging output -raw admin_domain)"
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw admin_lambda_alias_name)"
+            echo "web_bucket=$(terraform -chdir=infra/envs/staging output -raw admin_web_bucket_name)"
+            echo "web_dist=$(terraform -chdir=infra/envs/staging output -raw admin_web_distribution_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -127,3 +131,40 @@ jobs:
         run: |
           curl -sSf "https://$DOMAIN/health" | tee health.json
           jq -e '.environment == "staging"' health.json > /dev/null
+
+      # ── The portal (#215) ────────────────────────────────────────────────
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build the portal
+        working-directory: apps/insolvia_admin
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_INSOLVIA_ENV: staging
+        run: |
+          npm ci
+          npm run build
+
+      # Two-tier cache sync, the app workflow's shape (its comment owns the
+      # argument): Vite's dist/assets are content-hashed — immutable forever;
+      # index.html keeps its name while its bytes change — never cached.
+      - name: Sync the portal to S3 + invalidate
+        env:
+          SRC: apps/insolvia_admin/dist
+          BUCKET: ${{ steps.tf.outputs.web_bucket }}
+          DIST: ${{ steps.tf.outputs.web_dist }}
+        run: |
+          set -euo pipefail
+          aws s3 sync "$SRC/assets" "s3://$BUCKET/assets" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync "$SRC" "s3://$BUCKET" --exclude "assets/*" \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      - name: Smoke test the portal
+        run: |
+          # Through CloudFront, retrying past the invalidation: the shell
+          # must serve, carrying the app's title.
+          curl -sSf --retry 5 --retry-delay 5 --retry-all-errors \
+            "https://staging-admin.insolvia.ai/" | grep -q "Insolvia Admin"
