@@ -1,7 +1,9 @@
+import { permits } from '@insolvia-ai/api-client';
 import type { ReactNode } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useMembership } from '@/api/me';
 import { AccountBar } from '@/components/account-bar';
 import { Wordmark } from '@/components/wordmark';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
@@ -38,21 +40,34 @@ export interface AppShellProps {
  */
 export function AppShell({ children, actions, maxContentWidth = contentMaxWidth }: AppShellProps) {
   const theme = useTheme();
+  const membership = useMembership();
+
+  // A COURTESY, never a control — the same `permits` rule the firm screen
+  // documents. The value is MeProvider's session-lifetime read, so a demoted
+  // admin may keep the link until they next sign in; the screen's own "an
+  // administrator's job" fallback is what actually answers them, and the API
+  // enforces regardless.
+  const showFirmLink =
+    membership != null && permits(membership.permissions.firm_administration, 'view_only');
+
+  const navLink = [
+    styles.navLink,
+    { color: theme.colors.muted, fontFamily: theme.typography.body },
+  ];
 
   return (
     <View style={[styles.page, { backgroundColor: theme.colors.bg }]}>
       <View role="banner" style={[styles.header, { borderBottomColor: theme.colors.line }]}>
         <Wordmark />
         <View role="navigation" aria-label="Primary" style={styles.nav}>
-          <Link
-            href="/"
-            style={[
-              styles.navLink,
-              { color: theme.colors.muted, fontFamily: theme.typography.body },
-            ]}
-          >
+          <Link href="/" style={navLink}>
             Home
           </Link>
+          {showFirmLink ? (
+            <Link href="/firm" style={navLink}>
+              Firm
+            </Link>
+          ) : null}
         </View>
         {actions}
         <AccountBar />
