@@ -133,6 +133,35 @@ USAGE
 *) die "unexpected argument '$1' — this script takes none (try --help)" ;;
 esac
 
+# Compare the installed version of each named package against what
+# package-lock.json resolves, and warn when they differ. node, not jq/python:
+# it is the one tool guaranteed present wherever node_modules exists at all,
+# and reading two JSON files is a one-liner for it. Never fails the caller —
+# a package absent from the lockfile (mid-bump, fresh package) is simply
+# skipped, and node itself missing is the missing-node_modules warning's
+# problem, not this one's.
+stale_node_modules() {
+  local root="$1" stale line
+  shift
+  command -v node >/dev/null 2>&1 || return 0
+  stale="$(node -e '
+    const [lockPath, nmDir, ...pkgs] = process.argv.slice(1);
+    const locked = require(lockPath).packages || {};
+    for (const pkg of pkgs) {
+      const want = (locked["node_modules/" + pkg] || {}).version;
+      if (!want) continue;
+      let have;
+      try { have = require(nmDir + "/" + pkg + "/package.json").version; }
+      catch { have = "nothing"; }
+      if (have !== want) console.log(pkg + ": installed " + have + ", lockfile pins " + want);
+    }
+  ' "$root/package-lock.json" "$root/node_modules" "$@" 2>/dev/null)" || stale=""
+  [[ -n "$stale" ]] || return 0
+  while IFS= read -r line; do
+    warn "root node_modules is stale: $line — run npm install. (A stale install replays bugs whose fix is already in the tree.)"
+  done <<<"$stale"
+}
+
 # ── Preflight ───────────────────────────────────────────────────
 # Every check here exists because its failure mode is otherwise a wall of
 # container or bundler output that never names the missing step.
@@ -178,10 +207,21 @@ preflight() {
   [[ -f "$REPO_ROOT/services/admin/.env" ]] ||
     warn "services/admin/.env is missing — the admin service will run in-memory only. Run ./scripts/dev-aws-setup.sh to point it at this machine's dev tables."
 
-  [[ -d "$REPO_ROOT/node_modules" ]] || {
+  if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
     warn "root node_modules missing — run ./apps/insolvia_app/scripts/dev-setup.sh (the app resolves through the root workspace)."
     failures=$((failures + 1))
-  }
+  else
+    # Present is not the same as current. A node_modules behind the lockfile is
+    # the nastier failure: the fix is in the tree, the bug is on screen, and
+    # nothing names the gap — the Select overlay fix (design-system 0.14.1)
+    # "regressed" on a machine still running the 0.13.0 install for exactly
+    # this reason. Only the two design-system packages are checked, because
+    # their staleness is the case that reads as a UI regression rather than a
+    # crash; verifying all of node_modules is `npm ci`'s job, not a preflight's.
+    # Warn-only: the mismatch story is always "run npm install", and blocking
+    # five healthy services on a version skew helps nobody.
+    stale_node_modules "$REPO_ROOT" @insolvia-ai/design-system @insolvia-ai/tokens
+  fi
   # Marketing and the admin portal are deliberately outside the npm workspace
   # and install from their own lockfiles — see the root package.json comments.
   [[ -d "$REPO_ROOT/apps/insolvia_marketing/node_modules" ]] || {
