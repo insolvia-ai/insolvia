@@ -17,19 +17,28 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# The one principal allowed to touch case rows. Looked up by name rather than
-# passed as an ARN for the same reason module.mailer does it: a resource
-# reference across a module boundary would make api_service depend on this
-# module, and this module already depends on api_service.
+# The one principal allowed to touch case rows arrives as var.api_role_name —
+# a NAME, used directly by the policy attachments below, and deliberately
+# neither of the two alternatives:
+#
+#   - Not a resource reference (an ARN output consumed as `role =`): that
+#     direction of reference would make api_service depend on this module,
+#     and this module already depends on api_service.
+#   - Not a `data "aws_iam_role"` lookup on the name: a data source whose
+#     config is a known string is read at PLAN time, so an environment whose
+#     first apply creates the role and its grants together fails before it
+#     creates anything — "reading IAM Role (…): couldn't find resource", and
+#     re-running can never fix it. The admin service's first staging apply
+#     hit exactly this. Using the name directly keeps the ordering edge (the
+#     env root passes module.<service>.lambda_role_name, so the attachment
+#     still waits for the role) without the plan-time read.
+#
+# Every module with a grant seam follows this shape and points here.
 #
 # Optional, and null in exactly one place: infra/envs/dev, where there is no
 # Lambda at all — the local API runs as a dev server or under compose and the
 # developer's own IAM user is the principal. The waitlist table's dev instance
 # skips its grant for the same reason.
-data "aws_iam_role" "api" {
-  count = var.api_role_name == null ? 0 : 1
-  name  = var.api_role_name
-}
 
 locals {
   # insolvia-cases-<env>
@@ -351,7 +360,7 @@ resource "aws_iam_role_policy" "api_case_access" {
   count = var.api_role_name == null ? 0 : 1
 
   name = "access-${local.name}"
-  role = data.aws_iam_role.api[0].id
+  role = var.api_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"

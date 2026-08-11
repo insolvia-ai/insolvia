@@ -434,16 +434,14 @@ resource "aws_cognito_user_pool_client" "web" {
 # it costs a second function, a second deploy path and an internal call for one
 # endpoint. Revisit if this grant ever needs a second action — that is the
 # signal that the invite flow has outgrown living here.
-data "aws_iam_role" "api" {
-  count = var.api_role_name == null ? 0 : 1
-  name  = var.api_role_name
-}
-
+# The name in var.api_role_name is used directly, not looked up — see
+# modules/case_store's comment for why a plan-time data lookup deadlocks a
+# bootstrap apply.
 resource "aws_iam_role_policy" "api_invite" {
   count = var.api_role_name == null ? 0 : 1
 
   name = "invite-${aws_cognito_user_pool.main.name}"
-  role = data.aws_iam_role.api[0].id
+  role = var.api_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -469,16 +467,11 @@ resource "aws_iam_role_policy" "api_invite" {
 # the "second action" revisit trigger recorded on api_invite is not tripped.
 # Everything api_invite's comment says about what one action on one pool
 # cannot become (an impersonation primitive) holds here unchanged.
-data "aws_iam_role" "admin" {
-  count = var.admin_invite_role_name == null ? 0 : 1
-  name  = var.admin_invite_role_name
-}
-
 resource "aws_iam_role_policy" "admin_invite" {
   count = var.admin_invite_role_name == null ? 0 : 1
 
   name = "admin-invite-${aws_cognito_user_pool.main.name}"
-  role = data.aws_iam_role.admin[0].id
+  role = var.admin_invite_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"

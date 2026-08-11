@@ -40,11 +40,13 @@ data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
 
-# The one caller registered in the service registry below. Looked up by name
-# rather than hard-coded, since the caller is this module's own sibling —
-# module.api_service.lambda_role_name.
-data "aws_iam_role" "caller" {
-  name = var.caller_role_name
+locals {
+  # The one caller registered in the service registry below —
+  # module.api_service.lambda_role_name. The ARN is constructed rather than
+  # looked up with data "aws_iam_role": modules/case_store's comment owns why
+  # a plan-time lookup deadlocks a bootstrap apply that creates the role in
+  # the same run.
+  caller_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.caller_role_name}"
 }
 
 locals {
@@ -76,7 +78,7 @@ locals {
     sender_address          = var.sender_address
     allowed_categories      = ["welcome", "email_verification", "password_reset"]
     allowed_message_classes = ["transactional"]
-    allowed_role_arns       = [data.aws_iam_role.caller.arn]
+    allowed_role_arns       = [local.caller_role_arn]
     configuration_set       = local.configuration_set
     send_queue_url          = aws_sqs_queue.api_send.url
     status_queue_url        = aws_sqs_queue.api_status.url
@@ -942,11 +944,11 @@ resource "aws_route53_record" "mailer" {
 }
 
 # The one caller's grant: execute-api:Invoke on exactly the two routes
-# insolvia_api is allowed to hit. `data.aws_iam_role.caller` (looked up by
-# var.caller_role_name) is the role that receives it.
+# insolvia_api is allowed to hit, attached onto the role var.caller_role_name
+# names.
 resource "aws_iam_role_policy" "api_invoke" {
   name = "invoke-${local.name}"
-  role = data.aws_iam_role.caller.id
+  role = var.caller_role_name
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

@@ -31,11 +31,6 @@ locals {
   name = "${var.project}-firms-${var.environment}"
 }
 
-data "aws_iam_role" "api" {
-  count = var.api_role_name == null ? 0 : 1
-  name  = var.api_role_name
-}
-
 # ── The table ───────────────────────────────────────────────────
 #   PK  FIRM#<firm_id>
 #   SK  META                 the firm itself
@@ -113,20 +108,16 @@ resource "aws_dynamodb_table" "firms" {
 }
 
 # ── The one application principal ───────────────────────────────
-# Attached from inside this module onto the role looked up above — the same
-# shape modules/case_store and modules/case_documents use, and for the same
-# reason: a resource reference across the boundary would make api_service depend
-# on this module.
-data "aws_iam_role" "admin" {
-  count = var.admin_role_name == null ? 0 : 1
-  name  = var.admin_role_name
-}
-
+# Attached from inside this module onto the role var.api_role_name names — the
+# same shape modules/case_store and modules/case_documents use; case_store's
+# comment owns why the name is used directly (neither a cross-boundary resource
+# reference nor a plan-time data lookup — the latter deadlocks a first apply
+# that creates the role and its grants together).
 resource "aws_iam_role_policy" "api_firm_access" {
   count = var.api_role_name == null ? 0 : 1
 
   name = "access-${local.name}"
-  role = data.aws_iam_role.api[0].id
+  role = var.api_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -195,7 +186,7 @@ resource "aws_iam_role_policy" "admin_firm_access" {
   count = var.admin_role_name == null ? 0 : 1
 
   name = "admin-access-${local.name}"
-  role = data.aws_iam_role.admin[0].id
+  role = var.admin_role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
