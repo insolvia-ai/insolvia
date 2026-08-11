@@ -205,7 +205,7 @@ duplicates them.
 |---|---|---|---|
 | app | <http://localhost:3000> | `apps/insolvia_app/scripts/dev-up.sh` | `…/dev-down.sh` |
 | api | <http://127.0.0.1:8080/health> | `services/api/scripts/dev-up.sh` | `…/dev-down.sh` |
-| admin | <http://127.0.0.1:8090/health> | `services/admin/scripts/dev-up.sh` | `…/dev-down.sh` |
+| admin api | <http://127.0.0.1:8090/health> | `services/admin/scripts/dev-up.sh` | `…/dev-down.sh` |
 | admin portal | <http://localhost:3100> | `apps/insolvia_admin/scripts/dev-up.sh` | `…/dev-down.sh` |
 | marketing | <http://localhost:5173> | `apps/insolvia_marketing/scripts/dev-up.sh` | `…/dev-down.sh` |
 | mailer | <http://127.0.0.1:8026> (Mailpit <http://127.0.0.1:8025>) | `services/mailer/scripts/dev-up.sh` | `…/dev-down.sh` |
@@ -215,6 +215,11 @@ client registers `http://localhost:3100` as an exact origin, which is why its
 `dev-up.sh` runs Vite with `--strictPort` rather than letting it drift. Its
 sign-in needs no local account — staff use their own `@insolvia.ai` Google
 Workspace login.
+
+The two admin halves mirror their hostnames (`admin-api.insolvia.ai` /
+`admin.insolvia.ai`): **8090 is the admin service, a JSON API** — `/health` is
+its only browser-friendly URL and everything else 404s or wants a Google
+token — and **the browsable staff UI is the portal on 3100**.
 
 **Every area owns both halves.** `dev-up.sh` knows how to start that area — the
 API's exports short-lived AWS credentials before `compose up`, the app's pins
