@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { MeProvider } from '@/api/me';
 import { SessionProvider } from '@/session';
 
 /**
@@ -22,11 +23,19 @@ import { SessionProvider } from '@/session';
  * re-running the refresh-token exchange on every route change. It sits outside
  * `<Stack>` so `/sign-in` and `/auth/callback` — which are not signed-in screens
  * but very much need the session — are inside it too.
+ *
+ * `MeProvider` wraps the navigator for the same reason the session does: it
+ * holds one `/v1/me` answer for the session's lifetime — the shell's
+ * navigation and the home screen's `MePanel` both read it. Inside the
+ * navigator it would refetch on every route change, which is exactly the
+ * cost it exists to avoid.
  */
 export default function RootLayout() {
   return (
     <SessionProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <MeProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </MeProvider>
     </SessionProvider>
   );
 }
