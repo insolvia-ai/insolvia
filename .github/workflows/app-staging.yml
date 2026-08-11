@@ -369,12 +369,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      # From requirements.txt rather than a bare `pip install boto3`, so the
-      # seeder resolves the same pinned boto3 the service does — the version is
-      # pinned there precisely so local, CI and Lambda agree, and a second
-      # unpinned install here would be a second answer.
-      - name: Install the API's runtime dependencies
-        run: pip install -r services/api/requirements.txt
+      # From the admin service's requirements rather than a bare `pip install
+      # boto3`, so the seeder resolves the same pinned boto3 the service that
+      # owns it does — and from that service's OWN directory, because its
+      # requirements.txt names ../../packages/insolvia_core and pip resolves
+      # that path against the current working directory, not the file.
+      - name: Install the admin service's runtime dependencies
+        run: pip install -r requirements.txt
+        working-directory: services/admin
 
       # Accounts AND firms, from one fixture. Adding a test user is an edit to
       # seeds/staging.json — no secret per person, no script run, nothing here
@@ -383,8 +385,9 @@ jobs:
       - name: Seed the staging accounts and firms
         env:
           # The seeder lives in the ADMIN service (#212 — provisioning
-          # tooling has one home); the requirements installed above are the
-          # API's, whose pins cover everything the seeder imports.
+          # tooling has one home); the requirements installed above are that
+          # service's own, so the pins match what the seeder runs against
+          # in Lambda.
           PYTHONPATH: services/admin/src
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: |
