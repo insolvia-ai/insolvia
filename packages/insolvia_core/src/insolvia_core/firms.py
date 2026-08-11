@@ -522,6 +522,29 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
     return FirmUserChanges(**changes)  # type: ignore[arg-type]
 
 
+def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
+    """Validate PATCH /v1/me. Unknown keys are ignored.
+
+    Display name is the ONE field a member may change about themselves.
+    Everything else on the row is somebody else's statement about them — role,
+    permissions, the admin flag and status are an administrator's writes
+    (parse_firm_user_update), and email is a pool fact, for the reason that
+    parser records. So this is not parse_firm_user_update with a smaller
+    allowlist by accident: a payload carrying `role` here is ignored the same
+    way one carrying `email` is there, and what the caller can rely on is that
+    the only thing this parser ever produces is a rename.
+    """
+    errors: dict[str, str] = {}
+    if "displayName" not in payload:
+        raise ValidationError("no supported fields to update")
+    display_name = _parse_name(
+        payload["displayName"], errors, field="displayName", cap=MAX_DISPLAY_NAME
+    )
+    if errors or display_name is None:
+        raise FieldValidationError(errors)
+    return FirmUserChanges(display_name=display_name)
+
+
 # ── Construction ────────────────────────────────────────────────────
 
 

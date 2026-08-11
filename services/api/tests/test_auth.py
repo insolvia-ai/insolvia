@@ -238,6 +238,143 @@ def test_me_never_returns_an_email():
     assert not any("email" in key for key in body)
 
 
+# ── PATCH /v1/me — the self-service rename (#216 / 11.16) ────────────
+
+
+def patch_me(client, token: str, payload):
+    return client.patch(
+        "/v1/me", headers={"Authorization": f"Bearer {token}"}, json=payload
+    )
+
+
+def provisioned(*, permissions=None, is_admin=False, user_status="active"):
+    """A store holding one firm and SUBJECT as a member of it."""
+    from insolvia_core.firms import Firm, FirmUser, default_permissions
+
+    firms = MemoryFirmStore()
+    firm_id = "00000000-0000-4000-8000-00000000f18a"
+    firms.create_firm(
+        Firm(
+            id=firm_id,
+            name="Example & Partners",
+            status="active",
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    firms.add_user(
+        FirmUser(
+            firm_id=firm_id,
+            subject=SUBJECT,
+            email="member@example.test",
+            display_name="Original Name",
+            role="staff",
+            is_admin=is_admin,
+            access_all_cases=False,
+            permissions=(
+                default_permissions("staff") if permissions is None else permissions
+            ),
+            status=user_status,
+            created_at="2026-01-01T00:00:00.000Z",
+            updated_at="2026-01-01T00:00:00.000Z",
+        )
+    )
+    return firms, firm_id
+
+
+def test_a_member_renames_themselves_and_the_row_agrees():
+    firms, firm_id = provisioned()
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"displayName": "Corrected Name"}
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["firm"]["displayName"] == "Corrected Name"
+    # The row itself, not just the echo — the directory reads this.
+    assert firms.get_user(firm_id, SUBJECT).display_name == "Corrected Name"
+
+
+def test_the_patch_answers_with_the_get_body():
+    # One serializer for both — the client re-renders from the response
+    # without a follow-up GET, so the shapes must never drift.
+    firms, _ = provisioned()
+    client = make_client(firm_store=firms)
+    token = make_token()
+
+    patched = patch_me(client, token, {"displayName": "Corrected Name"}).get_json()
+    fetched = get_me(client, token).get_json()
+
+    assert patched == fetched
+
+
+def test_no_permission_is_needed_to_rename_yourself():
+    """The point of the route. The permission axes govern what an admin may do
+    to OTHERS; a paralegal with every feature hidden still owns their name."""
+    from insolvia_core.firms import FEATURES, HIDDEN
+
+    firms, firm_id = provisioned(permissions=dict.fromkeys(FEATURES, HIDDEN))
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"displayName": "Still Mine"}
+    )
+
+    assert response.status_code == 200
+    assert firms.get_user(firm_id, SUBJECT).display_name == "Still Mine"
+
+
+def test_a_rename_cannot_smuggle_a_promotion():
+    firms, firm_id = provisioned(is_admin=False)
+
+    response = patch_me(
+        make_client(firm_store=firms),
+        make_token(),
+        {"displayName": "Corrected Name", "isAdmin": True, "role": "attorney"},
+    )
+
+    assert response.status_code == 200
+    row = firms.get_user(firm_id, SUBJECT)
+    assert row.is_admin is False
+    assert row.role == "staff"
+
+
+def test_a_privilege_only_payload_is_a_validation_error():
+    firms, firm_id = provisioned()
+
+    response = patch_me(make_client(firm_store=firms), make_token(), {"isAdmin": True})
+
+    assert response.status_code == 400
+    assert firms.get_user(firm_id, SUBJECT).is_admin is False
+
+
+def test_a_bad_name_reports_the_field():
+    firms, _ = provisioned()
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"displayName": " "}
+    )
+
+    assert response.status_code == 400
+    assert "displayName" in response.get_json()["fields"]
+
+
+def test_a_caller_in_no_firm_cannot_rename():
+    # Unlike GET, which reports the absence, there is no row to write here.
+    response = patch_me(make_client(), make_token(), {"displayName": "Nobody"})
+    assert response.status_code == 403
+
+
+def test_a_disabled_member_cannot_rename():
+    firms, firm_id = provisioned(user_status="disabled")
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"displayName": "Not Anymore"}
+    )
+
+    assert response.status_code == 403
+    assert firms.get_user(firm_id, SUBJECT).display_name == "Original Name"
+
+
 def test_multiple_scopes_split_on_whitespace(auth_client):
     token = make_token(scope="openid profile email")
 

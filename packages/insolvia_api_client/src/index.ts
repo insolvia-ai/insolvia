@@ -47,6 +47,7 @@ export {
   permits,
   updateCaseChangesToJson,
   updateFirmUserRequestToJson,
+  updateMeRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 // The four debtor enums are exported as VALUES, not only as types: each one is
@@ -101,6 +102,7 @@ export type {
   PutDebtorRequest,
   UpdateCaseChanges,
   UpdateFirmUserRequest,
+  UpdateMeRequest,
   UploadDocumentOptions,
   Venue,
   VenueBasis,

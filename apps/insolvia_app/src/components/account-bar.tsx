@@ -1,4 +1,5 @@
 import { Button } from '@insolvia-ai/design-system';
+import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useSession } from '@/session';
@@ -36,6 +37,15 @@ export function AccountBar() {
           {user.email}
         </Text>
       )}
+      {/* A text link like the shell's nav links, not a button: it navigates.
+          The email stays plain text beside it so the link's accessible name
+          says where it goes rather than who you are. */}
+      <Link
+        href="/account"
+        style={[styles.email, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+      >
+        Account
+      </Link>
       {/*
         size="lg" (48dp) for the 44dp WCAG 2.5.5 target-size floor this app
         enforces — the package's `md` is 40dp. No glyph and no aria-label: the

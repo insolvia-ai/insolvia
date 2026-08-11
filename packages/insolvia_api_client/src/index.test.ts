@@ -2796,6 +2796,101 @@ describe('the firm block on /v1/me', () => {
   });
 });
 
+describe('updateMe', () => {
+  // Pinned against services/api/src/insolvia_api/api/routes/me.py's PATCH,
+  // which answers with the SAME body as the GET — one serializer for both,
+  // so the client re-renders from the response without a follow-up GET.
+  const RENAMED = {
+    subject: SUBJECT,
+    username: USERNAME,
+    clientId: CLIENT_ID,
+    scopes: ['aws.cognito.signin.user.admin'],
+    expiresAt: 1893456000,
+    firm: {
+      id: 'f1a2b3c4-0000-4000-8000-000000000001',
+      name: 'Example & Partners',
+      role: 'staff',
+      displayName: 'Corrected Name',
+      isAdmin: false,
+      accessAllCases: false,
+      permissions: {
+        cases: 'view_only',
+        intake: 'view_only',
+        documents: 'view_only',
+        extraction_review: 'hidden',
+        firm_administration: 'hidden',
+      },
+    },
+  };
+
+  test('PATCHes /v1/me with exactly a displayName and maps the answered principal', async () => {
+    const stub = stubFetch(() => jsonResponse(RENAMED, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const principal = await client.updateMe({ displayName: 'Corrected Name' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PATCH');
+    expect(seen.url).toBe(`${BASE_URL}/v1/me`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    // The whole writable surface. A second key here would mean the client
+    // started sending something the server's parser deliberately ignores.
+    expect(JSON.parse(seen.body)).toEqual({ displayName: 'Corrected Name' });
+
+    expect(principal.firm?.displayName).toBe('Corrected Name');
+    expect(principal.subject).toBe(SUBJECT);
+  });
+
+  test('a 400 with a field message surfaces as ApiValidationException', async () => {
+    // The literal body app_factory's FieldValidationError handler emits.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { displayName: 'A name is required.' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const failure = client.updateMe({ displayName: ' ' });
+
+    await expect(failure).rejects.toThrow(ApiValidationException);
+    await failure.catch((caught: unknown) => {
+      expect((caught as ApiValidationException).fields.displayName).toBe('A name is required.');
+    });
+  });
+
+  test('a caller in no firm gets the 403 through as an ApiException', async () => {
+    // Unlike the GET, which reports firmlessness as an answer, there is no
+    // row to rename — the server's ForbiddenError body comes through.
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ForbiddenError', message: 'no active firm membership' }, 403),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.updateMe({ displayName: 'Nobody' })).rejects.toThrow(ApiException);
+  });
+
+  test('refuses to send without a token, before any request', async () => {
+    const stub = stubFetch(() => jsonResponse(RENAMED, 200));
+    const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
+
+    await expect(client.updateMe({ displayName: 'Nobody' })).rejects.toThrow(
+      ApiUnauthorizedException,
+    );
+    expect(stub.requests()).toHaveLength(0);
+  });
+});
+
 describe('permits', () => {
   test('add_edit satisfies view_only, and hidden satisfies nothing', () => {
     // Exists so no caller writes `permissions.documents === 'add_edit'` and

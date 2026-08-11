@@ -146,6 +146,24 @@ export function permits(held: PermissionLevel, required: PermissionLevel): boole
 }
 
 /**
+ * The `PATCH /v1/me` request body — your own display name, and nothing else.
+ *
+ * One required field where {@link UpdateFirmUserRequest} has six optional
+ * ones, and that asymmetry is the contract: everything else on the record is
+ * an administrator's statement about you (role, permissions, status — sent
+ * through {@link InsolviaApiClient.updateFirmUser}), and email is a pool fact
+ * neither endpoint accepts.
+ */
+export interface UpdateMeRequest {
+  readonly displayName: string;
+}
+
+/** The `PATCH /v1/me` body. */
+export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, unknown> {
+  return { displayName: request.displayName };
+}
+
+/**
  * A colleague as `GET /v1/firm/directory` returns them — three fields, for
  * every member of the firm.
  *

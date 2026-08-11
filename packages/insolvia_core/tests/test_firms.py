@@ -32,6 +32,7 @@ from insolvia_core.firms import (
     parse_firm_creation,
     parse_firm_user_creation,
     parse_firm_user_update,
+    parse_self_update,
     permission_for,
     permits,
     set_firm_status,
@@ -277,6 +278,42 @@ def test_changing_a_role_leaves_the_permission_map_alone():
     promoted = apply_user_changes(tuned, parse_firm_user_update({"role": "attorney"}))
     assert promoted.role == "attorney"
     assert permission_for(promoted, CASES) == HIDDEN
+
+
+def test_a_self_update_renames_and_nothing_else():
+    changes = parse_self_update({"displayName": "Robert"})
+    updated = apply_user_changes(user(), changes)
+    assert updated.display_name == "Robert"
+    assert (updated.role, updated.is_admin, updated.status) == (
+        user().role,
+        user().is_admin,
+        user().status,
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"role": "attorney"}, {"isAdmin": True}, {"status": "disabled"}, {}],
+    ids=["role", "isAdmin", "status", "empty"],
+)
+def test_a_self_update_without_a_display_name_is_refused(payload):
+    """`role` and friends land in the same branch as an empty payload: the
+    parser never produces anything but a rename, so a privilege field here is
+    ignored the same way `email` is in parse_firm_user_update — and with no
+    rename alongside it, there is nothing to do."""
+    with pytest.raises(ValidationError):
+        parse_self_update(payload)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "   ", None, 7, "x" * 201],
+    ids=["empty", "blank", "null", "int", "long"],
+)
+def test_a_self_update_validates_the_name_like_any_other(value):
+    with pytest.raises(FieldValidationError) as caught:
+        parse_self_update({"displayName": value})
+    assert "displayName" in caught.value.fields
 
 
 def test_a_subject_must_be_a_cognito_sub():
