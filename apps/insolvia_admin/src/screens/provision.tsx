@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { Alert, Button, Card, Field, Input } from "@insolvia-ai/design-system";
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
+import { Alert, Button, Card, Field, Input } from '@insolvia-ai/design-system';
 
-import { AdminApiError, AdminUnauthorizedError } from "../api/client";
-import { useClient } from "../api/use-client";
-import { useSession } from "../session/session";
+import { AdminApiError, AdminUnauthorizedError } from '../api/client';
+import { useClient } from '../api/use-client';
+import { useSession } from '../session/session';
 
 /**
  * Provision a firm and its first administrator — the form that replaces the
@@ -29,10 +29,10 @@ export function ProvisionScreen() {
     setError(null);
     try {
       const result = await client.provisionFirm({
-        name: String(form.get("name") ?? ""),
+        name: String(form.get('name') ?? ''),
         admin: {
-          email: String(form.get("email") ?? ""),
-          displayName: String(form.get("displayName") ?? ""),
+          email: String(form.get('email') ?? ''),
+          displayName: String(form.get('displayName') ?? ''),
         },
       });
       navigate(`/firms/${result.firm.id}`, { replace: true });
@@ -49,7 +49,7 @@ export function ProvisionScreen() {
           setError(caught.message);
         }
       } else {
-        setError("Provisioning failed — nothing was created. Try again.");
+        setError('Provisioning failed — nothing was created. Try again.');
       }
     } finally {
       setSubmitting(false);
@@ -60,14 +60,15 @@ export function ProvisionScreen() {
     <Card.Root className="mx-auto max-w-lg p-8">
       <h1 className="mb-1 font-serif text-2xl font-bold">Provision a firm</h1>
       <p className="mb-6 text-sm text-muted">
-        The first administrator receives the invitation email with their
-        temporary password — the address is also their sign-in name. They can
-        add their colleagues themselves once in.
+        The first administrator receives the invitation email with their temporary password — the
+        address is also their sign-in name. They can add their colleagues themselves once in.
       </p>
 
       {error !== null ? (
         <div className="mb-4">
-          <Alert.Root intent="danger"><Alert.Description>{error}</Alert.Description></Alert.Root>
+          <Alert.Root intent="danger">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Root>
         </div>
       ) : null}
 
@@ -81,15 +82,10 @@ export function ProvisionScreen() {
         <Field.Root name="name" invalid={fields.name !== undefined}>
           <Field.Label>Firm name</Field.Label>
           <Input required />
-          {fields.name !== undefined ? (
-            <Field.Error>{fields.name}</Field.Error>
-          ) : null}
+          {fields.name !== undefined ? <Field.Error>{fields.name}</Field.Error> : null}
         </Field.Root>
 
-        <Field.Root
-          name="displayName"
-          invalid={fields.displayName !== undefined}
-        >
+        <Field.Root name="displayName" invalid={fields.displayName !== undefined}>
           <Field.Label>First administrator's name</Field.Label>
           <Input required />
           {fields.displayName !== undefined ? (
@@ -100,13 +96,11 @@ export function ProvisionScreen() {
         <Field.Root name="email" invalid={fields.email !== undefined}>
           <Field.Label>First administrator's work email</Field.Label>
           <Input type="email" required />
-          {fields.email !== undefined ? (
-            <Field.Error>{fields.email}</Field.Error>
-          ) : null}
+          {fields.email !== undefined ? <Field.Error>{fields.email}</Field.Error> : null}
         </Field.Root>
 
         <Button intent="primary" type="submit" disabled={submitting}>
-          {submitting ? "Provisioning…" : "Provision firm"}
+          {submitting ? 'Provisioning…' : 'Provision firm'}
         </Button>
       </form>
     </Card.Root>

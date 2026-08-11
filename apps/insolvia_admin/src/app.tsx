@@ -1,32 +1,25 @@
-import { useMemo, type ReactNode } from "react";
-import {
-  BrowserRouter,
-  Link,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router";
-import { Button } from "@insolvia-ai/design-system";
+import { useMemo, type ReactNode } from 'react';
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router';
+import { Button } from '@insolvia-ai/design-system';
 
-import { config } from "./config/environment";
-import { AdminClient } from "./api/client";
-import { SessionProvider, useSession } from "./session/session";
-import { ClientContext } from "./api/use-client";
-import { AuthCallbackScreen } from "./screens/auth-callback";
-import { FirmDetailScreen } from "./screens/firm-detail";
-import { FirmsScreen } from "./screens/firms";
-import { ProvisionScreen } from "./screens/provision";
-import { SignInScreen } from "./screens/sign-in";
+import { config } from './config/environment';
+import { AdminClient } from './api/client';
+import { SessionProvider, useSession } from './session/session';
+import { ClientContext } from './api/use-client';
+import { FirmDetailScreen } from './screens/firm-detail';
+import { FirmsScreen } from './screens/firms';
+import { ProvisionScreen } from './screens/provision';
+import { SignInScreen } from './screens/sign-in';
 
 /** Renders children only for a signed-in staff member; otherwise the sign-in
- * screen, remembering where they were headed. A COURTESY, never a control —
- * the admin service verifies every request itself. */
+ * screen, IN PLACE. No redirect ever leaves the page (Google's button hands
+ * the session a token right here), so there is no return-to to remember: the
+ * guarded screen appears at the same URL the moment the session flips. A
+ * COURTESY, never a control — the admin service verifies every request. */
 function RequireStaff({ children }: { children: ReactNode }) {
   const session = useSession();
-  const location = useLocation();
   if (!session.signedIn) {
-    return <SignInScreen returnTo={location.pathname} />;
+    return <SignInScreen />;
   }
   return <>{children}</>;
 }
@@ -43,7 +36,7 @@ function Shell({ children }: { children: ReactNode }) {
           </Link>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          {config.environment !== "production" ? (
+          {config.environment !== 'production' ? (
             <span className="rounded bg-surface-alt px-2 py-0.5 text-xs uppercase tracking-wide text-muted">
               {config.environment}
             </span>
@@ -61,10 +54,7 @@ function Shell({ children }: { children: ReactNode }) {
 
 function Wiring({ children }: { children: ReactNode }) {
   const session = useSession();
-  const client = useMemo(
-    () => new AdminClient(config.apiBaseUrl, session.token),
-    [session.token],
-  );
+  const client = useMemo(() => new AdminClient(config.apiBaseUrl, session.token), [session.token]);
   return <ClientContext.Provider value={client}>{children}</ClientContext.Provider>;
 }
 
@@ -75,7 +65,6 @@ export function App() {
         <Wiring>
           <Routes>
             <Route path="/" element={<Navigate to="/firms" replace />} />
-            <Route path="/auth/callback" element={<AuthCallbackScreen />} />
             <Route
               path="/firms"
               element={

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router";
-import { Alert, Badge, Button, Spinner, Table } from "@insolvia-ai/design-system";
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
+import { Alert, Badge, Button, Spinner, Table } from '@insolvia-ai/design-system';
 
-import { AdminUnauthorizedError, type FirmSummary } from "../api/client";
-import { useClient } from "../api/use-client";
-import { useSession } from "../session/session";
+import { AdminUnauthorizedError, type FirmSummary } from '../api/client';
+import { useClient } from '../api/use-client';
+import { useSession } from '../session/session';
 
 /** The index view #212 built the Scan for: every firm, status, seats, and
  * who provisioned it — "seeded" for rows that predate the portal. */
@@ -27,7 +27,7 @@ export function FirmsScreen() {
           session.signOut();
           return;
         }
-        setError("The firm list could not be loaded.");
+        setError('The firm list could not be loaded.');
       });
     return () => {
       cancelled = true;
@@ -43,15 +43,17 @@ export function FirmsScreen() {
         </Link>
       </div>
 
-      {error !== null ? <Alert.Root intent="danger"><Alert.Description>{error}</Alert.Description></Alert.Root> : null}
-      {firms === null && error === null ? (
-        <Spinner aria-label="Loading firms" />
+      {error !== null ? (
+        <Alert.Root intent="danger">
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Root>
       ) : null}
+      {firms === null && error === null ? <Spinner aria-label="Loading firms" /> : null}
 
       {firms !== null && firms.length === 0 ? (
         <p className="text-muted">
-          No firms yet. Provisioning the first one is the whole point — the
-          button above is #178 closed.
+          No firms yet. Provisioning the first one is the whole point — the button above is #178
+          closed.
         </p>
       ) : null}
 
@@ -69,17 +71,12 @@ export function FirmsScreen() {
             {firms.map((firm) => (
               <Table.Row key={firm.id}>
                 <Table.Cell>
-                  <Link
-                    to={`/firms/${firm.id}`}
-                    className="text-primary hover:underline"
-                  >
+                  <Link to={`/firms/${firm.id}`} className="text-primary hover:underline">
                     {firm.name}
                   </Link>
                 </Table.Cell>
                 <Table.Cell>
-                  <Badge
-                    intent={firm.status === "active" ? "success" : "danger"}
-                  >
+                  <Badge intent={firm.status === 'active' ? 'success' : 'danger'}>
                     {firm.status}
                   </Badge>
                 </Table.Cell>
@@ -87,9 +84,7 @@ export function FirmsScreen() {
                 <Table.Cell>
                   {/* null provenance is a REAL state (pre-portal rows), and
                       the honest rendering is "seeded", not a blank. */}
-                  {firm.createdByEmail ?? (
-                    <span className="text-muted">seeded</span>
-                  )}
+                  {firm.createdByEmail ?? <span className="text-muted">seeded</span>}
                 </Table.Cell>
               </Table.Row>
             ))}

@@ -1,6 +1,20 @@
 # ADR 0011 — Cross-tenant administration is a separate principal class
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-08-11: the portal acquires its ID token
+  through Google Identity Services (Google's own sign-in button, in-page),
+  not the authorization-code + PKCE redirect point 3 originally described.
+  The first real sign-in surfaced why the original could never work: Google
+  "Web application" OAuth clients require the client secret at the token
+  endpoint even when PKCE is sent (`invalid_request: client_secret is
+  missing.`) — a genuinely secretless code exchange is a Cognito capability,
+  not a Google one. The server-side alternative (the admin service holding
+  the secret and exchanging the code) was declined as a per-environment
+  secret to provision and rotate for a flow GIS provides without one.
+  Everything downstream of token acquisition is unchanged: the SERVICE still
+  verifies Google ID tokens (issuer, audience, `hd`, `email_verified`), the
+  portal still holds them in memory only, and no refresh token exists
+  anywhere — the amendment moves how the token arrives, not what it is or
+  how it is checked.
 - **Date:** 2026-08-10
 - **Relates to:** amends [ADR 0001](0001-client-stays-dumb-trust-boundary.md)
   (a second application principal now reaches a data store) and
@@ -32,10 +46,11 @@ Four decisions in one, each of which could have gone otherwise:
    what its package exports, structurally. The tenant API remains a service
    that can only act within an accessor's firm.
 3. **Google Workspace as the staff identity provider, directly.** The portal
-   runs authorization-code + PKCE against Google (a public, per-environment
-   client marked Internal in the Workspace org); the service verifies Google
-   **ID tokens**: issuer, audience, `hd = insolvia.ai`, `email_verified`. No
-   staff Cognito pool exists.
+   obtains a Google ID token in-page via Google Identity Services (a
+   per-environment client marked Internal in the Workspace org; *amended —
+   originally authorization-code + PKCE, see Status*); the service verifies
+   Google **ID tokens**: issuer, audience, `hd = insolvia.ai`,
+   `email_verified`. No staff Cognito pool exists.
 4. **Every mutation writes an append-only audit row** naming the verified
    staff caller — #178's "record who provisioned what" — to a table the
    service holds `PutItem` and nothing else on.

@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@insolvia-ai/design-system/theme.css";
+@import 'tailwindcss';
+@import '@insolvia-ai/design-system/theme.css';
 
 /* Required: let Tailwind v4 scan the design system's SOURCE for the utility
    classes its components use — node_modules is excluded from scanning by
