@@ -305,17 +305,16 @@ banner() {
   for name in $SERVICES; do
     printf '  %-10s %s\n' "$name" "$(service_url "$name")"
   done
-  # The sign-in pointer names the account script on purpose. Every pool sets
+  # The sign-in pointer names the seed script on purpose. Every pool sets
   # allow_admin_create_user_only, so the hosted UI has NO sign-up link — which
   # reads as a broken page rather than a deliberate policy, and the first
-  # person to hit it lost real time to exactly that.
-  printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
-  printf '%s  No account yet? There is no sign-up screen by design:%s\n' "$c_dim" "$c_reset"
-  printf '%s      ./scripts/dev-aws-create-user.sh%s\n' "$c_dim" "$c_reset"
-  # The second line matters as much as the first and is easier to miss: an
+  # person to hit it lost real time to exactly that. The same script also
+  # seeds the firm, which covers the failure that is easier to miss: an
   # account gets you PAST sign-in, and every route then answers 403 until the
   # firm exists. That failure looks like a broken build, not a missing step.
-  printf '%s  Signed in but everything 403s? You are in no firm yet:%s\n' "$c_dim" "$c_reset"
+  printf '\n%s  Sign in at http://localhost:3000 — this machine'"'"'s own Cognito pool.%s\n' "$c_dim" "$c_reset"
+  printf '%s  No account yet (there is no sign-up screen by design), or signed in%s\n' "$c_dim" "$c_reset"
+  printf '%s  but everything 403s? One script creates the account and its firm:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
   # The portal is the odd one out: no Cognito, no account script — staff sign
   # in with their own @insolvia.ai Google Workspace account. And name the

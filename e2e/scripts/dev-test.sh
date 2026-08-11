@@ -41,9 +41,12 @@
 # reasoning that keeps E2E out of the required PR checks (e2e/CLAUDE.md).
 #
 # Usage:
-#   export E2E_TEST_USER_PASSWORD=...        # the address comes from seeds/dev.json
 #   ./e2e/scripts/dev-test.sh                 # headless
 #   ./e2e/scripts/dev-test.sh --headed        # watch it drive the browser
+#
+# The password comes from E2E_TEST_USER_PASSWORD if exported, else from
+# ~/.config/insolvia/dev.env (the file dev-aws-seed.sh offers to write).
+# The address comes from seeds/dev.json.
 #
 set -euo pipefail
 
@@ -63,12 +66,21 @@ HEADED=0
 # ── Credentials: named, never echoed ────────────────────────────────────────
 # Only the password. The ADDRESS comes from seeds/dev.json below — the same
 # file ./scripts/dev-aws-seed.sh loads — so who this machine seeded and who the
-# suite signs in as cannot drift apart.
+# suite signs in as cannot drift apart. An exported E2E_TEST_USER_PASSWORD
+# wins; otherwise the dev password file dev-aws-seed.sh maintains covers the
+# local run, because the suite signs in as exactly the account it creates.
+DEV_ENV_FILE="$HOME/.config/insolvia/dev.env"
+if [[ -z "${E2E_TEST_USER_PASSWORD:-}" && -f "$DEV_ENV_FILE" ]]; then
+  # shellcheck source=/dev/null
+  source "$DEV_ENV_FILE"
+  E2E_TEST_USER_PASSWORD="${DEV_USER_PASSWORD:-}"
+fi
+export E2E_TEST_USER_PASSWORD
 [[ -n "${E2E_TEST_USER_PASSWORD:-}" ]] ||
-  die "E2E_TEST_USER_PASSWORD is not set.
-       It has no default on purpose — this repo is public. Use the password you
-       gave ./scripts/dev-aws-create-user.sh for the account in seeds/dev.json,
-       and make sure ./scripts/dev-aws-seed.sh has put it in a firm."
+  die "E2E_TEST_USER_PASSWORD is not set and $DEV_ENV_FILE provides no DEV_USER_PASSWORD.
+       There is no default on purpose — this repo is public. Use the password you
+       gave ./scripts/dev-aws-seed.sh for the account in seeds/dev.json (it offers
+       to write that file), and make sure that script has run."
 
 # Which fixture describes THIS target. Staging is the suite's default, so a run
 # against a laptop has to say so or it would look for people who only exist in

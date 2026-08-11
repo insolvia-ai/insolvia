@@ -229,8 +229,8 @@ def test_two_people_in_one_fixture_firm_share_it(tmp_path: Path) -> None:
 def test_a_password_in_the_fixture_creates_the_account(tmp_path: Path) -> None:
     """A password is what says "this environment owns its accounts".
 
-    Staging's does; dev's does not, because dev-aws-create-user.sh prompts a
-    human for one and a fixture must never carry that.
+    Staging's does; dev's does not, because the dev-aws-seed.sh wrapper makes
+    the account itself and a fixture must never carry a human's password.
     """
     store = MemoryFirmStore()
     pool = FakeAccounts(known={})
