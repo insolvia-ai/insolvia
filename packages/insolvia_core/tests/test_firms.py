@@ -19,6 +19,7 @@ from insolvia_core.firms import (
     LEVELS,
     VIEW_ONLY,
     FirmUser,
+    apply_firm_changes,
     apply_user_changes,
     create_firm,
     create_firm_user,
@@ -26,10 +27,12 @@ from insolvia_core.firms import (
     firm_from_item,
     firm_item,
     firm_json,
+    firm_summary_json,
     firm_user_from_item,
     firm_user_item,
     firm_user_json,
     parse_firm_creation,
+    parse_firm_update,
     parse_firm_user_creation,
     parse_firm_user_update,
     parse_self_update,
@@ -463,3 +466,54 @@ def test_an_unknown_status_is_refused_before_it_can_be_stored():
     firm = create_firm(parse_firm_creation({"name": "Example"}))
     with pytest.raises(ValidationError):
         set_firm_status(firm, "disabled")
+
+
+def test_a_firm_update_renames_and_keeps_provenance():
+    firm = create_firm(
+        parse_firm_creation({"name": "Example"}),
+        created_by="staff-subject",
+        created_by_email="operator@example.test",
+    )
+    renamed = apply_firm_changes(firm, parse_firm_update({"name": "Example, LLP"}))
+    assert renamed.name == "Example, LLP"
+    assert renamed.updated_at >= firm.updated_at
+    for field in ("id", "status", "created_by", "created_by_email"):
+        assert getattr(renamed, field) == getattr(firm, field)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"status": "suspended"}, {"status": "active"}, {}],
+    ids=["suspend", "reactivate", "empty"],
+)
+def test_a_firm_update_cannot_touch_status(payload):
+    """A firm suspending itself is a lockout with no self-service recovery —
+    self-signup is off. `status` lands in the same branch as an empty payload:
+    the parser never produces anything but a rename, and suspend/reactivate
+    stays the admin service's operation (set_firm_status)."""
+    with pytest.raises(ValidationError):
+        parse_firm_update(payload)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "   ", None, 7, "x" * 201],
+    ids=["empty", "blank", "null", "int", "long"],
+)
+def test_a_firm_update_validates_the_name(value):
+    with pytest.raises(FieldValidationError) as caught:
+        parse_firm_update({"name": value})
+    assert "name" in caught.value.fields
+
+
+def test_firm_summary_json_carries_no_provenance():
+    """The tenant-facing shape. createdBy / createdByEmail name the Insolvia
+    staff member who provisioned the firm — operational metadata for the admin
+    portal, not something a tenant response should carry."""
+    firm = create_firm(
+        parse_firm_creation({"name": "Example"}),
+        created_by="staff-subject",
+        created_by_email="operator@example.test",
+    )
+    payload = firm_summary_json(firm)
+    assert set(payload) == {"id", "name", "status", "createdAt", "updatedAt"}

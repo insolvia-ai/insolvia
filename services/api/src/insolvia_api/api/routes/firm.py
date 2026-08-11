@@ -41,10 +41,13 @@ from insolvia_core.firms import (
     FIRM_ADMINISTRATION,
     VIEW_ONLY,
     FirmUser,
+    apply_firm_changes,
     apply_user_changes,
     create_firm_user,
+    firm_summary_json,
     firm_user_json,
     firm_user_summary_json,
+    parse_firm_update,
     parse_firm_user_creation,
     parse_firm_user_update,
     would_leave_no_admin,
@@ -90,6 +93,50 @@ def _json_body() -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValidationError("request body must be a JSON object")
     return payload
+
+
+@blueprint.get("/v1/firm")
+@require_auth
+@requires(FIRM_ADMINISTRATION, VIEW_ONLY)
+def read_firm_route() -> ResponseReturnValue:
+    """The firm's own record, for the firm's own administrators (#217).
+
+    The tenant-facing shape — `firm_summary_json` owns why the provenance
+    fields the admin portal sees (`createdBy`, `createdByEmail`) are not in
+    it. The name here is the same row `/v1/me` reads, so what this returns is
+    what every member's header already shows.
+    """
+    return jsonify(firm_summary_json(current_accessor().firm)), 200
+
+
+@blueprint.patch("/v1/firm")
+@require_auth
+@requires(FIRM_ADMINISTRATION, ADD_EDIT)
+def update_firm_route() -> ResponseReturnValue:
+    """Rename the firm. Name only, and the omission is load-bearing:
+
+    `status` is refused by `parse_firm_update` (same "no supported fields"
+    branch as an empty body) because suspend/reactivate belongs to the admin
+    service — a firm suspending ITSELF is a lockout with no self-service
+    recovery, since self-signup is off and accessor resolution refuses every
+    member of a suspended firm, this route's caller included.
+
+    The new name reaches every member on their next `/v1/me` — it is the same
+    row — so there is no cache to invalidate and nothing else to write.
+    """
+    store = _firm_store()
+    accessor = current_accessor()
+    changes = parse_firm_update(_json_body())
+
+    updated = apply_firm_changes(accessor.firm, changes)
+    written = store.update_firm(updated)
+    if written is None:
+        # The firm vanished between resolving the accessor and writing —
+        # update_firm refuses to resurrect a deleted row.
+        raise NotFoundError("firm not found")
+
+    logger.info("firm updated")
+    return jsonify(firm_summary_json(written)), 200
 
 
 @blueprint.get("/v1/firm/directory")

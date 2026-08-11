@@ -164,6 +164,51 @@ export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, 
 }
 
 /**
+ * Whether the firm may be used at all. Reading `suspended` through this
+ * client is nearly hypothetical: accessor resolution refuses every member of
+ * a suspended firm, so the routes that return a {@link Firm} answer 403
+ * before they could say it.
+ */
+export type FirmStatus = 'active' | 'suspended';
+
+/**
+ * The firm's own record — `GET /v1/firm` and `PATCH /v1/firm`, for the firm's
+ * administrators.
+ *
+ * Thinner than what the ADMIN portal sees, deliberately: the provenance
+ * fields (`createdBy`, `createdByEmail`) name the Insolvia staff member who
+ * provisioned the firm, and a staff identity is not something a tenant
+ * response carries.
+ */
+export interface Firm {
+  readonly id: string;
+  readonly name: string;
+  readonly status: FirmStatus;
+  /** When the firm was provisioned, verbatim. */
+  readonly createdAt: string;
+  /** Last write to the record, verbatim. */
+  readonly updatedAt: string;
+}
+
+/**
+ * The `PATCH /v1/firm` request body — the name, and nothing else.
+ *
+ * **`status` is absent on purpose and never joins.** Suspend/reactivate is
+ * Insolvia's own operation, on the admin portal: a firm suspending itself
+ * would be a lockout with no self-service recovery, because self-signup is
+ * off and a suspended firm's members — the caller included — are refused
+ * everywhere.
+ */
+export interface UpdateFirmRequest {
+  readonly name: string;
+}
+
+/** The `PATCH /v1/firm` body. */
+export function updateFirmRequestToJson(request: UpdateFirmRequest): Record<string, unknown> {
+  return { name: request.name };
+}
+
+/**
  * A colleague as `GET /v1/firm/directory` returns them — three fields, for
  * every member of the firm.
  *
