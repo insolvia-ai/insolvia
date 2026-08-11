@@ -13,10 +13,12 @@ session #178 was written about.
 ## Running locally
 
 ```bash
-export NODE_AUTH_TOKEN="$(gh auth token)"   # GitHub Packages (design system)
-npm install
-npm run dev                                  # http://localhost:3100 — pinned
+./apps/insolvia_admin/scripts/dev-setup.sh   # packages auth + npm ci, once
+./apps/insolvia_admin/scripts/dev-up.sh      # http://localhost:3100 — pinned
 ```
+
+(Or the whole system at once: `./scripts/dev-up.sh` from the repo root now
+includes this portal and the admin service.)
 
 Sign-in works against the real dev Google client out of the box; the firm
 data needs the admin service running (`./services/admin/scripts/dev-up.sh`,

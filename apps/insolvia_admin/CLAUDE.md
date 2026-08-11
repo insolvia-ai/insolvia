@@ -21,8 +21,9 @@ does not apply. Human docs: [`README.md`](README.md).
   values; the build injects exactly one variable, `VITE_INSOLVIA_ENV`.
 - **The dev server is PINNED to :3100** (`strictPort`): Google's redirect
   URIs are exact-match and the app owns :3000. Local loop:
-  `./services/admin/scripts/dev-up.sh` (service on :8090) + `npm run dev`
-  here + your real Workspace account.
+  `./services/admin/scripts/dev-up.sh` (service on :8090) +
+  `./apps/insolvia_admin/scripts/dev-up.sh` here + your real Workspace
+  account — or both at once via the root `./scripts/dev-up.sh`.
 - **`RequireStaff` is a courtesy, never a control** — the admin service
   verifies every request; the guard just routes to sign-in.
 - Tests are Vitest: contract pins against literal admin-service JSON, and

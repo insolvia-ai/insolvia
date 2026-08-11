@@ -26,7 +26,9 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/runbooks/aws-bootstrap.md` § "The ci-trust anchor". |
 | `scripts/apply-account-access.sh` | Human-gated IAM apply | Applies `infra/envs/account-access` (the human IAM users, their groups, their attached policies). Same credential dance + plan review + confirm, plus guards for the two ways this root can lock you out. Use when someone joins, leaves or changes group. **Not** for rotating your own MFA — that is `docs/runbooks/iam-mfa-rotation.md`, and no Terraform resource is involved on purpose. |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
+| `apps/insolvia_admin/scripts/dev-setup.sh` | Admin portal | Same shape as marketing (own lockfile, packages auth → `npm ci`); `dev-up.sh` runs Vite on the pinned port 3100 |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
+| `services/admin/scripts/dev-setup.sh` | Admin service | Shared base → venv + pinned deps; `dev-up.sh` runs the compose stack on 8090 (in-memory without `services/admin/.env`), `dev-test.sh` runs ruff + mypy + pytest exactly as CI does |
 | `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs the Playwright suite against `http://localhost:3000` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running, an account from `scripts/dev-aws-create-user.sh` seeded by `scripts/dev-aws-seed.sh`, and `E2E_TEST_USER_PASSWORD` exported — no default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it. The staging run in `app-staging.yml` is unchanged and stays authoritative |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
@@ -191,7 +193,8 @@ GitHub UI / `gh` action); the script does everything after that.
 ## Running the whole system (`scripts/dev-up.sh`)
 
 ```bash
-./scripts/dev-up.sh     # api + mailer + app + marketing. Ctrl-C stops it all.
+./scripts/dev-up.sh     # api + admin + mailer + app + admin portal + marketing.
+                        # Ctrl-C stops it all.
 ```
 
 That is the whole interface — it takes no arguments. To run one part, run that
@@ -202,8 +205,16 @@ duplicates them.
 |---|---|---|---|
 | app | <http://localhost:3000> | `apps/insolvia_app/scripts/dev-up.sh` | `…/dev-down.sh` |
 | api | <http://127.0.0.1:8080/health> | `services/api/scripts/dev-up.sh` | `…/dev-down.sh` |
+| admin | <http://127.0.0.1:8090/health> | `services/admin/scripts/dev-up.sh` | `…/dev-down.sh` |
+| admin portal | <http://localhost:3100> | `apps/insolvia_admin/scripts/dev-up.sh` | `…/dev-down.sh` |
 | marketing | <http://localhost:5173> | `apps/insolvia_marketing/scripts/dev-up.sh` | `…/dev-down.sh` |
 | mailer | <http://127.0.0.1:8026> (Mailpit <http://127.0.0.1:8025>) | `services/mailer/scripts/dev-up.sh` | `…/dev-down.sh` |
+
+The portal's port matters the same way the app's does: the dev Google OAuth
+client registers `http://localhost:3100` as an exact origin, which is why its
+`dev-up.sh` runs Vite with `--strictPort` rather than letting it drift. Its
+sign-in needs no local account — staff use their own `@insolvia.ai` Google
+Workspace login.
 
 **Every area owns both halves.** `dev-up.sh` knows how to start that area — the
 API's exports short-lived AWS credentials before `compose up`, the app's pins

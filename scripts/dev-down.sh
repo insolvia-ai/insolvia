@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays — same as dev-up.sh.
-SERVICES="api mailer app marketing"
+SERVICES="api admin mailer app portal marketing"
 
 c_reset=$'\033[0m'
 c_red=$'\033[1;31m'
@@ -42,8 +42,10 @@ die() {
 service_dir() {
   case "$1" in
   api) printf '%s/services/api' "$REPO_ROOT" ;;
+  admin) printf '%s/services/admin' "$REPO_ROOT" ;;
   mailer) printf '%s/services/mailer' "$REPO_ROOT" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
+  portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
   marketing) printf '%s/apps/insolvia_marketing' "$REPO_ROOT" ;;
   esac
 }
@@ -54,13 +56,15 @@ case "${1:-}" in
   cat <<'USAGE'
 Usage: ./scripts/dev-down.sh
 
-Stops everything ./scripts/dev-up.sh starts: api, mailer, app, marketing —
-containers included. Safe to run when nothing is up.
+Stops everything ./scripts/dev-up.sh starts: api, admin, mailer, app,
+admin portal, marketing — containers included. Safe to run when nothing is up.
 
 To stop one part, run that part's own script instead:
   ./services/api/scripts/dev-down.sh
+  ./services/admin/scripts/dev-down.sh
   ./services/mailer/scripts/dev-down.sh
   ./apps/insolvia_app/scripts/dev-down.sh
+  ./apps/insolvia_admin/scripts/dev-down.sh
   ./apps/insolvia_marketing/scripts/dev-down.sh
 USAGE
   exit 0
