@@ -32,7 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays anywhere below.
-SERVICES="api mailer app marketing"
+SERVICES="api admin mailer app portal marketing"
 PIDS=""
 
 c_reset=$'\033[0m'
@@ -54,8 +54,10 @@ die() {
 service_dir() {
   case "$1" in
   api) printf '%s/services/api' "$REPO_ROOT" ;;
+  admin) printf '%s/services/admin' "$REPO_ROOT" ;;
   mailer) printf '%s/services/mailer' "$REPO_ROOT" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
+  portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
   marketing) printf '%s/apps/insolvia_marketing' "$REPO_ROOT" ;;
   esac
 }
@@ -63,8 +65,10 @@ service_dir() {
 service_port() {
   case "$1" in
   api) printf '8080' ;;
+  admin) printf '8090' ;;
   mailer) printf '8026' ;;
   app) printf '3000' ;;
+  portal) printf '3100' ;;
   marketing) printf '5173' ;;
   esac
 }
@@ -72,18 +76,22 @@ service_port() {
 service_url() {
   case "$1" in
   api) printf 'http://127.0.0.1:8080/health' ;;
+  admin) printf 'http://127.0.0.1:8090/health' ;;
   mailer) printf 'http://127.0.0.1:8026  (Mailpit: http://127.0.0.1:8025)' ;;
   app) printf 'http://localhost:3000' ;;
+  portal) printf 'http://localhost:3100' ;;
   marketing) printf 'http://localhost:5173' ;;
   esac
 }
 
-# One colour per service so four interleaved log streams stay attributable.
+# One colour per service so six interleaved log streams stay attributable.
 service_colour() {
   case "$1" in
   api) printf '\033[36m' ;;
+  admin) printf '\033[94m' ;;
   mailer) printf '\033[35m' ;;
   app) printf '\033[32m' ;;
+  portal) printf '\033[95m' ;;
   marketing) printf '\033[33m' ;;
   *) printf '' ;;
   esac
@@ -102,16 +110,19 @@ case "${1:-}" in
   cat <<'USAGE'
 Usage: ./scripts/dev-up.sh
 
-Brings up the whole system: api, mailer, app, marketing.
+Brings up the whole system: api, admin, mailer, app, admin portal, marketing.
 Ctrl-C stops all of it, containers included.
 
 To run one part, run that part's own script instead:
   ./services/api/scripts/dev-up.sh
+  ./services/admin/scripts/dev-up.sh
   ./services/mailer/scripts/dev-up.sh
   ./apps/insolvia_app/scripts/dev-up.sh
+  ./apps/insolvia_admin/scripts/dev-up.sh
   ./apps/insolvia_marketing/scripts/dev-up.sh
 
-Ports: api 8080 · mailer 8026 (Mailpit 8025) · app 3000 · marketing 5173
+Ports: api 8080 · admin 8090 · mailer 8026 (Mailpit 8025)
+       app 3000 · admin portal 3100 · marketing 5173
 USAGE
   exit 0
   ;;
@@ -156,14 +167,25 @@ preflight() {
       warn "services/api/.env has no AUTH_ISSUER_URL — protected routes will answer 401 and the app cannot sign in."
   fi
 
+  # Warn-only, matching the admin service's own posture: without its .env it
+  # runs on in-memory adapters, which is fine for poking at the portal but
+  # means a provisioned firm evaporates on restart and never reaches the real
+  # dev tables the app reads.
+  [[ -f "$REPO_ROOT/services/admin/.env" ]] ||
+    warn "services/admin/.env is missing — the admin service will run in-memory only. Run ./scripts/dev-aws-setup.sh to point it at this machine's dev tables."
+
   [[ -d "$REPO_ROOT/node_modules" ]] || {
     warn "root node_modules missing — run ./apps/insolvia_app/scripts/dev-setup.sh (the app resolves through the root workspace)."
     failures=$((failures + 1))
   }
-  # Marketing is deliberately outside the npm workspace and installs from its
-  # own lockfile — see the root package.json comments.
+  # Marketing and the admin portal are deliberately outside the npm workspace
+  # and install from their own lockfiles — see the root package.json comments.
   [[ -d "$REPO_ROOT/apps/insolvia_marketing/node_modules" ]] || {
     warn "apps/insolvia_marketing/node_modules missing — run ./apps/insolvia_marketing/scripts/dev-setup.sh."
+    failures=$((failures + 1))
+  }
+  [[ -d "$REPO_ROOT/apps/insolvia_admin/node_modules" ]] || {
+    warn "apps/insolvia_admin/node_modules missing — run ./apps/insolvia_admin/scripts/dev-setup.sh."
     failures=$((failures + 1))
   }
 
@@ -291,6 +313,10 @@ banner() {
   # firm exists. That failure looks like a broken build, not a missing step.
   printf '%s  Signed in but everything 403s? You are in no firm yet:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
+  # The portal is the odd one out: no Cognito, no account script — staff sign
+  # in with their own @insolvia.ai Google Workspace account.
+  printf '%s  The admin portal (http://localhost:3100) signs in with Google Workspace%s\n' "$c_dim" "$c_reset"
+  printf '%s  — any @insolvia.ai account; there is nothing to create locally.%s\n' "$c_dim" "$c_reset"
   printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
 }
 

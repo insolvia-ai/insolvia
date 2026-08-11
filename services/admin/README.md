@@ -27,10 +27,15 @@ in an append-only audit table naming who did what to which firm.
 ./services/admin/scripts/dev-setup.sh   # venv with pinned deps
 ./services/admin/scripts/dev-test.sh    # ruff + mypy + pytest (the CI gate)
 ./services/admin/scripts/dev-up.sh      # compose stack on :8090
+./services/admin/scripts/dev-down.sh    # stop it (containers outlive Ctrl-C)
 ```
 
-The suite and bare dev server run fully in-memory. Real AWS wiring
-(`services/admin/.env`) arrives with the service's infra (#213).
+The root `./scripts/dev-up.sh` includes this service (and the portal) when
+bringing the whole system up.
+
+The suite and bare dev server run fully in-memory without
+`services/admin/.env`; `./scripts/dev-aws-setup.sh` writes it to point at this
+machine's real dev tables and pool.
 
 The seeder (`insolvia_admin.entrypoints.seed`) also lives here — the
 dev/staging fixture loader `scripts/dev-aws-seed.sh` and the staging e2e use.
