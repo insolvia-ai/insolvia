@@ -14,14 +14,12 @@
 
 import { readFileSync } from 'node:fs';
 
-/**
- * The staging app's public origin.
- *
- * The workflow passes the Terraform `url` output instead, so this constant is
- * the local-run convenience, not the source of truth. It is a public hostname,
- * not a secret.
- */
-export const DEFAULT_BASE_URL = 'https://staging-app.insolvia.ai';
+// Deliberately no default base URL. There used to be one — staging's public
+// origin — and it made a bare `npm test` on a laptop quietly aim at deployed
+// staging, a flow that also needed staging's test password exported into a
+// developer's shell. Staging runs are CI's job (app-staging.yml passes the
+// Terraform `url` output); a local run goes through e2e/scripts/dev-test.sh,
+// which points this at the machine's own dev stack.
 
 /** Cognito's provided hosted-UI domains all live under this suffix. */
 const COGNITO_HOSTED_UI_SUFFIX = '.amazoncognito.com';
@@ -54,7 +52,15 @@ export function required(name: string): string {
 
 /** The origin under test. */
 export function baseUrl(): string {
-  return optional('E2E_BASE_URL') ?? DEFAULT_BASE_URL;
+  const value = optional('E2E_BASE_URL');
+  if (value === undefined) {
+    throw new Error(
+      'E2E_BASE_URL is not set. For a local run use e2e/scripts/dev-test.sh, ' +
+        'which aims the suite at this machine\'s dev stack; the staging run ' +
+        'is CI-only (app-staging.yml passes this from the Terraform output).',
+    );
+  }
+  return value;
 }
 
 /**
