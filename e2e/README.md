@@ -17,27 +17,30 @@ promotion. Agent rules: [`CLAUDE.md`](CLAUDE.md). One-time setup:
 
 ## Running it
 
-It is **not** an npm workspace member (see the `//` note in `package.json`), so
-it installs on its own:
+**Against staging: CI only.** `app-staging.yml` runs the suite after every
+staging deploy, passing `E2E_BASE_URL`, `E2E_COGNITO_DOMAIN` and the test-user
+password from Terraform outputs and the environment secret. There is no
+local-against-staging flow — it would put staging's secret in a developer's
+shell for a run CI already does, and `E2E_BASE_URL` deliberately has no
+default so a bare `npm test` refuses rather than quietly aiming at staging.
+
+**Locally: against this machine's dev stack**, via the wrapper (it is **not**
+an npm workspace member — see the `//` note in `package.json` — so it installs
+on its own):
 
 ```bash
-cd e2e
-npm ci
-npm run browser                     # playwright install --with-deps chromium
-
-read -rs E2E_TEST_USER_PASSWORD && export E2E_TEST_USER_PASSWORD
-npm test
+cd e2e && npm ci && npm run browser   # once; browser = playwright chromium
 ```
 
-Optional overrides, both public values with sane defaults:
+```bash
+./e2e/scripts/dev-test.sh             # or --headed to watch it
+```
 
-| Variable | Default | What |
-|---|---|---|
-| `E2E_BASE_URL` | `https://staging-app.insolvia.ai` | Origin under test. CI passes the Terraform `url` output. |
-| `E2E_COGNITO_DOMAIN` | — | Exact hosted-UI hostname to assert. CI passes the Terraform `auth_domain` output; unset falls back to asserting any `*.amazoncognito.com` host. |
-
-`E2E_TEST_USER_PASSWORD` has **no default** and the
-run fails at config load if either is missing.
+The wrapper needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh`
+done. The password comes from `~/.config/insolvia/dev.env` (which the seed
+script offers to write) or an exported `E2E_TEST_USER_PASSWORD`; the address
+comes from `seeds/dev.json`. Credentials have **no default** and the run fails
+at config load, naming the variable, if none is available.
 
 ## Two things to know before changing a test
 

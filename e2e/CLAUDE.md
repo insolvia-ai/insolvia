@@ -5,14 +5,18 @@ Post-deploy end-to-end tests against **real staging**. Human docs:
 [`../docs/runbooks/staging-e2e-setup.md`](../docs/runbooks/staging-e2e-setup.md).
 The design constraints these obey come from issue #40; #80 is the first test.
 
-- **Two targets: staging in CI, local dev when you run it yourself.**
-  `scripts/dev-test.sh` points `E2E_BASE_URL` at `http://localhost:3000` and
-  `E2E_COGNITO_DOMAIN` at this machine's dev pool, and refuses to start if the
-  stack is down or the credentials are unset. `infra/envs/dev` already registers
-  `http://localhost:3000` as an exact-match Cognito origin, which is what makes
-  a real sign-in round trip possible locally. **The staging run is still the
-  authoritative one** — only it exercises CloudFront, the deployed bundle and
-  the real API Lambda; a local pass is a faster loop, not a substitute.
+- **Two targets, one per place: staging in CI, local dev on a laptop — never
+  staging from a laptop.** `scripts/dev-test.sh` points `E2E_BASE_URL` at
+  `http://localhost:3000` and `E2E_COGNITO_DOMAIN` at this machine's dev pool,
+  and refuses to start if the stack is down or the credentials are unset.
+  `infra/envs/dev` already registers `http://localhost:3000` as an exact-match
+  Cognito origin, which is what makes a real sign-in round trip possible
+  locally. `E2E_BASE_URL` has **no default** on purpose: the old staging
+  default made a bare `npm test` aim at deployed staging and needed staging's
+  test password in a developer's shell — the one flow that put that secret on
+  a laptop. **The staging run is still the authoritative one** — only it
+  exercises CloudFront, the deployed bundle and the real API Lambda; a local
+  pass is a faster loop, not a substitute.
 - **Not an npm workspace member, and it must stay that way.** The root
   `package.json`'s `workspaces` array is explicit and this directory is
   deliberately absent from it, for the same reason `apps/insolvia_marketing` is:

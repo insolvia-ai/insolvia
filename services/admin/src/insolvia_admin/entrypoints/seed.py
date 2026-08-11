@@ -44,8 +44,9 @@ A firm row is keyed on a Cognito `sub`, so seeding a firm means knowing who its
 people are in the pool. A fixture person carrying a `password` says "this
 environment owns its accounts" and the loader creates them; one without says
 the account must already exist. Staging owns its accounts. Dev does not —
-`dev-aws-create-user.sh` prompts for a password interactively, and no fixture
-should ever carry one that a human typed.
+`dev-aws-seed.sh` (the shell wrapper) creates the dev account before invoking
+this loader, from `~/.config/insolvia/dev.env` or an interactive prompt, and
+no fixture should ever carry a password that a human typed.
 
 Doing both here is what makes a second test user cost a fixture edit rather
 than a script run, two secrets and a slot in `e2e/support/env.ts`. That matters
@@ -85,7 +86,7 @@ developer machine (`scripts/dev-aws-seed.sh`) and the staging e2e run.
 ## Why it is dev/staging only
 
 A tool whose target can be changed by one argument is a tool that eventually is
-— the reasoning `dev-aws-create-user.sh` records. `_require_seedable_table`
+— the reasoning `dev-aws-seed.sh` records. `_require_seedable_table`
 refuses anything that is not this machine's dev table or a staging table, and
 prod is refused outright: provisioning a real customer firm wants an audit
 trail and a review, which is #178 and is not a CLI.
@@ -299,8 +300,9 @@ def _subject_for(user: Mapping[str, Any], accounts: Accounts, *, check: bool) ->
 
     A `password` in the fixture is what says "this environment owns its
     accounts, make them". Without one the account must already exist — which is
-    how dev works, where `dev-aws-create-user.sh` prompts for a password
-    interactively and no fixture should ever carry one.
+    how dev works, where the `dev-aws-seed.sh` wrapper creates the account
+    before this loader runs and no fixture should ever carry a human's
+    password.
 
     Under --check nothing is created; an absent account reports as missing
     rather than being provisioned by a command whose whole promise is that it

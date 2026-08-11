@@ -14,9 +14,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
 | `scripts/dev-aws-setup.sh` | Per-machine AWS layer | Provisions this machine's isolated dev resources (`infra/envs/dev`: waitlist table + Cognito pool) and wires `services/api/.env` **and `apps/insolvia_app/.env`** at them; `--check` verifies |
-| `scripts/dev-aws-create-user.sh` | Per-machine AWS layer | Creates a sign-in account in this machine's dev Cognito pool. There is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; `--check` verifies. Gets you as far as signing in — pair it with the next row |
-| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev tables — today a firm with your dev account as its **admin**. Without it a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `app-staging.yml`, so the two environments differ in fixture and tables, never in the code path that built the rows. `--check` verifies |
-| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — waitlist, case, access-log and firm tables (delete + recreate) plus the pool's users — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-create-user.sh` **and** `dev-aws-seed.sh` again (only the latter with `--skip-cognito`) |
+| `scripts/dev-aws-seed.sh` | Per-machine AWS layer | Makes this machine signable-in **and** seeded, in one run. First ensures the dev account exists in this machine's Cognito pool — there is **no sign-up screen** on any pool (`allow_admin_create_user_only`), so this is the only way to get one; the password comes from `~/.config/insolvia/dev.env`, `DEV_USER_PASSWORD`, or a no-echo prompt that offers to write that file. Then loads [`seeds/dev.json`](../seeds/dev.json) into this machine's dev tables — today a firm with your dev account as its **admin**. Without the firm a signed-in developer resolves to no firm and every route behind `current_accessor()` answers **403** (`no_active_firm_user`), because the first firm cannot come from the API (`POST /v1/firm/users` is itself behind `FIRM_ADMINISTRATION`). **Edit the fixture to change what is seeded; this script only says where.** The same loader puts `seeds/staging.json` into staging from `app-staging.yml`, so the two environments differ in fixture and tables, never in the code path that built the rows — which is why the account step lives in this wrapper, not the loader. `--check` verifies both halves |
+| `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — waitlist, case, access-log and firm tables (delete + recreate) plus the pool's users — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-seed.sh` again, which recreates the account and the firm in one run |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
 | `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the four scripts above and `dev-up.sh` |
@@ -29,7 +28,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `apps/insolvia_admin/scripts/dev-setup.sh` | Admin portal | Same shape as marketing (own lockfile, packages auth → `npm ci`); `dev-up.sh` runs Vite on the pinned port 3100 |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
 | `services/admin/scripts/dev-setup.sh` | Admin service | Shared base → venv + pinned deps; `dev-up.sh` runs the compose stack on 8090 (in-memory without `services/admin/.env`), `dev-test.sh` runs ruff + mypy + pytest exactly as CI does |
-| `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs the Playwright suite against `http://localhost:3000` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running, an account from `scripts/dev-aws-create-user.sh` seeded by `scripts/dev-aws-seed.sh`, and `E2E_TEST_USER_PASSWORD` exported — no default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it. The staging run in `app-staging.yml` is unchanged and stays authoritative |
+| `e2e/scripts/dev-test.sh` | E2E, against local dev | Runs the Playwright suite against `http://localhost:3000` and **this machine's** dev Cognito pool, instead of deployed staging. Needs `scripts/dev-up.sh` running and `scripts/dev-aws-seed.sh` done; the password comes from `E2E_TEST_USER_PASSWORD` if exported, else `~/.config/insolvia/dev.env` — no committed default, the repo is public. The address comes from [`seeds/dev.json`](../seeds/dev.json). `--headed` to watch it. The staging run in `app-staging.yml` is unchanged and stays authoritative |
 | `services/api/scripts/dev-setup.sh` | API service | Shared base → Python 3.12 venv at `services/api/.venv` + pinned deps → chains into `scripts/dev-aws-setup.sh` (forwards `--profile`/`--region`/`--yes`/`--check`); `dev-up.sh` runs the compose stack against this machine's real AWS table, `dev-test.sh` runs ruff + pytest exactly as CI does |
 
 `packages/insolvia_api_client` has no scripts, deliberately: it is an npm
@@ -237,20 +236,20 @@ recovery cannot drift apart. To stop just one area, run that area's script.
 
 Two things worth knowing:
 
-- **You need an account before you can sign in.** The hosted UI has no sign-up
-  link and is not going to grow one — every pool sets
-  `allow_admin_create_user_only`, because a public sign-up form on a
-  bankruptcy-filing platform is an invitation to junk accounts. Run
-  `./scripts/dev-aws-create-user.sh` once; it prompts for a password without
-  echoing it and never stores it.
-- **And a firm before that account can do anything.** These are two separate
-  steps because they are two separate systems: the account lives in Cognito,
-  the firm membership lives in DynamoDB, and signing in only proves the first.
-  Skip `./scripts/dev-aws-seed.sh` and the app renders, `/v1/me` reports
-  no firm, and everything else answers 403 — which reads as a broken build
-  rather than a missing step, so it is worth doing both before you conclude
-  anything. `dev-aws-reset.sh` undoes both — it deletes the pool's users and
-  recreates the firm table — so re-run the pair after every reset.
+- **You need an account and a firm before the app is usable, and one script
+  makes both.** The hosted UI has no sign-up link and is not going to grow one
+  — every pool sets `allow_admin_create_user_only`, because a public sign-up
+  form on a bankruptcy-filing platform is an invitation to junk accounts. And
+  an account only gets you past sign-in: the account lives in Cognito, firm
+  membership lives in DynamoDB, and without the firm `/v1/me` reports no firm
+  and everything else answers 403 — which reads as a broken build rather than
+  a missing step. `./scripts/dev-aws-seed.sh` does both in order. The first
+  run prompts for a password (no echo) and offers to save it to
+  `~/.config/insolvia/dev.env` (chmod 600, outside the repo tree — this repo
+  is public and an in-tree `.env` has been committed here once already); with
+  the file in place, later runs and `e2e/scripts/dev-test.sh` need no prompt
+  and no export. `dev-aws-reset.sh` deletes the pool's users and recreates
+  the firm table — so re-run the seed script after every reset.
 - **It needs `dev-aws-setup.sh` to have run.** There is no DynamoDB emulator
   and no fake Cognito: the API talks to this machine's real per-developer
   tables and the app signs in against its real pool. Preflight says so by name

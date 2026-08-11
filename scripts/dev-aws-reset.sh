@@ -8,8 +8,8 @@
 # expected names before anything is touched.
 #
 # AFTERWARDS YOU HAVE NEITHER AN ACCOUNT NOR A FIRM. Re-run
-# scripts/dev-aws-create-user.sh and then scripts/dev-aws-seed.sh, in
-# that order — the second reads the subject the first creates.
+# scripts/dev-aws-seed.sh — it recreates the account (password from
+# ~/.config/insolvia/dev.env, or a prompt) and reseeds the firm.
 #
 set -euo pipefail
 
