@@ -13,6 +13,7 @@ import {
   putDebtorRequestToJson,
   updateCaseChangesToJson,
   updateFirmUserRequestToJson,
+  updateMeRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
@@ -30,6 +31,7 @@ import type {
   FirmUserStatus,
   PermissionLevel,
   UpdateFirmUserRequest,
+  UpdateMeRequest,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -222,6 +224,37 @@ export class InsolviaApiClient {
     // yet. That is a state, not a failure: every other authenticated endpoint
     // answers 403 for them, and this is the one that says so as an answer, so
     // a client can render "ask your administrator" instead of an error screen.
+    const firm = optionalFirmMembership(decoded);
+    return {
+      subject: requireString(decoded, 'subject'),
+      username: requireNullableString(decoded, 'username'),
+      clientId: requireString(decoded, 'clientId'),
+      scopes: requireStringArray(decoded, 'scopes'),
+      expiresAt: requireNullableNumber(decoded, 'expiresAt'),
+      ...(firm === undefined ? {} : { firm }),
+    };
+  }
+
+  /**
+   * `PATCH /v1/me` — correct your own display name.
+   *
+   * Display name only; see {@link UpdateMeRequest} for why nothing else is
+   * self-service. Any ACTIVE firm member may call it — no permission level is
+   * required, which is the point of the endpoint. Answers with the same body
+   * as {@link me}, so the caller re-renders from the response instead of
+   * following up with a GET. Throws {@link ApiValidationException} on a 400
+   * with a per-field message, and a plain {@link ApiException} with
+   * `statusCode` 403 for a caller in no firm — unlike the GET, which reports
+   * that state as an answer, there is no row to rename.
+   */
+  async updateMe(request: UpdateMeRequest): Promise<Principal> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateMeRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 200);
     const firm = optionalFirmMembership(decoded);
     return {
       subject: requireString(decoded, 'subject'),

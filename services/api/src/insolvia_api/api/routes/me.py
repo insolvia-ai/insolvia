@@ -1,12 +1,80 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify
-from flask.typing import ResponseReturnValue
-from insolvia_core.firms import FEATURES, permission_for
+import logging
 
-from insolvia_api.api.auth import current_principal, require_auth, resolve_accessor
+from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
+from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.firms import (
+    FEATURES,
+    apply_user_changes,
+    parse_self_update,
+    permission_for,
+)
+from insolvia_core.ports import FirmStore
+
+from insolvia_api.api.auth import (
+    current_accessor,
+    current_principal,
+    require_auth,
+    resolve_accessor,
+)
+from insolvia_api.api.dependencies import dependencies
+from insolvia_api.core.access import Accessor
+
+logger = logging.getLogger(__name__)
 
 blueprint = Blueprint("me", __name__)
+
+# The whole writable surface is one display name, capped at 200 characters.
+MAX_REQUEST_BYTES = 4 * 1024
+
+
+def _firm_store() -> FirmStore:
+    deps = dependencies()
+    if deps.firm_store is None:
+        raise RuntimeError("firm store is not composed")
+    return deps.firm_store
+
+
+def _json_body() -> dict[str, object]:
+    if request.content_length and request.content_length > MAX_REQUEST_BYTES:
+        raise ValidationError("request body exceeds 4 KiB")
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        raise ValidationError("request body must be a JSON object")
+    return payload
+
+
+def _me_body(accessor: Accessor | None) -> dict[str, object]:
+    """The one shape /v1/me answers with, for both the read and the write.
+
+    PATCH returning the same body as GET is deliberate: the client's follow-up
+    to "my name changed" is re-rendering the same screen state a fresh GET
+    would produce, so handing it back saves the round trip and keeps one
+    serializer honest for both.
+    """
+    principal = current_principal()
+    body: dict[str, object] = {
+        "subject": principal.subject,
+        "username": principal.username,
+        "clientId": principal.client_id,
+        "scopes": list(principal.scopes),
+        "expiresAt": principal.expires_at,
+    }
+    if accessor is not None:
+        body["firm"] = {
+            "id": accessor.firm.id,
+            "name": accessor.firm.name,
+            "role": accessor.user.role,
+            "displayName": accessor.user.display_name,
+            "isAdmin": accessor.user.is_admin,
+            "accessAllCases": accessor.user.access_all_cases,
+            "permissions": {
+                feature: permission_for(accessor.user, feature) for feature in FEATURES
+            },
+        }
+    return body
 
 
 @blueprint.get("/v1/me")
@@ -50,26 +118,37 @@ def read_me() -> ResponseReturnValue:
     hidden` and they can nonetheless manage users. A client rendering the
     stored map would hide the button and then be surprised the endpoint works.
     """
-    principal = current_principal()
-    body: dict[str, object] = {
-        "subject": principal.subject,
-        "username": principal.username,
-        "clientId": principal.client_id,
-        "scopes": list(principal.scopes),
-        "expiresAt": principal.expires_at,
-    }
+    return jsonify(_me_body(resolve_accessor()))
 
-    accessor = resolve_accessor()
-    if accessor is not None:
-        body["firm"] = {
-            "id": accessor.firm.id,
-            "name": accessor.firm.name,
-            "role": accessor.user.role,
-            "displayName": accessor.user.display_name,
-            "isAdmin": accessor.user.is_admin,
-            "accessAllCases": accessor.user.access_all_cases,
-            "permissions": {
-                feature: permission_for(accessor.user, feature) for feature in FEATURES
-            },
-        }
-    return jsonify(body)
+
+@blueprint.patch("/v1/me")
+@require_auth
+def update_me() -> ResponseReturnValue:
+    """Correct your own display name (issue #216 / 11.16).
+
+    Display name only — core/firms.parse_self_update owns why nothing else on
+    the row is self-service. No `@requires` gate, and that is the point of the
+    route: the permission axes govern what an admin may do to OTHERS, and
+    before this existed a paralegal who mistyped their name at invite time had
+    to ask an admin to fix it. `current_accessor()` is still the gate that
+    matters — no active membership in an active firm, no row to rename, 403.
+
+    The write goes to the firm-user row alone. Cognito holds no display name
+    for this pool, so there is no second system to fall out of sync with —
+    unlike email, which is exactly such a fact and stays read-only.
+    """
+    store = _firm_store()
+    accessor = current_accessor()
+    changes = parse_self_update(_json_body())
+
+    updated = apply_user_changes(accessor.user, changes)
+    written = store.update_user(updated)
+    if written is None:
+        # Removed from the firm between resolving the accessor and writing.
+        # The next request will 403; this one reports the row it did not find.
+        raise NotFoundError("firm user not found")
+
+    # GLBA posture as everywhere in this file's neighbours: no name, no
+    # subject — that somebody renamed themselves is all a log needs.
+    logger.info("self display name updated")
+    return jsonify(_me_body(Accessor(firm=accessor.firm, user=written)))
