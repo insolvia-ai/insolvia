@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // The design system publishes platform-split SOURCE with extensionless
+    // leaf imports; Vite picks .web via resolve.extensions, and this is tsc's
+    // spelling of the same rule (copied from marketing's tsconfig, whose
+    // comment owns it).
+    "moduleSuffixes": [".web", ""],
+    "skipLibCheck": true,
+    "types": ["vite/client", "vitest"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

@@ -85,6 +85,7 @@ storybook-static/
 # Node package that builds adds its own line. (The design system deliberately
 # has none: it publishes source — a package-side build would collapse its
 # .web/.native leaf pairs.)
+/apps/insolvia_admin/dist/
 
 # Tool-run artifacts that may sit on disk while a branch that does not track
 # their package is checked out (the per-app .gitignore only exists on branches
