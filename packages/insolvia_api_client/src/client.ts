@@ -12,6 +12,7 @@ import {
   listCasesQuery,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
+  updateFirmRequestToJson,
   updateFirmUserRequestToJson,
   updateMeRequestToJson,
   waitlistSubmissionToJson,
@@ -23,13 +24,16 @@ import type {
   CaseAssignee,
   CaseChapter,
   CaseStatus,
+  Firm,
   FirmColleague,
   FirmFeature,
   FirmMembership,
   FirmRole,
+  FirmStatus,
   FirmUser,
   FirmUserStatus,
   PermissionLevel,
+  UpdateFirmRequest,
   UpdateFirmUserRequest,
   UpdateMeRequest,
   CreateCaseRequest,
@@ -634,6 +638,43 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireDebtorArray(decoded, 'debtors');
+  }
+
+  /**
+   * `GET /v1/firm` — the firm's own record (issue #217).
+   *
+   * Administrators only (`firm_administration` at `view_only`). The name it
+   * returns is the same row `/v1/me` reads, so this is what every member's
+   * header already shows. See {@link Firm} for what the tenant shape
+   * deliberately does not carry.
+   */
+  async getFirm(): Promise<Firm> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmFromJson(decoded);
+  }
+
+  /**
+   * `PATCH /v1/firm` — rename the firm (issue #217).
+   *
+   * `firm_administration` at `add_edit`. Name only — {@link UpdateFirmRequest}
+   * owns why `status` is absent and never joins. The new name reaches every
+   * member on their next `/v1/me`; nothing else needs invalidating. Throws
+   * {@link ApiValidationException} on a 400 with a per-field message.
+   */
+  async updateFirm(request: UpdateFirmRequest): Promise<Firm> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateFirmRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmFromJson(decoded);
   }
 
   /**
@@ -1667,6 +1708,22 @@ function requirePermissions(
     permissions[feature] ??= 'hidden';
   }
   return permissions as Record<FirmFeature, PermissionLevel>;
+}
+
+const FIRM_STATUSES = ['active', 'suspended'] as const;
+
+function firmFromJson(response: DecodedResponse): Firm {
+  const status = response.json.status;
+  if (typeof status !== 'string' || !(FIRM_STATUSES as readonly string[]).includes(status)) {
+    throw malformedField(response, 'status', FIRM_STATUSES.join(' | '));
+  }
+  return {
+    id: requireString(response, 'id'),
+    name: requireString(response, 'name'),
+    status: status as FirmStatus,
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
 }
 
 function firmUserFromJson(response: DecodedResponse): FirmUser {

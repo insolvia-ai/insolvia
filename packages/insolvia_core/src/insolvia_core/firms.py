@@ -179,6 +179,21 @@ class FirmUserDraft:
 
 
 @dataclass(frozen=True)
+class FirmChanges:
+    """A validated PATCH of the firm's own record (#217). None means "leave
+    unchanged".
+
+    `status` is deliberately not here and never will be: `set_firm_status` is
+    the ONLY legal status write, and it belongs to the admin service — a firm
+    suspending itself is a lockout with no self-service recovery, because
+    self-signup is off. Future firm-profile fields join this class; the status
+    axis does not.
+    """
+
+    name: str | None = None
+
+
+@dataclass(frozen=True)
 class FirmUserChanges:
     """A validated PATCH body. None means "leave unchanged" — a caller changing
     a role alone must not silently reset the permission map."""
@@ -545,6 +560,22 @@ def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
     return FirmUserChanges(display_name=display_name)
 
 
+def parse_firm_update(payload: Mapping[str, object]) -> FirmChanges:
+    """Validate PATCH /v1/firm. Unknown keys are ignored.
+
+    `name` is the one field today. `status` lands in the "no supported fields"
+    branch on purpose — see FirmChanges for why it never joins, and the admin
+    service's PATCH /v1/firms/<id> for where suspend/reactivate lives.
+    """
+    errors: dict[str, str] = {}
+    if "name" not in payload:
+        raise ValidationError("no supported fields to update")
+    name = _parse_name(payload["name"], errors, field="name", cap=MAX_FIRM_NAME)
+    if errors or name is None:
+        raise FieldValidationError(errors)
+    return FirmChanges(name=name)
+
+
 # ── Construction ────────────────────────────────────────────────────
 
 
@@ -589,6 +620,19 @@ def set_firm_status(firm: Firm, status: str) -> Firm:
             "Firm status must be one of " + ", ".join(FIRM_STATUSES) + "."
         )
     return replace(firm, status=status, updated_at=_timestamp())
+
+
+def apply_firm_changes(firm: Firm, changes: FirmChanges) -> Firm:
+    """A new Firm with a validated PATCH applied and updated_at refreshed.
+
+    The firm-side sibling of `apply_user_changes`, and like it this touches
+    nothing the changes do not name — provenance survives a rename, and status
+    cannot appear here at all (FirmChanges has no such field, by decision).
+    """
+    updates: dict[str, object] = {}
+    if changes.name is not None:
+        updates["name"] = changes.name
+    return replace(firm, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
 def create_firm_user(draft: FirmUserDraft, *, firm_id: str, subject: str) -> FirmUser:
@@ -811,6 +855,25 @@ def firm_json(firm: Firm) -> dict[str, object]:
         "updatedAt": firm.updated_at,
         "createdBy": firm.created_by,
         "createdByEmail": firm.created_by_email,
+    }
+
+
+def firm_summary_json(firm: Firm) -> dict[str, object]:
+    """The firm's record as its OWN members see it (#217).
+
+    DELIBERATELY THINNER THAN `firm_json`, the same split firm_user_summary_json
+    makes below and for the same kind of reason: `created_by` / `created_by_email`
+    name the Insolvia staff member who provisioned the firm, and a staff
+    identity is operational metadata for the admin portal — not something a
+    tenant response should carry. A firm admin renaming their firm has no use
+    for it; an operator auditing provisioning does.
+    """
+    return {
+        "id": firm.id,
+        "name": firm.name,
+        "status": firm.status,
+        "createdAt": firm.created_at,
+        "updatedAt": firm.updated_at,
     }
 
 

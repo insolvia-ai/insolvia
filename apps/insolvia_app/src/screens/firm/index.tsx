@@ -1,6 +1,7 @@
 import { ApiException, ApiValidationException, permits } from '@insolvia-ai/api-client';
 import type {
   AddFirmUserRequest,
+  Firm as FirmRecord,
   FirmFeature,
   FirmMembership,
   FirmRole,
@@ -51,6 +52,18 @@ type ListState =
   | { readonly kind: 'error'; readonly message: string };
 
 /**
+ * What the screen's one live region announces. `saved` exists for the firm
+ * rename: its visible effect is the page title changing, which a screen
+ * reader does not announce — the region is the announcement.
+ */
+type FirmNotice = { readonly tone: 'error' | 'saved'; readonly message: string };
+
+type RecordState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly record: FirmRecord }
+  | { readonly kind: 'error'; readonly message: string };
+
+/**
  * The firm's own staff list: who is here, what they may reach, and adding
  * somebody new.
  *
@@ -82,7 +95,10 @@ export function Firm({ membership }: { membership: FirmMembership }) {
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<FirmNotice | null>(null);
+  // The heading follows a rename without waiting for the next /v1/me — the
+  // membership prop is a snapshot from mount.
+  const [firmName, setFirmName] = useState(membership.name);
 
   const mayAdminister = permits(membership.permissions.firm_administration, 'view_only');
   const mayChange = permits(membership.permissions.firm_administration, 'add_edit');
@@ -121,15 +137,23 @@ export function Firm({ membership }: { membership: FirmMembership }) {
 
   return (
     <AppShell actions={<EnvBadge env={env.name} />}>
-      <Heading level={1}>{membership.name}</Heading>
+      <Heading level={1}>{firmName}</Heading>
+
+      <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />
 
       {mayChange ? <AddColleague onAdded={load} onNotice={setNotice} /> : null}
 
       {/* One live region for the whole screen. Several would compete, and a
           screen reader would announce whichever won. */}
       {notice === null ? null : (
-        <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
-          {notice}
+        <Text
+          aria-live="assertive"
+          style={[
+            styles.error,
+            { color: notice.tone === 'error' ? theme.colors.danger : theme.colors.muted },
+          ]}
+        >
+          {notice.message}
         </Text>
       )}
 
@@ -154,13 +178,124 @@ export function Firm({ membership }: { membership: FirmMembership }) {
   );
 }
 
+/**
+ * The firm's own record: the name everyone sees, editable at `add_edit`
+ * (issue #217).
+ *
+ * `status` has no control here on purpose. Suspend/reactivate is Insolvia's
+ * own operation on the admin portal — a firm suspending itself would be a
+ * lockout with no self-service recovery — and the server's parser refuses a
+ * status either way; a control would be a button that can only 400.
+ */
+function FirmDetails({
+  editable,
+  onNotice,
+  onRenamed,
+}: {
+  editable: boolean;
+  onNotice: (notice: FirmNotice | null) => void;
+  onRenamed: (name: string) => void;
+}) {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [state, setState] = useState<RecordState>({ kind: 'loading' });
+  const [name, setName] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await call((client) => client.getFirm());
+        if (!cancelled && result.ok) {
+          setState({ kind: 'ready', record: result.value });
+          setName(result.value.name);
+        }
+      } catch {
+        if (!cancelled) {
+          setState({ kind: 'error', message: 'Could not load your firm’s record.' });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call]);
+
+  const save = async () => {
+    setSaving(true);
+    setFieldErrors({});
+    onNotice(null);
+    try {
+      const result = await call((client) => client.updateFirm({ name }));
+      if (result.ok) {
+        setState({ kind: 'ready', record: result.value });
+        setName(result.value.name);
+        onRenamed(result.value.name);
+        onNotice({ tone: 'saved', message: 'Your firm’s name is saved.' });
+      }
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        setFieldErrors(cause.fields);
+      } else {
+        onNotice({
+          tone: 'error',
+          message: 'Could not save your firm’s name. Please try again.',
+        });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  return (
+    <View style={styles.form}>
+      <Heading level={2}>Firm details</Heading>
+
+      {state.kind !== 'ready' ? (
+        <Text
+          aria-live={state.kind === 'error' ? 'assertive' : 'polite'}
+          style={[styles.body, muted]}
+        >
+          {state.kind === 'loading' ? 'Loading your firm’s record…' : state.message}
+        </Text>
+      ) : editable ? (
+        <>
+          <Field.Root name="name" invalid={Boolean(fieldErrors.name)}>
+            <Field.Label>Firm name</Field.Label>
+            <Input value={name} onValueChange={setName} autoCorrect={false} />
+            <Field.Description>
+              Shown to everyone in your firm, and on this page’s title. Firm since{' '}
+              {state.record.createdAt.slice(0, 10)}.
+            </Field.Description>
+            {fieldErrors.name ? <Field.Error match>{fieldErrors.name}</Field.Error> : null}
+          </Field.Root>
+          <View style={styles.actions}>
+            <Button size="lg" onPress={() => void save()} disabled={saving}>
+              {saving ? 'Saving…' : 'Save firm name'}
+            </Button>
+          </View>
+        </>
+      ) : (
+        <Text style={[styles.body, muted]}>
+          Firm since {state.record.createdAt.slice(0, 10)}. Renaming the firm is an administrator’s
+          job.
+        </Text>
+      )}
+    </View>
+  );
+}
+
 /** The add-a-colleague form. */
 function AddColleague({
   onAdded,
   onNotice,
 }: {
   onAdded: () => Promise<void>;
-  onNotice: (message: string | null) => void;
+  onNotice: (notice: FirmNotice | null) => void;
 }) {
   const theme = useTheme();
   const [email, setEmail] = useState('');
@@ -188,9 +323,9 @@ function AddColleague({
         // per-field messages are rendered as-is rather than restated here.
         setFieldErrors(cause.fields);
       } else if (cause instanceof ApiException && cause.statusCode === 409) {
-        onNotice('That email address already has an Insolvia account.');
+        onNotice({ tone: 'error', message: 'That email address already has an Insolvia account.' });
       } else {
-        onNotice('Could not add them. Please try again.');
+        onNotice({ tone: 'error', message: 'Could not add them. Please try again.' });
       }
     } finally {
       setSubmitting(false);
@@ -268,7 +403,7 @@ function Colleague({
   user: FirmUser;
   editable: boolean;
   onChanged: () => Promise<void>;
-  onNotice: (message: string | null) => void;
+  onNotice: (notice: FirmNotice | null) => void;
 }) {
   const theme = useTheme();
   const { call } = useApi();
@@ -285,11 +420,13 @@ function Colleague({
     } catch (cause) {
       if (cause instanceof ApiException && cause.statusCode === 409) {
         // NOT a permission failure. See the screen's docstring.
-        onNotice(
-          'Your firm must keep at least one active administrator. Appoint another one first.',
-        );
+        onNotice({
+          tone: 'error',
+          message:
+            'Your firm must keep at least one active administrator. Appoint another one first.',
+        });
       } else {
-        onNotice('Could not save that change. Please try again.');
+        onNotice({ tone: 'error', message: 'Could not save that change. Please try again.' });
       }
     } finally {
       setBusy(false);

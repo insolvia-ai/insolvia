@@ -64,6 +64,14 @@ const BOB_RECORD = {
   updatedAt: '2026-08-04T10:00:00.000Z',
 };
 
+const FIRM_RECORD = {
+  id: FIRM_ID,
+  name: 'Example & Partners',
+  status: 'active',
+  createdAt: '2026-01-05T09:00:00.000Z',
+  updatedAt: '2026-08-01T12:00:00.000Z',
+};
+
 /**
  * `/firm` — the firm's own people.
  *
@@ -81,9 +89,24 @@ describe('the firm screen', () => {
   let browser: FakeBrowser;
   const realFetch = globalThis.fetch;
 
-  function signedIn(handlers: Readonly<Record<string, () => Response>>) {
-    const route = routeFetch({ '/oauth2/token': tokenEndpointResponse, ...handlers });
-    const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
+  function signedIn(
+    handlers: Readonly<Record<string, () => Response>>,
+    patchFirm?: () => Response,
+  ) {
+    // `/v1/firm` LAST: routeFetch matches by substring in insertion order, so
+    // registered any earlier it would swallow `/v1/firm/users` too. The PATCH
+    // to the same URL as the GET is told apart by method, which routeFetch
+    // cannot see — hence the wrapper.
+    const route = routeFetch({
+      '/oauth2/token': tokenEndpointResponse,
+      ...handlers,
+      '/v1/firm': () => jsonResponse(200, FIRM_RECORD),
+    });
+    const fetchMock = jest.fn((url: string, init?: RequestInit) =>
+      patchFirm !== undefined && init?.method === 'PATCH' && url.endsWith('/v1/firm')
+        ? Promise.resolve(patchFirm())
+        : route(url),
+    );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     renderRouter('src/app', { initialUrl: '/firm' });
     return fetchMock;
@@ -216,6 +239,51 @@ describe('the firm screen', () => {
     // is the combobox a screen reader lands on.
     expect(screen.getByRole('combobox', { name: 'Documents for Bob Paralegal' })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Cases for Bob Paralegal' })).toBeTruthy();
+  });
+
+  it('renames the firm, and the page title follows the server’s echo', async () => {
+    const fetchMock = signedIn(
+      {
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      },
+      () => jsonResponse(200, { ...FIRM_RECORD, name: 'Example, LLP' }),
+    );
+    await screen.findByDisplayValue('Example & Partners');
+
+    const user = userEvent.setup();
+    const name = screen.getByLabelText('Firm name');
+    await user.clear(name);
+    await user.type(name, 'Example, LLP');
+    await user.press(screen.getByRole('button', { name: 'Save firm name' }));
+
+    expect(await screen.findByText('Your firm’s name is saved.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Example, LLP' })).toBeTruthy();
+
+    const patch = fetchMock.mock.calls.find(
+      ([url, init]) => url.endsWith('/v1/firm') && init?.method === 'PATCH',
+    );
+    expect(patch).toBeTruthy();
+    // Name only. A `status` here would be the client offering a
+    // self-suspension the server refuses to parse.
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ name: 'Example, LLP' });
+  });
+
+  it('shows the record read-only to a viewer, with no rename control', async () => {
+    signedIn({
+      '/v1/me': () =>
+        jsonResponse(
+          200,
+          membership({
+            isAdmin: false,
+            permissions: { ...ALL_ADD_EDIT, firm_administration: 'view_only' },
+          }),
+        ),
+      '/v1/firm/users': () => jsonResponse(200, { users: [BOB_RECORD] }),
+    });
+
+    expect(await screen.findByText(/Renaming the firm is an administrator’s job/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save firm name' })).toBeNull();
   });
 
   it('gives the page exactly one level-1 heading', async () => {

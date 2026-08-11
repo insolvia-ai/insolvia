@@ -2902,6 +2902,82 @@ describe('permits', () => {
   });
 });
 
+describe('the firm record', () => {
+  // Pinned against services/api/src/insolvia_api/api/routes/firm.py's
+  // GET/PATCH /v1/firm — the literal firm_summary_json shape, which carries
+  // NO createdBy/createdByEmail: those name the Insolvia staff member who
+  // provisioned the firm and never appear in a tenant response.
+  const FIRM_RECORD = {
+    id: 'f1a2b3c4-0000-4000-8000-000000000001',
+    name: 'Example & Partners',
+    status: 'active',
+    createdAt: '2026-01-05T09:00:00.000Z',
+    updatedAt: '2026-08-01T12:00:00.000Z',
+  };
+
+  test('GETs /v1/firm and maps the tenant shape exactly', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.getFirm();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(firm).toEqual(FIRM_RECORD);
+  });
+
+  test('PATCHes /v1/firm with exactly a name and maps the echoed record', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_RECORD, name: 'Example, LLP' }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.updateFirm({ name: 'Example, LLP' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PATCH');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    // The whole writable surface. `status` here would be the client offering
+    // a self-suspension the server's parser refuses to produce.
+    expect(JSON.parse(seen.body)).toEqual({ name: 'Example, LLP' });
+    expect(firm.name).toBe('Example, LLP');
+  });
+
+  test('a status this version cannot rank is malformed, not guessed', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_RECORD, status: 'archived' }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getFirm()).rejects.toThrow(ApiException);
+  });
+
+  test('a 400 with a field message surfaces as ApiValidationException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ValidationError', fields: { name: 'A name is required.' } }, 400),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const failure = client.updateFirm({ name: ' ' });
+
+    await expect(failure).rejects.toThrow(ApiValidationException);
+    await failure.catch((caught: unknown) => {
+      expect((caught as ApiValidationException).fields.name).toBe('A name is required.');
+    });
+  });
+});
+
 describe('listFirmDirectory', () => {
   test('GETs /v1/firm/directory and maps the three-field people', async () => {
     const stub = stubFetch(() =>

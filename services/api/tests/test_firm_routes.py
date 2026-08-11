@@ -178,6 +178,8 @@ def open_case(client, subject=ALICE):
 @pytest.mark.parametrize(
     ("method", "path"),
     [
+        ("get", "/v1/firm"),
+        ("patch", "/v1/firm"),
         ("get", "/v1/firm/users"),
         ("post", "/v1/firm/users"),
         ("patch", f"/v1/firm/users/{BOB}"),
@@ -196,6 +198,8 @@ def test_administration_needs_the_admin_flag(client, method, path):
 @pytest.mark.parametrize(
     ("method", "path"),
     [
+        ("get", "/v1/firm"),
+        ("patch", "/v1/firm"),
         ("get", "/v1/firm/users"),
         ("get", "/v1/firm/directory"),
         ("post", "/v1/firm/users"),
@@ -203,6 +207,76 @@ def test_administration_needs_the_admin_flag(client, method, path):
 )
 def test_administration_requires_a_token(client, method, path):
     assert getattr(client, method)(path, json={}).status_code == 401
+
+
+# ── The firm's own record (#217) ────────────────────────────────
+
+
+def test_an_admin_reads_the_firms_record_without_provenance(client):
+    """The exact-shape assertion is the point: `createdBy`/`createdByEmail`
+    name the Insolvia staff member who provisioned the firm, and a staff
+    identity must not appear in a tenant response — firm_summary_json owns
+    the reasoning."""
+    body = client.get("/v1/firm", headers=auth(ALICE)).get_json()
+    assert body == {
+        "id": FIRM_A,
+        "name": "Example & Partners",
+        "status": "active",
+        "createdAt": "2026-01-01T00:00:00.000Z",
+        "updatedAt": "2026-01-01T00:00:00.000Z",
+    }
+
+
+def test_the_record_is_the_callers_firm(client):
+    """No firm id in the URL, so there is nothing to point at firm A."""
+    assert client.get("/v1/firm", headers=auth(CAROL)).get_json()["id"] == FIRM_B
+
+
+def test_a_rename_lands_on_the_row_and_reaches_every_member(client, firms):
+    response = client.patch(
+        "/v1/firm", json={"name": "Example, LLP"}, headers=auth(ALICE)
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["name"] == "Example, LLP"
+    assert firms.get_firm(FIRM_A).name == "Example, LLP"
+    # The same row /v1/me reads — Bob sees the new name with no admin rights
+    # and no further write.
+    me = client.get("/v1/me", headers=auth(BOB)).get_json()
+    assert me["firm"]["name"] == "Example, LLP"
+
+
+def test_a_firm_cannot_suspend_itself(client, firms):
+    """Suspend/reactivate is the ADMIN SERVICE's operation. A firm suspending
+    itself would be a lockout with no self-service recovery — self-signup is
+    off, and accessor resolution refuses every member of a suspended firm,
+    this caller included."""
+    response = client.patch(
+        "/v1/firm", json={"status": "suspended"}, headers=auth(ALICE)
+    )
+
+    assert response.status_code == 400
+    assert firms.get_firm(FIRM_A).status == "active"
+
+
+def test_a_rename_cannot_smuggle_a_status(client, firms):
+    response = client.patch(
+        "/v1/firm",
+        json={"name": "Example, LLP", "status": "suspended"},
+        headers=auth(ALICE),
+    )
+
+    assert response.status_code == 200
+    assert firms.get_firm(FIRM_A).status == "active"
+    assert firms.get_firm(FIRM_A).name == "Example, LLP"
+
+
+def test_a_bad_firm_name_reports_the_field(client, firms):
+    response = client.patch("/v1/firm", json={"name": " "}, headers=auth(ALICE))
+
+    assert response.status_code == 400
+    assert "name" in response.get_json()["fields"]
+    assert firms.get_firm(FIRM_A).name == "Example & Partners"
 
 
 # ── The directory ───────────────────────────────────────────────
