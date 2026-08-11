@@ -32,7 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Bash 3.2 is what macOS ships, so no associative arrays anywhere below.
-SERVICES="api admin mailer app portal marketing"
+SERVICES="api admin-api mailer app portal marketing"
 PIDS=""
 
 c_reset=$'\033[0m'
@@ -54,7 +54,7 @@ die() {
 service_dir() {
   case "$1" in
   api) printf '%s/services/api' "$REPO_ROOT" ;;
-  admin) printf '%s/services/admin' "$REPO_ROOT" ;;
+  admin-api) printf '%s/services/admin' "$REPO_ROOT" ;;
   mailer) printf '%s/services/mailer' "$REPO_ROOT" ;;
   app) printf '%s/apps/insolvia_app' "$REPO_ROOT" ;;
   portal) printf '%s/apps/insolvia_admin' "$REPO_ROOT" ;;
@@ -65,7 +65,7 @@ service_dir() {
 service_port() {
   case "$1" in
   api) printf '8080' ;;
-  admin) printf '8090' ;;
+  admin-api) printf '8090' ;;
   mailer) printf '8026' ;;
   app) printf '3000' ;;
   portal) printf '3100' ;;
@@ -76,7 +76,7 @@ service_port() {
 service_url() {
   case "$1" in
   api) printf 'http://127.0.0.1:8080/health' ;;
-  admin) printf 'http://127.0.0.1:8090/health' ;;
+  admin-api) printf 'http://127.0.0.1:8090/health' ;;
   mailer) printf 'http://127.0.0.1:8026  (Mailpit: http://127.0.0.1:8025)' ;;
   app) printf 'http://localhost:3000' ;;
   portal) printf 'http://localhost:3100' ;;
@@ -88,7 +88,7 @@ service_url() {
 service_colour() {
   case "$1" in
   api) printf '\033[36m' ;;
-  admin) printf '\033[94m' ;;
+  admin-api) printf '\033[94m' ;;
   mailer) printf '\033[35m' ;;
   app) printf '\033[32m' ;;
   portal) printf '\033[95m' ;;
@@ -110,8 +110,8 @@ case "${1:-}" in
   cat <<'USAGE'
 Usage: ./scripts/dev-up.sh
 
-Brings up the whole system: api, admin, mailer, app, admin portal, marketing.
-Ctrl-C stops all of it, containers included.
+Brings up the whole system: api, admin api, mailer, app, admin portal,
+marketing. Ctrl-C stops all of it, containers included.
 
 To run one part, run that part's own script instead:
   ./services/api/scripts/dev-up.sh
@@ -121,8 +121,12 @@ To run one part, run that part's own script instead:
   ./apps/insolvia_admin/scripts/dev-up.sh
   ./apps/insolvia_marketing/scripts/dev-up.sh
 
-Ports: api 8080 · admin 8090 · mailer 8026 (Mailpit 8025)
+Ports: api 8080 · admin api 8090 · mailer 8026 (Mailpit 8025)
        app 3000 · admin portal 3100 · marketing 5173
+
+The two admin halves: 8090 is the admin SERVICE — a JSON API whose only
+browser-friendly URL is /health — and the staff UI that talks to it is the
+portal on http://localhost:3100.
 USAGE
   exit 0
   ;;
@@ -314,10 +318,29 @@ banner() {
   printf '%s  Signed in but everything 403s? You are in no firm yet:%s\n' "$c_dim" "$c_reset"
   printf '%s      ./scripts/dev-aws-seed.sh%s\n' "$c_dim" "$c_reset"
   # The portal is the odd one out: no Cognito, no account script — staff sign
-  # in with their own @insolvia.ai Google Workspace account.
-  printf '%s  The admin portal (http://localhost:3100) signs in with Google Workspace%s\n' "$c_dim" "$c_reset"
-  printf '%s  — any @insolvia.ai account; there is nothing to create locally.%s\n' "$c_dim" "$c_reset"
-  printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
+  # in with their own @insolvia.ai Google Workspace account. And name the
+  # split explicitly: someone WILL open 8090 in a browser expecting the admin
+  # UI, meet Flask's 404, and read it as broken.
+  printf '%s  The admin UI is the PORTAL (http://localhost:3100) — sign in with your%s\n' "$c_dim" "$c_reset"
+  printf '%s  own @insolvia.ai Google account; nothing to create locally. The admin%s\n' "$c_dim" "$c_reset"
+  printf '%s  api on 8090 is JSON only: /health in a browser, everything else 404s.%s\n' "$c_dim" "$c_reset"
+  if [[ -n "$BANNER_ON_CTRL_T" ]]; then
+    printf '%s  Scrolled away? Ctrl-T reprints this. Ctrl-C once stops everything.%s\n\n' "$c_dim" "$c_reset"
+  else
+    printf '%s  Ctrl-C once stops everything, containers included.%s\n\n' "$c_dim" "$c_reset"
+  fi
+}
+
+# On BSD/macOS, Ctrl-T sends SIGINFO to the foreground process group — the
+# native "what are you doing?" key. Trapping it turns the question into the
+# answer: the URL banner again, however far the six log streams have scrolled
+# it. Linux has no SIGINFO; the guard leaves this a macOS nicety rather than
+# a portability bug, and the banner's hint only appears when it works.
+BANNER_ON_CTRL_T=""
+install_banner_reprint() {
+  if trap banner INFO 2>/dev/null; then
+    BANNER_ON_CTRL_T=1
+  fi
 }
 
 main() {
@@ -340,6 +363,10 @@ main() {
   done
 
   wait_for_ports
+  # Let the port-open burst of bundler output land first, so the banner is
+  # the last thing on screen rather than the thing that burst scrolls away.
+  sleep 3
+  install_banner_reprint
   banner
 
   # Block until ANY child dies, or the user interrupts.
