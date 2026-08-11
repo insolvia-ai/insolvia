@@ -39,6 +39,8 @@ permissions:
   id-token: write
   contents: read
   statuses: read
+  # The portal build installs @insolvia-ai/design-system from GitHub Packages.
+  packages: read
 
 jobs:
   resolve:
@@ -92,6 +94,8 @@ jobs:
             echo "function=$(tf admin_lambda_function_name)"
             echo "domain=$(tf admin_domain)"
             echo "alias=$(tf admin_lambda_alias_name)"
+            echo "web_bucket=$(tf admin_web_bucket_name)"
+            echo "web_dist=$(tf admin_web_distribution_id)"
           } >> "$GITHUB_OUTPUT"
 
       - id: image
@@ -225,3 +229,38 @@ jobs:
           curl -sSf --retry 5 --retry-delay 3 --retry-all-errors \
             "https://$DOMAIN/health" | tee health.json
           jq -e '.environment == "production"' health.json > /dev/null
+
+      # ── The portal (#215) ────────────────────────────────────────────────
+      # The portal REBUILDS for prod rather than promoting an artifact — the
+      # same exception the app makes, for the same reason: the environment
+      # (client id, API host) is inlined at build time via VITE_INSOLVIA_ENV.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build the portal
+        working-directory: apps/insolvia_admin
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_INSOLVIA_ENV: production
+        run: |
+          npm ci
+          npm run build
+
+      - name: Sync the portal to S3 + invalidate
+        env:
+          SRC: apps/insolvia_admin/dist
+          BUCKET: ${{ steps.tf.outputs.web_bucket }}
+          DIST: ${{ steps.tf.outputs.web_dist }}
+        run: |
+          set -euo pipefail
+          aws s3 sync "$SRC/assets" "s3://$BUCKET/assets" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync "$SRC" "s3://$BUCKET" --exclude "assets/*" \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"
+
+      - name: Smoke test the portal
+        run: |
+          curl -sSf --retry 5 --retry-delay 5 --retry-all-errors \
+            "https://admin.insolvia.ai/" | grep -q "Insolvia Admin"

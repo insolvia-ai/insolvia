@@ -205,3 +205,18 @@ output "admin_domain" {
   description = "Hostname the admin service serves (deploy smoke target)."
   value       = module.admin_service.domain_name
 }
+
+output "admin_web_bucket_name" {
+  description = "Origin bucket the admin portal deploy syncs into."
+  value       = module.admin_web_hosting.bucket_name
+}
+
+output "admin_web_distribution_id" {
+  description = "Admin portal CloudFront distribution ID (cache invalidation)."
+  value       = module.admin_web_hosting.distribution_id
+}
+
+output "admin_portal_url" {
+  description = "Where the admin portal serves."
+  value       = module.admin_web_hosting.url
+}

@@ -8,7 +8,13 @@
 # the same document.
 
 locals {
-  bucket_name = "${var.project}-web-${var.environment}"
+  # Overridable for a SECOND instantiation in one environment (#215: the admin
+  # portal at insolvia-web-admin-<env>). The default preserves the original
+  # derived name byte-for-byte, so existing instances plan no changes. Keep
+  # any override on the `insolvia-web-` prefix: the deploy role's S3 grant is
+  # arn:aws:s3:::insolvia-web-* (infra/envs/ci-trust), and a name outside it
+  # is a human-applied IAM change.
+  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.project}-web-${var.environment}"
 }
 
 # ── Origin bucket (private) ─────────────────────────────────────

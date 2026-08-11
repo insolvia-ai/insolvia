@@ -81,6 +81,23 @@ module "api_service" {
 }
 
 
+
+# Admin portal hosting (#215): a second web_hosting instantiation — the module
+# gained a bucket_name override for exactly this, and the insolvia-web- prefix
+# keeps it inside the deploy role's existing S3 grant (no IAM change). Serves
+# apps/insolvia_admin, built and synced by the admin deploy workflow.
+module "admin_web_hosting" {
+  source = "../../modules/web_hosting"
+
+  project             = "insolvia"
+  environment         = local.environment
+  bucket_name         = "insolvia-web-admin-${local.environment}"
+  domain_name         = var.admin_subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  tags                = local.common_tags
+}
+
 # Admin service (#213): the cross-tenant provisioning surface (services/admin,
 # ADR 0011), deployed the way the API is — same cert-lookup reuse, same
 # image-before-apply bootstrap on the first apply (extend it with

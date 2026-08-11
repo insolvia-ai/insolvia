@@ -49,3 +49,11 @@ variable "google_admin_client_id" {
   type        = string
   default     = "925851246989-115l1fsln1ntv52uv3bhg29k819fram7.apps.googleusercontent.com"
 }
+
+# The admin PORTAL's host (#215) — the static SPA; the admin SERVICE lives at
+# admin_api_subdomain above. Same flat-label reasoning as every subdomain here.
+variable "admin_subdomain" {
+  description = "Hostname the admin portal serves in this environment."
+  type        = string
+  default     = "admin.insolvia.ai"
+}
