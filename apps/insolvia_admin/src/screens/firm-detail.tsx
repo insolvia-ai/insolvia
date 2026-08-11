@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router";
-import {
-  Alert,
-  Badge,
-  Button,
-  Spinner,
-  Table,
-} from "@insolvia-ai/design-system";
+import { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'react-router';
+import { Alert, Badge, Button, Spinner, Table } from '@insolvia-ai/design-system';
 
 import {
   AdminApiError,
   AdminUnauthorizedError,
   type FirmSummary,
   type FirmUser,
-} from "../api/client";
-import { useClient } from "../api/use-client";
-import { useSession } from "../session/session";
+} from '../api/client';
+import { useClient } from '../api/use-client';
+import { useSession } from '../session/session';
 
 /** One firm: its status and people, with the three operator actions —
  * suspend, reactivate, resend a stranded invite. */
@@ -45,20 +39,18 @@ export function FirmDetailScreen() {
     client
       .getFirm(firmId)
       .then(setFirm)
-      .catch((caught: unknown) => fail(caught, "This firm could not be loaded."));
+      .catch((caught: unknown) => fail(caught, 'This firm could not be loaded.'));
     client
       .listFirmUsers(firmId)
       .then(setUsers)
-      .catch((caught: unknown) =>
-        fail(caught, "The firm's people could not be loaded."),
-      );
+      .catch((caught: unknown) => fail(caught, "The firm's people could not be loaded."));
   }, [client, firmId, fail]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function setStatus(status: "active" | "suspended") {
+  async function setStatus(status: 'active' | 'suspended') {
     if (firmId === undefined) return;
     setBusy(true);
     setError(null);
@@ -66,13 +58,13 @@ export function FirmDetailScreen() {
     try {
       await client.setFirmStatus(firmId, status);
       setNotice(
-        status === "suspended"
+        status === 'suspended'
           ? "Suspended. Every request from this firm's users now answers 403 — enforcement is immediate."
-          : "Reactivated.",
+          : 'Reactivated.',
       );
       load();
     } catch (caught: unknown) {
-      fail(caught, "The status change did not apply.");
+      fail(caught, 'The status change did not apply.');
     } finally {
       setBusy(false);
     }
@@ -89,7 +81,7 @@ export function FirmDetailScreen() {
     } catch (caught: unknown) {
       // The 409 here is informative, not an error state: they already signed
       // in, and forgot-password is their way back — the message says so.
-      fail(caught, "The invitation could not be re-sent.");
+      fail(caught, 'The invitation could not be re-sent.');
     } finally {
       setBusy(false);
     }
@@ -97,7 +89,9 @@ export function FirmDetailScreen() {
 
   if (firm === null) {
     return error !== null ? (
-      <Alert.Root intent="danger"><Alert.Description>{error}</Alert.Description></Alert.Root>
+      <Alert.Root intent="danger">
+        <Alert.Description>{error}</Alert.Description>
+      </Alert.Root>
     ) : (
       <Spinner aria-label="Loading firm" />
     );
@@ -111,27 +105,17 @@ export function FirmDetailScreen() {
           <p className="text-sm text-muted">
             {firm.createdByEmail !== null
               ? `Provisioned by ${firm.createdByEmail} on ${firm.createdAt.slice(0, 10)}`
-              : "Seeded before the portal existed"}
+              : 'Seeded before the portal existed'}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge intent={firm.status === "active" ? "success" : "danger"}>
-            {firm.status}
-          </Badge>
-          {firm.status === "active" ? (
-            <Button
-              intent="secondary"
-              disabled={busy}
-              onClick={() => void setStatus("suspended")}
-            >
+          <Badge intent={firm.status === 'active' ? 'success' : 'danger'}>{firm.status}</Badge>
+          {firm.status === 'active' ? (
+            <Button intent="secondary" disabled={busy} onClick={() => void setStatus('suspended')}>
               Suspend
             </Button>
           ) : (
-            <Button
-              intent="primary"
-              disabled={busy}
-              onClick={() => void setStatus("active")}
-            >
+            <Button intent="primary" disabled={busy} onClick={() => void setStatus('active')}>
               Reactivate
             </Button>
           )}
@@ -140,12 +124,16 @@ export function FirmDetailScreen() {
 
       {notice !== null ? (
         <div className="mb-4">
-          <Alert.Root intent="success"><Alert.Description>{notice}</Alert.Description></Alert.Root>
+          <Alert.Root intent="success">
+            <Alert.Description>{notice}</Alert.Description>
+          </Alert.Root>
         </div>
       ) : null}
       {error !== null ? (
         <div className="mb-4">
-          <Alert.Root intent="danger"><Alert.Description>{error}</Alert.Description></Alert.Root>
+          <Alert.Root intent="danger">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Root>
         </div>
       ) : null}
 
@@ -175,9 +163,7 @@ export function FirmDetailScreen() {
                 <Table.Cell>{user.email}</Table.Cell>
                 <Table.Cell>{user.role}</Table.Cell>
                 <Table.Cell>
-                  <Badge
-                    intent={user.status === "active" ? "success" : "neutral"}
-                  >
+                  <Badge intent={user.status === 'active' ? 'success' : 'neutral'}>
                     {user.status}
                   </Badge>
                 </Table.Cell>

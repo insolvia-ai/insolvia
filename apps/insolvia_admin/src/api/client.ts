@@ -15,7 +15,7 @@
 export interface FirmSummary {
   readonly id: string;
   readonly name: string;
-  readonly status: "active" | "suspended";
+  readonly status: 'active' | 'suspended';
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly createdBy: string | null;
@@ -31,7 +31,7 @@ export interface FirmUser {
   readonly isAdmin: boolean;
   readonly accessAllCases: boolean;
   readonly permissions: Readonly<Record<string, string>>;
-  readonly status: "active" | "disabled";
+  readonly status: 'active' | 'disabled';
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -46,13 +46,9 @@ export class AdminApiError extends Error {
   /** Per-field messages when the service answered a field-validation 400. */
   readonly fields: Readonly<Record<string, string>> | null;
 
-  constructor(
-    statusCode: number,
-    message: string,
-    fields: Record<string, string> | null = null,
-  ) {
+  constructor(statusCode: number, message: string, fields: Record<string, string> | null = null) {
     super(message);
-    this.name = "AdminApiError";
+    this.name = 'AdminApiError';
     this.statusCode = statusCode;
     this.fields = fields;
   }
@@ -60,8 +56,8 @@ export class AdminApiError extends Error {
 
 export class AdminUnauthorizedError extends AdminApiError {
   constructor() {
-    super(401, "authentication required");
-    this.name = "AdminUnauthorizedError";
+    super(401, 'authentication required');
+    this.name = 'AdminUnauthorizedError';
   }
 }
 
@@ -78,11 +74,7 @@ export class AdminClient {
     this.token = token;
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const token = this.token();
     if (token === null) {
       throw new AdminUnauthorizedError();
@@ -91,7 +83,7 @@ export class AdminClient {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
       // Assigned conditionally rather than `undefined`-valued: the root
       // tsconfig's exactOptionalPropertyTypes treats those differently.
@@ -111,11 +103,11 @@ export class AdminClient {
     } | null;
     if (!response.ok) {
       const fields =
-        payload !== null && typeof payload.fields === "object"
+        payload !== null && typeof payload.fields === 'object'
           ? (payload.fields as Record<string, string>)
           : null;
       const message =
-        payload !== null && typeof payload.message === "string"
+        payload !== null && typeof payload.message === 'string'
           ? payload.message
           : `request failed (${response.status})`;
       throw new AdminApiError(response.status, message, fields);
@@ -124,39 +116,33 @@ export class AdminClient {
   }
 
   async listFirms(): Promise<readonly FirmSummary[]> {
-    const body = await this.request<{ firms: FirmSummary[] }>("GET", "/v1/firms");
+    const body = await this.request<{ firms: FirmSummary[] }>('GET', '/v1/firms');
     return body.firms;
   }
 
   async getFirm(firmId: string): Promise<FirmSummary> {
-    return this.request<FirmSummary>("GET", `/v1/firms/${firmId}`);
+    return this.request<FirmSummary>('GET', `/v1/firms/${firmId}`);
   }
 
   async provisionFirm(
     request: ProvisionRequest,
-  ): Promise<{ firm: Omit<FirmSummary, "userCount">; admin: FirmUser }> {
-    return this.request("POST", "/v1/firms", request);
+  ): Promise<{ firm: Omit<FirmSummary, 'userCount'>; admin: FirmUser }> {
+    return this.request('POST', '/v1/firms', request);
   }
 
   async setFirmStatus(
     firmId: string,
-    status: "active" | "suspended",
-  ): Promise<Omit<FirmSummary, "userCount">> {
-    return this.request("PATCH", `/v1/firms/${firmId}`, { status });
+    status: 'active' | 'suspended',
+  ): Promise<Omit<FirmSummary, 'userCount'>> {
+    return this.request('PATCH', `/v1/firms/${firmId}`, { status });
   }
 
   async listFirmUsers(firmId: string): Promise<readonly FirmUser[]> {
-    const body = await this.request<{ users: FirmUser[] }>(
-      "GET",
-      `/v1/firms/${firmId}/users`,
-    );
+    const body = await this.request<{ users: FirmUser[] }>('GET', `/v1/firms/${firmId}/users`);
     return body.users;
   }
 
   async resendInvite(firmId: string, subject: string): Promise<void> {
-    await this.request<void>(
-      "POST",
-      `/v1/firms/${firmId}/users/${subject}/resend-invite`,
-    );
+    await this.request<void>('POST', `/v1/firms/${firmId}/users/${subject}/resend-invite`);
   }
 }
