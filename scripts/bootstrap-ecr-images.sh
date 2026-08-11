@@ -41,13 +41,13 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api mailer marketing   (default: all three)
+#   service ...  any of: api admin mailer marketing   (default: all four)
 #   --dispatch   after pushing, re-run the matching <service>-<env>.yml workflows
 #   --yes        skip the confirmation prompt
 #
 # Examples:
 #   scripts/bootstrap-ecr-images.sh staging mailer marketing --dispatch
-#   scripts/bootstrap-ecr-images.sh staging            # all three, no dispatch
+#   scripts/bootstrap-ecr-images.sh staging            # all four, no dispatch
 #
 set -euo pipefail
 
