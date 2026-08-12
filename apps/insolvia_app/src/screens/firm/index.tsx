@@ -299,7 +299,8 @@ function AddColleague({
 }) {
   const theme = useTheme();
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<FirmRole>('paralegal');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -309,12 +310,13 @@ function AddColleague({
     setSubmitting(true);
     setFieldErrors({});
     onNotice(null);
-    const request: AddFirmUserRequest = { email, displayName, role };
+    const request: AddFirmUserRequest = { email, firstName, lastName, role };
     try {
       const result = await call((client) => client.addFirmUser(request));
       if (result.ok) {
         setEmail('');
-        setDisplayName('');
+        setFirstName('');
+        setLastName('');
         await onAdded();
       }
     } catch (cause) {
@@ -336,12 +338,16 @@ function AddColleague({
     <View style={styles.form}>
       <Heading level={2}>Add a colleague</Heading>
 
-      <Field.Root name="displayName" invalid={Boolean(fieldErrors.displayName)}>
-        <Field.Label>Name</Field.Label>
-        <Input value={displayName} onValueChange={setDisplayName} autoCorrect={false} />
-        {fieldErrors.displayName ? (
-          <Field.Error match>{fieldErrors.displayName}</Field.Error>
-        ) : null}
+      <Field.Root name="firstName" invalid={Boolean(fieldErrors.firstName)}>
+        <Field.Label>First name</Field.Label>
+        <Input value={firstName} onValueChange={setFirstName} autoCorrect={false} />
+        {fieldErrors.firstName ? <Field.Error match>{fieldErrors.firstName}</Field.Error> : null}
+      </Field.Root>
+
+      <Field.Root name="lastName" invalid={Boolean(fieldErrors.lastName)}>
+        <Field.Label>Last name</Field.Label>
+        <Input value={lastName} onValueChange={setLastName} autoCorrect={false} />
+        {fieldErrors.lastName ? <Field.Error match>{fieldErrors.lastName}</Field.Error> : null}
       </Field.Root>
 
       <Field.Root name="email" invalid={Boolean(fieldErrors.email)}>

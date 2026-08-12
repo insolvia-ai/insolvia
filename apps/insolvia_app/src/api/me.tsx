@@ -1,6 +1,14 @@
 import type { FirmMembership, Principal } from '@insolvia-ai/api-client';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { useApi } from '@/api/use-api';
 import { useSession } from '@/session';
@@ -11,6 +19,28 @@ export type MeState =
   | { readonly kind: 'error'; readonly message: string };
 
 const MeContext = createContext<MeState>({ kind: 'loading' });
+
+/**
+ * The write half of this provider, deliberately a SECOND context.
+ *
+ * Folding `adopt` into {@link MeContext}'s value would give that value a new
+ * identity on every state change, re-rendering every `useMe()` consumer — the
+ * shell's navigation on every screen — for a function that never changes.
+ */
+interface MeActions {
+  /**
+   * Replace the cached principal with one the server just answered with.
+   *
+   * `PATCH /v1/me` returns the identical body `GET /v1/me` produces, so a
+   * caller that renamed themselves already holds the fresh answer and this
+   * costs no request. Without it the cache would stay stale for the whole
+   * session — invisible while only `permissions` was read from it, and not
+   * invisible at all now that a screen can gate on the name.
+   */
+  readonly adopt: (principal: Principal) => void;
+}
+
+const MeActionsContext = createContext<MeActions>({ adopt: () => {} });
 
 /**
  * One `GET /v1/me` per signed-in session, held at the root for everything
@@ -67,12 +97,31 @@ export function MeProvider({ children }: { children: ReactNode }) {
     };
   }, [status, call]);
 
-  return <MeContext.Provider value={state}>{children}</MeContext.Provider>;
+  const adopt = useCallback((principal: Principal) => {
+    // `started` stays true: this is a fresher answer than a refetch would
+    // give, not a reason to ask again.
+    setState({ kind: 'ready', principal });
+  }, []);
+  const actions = useMemo<MeActions>(() => ({ adopt }), [adopt]);
+
+  return (
+    <MeActionsContext.Provider value={actions}>
+      <MeContext.Provider value={state}>{children}</MeContext.Provider>
+    </MeActionsContext.Provider>
+  );
 }
 
 /** The session's `/v1/me` answer — see {@link MeProvider}. */
 export function useMe(): MeState {
   return useContext(MeContext);
+}
+
+/**
+ * The way to hand this provider a principal the server just answered with.
+ * See {@link MeActions.adopt}.
+ */
+export function useMeActions(): MeActions {
+  return useContext(MeActionsContext);
 }
 
 /**

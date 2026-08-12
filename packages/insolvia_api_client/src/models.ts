@@ -111,7 +111,24 @@ export interface FirmMembership {
   readonly name: string;
   /** This user's job title. */
   readonly role: FirmRole;
-  /** This user's display name, as their firm recorded it. */
+  /**
+   * The two halves of this user's name, as their firm recorded them.
+   *
+   * **Either may be `''`, and that means "never recorded"** — not "blank".
+   * Rows written before the name was two fields carry one display string, and
+   * the server derives what it can from it; a name it cannot split yields an
+   * empty surname. A client that requires a real name is expected to ask,
+   * which is the state these two exist to make visible.
+   */
+  readonly firstName: string;
+  readonly lastName: string;
+  /**
+   * The composed name, for rendering. **Server-derived — there is nothing to
+   * write here.** Send {@link UpdateMeRequest} with the halves instead.
+   *
+   * It stays on the wire because most callers only ever show a name: a screen
+   * rendering "opened by" reads this one field and never needs the halves.
+   */
   readonly displayName: string;
   /** Full access to every feature, every case, and the firm's user list. */
   readonly isAdmin: boolean;
@@ -146,21 +163,39 @@ export function permits(held: PermissionLevel, required: PermissionLevel): boole
 }
 
 /**
- * The `PATCH /v1/me` request body — your own display name, and nothing else.
+ * The `PATCH /v1/me` request body — your own name, and nothing else.
  *
- * One required field where {@link UpdateFirmUserRequest} has six optional
- * ones, and that asymmetry is the contract: everything else on the record is
- * an administrator's statement about you (role, permissions, status — sent
+ * Two optional fields where {@link UpdateFirmUserRequest} has six, and the
+ * narrowness is the contract: everything else on the record is an
+ * administrator's statement about you (role, permissions, status — sent
  * through {@link InsolviaApiClient.updateFirmUser}), and email is a pool fact
  * neither endpoint accepts.
+ *
+ * **Both halves are optional, but the server refuses a body with neither.**
+ * Either alone is a legitimate edit: a row whose halves were derived from a
+ * pre-split display name often has a correct first name and an empty surname,
+ * and making that person retype both would be rude.
+ *
+ * `displayName` is deliberately absent — it is derived on the way out, so
+ * there is nothing here to write it with.
  */
 export interface UpdateMeRequest {
-  readonly displayName: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
 }
 
-/** The `PATCH /v1/me` body. */
+/**
+ * The `PATCH /v1/me` body.
+ *
+ * Omit-when-absent, this package's standing rule: an unsent half means "leave
+ * it alone", and sending `''` would mean "erase it" — a difference the server
+ * acts on, so it must not be blurred here.
+ */
 export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, unknown> {
-  return { displayName: request.displayName };
+  const body: Record<string, unknown> = {};
+  if (request.firstName !== undefined) body.firstName = request.firstName;
+  if (request.lastName !== undefined) body.lastName = request.lastName;
+  return body;
 }
 
 /**
@@ -219,7 +254,10 @@ export function updateFirmRequestToJson(request: UpdateFirmRequest): Record<stri
 export interface FirmColleague {
   /** The Cognito subject other endpoints address them by. */
   readonly subject: string;
-  /** Their name, for display. */
+  /** The two halves of their name. Either may be `''` — see {@link FirmMembership}. */
+  readonly firstName: string;
+  readonly lastName: string;
+  /** Their composed name, for display. Server-derived. */
   readonly displayName: string;
   /** Their job title. */
   readonly role: FirmRole;
@@ -239,7 +277,10 @@ export interface FirmUser {
   readonly subject: string;
   /** Their email address, which is also their sign-in username. */
   readonly email: string;
-  /** Their name, for display. */
+  /** The two halves of their name. Either may be `''` — see {@link FirmMembership}. */
+  readonly firstName: string;
+  readonly lastName: string;
+  /** Their composed name, for display. Server-derived. */
   readonly displayName: string;
   /** Their job title. */
   readonly role: FirmRole;
@@ -268,8 +309,9 @@ export interface FirmUser {
 export interface AddFirmUserRequest {
   /** The colleague's email address. Lower-cased by the server. */
   readonly email: string;
-  /** Their name, for display. */
-  readonly displayName: string;
+  /** Both halves are required to ADD somebody — the server refuses a partial name here. */
+  readonly firstName: string;
+  readonly lastName: string;
   /** Their job title, which chooses the default permission map. */
   readonly role: FirmRole;
   /** Full access, including the firm's user list. Defaults to `false`. */
@@ -284,7 +326,8 @@ export interface AddFirmUserRequest {
 export function addFirmUserRequestToJson(request: AddFirmUserRequest): Record<string, unknown> {
   const body: Record<string, unknown> = {
     email: request.email,
-    displayName: request.displayName,
+    firstName: request.firstName,
+    lastName: request.lastName,
     role: request.role,
   };
   // Omitted rather than sent as `undefined`: the server treats an absent key
@@ -310,7 +353,8 @@ export function addFirmUserRequestToJson(request: AddFirmUserRequest): Record<st
  * systems disagreeing about who somebody is.
  */
 export interface UpdateFirmUserRequest {
-  readonly displayName?: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
   readonly role?: FirmRole;
   readonly isAdmin?: boolean;
   readonly accessAllCases?: boolean;
@@ -323,7 +367,8 @@ export function updateFirmUserRequestToJson(
   request: UpdateFirmUserRequest,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if (request.displayName !== undefined) body.displayName = request.displayName;
+  if (request.firstName !== undefined) body.firstName = request.firstName;
+  if (request.lastName !== undefined) body.lastName = request.lastName;
   if (request.role !== undefined) body.role = request.role;
   if (request.isAdmin !== undefined) body.isAdmin = request.isAdmin;
   if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;

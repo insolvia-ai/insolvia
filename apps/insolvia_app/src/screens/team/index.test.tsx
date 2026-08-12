@@ -43,6 +43,8 @@ function me(permissions: Record<string, string> = ALL_ADD_EDIT) {
       id: '00000000-0000-4000-8000-00000000f18a',
       name: 'Example & Partners',
       role: 'attorney',
+      firstName: 'Alice',
+      lastName: 'Attorney',
       displayName: 'Alice Attorney',
       isAdmin: false,
       accessAllCases: true,
@@ -53,8 +55,20 @@ function me(permissions: Record<string, string> = ALL_ADD_EDIT) {
 
 const DIRECTORY = {
   people: [
-    { subject: ALICE, displayName: 'Alice Attorney', role: 'attorney' },
-    { subject: BOB, displayName: 'Bob Paralegal', role: 'paralegal' },
+    {
+      subject: ALICE,
+      firstName: 'Alice',
+      lastName: 'Attorney',
+      displayName: 'Alice Attorney',
+      role: 'attorney',
+    },
+    {
+      subject: BOB,
+      firstName: 'Bob',
+      lastName: 'Paralegal',
+      displayName: 'Bob Paralegal',
+      role: 'paralegal',
+    },
   ],
 };
 
