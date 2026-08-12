@@ -37,6 +37,10 @@ export async function signIn(page: Page): Promise<string> {
     (url) => url.origin === appOrigin && !url.pathname.startsWith('/auth/callback'),
     { timeout: 30_000 },
   );
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  // The account menu's TRIGGER, not the sign-out control: the identity and the
+  // way out moved behind one avatar in the app's header, so this is the thing
+  // that is visible without opening anything. `auth-round-trip.spec.ts` owns
+  // the contract and exercises the menu itself.
+  await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
   return appOrigin;
 }

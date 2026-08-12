@@ -45,7 +45,20 @@ jest.mock('@/config/environment', () => ({
  */
 async function renderSignedInHome() {
   const router = renderRouter('src/app', { initialUrl: '/' });
-  await screen.findByText(/Cognito subject/);
+  await screen.findByRole('button', { name: 'Account menu' });
+  // NOTHING ON THIS SCREEN RENDERS FROM `/v1/me` ANY MORE — MePanel's claim
+  // rows, which used to be the settle signal, moved to /account. So the
+  // request itself is the signal, and `waitFor` is what makes it one: it
+  // retries inside `act(...)`, flushing the response and the state update
+  // behind it. Returning before that lands leaves a `setState` to fire against
+  // an unmounted tree, which is the warning this helper exists to prevent.
+  await waitFor(() => {
+    expect(
+      (globalThis.fetch as unknown as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes('/v1/me'),
+      ),
+    ).toHaveLength(1);
+  });
   return router;
 }
 
@@ -103,16 +116,17 @@ describe('the home route', () => {
     expect(levelOne).toHaveLength(1);
   });
 
-  it('opens the API panel with a level-2 heading, not a second h1', async () => {
-    // `heading-order` is one of the rules the axe gate fails on, and a heading
-    // chosen for how big it should look is what breaks it.
+  it('no longer carries the API session panel', async () => {
+    // It was the pipeline proof (issue #77) and is support detail now — a
+    // Cognito subject and an app-client id mean nothing to somebody preparing
+    // a petition. It lives collapsed at the bottom of /account; see MePanel.
     await renderSignedInHome();
 
-    const heading = screen.getByRole('heading', { name: 'Your API session' });
-    expect(heading.props['aria-level']).toBe(2);
+    expect(screen.queryByRole('heading', { name: 'Support details' })).toBeNull();
+    expect(screen.queryByText(/Cognito subject/)).toBeNull();
   });
 
-  it('reflects the resolved environment in the badge and the body', async () => {
+  it('reflects the resolved environment in the badge, and only there', async () => {
     await renderSignedInHome();
 
     // Tests run without EXPO_PUBLIC_INSOLVIA_ENV, so this is the `local`
@@ -122,7 +136,11 @@ describe('the home route', () => {
 
     expect(screen.getByText(env.label.toUpperCase())).toBeTruthy();
     expect(screen.getByLabelText(`${env.label} environment, ${env.host}`)).toBeTruthy();
-    expect(screen.getByText(`Serving ${env.label.toLowerCase()} · ${env.host}`)).toBeTruthy();
+    // The body used to repeat this as "Serving local · localhost". The badge
+    // above already says it, and the footer's build stamp says it with the
+    // bundle id attached — so the prose line went, and this asserts it stayed
+    // gone rather than merely not asserting it.
+    expect(screen.queryByText(/^Serving /)).toBeNull();
   });
 
   it('keeps the decorative arrow glyph out of the primary CTA accessible name', async () => {
@@ -201,31 +219,37 @@ describe('the signed-in shell', () => {
     globalThis.fetch = realFetch;
   });
 
-  it("shows the user's email address as visible text", async () => {
-    // From the ID token's `email` claim. The end-to-end suite matches on the
-    // address being on screen, so this is a contract, not decoration.
+  /** Opens the account menu, which now holds the identity and the way out. */
+  async function openAccountMenu() {
     await renderSignedInHome();
+    await userEvent.press(screen.getByRole('button', { name: 'Account menu' }));
+  }
+
+  it('keeps the identity out of the header until the menu is opened', async () => {
+    // The header used to carry the address as plain text beside an Account
+    // link and a full-size Sign out button — most of its height, for something
+    // touched rarely. One avatar replaces all three.
+    await renderSignedInHome();
+
+    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Account menu' })).toBeTruthy();
+  });
+
+  it("shows the user's email address in the menu", async () => {
+    // From the ID token's `email` claim, never `/v1/me` — the pool's
+    // `username_attributes = ["email"]` means no access-token claim carries it.
+    await openAccountMenu();
 
     expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
   });
 
   it('never renders the Cognito username where an email belongs', async () => {
-    // `/v1/me`'s `username` is a UUID, because the pool uses
-    // `username_attributes = ["email"]`. Rendering it as an account label would
+    // `/v1/me`'s `username` is a UUID. Rendering it as an account label would
     // be a plausible-looking lie.
-    await renderSignedInHome();
+    await openAccountMenu();
     expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
 
     expect(screen.queryByText(/^00000000-0000-4000-8000-000000000001$/)).toBeNull();
-  });
-
-  it('renders the claims GET /v1/me returned', async () => {
-    await renderSignedInHome();
-
-    // The whole authenticated loop, proven: hosted-UI token → Authorization:
-    // Bearer → a JWT the API verified → claims on screen.
-    expect(screen.getByText(/Cognito subject: 00000000-0000-4000-8000-000000000001/)).toBeTruthy();
-    expect(screen.getByText(/Scopes: openid, email, profile/)).toBeTruthy();
   });
 
   it('sends the access token as a bearer credential, never the ID token', async () => {
@@ -239,17 +263,19 @@ describe('the signed-in shell', () => {
     expect(headers?.Authorization).toBe('Bearer test-access-token');
   });
 
-  it('offers a button named exactly "Sign out"', async () => {
-    // Another accessible name the end-to-end suite matches verbatim.
-    await renderSignedInHome();
+  it('offers a menu item named exactly "Sign out"', async () => {
+    // Another accessible name the end-to-end suite matches verbatim — and it
+    // is a `menuitem` now rather than a button, which is the coordinated half
+    // of that change.
+    await openAccountMenu();
 
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeTruthy();
   });
 
   it('clears storage and leaves for the hosted logout endpoint when pressed', async () => {
-    await renderSignedInHome();
+    await openAccountMenu();
 
-    await userEvent.press(screen.getByRole('button', { name: 'Sign out' }));
+    await userEvent.press(screen.getByRole('menuitem', { name: 'Sign out' }));
 
     // Leg one: nothing persisted survives.
     await waitFor(() => {

@@ -3,10 +3,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { MePanel } from '@/components/me-panel';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 /**
@@ -16,17 +13,20 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * product. Everything visual comes from our own components — the {@link AppShell}
  * frame (wordmark, landmarks, centered max-width column), {@link Button},
  * {@link Heading} — and every color, radius and spacing step comes from
- * `@insolvia-ai/tokens` via `@/theme`, so none is spelled out here. It also
- * surfaces the active environment, which is what makes a staging build
- * unmistakable at a glance.
+ * `@insolvia-ai/tokens` via `@/theme`, so none is spelled out here.
+ *
+ * It USED to end with two more things, both removed as leftovers: the
+ * `GET /v1/me` panel that proved the authenticated round trip (issue #77),
+ * which is support detail rather than product and now lives collapsed on
+ * `/account`; and a line reading "Serving local · localhost", which repeated
+ * what the header's environment badge already says and now appears once, in
+ * the footer's build stamp.
  *
  * It is reached only through `RequireSession` (see `src/app/index.tsx`), so
- * everything below can assume a signed-in user — which is what lets
- * {@link MePanel} call the protected `GET /v1/me` without a guard of its own.
+ * everything below can assume a signed-in user.
  */
 export function Home() {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const router = useRouter();
 
   const openCases = () => {
@@ -34,7 +34,7 @@ export function Home() {
   };
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>Your case workspace</Heading>
       <Text style={[styles.body, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
         This is the shell every Insolvia screen sits inside. Case intake, the forms engine, and
@@ -57,13 +57,6 @@ export function Home() {
           Your cases
         </Button>
       </View>
-
-      {/* The authenticated round trip, proven on screen (issue #77). */}
-      <MePanel />
-
-      <Text style={[styles.meta, { color: theme.colors.muted, fontFamily: theme.typography.body }]}>
-        Serving {env.label.toLowerCase()} · {env.host}
-      </Text>
     </AppShell>
   );
 }
@@ -78,9 +71,5 @@ const styles = StyleSheet.create({
   body: {
     fontSize: fontSizes.body,
     lineHeight: fontSizes.body * 1.5,
-  },
-  meta: {
-    fontSize: fontSizes.caption,
-    marginTop: spacing.lg,
   },
 });

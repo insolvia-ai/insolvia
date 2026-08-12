@@ -7,9 +7,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useMeActions } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
+import { MePanel } from '@/components/me-panel';
 import { useSession } from '@/session';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -29,14 +28,13 @@ type Notice = { readonly tone: 'saved' | 'error'; readonly message: string };
  * surname; this is where that gets fixed, and it is the same endpoint
  * {@link CompleteProfile} writes to.
  *
- * The email is rendered from the ID token (same source as {@link AccountBar},
+ * The email is rendered from the ID token (same source as {@link AccountMenu},
  * ADR 0007) and is read-only here BY DESIGN, not omission: it is the address
  * Cognito authenticates and sends to, and no endpoint on either side accepts
  * a change to it.
  */
 export function Account({ membership }: { membership: FirmMembership }) {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
   const { user } = useSession();
   const { adopt } = useMeActions();
@@ -81,7 +79,7 @@ export function Account({ membership }: { membership: FirmMembership }) {
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />} maxContentWidth={520}>
+    <AppShell maxContentWidth={520}>
       <Heading level={1}>Your account</Heading>
 
       <View style={styles.form}>
@@ -133,6 +131,10 @@ export function Account({ membership }: { membership: FirmMembership }) {
       <Text style={[styles.body, muted]}>
         Your email address is your sign-in name and can’t be changed from here.
       </Text>
+
+      {/* Collapsed, and last. It was on the home screen while the pipeline was
+          the product; see the component for why it survives at all. */}
+      <MePanel />
     </AppShell>
   );
 }

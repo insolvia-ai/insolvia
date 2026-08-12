@@ -94,10 +94,10 @@ describe('the account screen', () => {
 
     expect(await screen.findByDisplayValue('Alice')).toBeTruthy();
     expect(screen.getByDisplayValue('Attorney')).toBeTruthy();
-    // The address comes from the ID token, not /v1/me (ADR 0007), and there
-    // is no input for it — only the statement that it is the sign-in name.
-    // Twice: once in the shell's AccountBar, once in the read-only section.
-    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(2);
+    // The address comes from the ID token, not /v1/me (ADR 0007), and there is
+    // no input for it — only the statement that it is the sign-in name. ONCE
+    // now, not twice: the shell's copy moved inside the closed account menu.
+    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(1);
     expect(screen.getByText(/can’t be changed/i)).toBeTruthy();
   });
 
@@ -147,11 +147,12 @@ describe('the account screen', () => {
     expect(await screen.findByText('A name is required.')).toBeTruthy();
   });
 
-  it('is reachable from the shell’s Account link', async () => {
+  it('is reachable from the shell’s account menu', async () => {
     signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/');
-    await screen.findByText(TEST_EMAIL);
 
-    await userEvent.setup().press(screen.getByRole('link', { name: 'Account' }));
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('button', { name: 'Account menu' }));
+    await user.press(screen.getByRole('menuitem', { name: 'Your account' }));
 
     expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
   });

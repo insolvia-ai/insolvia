@@ -1,6 +1,7 @@
-import { useColorScheme } from 'react-native';
 import { colors, radii, spacing, typography } from '@insolvia-ai/tokens';
 import type { ColorScheme, ColorSchemeName } from '@insolvia-ai/tokens';
+
+import { useColorSchemeName } from './preference';
 
 /**
  * The app's theme: `@insolvia-ai/tokens` resolved for the active color scheme.
@@ -92,9 +93,15 @@ export function themeFor(scheme: string | null | undefined): Theme {
 /**
  * The theme for the active color scheme.
  *
- * `useColorScheme` follows the OS on native and `prefers-color-scheme` in the
- * browser.
+ * The scheme comes from {@link useColorSchemeName}, which resolves the user's
+ * own preference and falls back to the OS — `prefers-color-scheme` in the
+ * browser — when they have expressed none. Every component in this app reads
+ * colours through here, so that one hook is the whole app's answer to "light
+ * or dark".
+ *
+ * The design system's leaves ask the OS directly and cannot be redirected;
+ * `ThemePreferenceProvider` is what makes them agree with this. See it.
  */
 export function useTheme(): Theme {
-  return themeFor(useColorScheme());
+  return themeFor(useColorSchemeName());
 }

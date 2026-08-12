@@ -209,7 +209,8 @@ describe('the first-run name gate', () => {
     signedIn({ '/v1/me': () => jsonResponse(200, principal('Cher', '')) });
     await screen.findByRole('heading', { name: 'Tell us your name' });
 
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Account menu' }));
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeTruthy();
   });
 
   it('gives the gate screen exactly one level-1 heading', async () => {

@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 
 import { resolveAuthConfig } from '@/config/environment';
 import type { AuthConfig } from '@/config/environment';
-import { currentOrigin, navigateTo } from '@/session/browser';
+import { currentOrigin, navigateTo } from '@/platform/browser';
 import { readIdTokenClaims } from '@/session/id-token';
 import {
   authorizeUrl,
