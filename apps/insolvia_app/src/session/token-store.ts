@@ -21,7 +21,7 @@
  * each other's verifier, and an abandoned attempt must not outlive the tab.
  */
 
-import { persistentStore, readFrom, removeFrom, transientStore, writeTo } from '@/session/browser';
+import { persistentStore, readFrom, removeFrom, transientStore, writeTo } from '@/platform/browser';
 
 /**
  * Storage keys, namespaced so the app cannot collide with anything else on the

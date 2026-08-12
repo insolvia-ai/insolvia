@@ -231,6 +231,9 @@ jobs:
           EXPO_PUBLIC_INSOLVIA_ENV: production
           EXPO_PUBLIC_COGNITO_DOMAIN: ${{ steps.tf.outputs.auth_domain }}
           EXPO_PUBLIC_COGNITO_CLIENT_ID: ${{ steps.tf.outputs.auth_client_id }}
+          # The footer's build stamp — see app-staging.yml for why a commit sha
+          # is legitimately an `EXPO_PUBLIC_` value.
+          EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 

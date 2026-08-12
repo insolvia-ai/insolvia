@@ -15,9 +15,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
@@ -91,7 +89,6 @@ type RecordState =
  */
 export function Firm({ membership }: { membership: FirmMembership }) {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
@@ -125,7 +122,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
 
   if (!mayAdminister) {
     return (
-      <AppShell actions={<EnvBadge env={env.name} />}>
+      <AppShell>
         <Heading level={1}>{membership.name}</Heading>
         <Text style={[styles.body, muted]}>
           Managing your firm’s people is an administrator’s job. Ask one of your firm’s
@@ -136,7 +133,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
   }
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>{firmName}</Heading>
 
       <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />

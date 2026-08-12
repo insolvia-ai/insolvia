@@ -15,9 +15,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { openDownload, pickFile } from '@/screens/documents/browser';
 import type { PickedFile } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -82,7 +80,6 @@ type ListState =
  */
 export function Documents({ caseId }: { readonly caseId: string }) {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
@@ -266,7 +263,7 @@ export function Documents({ caseId }: { readonly caseId: string }) {
   const danger = { color: theme.colors.danger, fontFamily: theme.typography.body };
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>Case documents</Heading>
 
       {/*

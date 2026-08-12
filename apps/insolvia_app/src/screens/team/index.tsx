@@ -6,9 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 type State =
@@ -43,7 +41,6 @@ type State =
  */
 export function Team({ caseId, membership }: { caseId: string; membership: FirmMembership }) {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
 
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -93,7 +90,7 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
     state.kind === 'ready' ? new Set(state.assignees.map((a) => a.subject)) : new Set<string>();
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>Who is on this case</Heading>
 
       {notice === null ? null : (

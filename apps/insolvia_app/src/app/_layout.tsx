@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 
 import { MeProvider } from '@/api/me';
 import { SessionProvider } from '@/session';
+import { ThemePreferenceProvider } from '@/theme';
 
 /**
  * The root layout — the only navigator in the app.
@@ -26,16 +27,24 @@ import { SessionProvider } from '@/session';
  *
  * `MeProvider` wraps the navigator for the same reason the session does: it
  * holds one `/v1/me` answer for the session's lifetime — the shell's
- * navigation and the home screen's `MePanel` both read it. Inside the
- * navigator it would refetch on every route change, which is exactly the
- * cost it exists to avoid.
+ * navigation and the account screen both read it. Inside the navigator it
+ * would refetch on every route change, which is exactly the cost it exists to
+ * avoid.
+ *
+ * `ThemePreferenceProvider` is OUTERMOST, and outside the session on purpose:
+ * the sign-in and callback screens are as entitled to the user's chosen colour
+ * scheme as any other, and it depends on no session. It also supplies the
+ * design system's `ThemeProvider` — see that file for why an app-level scheme
+ * choice has to be imposed from two sides.
  */
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <MeProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </MeProvider>
-    </SessionProvider>
+    <ThemePreferenceProvider>
+      <SessionProvider>
+        <MeProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </MeProvider>
+      </SessionProvider>
+    </ThemePreferenceProvider>
   );
 }

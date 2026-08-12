@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -8,7 +8,6 @@ import {
   jsonResponse,
   routeFetch,
   TEST_AUTH_CONFIG,
-  TEST_EMAIL,
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
@@ -108,19 +107,31 @@ describe('the shell navigation', () => {
 
   it('keeps the entry from somebody whose firm has not granted administration', async () => {
     signedIn({ '/v1/me': () => jsonResponse(200, me('hidden')) });
-    // Settle: MePanel's rows mean its /v1/me round trip resolved, and the
-    // provider's parallel one — same handler, same microtask queue — with it.
-    await screen.findByText(TEST_EMAIL);
-    await screen.findByText(/Cognito subject/);
+    // SETTLE FIRST, or the absence below proves nothing — a Firm link missing
+    // because `/v1/me` has not answered yet looks identical to one correctly
+    // withheld. The avatar's initials are the signal: 'AA' can only come from
+    // the membership's display name, so seeing them means the round trip
+    // resolved AND a firm came back with it. (It used to be MePanel's claim
+    // rows, which have moved off the home screen to /account.)
+    await screen.findByText('AA');
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();
   });
 
   it('shows no entry to somebody in no firm at all', async () => {
-    signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
-    await screen.findByText(TEST_EMAIL);
-    await screen.findByText(/Cognito subject/);
+    const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
+    // No membership means no membership-derived UI to wait on — the avatar
+    // falls back to the email's initials, which render before the request even
+    // starts. So the settle is the request itself: `waitFor` retries across
+    // microtasks, so the state update that follows the response has flushed by
+    // the time the assertion below runs.
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
+        1,
+      );
+    });
+    await screen.findByRole('button', { name: 'Account menu' });
 
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();
   });
