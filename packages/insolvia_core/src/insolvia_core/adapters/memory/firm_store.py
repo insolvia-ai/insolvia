@@ -66,10 +66,14 @@ class MemoryFirmStore:
         return matches[0]
 
     def list_users(self, firm_id: str) -> tuple[FirmUser, ...]:
+        # BY SURNAME, and this key must stay identical to the DynamoDB
+        # adapter's — the two stores exist to be interchangeable, and an
+        # ordering that differed between them would make a test that passes
+        # here prove nothing about production.
         return tuple(
             sorted(
                 (user for user in self.users.values() if user.firm_id == firm_id),
-                key=lambda user: (user.display_name, user.subject),
+                key=lambda user: (user.last_name, user.first_name, user.subject),
             )
         )
 

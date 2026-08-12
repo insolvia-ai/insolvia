@@ -31,7 +31,8 @@
         {
           "handle": "admin",
           "email": "dev@insolvia.test",
-          "displayName": "Dev User",
+          "firstName": "Dev",
+          "lastName": "User",
           "role": "attorney",
           "isAdmin": true,
           "accessAllCases": true
