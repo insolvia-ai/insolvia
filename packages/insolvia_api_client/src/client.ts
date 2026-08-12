@@ -240,14 +240,16 @@ export class InsolviaApiClient {
   }
 
   /**
-   * `PATCH /v1/me` — correct your own display name.
+   * `PATCH /v1/me` — correct your own name.
    *
-   * Display name only; see {@link UpdateMeRequest} for why nothing else is
-   * self-service. Any ACTIVE firm member may call it — no permission level is
-   * required, which is the point of the endpoint. Answers with the same body
-   * as {@link me}, so the caller re-renders from the response instead of
-   * following up with a GET. Throws {@link ApiValidationException} on a 400
-   * with a per-field message, and a plain {@link ApiException} with
+   * Your name only; see {@link UpdateMeRequest} for why nothing else is
+   * self-service, and why either half alone is a legitimate body. Any ACTIVE
+   * firm member may call it — no permission level is required, which is the
+   * point of the endpoint. Answers with the same body as {@link me}, so the
+   * caller re-renders from the response instead of following up with a GET —
+   * which is also how a client holding a cached `/v1/me` refreshes it after a
+   * rename. Throws {@link ApiValidationException} on a 400 with a per-field
+   * message (`firstName` / `lastName`), and a plain {@link ApiException} with
    * `statusCode` 403 for a caller in no firm — unlike the GET, which reports
    * that state as an answer, there is no row to rename.
    */
@@ -702,6 +704,8 @@ export class InsolviaApiClient {
     const decoded = await decodeExpected(response, 200);
     return requireArrayOf(decoded, 'people', 'FirmColleague', (element) => ({
       subject: requireString(element, 'subject'),
+      firstName: requireString(element, 'firstName'),
+      lastName: requireString(element, 'lastName'),
       displayName: requireString(element, 'displayName'),
       role: requireFirmRole(element, 'role'),
     }));
@@ -733,7 +737,8 @@ export class InsolviaApiClient {
    * caller's own firm, which is not a value a client gets to choose.
    *
    * Throws {@link ApiValidationException} on a 400 (per-field: `email`,
-   * `displayName`, `role`, `isAdmin`, `accessAllCases`, `permissions`), and a
+   * `firstName`, `lastName`, `role`, `isAdmin`, `accessAllCases`,
+   * `permissions`), and a
    * plain {@link ApiException} with status 409 when the address already has an
    * Insolvia account.
    */
@@ -1734,6 +1739,8 @@ function firmUserFromJson(response: DecodedResponse): FirmUser {
   return {
     subject: requireString(response, 'subject'),
     email: requireString(response, 'email'),
+    firstName: requireString(response, 'firstName'),
+    lastName: requireString(response, 'lastName'),
     displayName: requireString(response, 'displayName'),
     role: requireFirmRole(response, 'role'),
     isAdmin: requireBoolean(response, 'isAdmin'),
@@ -1756,6 +1763,13 @@ function optionalFirmMembership(response: DecodedResponse): FirmMembership | und
     id: requireString(nested, 'id'),
     name: requireString(nested, 'name'),
     role: requireFirmRole(nested, 'role'),
+    // `requireString`, not an optional read, even though either half may be
+    // the empty string: `''` is a value the server always SENDS, and a
+    // response missing the key entirely is a contract break this package
+    // exists to catch. That strictness is why the API emits both keys
+    // unconditionally rather than sparsely.
+    firstName: requireString(nested, 'firstName'),
+    lastName: requireString(nested, 'lastName'),
     displayName: requireString(nested, 'displayName'),
     isAdmin: requireBoolean(nested, 'isAdmin'),
     accessAllCases: requireBoolean(nested, 'accessAllCases'),

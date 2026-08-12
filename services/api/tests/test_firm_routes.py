@@ -96,14 +96,16 @@ def member(
     is_admin: bool = False,
     access_all_cases: bool = False,
     status: str = "active",
-    display_name: str | None = None,
+    first_name: str = "Person",
+    last_name: str | None = None,
     permissions: dict[str, str] | None = None,
 ) -> FirmUser:
     return FirmUser(
         firm_id=firm_id,
         subject=subject,
         email=f"{subject[-4:]}@example.test",
-        display_name=display_name or f"Person {subject[-4:]}",
+        first_name=first_name,
+        last_name=last_name or subject[-4:],
         role=role,
         is_admin=is_admin,
         access_all_cases=access_all_cases,
@@ -119,10 +121,16 @@ def firms():
     store = MemoryFirmStore()
     store.create_firm(firm(FIRM_A, "Example & Partners"))
     store.create_firm(firm(FIRM_B, "Other Firm LLP"))
-    store.add_user(member(ALICE, is_admin=True, display_name="Alice Admin"))
-    store.add_user(member(DANA, access_all_cases=True, display_name="Dana Attorney"))
-    store.add_user(member(BOB, role="paralegal", display_name="Bob Paralegal"))
-    store.add_user(member(CAROL, FIRM_B, is_admin=True, display_name="Carol Other"))
+    store.add_user(member(ALICE, is_admin=True, first_name="Alice", last_name="Admin"))
+    store.add_user(
+        member(DANA, access_all_cases=True, first_name="Dana", last_name="Attorney")
+    )
+    store.add_user(
+        member(BOB, role="paralegal", first_name="Bob", last_name="Paralegal")
+    )
+    store.add_user(
+        member(CAROL, FIRM_B, is_admin=True, first_name="Carol", last_name="Other")
+    )
     return store
 
 
@@ -294,10 +302,15 @@ def test_anyone_in_the_firm_can_resolve_a_colleagues_name(client):
 
 
 def test_the_directory_withholds_everything_administrative(client):
-    """Three fields. A paralegal does not need their colleagues' email
-    addresses, permission maps, or whether somebody has been disabled."""
+    """Identity and job title, nothing more. A paralegal does not need their
+    colleagues' email addresses, permission maps, or whether somebody has been
+    disabled.
+
+    The name is three keys rather than one — the two halves plus the composed
+    string — and the exact-set assertion is what keeps that from being a door:
+    adding a field here has to be a deliberate edit to this line."""
     person = client.get("/v1/firm/directory", headers=auth(BOB)).get_json()["people"][0]
-    assert set(person) == {"subject", "displayName", "role"}
+    assert set(person) == {"subject", "firstName", "lastName", "displayName", "role"}
 
 
 def test_the_directory_is_firm_scoped(client):
@@ -315,7 +328,11 @@ def test_the_directory_keeps_disabled_colleagues(client, firms):
     <their subject>`. Dropping them would turn that into an unresolvable id —
     the client is rendering history, not offering a picker."""
     firms.users[(FIRM_A, BOB)] = member(
-        BOB, role="paralegal", display_name="Bob Paralegal", status="disabled"
+        BOB,
+        role="paralegal",
+        first_name="Bob",
+        last_name="Paralegal",
+        status="disabled",
     )
     subjects = {
         p["subject"]
@@ -350,7 +367,8 @@ def test_adding_a_colleague_creates_the_account_then_the_row(client, firms, dire
         "/v1/firm/users",
         json={
             "email": "New.Person@example.test",
-            "displayName": "New Person",
+            "firstName": "New",
+            "lastName": "Person",
             "role": "paralegal",
         },
         headers=auth(ALICE),
@@ -369,7 +387,12 @@ def test_adding_a_colleague_creates_the_account_then_the_row(client, firms, dire
 def test_a_new_colleague_gets_the_role_defaults(client):
     body = client.post(
         "/v1/firm/users",
-        json={"email": "clerk@example.test", "displayName": "Clerk", "role": "staff"},
+        json={
+            "email": "clerk@example.test",
+            "firstName": "Clerk",
+            "lastName": "Ofcourt",
+            "role": "staff",
+        },
         headers=auth(ALICE),
     ).get_json()
     assert body["permissions"] == default_permissions("staff")
@@ -382,7 +405,8 @@ def test_supplied_permissions_are_merged_over_the_defaults(client):
         "/v1/firm/users",
         json={
             "email": "clerk@example.test",
-            "displayName": "Clerk",
+            "firstName": "Clerk",
+            "lastName": "Ofcourt",
             "role": "staff",
             "permissions": {DOCUMENTS: HIDDEN},
         },
@@ -397,7 +421,12 @@ def test_an_address_that_already_has_an_account_is_409(client, directory):
     directory.create_user("taken@example.test")
     response = client.post(
         "/v1/firm/users",
-        json={"email": "taken@example.test", "displayName": "X", "role": "staff"},
+        json={
+            "email": "taken@example.test",
+            "firstName": "Al",
+            "lastName": "Ready",
+            "role": "staff",
+        },
         headers=auth(ALICE),
     )
     assert response.status_code == 409
@@ -413,7 +442,12 @@ def test_a_failed_account_creation_writes_no_row(client, firms, directory):
     before = len(firms.list_users(FIRM_A))
     client.post(
         "/v1/firm/users",
-        json={"email": "taken@example.test", "displayName": "X", "role": "staff"},
+        json={
+            "email": "taken@example.test",
+            "firstName": "Al",
+            "lastName": "Ready",
+            "role": "staff",
+        },
         headers=auth(ALICE),
     )
     assert len(firms.list_users(FIRM_A)) == before
@@ -422,15 +456,35 @@ def test_a_failed_account_creation_writes_no_row(client, firms, directory):
 @pytest.mark.parametrize(
     ("payload", "field"),
     [
-        ({"displayName": "X", "role": "staff"}, "email"),
-        ({"email": "not-an-email", "displayName": "X", "role": "staff"}, "email"),
+        ({"firstName": "A", "lastName": "B", "role": "staff"}, "email"),
+        (
+            {
+                "email": "not-an-email",
+                "firstName": "A",
+                "lastName": "B",
+                "role": "staff",
+            },
+            "email",
+        ),
+        # Both halves are required to ADD somebody, and each reports itself, so
+        # the invite form can put the message under the input that is wrong.
+        ({"email": "a@b.test", "lastName": "B", "role": "staff"}, "firstName"),
+        ({"email": "a@b.test", "firstName": "A", "role": "staff"}, "lastName"),
+        # Neither spelling at all still reports the legacy key, because that is
+        # the arm the parser falls through to when no explicit half is present.
         ({"email": "a@b.test", "role": "staff"}, "displayName"),
-        ({"email": "a@b.test", "displayName": "X"}, "role"),
-        ({"email": "a@b.test", "displayName": "X", "role": "partner"}, "role"),
+        # A legacy single name is refused rather than stored half-populated.
+        ({"email": "a@b.test", "displayName": "Cher", "role": "staff"}, "displayName"),
+        ({"email": "a@b.test", "firstName": "A", "lastName": "B"}, "role"),
+        (
+            {"email": "a@b.test", "firstName": "A", "lastName": "B", "role": "partner"},
+            "role",
+        ),
         (
             {
                 "email": "a@b.test",
-                "displayName": "X",
+                "firstName": "A",
+                "lastName": "B",
                 "role": "staff",
                 "isAdmin": "true",
             },

@@ -67,7 +67,12 @@ def _body() -> Mapping[str, object]:
 def provision_firm_route() -> ResponseReturnValue:
     """Provision a firm and its first administrator — #178's whole subject.
 
-    Body: {"name": ..., "admin": {"email": ..., "displayName": ...}}.
+    Body: {"name": ..., "admin": {"email": ..., "firstName": ..., "lastName": ...}}.
+
+    `admin.displayName` is still accepted in place of the pair, for one
+    release — `parse_firm_user_creation` owns that transition arm and the
+    reason it exists. The keys are forwarded rather than filtered so the arm
+    stays reachable; this route does not need to know which spelling arrived.
 
     The first administrator is an ADMIN BY CONSTRUCTION, not by request:
     `isAdmin` is forced true whatever the body says, because a firm whose
@@ -87,12 +92,26 @@ def provision_firm_route() -> ResponseReturnValue:
     admin_payload = payload.get("admin")
     if not isinstance(admin_payload, Mapping):
         raise FieldValidationError(
-            {"admin": "A firm needs its first administrator: {email, displayName}."}
+            {
+                "admin": (
+                    "A firm needs its first administrator: "
+                    "{email, firstName, lastName}."
+                )
+            }
         )
     admin_draft = parse_firm_user_creation(
         {
             "email": admin_payload.get("email"),
-            "displayName": admin_payload.get("displayName"),
+            # All three name keys are forwarded and the PARSER decides. It
+            # prefers the explicit pair and falls back to the legacy single
+            # name; deciding here instead would put that precedence in two
+            # places, and this one would be the one nobody updates when the
+            # transition arm is deleted.
+            **{
+                key: admin_payload[key]
+                for key in ("firstName", "lastName", "displayName")
+                if key in admin_payload
+            },
             "role": admin_payload.get("role", "attorney"),
             "isAdmin": True,
         }

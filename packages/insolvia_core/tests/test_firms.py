@@ -31,6 +31,7 @@ from insolvia_core.firms import (
     firm_user_from_item,
     firm_user_item,
     firm_user_json,
+    full_name,
     parse_firm_creation,
     parse_firm_update,
     parse_firm_user_creation,
@@ -39,6 +40,7 @@ from insolvia_core.firms import (
     permission_for,
     permits,
     set_firm_status,
+    split_legacy_name,
 )
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
@@ -52,7 +54,8 @@ def user(**overrides: object) -> FirmUser:
         "firm_id": FIRM_ID,
         "subject": ALICE,
         "email": "alice@example.test",
-        "display_name": "Alice Attorney",
+        "first_name": "Alice",
+        "last_name": "Attorney",
         "role": "attorney",
         "is_admin": False,
         "access_all_cases": False,
@@ -180,7 +183,12 @@ def test_a_firm_starts_active():
 
 def test_creating_a_user_fills_in_the_role_defaults():
     draft = parse_firm_user_creation(
-        {"email": "Bob@Example.test", "displayName": "Bob", "role": "staff"}
+        {
+            "email": "Bob@Example.test",
+            "firstName": "Bob",
+            "lastName": "Bobson",
+            "role": "staff",
+        }
     )
     # Lowercased: a firm admin typing a capital is not adding a second person.
     assert draft.email == "bob@example.test"
@@ -196,7 +204,8 @@ def test_supplied_permissions_merge_over_the_defaults_on_creation():
     draft = parse_firm_user_creation(
         {
             "email": "bob@example.test",
-            "displayName": "Bob",
+            "firstName": "Bob",
+            "lastName": "Bobson",
             "role": "staff",
             "permissions": {EXTRACTION_REVIEW: VIEW_ONLY},
         }
@@ -216,7 +225,8 @@ def test_the_admin_flag_must_be_a_real_boolean(value):
         parse_firm_user_creation(
             {
                 "email": "bob@example.test",
-                "displayName": "Bob",
+                "firstName": "Bob",
+                "lastName": "Bobson",
                 "role": "staff",
                 "isAdmin": value,
             }
@@ -231,7 +241,8 @@ def test_an_unknown_feature_is_refused_rather_than_dropped():
         parse_firm_user_creation(
             {
                 "email": "bob@example.test",
-                "displayName": "Bob",
+                "firstName": "Bob",
+                "lastName": "Bobson",
                 "role": "staff",
                 "permissions": {"document": ADD_EDIT},
             }
@@ -244,7 +255,8 @@ def test_an_unknown_level_is_refused():
         parse_firm_user_creation(
             {
                 "email": "bob@example.test",
-                "displayName": "Bob",
+                "firstName": "Bob",
+                "lastName": "Bobson",
                 "role": "staff",
                 "permissions": {DOCUMENTS: "full_control"},
             }
@@ -284,9 +296,9 @@ def test_changing_a_role_leaves_the_permission_map_alone():
 
 
 def test_a_self_update_renames_and_nothing_else():
-    changes = parse_self_update({"displayName": "Robert"})
+    changes = parse_self_update({"firstName": "Robert", "lastName": "Attorney"})
     updated = apply_user_changes(user(), changes)
-    assert updated.display_name == "Robert"
+    assert (updated.first_name, updated.last_name) == ("Robert", "Attorney")
     assert (updated.role, updated.is_admin, updated.status) == (
         user().role,
         user().is_admin,
@@ -295,11 +307,46 @@ def test_a_self_update_renames_and_nothing_else():
 
 
 @pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"firstName": "Robert"}, ("Robert", "Attorney")),
+        ({"lastName": "Barrister"}, ("Alice", "Barrister")),
+    ],
+    ids=["first-only", "last-only"],
+)
+def test_a_self_update_takes_either_half_alone(payload, expected):
+    """The state the client's first-run prompt exists for: a row whose halves
+    were derived from a pre-split display name can have a right first name and
+    an empty surname, and demanding both would make the correction a rewrite of
+    a value that was already right."""
+    updated = apply_user_changes(user(), parse_self_update(payload))
+    assert (updated.first_name, updated.last_name) == expected
+
+
+def test_a_self_update_still_accepts_one_display_name():
+    """THE TRANSITION ARM. A browser holding the previous bundle keeps sending
+    this shape until it reloads, and "Save name" must not 400 for it."""
+    updated = apply_user_changes(
+        user(), parse_self_update({"displayName": "Robert Barrister"})
+    )
+    assert (updated.first_name, updated.last_name) == ("Robert", "Barrister")
+
+
+def test_a_legacy_self_update_refuses_a_single_token_name():
+    """An old client must not be able to write a row that puts its own user in
+    front of the first-run prompt on the next load — that would read as the
+    release having lost their name."""
+    with pytest.raises(FieldValidationError) as caught:
+        parse_self_update({"displayName": "Cher"})
+    assert "displayName" in caught.value.fields
+
+
+@pytest.mark.parametrize(
     "payload",
     [{"role": "attorney"}, {"isAdmin": True}, {"status": "disabled"}, {}],
     ids=["role", "isAdmin", "status", "empty"],
 )
-def test_a_self_update_without_a_display_name_is_refused(payload):
+def test_a_self_update_without_a_name_is_refused(payload):
     """`role` and friends land in the same branch as an empty payload: the
     parser never produces anything but a rename, so a privilege field here is
     ignored the same way `email` is in parse_firm_user_update — and with no
@@ -310,20 +357,29 @@ def test_a_self_update_without_a_display_name_is_refused(payload):
 
 @pytest.mark.parametrize(
     "value",
-    ["", "   ", None, 7, "x" * 201],
+    ["", "   ", None, 7, "x" * 101],
     ids=["empty", "blank", "null", "int", "long"],
 )
-def test_a_self_update_validates_the_name_like_any_other(value):
+@pytest.mark.parametrize("field", ["firstName", "lastName"], ids=["first", "last"])
+def test_a_self_update_validates_each_half_like_any_other_name(field, value):
+    """Each half reports ITSELF, which is what puts the server's message under
+    the input that is wrong. The "long" case is 101 rather than 201: two parts
+    at the old whole-name cap would allow a 401-character display string."""
     with pytest.raises(FieldValidationError) as caught:
-        parse_self_update({"displayName": value})
-    assert "displayName" in caught.value.fields
+        parse_self_update({field: value})
+    assert field in caught.value.fields
 
 
 def test_a_subject_must_be_a_cognito_sub():
     """It flows into a sort key and a GSI partition key. A value carrying a `#`
     would produce a key that collides with a differently-spelled one."""
     draft = parse_firm_user_creation(
-        {"email": "bob@example.test", "displayName": "Bob", "role": "staff"}
+        {
+            "email": "bob@example.test",
+            "firstName": "Bob",
+            "lastName": "Bobson",
+            "role": "staff",
+        }
     )
     with pytest.raises(ValidationError):
         create_firm_user(draft, firm_id=FIRM_ID, subject="USER#" + BOB)
@@ -359,6 +415,101 @@ def test_a_firm_user_round_trips():
 def test_a_firm_round_trips():
     original = create_firm(parse_firm_creation({"name": "Example"}))
     assert firm_from_item(firm_item(original)) == original
+
+
+# ── The name, and the migration under it ────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("first", "last", "expected"),
+    [
+        ("Alice", "Attorney", "Alice Attorney"),
+        ("Cher", "", "Cher"),
+        ("", "Attorney", "Attorney"),
+        ("", "", ""),
+    ],
+    ids=["both", "first-only", "last-only", "neither"],
+)
+def test_full_name_joins_and_drops_the_gap(first, last, expected):
+    """The ONE place a display string is composed. A missing half must not
+    leave a stray space, because this value is rendered verbatim."""
+    assert full_name(user(first_name=first, last_name=last)) == expected
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [
+        ("Alice Attorney", ("Alice", "Attorney")),
+        # The last space wins, so a middle name stays with the first half.
+        ("Mary Anne Smith", ("Mary Anne", "Smith")),
+        # We do not know this person's surname, and saying so is what lets the
+        # client ask rather than inventing one.
+        ("Cher", ("Cher", "")),
+        ("", ("", "")),
+        ("   ", ("", "")),
+        ("  Alice   Attorney  ", ("Alice", "Attorney")),
+    ],
+    ids=["simple", "middle", "single", "empty", "blank", "padded"],
+)
+def test_split_legacy_name_guesses_the_same_way_everywhere(stored, expected):
+    assert split_legacy_name(stored) == expected
+
+
+def test_a_legacy_row_is_read_by_deriving_the_halves():
+    """THE MIGRATION. Every existing row carries one display name and no halves,
+    and there are as many of them as there are users. Deriving keeps the firm's
+    directory readable on the deploy; blanking them would read as data loss to
+    a whole firm at once."""
+    item = dict(firm_user_item(user()))
+    del item["firstName"]
+    del item["lastName"]
+    item["displayName"] = "Alice Attorney"
+
+    restored = firm_user_from_item(item)
+    assert (restored.first_name, restored.last_name) == ("Alice", "Attorney")
+
+
+def test_a_legacy_row_with_one_token_derives_an_empty_surname():
+    """Which is precisely what the client's first-run prompt keys on."""
+    item = dict(firm_user_item(user()))
+    del item["firstName"]
+    del item["lastName"]
+    item["displayName"] = "Cher"
+
+    restored = firm_user_from_item(item)
+    assert (restored.first_name, restored.last_name) == ("Cher", "")
+
+
+def test_stored_halves_win_over_the_legacy_display_name():
+    """A converged row carries all three. The halves are the truth; the
+    composed attribute is a derived leftover of the transition."""
+    item = dict(firm_user_item(user(first_name="Alice", last_name="Attorney")))
+    item["displayName"] = "Something Else"
+
+    restored = firm_user_from_item(item)
+    assert (restored.first_name, restored.last_name) == ("Alice", "Attorney")
+
+
+def test_a_half_populated_row_is_tolerated_rather_than_malformed():
+    """PATCH /v1/me accepts either half alone, so half-populated is a state the
+    write path can legitimately produce — unlike every other field here, whose
+    absence means a row this service did not write."""
+    item = dict(firm_user_item(user()))
+    del item["lastName"]
+
+    restored = firm_user_from_item(item)
+    assert (restored.first_name, restored.last_name) == ("Alice", "")
+
+
+def test_the_stored_item_still_carries_a_derived_display_name():
+    """A TRANSITION ATTRIBUTE, for one release. The release order redeploys the
+    API a step ahead of the admin service, and the older of the two still reads
+    `item["displayName"]` — without this it would KeyError into a 500 for the
+    couple of minutes between the two legs."""
+    item = firm_user_item(user(first_name="Alice", last_name="Attorney"))
+    assert item["firstName"] == "Alice"
+    assert item["lastName"] == "Attorney"
+    assert item["displayName"] == "Alice Attorney"
 
 
 def test_the_flags_survive_as_booleans_not_truthy_values():

@@ -2671,6 +2671,8 @@ describe('the firm block on /v1/me', () => {
             id: 'f1a2b3c4-0000-4000-8000-000000000001',
             name: 'Example & Partners',
             role: 'attorney',
+            firstName: 'Alice',
+            lastName: 'Attorney',
             displayName: 'Alice Attorney',
             isAdmin: true,
             accessAllCases: false,
@@ -2691,6 +2693,8 @@ describe('the firm block on /v1/me', () => {
       id: 'f1a2b3c4-0000-4000-8000-000000000001',
       name: 'Example & Partners',
       role: 'attorney',
+      firstName: 'Alice',
+      lastName: 'Attorney',
       displayName: 'Alice Attorney',
       isAdmin: true,
       accessAllCases: false,
@@ -2741,6 +2745,8 @@ describe('the firm block on /v1/me', () => {
             id: 'f1a2b3c4-0000-4000-8000-000000000001',
             name: 'Example & Partners',
             role: 'staff',
+            firstName: 'Sam',
+            lastName: 'Staff',
             displayName: 'Sam Staff',
             isAdmin: false,
             accessAllCases: false,
@@ -2778,7 +2784,9 @@ describe('the firm block on /v1/me', () => {
             id: 'f1a2b3c4-0000-4000-8000-000000000001',
             name: 'Example & Partners',
             role: 'attorney',
-            displayName: 'Alice',
+            firstName: 'Alice',
+            lastName: 'Attorney',
+            displayName: 'Alice Attorney',
             isAdmin: false,
             accessAllCases: false,
             permissions: { cases: 'full_control' },
@@ -2810,6 +2818,8 @@ describe('updateMe', () => {
       id: 'f1a2b3c4-0000-4000-8000-000000000001',
       name: 'Example & Partners',
       role: 'staff',
+      firstName: 'Corrected',
+      lastName: 'Name',
       displayName: 'Corrected Name',
       isAdmin: false,
       accessAllCases: false,
@@ -2823,46 +2833,82 @@ describe('updateMe', () => {
     },
   };
 
-  test('PATCHes /v1/me with exactly a displayName and maps the answered principal', async () => {
+  test('PATCHes /v1/me with exactly the two name halves and maps the answered principal', async () => {
     const stub = stubFetch(() => jsonResponse(RENAMED, 200));
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const principal = await client.updateMe({ displayName: 'Corrected Name' });
+    const principal = await client.updateMe({ firstName: 'Corrected', lastName: 'Name' });
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('PATCH');
     expect(seen.url).toBe(`${BASE_URL}/v1/me`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toBe('application/json');
-    // The whole writable surface. A second key here would mean the client
-    // started sending something the server's parser deliberately ignores.
-    expect(JSON.parse(seen.body)).toEqual({ displayName: 'Corrected Name' });
+    // The whole writable surface. A `displayName` key here would mean the
+    // client started sending a field the server derives and never accepts.
+    expect(JSON.parse(seen.body)).toEqual({ firstName: 'Corrected', lastName: 'Name' });
 
+    expect(principal.firm?.firstName).toBe('Corrected');
+    expect(principal.firm?.lastName).toBe('Name');
+    // The derived field rides along, which is what lets a screen that only
+    // renders a name stay untouched by the split.
     expect(principal.firm?.displayName).toBe('Corrected Name');
     expect(principal.subject).toBe(SUBJECT);
+  });
+
+  test('sends only the half that was supplied', async () => {
+    // OMIT-WHEN-ABSENT, this package's standing rule, and it carries meaning
+    // here: an unsent half means "leave it alone", while `''` would mean
+    // "erase it". Correcting a surname alone is the common case for a row
+    // whose halves were derived from a pre-split display name.
+    const stub = stubFetch(() => jsonResponse(RENAMED, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateMe({ lastName: 'Name' });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ lastName: 'Name' });
+  });
+
+  test('a response missing a name half is a malformed contract, not an empty string', async () => {
+    // `requireString` rather than an optional read. `''` is a value the server
+    // always SENDS; a missing key is a contract break, and silently defaulting
+    // it would hide exactly the drift this package exists to catch.
+    const withoutHalves = {
+      ...RENAMED,
+      firm: Object.fromEntries(Object.entries(RENAMED.firm).filter(([key]) => key !== 'lastName')),
+    };
+    const stub = stubFetch(() => jsonResponse(withoutHalves, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.updateMe({ firstName: 'Corrected' })).rejects.toThrow(ApiException);
   });
 
   test('a 400 with a field message surfaces as ApiValidationException', async () => {
     // The literal body app_factory's FieldValidationError handler emits.
     const stub = stubFetch(() =>
-      jsonResponse(
-        { error: 'ValidationError', fields: { displayName: 'A name is required.' } },
-        400,
-      ),
+      jsonResponse({ error: 'ValidationError', fields: { firstName: 'A name is required.' } }, 400),
     );
     const client = new InsolviaApiClient(BASE_URL, {
       fetch: stub.fetch,
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const failure = client.updateMe({ displayName: ' ' });
+    const failure = client.updateMe({ firstName: ' ' });
 
     await expect(failure).rejects.toThrow(ApiValidationException);
     await failure.catch((caught: unknown) => {
-      expect((caught as ApiValidationException).fields.displayName).toBe('A name is required.');
+      // Keyed by the HALF that was wrong, which is what puts the server's
+      // message under the right input rather than under the whole form.
+      expect((caught as ApiValidationException).fields.firstName).toBe('A name is required.');
     });
   });
 
@@ -2877,14 +2923,16 @@ describe('updateMe', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    await expect(client.updateMe({ displayName: 'Nobody' })).rejects.toThrow(ApiException);
+    await expect(client.updateMe({ firstName: 'No', lastName: 'Body' })).rejects.toThrow(
+      ApiException,
+    );
   });
 
   test('refuses to send without a token, before any request', async () => {
     const stub = stubFetch(() => jsonResponse(RENAMED, 200));
     const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
 
-    await expect(client.updateMe({ displayName: 'Nobody' })).rejects.toThrow(
+    await expect(client.updateMe({ firstName: 'No', lastName: 'Body' })).rejects.toThrow(
       ApiUnauthorizedException,
     );
     expect(stub.requests()).toHaveLength(0);
@@ -2979,13 +3027,25 @@ describe('the firm record', () => {
 });
 
 describe('listFirmDirectory', () => {
-  test('GETs /v1/firm/directory and maps the three-field people', async () => {
+  test('GETs /v1/firm/directory and maps the thin colleague representation', async () => {
     const stub = stubFetch(() =>
       jsonResponse(
         {
           people: [
-            { subject: 'a-1', displayName: 'Alice Attorney', role: 'attorney' },
-            { subject: 'b-2', displayName: 'Bob Paralegal', role: 'paralegal' },
+            {
+              subject: 'a-1',
+              firstName: 'Alice',
+              lastName: 'Attorney',
+              displayName: 'Alice Attorney',
+              role: 'attorney',
+            },
+            {
+              subject: 'b-2',
+              firstName: 'Bob',
+              lastName: 'Paralegal',
+              displayName: 'Bob Paralegal',
+              role: 'paralegal',
+            },
           ],
         },
         200,
@@ -3003,8 +3063,20 @@ describe('listFirmDirectory', () => {
     expect(seen.url).toBe(`${BASE_URL}/v1/firm/directory`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(people).toEqual([
-      { subject: 'a-1', displayName: 'Alice Attorney', role: 'attorney' },
-      { subject: 'b-2', displayName: 'Bob Paralegal', role: 'paralegal' },
+      {
+        subject: 'a-1',
+        firstName: 'Alice',
+        lastName: 'Attorney',
+        displayName: 'Alice Attorney',
+        role: 'attorney',
+      },
+      {
+        subject: 'b-2',
+        firstName: 'Bob',
+        lastName: 'Paralegal',
+        displayName: 'Bob Paralegal',
+        role: 'paralegal',
+      },
     ]);
   });
 
@@ -3015,7 +3087,15 @@ describe('listFirmDirectory', () => {
     const stub = stubFetch(() =>
       jsonResponse(
         {
-          people: [{ subject: 'a-1', displayName: 'Alice', role: 'attorney' }],
+          people: [
+            {
+              subject: 'a-1',
+              firstName: 'Alice',
+              lastName: 'Attorney',
+              displayName: 'Alice Attorney',
+              role: 'attorney',
+            },
+          ],
         },
         200,
       ),
@@ -3028,7 +3108,13 @@ describe('listFirmDirectory', () => {
     const people = await client.listFirmDirectory();
 
     expect(people).toHaveLength(1);
-    expect(Object.keys(people[0]!).sort()).toEqual(['displayName', 'role', 'subject']);
+    expect(Object.keys(people[0]!).sort()).toEqual([
+      'displayName',
+      'firstName',
+      'lastName',
+      'role',
+      'subject',
+    ]);
   });
 });
 
@@ -3037,6 +3123,8 @@ describe('the firm user endpoints', () => {
   const USER = {
     subject: SUBJECT_ID,
     email: 'bob@example.test',
+    firstName: 'Bob',
+    lastName: 'Paralegal',
     displayName: 'Bob Paralegal',
     role: 'paralegal',
     isAdmin: false,
@@ -3075,7 +3163,8 @@ describe('the firm user endpoints', () => {
 
     await client.addFirmUser({
       email: 'bob@example.test',
-      displayName: 'Bob Paralegal',
+      firstName: 'Bob',
+      lastName: 'Paralegal',
       role: 'paralegal',
     });
 
@@ -3087,7 +3176,8 @@ describe('the firm user endpoints', () => {
     // different request from omitting it.
     expect(JSON.parse(seen.body)).toEqual({
       email: 'bob@example.test',
-      displayName: 'Bob Paralegal',
+      firstName: 'Bob',
+      lastName: 'Paralegal',
       role: 'paralegal',
     });
   });
@@ -3101,7 +3191,8 @@ describe('the firm user endpoints', () => {
 
     await client.addFirmUser({
       email: 'dana@example.test',
-      displayName: 'Dana',
+      firstName: 'Dana',
+      lastName: 'Attorney',
       role: 'attorney',
       isAdmin: false,
       accessAllCases: true,
@@ -3110,7 +3201,8 @@ describe('the firm user endpoints', () => {
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
       email: 'dana@example.test',
-      displayName: 'Dana',
+      firstName: 'Dana',
+      lastName: 'Attorney',
       role: 'attorney',
       isAdmin: false,
       accessAllCases: true,
@@ -3134,7 +3226,12 @@ describe('the firm user endpoints', () => {
     });
 
     const error = await client
-      .addFirmUser({ email: 'taken@example.test', displayName: 'X', role: 'staff' })
+      .addFirmUser({
+        email: 'taken@example.test',
+        firstName: 'Al',
+        lastName: 'Ready',
+        role: 'staff',
+      })
       .catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(ApiException);

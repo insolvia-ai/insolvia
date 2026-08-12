@@ -2,6 +2,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 
+import { RequireProfile } from '@/components/require-profile';
 import { StatusScreen } from '@/components/status-screen';
 import { useSession } from '@/session';
 
@@ -10,8 +11,8 @@ export interface RequireSessionProps {
 }
 
 /**
- * The route guard: renders `children` only for a signed-in user, and sends
- * everyone else to sign-in.
+ * The route guard: renders `children` only for a signed-in user with a usable
+ * name, and sends everyone else to sign-in.
  *
  * **The `loading` arm is the acceptance criterion of issue #78, not a nicety.**
  * On every reload the session starts as `loading` while the stored refresh
@@ -48,7 +49,13 @@ export function RequireSession({ children }: RequireSessionProps) {
   }, [pathname, router, status]);
 
   if (status === 'signed-in') {
-    return <>{children}</>;
+    // {@link RequireProfile} sits HERE rather than around the navigator in
+    // `src/app/_layout.tsx` — it owns the reasoning, and the short version is
+    // that a guard replacing its children would unmount the `<Stack>`. Every
+    // protected route composes this component, so putting it here covers all
+    // of them and structurally spares `/sign-in` and `/auth/callback`, which
+    // compose no guard at all.
+    return <RequireProfile>{children}</RequireProfile>;
   }
 
   // Covers both `loading` and the frame or two after `signed-out` before the

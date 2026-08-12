@@ -22,7 +22,14 @@ def provision(
 ):
     return client.post(
         "/v1/firms",
-        json={"name": name, "admin": {"email": email, "displayName": "Alice Attorney"}},
+        json={
+            "name": name,
+            "admin": {
+                "email": email,
+                "firstName": "Alice",
+                "lastName": "Attorney",
+            },
+        },
         headers=staff_headers,
     )
 
@@ -143,7 +150,8 @@ def test_the_body_cannot_demote_the_first_admin(client, staff_headers, firm_stor
             "name": "Example",
             "admin": {
                 "email": "a@example.test",
-                "displayName": "A",
+                "firstName": "Ada",
+                "lastName": "Admin",
                 "isAdmin": False,
             },
         },

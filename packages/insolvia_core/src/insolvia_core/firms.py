@@ -85,7 +85,15 @@ FIRM_ADMINISTRATION: Final = "firm_administration"
 FEATURES: Final = (CASES, INTAKE, DOCUMENTS, EXTRACTION_REVIEW, FIRM_ADMINISTRATION)
 
 MAX_FIRM_NAME: Final = 200
+# The cap on a WHOLE display name. It survives the first/last split because the
+# transition arm in the parsers below still accepts one — see `split_legacy_name`.
 MAX_DISPLAY_NAME: Final = 200
+# The cap on one HALF of a name. Deliberately lower than MAX_DISPLAY_NAME: two
+# parts at 200 each would allow a 401-character display string, which is not
+# what the old cap meant. Reads never run through a parser, so no stored row can
+# fail this — only somebody actively editing a part longer than it, which has
+# never happened.
+MAX_NAME_PART: Final = 100
 MAX_EMAIL: Final = 320
 
 # Same shape as core/waitlist.py's. Deliberately loose: this address is a
@@ -139,12 +147,26 @@ class FirmUser:
                         able to add users or change anyone's permissions.
       permissions       per-feature level. Consulted through `permission_for`,
                         never read directly — see it for why.
+
+    THE NAME IS TWO FIELDS AND NO STORED DISPLAY STRING. `full_name` composes
+    the one a screen renders, so there is exactly one place that decides how the
+    halves join. Storing the composed value beside them would be a second owner
+    of the same fact, and `apply_user_changes` is where it would go wrong: a
+    PATCH that set `first_name` and forgot to recompute would leave a row whose
+    two name fields disagreed, with nothing in the type system to notice.
+
+    `""` IS A REAL VALUE on either half, and load-bearing — it means "never
+    recorded". Rows written before the split carry one display string, and
+    `firm_user_from_item` derives what it can from it; a name it cannot split
+    (a single token) yields an empty surname, which is the honest answer and
+    what the client's first-run prompt keys on.
     """
 
     firm_id: str
     subject: str
     email: str
-    display_name: str
+    first_name: str
+    last_name: str
     role: str
     is_admin: bool
     access_all_cases: bool
@@ -171,7 +193,8 @@ class FirmUserDraft:
     """
 
     email: str
-    display_name: str
+    first_name: str
+    last_name: str
     role: str
     is_admin: bool
     access_all_cases: bool
@@ -198,7 +221,8 @@ class FirmUserChanges:
     """A validated PATCH body. None means "leave unchanged" — a caller changing
     a role alone must not silently reset the permission map."""
 
-    display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     role: str | None = None
     is_admin: bool | None = None
     access_all_cases: bool | None = None
@@ -294,6 +318,47 @@ def permission_for(user: FirmUser, feature: str) -> str:
     return level if level in LEVELS else HIDDEN
 
 
+def full_name(user: FirmUser) -> str:
+    """The display string, composed from the two halves.
+
+    THE ONLY PLACE THAT DECIDES HOW A NAME READS. Every serializer and every
+    store adapter calls this rather than joining the halves itself, which is
+    what makes "a name is two fields" a decision with one consequence instead of
+    a rule six call sites have to remember.
+
+    Drops the separator when a half is empty, so a row that only ever recorded
+    one part reads as that part rather than as a name with a stray space.
+    """
+    return " ".join(part for part in (user.first_name, user.last_name) if part)
+
+
+def split_legacy_name(value: str) -> tuple[str, str]:
+    """Split a single stored display name into a first and last half.
+
+    THE MIGRATION, and it is a guess — which is why it lives in one named
+    function that both the read path and the parsers' transition arm call, so
+    they cannot disagree about what a given string becomes.
+
+    Splits on the LAST space, so "Mary Anne Smith" keeps "Mary Anne" together
+    and takes "Smith" as the surname. That is right far more often than
+    splitting on the first space, and wrong for a compound surname ("Mary van
+    der Berg" gives "Mary van der"). Wrong is recoverable in ten seconds on the
+    account screen; the alternative — refusing to guess and blanking every
+    colleague's name until each person next signs in — reads as data loss to a
+    whole firm at once.
+
+    A single token yields an empty surname rather than a duplicated one. We do
+    not know that person's surname, and saying so is what lets the client ask.
+    """
+    trimmed = value.strip()
+    if not trimmed:
+        return ("", "")
+    first, _, last = trimmed.rpartition(" ")
+    # `rpartition` puts the whole string in the LAST element when there is no
+    # separator, which is the single-token case: that token is the first name.
+    return (first.strip(), last.strip()) if first else (last.strip(), "")
+
+
 def is_active_admin(user: FirmUser) -> bool:
     return user.is_admin and user.status == "active"
 
@@ -360,6 +425,36 @@ def _parse_name(
         errors[field] = f"Please keep this under {cap} characters."
         return None
     return name
+
+
+def _parse_legacy_name(value: object, errors: dict[str, str]) -> tuple[str, str] | None:
+    """Accept a pre-split `displayName` and split it. THE TRANSITION ARM.
+
+    Every parser below takes `firstName`/`lastName`, and also still takes the
+    single `displayName` a client written before the split sends. That is not
+    politeness — it is the deploy window. The release order puts the API live
+    before the new bundle exists, but a browser holding the OLD bundle keeps
+    sending the old shape for as long as that tab stays open, and the admin
+    service redeploys a step behind the API. Without this arm, "Save name" 400s
+    for those callers.
+
+    ONE RELEASE ONLY. The follow-up deletes this function and its three call
+    sites; `displayName` stays in RESPONSES indefinitely, where it is derived
+    and free.
+
+    A single token is REFUSED rather than stored with an empty surname. An old
+    client must not be able to write a row that puts its own user in front of
+    the first-run prompt on their next load — that would look like the new
+    release had lost their name.
+    """
+    name = _parse_name(value, errors, field="displayName", cap=MAX_DISPLAY_NAME)
+    if name is None:
+        return None
+    first, last = split_legacy_name(name)
+    if not last:
+        errors["displayName"] = "Please give both a first and a last name."
+        return None
+    return (first, last)
 
 
 def _parse_email(value: object, errors: dict[str, str]) -> str | None:
@@ -443,9 +538,20 @@ def parse_firm_user_creation(payload: Mapping[str, object]) -> FirmUserDraft:
     """
     errors: dict[str, str] = {}
     email = _parse_email(payload.get("email"), errors)
-    display_name = _parse_name(
-        payload.get("displayName"), errors, field="displayName", cap=MAX_DISPLAY_NAME
-    )
+    # Both halves are required to add somebody. The explicit pair wins outright
+    # when it is present, so a client sending both spellings is not ambiguous —
+    # the same "unknown keys are ignored" rule this docstring already states.
+    names: tuple[str, str] | None
+    if "firstName" in payload or "lastName" in payload:
+        first = _parse_name(
+            payload.get("firstName"), errors, field="firstName", cap=MAX_NAME_PART
+        )
+        last = _parse_name(
+            payload.get("lastName"), errors, field="lastName", cap=MAX_NAME_PART
+        )
+        names = (first, last) if first is not None and last is not None else None
+    else:
+        names = _parse_legacy_name(payload.get("displayName"), errors)
     role = _parse_role(payload.get("role"), errors)
 
     is_admin = False
@@ -468,12 +574,13 @@ def parse_firm_user_creation(payload: Mapping[str, object]) -> FirmUserDraft:
         if parsed_permissions is not None:
             overrides = parsed_permissions
 
-    if errors or email is None or display_name is None or role is None:
+    if errors or email is None or names is None or role is None:
         raise FieldValidationError(errors)
 
     return FirmUserDraft(
         email=email,
-        display_name=display_name,
+        first_name=names[0],
+        last_name=names[1],
         role=role,
         is_admin=is_admin,
         access_all_cases=access_all_cases,
@@ -496,15 +603,30 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
     errors: dict[str, str] = {}
     changes: dict[str, object] = {}
 
-    if "displayName" in payload:
-        display_name = _parse_name(
-            payload["displayName"],
-            errors,
-            field="displayName",
-            cap=MAX_DISPLAY_NAME,
+    # Each half is independently optional here, unlike creation: an admin
+    # correcting a misspelled surname sends that half alone, and the other must
+    # not be reset by its absence — the same "None means leave unchanged" rule
+    # every other field on this parser follows.
+    if "firstName" in payload:
+        first = _parse_name(
+            payload["firstName"], errors, field="firstName", cap=MAX_NAME_PART
         )
-        if display_name is not None:
-            changes["display_name"] = display_name
+        if first is not None:
+            changes["first_name"] = first
+    if "lastName" in payload:
+        last = _parse_name(
+            payload["lastName"], errors, field="lastName", cap=MAX_NAME_PART
+        )
+        if last is not None:
+            changes["last_name"] = last
+    if (
+        "displayName" in payload
+        and "firstName" not in payload
+        and "lastName" not in payload
+    ):
+        legacy = _parse_legacy_name(payload["displayName"], errors)
+        if legacy is not None:
+            changes["first_name"], changes["last_name"] = legacy
     if "role" in payload:
         role = _parse_role(payload["role"], errors)
         if role is not None:
@@ -540,7 +662,7 @@ def parse_firm_user_update(payload: Mapping[str, object]) -> FirmUserChanges:
 def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
     """Validate PATCH /v1/me. Unknown keys are ignored.
 
-    Display name is the ONE field a member may change about themselves.
+    Their own name is the ONE thing a member may change about themselves.
     Everything else on the row is somebody else's statement about them — role,
     permissions, the admin flag and status are an administrator's writes
     (parse_firm_user_update), and email is a pool fact, for the reason that
@@ -548,16 +670,38 @@ def parse_self_update(payload: Mapping[str, object]) -> FirmUserChanges:
     allowlist by accident: a payload carrying `role` here is ignored the same
     way one carrying `email` is there, and what the caller can rely on is that
     the only thing this parser ever produces is a rename.
+
+    EITHER HALF ALONE IS ACCEPTED. The account screen sends both; somebody
+    fixing only their surname — the common case for a row whose halves were
+    derived from a legacy display name — sends one. Requiring both would make
+    the correction a rewrite of a value that was already right.
     """
     errors: dict[str, str] = {}
-    if "displayName" not in payload:
-        raise ValidationError("no supported fields to update")
-    display_name = _parse_name(
-        payload["displayName"], errors, field="displayName", cap=MAX_DISPLAY_NAME
-    )
-    if errors or display_name is None:
+    changes: dict[str, str] = {}
+
+    if "firstName" in payload:
+        first = _parse_name(
+            payload["firstName"], errors, field="firstName", cap=MAX_NAME_PART
+        )
+        if first is not None:
+            changes["first_name"] = first
+    if "lastName" in payload:
+        last = _parse_name(
+            payload["lastName"], errors, field="lastName", cap=MAX_NAME_PART
+        )
+        if last is not None:
+            changes["last_name"] = last
+
+    if not changes and not errors and "displayName" in payload:
+        legacy = _parse_legacy_name(payload["displayName"], errors)
+        if legacy is not None:
+            changes["first_name"], changes["last_name"] = legacy
+
+    if errors:
         raise FieldValidationError(errors)
-    return FirmUserChanges(display_name=display_name)
+    if not changes:
+        raise ValidationError("no supported fields to update")
+    return FirmUserChanges(**changes)  # type: ignore[arg-type]
 
 
 def parse_firm_update(payload: Mapping[str, object]) -> FirmChanges:
@@ -651,7 +795,8 @@ def create_firm_user(draft: FirmUserDraft, *, firm_id: str, subject: str) -> Fir
         firm_id=firm_id,
         subject=subject,
         email=draft.email,
-        display_name=draft.display_name,
+        first_name=draft.first_name,
+        last_name=draft.last_name,
         role=draft.role,
         is_admin=draft.is_admin,
         access_all_cases=draft.access_all_cases,
@@ -676,7 +821,13 @@ def apply_user_changes(user: FirmUser, changes: FirmUserChanges) -> FirmUser:
     updates = {
         field: value
         for field, value in (
-            ("display_name", changes.display_name),
+            # Two entries, not one, and independently applied: a PATCH carrying
+            # only a surname leaves the first name alone. This is the loop the
+            # FirmUser docstring names as the reason there is no stored display
+            # string — a third entry here that had to be kept in step with these
+            # two is exactly how the halves and the whole would drift apart.
+            ("first_name", changes.first_name),
+            ("last_name", changes.last_name),
             ("role", changes.role),
             ("is_admin", changes.is_admin),
             ("access_all_cases", changes.access_all_cases),
@@ -777,6 +928,18 @@ def firm_user_item(user: FirmUser) -> dict[str, FirmItemValue]:
     not raise anything — it produces a user who simply cannot sign in, with no
     error in any log. That is why they are written here, unconditionally,
     rather than by an adapter that might have a branch.
+
+    `displayName` IS STILL WRITTEN, and it is derived rather than stored — a
+    transition attribute, for ONE release. The release order redeploys the API
+    a step ahead of the admin service, and both read these rows through
+    `firm_user_from_item`; the older of the two still does `item["displayName"]`
+    and would `KeyError` into a 500 on every firm-detail page for the couple of
+    minutes between the two legs. The follow-up release drops this line.
+
+    There is no backfill script and there should not be one. Both stores write
+    a whole item (`put_item`), so the first edit of any kind converges a legacy
+    row on its own; a migration script would be a third writer of this shape,
+    which this package's rules forbid.
     """
     return {
         "PK": partition_key(user.firm_id),
@@ -786,7 +949,9 @@ def firm_user_item(user: FirmUser) -> dict[str, FirmItemValue]:
         "firmId": user.firm_id,
         "subject": user.subject,
         "email": user.email,
-        "displayName": user.display_name,
+        "firstName": user.first_name,
+        "lastName": user.last_name,
+        "displayName": full_name(user),
         "role": user.role,
         "isAdmin": user.is_admin,
         "accessAllCases": user.access_all_cases,
@@ -810,6 +975,18 @@ def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
     boundary where the value enters the service. A row carrying a feature name
     we do not recognise is not corrupt — it is a row from a newer version — and
     dropping the entry is the reading that cannot over-grant.
+
+    THE NAME IS THE ONE TOLERANT PAIR HERE, the same shape `firm_from_item`'s
+    provenance already has. Every other field raises on absence, because its
+    absence means a row this service did not write. A row with no `firstName`
+    is different: it is a row written before the name was two fields, and there
+    are as many of them as there are existing users. It is read by deriving the
+    halves from the legacy `displayName` — see `split_legacy_name` for why we
+    guess rather than blank it, and for what a single-token name yields.
+
+    A row carrying ONE half and not the other is also tolerated rather than
+    treated as corrupt: `PATCH /v1/me` accepts either half alone, so
+    half-populated is a state the write path can legitimately produce.
     """
     try:
         raw = item["permissions"]
@@ -822,11 +999,20 @@ def firm_user_from_item(item: Mapping[str, FirmItemValue]) -> FirmUser:
             if isinstance(raw, dict)
             else {}
         )
+        if "firstName" in item or "lastName" in item:
+            first_name = str(item.get("firstName", ""))
+            last_name = str(item.get("lastName", ""))
+        else:
+            legacy = item.get("displayName")
+            first_name, last_name = split_legacy_name(
+                str(legacy) if legacy is not None else ""
+            )
         return FirmUser(
             firm_id=str(item["firmId"]),
             subject=str(item["subject"]),
             email=str(item["email"]),
-            display_name=str(item["displayName"]),
+            first_name=first_name,
+            last_name=last_name,
             role=str(item["role"]),
             # bool() rather than a cast: these are stored as DynamoDB BOOL and
             # come back as Python bools, and a row that somehow holds anything
@@ -890,10 +1076,17 @@ def firm_user_summary_json(user: FirmUser) -> dict[str, object]:
     paralegal their colleagues' email addresses, permission maps, or whether
     somebody has been disabled — those are the firm's administration, and
     `firm_user_json` is what an administrator gets.
+
+    `displayName` is DERIVED and stays on the wire indefinitely — it is what
+    turns a subject into a rendered name, and it costs nothing to compose. The
+    two halves ride alongside it for a client that needs to edit them; a client
+    that only renders a name reads the one field and does not change at all.
     """
     return {
         "subject": user.subject,
-        "displayName": user.display_name,
+        "firstName": user.first_name,
+        "lastName": user.last_name,
+        "displayName": full_name(user),
         "role": user.role,
     }
 
@@ -917,7 +1110,9 @@ def firm_user_json(user: FirmUser) -> dict[str, object]:
     return {
         "subject": user.subject,
         "email": user.email,
-        "displayName": user.display_name,
+        "firstName": user.first_name,
+        "lastName": user.last_name,
+        "displayName": full_name(user),
         "role": user.role,
         "isAdmin": user.is_admin,
         "accessAllCases": user.access_all_cases,
