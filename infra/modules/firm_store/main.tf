@@ -4,7 +4,7 @@
 # signed-in user belongs to, what their role is, and which features they may
 # reach.
 #
-# WHY A TABLE OF ITS OWN rather than more partitions in insolvia-cases-<env>.
+# WHY A TABLE OF ITS OWN rather than more partitions in insolvia-<env>-cases.
 # Three reasons, and the first is the one that matters:
 #
 #   - It is read on EVERY authenticated request. Ownership resolution happens
@@ -15,20 +15,20 @@
 #     (it does not know the firm until it has read one) but write only through
 #     the administration endpoints — not the same grant as case data, which is
 #     read and written on the same paths.
-#   - A table called insolvia-cases-<env> holding firms would be a naming lie,
+#   - A table called insolvia-<env>-cases holding firms would be a naming lie,
 #     and infra/CLAUDE.md's `insolvia-<thing>-<env>` convention is the thing
 #     that keeps a reader able to guess what is where.
 #
 # It takes the CASE key rather than minting one, exactly as modules/case_documents
 # does. Firm membership is not case data, but it is the thing that decides who
 # reads case data, and a separate key would be a second thing to get the deny
-# right on. ci-trust's DenyCaseDataDecryption covers alias/insolvia-cases-*, so
+# right on. ci-trust's DenyCaseDataDecryption covers alias/insolvia-*-cases, so
 # reusing that key means CI provisions this table and can never read a firm's
 # staff list.
 
 locals {
-  # insolvia-firms-<env>
-  name = "${var.project}-firms-${var.environment}"
+  # insolvia-<env>-firms
+  name = "${var.project}-${var.environment}-firms"
 }
 
 # ── The table ───────────────────────────────────────────────────
@@ -116,7 +116,7 @@ resource "aws_dynamodb_table" "firms" {
 resource "aws_iam_role_policy" "api_firm_access" {
   count = var.api_role_name == null ? 0 : 1
 
-  name = "access-${local.name}"
+  name = "${local.name}-access"
   role = var.api_role_name
 
   policy = jsonencode({
@@ -185,7 +185,7 @@ resource "aws_iam_role_policy" "api_firm_access" {
 resource "aws_iam_role_policy" "admin_firm_access" {
   count = var.admin_role_name == null ? 0 : 1
 
-  name = "admin-access-${local.name}"
+  name = "${local.name}-admin-access"
   role = var.admin_role_name
 
   policy = jsonencode({

@@ -29,8 +29,8 @@ from insolvia_admin.entrypoints.seed import Dependencies, RefusedError, main
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.ports import FirmStore
 
-DEV_TABLE = "insolvia-firms-dev-0123456789ab"
-STAGING_TABLE = "insolvia-firms-staging"
+DEV_TABLE = "insolvia-dev-0123456789ab-firms"
+STAGING_TABLE = "insolvia-staging-firms"
 POOL = "us-east-1_examplepool"
 
 ALICE = "11111111-2222-3333-4444-555555555555"
@@ -121,13 +121,18 @@ def run(
 @pytest.mark.parametrize(
     "table",
     [
-        "insolvia-firms-prod",
-        "insolvia-firms-prod-0123456789ab",
-        "insolvia-firms-dev-NOTHEX000000",
-        "insolvia-firms-dev-0123456789",
+        "insolvia-prod-firms",
+        "insolvia-prod-0123456789ab-firms",
+        "insolvia-dev-NOTHEX000000-firms",
+        "insolvia-dev-0123456789-firms",
+        # The OLD env-last spelling, which the guard must now reject — a stale
+        # script or a hand-typed name from before the rename. Written out
+        # rather than derived, because it is exactly the string that must NOT
+        # match any more.
+        "insolvia-firms-staging",
         # The right shape for the wrong store: the guard is per-kind, not a
         # general "looks like a non-prod table" test.
-        "insolvia-cases-staging",
+        "insolvia-staging-cases",
     ],
 )
 def test_an_unseedable_table_is_refused(tmp_path: Path, table: str) -> None:
@@ -471,6 +476,6 @@ def test_check_is_refused_against_prod_too(tmp_path: Path) -> None:
     store = MemoryFirmStore()
 
     assert (
-        run(one_firm(tmp_path, user()), store, table="insolvia-firms-prod", check=True)
+        run(one_firm(tmp_path, user()), store, table="insolvia-prod-firms", check=True)
         == 2
     )

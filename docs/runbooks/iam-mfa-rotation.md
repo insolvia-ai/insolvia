@@ -13,7 +13,7 @@ authenticator app, or a device that was lost.
 
 ## Before you start: it is almost certainly not permissions
 
-Every human user in this account is in the `Admin` group, which carries
+Every human user in this account is in the `insolvia-shared-admin-group`, which carries
 `AdministratorAccess` — so every MFA action is already allowed. Confirm rather
 than assume:
 

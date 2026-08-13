@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket  = "insolvia-terraform-state"
+    bucket  = "insolvia-shared-terraform-state-us-east-1"
     key     = "insolvia/ci-trust/terraform.tfstate"
     region  = "us-east-1"
     encrypt = true

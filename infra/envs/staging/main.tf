@@ -42,9 +42,9 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin", "marketing", "mailer"])
+  for_each = toset(["api", "admin-api", "marketing", "mailer"])
 
-  name = "insolvia-${each.key}"
+  name = "insolvia-shared-${each.key}"
 }
 
 module "web_hosting" {
@@ -52,6 +52,7 @@ module "web_hosting" {
 
   project             = "insolvia"
   environment         = local.environment
+  component           = "app"
   domain_name         = var.subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
@@ -83,15 +84,17 @@ module "api_service" {
 
 
 # Admin portal hosting (#215): a second web_hosting instantiation — the module
-# gained a bucket_name override for exactly this, and the insolvia-web- prefix
-# keeps it inside the deploy role's existing S3 grant (no IAM change). Serves
+# takes a `component` for exactly this, which is what keeps the two buckets
+# apart (insolvia-<env>-app-* and insolvia-<env>-admin-*). Each component needs
+# its own ARN pattern in the deploy role's S3 grant, and infra/envs/ci-trust is
+# human-applied, so a THIRD instance is an IAM change first. Serves
 # apps/insolvia_admin, built and synced by the admin deploy workflow.
 module "admin_web_hosting" {
   source = "../../modules/web_hosting"
 
   project             = "insolvia"
   environment         = local.environment
-  bucket_name         = "insolvia-web-admin-${local.environment}"
+  component           = "admin"
   domain_name         = var.admin_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
@@ -115,7 +118,7 @@ module "admin_service" {
   domain_name         = var.admin_api_subdomain
   hosted_zone_id      = data.aws_route53_zone.main.zone_id
   acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
-  ecr_repository_url  = data.aws_ecr_repository.service["admin"].repository_url
+  ecr_repository_url  = data.aws_ecr_repository.service["admin-api"].repository_url
   image_tag           = local.environment
   firm_table_name     = module.firm_store.table_name
   firm_user_pool_id   = module.auth.user_pool_id
@@ -471,11 +474,11 @@ resource "aws_ssm_parameter" "case_document_bucket" {
 }
 
 # Case-data audit trail (issue 8.2): CloudTrail data events on the case table,
-# into an insolvia-audit-<env> bucket under its own key. Declared after
+# into an insolvia-<env>-audit bucket under its own key. Declared after
 # module.case_store because it records that module's table.
 #
 # The key is separate from the case key by necessity as well as design:
-# ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-cases-*,
+# ci-trust denies the deploy role kms:GenerateDataKey on alias/insolvia-*-cases,
 # so a trail pointed at the case key fails at CreateTrail. The upside is that
 # the pipeline can write this log and has no kms:Decrypt for audit keys
 # anywhere, so it can never read back what it recorded.

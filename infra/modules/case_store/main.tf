@@ -41,8 +41,8 @@ data "aws_region" "current" {}
 # skips its grant for the same reason.
 
 locals {
-  # insolvia-cases-<env>
-  name = "${var.project}-cases-${var.environment}"
+  # insolvia-<env>-cases
+  name = "${var.project}-${var.environment}-cases"
 
   # Every KMS action the API role needs, and no more.
   #
@@ -267,7 +267,7 @@ resource "aws_dynamodb_table" "cases" {
 # which the provenance fields in the case record already answer better. The
 # question this table exists for is who *saw* it.
 resource "aws_dynamodb_table" "access_log" {
-  name         = "${var.project}-case-access-log-${var.environment}"
+  name         = "${var.project}-${var.environment}-case-access-log"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
@@ -289,7 +289,7 @@ resource "aws_dynamodb_table" "access_log" {
   #   CMK-encrypted table it needs kms:Decrypt on that key. This table is
   #   encrypted under the case key on purpose (see below), and ci-trust's
   #   DenyCaseDataDecryption denies the deploy role kms:Decrypt on exactly
-  #   alias/insolvia-cases-*. An explicit deny wins, so the create half-
+  #   alias/insolvia-*-cases. An explicit deny wins, so the create half-
   #   succeeded — table made, TTL rejected — leaving a tainted resource that
   #   every later run destroyed and failed to recreate. Four merges in a row.
   #
@@ -336,7 +336,7 @@ resource "aws_dynamodb_table" "access_log" {
   point_in_time_recovery { enabled = var.point_in_time_recovery }
 
   # Same key as the case table. That is deliberate: it means the deploy role,
-  # already denied every data-plane verb on alias/insolvia-cases-*, cannot read
+  # already denied every data-plane verb on alias/insolvia-*-cases, cannot read
   # the access log either.
   server_side_encryption {
     enabled     = true
@@ -359,7 +359,7 @@ resource "aws_dynamodb_table" "access_log" {
 resource "aws_iam_role_policy" "api_case_access" {
   count = var.api_role_name == null ? 0 : 1
 
-  name = "access-${local.name}"
+  name = "${local.name}-access"
   role = var.api_role_name
 
   policy = jsonencode({

@@ -53,7 +53,7 @@ variable "firm_table_name" {
 }
 
 variable "firm_user_pool_id" {
-  description = "The FIRM Cognito pool (insolvia-users-<env>) provisioning mints first-administrator accounts in. The AdminCreateUser grant is attached by modules/auth's admin_invite_role_name seam, not here."
+  description = "The FIRM Cognito pool (insolvia-<env>-users) provisioning mints first-administrator accounts in. The AdminCreateUser grant is attached by modules/auth's admin_invite_role_name seam, not here."
   type        = string
 }
 

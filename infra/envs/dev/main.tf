@@ -28,8 +28,12 @@
 # plain dev server, not Lambda, and the app runs on the Expo dev server.
 
 locals {
-  # dev-<machine_short_id> is this machine's environment name, slotting into
-  # the repo-wide insolvia-<thing>-<env> convention.
+  # dev-<machine_short_id> is this machine's environment name, and it slots
+  # into the ENV segment of the repo-wide insolvia-<env>-<component>
+  # convention (the insolvia-aws-naming skill) — so this machine's case table
+  # is insolvia-dev-<short-id>-cases. The machine id being inside the env
+  # segment rather than trailing the whole name is what keeps two developers
+  # from colliding on any name, including the globally-unique ones.
   environment = "dev-${var.machine_short_id}"
 
   common_tags = {
@@ -54,7 +58,7 @@ locals {
 #     there is no execution role to scope PutItem to.
 
 resource "aws_dynamodb_table" "waitlist" {
-  name         = "insolvia-waitlist-${local.environment}"
+  name         = "insolvia-${local.environment}-waitlist"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
@@ -155,7 +159,7 @@ module "case_documents" {
 # services/admin's core/audit.py item shape. PITR off, protection off —
 # throwaway rows a developer wipes; the DEPLOYED table is the durable record.
 resource "aws_dynamodb_table" "admin_audit" {
-  name         = "insolvia-admin-audit-${local.environment}"
+  name         = "insolvia-${local.environment}-admin-api-audit"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
@@ -177,7 +181,7 @@ resource "aws_dynamodb_table" "admin_audit" {
 # ── Auth ────────────────────────────────────────────────────────
 # The same module staging and prod instantiate, with the machine environment
 # name. The Cognito hosted-domain prefix the module derives
-# (insolvia-dev-<machine_short_id>) is GLOBALLY unique across all of AWS —
+# (insolvia-dev-<machine_short_id>-auth) is GLOBALLY unique across all of AWS —
 # the machine short id in it is what makes a per-developer pool safe to
 # create at all. Registers only the localhost web origin staging also
 # registers for dev (`npx expo start --web --port 3000` — the port is pinned

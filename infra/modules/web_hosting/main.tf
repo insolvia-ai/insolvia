@@ -7,14 +7,29 @@
 # route needs — the client owns routing, so the origin must hand every path
 # the same document.
 
+data "aws_region" "current" {}
+
 locals {
-  # Overridable for a SECOND instantiation in one environment (#215: the admin
-  # portal at insolvia-web-admin-<env>). The default preserves the original
-  # derived name byte-for-byte, so existing instances plan no changes. Keep
-  # any override on the `insolvia-web-` prefix: the deploy role's S3 grant is
-  # arn:aws:s3:::insolvia-web-* (infra/envs/ci-trust), and a name outside it
-  # is a human-applied IAM change.
-  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.project}-web-${var.environment}"
+  # insolvia-<env>-<component> — the OAC name stem, and the bucket's before its
+  # region suffix.
+  #
+  # `var.component` is what distinguishes the TWO instantiations each
+  # environment makes: `app` (the Expo SPA at app.insolvia.ai) and `admin` (the
+  # staff portal at admin.insolvia.ai). It replaced a `bucket_name` string
+  # override, which let a caller write any name it liked — including one
+  # outside the deploy role's S3 grant, and including one with no region
+  # suffix. A component name cannot do either.
+  #
+  # Each component needs its own ARN pattern in the deploy role's S3 grant
+  # (infra/envs/ci-trust: arn:aws:s3:::insolvia-*-app-*, ...-admin-*), and
+  # that root is human-applied — so ADDING a third instantiation is an IAM
+  # change before it is an env change.
+  name = "${var.project}-${var.environment}-${var.component}"
+
+  # S3 bucket names are globally unique across all of AWS, which is why this
+  # one alone takes a suffix (insolvia-aws-naming § per-resource-type
+  # patterns). From the provider's region, never a literal.
+  bucket_name = "${local.name}-${data.aws_region.current.region}"
 }
 
 # ── Origin bucket (private) ─────────────────────────────────────
@@ -33,7 +48,7 @@ resource "aws_s3_bucket_public_access_block" "site" {
 
 # ── CloudFront access to the bucket (OAC, no public access) ─────
 resource "aws_cloudfront_origin_access_control" "site" {
-  name                              = "${local.bucket_name}-oac"
+  name                              = "${local.name}-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"

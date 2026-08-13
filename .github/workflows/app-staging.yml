@@ -188,7 +188,7 @@ jobs:
 
       - uses: actions/upload-artifact@v6
         with:
-          name: insolvia-web-staging
+          name: insolvia-staging-app
           path: apps/insolvia_app/dist
           retention-days: 14
 
@@ -211,7 +211,7 @@ jobs:
 
       - uses: actions/download-artifact@v7
         with:
-          name: insolvia-web-staging
+          name: insolvia-staging-app
           path: web
 
       # ── Two-tier cache sync, inline ──────────────────────────────────────

@@ -122,7 +122,7 @@ jobs:
         run: |
           environment="$(
             aws ssm get-parameters-by-path \
-              --path /insolvia/prod/admin \
+              --path /insolvia/prod/admin-api \
               --with-decryption \
               --query 'Parameters[].{Name:Name,Value:Value}' \
               --output json \

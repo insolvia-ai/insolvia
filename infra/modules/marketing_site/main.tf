@@ -20,17 +20,31 @@
 # in the ECR repository. The repository is not created here — it lives in
 # infra/envs/shared and is applied before any environment — so bootstrap is:
 #
-#   terraform -chdir=infra/envs/shared apply   # creates insolvia-marketing
+#   terraform -chdir=infra/envs/shared apply   # creates insolvia-shared-marketing
 #   # build + docker push <repo_url>:<env>     # this env's marker tag
 #   terraform apply
 #
 # After creation the deploy workflow owns the running image via
 # `aws lambda update-function-code --image-uri` (image_uri is ignore_changes).
 
+data "aws_region" "current" {}
+
 locals {
-  name_prefix   = "${var.project}-marketing"
-  bucket_name   = "${local.name_prefix}-assets-${var.environment}"
-  function_name = "${local.name_prefix}-ssr-${var.environment}"
+  # insolvia-<env>-marketing — the stem every name here derives from. The
+  # component is `marketing` because that is the surface served
+  # (www.insolvia.ai), not because of which tier renders it.
+  name = "${var.project}-${var.environment}-marketing"
+
+  # The assets bucket. Region suffix for S3's global uniqueness
+  # (insolvia-aws-naming); no `-assets` qualifier, because this component has
+  # exactly one bucket and an identifier is only for a component that needs
+  # more than one instance.
+  bucket_name = "${local.name}-${data.aws_region.current.region}"
+
+  # `ssr` IS an identifier here, and earns it: `marketing` also names the
+  # bucket, the OAC and the viewer-request function, so the compute needs
+  # distinguishing.
+  function_name = "${local.name}-ssr"
 
   # Does this environment own the apex? Drives three things that must agree:
   # the CloudFront alias list, the apex A/AAAA records, and whether the
@@ -40,10 +54,10 @@ locals {
 
 # No waitlist table here. The SSR action brokers submissions through the
 # API's POST /v1/waitlist (per docs/adr/0001 — no client holds AWS access),
-# and the table lives with modules/api_service as insolvia-waitlist-<env>.
+# and the table lives with modules/api_service as insolvia-<env>-waitlist.
 
 # ── ECR — the SSR Lambda's Docker image ─────────────────────────
-# Not owned here: `insolvia-marketing` is one repository shared by every
+# Not owned here: `insolvia-shared-marketing` is one repository shared by every
 # environment, created in infra/envs/shared and passed in as
 # `var.ecr_repository_url`, so prod can deploy the exact digest staging
 # validated. The image is environment-agnostic — the only env-specific value,
@@ -261,7 +275,7 @@ resource "aws_s3_bucket_public_access_block" "assets" {
 }
 
 resource "aws_cloudfront_origin_access_control" "assets" {
-  name                              = "${local.bucket_name}-oac"
+  name                              = "${local.name}-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -284,7 +298,7 @@ data "aws_cloudfront_cache_policy" "optimized" {
 # switching this origin to an OAC-signed Function URL later without CloudFront
 # silently dropping its SigV4 signature.
 resource "aws_cloudfront_origin_request_policy" "ssr" {
-  name    = "${local.function_name}-origin-request"
+  name    = "${local.name}-origin-request"
   comment = "All viewer data except Host + Authorization"
 
   headers_config {
@@ -321,7 +335,7 @@ resource "aws_cloudfront_origin_request_policy" "ssr" {
 #    production page ships noindex. Overwriting also stops a viewer from
 #    spoofing the header.
 resource "aws_cloudfront_function" "viewer_request" {
-  name    = "${local.name_prefix}-viewer-request-${var.environment}"
+  name    = "${local.name}-viewer-request"
   runtime = "cloudfront-js-2.0"
   comment = local.serves_apex ? "301 ${var.apex_domain} -> ${var.www_domain}; viewer Host -> X-Forwarded-Host" : "viewer Host -> X-Forwarded-Host"
   publish = true

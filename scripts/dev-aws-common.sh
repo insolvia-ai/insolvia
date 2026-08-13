@@ -23,7 +23,7 @@ API_DIR="$REPO_ROOT/services/api"
 APP_DIR="$REPO_ROOT/apps/insolvia_app"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/insolvia"
 MACHINE_ID_FILE="$CONFIG_DIR/machine-id"
-STATE_BUCKET="insolvia-terraform-state"
+STATE_BUCKET="insolvia-shared-terraform-state-us-east-1"
 
 # The `default` AWS profile is Insolvia's (its own dedicated account —
 # 521762924626). Override with --profile on any script, or AWS_PROFILE in the
@@ -84,11 +84,11 @@ load_aws_identity() {
   DEV_ENVIRONMENT="dev-$MACHINE_SHORT_ID"
   # What infra/envs/dev actually names things — asserted before any
   # destructive action ever touches a resource.
-  WAITLIST_TABLE_NAME_EXPECTED="insolvia-waitlist-$DEV_ENVIRONMENT"
-  CASE_TABLE_NAME_EXPECTED="insolvia-cases-$DEV_ENVIRONMENT"
-  CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-case-access-log-$DEV_ENVIRONMENT"
-  FIRM_TABLE_NAME_EXPECTED="insolvia-firms-$DEV_ENVIRONMENT"
-  USER_POOL_NAME_EXPECTED="insolvia-users-$DEV_ENVIRONMENT"
+  WAITLIST_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-waitlist"
+  CASE_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-cases"
+  CASE_ACCESS_LOG_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-case-access-log"
+  FIRM_TABLE_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-firms"
+  USER_POOL_NAME_EXPECTED="insolvia-$DEV_ENVIRONMENT-users"
   STATE_KEY="insolvia/dev/$AWS_ACCOUNT_ID/$MACHINE_ID/terraform.tfstate"
 }
 

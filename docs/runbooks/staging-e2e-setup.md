@@ -62,7 +62,7 @@ echo.
 
 ### 1. Let the pipeline into the staging pool
 
-The seed role (`insolvia-github-actions-seed`) needs to create accounts in the
+The seed role (`insolvia-staging-seed-role`) needs to create accounts in the
 staging pool. That pool's ARN is not knowable when `ci-trust` is first applied —
 a pool ARN contains a generated id — so it is passed in as a variable once
 staging exists.

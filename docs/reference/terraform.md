@@ -16,7 +16,7 @@ infra/
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
-│   │                         #   insolvia-audit-<env> under its own key
+│   │                         #   insolvia-<env>-audit under its own key
 │   ├── mailer/               # transactional email: Lambda + S3 + DynamoDB + SES
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex)
@@ -27,27 +27,27 @@ infra/
     ├── shared/               # account-wide, env-independent
     │                         #   • Route53 hosted zone  insolvia.ai
     │                         #   • ACM wildcard cert    *.insolvia.ai + apex SAN (us-east-1)
-    │                         #   • IAM role             insolvia-github-actions (OIDC)
+    │                         #   • IAM role             insolvia-shared-deploy-role (OIDC)
     ├── staging/              # web_hosting -> staging-app.insolvia.ai
     │                         # api_service -> staging-api.insolvia.ai
-    │                         # auth        -> insolvia-users-staging
+    │                         # auth        -> insolvia-staging-users
     ├── prod/                 # web_hosting -> app.insolvia.ai
     │                         # api_service -> api.insolvia.ai
-    │                         # auth        -> insolvia-users-prod
+    │                         # auth        -> insolvia-prod-users
     │                         # marketing_site -> www.insolvia.ai (+ apex 301)
     └── dev/                  # PER DEVELOPER MACHINE (see below) — waitlist
                               # table + case store + auth pool, env suffix
                               # dev-<short-id>; audit trail opt-in
 ```
 
-| Env | State key (`s3://insolvia-terraform-state/…`) | Owns |
+| Env | State key (`s3://insolvia-shared-terraform-state-us-east-1/…`) | Owns |
 |---|---|---|
-| ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-github-actions` deploy role + its policy — **human-applied only**, never by CI (see below) |
+| ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy — **human-applied only**, never by CI (see below) |
 | account-access | `insolvia/account-access/terraform.tfstate` | The human IAM users, the groups they belong to, and the policies attached to them — **human-applied only**, and CI *cannot* apply it at all (see below) |
-| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-api`, `insolvia-marketing`, `insolvia-mailer` — one per service, shared by every env) |
-| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-waitlist-staging`, alarms); staging auth (`insolvia-users-staging`) |
-| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-waitlist-prod`, alarms); prod auth (`insolvia-users-prod`); the marketing stack (see below) |
-| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-waitlist-dev-<short-id>` and `insolvia-cases-dev-<short-id>` tables and `insolvia-users-dev-<short-id>` pool; the audit trail only with `-var=enable_audit_trail=true` |
+| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer` — one per service, shared by every env) |
+| staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-staging-waitlist`, alarms); staging auth (`insolvia-staging-users`) |
+| prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-prod-waitlist`, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
+| dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-waitlist` and `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
 
 ## Cross-layer references (data sources, not outputs)
 
@@ -92,7 +92,7 @@ edit to the user map can never propose a change to the deploy role.
 Apply with `scripts/apply-account-access.sh` (credential dance → plan → confirm).
 
 **What it deliberately does not model**, all for the same reason — the
-credential would be written to `s3://insolvia-terraform-state` in plaintext:
+credential would be written to `s3://insolvia-shared-terraform-state-us-east-1` in plaintext:
 
 | Not modelled | Why | Where it lives instead |
 |---|---|---|
@@ -102,7 +102,7 @@ credential would be written to `s3://insolvia-terraform-state` in plaintext:
 
 A self-service *"manage your own MFA"* policy is also absent, and the module
 header says so explicitly so it is not re-added from a search result: every
-user here is in `Admin`, so `AdministratorAccess` already allows every MFA
+user here is in `insolvia-shared-admin-group`, so `AdministratorAccess` already allows every MFA
 action (verified with `aws iam simulate-principal-policy`). It starts doing
 work the day a non-admin user exists. MFA **enforcement**
 (`aws:MultiFactorAuthPresent`) is a real open gap rather than a settled
@@ -128,7 +128,7 @@ short of root recovery, and a real departure can afford a second plan.
 One instance per environment (issue #63): `staging-api.insolvia.ai` and
 `api.insolvia.ai`. Each owns, per env:
 
-- **ECR** — *not* owned per env. One repository per service, `insolvia-api`,
+- **ECR** — *not* owned per env. One repository per service, `insolvia-shared-api`,
   shared by staging and prod and created in `envs/shared`: prod deliberately
   deploys the exact image digest staging validated, which requires one place
   both envs can name it. Environment
@@ -138,7 +138,7 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   runtime). Retention is time-based with no catch-all rule, because ECR
   lifecycle rules only ever *expire* and never *protect*: a catch-all would
   evict the digest prod is running once staging churned past it.
-- **Lambda (Image)** `insolvia-api-<env>` — 30 s / 512 MB, Flask+Mangum from
+- **Lambda (Image)** `insolvia-<env>-api` — 30 s / 512 MB, Flask+Mangum from
   `services/api/`. `lifecycle { ignore_changes = [image_uri, environment] }`:
   the **deploy workflow owns both** — it pushes an image and injects the
   environment it resolves from SSM (below), so Terraform's copies are only the
@@ -153,7 +153,7 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   API's own region — unlike CloudFront's unconditional us-east-1 — so the
   same shared wildcard-cert lookup serves both, only because everything is
   us-east-1.
-- **DynamoDB** `insolvia-waitlist-<env>` — `PK`/`SK` string keys,
+- **DynamoDB** `insolvia-<env>-waitlist` — `PK`/`SK` string keys,
   PAY_PER_REQUEST, PITR. Lives here rather than with the marketing site per
   `docs/adr/0001`. The Lambda's role gets
   **PutItem only** (append-only by design), on its own env's table only.
@@ -163,7 +163,7 @@ One instance per environment (issue #63): `staging-api.insolvia.ai` and
   join as SecureStrings with `ignore_changes = [value]`, so Terraform creates
   the slot but never owns the value.
 - **Alarms** (#69) — Lambda errors and throttles, HTTP API `5xx`, p99 latency
-  > 2 s sustained — all to an `insolvia-api-<env>-alarms` SNS topic.
+  > 2 s sustained — all to an `insolvia-<env>-api-alarms` SNS topic.
   Subscribing an email is a manual step (confirmation click; no real addresses
   in this public repo).
 
@@ -174,7 +174,7 @@ deadlocks**: Terraform owns the repo the image must already be in. Once per
 env:
 
 ```
-terraform -chdir=infra/envs/shared apply          # creates insolvia-api
+terraform -chdir=infra/envs/shared apply          # creates insolvia-shared-api
 docker build --target lambda -f services/api/Dockerfile -t <repo-url>:<env> . && docker push <repo-url>:<env>
 terraform apply
 ```
@@ -185,16 +185,16 @@ update-function-code` → resolve `/insolvia/<env>/api/*` →
 
 ## Auth (`infra/modules/auth/`)
 
-One Cognito user pool per environment (issue #65): `insolvia-users-staging`
-and `insolvia-users-prod`, fully separate — a staging token can never verify
+One Cognito user pool per environment (issue #65): `insolvia-staging-users`
+and `insolvia-prod-users`, fully separate — a staging token can never verify
 against prod. Each owns, per env:
 
-- **User pool** `insolvia-users-<env>` — email as username, **self-signup
+- **User pool** `insolvia-<env>-users` — email as username, **self-signup
   disabled** (attorneys are provisioned via `admin-create-user`), 12+ char
   password policy, optional TOTP MFA, ESSENTIALS plan (threat protection is a
   PLUS-plan upsell, deferred). `deletion_protection` is ACTIVE on prod only.
 - **Hosted domain** — Cognito-provided prefix
-  `insolvia-<env>.auth.us-east-1.amazoncognito.com`, serving **managed login**
+  `insolvia-<env>-auth.auth.us-east-1.amazoncognito.com`, serving **managed login**
   (`managed_login_version = 2`), not the classic hosted UI. AWS calls the
   classic UI a "first-generation" service; managed login is what carries the
   branding editor, dark mode, localisation and the Terms/Privacy links at
@@ -228,7 +228,7 @@ against prod. Each owns, per env:
   custom domain is per-pool and takes 15–20 minutes each way, so a per-machine
   one would add a quarter-hour to every `dev-aws-setup.sh` run.
 - **One public PKCE app client**, authorization-code, no secret, refresh-token
-  rotation enabled: `insolvia-web-<env>` — the SPA; callbacks at
+  rotation enabled: `insolvia-<env>-app` — the SPA; callbacks at
   `<origin>/auth/callback`, sign-out to the origin. Staging also registers
   `http://localhost:3000`, so the dev server must serve on that exact port
   (`apps/insolvia_app/scripts/dev-up.sh` pins it); prod registers no dev
@@ -251,14 +251,14 @@ The first persistent store of GLBA-scope data in the account — SSNs, full
 financials — so the posture here is the one to copy, not to improvise on. The
 logical model it holds is
 [`case-data-model.md`](case-data-model.md); this section is how it is
-protected. One instance per environment — `insolvia-cases-staging`,
-`insolvia-cases-prod`, and `insolvia-cases-dev-<short-id>` on each developer
+protected. One instance per environment — `insolvia-staging-cases`,
+`insolvia-prod-cases`, and `insolvia-dev-<short-id>-cases` on each developer
 machine — each under its own key. Local is the same module, not an
 approximation of it: there is no DynamoDB emulator here, so a KMS or IAM
 mistake surfaces on a laptop instead of after a deploy.
 
 **Encryption at rest.** A customer-managed KMS key per environment
-(`alias/insolvia-cases-<env>`), rotation enabled, with the DynamoDB table's
+(`alias/insolvia-<env>-cases`), rotation enabled, with the DynamoDB table's
 `server_side_encryption` pointed at it. `enabled = true` alone would use the
 AWS-owned DynamoDB key, which is not a key we control — the distinction is the
 entire point. Staging and prod never share a key: the key is what makes prod
@@ -315,7 +315,7 @@ twice over instead: the table depends on the key, so a `terraform destroy`
 reaches the table first and aborts on its deletion protection, and even a
 scheduled key deletion is cancellable for 30 days.
 
-**The access log.** A second table, `insolvia-case-access-log-<env>`, keyed
+**The access log.** A second table, `insolvia-<env>-case-access-log`, keyed
 `PK = CASE#<id>` / `SK = <recorded_at>#<event_id>`, under the same key. It
 answers the question the CloudTrail trail structurally cannot: *which
 signed-in user* read this case. ADR 0001 means AWS only ever sees the API
@@ -327,7 +327,7 @@ who *saw* it is the question with no other source.
 **Nothing in it expires, and TTL cannot be turned on from the pipeline.**
 DynamoDB authorises `UpdateTimeToLive` against the caller, and on a
 CMK-encrypted table that needs `kms:Decrypt` on the key — which `ci-trust`
-explicitly denies the deploy role on `alias/insolvia-cases-*`. There is no
+explicitly denies the deploy role on `alias/insolvia-*-cases`. There is no
 condition key separating "enable TTL" from "read a row"; both are
 `kms:ViaService = dynamodb`. So the choice is retention or a deploy role that
 can read case data, and the deny wins. That also matches the posture
@@ -363,13 +363,13 @@ published: DynamoDB decrypts under its own grant, so the API never names it.
 ## Case-data audit trail (`infra/modules/audit_trail/`)
 
 CloudTrail data events for the stores holding GLBA-scope data, into an
-`insolvia-audit-<env>` bucket under its own key. One instance per deployed
+`insolvia-<env>-audit` bucket under its own key. One instance per deployed
 environment; on a developer machine it is opt-in (below).
 
 **What it can and cannot prove.** Because
 [ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md) makes the API
 Lambda's role the only application principal, every data event names
-`insolvia-api-<env>-role` and never the signed-in user behind it. That makes
+`insolvia-<env>-api-role` and never the signed-in user behind it. That makes
 this evidence about **administrative** access — the "no human read paths in
 prod" claim — and about the shape and volume of application access. *Which
 user read this SSN* is a different question that only an application-level log
@@ -377,7 +377,7 @@ the API writes can answer. Do not let this trail stand in for that one.
 
 **Its key is not the case key**, and that is forced rather than chosen:
 `ci-trust`'s `DenyCaseDataDecryption` denies the deploy role
-`kms:GenerateDataKey` on anything aliased `alias/insolvia-cases-*`, so a trail
+`kms:GenerateDataKey` on anything aliased `alias/insolvia-*-cases`, so a trail
 pointed at the case key fails at `CreateTrail`. The separation is worth having
 anyway — the deploy role holds no `kms:Decrypt` for audit keys in any
 statement, so the pipeline can create this trail and write to it and can never
@@ -424,11 +424,11 @@ declares no `key`), so two developers can never collide on names or state.
 
 What it owns is deliberately only what local dev consumes today:
 
-- **DynamoDB** `insolvia-waitlist-dev-<short-id>` — same PK/SK schema as
+- **DynamoDB** `insolvia-dev-<short-id>-waitlist` — same PK/SK schema as
   `api_service`'s table so the API's adapter behaves identically, but PITR is
   **off** (throwaway data; `dev-aws-reset.sh` wipes it by design).
 - **Case store** via the same `modules/case_store` as staging/prod —
-  `insolvia-cases-dev-<short-id>` and its access-log table under this
+  `insolvia-dev-<short-id>-cases` and its access-log table under this
   machine's own customer-managed key, so the tenancy indexes and the encrypted read path behave here exactly as
   they do deployed. PITR and deletion protection are **off** and the key
   deletion window is the minimum 7 days, so a teardown does not leave a
@@ -436,8 +436,8 @@ What it owns is deliberately only what local dev consumes today:
   so no grant is created and the developer's own credentials are the
   principal.
 - **Auth** via the same `modules/auth` as staging/prod —
-  `insolvia-users-dev-<short-id>`, hosted-domain prefix
-  `insolvia-dev-<short-id>` (Cognito domain prefixes are globally unique
+  `insolvia-dev-<short-id>-users`, hosted-domain prefix
+  `insolvia-dev-<short-id>-auth` (Cognito domain prefixes are globally unique
   across AWS; the short id is what makes a per-developer pool creatable at
   all), localhost-only web origin, deletion protection off. Outputs only —
   preps local auth work, nothing consumes it yet.
@@ -487,9 +487,9 @@ viewer ── CloudFront (www.insolvia.ai + insolvia.ai) ─┬─ /assets/*  �
   apply `infra/envs/shared` (which creates the repository), push the image,
   then a full apply.
 
-Names: `insolvia-marketing` (ECR — shared across envs, no suffix),
-`insolvia-marketing-ssr-prod` (Lambda + HTTP API + role),
-`insolvia-marketing-assets-prod` (S3).
+Names: `insolvia-shared-marketing` (ECR — shared across envs),
+`insolvia-prod-marketing-ssr` (Lambda + HTTP API + role),
+`insolvia-prod-marketing-us-east-1` (S3).
 
 ## Providers
 
@@ -555,7 +555,11 @@ Never `terraform destroy` `shared` casually — it holds the hosted zone and the
 deploy role every other layer depends on. Tear down `prod`/`staging` first.
 
 ## Conventions
-- Resources: `insolvia-<thing>-<env>` (e.g. `insolvia-web-staging`).
+- Resources: `insolvia-<env>-<component>-<identifier>` — environment SECOND
+  (e.g. `insolvia-staging-api`, `insolvia-prod-mailer-feedback-dlq`). S3 buckets
+  take a `-us-east-1` suffix for global uniqueness
+  (`insolvia-prod-case-documents-us-east-1`). The `insolvia-aws-naming` skill
+  owns the full per-resource-type table and the component-naming rule.
 - Tags: `{ Project = "insolvia", Environment = <env>, ManagedBy = "terraform" }`.
 - Sensitive vars `sensitive = true`; commit `terraform.tfvars.example`, never real `*.tfvars`.
 - The infra directory is always `infra/`, never `terraform/`.

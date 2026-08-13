@@ -19,7 +19,7 @@
 # deployment order in docs/reference/terraform.md) — so the cycle is
 # just "seed an image, then apply", once per environment:
 #
-#   1. apply infra/envs/shared (creates insolvia-api)
+#   1. apply infra/envs/shared (creates insolvia-shared-api)
 #   2. build services/api
 #      (`docker build --platform linux/amd64 --provenance=false --target lambda`),
 #      tag it <repo-url>:<env> — this environment's moving marker tag, which is
@@ -38,8 +38,10 @@
 # the image drift (see the lifecycle note on the Lambda).
 
 locals {
-  # insolvia-api-<env> — the repo/Lambda/API/alarm name stem.
-  name = "${var.project}-api-${var.environment}"
+  # insolvia-<env>-api — the Lambda/API/alarm name stem. Environment is the
+  # SECOND segment, per the insolvia-aws-naming skill; `api` is the component
+  # because that is the surface this serves (api.insolvia.ai).
+  name = "${var.project}-${var.environment}-api"
 
   # The per-environment API config namespace (#70): /<project>/<env>/..., with
   # an /api segment so later services can claim sibling namespaces.
@@ -47,7 +49,7 @@ locals {
 }
 
 # ── Container repository ────────────────────────────────────────
-# This module does NOT own a repository. `insolvia-api` is a single repo
+# This module does NOT own a repository. `insolvia-shared-api` is a single repo
 # shared by every environment, created in infra/envs/shared and passed in as
 # `var.ecr_repository_url`.
 #
@@ -101,7 +103,7 @@ removed {
 # ── Waitlist storage ────────────────────────────────────────────
 # The API owns the waitlist table: docs/adr/0001 makes the API the only
 # application principal with data-store access (an SSR Lambda holding a
-# DynamoDB grant was reviewed and rejected). Named insolvia-waitlist-<env> —
+# DynamoDB grant was reviewed and rejected). Named insolvia-<env>-waitlist —
 # deliberately NOT insolvia-marketing-waitlist-*: the table belongs to the
 # API, not to any one client of it.
 #
@@ -111,7 +113,7 @@ removed {
 # requirement: staging must never be able to read (or pollute) prod.
 
 resource "aws_dynamodb_table" "waitlist" {
-  name         = "${var.project}-waitlist-${var.environment}"
+  name         = "${var.project}-${var.environment}-waitlist"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
@@ -165,7 +167,10 @@ resource "aws_iam_role_policy_attachment" "api_basic" {
 # ssm:GetParameter here on the specific parameters it reads — per-parameter,
 # like the mailer's kill-switch grant, not the whole ${local.ssm_prefix} tree.
 resource "aws_iam_role_policy" "api" {
-  name = "${local.name}-policy"
+  # `-data` is the GRANT this policy carries, per the naming skill's IAM policy
+  # pattern ([project]-[env]-[component]-[grant]). "-policy" said only that a
+  # policy is a policy.
+  name = "${local.name}-data"
   role = aws_iam_role.api.id
   policy = jsonencode({
     Version = "2012-10-17"
