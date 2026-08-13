@@ -16,7 +16,12 @@
 #   * case-documents bucket      force_destroy = false
 #   * mailer content bucket      force_destroy = false
 #   * audit bucket               force_destroy = false, versioned
-#   * ECR repositories           no force_delete, and they hold images
+#
+# The container repositories need the same treatment and are deliberately NOT
+# here: they are shared across environments, so emptying them is account-wide
+# and running this for `staging` would have pulled the images prod depends on.
+# They belong to scripts/rename-teardown-ecr.sh, which runs BEFORE the shared
+# apply — see that script's order.
 #
 # Each of those fails the apply at the moment it is reached, leaving the
 # environment half-renamed — some resources on the new names, some on the old,
@@ -61,7 +66,7 @@ for arg in "$@"; do
       ENV="$arg" ;;
     --check)   CHECK_ONLY=true ;;
     --yes|-y)  ASSUME_YES=true ;;
-    -h|--help) sed -n '2,43p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
     *)         die "unrecognized argument: $arg (see --help)" ;;
   esac
 done
@@ -101,7 +106,6 @@ OLD_BUCKETS=(
   "insolvia-case-documents-$ENV"
   "insolvia-audit-$ENV"
 )
-OLD_ECR=(insolvia-api insolvia-admin insolvia-mailer insolvia-marketing)
 
 # ── Confirmation ────────────────────────────────────────────────
 if ! $CHECK_ONLY; then
@@ -202,38 +206,6 @@ for bucket in "${OLD_BUCKETS[@]}"; do
   ok "  $bucket — empty"
 done
 
-# ── 4. ECR repositories ─────────────────────────────────────────
-# The repositories are renamed too (insolvia-api -> insolvia-shared-api), and
-# `aws_ecr_repository` has no force_delete in this config, so the destroy fails
-# on RepositoryNotEmptyException while they hold images.
-#
-# THE CONSEQUENCE THAT BITES: the NEW repositories come up empty, and an
-# Image-package Lambda cannot be created from an empty repository. So the shared
-# apply must be followed by scripts/bootstrap-ecr-images.sh <env> BEFORE the
-# environment apply, exactly as a fresh account would need. Emptying these is
-# also what makes a rollback to the old names impossible without a rebuild —
-# which is why it is the last step here rather than the first.
-log "── ECR repositories ──────────────────────────"
-for repo in "${OLD_ECR[@]}"; do
-  if ! aws ecr describe-repositories --repository-names "$repo" --region "$REGION" >/dev/null 2>&1; then
-    continue
-  fi
-  ids="$(aws ecr list-images --repository-name "$repo" --region "$REGION" \
-    --query 'imageIds[*]' --output json)"
-  n="$(printf '%s' "$ids" | jq 'length')"
-  if [[ "$n" -eq 0 ]]; then
-    log "  $repo — already empty"
-    continue
-  fi
-  if $CHECK_ONLY; then
-    log "  $repo — WOULD delete $n image(s)"
-  else
-    aws ecr batch-delete-image --repository-name "$repo" --region "$REGION" \
-      --image-ids "$ids" >/dev/null
-    ok "  $repo — $n image(s) deleted"
-  fi
-done
-
 if $CHECK_ONLY; then
   printf '\n'
   log "--check: nothing was changed."
@@ -242,21 +214,19 @@ fi
 
 cat <<EOF
 
-Cleared. Now, in this order:
+Cleared.
 
-  1. terraform -chdir=infra/envs/shared apply
-     Creates insolvia-shared-{api,admin-api,marketing,mailer}.
+By this point infra/envs/shared must already be applied and the new
+repositories seeded (rename-teardown-ecr.sh -> shared apply ->
+bootstrap-ecr-images.sh). If they are not, the $ENV apply fails with
+"Source image ... does not exist".
 
-  2. ./scripts/bootstrap-ecr-images.sh $ENV
-     The new repositories are empty and the Lambdas cannot be created without
-     an image. Skipping this makes step 3 fail with
-     "Source image ... does not exist".
+  1. Apply $ENV — in CI, which is the rule for staging and prod
+     (infra/CLAUDE.md). The rename itself. Every protection this script cleared
+     is re-asserted by the config on the NEW resources, so prod comes back
+     protected.
 
-  3. terraform -chdir=infra/envs/$ENV apply
-     The rename itself. Every protection this script cleared is re-asserted by
-     the config on the NEW resources, so prod comes back protected.
-
-  4. Re-seed. Staging: the seed step in app-staging.yml, on the next deploy.
+  2. Re-seed. Staging: the seed step in app-staging.yml, on the next deploy.
      Prod: there is no seeding path — the pool and the firm table are empty and
      every account has to be re-created.
 

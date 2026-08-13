@@ -88,12 +88,21 @@ SERVICES=()
 # it serves is admin-api.insolvia.ai — so its repository is
 # insolvia-shared-admin-api. `admin` alone is the staff PORTAL, which has no
 # container at all. See the insolvia-aws-naming skill.
-declare -A ECR_COMPONENT=(
-  [api]=api
-  [admin]=admin-api
-  [mailer]=mailer
-  [marketing]=marketing
-)
+#
+# A `case`, not an associative array: macOS ships bash 3.2, where `declare -A`
+# is not an error but a silent indexed-array declaration — `[admin]=admin-api`
+# then evaluates `admin` as arithmetic and dies under `set -u` with the
+# baffling "admin: unbound variable". Every script here has to run on system
+# bash, so nothing may use a bash 4 construct.
+ecr_component() {
+  case "$1" in
+    api)       printf 'api' ;;
+    admin)     printf 'admin-api' ;;
+    mailer)    printf 'mailer' ;;
+    marketing) printf 'marketing' ;;
+    *)         die "no ECR component mapping for service '$1'" ;;
+  esac
+}
 
 for arg in "$@"; do
   case "$arg" in
@@ -208,7 +217,7 @@ for svc in "${SERVICES[@]}"; do
   # marker tag, which is what the Lambda's Terraform seed points at
   # (var.image_tag) — not `:latest`, which under a shared repository would mean
   # "whatever any environment pushed last".
-  repo="insolvia-shared-${ECR_COMPONENT[$svc]}"
+  repo="insolvia-shared-$(ecr_component "$svc")"
   image="$REGISTRY/$repo"
   log "── $svc → $repo ─────────────────────────────"
 

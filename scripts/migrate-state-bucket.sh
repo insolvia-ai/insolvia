@@ -33,13 +33,24 @@
 #   4. update the AWS_ROLE_ARN and AWS_SEED_ROLE_ARN GitHub secrets — the role
 #      names changed, so the OLD ARNs no longer resolve and every deploy fails
 #      at configure-aws-credentials with a role-not-found
-#   5. scripts/rename-teardown.sh <env> — clears deletion protection and empties
+#   5. scripts/rename-teardown-ecr.sh   — empties the OLD container repositories.
+#                                         MUST precede the shared apply: the
+#                                         repositories are renamed, and the
+#                                         destroy fails on
+#                                         RepositoryNotEmptyException while they
+#                                         hold images — mid-apply, leaving
+#                                         `shared` half-done
+#   6. apply shared                     — creates insolvia-shared-*
+#   7. scripts/bootstrap-ecr-images.sh staging && ... prod
+#                                       — the new repositories are empty, and an
+#                                         Image-package Lambda cannot be created
+#                                         from an empty repository
+#   8. scripts/rename-teardown.sh <env> — clears deletion protection and empties
 #                                         the buckets the rename apply destroys
-#   6. apply shared, then staging / prod
-#   7. scripts/bootstrap-ecr-images.sh <env> — the new repositories are empty,
-#      and an Image-package Lambda cannot be created from an empty repository
+#   9. merge; CI applies staging, then prod behind the promote gate
 #
 # Steps 3 and 4 are the pair that bricks CI if either is skipped alone.
+# Step 5 before step 6 is the pair that half-applies `shared` if reversed.
 #
 # Usage:
 #   ./scripts/migrate-state-bucket.sh [--check] [--yes]
@@ -65,7 +76,7 @@ for arg in "$@"; do
   case "$arg" in
     --check)   CHECK_ONLY=true ;;
     --yes|-y)  ASSUME_YES=true ;;
-    -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,59p' "$0"; exit 0 ;;
     *)         die "unrecognized argument: $arg" ;;
   esac
 done

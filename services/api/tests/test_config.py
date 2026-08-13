@@ -64,8 +64,9 @@ def test_case_document_bucket_defaults_to_none():
 
 
 def test_case_document_bucket_is_read():
-    config = load_config({"CASE_DOCUMENT_BUCKET": "insolvia-staging-case-documents-us-east-1"})
-    assert config.case_document_bucket == "insolvia-staging-case-documents-us-east-1"
+    name = "insolvia-staging-case-documents-us-east-1"
+    config = load_config({"CASE_DOCUMENT_BUCKET": name})
+    assert config.case_document_bucket == name
 
 
 def test_mailer_api_url_defaults_to_none():
