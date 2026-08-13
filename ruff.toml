@@ -4,6 +4,25 @@
 target-version = "py311"
 line-length = 88
 
+# Agent tooling is never ours to lint. `.agents/skills/` is third-party
+# documentation installed by scripts/dev-setup.sh, and some of it ships Python
+# (expo-skill-eval's generate_viewer.py alone is 63 E501s against the
+# line-length above). At the repo root .gitignore keeps it invisible, but a
+# `ruff check .` run from a service directory would still walk a copy that
+# landed there — and .gitignore would NOT cover that copy, because
+# `.agents/skills/` contains a slash and git therefore anchors the pattern to
+# the repo root.
+#
+# So the exclusion is here, not as an explicit `src tests` argument list in the
+# three services' scripts/dev-test.sh: those scripts exist to run byte-for-byte
+# what the `*-pr.yml` Lint step runs (`ruff check .`), and narrowing the local
+# argument list would break that equivalence — and only for the services, while
+# packages/insolvia_core has the same gate. One config both sides already read.
+#
+# No trailing slash and no directory separator, so these match a directory of
+# that name at ANY depth — which is the whole point.
+extend-exclude = [".agents", ".claude"]
+
 [lint]
 # Strict, curated rule set. Beyond the pyflakes/pycodestyle baseline this adds
 # import sorting, bug patterns, modern-syntax upgrades, simplifications,
