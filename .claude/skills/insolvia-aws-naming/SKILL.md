@@ -149,6 +149,32 @@ the deny existed to remove. `ci-trust` is human-applied
 (`scripts/apply-ci-trust.sh`), so a rename touching any fenced family is a
 two-apply change: `ci-trust` first, then the env.
 
+**That first apply must be a UNION of the old and new patterns, not a swap.**
+This is the one that is easy to get wrong, because the finished state looks
+correct and the plan is clean. Terraform REFRESHES a resource before it
+destroys it, so for the single apply that renames a bucket the deploy role
+needs to read the OLD name — which the new pattern no longer matches. Swapping
+them produced a wall of
+
+```
+AccessDenied ... s3:GetBucketVersioning on insolvia-audit-staging
+```
+
+for buckets the apply was about to delete, and there is no route to the destroy
+that skips the read. So: add the old patterns alongside the new, apply
+`ci-trust`, apply the environments, then remove the old patterns in a third
+apply. Mark them `TRANSITIONAL` when you add them, or they become permanent.
+
+For a **deny**, keeping both spellings is the safe direction rather than merely
+the working one — narrowing a deny to the new name while the old resource still
+exists un-protects it for the length of the transition.
+
+S3 is usually the only family that needs this, and the reason is worth
+internalising: every other grant is fenced flat (`function:insolvia-*`,
+`table/insolvia-*`, `role/insolvia-*`, `alias/insolvia*`) and a flat prefix
+matches both spellings by construction. Only the bucket grants are fenced per
+COMPONENT — and the component is what moved.
+
 ## Before you rename anything: know what it costs
 
 A rename in Terraform is a **destroy and recreate** for most AWS resources.
