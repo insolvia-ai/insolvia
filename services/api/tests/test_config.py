@@ -27,8 +27,8 @@ def test_waitlist_table_name_defaults_to_none():
 
 
 def test_waitlist_table_name_is_read():
-    config = load_config({"WAITLIST_TABLE_NAME": "insolvia-waitlist-staging"})
-    assert config.waitlist_table_name == "insolvia-waitlist-staging"
+    config = load_config({"WAITLIST_TABLE_NAME": "insolvia-staging-waitlist"})
+    assert config.waitlist_table_name == "insolvia-staging-waitlist"
 
 
 def test_case_table_name_defaults_to_none():
@@ -36,8 +36,8 @@ def test_case_table_name_defaults_to_none():
 
 
 def test_case_table_name_is_read():
-    config = load_config({"CASE_TABLE_NAME": "insolvia-cases-staging"})
-    assert config.case_table_name == "insolvia-cases-staging"
+    config = load_config({"CASE_TABLE_NAME": "insolvia-staging-cases"})
+    assert config.case_table_name == "insolvia-staging-cases"
 
 
 def test_firm_table_name_defaults_to_none():
@@ -45,8 +45,8 @@ def test_firm_table_name_defaults_to_none():
 
 
 def test_firm_table_name_is_read():
-    config = load_config({"FIRM_TABLE_NAME": "insolvia-firms-staging"})
-    assert config.firm_table_name == "insolvia-firms-staging"
+    config = load_config({"FIRM_TABLE_NAME": "insolvia-staging-firms"})
+    assert config.firm_table_name == "insolvia-staging-firms"
 
 
 def test_case_access_log_table_name_defaults_to_none():
@@ -54,7 +54,7 @@ def test_case_access_log_table_name_defaults_to_none():
 
 
 def test_case_access_log_table_name_is_read():
-    name = "insolvia-case-access-log-staging"
+    name = "insolvia-staging-case-access-log"
     config = load_config({"CASE_ACCESS_LOG_TABLE_NAME": name})
     assert config.case_access_log_table_name == name
 
@@ -64,8 +64,8 @@ def test_case_document_bucket_defaults_to_none():
 
 
 def test_case_document_bucket_is_read():
-    config = load_config({"CASE_DOCUMENT_BUCKET": "insolvia-case-documents-staging"})
-    assert config.case_document_bucket == "insolvia-case-documents-staging"
+    config = load_config({"CASE_DOCUMENT_BUCKET": "insolvia-staging-case-documents-us-east-1"})
+    assert config.case_document_bucket == "insolvia-staging-case-documents-us-east-1"
 
 
 def test_mailer_api_url_defaults_to_none():

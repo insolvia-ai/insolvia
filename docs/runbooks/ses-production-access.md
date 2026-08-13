@@ -136,7 +136,7 @@ What to check:
 6. Confirm the record holds only a hash:
 
    ```bash
-   aws dynamodb scan --table-name insolvia-mailer-suppressions-staging \
+   aws dynamodb scan --table-name insolvia-staging-mailer-suppressions \
      --projection-expression 'recipient_hash,reason' --max-items 5
    ```
 

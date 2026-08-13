@@ -4,7 +4,7 @@ description: >-
   How to change what the Insolvia CI deploy role is allowed to do — and why
   those changes can't be applied by CI. Use this WHENEVER a change touches the
   GitHub Actions deploy role's IAM permissions: editing
-  infra/envs/ci-trust/main.tf (the OIDC provider / insolvia-github-actions
+  infra/envs/ci-trust/main.tf (the OIDC provider / insolvia-shared-deploy-role
   role / its policy), or diagnosing a deploy that fails with an IAM
   AccessDenied. Trigger it the moment you see "not authorized to perform:
   <service>:<Action>" / "no identity-based policy allows" in a staging, prod,
@@ -28,7 +28,7 @@ action to the deploy role's policy, merge, then a human runs
 
 ## Why — the trust anchor and its self-deny
 
-The deploy role (`insolvia-github-actions`) and the GitHub OIDC provider it's
+The deploy role (`insolvia-shared-deploy-role`) and the GitHub OIDC provider it's
 assumed through live in their own Terraform root, **`infra/envs/ci-trust`**,
 separate from everything CI applies. That root's policy contains an explicit
 `Deny` (`DenySelfPrivilegeEscalation`) on `iam:PutRolePolicy` (and friends)

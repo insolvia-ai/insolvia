@@ -1,8 +1,8 @@
 # ── CI trust anchor ─────────────────────────────────────────────
 # The account-wide GitHub-Actions trust anchor, extracted from `shared` into
 # its own state so it is NEVER applied by CI. It owns three things and nothing
-# else: the GitHub OIDC provider, the `insolvia-github-actions` deploy role,
-# and that role's permissions policy.
+# else: the GitHub OIDC provider, the `insolvia-shared-deploy-role`, and that
+# role's permissions policy.
 #
 # WHY ITS OWN ROOT: the role's policy carries an explicit self-deny
 # (DenySelfPrivilegeEscalation) forbidding the role from editing its own
@@ -75,7 +75,7 @@ data "aws_iam_policy_document" "github_assume" {
 }
 
 resource "aws_iam_role" "github_actions" {
-  name               = "insolvia-github-actions"
+  name               = "insolvia-shared-deploy-role"
   assume_role_policy = data.aws_iam_policy_document.github_assume.json
   tags               = local.common_tags
 }
@@ -92,8 +92,8 @@ data "aws_iam_policy_document" "github_permissions" {
       "s3:DeleteObject",
     ]
     resources = [
-      "arn:aws:s3:::insolvia-terraform-state",
-      "arn:aws:s3:::insolvia-terraform-state/*",
+      "arn:aws:s3:::insolvia-shared-terraform-state-us-east-1",
+      "arn:aws:s3:::insolvia-shared-terraform-state-us-east-1/*",
     ]
   }
 
@@ -103,8 +103,10 @@ data "aws_iam_policy_document" "github_permissions" {
       "s3:*",
     ]
     resources = [
-      "arn:aws:s3:::insolvia-web-*",
-      "arn:aws:s3:::insolvia-web-*/*",
+      "arn:aws:s3:::insolvia-*-app-*",
+      "arn:aws:s3:::insolvia-*-app-*/*",
+      "arn:aws:s3:::insolvia-*-admin-*",
+      "arn:aws:s3:::insolvia-*-admin-*/*",
     ]
   }
 
@@ -121,8 +123,9 @@ data "aws_iam_policy_document" "github_permissions" {
   # ── Marketing site (issues #43, #47) ───────────────────────────
   # The marketing stack (infra/envs/staging and infra/envs/prod) needs only
   # one grant the other statements don't cover: its assets bucket (does not
-  # match the insolvia-web-* prefix). The prefix below is environment-agnostic,
-  # so adding the staging instantiation needed no change here.
+  # match the web-hosting patterns above). The pattern below wildcards the ENV
+  # segment, so adding an environment needs no change here — but note that is a
+  # mid-string wildcard, not a prefix: env is the second segment now.
   # Its ECR repository, HTTP API, and access logs are
   # covered by the backend-API statements below (EcrAuthToken,
   # EcrRepositories, HttpApis, ApiAccessLogGroups — all insolvia-* scoped);
@@ -132,8 +135,8 @@ data "aws_iam_policy_document" "github_permissions" {
     sid     = "MarketingAssetsBucket"
     actions = ["s3:*"]
     resources = [
-      "arn:aws:s3:::insolvia-marketing-*",
-      "arn:aws:s3:::insolvia-marketing-*/*",
+      "arn:aws:s3:::insolvia-*-marketing-*",
+      "arn:aws:s3:::insolvia-*-marketing-*/*",
     ]
   }
   # ── end marketing site ─────────────────────────────────────────
@@ -190,24 +193,24 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = ["*"]
   }
 
-  # The inbound-mail bucket does not match the insolvia-web-* prefix above.
+  # The inbound-mail bucket does not match the web-hosting patterns above.
   statement {
     sid     = "InboundMailBucket"
     actions = ["s3:*"]
     resources = [
-      "arn:aws:s3:::insolvia-inbound-mail-*",
-      "arn:aws:s3:::insolvia-inbound-mail-*/*",
+      "arn:aws:s3:::insolvia-*-inbound-mail-*",
+      "arn:aws:s3:::insolvia-*-inbound-mail-*/*",
     ]
   }
 
   # The mailer's private content bucket (S3 message manifests) does not match
-  # the insolvia-web-* prefix either — see infra/modules/mailer.
+  # the web-hosting patterns either — see infra/modules/mailer.
   statement {
     sid     = "MailerContentBucket"
     actions = ["s3:*"]
     resources = [
-      "arn:aws:s3:::insolvia-mailer-*",
-      "arn:aws:s3:::insolvia-mailer-*/*",
+      "arn:aws:s3:::insolvia-*-mailer-*",
+      "arn:aws:s3:::insolvia-*-mailer-*/*",
     ]
   }
 
@@ -306,7 +309,7 @@ data "aws_iam_policy_document" "github_permissions" {
   }
 
   # ── Backend API stack (#62, #63, #69, #70) ─────────────────────
-  # The API deploy builds a Docker image, pushes it to insolvia-api-<env>,
+  # The API deploy builds a Docker image, pushes it to insolvia-shared-api,
   # applies the env stacks, and points the Lambda at the new image. Most of
   # what it needs is already granted above: Lambda create/update on
   # function:insolvia-* (ForwarderCompute), the alarm SNS topic (AlertTopics),
@@ -451,7 +454,7 @@ data "aws_iam_policy_document" "github_permissions" {
   # SSE-KMS case bucket at all, because DenyCaseDataDecryption fires with
   # kms:ViaService = s3. That is the desired posture — case documents move
   # through the API, never through CI — but it does mean an aws_s3_object
-  # targeting insolvia-case-* would fail, by design rather than by accident.
+  # targeting insolvia-*-case-* would fail, by design rather than by accident.
   statement {
     sid = "EncryptionKeyGrants"
     actions = [
@@ -554,7 +557,7 @@ data "aws_iam_policy_document" "github_permissions" {
   # stated requirement rather than speculation. Worth knowing what it can and
   # cannot prove before 8.2 designs against it: because ADR 0001 makes the
   # API's execution role the ONLY application principal, CloudTrail data
-  # events on the case store would show `insolvia-api-<env>-role` for every
+  # events on the case store would show `insolvia-<env>-api-role` for every
   # read and never the end user behind it. It is therefore evidence about
   # administrative and control-plane access — the "no human read paths in
   # prod" claim — while "which signed-in user read this SSN" has to be an
@@ -596,15 +599,15 @@ data "aws_iam_policy_document" "github_permissions" {
   }
 
   # Case documents — credit reports, pay stubs, bank statements. A separate
-  # bucket family from insolvia-web-* / insolvia-mailer-*, and the prefix is
-  # left broad (insolvia-case-*) so that issues 8.2 and 8.6 can settle exact
-  # bucket names without another human-applied round trip through this file.
+  # bucket family from the app/admin and mailer patterns above, and it is left
+  # broad (insolvia-*-case-*) so that a change to the exact bucket names does
+  # not need another human-applied round trip through this file.
   statement {
     sid     = "CaseDocumentBuckets"
     actions = ["s3:*"]
     resources = [
-      "arn:aws:s3:::insolvia-case-*",
-      "arn:aws:s3:::insolvia-case-*/*",
+      "arn:aws:s3:::insolvia-*-case-*",
+      "arn:aws:s3:::insolvia-*-case-*/*",
     ]
   }
 
@@ -617,8 +620,8 @@ data "aws_iam_policy_document" "github_permissions" {
     sid     = "AuditLogBuckets"
     actions = ["s3:*"]
     resources = [
-      "arn:aws:s3:::insolvia-audit-*",
-      "arn:aws:s3:::insolvia-audit-*/*",
+      "arn:aws:s3:::insolvia-*-audit-*",
+      "arn:aws:s3:::insolvia-*-audit-*/*",
     ]
   }
 
@@ -810,7 +813,7 @@ data "aws_iam_policy_document" "github_permissions" {
   # An EXPLICIT deny on mutating the pipeline's own identity. Explicit deny
   # beats every allow in IAM, including any added later.
   #
-  # This is not belt-and-braces. The role is named `insolvia-github-actions`,
+  # This is not belt-and-braces. The role is named `insolvia-shared-deploy-role`,
   # which MATCHES the `role/insolvia-*` resource pattern in
   # ServiceRoleManagement above — so without this statement the pipeline would
   # hold iam:PutRolePolicy and iam:DeleteRole over itself, and any change to
@@ -896,8 +899,10 @@ data "aws_iam_policy_document" "github_permissions" {
   # and dev roots, and this root is applied by a human before any of them.
   #
   # The pattern must track infra/modules/case_store: `alias/${local.name}` where
-  # name is "insolvia-cases-<env>". Renaming there without renaming here
-  # silently stops the deny matching, which is why it is spelled out.
+  # name is "insolvia-<env>-cases". Because the env is the SECOND segment, the
+  # wildcard sits in the MIDDLE — `alias/insolvia-*-cases`, not a prefix match.
+  # Renaming there without renaming here silently stops the deny matching, which
+  # is why it is spelled out.
   statement {
     sid    = "DenyCaseDataDecryption"
     effect = "Deny"
@@ -917,7 +922,7 @@ data "aws_iam_policy_document" "github_permissions" {
       # the case pattern is enough to deny.
       test     = "ForAnyValue:StringLike"
       variable = "kms:ResourceAliases"
-      values   = ["alias/insolvia-cases-*"]
+      values   = ["alias/insolvia-*-cases"]
     }
   }
 
@@ -940,7 +945,7 @@ data "aws_iam_policy_document" "github_permissions" {
       "s3:DeleteObject",
       "s3:DeleteObjectVersion",
     ]
-    resources = ["arn:aws:s3:::insolvia-audit-*/*"]
+    resources = ["arn:aws:s3:::insolvia-*-audit-*/*"]
   }
 
   # Attaching AWS-managed policies is constrained to the single policy the
@@ -966,7 +971,7 @@ data "aws_iam_policy_document" "github_permissions" {
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role_policy" "github_permissions" {
-  name   = "insolvia-deploy"
+  name   = "insolvia-shared-deploy-permissions"
   role   = aws_iam_role.github_actions.id
   policy = data.aws_iam_policy_document.github_permissions.json
 }
@@ -991,7 +996,7 @@ resource "aws_iam_role_policy" "github_permissions" {
 # WHY IT NEEDS THE CASE KEY AT ALL. infra/envs/staging/main.tf gives the firm
 # store the case store's key on purpose — "firm membership decides who reads
 # case data, and one deny should cover both" — so writing a firm row requires
-# GenerateDataKey on `alias/insolvia-cases-staging`. That is the uncomfortable
+# GenerateDataKey on `alias/insolvia-staging-cases`. That is the uncomfortable
 # part of this design and it is bounded rather than waved away: the grant is
 # staging's key only, usable only through DynamoDB, and this role has no
 # DynamoDB access to the CASE table, so the key buys nothing it can decrypt.
@@ -1033,7 +1038,7 @@ data "aws_iam_policy_document" "github_seed_assume" {
 }
 
 resource "aws_iam_role" "github_seed" {
-  name               = "insolvia-github-actions-seed"
+  name               = "insolvia-staging-seed-role"
   assume_role_policy = data.aws_iam_policy_document.github_seed_assume.json
   tags               = local.common_tags
 }
@@ -1051,8 +1056,8 @@ data "aws_iam_policy_document" "github_seed_permissions" {
       "dynamodb:Query",
     ]
     resources = [
-      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-firms-staging",
-      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-firms-staging/index/*",
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-staging-firms",
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-staging-firms/index/*",
     ]
   }
 
@@ -1060,11 +1065,12 @@ data "aws_iam_policy_document" "github_seed_permissions" {
   #
   # Scoped by alias for the same reason DenyCaseDataDecryption is: this root is
   # applied by a human before staging exists, so it cannot know the key ARN.
-  # The pattern must track infra/modules/case_store's `alias/${local.name}` —
+  # The value must track infra/modules/case_store's `alias/${local.name}` —
   # renaming there without renaming here does not fail the apply, it silently
   # stops this matching and the seed step starts failing with AccessDenied.
   #
-  # `-staging` exactly, not `-*`: a wildcard would reach the prod case key.
+  # `insolvia-staging-cases` exactly, not `insolvia-*-cases`: a wildcard would
+  # reach the prod case key.
   statement {
     sid = "StagingCaseKeyThroughDynamoDbOnly"
     actions = [
@@ -1077,7 +1083,7 @@ data "aws_iam_policy_document" "github_seed_permissions" {
     condition {
       test     = "ForAnyValue:StringEquals"
       variable = "kms:ResourceAliases"
-      values   = ["alias/insolvia-cases-staging"]
+      values   = ["alias/insolvia-staging-cases"]
     }
 
     # Without this the grant would be usable from anywhere — the CLI, a Lambda,
@@ -1127,7 +1133,7 @@ data "aws_iam_policy_document" "github_seed_permissions" {
 }
 
 resource "aws_iam_role_policy" "github_seed_permissions" {
-  name   = "insolvia-seed-staging"
+  name   = "insolvia-staging-seed-firms"
   role   = aws_iam_role.github_seed.id
   policy = data.aws_iam_policy_document.github_seed_permissions.json
 }

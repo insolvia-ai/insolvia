@@ -3,7 +3,7 @@
 #   • wildcard ACM cert *.insolvia.ai (+ apex SAN), DNS-validated, us-east-1
 #   • the SES domain identity for insolvia.ai + all mail DNS (see `email` below)
 #
-# The GitHub OIDC provider and the insolvia-github-actions deploy role USED to
+# The GitHub OIDC provider and the insolvia-shared-deploy-role USED to
 # live here; they were extracted into infra/envs/ci-trust so the deploy role's
 # own policy is never applied by CI (it can't be — see that root's header and
 # DenySelfPrivilegeEscalation). Consequence: everything left in `shared` is
@@ -120,21 +120,30 @@ module "email" {
 # SSM, the marketing SSR from process.env, the mailer from its Lambda env), so
 # nothing environment-specific is ever baked into a layer.
 #
-# These are the only `insolvia-<thing>` resources with no `-<env>` suffix. That
-# is the shared-layer convention (see infra/CLAUDE.md) — the name carries no
-# environment because the resource genuinely has none.
+# These take `shared` in the environment slot rather than omitting it. They
+# genuinely have no environment, and `shared` is what this root's tags have
+# always said (Environment = "shared") — so the name now says what the tag says.
+# The earlier convention gave them no env segment at all (`insolvia-api`), which
+# read fine in isolation and sorted nowhere near `insolvia-prod-api` in a
+# console listing. See the insolvia-aws-naming skill § "shared is an
+# environment, not an exemption".
 #
-# Named `insolvia-*` so the deploy role's existing ECR grant covers them without
-# an IAM change (infra/envs/ci-trust/main.tf) — that grant is human-applied, so
-# a rename here would strand the pipeline.
+# The component names match the services they hold images for, including
+# `admin-api` rather than `admin` — `admin` is the staff PORTAL, which has no
+# container at all (it is a static SPA in an S3 bucket).
+#
+# Named `insolvia-*` so the deploy role's ECR grant
+# (arn:aws:ecr:...:repository/insolvia-*, infra/envs/ci-trust/main.tf) covers
+# them without an IAM change — that grant is human-applied, so a rename OUT of
+# that prefix would strand the pipeline.
 locals {
-  container_repositories = toset(["api", "admin", "marketing", "mailer"])
+  container_repositories = toset(["api", "admin-api", "marketing", "mailer"])
 }
 
 resource "aws_ecr_repository" "service" {
   for_each = local.container_repositories
 
-  name = "insolvia-${each.key}"
+  name = "insolvia-shared-${each.key}"
   # MUTABLE is load-bearing: `staging` and `prod` are moving marker tags that CI
   # repoints at each deploy (see the lifecycle policy below).
   image_tag_mutability = "MUTABLE"

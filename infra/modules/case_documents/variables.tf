@@ -1,5 +1,5 @@
 variable "project" {
-  description = "Name prefix. The bucket must stay in the insolvia-case-* family — ci-trust's CaseDocumentBuckets grant is scoped to exactly that prefix."
+  description = "Name prefix. The bucket must stay in the insolvia-*-case-* family — ci-trust's CaseDocumentBuckets grant is scoped to exactly that prefix."
   type        = string
   default     = "insolvia"
 }

@@ -91,12 +91,12 @@ jobs:
         env:
           FUNCTION: ${{ steps.tf.outputs.function }}
         run: |
-          # /insolvia/staging/admin/<kebab-key> -> KEBAB_KEY, e.g.
+          # /insolvia/staging/admin-api/<kebab-key> -> KEBAB_KEY, e.g.
           #   firm-table-name  -> FIRM_TABLE_NAME
           #   google-client-id -> GOOGLE_CLIENT_ID
           environment="$(
             aws ssm get-parameters-by-path \
-              --path /insolvia/staging/admin \
+              --path /insolvia/staging/admin-api \
               --with-decryption \
               --query 'Parameters[].{Name:Name,Value:Value}' \
               --output json \

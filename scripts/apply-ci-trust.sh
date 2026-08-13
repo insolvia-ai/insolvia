@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Apply infra/envs/ci-trust — the GitHub OIDC provider + insolvia-github-actions
+# Apply infra/envs/ci-trust — the GitHub OIDC provider + insolvia-shared-deploy-role
 # deploy role + its permissions policy.
 #
 # This root is HUMAN-APPLIED ONLY, on purpose. The deploy role's policy denies
@@ -54,7 +54,10 @@ ok "Authenticated as $caller"
 # it with the deploy role's own credentials, the apply would hit the self-deny
 # anyway — but catch it early with a clear message.
 case "$caller" in
-  *:assumed-role/insolvia-github-actions/*)
+  # Both spellings: `insolvia-github-actions` is the pre-rename name, and this
+  # root is the apply that renames it — so during that one apply the caller
+  # could legitimately be either.
+  *:assumed-role/insolvia-shared-deploy-role/*|*:assumed-role/insolvia-github-actions/*)
     die "You are the deploy role itself — it cannot change its own permissions (that's the whole point). Run this as a human admin (aws login)." ;;
 esac
 

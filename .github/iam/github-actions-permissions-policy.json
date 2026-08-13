@@ -1,5 +1,5 @@
 {
-  "__comment": "Reference copy of the permissions policy for the github-actions-insolvia role. Authoritative definition lives in infra/envs/shared/main.tf.",
+  "__comment": "PARTIAL reference copy of three statements from the insolvia-shared-deploy-role's permissions policy. The authoritative definition — around forty statements, including the two explicit denies that are controls rather than scoping — lives in infra/envs/ci-trust/main.tf and is applied by a human, never CI. Read that file, not this one; this exists only to show the shape.",
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -7,17 +7,20 @@
       "Effect": "Allow",
       "Action": ["s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": [
-        "arn:aws:s3:::insolvia-terraform-state",
-        "arn:aws:s3:::insolvia-terraform-state/*"
+        "arn:aws:s3:::insolvia-shared-terraform-state-us-east-1",
+        "arn:aws:s3:::insolvia-shared-terraform-state-us-east-1/*"
       ]
     },
     {
+      "__comment": "The env is the SECOND name segment (insolvia-<env>-<component>), so a component fence is a mid-string wildcard, not a prefix.",
       "Sid": "WebHostingBuckets",
       "Effect": "Allow",
       "Action": ["s3:*"],
       "Resource": [
-        "arn:aws:s3:::insolvia-web-*",
-        "arn:aws:s3:::insolvia-web-*/*"
+        "arn:aws:s3:::insolvia-*-app-*",
+        "arn:aws:s3:::insolvia-*-app-*/*",
+        "arn:aws:s3:::insolvia-*-admin-*",
+        "arn:aws:s3:::insolvia-*-admin-*/*"
       ]
     },
     {

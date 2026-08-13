@@ -1,5 +1,5 @@
 # Cognito auth for the Insolvia app (#65): one user pool per environment
-# (insolvia-users-<env>), a Cognito-provided hosted domain, and one public
+# (insolvia-<env>-users), a Cognito-provided hosted domain, and one public
 # PKCE app client for the web SPA. The house style is email-as-username,
 # admin-only creation, and SRP-only explicit flows, on the OAuth
 # authorization-code + PKCE flows a browser SPA actually needs.
@@ -49,7 +49,7 @@ locals {
 # ── User pool ───────────────────────────────────────────────────
 
 resource "aws_cognito_user_pool" "main" {
-  name = "${var.project}-users-${var.environment}"
+  name = "${var.project}-${var.environment}-users"
 
   # Self-signup is DISABLED, deliberately: Insolvia's users are attorneys and
   # their staff, provisioned by us (aws cognito-idp admin-create-user, or the
@@ -127,7 +127,7 @@ resource "aws_cognito_user_pool" "main" {
   #
   # What "every row keyed on a subject" means, because it is the half that is
   # easy to miss: a replaced pool mints NEW subs, so `firm_user` rows
-  # (insolvia-firms-<env>, keyed on the subject), `case.createdBy` and every
+  # (insolvia-<env>-firms, keyed on the subject), `case.createdBy` and every
   # case assignment would all point at identities that no longer exist. Those
   # tables are empty today. After the first firm is onboarded this stops being
   # a pool replacement and becomes a data migration.
@@ -204,7 +204,11 @@ resource "aws_cognito_user_pool" "main" {
 #   • The rendered markup changes completely, so the staging E2E's hosted-UI
 #     field selectors must be re-derived from the real page (see e2e/).
 resource "aws_cognito_user_pool_domain" "main" {
-  domain                = "${var.project}-${var.environment}"
+  # insolvia-<env>-auth. The prefix is GLOBALLY unique across all of AWS, so
+  # the env segment is what makes a per-developer pool creatable at all; the
+  # `auth` component says what the hostname serves rather than leaving the
+  # slot empty.
+  domain                = "${var.project}-${var.environment}-auth"
   user_pool_id          = aws_cognito_user_pool.main.id
   managed_login_version = 2
 
@@ -358,7 +362,10 @@ locals {
 
 # The web SPA (app.insolvia.ai / staging-app.insolvia.ai, Expo web).
 resource "aws_cognito_user_pool_client" "web" {
-  name         = "${var.project}-web-${var.environment}"
+  # Component `app`, matching the surface it signs people in to — the same
+  # component modules/web_hosting uses for that SPA's bucket. It was `web`,
+  # which named a tier and collided with two other resources.
+  name         = "${var.project}-${var.environment}-app"
   user_pool_id = aws_cognito_user_pool.main.id
 
   generate_secret = false # public client — see the header comment
@@ -426,7 +433,7 @@ resource "aws_cognito_user_pool_client" "web" {
 #     reach.
 #   - AN ACCOUNT ALONE GRANTS NOTHING. A pool user with no firm-user row can
 #     sign in and is refused by every route (services/api's current_accessor).
-#     Reaching data needs a row in insolvia-firms-<env>, which is a different
+#     Reaching data needs a row in insolvia-<env>-firms, which is a different
 #     grant on a different table.
 #
 # The alternative considered and rejected: a separate, narrower invite Lambda,
@@ -440,7 +447,7 @@ resource "aws_cognito_user_pool_client" "web" {
 resource "aws_iam_role_policy" "api_invite" {
   count = var.api_role_name == null ? 0 : 1
 
-  name = "invite-${aws_cognito_user_pool.main.name}"
+  name = "${aws_cognito_user_pool.main.name}-invite"
   role = var.api_role_name
 
   policy = jsonencode({
@@ -470,7 +477,7 @@ resource "aws_iam_role_policy" "api_invite" {
 resource "aws_iam_role_policy" "admin_invite" {
   count = var.admin_invite_role_name == null ? 0 : 1
 
-  name = "admin-invite-${aws_cognito_user_pool.main.name}"
+  name = "${aws_cognito_user_pool.main.name}-admin-invite"
   role = var.admin_invite_role_name
 
   policy = jsonencode({

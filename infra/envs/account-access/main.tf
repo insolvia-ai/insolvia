@@ -41,7 +41,7 @@ locals {
   # would happily send an unknown group name to IAM and fail late, or worse,
   # match a group this root does not manage.
   groups = {
-    Admin = aws_iam_group.admin.name
+    admin = aws_iam_group.admin.name
   }
 
   # Flattened so each (user, policy) pair is its own resource instance with a
@@ -65,8 +65,18 @@ locals {
 # someone in or out is then a one-line membership change with no policy edit,
 # and `aws iam list-attached-group-policies` answers "who is an admin here"
 # without walking every user.
+# insolvia-shared-admin-group. Account-wide, so the env segment is `shared`
+# (the insolvia-aws-naming skill); `-group` is the identifier that keeps it
+# apart from a role of the same component.
+#
+# It was `Admin` — mixed case, and the one AWS name in the account that said
+# nothing about which account it belonged to. IAM renames a group IN PLACE
+# (UpdateGroup), so this is not a destroy; the AdministratorAccess attachment
+# below does re-attach, and the apply that carries it is the one moment a sole
+# admin could be left without the group. The recovery path is the account root
+# user, which is why the rename was worth taking rather than exempting.
 resource "aws_iam_group" "admin" {
-  name = "Admin"
+  name = "insolvia-shared-admin-group"
 }
 
 resource "aws_iam_group_policy_attachment" "admin_administrator_access" {
@@ -140,6 +150,11 @@ resource "aws_iam_user_policy_attachment" "human" {
 # is a hard plan error. So when you add a NEW person to `var.human_users`, do
 # not add an import block for them — Terraform must create that user. Import
 # blocks are only ever for adopting something that already exists.
+# `Admin` is the PRE-RENAME name — the id an import must use is whatever the
+# group is called in the account right now, not what this config renames it to.
+# Once this has applied, the group is insolvia-shared-admin-group and these two
+# blocks are stale: they are no-ops against existing state, but a from-scratch
+# state would fail on them. Delete both after the first apply.
 import {
   to = aws_iam_group.admin
   id = "Admin"
@@ -170,7 +185,8 @@ import {
 # MFA DEVICES. `aws_iam_virtual_mfa_device` exists, and it is the wrong tool
 # here: the resource returns `base_32_string_seed` and `qr_code_png` as
 # attributes, which means the TOTP shared secret is written to
-# s3://insolvia-terraform-state in plaintext. Anyone who can read that bucket
+# s3://insolvia-shared-terraform-state-us-east-1 in plaintext. Anyone who can
+# read that bucket
 # can then generate valid second factors for an AdministratorAccess user, which
 # inverts what the second factor is for. Enrolment stays a console action by
 # the person holding the device — docs/runbooks/iam-mfa-rotation.md is the
@@ -191,7 +207,7 @@ import {
 # (iam:CreateVirtualMFADevice + iam:EnableMFADevice on
 # arn:aws:iam::*:mfa/${aws:username}) is deliberately absent, and this note
 # exists so it is not added from a search result the next time an MFA setup
-# fails. Every user here is in Admin, so AdministratorAccess already allows all
+# fails. Every user here is in the admin group, so AdministratorAccess already allows all
 # of it — verified with `aws iam simulate-principal-policy`, which returns
 # "allowed" for CreateVirtualMFADevice, EnableMFADevice, DeactivateMFADevice,
 # DeleteVirtualMFADevice, ResyncMFADevice and ListMFADevices. Attaching the

@@ -4,7 +4,7 @@ output "human_user_arns" {
 }
 
 output "admin_group_arn" {
-  description = "ARN of the Admin group (AdministratorAccess)."
+  description = "ARN of the insolvia-shared-admin-group (AdministratorAccess)."
   value       = aws_iam_group.admin.arn
 }
 

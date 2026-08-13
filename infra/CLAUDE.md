@@ -26,12 +26,25 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   platform, so the other one fails checksum verification at init. If init ever
   reports a lock/constraint conflict, fix the lock with that command — don't
   delete the file.
-- **Naming `insolvia-<thing>-<env>`;** tags `{ Project = "insolvia",
+- **Naming `insolvia-<env>-<component>-<identifier>`** — environment SECOND,
+  component named for what it *serves*. **Read the `insolvia-aws-naming` skill
+  before creating or renaming any AWS resource**; it owns the per-resource-type
+  patterns (S3's region suffix, `-role`, `-dlq`, `-oac`), the component-naming
+  rule, and which renames destroy data. Tags `{ Project = "insolvia",
   Environment, ManagedBy = "terraform" }`. Sensitive vars `sensitive = true`,
   never committed — commit `terraform.tfvars.example`, never real `*.tfvars`.
-  **Carve-out: resources owned by `shared` carry no `-<env>` suffix**, because
-  they genuinely have no environment — `insolvia-api`, `insolvia-marketing`,
-  `insolvia-mailer` (the container repositories). Do not "fix" those names.
+  **`shared` is an environment, not an exemption**: account-wide resources take
+  it in the env slot — `insolvia-shared-api` (a container repository),
+  `insolvia-shared-deploy-role`. There was once a carve-out giving them no env
+  segment at all; it is gone.
+- **A rename is not just a rename — `envs/ci-trust` fences the deploy role by
+  ARN pattern, and two of those patterns are controls.** Because env is the
+  second segment, a component fence is a MID-STRING wildcard
+  (`arn:aws:s3:::insolvia-*-marketing-*`, `alias/insolvia-*-cases`). Missing one
+  does not fail the apply — `DenyCaseDataDecryption` and `DenyAuditLogErasure`
+  simply stop matching, and the pipeline silently gains what the deny existed to
+  remove. `ci-trust` is human-applied, so any rename touching a fenced family is
+  a two-apply change: `ci-trust` first, then the env.
 - **Container repositories are shared across environments**, one per service,
   in `envs/shared`. This is what lets a prod deploy run the exact image digest
   staging validated instead of rebuilding — see the note in
@@ -40,11 +53,13 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   Cognito pools, not in separate image stores.
 - **Structure:** `modules/<concern>/{main,variables,outputs}.tf`,
   `envs/<env>/{main,variables,providers,backend,outputs}.tf`. State:
-  `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`,
-  `encrypt = true`.
+  `s3://insolvia-shared-terraform-state-us-east-1`, key
+  `insolvia/<env>/terraform.tfstate`, `encrypt = true`. The bucket is created by
+  hand (`docs/runbooks/aws-bootstrap.md`), not by Terraform — a root cannot
+  create its own backend.
 - **Environments** `staging`, `prod`, `shared` (account-wide) — each a separate
   `envs/<env>/` dir with its own state key, **never** Terraform workspaces.
-- **The `ci-trust` root** (OIDC provider + `insolvia-github-actions` deploy role
+- **The `ci-trust` root** (OIDC provider + `insolvia-shared-deploy-role`
   + its policy) is applied by a **human, never CI** (`DenySelfPrivilegeEscalation`)
   — `scripts/apply-ci-trust.sh`; skill `insolvia-deploy-role-permissions`.
 - **The `account-access` root** holds the **human** IAM users and groups —
@@ -55,7 +70,7 @@ the `insolvia-aws-auth` skill first if credentials aren't working.
   bucket; `docs/reference/terraform.md` § "Human account access" has the table
   and `docs/runbooks/iam-mfa-rotation.md` the procedure that replaces them. Do
   not add a self-service "manage your own MFA" policy either: every user is in
-  `Admin`, so it grants nothing that isn't already held.
+  `insolvia-shared-admin-group`, so it grants nothing that isn't already held.
 - **The GitHub org login is lowercase `insolvia-ai`.** GitHub emits the stored
   casing in the OIDC `sub`, and the IAM `StringLike` condition is case-sensitive
   — a mismatch fails `AssumeRoleWithWebIdentity` with an unhelpful error. Keep it

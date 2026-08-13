@@ -12,7 +12,7 @@
 # with:
 #
 #   InvalidParameterValueException: Source image
-#     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-<svc>:<env>
+#     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-shared-<component>:<env>
 #     does not exist. Provide a valid source image.
 #
 # The same note lives at the top of infra/modules/{api_service,admin_service,mailer,
@@ -26,8 +26,8 @@
 #
 # It does not apply Terraform and it does not create the ECR repositories. The
 # repositories are shared across environments and live in infra/envs/shared
-# (one per service, no -<env> suffix); if one is genuinely absent, apply that
-# root first:
+# (one per service, `shared` in the environment slot — insolvia-shared-api and
+# friends); if one is genuinely absent, apply that root first:
 #
 #   terraform -chdir=infra/envs/shared apply
 #
@@ -82,6 +82,18 @@ ENV=""
 DISPATCH=false
 ASSUME_YES=false
 SERVICES=()
+
+# The CLI name for a service is not always its component name: the admin
+# SERVICE is `admin` on the command line and in services/admin, but the surface
+# it serves is admin-api.insolvia.ai — so its repository is
+# insolvia-shared-admin-api. `admin` alone is the staff PORTAL, which has no
+# container at all. See the insolvia-aws-naming skill.
+declare -A ECR_COMPONENT=(
+  [api]=api
+  [admin]=admin-api
+  [mailer]=mailer
+  [marketing]=marketing
+)
 
 for arg in "$@"; do
   case "$arg" in
@@ -196,7 +208,7 @@ for svc in "${SERVICES[@]}"; do
   # marker tag, which is what the Lambda's Terraform seed points at
   # (var.image_tag) — not `:latest`, which under a shared repository would mean
   # "whatever any environment pushed last".
-  repo="insolvia-$svc"
+  repo="insolvia-shared-${ECR_COMPONENT[$svc]}"
   image="$REGISTRY/$repo"
   log "── $svc → $repo ─────────────────────────────"
 

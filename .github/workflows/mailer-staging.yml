@@ -12,7 +12,7 @@ name: Mailer · Deploy · Staging
 # Image-package Lambda refuses to be created before its image exists, so the
 # apply below deadlocks. Bootstrap once by hand, per
 # infra/modules/mailer/main.tf:
-#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-mailer)
+#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-shared-mailer)
 #   2. docker build --target lambda services/mailer, tag <repo-url>:staging, push
 #   3. terraform apply   (full)
 # After that, every deploy is this workflow.

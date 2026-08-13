@@ -24,6 +24,8 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/staging-github-set-secrets.sh` | Staging E2E setup (one-time) | Sets `E2E_TEST_USER_PASSWORD` as an **`insolvia-staging` environment** secret (narrower than `AWS_ROLE_ARN`, which is repo-level — the seed role's trust policy only accepts tokens minted for that environment, so a repo-level secret would be a value no job could use), read from the environment or a no-echo prompt and piped on stdin. **The only secret staging's test data needs** — the addresses are in [`seeds/staging.json`](../seeds/staging.json) and the accounts are created by the seed step in `app-staging.yml`, so adding a test user comes nowhere near this script. Re-running rotates, and the next deploy converges every seeded account onto the new value. `--check`, `--yes`. |
 | `scripts/apply-ci-trust.sh` | Human-gated trust apply | Applies `infra/envs/ci-trust` (OIDC provider + deploy role + its policy) — the one root CI can't apply (`DenySelfPrivilegeEscalation`). Credential dance + plan review + confirm. Use when a deploy fails on an IAM `AccessDenied` after you granted the pipeline a new permission. See `docs/runbooks/aws-bootstrap.md` § "The ci-trust anchor". |
 | `scripts/apply-account-access.sh` | Human-gated IAM apply | Applies `infra/envs/account-access` (the human IAM users, their groups, their attached policies). Same credential dance + plan review + confirm, plus guards for the two ways this root can lock you out. Use when someone joins, leaves or changes group. **Not** for rotating your own MFA — that is `docs/runbooks/iam-mfa-rotation.md`, and no Terraform resource is involved on purpose. |
+| `scripts/migrate-state-bucket.sh` | One-time, human | Copies Terraform state from the old `insolvia-terraform-state` bucket to `insolvia-shared-terraform-state-us-east-1` (the naming refactor's one non-conforming bucket). **Copies and verifies key-for-key; never deletes the source** — losing state does not lose data, it loses the ability to destroy what the state described. `--check` diffs the two buckets and changes nothing. Prints the exact follow-up order, including the two GitHub secrets that must move to the renamed role ARNs or every deploy fails at `configure-aws-credentials`. |
+| `scripts/rename-teardown.sh` | One-time, per env | Clears what would make the naming-rename apply fail half-way: DynamoDB deletion protection, Cognito deletion protection, every object **and version** in the six buckets, and the images in the ECR repositories. `<staging\|prod> [--check] [--yes]`. **This destroys data — on prod, real case documents and every user's password.** `--check` reports without touching anything; prod additionally requires typing the word `prod`. Run it *before* the rename apply, then re-seed images with `bootstrap-ecr-images.sh`. |
 | `apps/insolvia_marketing/scripts/dev-setup.sh` | Marketing site | Shared base → packages auth → `npm ci`; `dev-up.sh` runs the dev server |
 | `apps/insolvia_admin/scripts/dev-setup.sh` | Admin portal | Same shape as marketing (own lockfile, packages auth → `npm ci`); `dev-up.sh` runs Vite on the pinned port 3100 |
 | `apps/insolvia_app/scripts/dev-setup.sh` | Expo app | Shared base → npm workspace install at the repo root; `dev-up.sh` starts the Expo dev server |
@@ -282,7 +284,7 @@ A lost or regenerated `~/.config/insolvia/machine-id` orphans that old id's
 environment: `dev-aws-destroy.sh` only ever inits the *current* id's state
 key, so the old resources and state object survive every teardown.
 `dev-aws-destroy-orphan.sh` takes the 12-char short id visible in the leftover
-resource names (e.g. `insolvia-waitlist-dev-<short-id>`), locates that id's
+resource names (e.g. `insolvia-dev-<short-id>-waitlist`), locates that id's
 own state object in the bucket, destroys everything the state tracks, and
 removes the state object. It refuses the current machine's id, and without
 `--yes` the embedded `terraform destroy` shows its plan and asks first.
@@ -296,7 +298,7 @@ How it works:
 
 - **Identity** — a UUID generated once into `~/.config/insolvia/machine-id`;
   its first 12 hex chars suffix every resource name
-  (`insolvia-waitlist-dev-<short-id>`, `insolvia-users-dev-<short-id>`) and
+  (`insolvia-dev-<short-id>-waitlist`, `insolvia-dev-<short-id>-users`) and
   this machine's own Terraform state key
   (`insolvia/dev/<account-id>/<machine-id>/terraform.tfstate`).
 - **Credentials** — your own AWS profile (the `default` profile; `--profile` /
