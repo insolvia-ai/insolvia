@@ -8,6 +8,7 @@ from insolvia_core.errors import NotFoundError, ValidationError
 from insolvia_core.firms import (
     FEATURES,
     apply_user_changes,
+    full_name,
     parse_self_update,
     permission_for,
 )
@@ -26,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 blueprint = Blueprint("me", __name__)
 
-# The whole writable surface is one display name, capped at 200 characters.
+# The whole writable surface is a first and a last name, each capped at 100
+# characters. 4 KiB is still generous for that, and the cap is here so a body
+# that is not a name at all is refused before it is parsed at all.
 MAX_REQUEST_BYTES = 4 * 1024
 
 
@@ -67,7 +70,15 @@ def _me_body(accessor: Accessor | None) -> dict[str, object]:
             "id": accessor.firm.id,
             "name": accessor.firm.name,
             "role": accessor.user.role,
-            "displayName": accessor.user.display_name,
+            # The two halves a client edits, and the composed string a client
+            # renders. `displayName` is DERIVED — `full_name` is its only
+            # author — so it costs nothing to keep sending and it is what lets
+            # every screen that merely shows a name stay untouched by the
+            # split. Both halves may be `""`: that means "never recorded", and
+            # it is what the client's first-run prompt keys on.
+            "firstName": accessor.user.first_name,
+            "lastName": accessor.user.last_name,
+            "displayName": full_name(accessor.user),
             "isAdmin": accessor.user.is_admin,
             "accessAllCases": accessor.user.access_all_cases,
             "permissions": {
@@ -124,14 +135,19 @@ def read_me() -> ResponseReturnValue:
 @blueprint.patch("/v1/me")
 @require_auth
 def update_me() -> ResponseReturnValue:
-    """Correct your own display name (issue #216 / 11.16).
+    """Correct your own name (issue #216 / 11.16).
 
-    Display name only — core/firms.parse_self_update owns why nothing else on
+    Your name only — core/firms.parse_self_update owns why nothing else on
     the row is self-service. No `@requires` gate, and that is the point of the
     route: the permission axes govern what an admin may do to OTHERS, and
     before this existed a paralegal who mistyped their name at invite time had
     to ask an admin to fix it. `current_accessor()` is still the gate that
     matters — no active membership in an active firm, no row to rename, 403.
+
+    IT IS ALSO WHAT THE CLIENT'S FIRST-RUN PROMPT WRITES TO. A row whose halves
+    were derived from a pre-split display name can have an empty surname, and
+    that is the state the app blocks on; this route is the only way out of it,
+    which is why it takes either half alone rather than demanding both.
 
     The write goes to the firm-user row alone. Cognito holds no display name
     for this pool, so there is no second system to fall out of sync with —
@@ -150,5 +166,5 @@ def update_me() -> ResponseReturnValue:
 
     # GLBA posture as everywhere in this file's neighbours: no name, no
     # subject — that somebody renamed themselves is all a log needs.
-    logger.info("self display name updated")
+    logger.info("self name updated")
     return jsonify(_me_body(Accessor(firm=accessor.firm, user=written)))

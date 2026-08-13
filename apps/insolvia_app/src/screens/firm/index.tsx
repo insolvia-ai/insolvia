@@ -15,9 +15,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
@@ -91,7 +89,6 @@ type RecordState =
  */
 export function Firm({ membership }: { membership: FirmMembership }) {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
@@ -125,7 +122,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
 
   if (!mayAdminister) {
     return (
-      <AppShell actions={<EnvBadge env={env.name} />}>
+      <AppShell>
         <Heading level={1}>{membership.name}</Heading>
         <Text style={[styles.body, muted]}>
           Managing your firm’s people is an administrator’s job. Ask one of your firm’s
@@ -136,7 +133,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
   }
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>{firmName}</Heading>
 
       <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />
@@ -299,7 +296,8 @@ function AddColleague({
 }) {
   const theme = useTheme();
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<FirmRole>('paralegal');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -309,12 +307,13 @@ function AddColleague({
     setSubmitting(true);
     setFieldErrors({});
     onNotice(null);
-    const request: AddFirmUserRequest = { email, displayName, role };
+    const request: AddFirmUserRequest = { email, firstName, lastName, role };
     try {
       const result = await call((client) => client.addFirmUser(request));
       if (result.ok) {
         setEmail('');
-        setDisplayName('');
+        setFirstName('');
+        setLastName('');
         await onAdded();
       }
     } catch (cause) {
@@ -336,12 +335,16 @@ function AddColleague({
     <View style={styles.form}>
       <Heading level={2}>Add a colleague</Heading>
 
-      <Field.Root name="displayName" invalid={Boolean(fieldErrors.displayName)}>
-        <Field.Label>Name</Field.Label>
-        <Input value={displayName} onValueChange={setDisplayName} autoCorrect={false} />
-        {fieldErrors.displayName ? (
-          <Field.Error match>{fieldErrors.displayName}</Field.Error>
-        ) : null}
+      <Field.Root name="firstName" invalid={Boolean(fieldErrors.firstName)}>
+        <Field.Label>First name</Field.Label>
+        <Input value={firstName} onValueChange={setFirstName} autoCorrect={false} />
+        {fieldErrors.firstName ? <Field.Error match>{fieldErrors.firstName}</Field.Error> : null}
+      </Field.Root>
+
+      <Field.Root name="lastName" invalid={Boolean(fieldErrors.lastName)}>
+        <Field.Label>Last name</Field.Label>
+        <Input value={lastName} onValueChange={setLastName} autoCorrect={false} />
+        {fieldErrors.lastName ? <Field.Error match>{fieldErrors.lastName}</Field.Error> : null}
       </Field.Root>
 
       <Field.Root name="email" invalid={Boolean(fieldErrors.email)}>

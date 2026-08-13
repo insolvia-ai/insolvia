@@ -42,6 +42,8 @@ function membership(overrides: Record<string, unknown> = {}) {
       id: FIRM_ID,
       name: 'Example & Partners',
       role: 'attorney',
+      firstName: 'Alice',
+      lastName: 'Admin',
       displayName: 'Alice Admin',
       isAdmin: true,
       accessAllCases: false,
@@ -54,6 +56,8 @@ function membership(overrides: Record<string, unknown> = {}) {
 const BOB_RECORD = {
   subject: BOB,
   email: 'bob@example.test',
+  firstName: 'Bob',
+  lastName: 'Paralegal',
   displayName: 'Bob Paralegal',
   role: 'paralegal',
   isAdmin: false,
@@ -181,7 +185,8 @@ describe('the firm screen', () => {
     await screen.findByRole('heading', { name: 'Add a colleague' });
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Name'), 'Dana Attorney');
+    await user.type(screen.getByLabelText('First name'), 'Dana');
+    await user.type(screen.getByLabelText('Last name'), 'Attorney');
     await user.type(screen.getByLabelText('Work email'), 'dana@example.test');
     await user.press(screen.getByRole('radio', { name: 'Attorney' }));
     await user.press(screen.getByRole('button', { name: 'Add colleague' }));
@@ -194,7 +199,8 @@ describe('the firm screen', () => {
     // absent key as "use the role default" and a present one as an instruction.
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({
       email: 'dana@example.test',
-      displayName: 'Dana Attorney',
+      firstName: 'Dana',
+      lastName: 'Attorney',
       role: 'attorney',
     });
   });

@@ -64,8 +64,9 @@ src/
 ├── components/             APP-SPECIFIC UI — RN primitives, no library
 │                           (Button and Field come from the design system)
 ├── session/                sign-in, tokens, refresh — see below
+├── platform/browser.ts     every browser global, each behind a guard
 ├── config/environment.ts   build-time configuration
-└── theme.ts                StyleSheet helpers over @insolvia-ai/tokens
+└── theme/                  tokens for the active scheme, and the scheme itself
 ```
 
 Rules that follow from it:
@@ -108,9 +109,15 @@ UI comes from two places, both rendering bare RN primitives:
   for a second copy of something shared. When a component resolves oddly or
   renders unstyled, that is `design-system-platforms`.
 - **Everything else in `components/` is app-specific** — the shell chrome and
-  branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`) that marketing has no
-  use for. It stays here by decision
+  branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`, `ThemeToggle`,
+  `AccountMenu`) that marketing has no use for. It stays here by decision
   ([ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md)).
+
+  Two of them are app-local **because the package cannot express them**, not
+  by preference. `ThemeToggle` drives an app-level colour-scheme preference the
+  package knows nothing about; `AccountMenu` supplies its own trigger because
+  `Dropdown.Trigger` wraps children in a `Text` and so cannot hold an `Avatar`.
+  Each says so at its definition.
 
 Both exist in this shape because react-native-web maps accessibility props onto
 real HTML elements (`propsToAccessibilityComponent.js`). That mapping is the
@@ -121,6 +128,7 @@ whole accessibility story, and it only fires if a component asks for it:
 | `Heading`    | app    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
 | `Button`     | design system | `Pressable accessibilityRole="button"` | `<button type="button">`       |
 | `AppShell`   | app    | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
+| `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu | `<button aria-haspopup="menu">` + `role="menu"` |
 | `Field`      | design system | compound `Field.Root/Label/Description/Error` around a control | labelled input group |
 | `Input`      | design system | `TextInput` + the Field's ids, read from context | labelled `<input>`        |
 | `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
@@ -176,10 +184,10 @@ below the `<title>` and why this paragraph is here rather than in the file.
 ## Everything else
 
 - **No hard-coded colors, radii, or spacing steps.** Everything comes from
-  `@insolvia-ai/tokens` via [`src/theme.ts`](src/theme.ts), and only the
+  `@insolvia-ai/tokens` via [`src/theme/`](src/theme/index.ts), and only the
   **semantic** color layer is exported — the raw ink/brass/paper palette is
   unreachable on purpose. Font sizes are the one scale tokens do not carry yet;
-  `theme.ts`'s `fontSizes` is their single owner, so a literal `fontSize:` in a
+  `theme/theme.ts`'s `fontSizes` is their single owner, so a literal `fontSize:` in a
   component is a bug. The two colors in `public/manifest.json` are the unavoidable
   exception — JSON cannot import tokens — so update them by hand if the brand
   changes.
@@ -216,9 +224,12 @@ below the `<title>` and why this paragraph is here rather than in the file.
     `code_challenge`/S256 at all. Do not delete them as redundant.
 
   `@/session` is the barrel and the public surface; screens need only
-  `useSession()`. **No new dependency was added for any of this** — PKCE is Web
+  `useSession()`. The browser globals it used to hold moved to
+  `platform/browser.ts` when the colour-scheme preference became a second
+  caller — a `localStorage` wrapper is platform plumbing, not session state,
+  and reaching into `@/session` for one would be reaching past that barrel. **No new dependency was added for any of this** — PKCE is Web
   Crypto and storage is the platform APIs, each read lazily behind a guard in
-  `session/browser.ts` so a non-web runtime degrades instead of crashing. A
+  `platform/browser.ts` so a non-web runtime degrades instead of crashing. A
   future **native** client is what would justify `expo-auth-session`; on web it
   would buy nothing.
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and

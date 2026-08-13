@@ -222,7 +222,16 @@ class DynamoDbFirmStore:
                 break
         # Sorted here rather than by the key, because the sort key is
         # USER#<uuid> and orders by nothing a human recognises.
-        return tuple(sorted(users, key=lambda user: (user.display_name, user.subject)))
+        #
+        # BY SURNAME, which is what a staff list is normally ordered by and is
+        # now expressible. `subject` still breaks the tie, so two colleagues who
+        # share a name keep a stable order rather than one that varies per query.
+        # The memory adapter sorts identically and must not drift from this.
+        return tuple(
+            sorted(
+                users, key=lambda user: (user.last_name, user.first_name, user.subject)
+            )
+        )
 
     def update_user(self, user: FirmUser) -> FirmUser | None:
         try:

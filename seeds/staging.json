@@ -37,7 +37,8 @@
           "handle": "admin",
           "email": "e2e-admin@insolvia.test",
           "password": "${E2E_TEST_USER_PASSWORD}",
-          "displayName": "E2E Admin",
+          "firstName": "E2E",
+          "lastName": "Admin",
           "role": "attorney",
           "isAdmin": true,
           "accessAllCases": true
@@ -51,7 +52,8 @@
           "handle": "paralegal",
           "email": "e2e-paralegal@insolvia.test",
           "password": "${E2E_TEST_USER_PASSWORD}",
-          "displayName": "E2E Paralegal",
+          "firstName": "E2E",
+          "lastName": "Paralegal",
           "role": "paralegal",
           "isAdmin": false,
           "accessAllCases": false
@@ -71,7 +73,8 @@
           "handle": "outsider",
           "email": "e2e-outsider@insolvia.test",
           "password": "${E2E_TEST_USER_PASSWORD}",
-          "displayName": "E2E Outsider",
+          "firstName": "E2E",
+          "lastName": "Outsider",
           "role": "attorney",
           "isAdmin": true,
           "accessAllCases": true

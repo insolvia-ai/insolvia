@@ -525,7 +525,8 @@ firm {
 
 firm_user {                        // keyed (firm_id, subject) — no id of its own
   firm_id, subject                 // subject is the Cognito sub
-  email, display_name
+  email
+  first_name, last_name                     // either may be "" — see below
   role: attorney | paralegal | staff        // drives DEFAULTS, decides nothing
   is_admin: bool                            // every feature, every case, the staff list
   access_all_cases: bool                    // every case, without per-case linking
@@ -543,6 +544,16 @@ server-minted, unique, immutable, and the only thing an access token carries. A
 surrogate would be a third name for one row. That is **not** the debtor
 situation in reverse — a debtor arrives with no server-owned identifier, so a
 key there has to be invented from the data.
+
+**A name is two fields and no stored display string.** The one a screen renders
+is composed on read, so nothing can store a whole that disagrees with its
+halves. `""` on either half is a real value meaning "never recorded": rows
+written before the split carry one display string, and the read path derives
+what it can from it by splitting on the last space — so a lone "Cher" yields an
+empty surname rather than a guess. The client asks such a user for their name
+before letting them work, which is the only reason an empty half is worth
+distinguishing from a blank one. `displayName` remains on the **wire**, derived,
+because most callers only ever render a name.
 
 `role`, `is_admin`, `access_all_cases` and `permissions` are four independent
 axes on purpose. Collapsing role into access is the trap where "attorney"

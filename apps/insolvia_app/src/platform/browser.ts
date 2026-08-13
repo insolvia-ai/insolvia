@@ -1,8 +1,8 @@
 /**
- * Every browser global the session touches, each behind a guard.
+ * Every browser global the app touches, each behind a guard.
  *
  * **Why this file exists at all.** Web is the only shipping target (decision D9
- * in `docs/plan.md`, [ADR 0004]), so the session is written directly against
+ * in `docs/plan.md`, [ADR 0004]), so the app is written directly against
  * `location`, `localStorage` and `sessionStorage` rather than against a
  * cross-platform abstraction. But this is a React Native app: the same modules
  * are loaded by jest-expo's native test environment, and would be loaded by a
@@ -12,6 +12,13 @@
  * caller already has to handle for the far more common web case: Safari in
  * private mode throws on `localStorage` access, and a user can disable storage
  * outright.
+ *
+ * **It lives in `platform/`, not `session/`, because it is platform plumbing
+ * rather than session state.** It sat under `session/` while the session was
+ * its only caller; the colour-scheme preference is the second, and `@/session`
+ * is a barrel screens reach only through `useSession()` — so leaving it there
+ * would have meant reaching inside another module's public surface for a
+ * `localStorage` wrapper.
  *
  * **A future native client is what would justify `expo-auth-session`** — it
  * owns the custom-scheme redirect (`insolvia://auth/callback`), the system
@@ -94,10 +101,13 @@ export function navigateTo(url: string): void {
  * `localStorage` — the **persistent** store, and the only thing in this app
  * that survives a tab closing.
  *
- * It holds exactly one value, the refresh token, which is ADR 0007's
- * eyes-open trade-off: it buys the 30-day "stay signed in" window the pool is
- * configured for, at the cost that a successful XSS can read it. Access and ID
- * tokens never come near it.
+ * Two values live here. The **refresh token** is ADR 0007's eyes-open
+ * trade-off: it buys the 30-day "stay signed in" window the pool is configured
+ * for, at the cost that a successful XSS can read it. Access and ID tokens
+ * never come near it. The **colour-scheme preference** is the other, and it is
+ * not sensitive — it is here because it has to survive a reload to be worth
+ * having, and because reading it synchronously at first paint is what stops a
+ * flash of the wrong scheme.
  */
 export function persistentStore(): StorageLike | null {
   return usableStore(() => globals().localStorage);

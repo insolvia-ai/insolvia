@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
@@ -33,6 +33,25 @@ describe('the /auth/callback route', () => {
     // the return leg of sign-in.
     const routeFile = path.join(__dirname, '..', 'app', 'auth', 'callback.tsx');
     expect(existsSync(routeFile)).toBe(true);
+  });
+
+  it('composes no session guard, which is what keeps the name gate off it', () => {
+    // A SECOND drift guard, for a different mechanism. The first-run name gate
+    // lives inside `RequireSession`, so the OAuth return leg is spared
+    // STRUCTURALLY — by this file composing no guard — rather than by a
+    // pathname allowlist somebody has to remember to update.
+    //
+    // That distinction is load-bearing: the session flips to `signed-in`
+    // DURING the exchange this route performs, so a pathname-based gate would
+    // race it and could unmount the exchange effect mid-flight. Wrapping this
+    // route in a guard would reintroduce exactly that. `/sign-in` is in the
+    // same position for the same reason.
+    for (const file of [
+      path.join(__dirname, '..', 'app', 'auth', 'callback.tsx'),
+      path.join(__dirname, '..', 'app', 'sign-in.tsx'),
+    ]) {
+      expect(readFileSync(file, 'utf8')).not.toContain('RequireSession');
+    }
   });
 });
 

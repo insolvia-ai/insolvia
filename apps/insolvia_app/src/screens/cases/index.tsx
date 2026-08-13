@@ -7,9 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 const CHAPTERS: readonly { readonly value: CaseChapter; readonly label: string }[] = [
@@ -41,7 +39,6 @@ type ListState =
  */
 export function Cases() {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
@@ -114,7 +111,7 @@ export function Cases() {
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>Your cases</Heading>
 
       {/* level={2}: the screen owns the one <h1>; a heading picked for size

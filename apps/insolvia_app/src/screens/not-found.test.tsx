@@ -70,8 +70,10 @@ describe('an unknown path', () => {
     // registered at runtime but expo-router ships no type declaration for it,
     // so it would not typecheck.
     expect(router.getPathname()).toBe('/');
-    // Waits for the API panel too, so no state update lands after the test.
-    expect(await screen.findByText(/Cognito subject/)).toBeTruthy();
+    // Waits for the shell's account control too, so no state update lands
+    // after the test. It used to wait on the API panel's claims, which have
+    // moved to /account.
+    expect(await screen.findByRole('button', { name: 'Account menu' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
   });
 

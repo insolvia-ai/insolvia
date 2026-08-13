@@ -26,6 +26,12 @@ export interface FirmSummary {
 export interface FirmUser {
   readonly subject: string;
   readonly email: string;
+  /** The two halves. Either may be `''` — the server derives them for rows
+   * written before the name was two fields, and a name it cannot split yields
+   * an empty surname. */
+  readonly firstName: string;
+  readonly lastName: string;
+  /** The composed name, for display. Server-derived; nothing writes it. */
   readonly displayName: string;
   readonly role: string;
   readonly isAdmin: boolean;
@@ -38,7 +44,11 @@ export interface FirmUser {
 
 export interface ProvisionRequest {
   readonly name: string;
-  readonly admin: { readonly email: string; readonly displayName: string };
+  readonly admin: {
+    readonly email: string;
+    readonly firstName: string;
+    readonly lastName: string;
+  };
 }
 
 export class AdminApiError extends Error {
