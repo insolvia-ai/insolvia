@@ -5,7 +5,8 @@ in force, and the work ahead. Completed milestones are summarized in one table
 — their full histories live in git, the PRs, and the ADRs, not here. Desktop
 was dropped entirely (D9); this document no longer plans for it.
 
-Status: **foundation shipped; product work ahead** · Last pruned 2026-08-01
+Status: **foundation shipped; intake shipped; forms & petition engine is the
+current milestone** · Last pruned 2026-08-11
 
 ---
 
@@ -17,8 +18,8 @@ Status: **foundation shipped; product work ahead** · Last pruned 2026-08-01
 |---|---|
 | **M0 · Foundation repo** — design system, app shell, CI/CD, infra authored | ✅ Shipped |
 | **M1 · Live staging + MyCase API spike** | Staging **live** (all four surfaces); MyCase spike **open** — see Milestone 0 below |
-| **M2 · MyCase-native intake + AI extraction** | Next up (§ Product milestones) |
-| **M3 · Compliant Chapter 7 packet** | After M2 (§ Product milestones) |
+| **M2 · MyCase-native intake + AI extraction** | Intake **shipped** (standalone, MyCase-independent); AI extraction **deferred to its own milestone** 2026-08-11 (§ Product milestones) |
+| **M3 · Compliant Chapter 7 packet** | **Current work** — taken up ahead of extraction (§ Product milestones) |
 
 ---
 
@@ -120,16 +121,46 @@ leaving it open-ended.
 
 Each is a GitHub milestone with its issues filed; the issue bodies carry the
 scope and "done when", so this table stays one line each. Ordering is the
-dependency order. MyCase sync is deliberately **out** of all four — it waits on
+dependency order. MyCase sync is deliberately **out** of all five — it waits on
 Milestone 0; the intake data model keeps a sync seam open (issue 8.1).
 
 | Milestone | Business plan | Issues | One-line scope |
 |---|---|---|---|
 | [`Product · Auth`](https://github.com/insolvia-ai/insolvia/milestone/4) | — | 7.1–7.6 | Wire the app to the existing Cognito seam: sign-in, session, the first authenticated API endpoint (JWT verification lands server-side with it). |
-| [`Product · Intake & AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.10 | Standalone intake behind auth; Claude extracting credit reports and pay stubs, human-confirmed before case entry. Includes the intake form widgets (risk 4) and the design-partner web-first test (risk 3). |
-| [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) | M3 / P2 | 9.1–9.8 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. Opens with the effective-date model the register demands from day one. |
+| [`Product · Intake`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.6, 8.10 | Standalone intake behind auth: case data model, encrypted store, case CRUD, the intake form widgets (risk 4), the questionnaire, document upload. Only the design-partner web-first test (risk 3) is still open. |
+| **[`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6)** — *current* | M3 / P2 | 9.1–9.9 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. Opens with the effective-date model the register demands from day one. |
 | [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register. |
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
+| [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) | M2 / P1 | 8.7–8.9 | Claude reading credit reports and pay stubs into candidate records, human-confirmed before case entry. **Deferred 2026-08-11** — see below. |
+
+### Why extraction is its own milestone now (2026-08-11)
+
+It was 8.7–8.9 inside `Product · Intake & AI extraction`. Intake shipped, and
+rather than finish that milestone's tail, extraction was re-scoped as a
+milestone of its own and the forms engine became the current work. Three
+consequences are worth writing down, because none is obvious from the milestone
+list alone:
+
+- **The forms engine never depended on it.** Forms fill deterministically from
+  *confirmed* case data (business plan §4); extraction only changes who does the
+  typing. 9.1–9.3 and 9.8 were unblocked the whole time.
+- **What extraction *was* hiding: a case holds almost no case data.** The API
+  implements `Case`, `Debtor`, `Document` and provenance — no creditors, claims,
+  assets, income or SOFA entries, though
+  [`case-data-model.md`](reference/case-data-model.md) specifies all of them.
+  Extraction was the assumed way those records would arrive, so nothing had
+  filed the plain manual path. It is filed now as 9.9, sequenced ahead of the
+  creditor matrix (9.4) and packet assembly (9.6). It was owed regardless: a
+  candidate needs a record shape to be confirmed *into*, and every creditor no
+  document mentions is typed by hand.
+- **The Anthropic decisions moved with the work, not with the milestone.** 8.7
+  was carrying where the model call runs (inside `services/api` vs its own
+  service — latency against the Lambda's limits) and the no-training /
+  zero-retention configuration. The AI review agent (9.7) is now the first
+  Claude surface to land, so it inherits both and 8.7 adopts what it decides.
+
+Issue numbers stayed 8.7–8.9 in the new milestone: they are cross-referenced
+from 9.4, 9.7 and the ADRs, and renumbering buys nothing.
 
 **Worth flagging now:** `business/regulatory-source-register.html` describes a
 maintenance calendar (§522 dollar amounts every 3 years, Census median income

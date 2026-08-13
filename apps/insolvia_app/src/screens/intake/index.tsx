@@ -7,9 +7,7 @@ import { StyleSheet, Text } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { EnvBadge } from '@/components/env-badge';
 import { Heading } from '@/components/heading';
-import { appEnvironment, environmentInfo } from '@/config/environment';
 import { fontSizes, useTheme } from '@/theme';
 
 import { DebtorFields } from './debtor-fields';
@@ -76,7 +74,6 @@ function bodyOf(debtor: Debtor): DebtorBody {
 
 export function Intake() {
   const theme = useTheme();
-  const env = environmentInfo(appEnvironment);
   const { call } = useApi();
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
 
@@ -204,7 +201,7 @@ export function Intake() {
   const saveState: SaveState = save[role] ?? { kind: 'idle' };
 
   return (
-    <AppShell actions={<EnvBadge env={env.name} />}>
+    <AppShell>
       <Heading level={1}>Intake</Heading>
 
       {/* ONE region, always mounted, whose text changes. aria-live announces a

@@ -83,6 +83,8 @@ describe('the six routes', () => {
           admin: {
             subject: '00000000-0000-4000-8000-00000000a11c',
             email: 'admin@example.test',
+            firstName: 'Alice',
+            lastName: 'Attorney',
             displayName: 'Alice Attorney',
             role: 'attorney',
             isAdmin: true,
@@ -98,14 +100,14 @@ describe('the six routes', () => {
     );
     const result = await clientWithToken().provisionFirm({
       name: 'Example & Partners',
-      admin: { email: 'admin@example.test', displayName: 'Alice Attorney' },
+      admin: { email: 'admin@example.test', firstName: 'Alice', lastName: 'Attorney' },
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${BASE}/v1/firms`);
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({
       name: 'Example & Partners',
-      admin: { email: 'admin@example.test', displayName: 'Alice Attorney' },
+      admin: { email: 'admin@example.test', firstName: 'Alice', lastName: 'Attorney' },
     });
     expect(result.admin.isAdmin).toBe(true);
   });
@@ -151,7 +153,7 @@ describe('the six routes', () => {
     await expect(
       clientWithToken().provisionFirm({
         name: '',
-        admin: { email: 'a@b.test', displayName: 'A' },
+        admin: { email: 'a@b.test', firstName: 'Ada', lastName: 'Admin' },
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
@@ -172,7 +174,7 @@ describe('the six routes', () => {
     await expect(
       clientWithToken().provisionFirm({
         name: 'Example',
-        admin: { email: 'taken@example.test', displayName: 'A' },
+        admin: { email: 'taken@example.test', firstName: 'Ada', lastName: 'Admin' },
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
@@ -181,7 +183,7 @@ describe('the six routes', () => {
     try {
       await clientWithToken().provisionFirm({
         name: 'Example',
-        admin: { email: 'taken@example.test', displayName: 'A' },
+        admin: { email: 'taken@example.test', firstName: 'Ada', lastName: 'Admin' },
       });
     } catch (caught) {
       expect(caught).toBeInstanceOf(AdminApiError);

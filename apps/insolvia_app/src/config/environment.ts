@@ -47,6 +47,21 @@ export const environmentApiBaseUrls = {
 } as const satisfies Record<AppEnvironment, string>;
 
 /**
+ * Where the marketing site lives for this environment — the footer's Privacy
+ * and help links leave the app for it.
+ *
+ * Local points at the DEPLOYED staging site rather than a `localhost` port,
+ * and that is deliberate: marketing is a separate dev server nobody runs
+ * alongside the app, so a localhost link here would be a dead link on every
+ * developer machine. The pages it reaches are public and identical.
+ */
+export const environmentMarketingUrls = {
+  local: 'https://staging.insolvia.ai',
+  staging: 'https://staging.insolvia.ai',
+  production: 'https://insolvia.ai',
+} as const satisfies Record<AppEnvironment, string>;
+
+/**
  * Exhaustiveness guards.
  *
  * `satisfies Record<AppEnvironment, …>` already rejects a map that omits an
@@ -64,6 +79,26 @@ type Exhaustive<M> = [Undeclared<M>] extends [never] ? true : never;
 const _hostsAreExhaustive: Exhaustive<typeof environmentHosts> = true;
 const _apiBaseUrlsAreExhaustive: Exhaustive<typeof environmentApiBaseUrls> = true;
 const _labelsAreExhaustive: Exhaustive<typeof environmentLabels> = true;
+const _marketingUrlsAreExhaustive: Exhaustive<typeof environmentMarketingUrls> = true;
+
+/** The marketing site for an environment. See {@link environmentMarketingUrls}. */
+export function marketingUrl(env: AppEnvironment = appEnvironment): string {
+  return environmentMarketingUrls[env];
+}
+
+/**
+ * Which bundle this is — the last segment of the footer's build stamp.
+ *
+ * A COMMIT SHA rather than the `version` in `app.config.ts`, because that
+ * version has not moved since the app was created and never distinguishes two
+ * builds. This is what a customer reads back over a support call.
+ *
+ * `dev` when unset, which is every local build: `EXPO_PUBLIC_BUILD_SHA` is
+ * supplied by the deploy workflows from `github.sha`. Like every
+ * `EXPO_PUBLIC_*` value it is inlined at bundle time and is not a secret — a
+ * commit sha is public the moment it is pushed.
+ */
+export const buildStamp: string = process.env.EXPO_PUBLIC_BUILD_SHA?.trim().slice(0, 7) || 'dev';
 
 /**
  * Resolves the environment from the compile-time `EXPO_PUBLIC_INSOLVIA_ENV`

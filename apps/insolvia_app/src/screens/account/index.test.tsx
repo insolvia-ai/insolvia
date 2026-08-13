@@ -22,7 +22,7 @@ jest.mock('@/config/environment', () => ({
 
 const ALICE = '00000000-0000-4000-8000-00000000a11c';
 
-function membership(displayName = 'Alice Attorney') {
+function membership(firstName = 'Alice', lastName = 'Attorney') {
   return {
     subject: ALICE,
     username: null,
@@ -33,7 +33,9 @@ function membership(displayName = 'Alice Attorney') {
       id: '00000000-0000-4000-8000-00000000f18a',
       name: 'Example & Partners',
       role: 'attorney',
-      displayName,
+      firstName,
+      lastName,
+      displayName: [firstName, lastName].filter(Boolean).join(' '),
       isAdmin: false,
       accessAllCases: false,
       permissions: {
@@ -48,7 +50,7 @@ function membership(displayName = 'Alice Attorney') {
 }
 
 /**
- * `/account` — your own display name, and the email you sign in with.
+ * `/account` — your own name, and the email you sign in with.
  *
  * The membership above deliberately holds NO administration permission: the
  * point of the endpoint this screen calls is that renaming yourself needs
@@ -90,37 +92,41 @@ describe('the account screen', () => {
   it('prefills the name from the membership and shows the sign-in email read-only', async () => {
     signedIn({ '/v1/me': () => jsonResponse(200, membership()) });
 
-    expect(await screen.findByDisplayValue('Alice Attorney')).toBeTruthy();
-    // The address comes from the ID token, not /v1/me (ADR 0007), and there
-    // is no input for it — only the statement that it is the sign-in name.
-    // Twice: once in the shell's AccountBar, once in the read-only section.
-    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(2);
+    expect(await screen.findByDisplayValue('Alice')).toBeTruthy();
+    expect(screen.getByDisplayValue('Attorney')).toBeTruthy();
+    // The address comes from the ID token, not /v1/me (ADR 0007), and there is
+    // no input for it — only the statement that it is the sign-in name. ONCE
+    // now, not twice: the shell's copy moved inside the closed account menu.
+    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(1);
     expect(screen.getByText(/can’t be changed/i)).toBeTruthy();
   });
 
-  it('saves exactly the display name, and re-renders from the server’s echo', async () => {
+  it('saves exactly the two name halves, and re-renders from the server’s echo', async () => {
     const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, () =>
-      jsonResponse(200, membership('Alice Corrected')),
+      jsonResponse(200, membership('Alice', 'Corrected')),
     );
-    await screen.findByDisplayValue('Alice Attorney');
+    await screen.findByDisplayValue('Attorney');
 
     const user = userEvent.setup();
-    const name = screen.getByLabelText('Name');
-    await user.clear(name);
-    await user.type(name, 'Alice Corrected');
+    const last = screen.getByLabelText('Last name');
+    await user.clear(last);
+    await user.type(last, 'Corrected');
     await user.press(screen.getByRole('button', { name: 'Save name' }));
 
     expect(await screen.findByText('Your name is saved.')).toBeTruthy();
     // The rendered value is the SERVER's echo, not trust in local state.
-    expect(screen.getByDisplayValue('Alice Corrected')).toBeTruthy();
+    expect(screen.getByDisplayValue('Corrected')).toBeTruthy();
 
     const patch = fetchMock.mock.calls.find(
       ([url, init]) => url.includes('/v1/me') && init?.method === 'PATCH',
     );
     expect(patch).toBeTruthy();
-    // The whole writable surface — a second key here would be the client
-    // sending something the server's parser deliberately ignores.
-    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ displayName: 'Alice Corrected' });
+    // The whole writable surface. A `displayName` key here would be the client
+    // sending a field the server derives and never accepts.
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+      firstName: 'Alice',
+      lastName: 'Corrected',
+    });
   });
 
   it('renders the server’s own message on a rejected name', async () => {
@@ -129,23 +135,24 @@ describe('the account screen', () => {
     signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, () =>
       jsonResponse(400, {
         error: 'ValidationError',
-        fields: { displayName: 'A name is required.' },
+        fields: { firstName: 'A name is required.' },
       }),
     );
-    await screen.findByDisplayValue('Alice Attorney');
+    await screen.findByDisplayValue('Alice');
 
     const user = userEvent.setup();
-    await user.clear(screen.getByLabelText('Name'));
+    await user.clear(screen.getByLabelText('First name'));
     await user.press(screen.getByRole('button', { name: 'Save name' }));
 
     expect(await screen.findByText('A name is required.')).toBeTruthy();
   });
 
-  it('is reachable from the shell’s Account link', async () => {
+  it('is reachable from the shell’s account menu', async () => {
     signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/');
-    await screen.findByText(TEST_EMAIL);
 
-    await userEvent.setup().press(screen.getByRole('link', { name: 'Account' }));
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('button', { name: 'Account menu' }));
+    await user.press(screen.getByRole('menuitem', { name: 'Your account' }));
 
     expect(await screen.findByRole('heading', { name: 'Your account' })).toBeTruthy();
   });

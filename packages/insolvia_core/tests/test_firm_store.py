@@ -53,14 +53,16 @@ def firm(firm_id: str = FIRM_ID, name: str = "Example & Partners") -> Firm:
 def user(
     subject: str = ALICE,
     firm_id: str = FIRM_ID,
-    display_name: str = "Alice Attorney",
+    first_name: str = "Alice",
+    last_name: str = "Attorney",
     **overrides: object,
 ) -> FirmUser:
     defaults: dict[str, object] = {
         "firm_id": firm_id,
         "subject": subject,
-        "email": f"{display_name.split()[0].lower()}@example.test",
-        "display_name": display_name,
+        "email": f"{first_name.lower()}@example.test",
+        "first_name": first_name,
+        "last_name": last_name,
         "role": "attorney",
         "is_admin": False,
         "access_all_cases": False,
@@ -82,8 +84,8 @@ def test_adding_the_same_person_twice_is_refused():
     store = MemoryFirmStore()
     store.add_user(user())
     with pytest.raises(RuntimeError):
-        store.add_user(user(display_name="Alice Impostor"))
-    assert store.get_user(FIRM_ID, ALICE).display_name == "Alice Attorney"
+        store.add_user(user(first_name="Alice", last_name="Impostor"))
+    assert store.get_user(FIRM_ID, ALICE).last_name == "Attorney"
 
 
 def test_a_user_is_read_within_their_firm():
@@ -115,16 +117,29 @@ def test_finding_an_unprovisioned_subject_is_none_not_an_error():
     assert MemoryFirmStore().find_user(ALICE) is None
 
 
-def test_a_staff_list_is_one_firm_ordered_by_display_name():
+def test_a_staff_list_is_one_firm_ordered_by_surname():
+    """BY SURNAME, which is how a staff list is normally read and what the
+    split made expressible.
+
+    The two names are chosen so the orders DISAGREE: by surname it is Adams
+    then Zimmerman, by first name it would be Adam then Zoe. A pair that sorted
+    the same either way would pass under the old key and prove nothing."""
     store = MemoryFirmStore()
-    store.add_user(user(subject=BOB, display_name="Bob Paralegal"))
-    store.add_user(user())
-    store.add_user(user(subject=BOB, firm_id=OTHER_FIRM_ID, display_name="Aaron Other"))
+    store.add_user(user(subject=BOB, first_name="Adam", last_name="Zimmerman"))
+    store.add_user(user(first_name="Zoe", last_name="Adams"))
+    store.add_user(
+        user(
+            subject=BOB,
+            firm_id=OTHER_FIRM_ID,
+            first_name="Aaron",
+            last_name="Other",
+        )
+    )
 
     listed = store.list_users(FIRM_ID)
-    assert [person.display_name for person in listed] == [
-        "Alice Attorney",
-        "Bob Paralegal",
+    assert [(p.first_name, p.last_name) for p in listed] == [
+        ("Zoe", "Adams"),
+        ("Adam", "Zimmerman"),
     ]
 
 
@@ -283,7 +298,7 @@ def test_a_staff_list_follows_every_page(monkeypatch):
     fake = FakeDynamoDb()
     store = dynamo_store(monkeypatch, fake)
     first_page = _written_item(
-        monkeypatch, user(display_name="Bob Paralegal", subject=BOB)
+        monkeypatch, user(first_name="Bob", last_name="Paralegal", subject=BOB)
     )
     second_page = _written_item(monkeypatch, user())
 
@@ -305,9 +320,9 @@ def test_a_staff_list_follows_every_page(monkeypatch):
     assert len(fake.calls) == 2
     assert "ExclusiveStartKey" in fake.calls[1][1]
     # And the two pages are merged and ordered together, not per page.
-    assert [person.display_name for person in listed] == [
-        "Alice Attorney",
-        "Bob Paralegal",
+    assert [(p.first_name, p.last_name) for p in listed] == [
+        ("Alice", "Attorney"),
+        ("Bob", "Paralegal"),
     ]
 
 
@@ -353,6 +368,32 @@ def test_a_real_error_still_propagates(monkeypatch):
     )
     with pytest.raises(ClientError):
         store.update_user(user())
+
+
+def test_the_written_item_carries_both_halves_and_the_derived_whole(monkeypatch):
+    """What actually lands in the table. `displayName` is a TRANSITION
+    attribute — derived, written for one release so the admin service, which
+    redeploys a step behind the API and still reads `item["displayName"]`, does
+    not KeyError into a 500 during the window between the two legs."""
+    item = _written_item(monkeypatch, user(first_name="Alice", last_name="Attorney"))
+
+    assert item["firstName"] == {"S": "Alice"}
+    assert item["lastName"] == {"S": "Attorney"}
+    assert item["displayName"] == {"S": "Alice Attorney"}
+
+
+def test_a_written_row_is_read_back_with_its_halves_intact(monkeypatch):
+    """The round trip through the adapter's own converter, which is the pair
+    that has to agree — a store writing one spelling and reading another would
+    be invisible to a test that only exercised one direction."""
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.responses["query"] = {
+        "Items": [_written_item(monkeypatch, user(first_name="Zoe", last_name="Adams"))]
+    }
+
+    (person,) = store.list_users(FIRM_ID)
+    assert (person.first_name, person.last_name) == ("Zoe", "Adams")
 
 
 def _written_item(monkeypatch, person: FirmUser) -> dict[str, Any]:

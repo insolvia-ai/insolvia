@@ -32,7 +32,8 @@ export function ProvisionScreen() {
         name: String(form.get('name') ?? ''),
         admin: {
           email: String(form.get('email') ?? ''),
-          displayName: String(form.get('displayName') ?? ''),
+          firstName: String(form.get('firstName') ?? ''),
+          lastName: String(form.get('lastName') ?? ''),
         },
       });
       navigate(`/firms/${result.firm.id}`, { replace: true });
@@ -85,12 +86,16 @@ export function ProvisionScreen() {
           {fields.name !== undefined ? <Field.Error>{fields.name}</Field.Error> : null}
         </Field.Root>
 
-        <Field.Root name="displayName" invalid={fields.displayName !== undefined}>
-          <Field.Label>First administrator's name</Field.Label>
+        <Field.Root name="firstName" invalid={fields.firstName !== undefined}>
+          <Field.Label>First administrator's first name</Field.Label>
           <Input required />
-          {fields.displayName !== undefined ? (
-            <Field.Error>{fields.displayName}</Field.Error>
-          ) : null}
+          {fields.firstName !== undefined ? <Field.Error>{fields.firstName}</Field.Error> : null}
+        </Field.Root>
+
+        <Field.Root name="lastName" invalid={fields.lastName !== undefined}>
+          <Field.Label>First administrator's last name</Field.Label>
+          <Input required />
+          {fields.lastName !== undefined ? <Field.Error>{fields.lastName}</Field.Error> : null}
         </Field.Root>
 
         <Field.Root name="email" invalid={fields.email !== undefined}>

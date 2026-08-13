@@ -41,7 +41,8 @@ DIRECTORY = {"alice@insolvia.test": ALICE, "bob@insolvia.test": BOB}
 def user(email: str = "alice@insolvia.test", **overrides: object) -> dict[str, object]:
     return {
         "email": email,
-        "displayName": "Example Person",
+        "firstName": "Example",
+        "lastName": "Person",
         "role": "attorney",
         "isAdmin": True,
         "accessAllCases": True,

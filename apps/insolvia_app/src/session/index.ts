@@ -65,5 +65,5 @@ export {
 } from './token-store';
 export type { PendingAuthorization } from './token-store';
 
-export { currentOrigin, navigateTo, persistentStore, transientStore } from './browser';
-export type { StorageLike } from './browser';
+export { currentOrigin, navigateTo, persistentStore, transientStore } from '@/platform/browser';
+export type { StorageLike } from '@/platform/browser';

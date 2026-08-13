@@ -19,8 +19,14 @@ import { cognitoHostDescription, isCognitoHost, testUser } from '../support/env'
  * selectors break only if the app's accessibility does:
  *
  *   - sign-in trigger : button named "Sign in"
- *   - sign-out control: button named "Sign out"
- *   - signed-in state : the user's email address rendered as visible text
+ *   - account menu    : button named "Account menu" — the header's one account
+ *                       control, which opens the rest
+ *   - sign-out control: MENUITEM named "Sign out", inside that menu
+ *   - signed-in state : the user's email address, visible once the menu is open
+ *
+ * The last three changed together when the header's three account controls
+ * became one avatar. The email is no longer on screen at rest, which is why
+ * step 5 opens the menu before looking for it.
  *
  * Cognito's pages are NOT ours and get no such contract. The pool serves
  * MANAGED LOGIN (`managed_login_version = 2`), whose markup was read off the
@@ -47,7 +53,8 @@ import { cognitoHostDescription, isCognitoHost, testUser } from '../support/env'
  */
 
 const signInButton = (page: Page) => page.getByRole('button', { name: 'Sign in' });
-const signOutButton = (page: Page) => page.getByRole('button', { name: 'Sign out' });
+const accountMenu = (page: Page) => page.getByRole('button', { name: 'Account menu' });
+const signOutItem = (page: Page) => page.getByRole('menuitem', { name: 'Sign out' });
 
 test.describe('staging auth round trip', () => {
   test('signs in through the Cognito hosted UI and back out again', async ({ page }) => {
@@ -131,15 +138,21 @@ test.describe('staging auth round trip', () => {
     // This is the assertion issue #80 exists for: the address is on screen only
     // if the token exchange succeeded, the ID token was accepted, and the app
     // rendered the identity it got back.
+    //
+    // It lives inside the account menu now, so the menu is opened first. That
+    // is not merely a selector change — pressing the trigger and finding the
+    // address behind it proves the menu opens at all, which nothing else here
+    // would catch.
+    await expect(accountMenu(page)).toBeVisible();
+    await accountMenu(page).click();
     await expect(
       page.getByText(email).first(),
       'the signed-in app should render the test user\'s email address — its absence ' +
-        'means the /v1/me + ID-token loop did not close',
+        'means the /v1/me + ID-token loop did not close, or the account menu did not open',
     ).toBeVisible();
-    await expect(signOutButton(page)).toBeVisible();
 
     // ── 6. Sign out ───────────────────────────────────────────────────────
-    await signOutButton(page).click();
+    await signOutItem(page).click();
     await expect(
       signInButton(page),
       'signing out should return the app to its signed-out state',

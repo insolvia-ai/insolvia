@@ -206,7 +206,8 @@ def test_me_reports_the_firm_and_the_effective_permissions():
             firm_id=firm_id,
             subject=SUBJECT,
             email="admin@example.test",
-            display_name="Example Admin",
+            first_name="Example",
+            last_name="Admin",
             role="attorney",
             is_admin=True,
             access_all_cases=False,
@@ -267,7 +268,8 @@ def provisioned(*, permissions=None, is_admin=False, user_status="active"):
             firm_id=firm_id,
             subject=SUBJECT,
             email="member@example.test",
-            display_name="Original Name",
+            first_name="Original",
+            last_name="Name",
             role="staff",
             is_admin=is_admin,
             access_all_cases=False,
@@ -286,13 +288,66 @@ def test_a_member_renames_themselves_and_the_row_agrees():
     firms, firm_id = provisioned()
 
     response = patch_me(
+        make_client(firm_store=firms),
+        make_token(),
+        {"firstName": "Corrected", "lastName": "Name"},
+    )
+
+    assert response.status_code == 200
+    firm_block = response.get_json()["firm"]
+    assert firm_block["firstName"] == "Corrected"
+    assert firm_block["lastName"] == "Name"
+    # The composed string rides along, derived. Every screen that only RENDERS
+    # a name reads this one field and was untouched by the split.
+    assert firm_block["displayName"] == "Corrected Name"
+    # The row itself, not just the echo — the directory reads this.
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Corrected", "Name")
+
+
+def test_either_half_of_a_name_may_be_corrected_alone():
+    """The state the first-run prompt exists for. A row whose halves were
+    derived from a pre-split display name can have a right first name and an
+    empty surname, and making that person retype both would be rude."""
+    firms, firm_id = provisioned()
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"lastName": "Renamed"}
+    )
+
+    assert response.status_code == 200
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Original", "Renamed")
+
+
+def test_a_client_still_sending_one_display_name_is_accepted():
+    """THE TRANSITION ARM, and the deploy window it exists for: a browser
+    holding the previous bundle keeps sending this shape until it reloads."""
+    firms, firm_id = provisioned()
+
+    response = patch_me(
         make_client(firm_store=firms), make_token(), {"displayName": "Corrected Name"}
     )
 
     assert response.status_code == 200
-    assert response.get_json()["firm"]["displayName"] == "Corrected Name"
-    # The row itself, not just the echo — the directory reads this.
-    assert firms.get_user(firm_id, SUBJECT).display_name == "Corrected Name"
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Corrected", "Name")
+
+
+def test_a_single_token_display_name_is_refused_rather_than_half_stored():
+    """An old client must not be able to write a row that puts its own user in
+    front of the first-run prompt on their next load — that would read as the
+    new release having lost their name."""
+    firms, firm_id = provisioned()
+
+    response = patch_me(
+        make_client(firm_store=firms), make_token(), {"displayName": "Cher"}
+    )
+
+    assert response.status_code == 400
+    assert "displayName" in response.get_json()["fields"]
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Original", "Name")
 
 
 def test_the_patch_answers_with_the_get_body():
@@ -302,7 +357,9 @@ def test_the_patch_answers_with_the_get_body():
     client = make_client(firm_store=firms)
     token = make_token()
 
-    patched = patch_me(client, token, {"displayName": "Corrected Name"}).get_json()
+    patched = patch_me(
+        client, token, {"firstName": "Corrected", "lastName": "Name"}
+    ).get_json()
     fetched = get_me(client, token).get_json()
 
     assert patched == fetched
@@ -316,11 +373,14 @@ def test_no_permission_is_needed_to_rename_yourself():
     firms, firm_id = provisioned(permissions=dict.fromkeys(FEATURES, HIDDEN))
 
     response = patch_me(
-        make_client(firm_store=firms), make_token(), {"displayName": "Still Mine"}
+        make_client(firm_store=firms),
+        make_token(),
+        {"firstName": "Still", "lastName": "Mine"},
     )
 
     assert response.status_code == 200
-    assert firms.get_user(firm_id, SUBJECT).display_name == "Still Mine"
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Still", "Mine")
 
 
 def test_a_rename_cannot_smuggle_a_promotion():
@@ -329,7 +389,12 @@ def test_a_rename_cannot_smuggle_a_promotion():
     response = patch_me(
         make_client(firm_store=firms),
         make_token(),
-        {"displayName": "Corrected Name", "isAdmin": True, "role": "attorney"},
+        {
+            "firstName": "Corrected",
+            "lastName": "Name",
+            "isAdmin": True,
+            "role": "attorney",
+        },
     )
 
     assert response.status_code == 200
@@ -351,16 +416,22 @@ def test_a_bad_name_reports_the_field():
     firms, _ = provisioned()
 
     response = patch_me(
-        make_client(firm_store=firms), make_token(), {"displayName": " "}
+        make_client(firm_store=firms),
+        make_token(),
+        {"firstName": " ", "lastName": "Name"},
     )
 
     assert response.status_code == 400
-    assert "displayName" in response.get_json()["fields"]
+    # The half that was wrong, not a generic "name" — this is what puts the
+    # server's message under the right input on the account screen.
+    assert "firstName" in response.get_json()["fields"]
 
 
 def test_a_caller_in_no_firm_cannot_rename():
     # Unlike GET, which reports the absence, there is no row to write here.
-    response = patch_me(make_client(), make_token(), {"displayName": "Nobody"})
+    response = patch_me(
+        make_client(), make_token(), {"firstName": "No", "lastName": "Body"}
+    )
     assert response.status_code == 403
 
 
@@ -368,11 +439,14 @@ def test_a_disabled_member_cannot_rename():
     firms, firm_id = provisioned(user_status="disabled")
 
     response = patch_me(
-        make_client(firm_store=firms), make_token(), {"displayName": "Not Anymore"}
+        make_client(firm_store=firms),
+        make_token(),
+        {"firstName": "Not", "lastName": "Anymore"},
     )
 
     assert response.status_code == 403
-    assert firms.get_user(firm_id, SUBJECT).display_name == "Original Name"
+    row = firms.get_user(firm_id, SUBJECT)
+    assert (row.first_name, row.last_name) == ("Original", "Name")
 
 
 def test_multiple_scopes_split_on_whitespace(auth_client):

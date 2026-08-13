@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react-native';
+import { waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -27,6 +27,11 @@ jest.mock('@/config/environment', () => ({
  * Each test scripts the two endpoints call-by-call, because the interesting
  * thing here is the **order and count** of requests, not their content: exactly
  * one refresh, exactly one retry, and no loop.
+ *
+ * They settle on the SCRIPT rather than on rendered claims. The claims used to
+ * be on the home screen, which made them a convenient signal; MePanel now sits
+ * collapsed at the bottom of /account, so the panel's own rendering is tested
+ * where it lives and this file asserts what its name says it asserts.
  */
 describe('the API session panel', () => {
   let browser: FakeBrowser;
@@ -65,14 +70,22 @@ describe('the API session panel', () => {
     globalThis.fetch = realFetch;
   });
 
-  it('renders the claims on a first-try success', async () => {
-    useFetch(
+  it('asks once, and does not refresh when nothing was rejected', async () => {
+    const fetchMock = useFetch(
       scriptFetch({ token: [() => tokenEndpointResponse()], me: [() => principalResponse()] }),
     );
 
     renderRouter('src/app', { initialUrl: '/' });
 
-    expect(await screen.findByText(/Cognito subject/)).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
+        1,
+      );
+    });
+    // The bootstrap refresh, and nothing reactive on top of it.
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/oauth2/token')),
+    ).toHaveLength(1);
   });
 
   it('refreshes once and retries when the API answers 401', async () => {
@@ -92,7 +105,11 @@ describe('the API session panel', () => {
 
     renderRouter('src/app', { initialUrl: '/' });
 
-    expect(await screen.findByText(/Cognito subject/)).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
+        2,
+      );
+    });
 
     const meCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'));
     const tokenCalls = fetchMock.mock.calls.filter(([url]) =>
@@ -157,11 +174,20 @@ describe('the API session panel', () => {
       }),
     );
 
+    const fetchMock = globalThis.fetch as unknown as jest.Mock;
     renderRouter('src/app', { initialUrl: '/' });
 
-    const message = await screen.findByText('Could not reach the Insolvia API.');
-    // Announced, not merely drawn.
-    expect(message.props['aria-live']).toBe('assertive');
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
+        1,
+      );
+    });
+
+    // NO SECOND TOKEN CALL: a 500 is the API's problem, and refreshing over it
+    // would be treating a server fault as an expired credential.
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes('/oauth2/token')),
+    ).toHaveLength(1);
     // The session is intact: still a stored token (rotated by the bootstrap
     // refresh, hence "not null" rather than a literal), and no sign-out.
     expect(readRefreshToken()).not.toBeNull();
