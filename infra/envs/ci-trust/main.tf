@@ -98,6 +98,21 @@ data "aws_iam_policy_document" "github_permissions" {
   }
 
   statement {
+    # ── TRANSITIONAL: the PRE-rename bucket names ──────────────────
+    # DELETE THESE ONCE STAGING AND PROD HAVE BOTH APPLIED THE RENAME.
+    #
+    # Terraform REFRESHES a resource before it destroys it, so for the one apply
+    # that renames a bucket the role needs BOTH names. The rename's first
+    # ci-trust apply swapped these patterns instead of adding to them, and the
+    # staging apply died on a wall of
+    #   AccessDenied ... s3:GetBucketVersioning on insolvia-audit-staging
+    # for buckets it was about to delete. Refreshing the old name is not an
+    # optional nicety — there is no path to the destroy without it.
+    #
+    # S3 is the only family that needed this. Everything else the role touches is
+    # fenced flat (function:insolvia-*, table/insolvia-*, role/insolvia-*,
+    # alias/insolvia*), and a flat prefix matches both spellings by construction.
+    # Only the bucket grants are fenced per-COMPONENT, and component moved.
     sid = "WebHostingBuckets"
     actions = [
       "s3:*",
@@ -107,6 +122,11 @@ data "aws_iam_policy_document" "github_permissions" {
       "arn:aws:s3:::insolvia-*-app-*/*",
       "arn:aws:s3:::insolvia-*-admin-*",
       "arn:aws:s3:::insolvia-*-admin-*/*",
+
+      # TRANSITIONAL — the pre-rename insolvia-web-<env> and
+      # insolvia-web-admin-<env>. See the banner above.
+      "arn:aws:s3:::insolvia-web-*",
+      "arn:aws:s3:::insolvia-web-*/*",
     ]
   }
 
@@ -137,6 +157,10 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = [
       "arn:aws:s3:::insolvia-*-marketing-*",
       "arn:aws:s3:::insolvia-*-marketing-*/*",
+
+      # TRANSITIONAL — pre-rename insolvia-marketing-assets-<env>.
+      "arn:aws:s3:::insolvia-marketing-*",
+      "arn:aws:s3:::insolvia-marketing-*/*",
     ]
   }
   # ── end marketing site ─────────────────────────────────────────
@@ -211,6 +235,10 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = [
       "arn:aws:s3:::insolvia-*-mailer-*",
       "arn:aws:s3:::insolvia-*-mailer-*/*",
+
+      # TRANSITIONAL — pre-rename insolvia-mailer-content-<env>.
+      "arn:aws:s3:::insolvia-mailer-*",
+      "arn:aws:s3:::insolvia-mailer-*/*",
     ]
   }
 
@@ -608,6 +636,10 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = [
       "arn:aws:s3:::insolvia-*-case-*",
       "arn:aws:s3:::insolvia-*-case-*/*",
+
+      # TRANSITIONAL — pre-rename insolvia-case-documents-<env>.
+      "arn:aws:s3:::insolvia-case-*",
+      "arn:aws:s3:::insolvia-case-*/*",
     ]
   }
 
@@ -622,6 +654,10 @@ data "aws_iam_policy_document" "github_permissions" {
     resources = [
       "arn:aws:s3:::insolvia-*-audit-*",
       "arn:aws:s3:::insolvia-*-audit-*/*",
+
+      # TRANSITIONAL — pre-rename insolvia-audit-<env>.
+      "arn:aws:s3:::insolvia-audit-*",
+      "arn:aws:s3:::insolvia-audit-*/*",
     ]
   }
 
@@ -922,7 +958,10 @@ data "aws_iam_policy_document" "github_permissions" {
       # the case pattern is enough to deny.
       test     = "ForAnyValue:StringLike"
       variable = "kms:ResourceAliases"
-      values   = ["alias/insolvia-*-cases"]
+      # Same widening argument as DenyAuditLogErasure: the second entry is
+      # TRANSITIONAL, and covering both spellings is the safe direction for a
+      # deny. Remove it with the rest once both environments have applied.
+      values = ["alias/insolvia-*-cases", "alias/insolvia-cases-*"]
     }
   }
 
@@ -945,7 +984,14 @@ data "aws_iam_policy_document" "github_permissions" {
       "s3:DeleteObject",
       "s3:DeleteObjectVersion",
     ]
-    resources = ["arn:aws:s3:::insolvia-*-audit-*/*"]
+    resources = [
+      "arn:aws:s3:::insolvia-*-audit-*/*",
+      # TRANSITIONAL — but note the direction: this is a DENY, so covering the
+      # old name too is strictly safer. Dropping it while the old bucket still
+      # exists would have silently un-protected it, which is the failure mode
+      # the skill warns about for exactly these two statements.
+      "arn:aws:s3:::insolvia-audit-*/*",
+    ]
   }
 
   # Attaching AWS-managed policies is constrained to the single policy the
