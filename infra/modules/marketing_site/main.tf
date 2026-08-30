@@ -335,6 +335,22 @@ resource "aws_cloudfront_origin_request_policy" "ssr" {
 #    production page ships noindex. Overwriting also stops a viewer from
 #    spoofing the header.
 resource "aws_cloudfront_function" "viewer_request" {
+  # RENAMING THIS FUNCTION NEEDS create_before_destroy, and the default order
+  # cannot work. A name change forces replacement, and CloudFront refuses to
+  # delete a function while a distribution still references it:
+  #
+  #   FunctionInUse: Cannot delete function ..., it is in use by 1 distributions
+  #
+  # Destroy-then-create deadlocks there, because the distribution can only be
+  # repointed at the replacement once the replacement exists. Creating first
+  # lets the distribution move across, and the old function is then
+  # unreferenced and deletable. Names differ during the overlap, so there is no
+  # collision — which is exactly why this works for a RENAME and would not for
+  # an in-place code change.
+  lifecycle {
+    create_before_destroy = true
+  }
+
   name    = "${local.name}-viewer-request"
   runtime = "cloudfront-js-2.0"
   comment = local.serves_apex ? "301 ${var.apex_domain} -> ${var.www_domain}; viewer Host -> X-Forwarded-Host" : "viewer Host -> X-Forwarded-Host"

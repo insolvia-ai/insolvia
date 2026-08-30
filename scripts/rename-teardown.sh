@@ -15,7 +15,8 @@
 #     DynamoDB tables
 #   * case-documents bucket      force_destroy = false
 #   * mailer content bucket      force_destroy = false
-#   * audit bucket               force_destroy = false, versioned
+#   * audit bucket               force_destroy = false, versioned, AND still
+#                                being written to by its trail
 #
 # The container repositories need the same treatment and are deliberately NOT
 # here: they are shared across environments, so emptying them is account-wide
@@ -66,7 +67,7 @@ for arg in "$@"; do
       ENV="$arg" ;;
     --check)   CHECK_ONLY=true ;;
     --yes|-y)  ASSUME_YES=true ;;
-    -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,49p' "$0"; exit 0 ;;
     *)         die "unrecognized argument: $arg (see --help)" ;;
   esac
 done
@@ -170,7 +171,35 @@ else
   ok "  $OLD_POOL_NAME ($pool_id) — deletion protection cleared"
 fi
 
-# ── 3. Empty the buckets ────────────────────────────────────────
+# ── 3. Stop the trail BEFORE emptying its bucket ────────────────
+# Emptying alone is not enough, and the first attempt proved it: the trail keeps
+# delivering while the rename apply runs, so objects land between the teardown
+# and the DeleteBucket and the apply dies on
+#
+#   BucketNotEmpty: ... You must delete all versions in the bucket.
+#
+# Nothing here races once the writer is stopped. The trail is about to be
+# destroyed and recreated under the new name anyway, so the logging gap is the
+# rename window itself rather than anything extra — but it IS a gap in audit
+# coverage, which is worth saying out loud rather than burying.
+log "── CloudTrail ────────────────────────────────"
+OLD_TRAIL="insolvia-audit-$ENV"
+if aws cloudtrail get-trail-status --name "$OLD_TRAIL" --region "$REGION" >/dev/null 2>&1; then
+  logging="$(aws cloudtrail get-trail-status --name "$OLD_TRAIL" --region "$REGION" \
+    --query 'IsLogging' --output text)"
+  if [[ "$logging" != "True" ]]; then
+    log "  $OLD_TRAIL — already stopped"
+  elif $CHECK_ONLY; then
+    log "  $OLD_TRAIL — WOULD stop logging"
+  else
+    aws cloudtrail stop-logging --name "$OLD_TRAIL" --region "$REGION"
+    ok "  $OLD_TRAIL — logging stopped (audit gap starts here)"
+  fi
+else
+  log "  $OLD_TRAIL — not found, skipping"
+fi
+
+# ── 4. Empty the buckets ────────────────────────────────────────
 # `aws s3 rm --recursive` removes current versions only, which leaves a
 # versioned bucket (the audit one, deliberately) non-empty and still
 # undeletable. Both loops are needed.
