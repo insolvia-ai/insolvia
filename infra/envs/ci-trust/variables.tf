@@ -57,7 +57,25 @@ variable "staging_user_pool_arn" {
     below include AdminSetUserPassword — which on a prod pool is the ability to
     take over any customer account. There is no scoping condition that fixes
     that; only the exact ARN does, which is why this variable exists at all.
+
+    NOT A SECRET, which is why it sits here as a default rather than in an
+    uncommitted tfvars. A pool ARN carries the pool id, and that id is already
+    public by construction — it is in the issuer URL, in every sign-in redirect
+    the browser makes, and published to SSM as a plain String by each env root
+    with that exact reasoning written down. A default is also the only form
+    that survives a fresh clone, and every other variable in this root is
+    carried the same way.
+
+    THIS VALUE IS THE STAGING POOL AS OF THE NAMING RENAME. It changed once
+    already: the rename recreated the pool, the old id stopped existing, and
+    the seed step failed with
+
+      AccessDeniedException ... AdminGetUser
+
+    which is not an apply failure and so does not announce itself. Anything
+    that replaces the pool again must update this and re-apply this root by
+    hand.
   EOT
   type        = string
-  default     = ""
+  default     = "arn:aws:cognito-idp:us-east-1:521762924626:userpool/us-east-1_H6iy8mjKM"
 }
