@@ -6,18 +6,24 @@
 # IT TAKES THE CASE KEY RATHER THAN MINTING ONE, which modules/case_store
 # reserved for it in as many words: "one key protects one case, documents and
 # rows alike". That is not tidiness. The deploy role is denied every data-plane
-# KMS verb on `alias/insolvia-cases-*` (ci-trust's DenyCaseDataDecryption), so
+# KMS verb on `alias/insolvia-*-cases` (ci-trust's DenyCaseDataDecryption), so
 # reusing the case key means CI can create this bucket, configure it, and never
 # read a byte out of it. A second key would have to earn that deny again, and
 # the day it did not, nobody would notice.
 #
-# The bucket NAME must stay in the `insolvia-case-*` family: ci-trust's
+# The bucket NAME must stay in the `insolvia-*-case-*` family: ci-trust's
 # CaseDocumentBuckets grant is scoped to exactly that prefix, and a rename puts
 # the bucket outside what CI may manage.
 
 locals {
-  # insolvia-case-documents-<env>
-  name = "${var.project}-case-documents-${var.environment}"
+  # insolvia-<env>-case-documents — the IAM/policy name stem.
+  name = "${var.project}-${var.environment}-case-documents"
+
+  # The BUCKET takes a region suffix on top, because S3 bucket names are
+  # globally unique across all of AWS (insolvia-aws-naming § per-resource-type
+  # patterns). Built from var.aws_region rather than written out, so a region
+  # change cannot leave a name claiming us-east-1 behind.
+  bucket_name = "${local.name}-${var.aws_region}"
 
   # What the API needs to broker an upload and a download, and nothing else.
   # No ListBucket: the case's documents are enumerated from the case store,
@@ -58,7 +64,7 @@ locals {
 }
 
 resource "aws_s3_bucket" "documents" {
-  bucket = local.name
+  bucket = local.bucket_name
 
   # Prod on, staging off — the same split modules/case_store makes, and for the
   # same reason: staging holds synthetic documents and stays disposable, prod
@@ -344,7 +350,7 @@ data "aws_iam_policy_document" "bucket" {
   # default encryption applies only when a request names no algorithm at all,
   # so `aws:kms:dsse` with no key id does not inherit this bucket's key — S3
   # encrypts under the AWS-managed `aws/s3` key instead, and a case document
-  # lands outside `alias/insolvia-cases-*` while looking like an upgrade in the
+  # lands outside `alias/insolvia-*-cases` while looking like an upgrade in the
   # request. The statement below closes the same hole for an explicit key id;
   # this one closes it for the algorithm. Nothing in this system asks for DSSE,
   # and one encryption mode is one thing to reason about.
@@ -373,7 +379,7 @@ data "aws_iam_policy_document" "bucket" {
   # fence. `aws:kms` satisfies it, and `aws:kms` plus an
   # `x-amz-server-side-encryption-aws-kms-key-id` naming some OTHER key stores
   # a case document under a key that is not the case key — outside
-  # `alias/insolvia-cases-*`, which is the exact thing ci-trust's
+  # `alias/insolvia-*-cases`, which is the exact thing ci-trust's
   # DenyCaseDataDecryption is scoped against. The deny that keeps the deploy
   # role from reading case data would simply not apply to that object.
   #
@@ -429,7 +435,7 @@ resource "aws_s3_bucket_policy" "documents" {
 resource "aws_iam_role_policy" "api_document_access" {
   count = var.api_role_name == null ? 0 : 1
 
-  name = "access-${local.name}"
+  name = "${local.name}-access"
   role = var.api_role_name
 
   policy = jsonencode({

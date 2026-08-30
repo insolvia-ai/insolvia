@@ -119,10 +119,11 @@ from insolvia_core.firms import (
 )
 from insolvia_core.ports import FirmStore
 
-# What infra/modules/* name a table, per environment. Dev carries the machine
-# short id from scripts/dev-aws-common.sh; staging is flat. Prod matches
-# neither, which is the point.
-_SEEDABLE_TABLE: Final = r"^insolvia-{kind}-(dev-[0-9a-f]{{12}}|staging)\Z"
+# What infra/modules/* name a table, per environment: insolvia-<env>-<kind>,
+# environment SECOND (the insolvia-aws-naming skill). Dev carries the machine
+# short id from scripts/dev-aws-common.sh inside the env segment; staging is
+# flat. Prod matches neither, which is the point.
+_SEEDABLE_TABLE: Final = r"^insolvia-(dev-[0-9a-f]{{12}}|staging)-{kind}\Z"
 
 _VAR: Final = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
@@ -252,7 +253,7 @@ def _require_seedable_table(table: str, *, kind: str) -> None:
     if not re.match(_SEEDABLE_TABLE.format(kind=kind), table):
         raise RefusedError(
             f"'{table}' is not a seedable {kind} table (expected "
-            f"insolvia-{kind}-dev-<machine short id> or insolvia-{kind}-staging)"
+            f"insolvia-dev-<machine short id>-{kind} or insolvia-staging-{kind})"
         )
 
 

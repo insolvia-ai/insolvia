@@ -27,7 +27,7 @@
 # Same image-before-apply deadlock as api_service, times three Lambdas from
 # one image:
 #
-#   1. apply infra/envs/shared (creates insolvia-mailer)
+#   1. apply infra/envs/shared (creates insolvia-shared-mailer)
 #   2. build services/mailer (`docker build --target lambda`), tag
 #      <repo-url>:<env> — the per-environment marker tag this module seeds from
 #      (`var.image_tag`), not `:latest`, which does not exist under a shared
@@ -50,11 +50,12 @@ locals {
 }
 
 locals {
-  # insolvia-mailer-<env> — reused across resource types that don't need a
-  # purpose qualifier (HTTP API, SES configuration set). NOT the ECR
-  # repository name: that repository is shared across environments and so
-  # carries no -<env> suffix (infra/envs/shared).
-  name = "${var.project}-mailer-${var.environment}"
+  # insolvia-<env>-mailer — reused across resource types that don't need a
+  # purpose qualifier (HTTP API, SES configuration set), and the stem every
+  # qualified name here derives from. NOT the ECR repository name: that
+  # repository is shared across environments, so its env segment is `shared`
+  # — insolvia-shared-mailer, in infra/envs/shared.
+  name = "${var.project}-${var.environment}-mailer"
 
   # Insolvia's traffic is all transactional auth mail (welcome,
   # email_verification, password_reset from PR1) — one configuration set is
@@ -104,7 +105,7 @@ locals {
 
 # ─── Container repository ────────────────────────────────────────────────────
 
-# Not owned here: `insolvia-mailer` is one repository shared by every
+# Not owned here: `insolvia-shared-mailer` is one repository shared by every
 # environment, created in infra/envs/shared and passed in as
 # `var.ecr_repository_url`, so prod can deploy the exact digest staging
 # validated. The image is environment-agnostic — every env-specific value
@@ -140,11 +141,12 @@ removed {
 # ─── Private content storage ─────────────────────────────────────────────────
 # Holds request manifests (14-day expiry) and, once attachments ship,
 # uploaded attachment bytes pending scan. A fixed, deterministic name — like
-# web_hosting/marketing_site's buckets — since this repo's convention names S3
-# buckets exactly insolvia-<thing>-<env>.
+# web_hosting/marketing_site's buckets — since this repo names S3 buckets
+# insolvia-<env>-<component>-<region>, the region suffix being S3's
+# global-uniqueness requirement (the insolvia-aws-naming skill).
 
 resource "aws_s3_bucket" "content" {
-  bucket        = "${var.project}-mailer-content-${var.environment}"
+  bucket        = "${local.name}-content-${data.aws_region.current.region}"
   force_destroy = false
   tags          = var.tags
 }
@@ -252,7 +254,7 @@ resource "aws_s3_bucket_policy" "content" {
 # ─── DynamoDB ────────────────────────────────────────────────────────────────
 
 resource "aws_dynamodb_table" "messages" {
-  name         = "${var.project}-mailer-messages-${var.environment}"
+  name         = "${local.name}-messages"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "record_key"
 
@@ -272,7 +274,7 @@ resource "aws_dynamodb_table" "messages" {
 }
 
 resource "aws_dynamodb_table" "suppressions" {
-  name         = "${var.project}-mailer-suppressions-${var.environment}"
+  name         = "${local.name}-suppressions"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "recipient_hash"
 
@@ -290,14 +292,14 @@ resource "aws_dynamodb_table" "suppressions" {
 # The "api" names the caller (insolvia_api), matching the service registry key.
 
 resource "aws_sqs_queue" "api_send_dlq" {
-  name                      = "${var.project}-mailer-api-send-dlq-${var.environment}"
+  name                      = "${local.name}-api-send-dlq"
   message_retention_seconds = 1209600
   sqs_managed_sse_enabled   = true
   tags                      = var.tags
 }
 
 resource "aws_sqs_queue" "api_send" {
-  name                       = "${var.project}-mailer-api-send-${var.environment}"
+  name                       = "${local.name}-api-send"
   message_retention_seconds  = 86400
   visibility_timeout_seconds = 180
   sqs_managed_sse_enabled    = true
@@ -317,14 +319,14 @@ resource "aws_sqs_queue_redrive_allow_policy" "api_send" {
 }
 
 resource "aws_sqs_queue" "api_status_dlq" {
-  name                      = "${var.project}-mailer-api-status-dlq-${var.environment}"
+  name                      = "${local.name}-api-status-dlq"
   message_retention_seconds = 1209600
   sqs_managed_sse_enabled   = true
   tags                      = var.tags
 }
 
 resource "aws_sqs_queue" "api_status" {
-  name                       = "${var.project}-mailer-api-status-${var.environment}"
+  name                       = "${local.name}-api-status"
   message_retention_seconds  = 1209600
   visibility_timeout_seconds = 180
   sqs_managed_sse_enabled    = true
@@ -336,14 +338,14 @@ resource "aws_sqs_queue" "api_status" {
 }
 
 resource "aws_sqs_queue" "feedback_dlq" {
-  name                      = "${var.project}-mailer-feedback-dlq-${var.environment}"
+  name                      = "${local.name}-feedback-dlq"
   message_retention_seconds = 1209600
   sqs_managed_sse_enabled   = true
   tags                      = var.tags
 }
 
 resource "aws_sqs_queue" "feedback" {
-  name                       = "${var.project}-mailer-feedback-${var.environment}"
+  name                       = "${local.name}-feedback"
   message_retention_seconds  = 1209600
   visibility_timeout_seconds = 180
   sqs_managed_sse_enabled    = true
@@ -361,7 +363,7 @@ resource "aws_sqs_queue" "feedback" {
 # and exists regardless of whether any alarm ever fires.
 
 resource "aws_sns_topic" "feedback" {
-  name = "${var.project}-mailer-feedback-${var.environment}"
+  name = "${local.name}-feedback"
   tags = var.tags
 }
 
@@ -454,19 +456,19 @@ data "aws_iam_policy_document" "lambda_trust" {
 }
 
 resource "aws_iam_role" "ingress" {
-  name               = "${var.project}-mailer-ingress-role-${var.environment}"
+  name               = "${local.name}-ingress-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
   tags               = var.tags
 }
 
 resource "aws_iam_role" "sender" {
-  name               = "${var.project}-mailer-sender-role-${var.environment}"
+  name               = "${local.name}-sender-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
   tags               = var.tags
 }
 
 resource "aws_iam_role" "feedback" {
-  name               = "${var.project}-mailer-feedback-role-${var.environment}"
+  name               = "${local.name}-feedback-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
   tags               = var.tags
 }
@@ -487,7 +489,7 @@ resource "aws_iam_role_policy_attachment" "feedback_basic" {
 }
 
 resource "aws_iam_role_policy" "ingress" {
-  name = "${var.project}-mailer-ingress-${var.environment}"
+  name = "${local.name}-ingress-data"
   role = aws_iam_role.ingress.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -523,7 +525,7 @@ resource "aws_iam_role_policy" "ingress" {
 }
 
 resource "aws_iam_role_policy" "sender" {
-  name = "${var.project}-mailer-sender-${var.environment}"
+  name = "${local.name}-sender-data"
   role = aws_iam_role.sender.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -572,7 +574,7 @@ resource "aws_iam_role_policy" "sender" {
 }
 
 resource "aws_iam_role_policy" "feedback" {
-  name = "${var.project}-mailer-feedback-${var.environment}"
+  name = "${local.name}-feedback-data"
   role = aws_iam_role.feedback.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -629,7 +631,7 @@ data "aws_iam_policy_document" "guardduty_trust" {
 resource "aws_iam_role" "guardduty" {
   count = var.enable_attachment_scanning ? 1 : 0
 
-  name               = "${var.project}-mailer-guardduty-role-${var.environment}"
+  name               = "${local.name}-guardduty-role"
   assume_role_policy = data.aws_iam_policy_document.guardduty_trust[0].json
   tags               = var.tags
 }
@@ -637,7 +639,7 @@ resource "aws_iam_role" "guardduty" {
 resource "aws_iam_role_policy" "guardduty" {
   count = var.enable_attachment_scanning ? 1 : 0
 
-  name = "${var.project}-mailer-guardduty-${var.environment}"
+  name = "${local.name}-guardduty-scan"
   role = aws_iam_role.guardduty[0].id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -710,7 +712,7 @@ locals {
 resource "aws_cloudwatch_event_rule" "guardduty_result" {
   for_each = local.guardduty_alarm_statuses
 
-  name = "${var.project}-mailer-guardduty-${each.key}-${var.environment}"
+  name = "${local.name}-guardduty-${each.key}"
   event_pattern = jsonencode({
     source      = ["aws.guardduty"]
     detail-type = ["GuardDuty Malware Protection Object Scan Result"]
@@ -754,7 +756,7 @@ resource "aws_lambda_permission" "guardduty_events" {
 # image_uri is ignored, because the deploy workflow owns Lambda code updates.
 
 resource "aws_lambda_function" "ingress" {
-  function_name = "${var.project}-mailer-ingress-${var.environment}"
+  function_name = "${local.name}-ingress"
   role          = aws_iam_role.ingress.arn
   package_type  = "Image"
   image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
@@ -775,7 +777,7 @@ resource "aws_lambda_function" "ingress" {
 }
 
 resource "aws_lambda_function" "sender" {
-  function_name                  = "${var.project}-mailer-sender-${var.environment}"
+  function_name                  = "${local.name}-sender"
   role                           = aws_iam_role.sender.arn
   package_type                   = "Image"
   image_uri                      = "${var.ecr_repository_url}:${var.image_tag}"
@@ -797,7 +799,7 @@ resource "aws_lambda_function" "sender" {
 }
 
 resource "aws_lambda_function" "feedback" {
-  function_name = "${var.project}-mailer-feedback-${var.environment}"
+  function_name = "${local.name}-feedback"
   role          = aws_iam_role.feedback.arn
   package_type  = "Image"
   image_uri     = "${var.ecr_repository_url}:${var.image_tag}"
@@ -947,7 +949,7 @@ resource "aws_route53_record" "mailer" {
 # insolvia_api is allowed to hit, attached onto the role var.caller_role_name
 # names.
 resource "aws_iam_role_policy" "api_invoke" {
-  name = "invoke-${local.name}"
+  name = "${local.name}-invoke"
   role = var.caller_role_name
   policy = jsonencode({
     Version = "2012-10-17"

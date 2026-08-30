@@ -19,7 +19,7 @@ def service():
         allowed_categories=frozenset(),
         allowed_message_classes=frozenset(),
         allowed_role_arns=frozenset(
-            {"arn:aws:iam::123456789012:role/insolvia-api-lambda-role-production"}
+            {"arn:aws:iam::123456789012:role/insolvia-prod-api-role"}
         ),
     )
 
@@ -27,9 +27,9 @@ def service():
 def test_assumed_role_is_normalized():
     assert (
         normalize_principal(
-            "arn:aws:sts::123456789012:assumed-role/insolvia-api-lambda-role-production/session"
+            "arn:aws:sts::123456789012:assumed-role/insolvia-prod-api-role/session"
         )
-        == "arn:aws:iam::123456789012:role/insolvia-api-lambda-role-production"
+        == "arn:aws:iam::123456789012:role/insolvia-prod-api-role"
     )
 
 
@@ -40,15 +40,13 @@ def test_principal_is_read_from_http_api_event():
                 "iam": {
                     "userArn": (
                         "arn:aws:sts::123456789012:assumed-role/"
-                        "insolvia-api-lambda-role-production/session"
+                        "insolvia-prod-api-role/session"
                     )
                 }
             }
         }
     }
-    assert principal_from_event(event).endswith(
-        "role/insolvia-api-lambda-role-production"
-    )
+    assert principal_from_event(event).endswith("role/insolvia-prod-api-role")
 
 
 def test_unregistered_role_is_rejected():
@@ -61,9 +59,7 @@ def test_iam_authorizer_uses_only_lambda_request_context():
     with pytest.raises(AuthorizationError):
         authorizer.authorize(service())
 
-    token = set_principal(
-        "arn:aws:iam::123456789012:role/insolvia-api-lambda-role-production"
-    )
+    token = set_principal("arn:aws:iam::123456789012:role/insolvia-prod-api-role")
     try:
         authorizer.authorize(service())
     finally:

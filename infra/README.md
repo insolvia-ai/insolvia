@@ -6,14 +6,14 @@ model and [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.m
 
 ```
 modules/                 web_hosting, marketing_site, auth, email, api_service, mailer, …
-envs/ci-trust/           OIDC provider + insolvia-github-actions deploy role + its policy (human-applied only)
+envs/ci-trust/           OIDC provider + insolvia-shared-deploy-role deploy role + its policy (human-applied only)
 envs/account-access/     human IAM users + groups + their attached policies (human-applied; CI has no IAM user/group permissions at all)
 envs/shared/             Route53 zone insolvia.ai, *.insolvia.ai ACM cert, SES domain identity + mail DNS
 envs/staging/            staging-app / staging-www + the service stacks
 envs/prod/               app / www + the service stacks (owns the apex)
 ```
 
-State: `s3://insolvia-terraform-state`, key `insolvia/<env>/terraform.tfstate`.
+State: `s3://insolvia-shared-terraform-state-us-east-1`, key `insolvia/<env>/terraform.tfstate`.
 The deploy role lives in **`ci-trust`**, not `shared` — CI can't apply its own
 permissions (see [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md) and the
 **insolvia-deploy-role-permissions** skill).

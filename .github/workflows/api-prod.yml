@@ -2,7 +2,7 @@ name: API · Deploy · Production
 
 # PROMOTES the image staging validated — it does not build one.
 #
-# The shared insolvia-api repository (infra/envs/shared) already holds the
+# The shared insolvia-shared-api repository (infra/envs/shared) already holds the
 # image staging tested, tagged `sha-<commit>`. This workflow resolves that tag
 # to an immutable digest and points the prod Lambda at it, so production runs
 # the exact bytes that were exercised on staging rather than a fresh compile of

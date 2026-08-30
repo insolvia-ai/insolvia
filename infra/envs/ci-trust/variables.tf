@@ -46,6 +46,13 @@ variable "staging_user_pool_arn" {
     Get it with:
       terraform -chdir=infra/envs/staging output -raw auth_user_pool_arn
 
+    THE SAME CONCESSION BITES ON A POOL REPLACEMENT, not just on bootstrap.
+    Anything that recreates the staging pool — the naming rename did, since a
+    pool name change is a destroy-and-recreate — mints a NEW id, so the value
+    here goes stale and this root needs a second human apply with the new ARN.
+    The symptom is not a failed apply: it is the seed step in app-staging.yml
+    failing with AccessDenied against a pool that no longer exists.
+
     WHY NOT A WILDCARD. `userpool/*` would reach PROD's pool, and the actions
     below include AdminSetUserPassword — which on a prod pool is the ability to
     take over any customer account. There is no scoping condition that fixes

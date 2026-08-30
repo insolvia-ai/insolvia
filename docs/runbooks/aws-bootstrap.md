@@ -32,7 +32,7 @@ eval "$(aws configure export-credentials --format env)"
 ### The ci-trust anchor
 
 `infra/envs/ci-trust` owns the GitHub OIDC provider, the
-`insolvia-github-actions` deploy role, and that role's permissions policy. It is
+`insolvia-shared-deploy-role` deploy role, and that role's permissions policy. It is
 **applied only by a human admin — never by CI — and that is the point**: the
 role's own policy denies it `iam:PutRolePolicy` on itself, so a privilege change
 cannot take effect from merged code alone. Because CI never applies `ci-trust`,
@@ -70,13 +70,13 @@ scripts/apply-account-access.sh
 Every `backend.tf` in the repo points at this bucket, so `terraform init` cannot
 run anywhere until it exists. Verified absent 2026-07-21.
 ```bash
-aws s3api create-bucket --bucket insolvia-terraform-state --region us-east-1
-aws s3api put-bucket-versioning --bucket insolvia-terraform-state \
+aws s3api create-bucket --bucket insolvia-shared-terraform-state-us-east-1 --region us-east-1
+aws s3api put-bucket-versioning --bucket insolvia-shared-terraform-state-us-east-1 \
   --versioning-configuration Status=Enabled
-aws s3api put-bucket-encryption --bucket insolvia-terraform-state \
+aws s3api put-bucket-encryption --bucket insolvia-shared-terraform-state-us-east-1 \
   --server-side-encryption-configuration \
   '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-aws s3api put-public-access-block --bucket insolvia-terraform-state \
+aws s3api put-public-access-block --bucket insolvia-shared-terraform-state-us-east-1 \
   --public-access-block-configuration \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
@@ -130,7 +130,7 @@ zone + cert + SES live in `infra/envs/shared`. Apply ci-trust first, because
 creates.
 
 ```bash
-terraform -chdir=infra/envs/ci-trust apply   # OIDC provider + insolvia-github-actions role
+terraform -chdir=infra/envs/ci-trust apply   # OIDC provider + insolvia-shared-deploy-role role
 terraform -chdir=infra/envs/ci-trust output github_actions_role_arn
 ```
 
@@ -143,7 +143,7 @@ certificate should reach `ISSUED` without any registrar work.
 ## 5. Wire the GitHub repo
 ```bash
 # Deploy role ARN from step 4:
-gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/insolvia-github-actions"
+gh secret set AWS_ROLE_ARN --repo insolvia-ai/insolvia --body "arn:aws:iam::521762924626:role/insolvia-shared-deploy-role"
 ```
 Repo lockdown (private, branch protection, environments) is documented in the
 plan §2e and applied once `@insolvia-dev` has admin on the repo.

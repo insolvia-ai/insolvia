@@ -35,12 +35,12 @@ variable "human_users" {
 
   default = {
     "andreas.savva" = {
-      groups = ["Admin"]
+      groups = ["admin"]
 
-      # Redundant while this user is in Admin — AdministratorAccess already
+      # Redundant while this user is in the admin group — AdministratorAccess already
       # allows iam:ChangePassword — but it is attached in the live account and
       # this root is meant to be the complete picture of what the user holds.
-      # It also survives a future move out of Admin, which is when it starts
+      # It also survives a future move out of that group, which is when it starts
       # doing work.
       attached_policy_arns = ["arn:aws:iam::aws:policy/IAMUserChangePassword"]
 

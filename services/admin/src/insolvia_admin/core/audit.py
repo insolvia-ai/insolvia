@@ -3,7 +3,7 @@
 The requirement #178 stated outright: "it must record who provisioned what."
 Same posture as the tenant API's case access log, and for the same reason:
 per ADR 0001 the execution role is the only principal AWS ever sees, so
-CloudTrail can say `insolvia-admin-<env>-role` touched the firm table and can
+CloudTrail can say `insolvia-<env>-admin-api-role` touched the firm table and can
 never say which staff member. The verified staff identity exists only inside
 the request, which makes this service the only thing that can write it down.
 

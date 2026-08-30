@@ -1,7 +1,7 @@
 # Mailer operations
 
 Alarms live in `infra/modules/mailer/main.tf` under "Alerting (issue 6.7)",
-wired to the module's own SNS topic (`insolvia-mailer-<env>-alarms`, module
+wired to the module's own SNS topic (`insolvia-<env>-mailer-alarms`, module
 output `alarms_topic_arn`, env output `mailer_alarms_topic_arn`). Terraform
 manages no subscriptions — subscribe by hand once, against that topic ARN, and
 confirm the email. Until someone does, every alarm is visible in CloudWatch

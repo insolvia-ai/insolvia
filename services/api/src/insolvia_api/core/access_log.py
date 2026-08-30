@@ -3,7 +3,7 @@
 The log that answers the question CloudTrail structurally cannot. Per
 docs/adr/0001 the API's execution role is the only principal AWS ever sees,
 so every CloudTrail data event on the case table names
-`insolvia-api-<env>-role` and never the person behind the request. The
+`insolvia-<env>-api-role` and never the person behind the request. The
 signed-in identity exists only inside the request, which makes this service
 the only thing that can write it down.
 

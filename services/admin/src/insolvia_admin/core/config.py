@@ -60,7 +60,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     access to it, which is the exception ADR 0011 records. Unset composes the
     in-memory store.
 
-    FIRM_USER_POOL_ID — the FIRM pool (insolvia-users-<env>), where
+    FIRM_USER_POOL_ID — the FIRM pool (insolvia-<env>-users), where
     provisioning mints the first administrator's account. Deliberately not
     named AUTH_USER_POOL_ID as the API's is: this service never verifies
     tokens from that pool — staff tokens come from Google — and a name that

@@ -22,7 +22,7 @@ from botocore.exceptions import ClientError
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.core.documents import UPLOAD_TAG, StoredBlob
 
-BUCKET = "insolvia-case-documents-example"
+BUCKET = "insolvia-example-case-documents-us-east-1"
 KEY = "cases/00000000-0000-4000-8000-0000000000ca/00000000-0000-4000-8000-0000000000d0"
 
 

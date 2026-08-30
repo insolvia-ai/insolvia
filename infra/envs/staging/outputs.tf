@@ -173,7 +173,7 @@ output "marketing_url" {
 
 output "admin_ecr_repository_url" {
   description = "Shared insolvia-admin repository the deploy workflow pushes to."
-  value       = data.aws_ecr_repository.service["admin"].repository_url
+  value       = data.aws_ecr_repository.service["admin-api"].repository_url
 }
 
 output "admin_lambda_function_name" {

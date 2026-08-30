@@ -210,7 +210,7 @@ class FakeDynamoDb:
 
 def dynamo_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbFirmStore:
     monkeypatch.setattr(aws_firm_store.boto3, "client", lambda _service: fake)
-    return DynamoDbFirmStore("insolvia-firms-test")
+    return DynamoDbFirmStore("insolvia-test-firms")
 
 
 def conditional_check_failed() -> ClientError:

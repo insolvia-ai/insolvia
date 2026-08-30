@@ -25,13 +25,21 @@
 # without an image.
 
 locals {
-  # insolvia-admin-<env> — the Lambda/API/alarm name stem.
-  name = "${var.project}-admin-${var.environment}"
+  # insolvia-<env>-admin-api — the Lambda/API/alarm name stem.
+  #
+  # The component is `admin-api`, NOT `admin`, and the distinction is the whole
+  # point of the naming skill's component rule: `admin` is the staff PORTAL
+  # (the SPA bucket + CloudFront in module.admin_web_hosting, serving
+  # admin.insolvia.ai), and this is the service behind it
+  # (admin-api.insolvia.ai). They were both called `admin` and the pair was
+  # unreadable.
+  name = "${var.project}-${var.environment}-admin-api"
 
-  # The per-environment config namespace: /insolvia/<env>/admin — a sibling
+  # The per-environment config namespace: /insolvia/<env>/admin-api — a sibling
   # of the API's /api namespace, exactly as that namespace's comment
-  # anticipated.
-  ssm_prefix = "/${var.project}/${var.environment}/admin"
+  # anticipated. The last segment tracks the component name above; the deploy
+  # workflow's get-parameters-by-path step reads this path literally.
+  ssm_prefix = "/${var.project}/${var.environment}/admin-api"
 }
 
 # ── Admin audit table (#178's audit trail) ──────────────────────
@@ -41,7 +49,7 @@ locals {
 # durable record #178 asked for, so "throwaway" never applies to it.
 
 resource "aws_dynamodb_table" "audit" {
-  name         = "${var.project}-admin-audit-${var.environment}"
+  name         = "${local.name}-audit"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "PK"
   range_key    = "SK"
@@ -89,7 +97,7 @@ resource "aws_iam_role_policy_attachment" "admin_basic" {
 # PutItem ONLY — see the header. The firm-table and Cognito grants are
 # attached by the other modules' seams, against the role this module outputs.
 resource "aws_iam_role_policy" "admin_audit" {
-  name = "${local.name}-audit-policy"
+  name = "${local.name}-audit"
   role = aws_iam_role.admin.id
   policy = jsonencode({
     Version = "2012-10-17"

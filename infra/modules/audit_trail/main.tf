@@ -5,7 +5,7 @@
 #
 # WHAT THIS CAN AND CANNOT PROVE. Per ADR 0001 the API Lambda's role is the
 # only application principal, so every data event here names
-# `insolvia-api-<env>-role` and never the signed-in user behind it. That makes
+# `insolvia-<env>-api-role` and never the signed-in user behind it. That makes
 # this evidence about ADMINISTRATIVE access — the "no human read paths in
 # prod" claim — and about the shape and volume of application access. "Which
 # user read this SSN" is a different question, and it has to be answered by an
@@ -20,13 +20,19 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  # insolvia-audit-<env>
-  name = "${var.project}-audit-${var.environment}"
+  # insolvia-<env>-audit — the trail/key-alias name stem.
+  name = "${var.project}-${var.environment}-audit"
 
-  # Bucket and trail names must both match the insolvia-audit-* prefixes the
-  # deploy role is granted in infra/envs/ci-trust. Renaming this stem without
-  # renaming those is a human-applied round trip away from a broken deploy.
-  bucket_name = local.name
+  # Bucket and trail names must both match the insolvia-*-audit-* patterns the
+  # deploy role is granted in infra/envs/ci-trust — and the bucket must also
+  # match DenyAuditLogErasure there, which is a CONTROL rather than a scope.
+  # Renaming this stem without renaming those does not fail the apply; it
+  # silently stops the deny matching. That is a human-applied round trip.
+  #
+  # The region suffix is S3's global-uniqueness requirement
+  # (insolvia-aws-naming); the trail keeps the bare stem, since CloudTrail
+  # trail names are only account-and-region scoped.
+  bucket_name = "${local.name}-${data.aws_region.current.region}"
 
   # Constructed rather than read off aws_cloudtrail.audit.arn, and that is the
   # point: the bucket policy must name the trail, and the trail must name the
@@ -40,7 +46,7 @@ locals {
 # the first of which is load-bearing:
 #
 #   1. It cannot be the case key. ci-trust's DenyCaseDataDecryption denies the
-#      deploy role kms:GenerateDataKey on anything aliased alias/insolvia-cases-*
+#      deploy role kms:GenerateDataKey on anything aliased alias/insolvia-*-cases
 #      — verified with simulate-principal-policy — so a trail pointed at the
 #      case key fails at CreateTrail, not at review.
 #   2. Separating them is the point anyway. The deploy role holds no kms:Decrypt

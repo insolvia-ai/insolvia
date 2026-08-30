@@ -24,7 +24,7 @@ source "$SCRIPT_DIR/dev-aws-common.sh"
 usage() {
   printf 'Usage: %s <short-id> [--profile NAME] [--region REGION] [--yes]\n' "$0"
   printf '  <short-id>  the 12 hex chars from the orphaned resource names,\n'
-  printf '              e.g. 0123456789ab for insolvia-waitlist-dev-0123456789ab\n'
+  printf '              e.g. 0123456789ab for insolvia-dev-0123456789ab-waitlist\n'
 }
 
 ORPHAN_SHORT_ID=""

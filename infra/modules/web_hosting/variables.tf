@@ -30,16 +30,19 @@ variable "tags" {
   default     = {}
 }
 
-# See the local in main.tf: null derives the original insolvia-web-<env>; a
-# second instantiation in the same environment must set this (bucket names and
-# the OAC name derive from it and would otherwise collide).
-variable "bucket_name" {
-  description = "Origin bucket name, or null to derive <project>-web-<environment>. Keep the insolvia-web- prefix."
+# What this instantiation SERVES, and the third segment of every name it
+# creates — see the local in main.tf. Each environment instantiates this module
+# twice, once per component, so this is what keeps the two apart.
+#
+# It replaced a free-text `bucket_name` override. Naming the component rather
+# than the bucket is what makes the region suffix and the insolvia-<env>- stem
+# unskippable: a caller can no longer hand-write a name that omits either.
+variable "component" {
+  description = "The surface this instance serves: `app` (the Expo SPA) or `admin` (the staff portal). Becomes insolvia-<env>-<component>."
   type        = string
-  default     = null
 
   validation {
-    condition     = var.bucket_name == null || can(regex("^insolvia-web-", var.bucket_name))
-    error_message = "bucket_name must keep the insolvia-web- prefix (the deploy role's S3 grant is scoped to it)."
+    condition     = contains(["app", "admin"], var.component)
+    error_message = "component must be one of: app, admin. A new value needs a matching arn:aws:s3:::insolvia-*-<component>-* grant in infra/envs/ci-trust, which is human-applied."
   }
 }

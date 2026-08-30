@@ -57,7 +57,10 @@ ok "Authenticated as $caller"
 # The deploy role cannot apply this root — it holds no IAM user/group actions.
 # It would fail on the first API call anyway; say so up front instead.
 case "$caller" in
-  *:assumed-role/insolvia-github-actions/*)
+  # Both spellings: `insolvia-github-actions` is the pre-rename name, and this
+  # root is the apply that renames it — so during that one apply the caller
+  # could legitimately be either.
+  *:assumed-role/insolvia-shared-deploy-role/*|*:assumed-role/insolvia-github-actions/*)
     die "You are the deploy role — it holds no iam:*User*/*Group* permissions, by design. Run this as a human admin (aws login)." ;;
 esac
 
