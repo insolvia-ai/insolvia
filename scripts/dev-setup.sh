@@ -215,12 +215,24 @@ install_skills() {
     local args=() name count=0
     for name in $names; do args+=(--skill "$name"); count=$((count + 1)); done
     log "skills: $source ($count)"
-    # `</dev/null` is load-bearing: npx inherits this loop's stdin, and without
-    # it the first `add` swallows the remaining lines of "$sources" — one source
-    # gets installed and the rest vanish silently.
-    if ! GH_TOKEN="${token:-${GH_TOKEN:-}}" npx --yes skills@1 add "$source" \
-        "${args[@]}" --agent universal --agent claude-code -y </dev/null >/dev/null 2>&1; then
-      warn "could not install skills from $source — re-run, or: npx skills add $source --agent universal --agent claude-code"
+    # `cd "$REPO_ROOT"` in a subshell is load-bearing: `skills add` resolves
+    # `.agents/skills/`, `.claude/skills/` and `skills-lock.json` against the
+    # PROCESS's working directory, and this script is reached from a
+    # per-package one (`cd services/api && ./scripts/dev-setup.sh` → this, via
+    # services/api/scripts/dev-setup.sh). Without the cd it installs a second
+    # skills tree under whatever directory the developer happened to be in —
+    # which `ruff check .` then lints as if it were service code, and which
+    # .gitignore does NOT cover: `.agents/skills/` contains a slash, so git
+    # anchors it to the repo root and a nested copy shows up untracked
+    # alongside a stray skills-lock.json. A subshell, not a bare cd, so the
+    # rest of the script keeps the caller's cwd.
+    #
+    # `</dev/null` is load-bearing too: npx inherits this loop's stdin, and
+    # without it the first `add` swallows the remaining lines of "$sources" —
+    # one source gets installed and the rest vanish silently.
+    if ! ( cd "$REPO_ROOT" && GH_TOKEN="${token:-${GH_TOKEN:-}}" npx --yes skills@1 add "$source" \
+        "${args[@]}" --agent universal --agent claude-code -y </dev/null >/dev/null 2>&1 ); then
+      warn "could not install skills from $source — re-run, or, FROM THE REPO ROOT: npx skills add $source --agent universal --agent claude-code"
     fi
   done <<< "$sources"
 
@@ -231,7 +243,7 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   if [[ -d "$REPO_ROOT/.agents/skills" ]]; then
     skip "agent skills" "$REPO_ROOT/.agents/skills"
   else
-    warn "agent skills not installed — run without --check, or: npx skills add <source> --agent universal --agent claude-code"
+    warn "agent skills not installed — run without --check, or, FROM THE REPO ROOT: npx skills add <source> --agent universal --agent claude-code"
   fi
 else
   install_skills
