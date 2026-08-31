@@ -423,12 +423,33 @@ jobs:
 
   # ── PRODUCTION ───────────────────────────────────────────────────────────
   #
-  # Default `if:` (success) everywhere below, deliberately: unlike the staging
-  # legs, nothing upstream of these can be skipped-but-fine — if `promote` did
-  # not succeed, production must not start, and if any prod leg fails the
-  # chain must stop dead.
+  # EVERY JOB BELOW STATES ITS CONDITION EXPLICITLY, and the default `if:` is
+  # exactly what it must not use. That default was here for a long time on the
+  # reasoning that "nothing upstream of these can be skipped-but-fine", and the
+  # reasoning was wrong: the staging legs are `changes`-gated, so `admin`,
+  # `mailer` and the rest routinely skip-but-fine. `record` and `promote`
+  # tolerate that with their own `!cancelled() && !failure()`, but the implicit
+  # `success()` on a job does NOT stop at its direct `needs` — a skip upstream
+  # propagates through the chain and skips it, even though `promote` itself
+  # succeeded.
+  #
+  # The result: the production stage never ran. Not once, in every release run
+  # on record — the reviewer approved, `promote` went green, and all six prod
+  # jobs were skipped in the same second, with no nested workflow ever
+  # dispatched and nothing anywhere reported as failed. A gate that silently
+  # ships nothing looks exactly like a gate that shipped.
+  #
+  # `needs.<job>.result == 'success'` is immune to that, because it asks about
+  # the one thing that actually matters instead of inheriting a verdict from
+  # the whole graph. The intent is unchanged and now enforceable: if `promote`
+  # did not succeed, production must not start, and if any prod leg fails the
+  # chain stops dead. `!cancelled()` keeps a cancelled run from continuing.
+  #
+  # Bracket notation on the hyphenated names is required — `needs.prod-infra`
+  # parses as a subtraction.
   prod-infra:
     needs: promote
+    if: ${{ !cancelled() && needs.promote.result == 'success' }}
     uses: ./.github/workflows/infra-prod.yml
     with:
       mode: apply
@@ -437,6 +458,7 @@ jobs:
 
   prod-mailer:
     needs: prod-infra
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' }}
     uses: ./.github/workflows/mailer-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -445,6 +467,7 @@ jobs:
 
   prod-api:
     needs: [prod-infra, prod-mailer]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-mailer'].result == 'success' }}
     uses: ./.github/workflows/api-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -453,6 +476,7 @@ jobs:
 
   prod-admin:
     needs: [prod-infra, prod-api]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
     uses: ./.github/workflows/admin-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -461,6 +485,7 @@ jobs:
 
   prod-marketing:
     needs: [prod-infra, prod-api]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
     uses: ./.github/workflows/marketing-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -469,6 +494,7 @@ jobs:
 
   prod-app:
     needs: [prod-infra, prod-marketing]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-marketing'].result == 'success' }}
     uses: ./.github/workflows/app-prod.yml
     with:
       sha: ${{ github.sha }}
