@@ -1,0 +1,214 @@
+{
+  "scheme_id": "tx",
+  "jurisdiction": "TX",
+  "name": "Texas exemptions (Tex. Prop. Code chs. 41-42; Tex. Const. art. XVI)",
+  "opted_out_of_federal": false,
+  "opt_out_citation": null,
+  "notes": "Texas has NOT opted out: a Texas-domiciled debtor elects either this scheme or federal § 522(d) on 106C line 1 (11 U.S.C. § 522(b)(2)) — both answers are live. The official statutes.capitol.texas.gov pages are script-rendered and could not be machine-read at build time; figures were verified against two independent mirrors and should be re-checked against the official text before first filing.",
+  "entries": [
+    {
+      "entry_id": "tx-homestead",
+      "category": "homestead",
+      "description": "Homestead — unlimited value; up to 10 contiguous urban acres, or rural acreage of 100 acres (single adult) / 200 acres (family)",
+      "citation": "Tex. Prop. Code §§ 41.001-41.002; Tex. Const. art. XVI, §§ 50-51",
+      "amount": null,
+      "unlimited": true,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code §§ 41.001-41.002 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_41.002",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Value-unlimited but acreage-limited; subject in bankruptcy to 11 U.S.C. § 522(p)/(q). Acreage definitions last amended eff. 2000-01-01.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-personal-property-aggregate",
+      "category": "personal_property",
+      "description": "Aggregate cap on the personal property listed in § 42.002 (home furnishings, provisions, tools of trade, apparel, jewelry, two firearms, athletic gear, vehicles, listed livestock, pets), exclusive of liens",
+      "citation": "Tex. Prop. Code § 42.001(a)",
+      "amount": "50000.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.001 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_42.001",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "Tex. Prop. Code § 42.001 (FindLaw mirror)",
+          "url": "https://codes.findlaw.com/tx/property-code/prop-sect-42-001/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": "100000.00",
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "$50,000.00 single adult / $100,000.00 family — a family ceiling, not per-spouse doubling. Current figures set by Acts 2015, ch. 793 (H.B. 2706), eff. 2015-09-01. Unpaid commissions <= 25% of the cap count toward it (§ 42.001(d)).",
+      "figure_since": "2015-09-01"
+    },
+    {
+      "entry_id": "tx-vehicle",
+      "category": "vehicle",
+      "description": "A two-, three-, or four-wheeled motor vehicle per family member (or single adult) holding a driver's license, or who relies on another to operate it",
+      "citation": "Tex. Prop. Code § 42.002(a)(9)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.002 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_42.002",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No per-vehicle cap; counts against the § 42.001 aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-tools-of-trade",
+      "category": "tools_of_trade",
+      "description": "Tools, equipment, books, and apparatus of a trade or profession, including boats and motor vehicles used in it",
+      "citation": "Tex. Prop. Code § 42.002(a)(4)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.002 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_42.002",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No category cap; counts against the § 42.001 aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-jewelry",
+      "category": "jewelry",
+      "description": "Jewelry",
+      "citation": "Tex. Prop. Code § 42.002(a)(6)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.002 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_42.002",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Capped at 25% of the § 42.001 aggregate (i.e. $12,500.00 single / $25,000.00 family — derived, not stored) and counts against that aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-wages",
+      "category": "wages",
+      "description": "Current wages for personal services",
+      "citation": "Tex. Prop. Code § 42.001(b)(1)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.001 (FindLaw mirror)",
+          "url": "https://codes.findlaw.com/tx/property-code/prop-sect-42-001/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Outside the aggregate; not exempt against court-ordered child support.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-health-aids",
+      "category": "health_aids",
+      "description": "Professionally prescribed health aids of the debtor or a dependent",
+      "citation": "Tex. Prop. Code § 42.001(b)(2)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.001 (FindLaw mirror)",
+          "url": "https://codes.findlaw.com/tx/property-code/prop-sect-42-001/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Outside the § 42.001 aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-support",
+      "category": "support_and_benefits",
+      "description": "Alimony, support, or separate maintenance received or to be received",
+      "citation": "Tex. Prop. Code § 42.001(b)(3)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.001 (FindLaw mirror)",
+          "url": "https://codes.findlaw.com/tx/property-code/prop-sect-42-001/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Outside the § 42.001 aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "tx-retirement",
+      "category": "retirement",
+      "description": "Assets in tax-qualified retirement plans, IRAs, and similar arrangements",
+      "citation": "Tex. Prop. Code § 42.0021",
+      "amount": null,
+      "unlimited": true,
+      "verification": "unverified",
+      "sources": [
+        {
+          "title": "Tex. Prop. Code § 42.0021 (Public.Law mirror)",
+          "url": "https://texas.public.law/statutes/tex._prop._code_section_42.0021",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "UNVERIFIED at build time: the section text (which plans qualify, treatment of nonqualified rollovers, inherited IRAs) was not fetched and confirmed — only the citation and its general effect. Verify the full text before Schedule C cites it.",
+      "figure_since": null
+    }
+  ],
+  "limits": []
+}

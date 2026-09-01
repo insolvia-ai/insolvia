@@ -1,0 +1,202 @@
+{
+  "scheme_id": "fl",
+  "jurisdiction": "FL",
+  "name": "Florida exemptions (Fla. Const. art. X, § 4; Fla. Stat. ch. 222)",
+  "opted_out_of_federal": true,
+  "opt_out_citation": "Fla. Stat. § 222.20",
+  "notes": "Opt-out: Florida residents may not elect § 522(d) (Fla. Stat. § 222.20, ch. 79-363). Federal non-bankruptcy exemptions and the § 522(p)/(q) homestead caps still apply.",
+  "entries": [
+    {
+      "entry_id": "fl-homestead",
+      "category": "homestead",
+      "description": "Homestead: residence of the owner or owner's family — unlimited value; limited to 1/2 acre of contiguous land within a municipality or 160 contiguous acres outside one",
+      "citation": "Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02",
+      "amount": null,
+      "unlimited": true,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Fla. Const. art. X, § 4 (Homestead; exemptions)",
+          "url": "https://www.flsenate.gov/Laws/Constitution#A10S04",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "Fla. Const. art. X, § 4 (as reproduced by Florida court-rules mirror)",
+          "url": "https://floridacourtrules.com/florida-constitution/article-10-section-4/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Value-unlimited but acreage-limited. Subject in bankruptcy to 11 U.S.C. § 522(p)/(q) caps for recently acquired or misconduct-tainted homesteads. The flsenate.gov constitution page could not be machine-read at build time; text verified against mirrors — re-verify against the official page before first filing.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-personal-property",
+      "category": "personal_property",
+      "description": "Personal property of any kind",
+      "citation": "Fla. Const. art. X, § 4(a)(2)",
+      "amount": "1000.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "Fla. Const. art. X, § 4 (Homestead; exemptions)",
+          "url": "https://www.flsenate.gov/Laws/Constitution#A10S04",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "Fla. Const. art. X, § 4 (as reproduced by Florida court-rules mirror)",
+          "url": "https://floridacourtrules.com/florida-constitution/article-10-section-4/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Constitutional figure, unchanged since the 1968 revision; doubles in practice for joint filers as each spouse claims it. Same build-time mirror caveat as fl-homestead.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-vehicle",
+      "category": "vehicle",
+      "description": "A single motor vehicle",
+      "citation": "Fla. Stat. § 222.25(1)",
+      "amount": "5000.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.25 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.25",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "Laws of Fla. ch. 2024-110 (SB 158), raising the exemption from $1,000 to $5,000 eff. July 1, 2024",
+          "url": "https://www.flsenate.gov/Session/Bill/2024/158",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Raised from $1,000.00 by ch. 2024-110, eff. 2024-07-01. A case filed before that date needs the old figure; none can still be prepared in this product, so the historical row is omitted.",
+      "figure_since": "2024-07-01"
+    },
+    {
+      "entry_id": "fl-health-aids",
+      "category": "health_aids",
+      "description": "Professionally prescribed health aids for the debtor or a dependent",
+      "citation": "Fla. Stat. § 222.25(2)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.25 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.25",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-wildcard-no-homestead",
+      "category": "wildcard",
+      "description": "Personal property of any kind — ONLY if the debtor does not claim or receive the benefit of the homestead exemption",
+      "citation": "Fla. Stat. § 222.25(4)",
+      "amount": "4000.00",
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.25 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.25",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Conditional, not a carryover: available instead of, never alongside, the homestead benefit. Enacted 2007; amendment date of the current figure not separately verified — the figure itself is the current statute text.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-wages-head-of-family",
+      "category": "wages",
+      "description": "Disposable earnings of a head of family (provides more than half the support of a child or other dependent)",
+      "citation": "Fla. Stat. § 222.11",
+      "amount": null,
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.11 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.11",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No flat cap: earnings <= $750.00/week are fully exempt; above that, exempt absent a written waiver (14-point type, separate document). Non-head-of-family earnings get only federal CCPA limits (15 U.S.C. § 1673). Exemption follows earnings into a bank account for 6 months if traceable.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-life-insurance-annuities",
+      "category": "life_insurance",
+      "description": "Cash surrender value of life insurance policies and proceeds of annuity contracts issued to Florida residents",
+      "citation": "Fla. Stat. § 222.14",
+      "amount": null,
+      "unlimited": true,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.14 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.14",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Not exempt against a creditor the policy or contract was effected for the benefit of.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "fl-retirement",
+      "category": "retirement",
+      "description": "Assets in tax-qualified retirement plans and accounts (IRC §§ 401(a), 403(a)/(b), 408, 408A, 409, 414, 457(b), 501(a)), including inherited IRAs",
+      "citation": "Fla. Stat. § 222.21(2)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Fla. Stat. § 222.21 (2025)",
+          "url": "https://www.flsenate.gov/Laws/Statutes/2025/222.21",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Last substantively amended by ch. 2022-167.",
+      "figure_since": null
+    }
+  ],
+  "limits": []
+}
