@@ -28,7 +28,8 @@ the set is not revised in lockstep — some schedules are a decade older than
 others. The
 [regulatory source register](../business/regulatory-source-register.html) owns
 which revision is current and when it is checked; this document does not
-restate it. A case records the revisions it was prepared against, so that a
+restate it. A case records the revisions it was prepared against — the
+float-then-pin rule in [`effective-dating.md`](effective-dating.md) — so that a
 case begun before a revision keeps answering the questions it was actually
 asked.
 
@@ -465,7 +466,9 @@ the current figures and the adjustment calendar.
 What this model commits to is only that **a case records which constant set
 applied when it was prepared**, via `constants_set_id`. Where those sets live
 and how they are versioned is shared with the forms engine's effective-dating
-problem and is settled there, not here.
+problem and is settled in [`effective-dating.md`](effective-dating.md), not
+here: `constants_set_id` is the pinned release id of the `code/dollar-amounts`
+series, and `form_revisions` pins each form series the same way.
 
 ## The external-system seam — an origin pointer, not sync
 

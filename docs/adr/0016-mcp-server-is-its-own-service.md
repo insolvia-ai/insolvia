@@ -1,4 +1,4 @@
-# ADR 0014 — The MCP server is its own service
+# ADR 0016 — The MCP server is its own service
 
 - **Status:** Accepted
 - **Date:** 2026-09-01

@@ -5,7 +5,7 @@ promised: which tools expose the case domain to an attorney's AI harness, what
 an agent write is allowed to mean, and the vocabulary the server speaks. This
 is the design artifact issues 12.2–12.4 implement
 ([#261](https://github.com/insolvia-ai/insolvia/issues/261)–[#263](https://github.com/insolvia-ai/insolvia/issues/263));
-where it lives is [ADR 0014](../adr/0014-mcp-server-is-its-own-service.md).
+where it lives is [ADR 0016](../adr/0016-mcp-server-is-its-own-service.md).
 
 Three rules are inherited, not designed here, and every decision below is
 downstream of them:
@@ -365,7 +365,7 @@ surface) rather than in 12.5's issue thread:
   constraints above.
 - **Service scaffolding, Lambda/API Gateway wiring, all three environments** —
   12.3 ([#262](https://github.com/insolvia-ai/insolvia/issues/262)), placed by
-  [ADR 0014](../adr/0014-mcp-server-is-its-own-service.md).
+  [ADR 0016](../adr/0016-mcp-server-is-its-own-service.md).
 - **The review UI** that accepts, corrects, or rejects candidates — the
   extraction-review work (8.9); this surface only feeds its queue.
 - **Candidate item shapes in the store** — owned by
@@ -376,7 +376,7 @@ surface) rather than in 12.5's issue thread:
 
 - [ADR 0013](../adr/0013-mcp-server-replaces-direct-pms-integration.md) — why
   an MCP server exists at all
-- [ADR 0014](../adr/0014-mcp-server-is-its-own-service.md) — where it runs
+- [ADR 0016](../adr/0016-mcp-server-is-its-own-service.md) — where it runs
 - [`case-data-model.md`](case-data-model.md) — every entity these tools expose
 - [ADR 0001](../adr/0001-client-stays-dumb-trust-boundary.md) ·
   [ADR 0009](../adr/0009-a-case-belongs-to-a-firm.md) ·

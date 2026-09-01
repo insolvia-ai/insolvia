@@ -18,7 +18,8 @@ that is rewritten as work lands.
 |---|---|
 | [`architecture.md`](reference/architecture.md) | Monorepo shape, toolchain (incl. the Expo free-tier constraint), environment model, hosting topology, CI/CD, PR-gate design + the required-check contract. |
 | [`case-data-model.md`](reference/case-data-model.md) | The case schema: entities mapped to B101/B106/B107, per-field provenance and the confirm-before-entry invariant, derived values, the external-system seam (an origin pointer since [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md)). |
-| [`mcp-surface.md`](reference/mcp-surface.md) | The MCP tool surface over the case domain: the eight tools with schemas, the candidate-write flow (agent writes land as candidates, confirmed only by humans), permission gating, pagination, error vocabulary. Placement: [ADR 0014](adr/0014-mcp-server-is-its-own-service.md). |
+| [`effective-dating.md`](reference/effective-dating.md) | How form revisions and regulatory datasets are versioned: series, immutable effective-dated releases, date resolution, float-then-pin on cases, and the scheduled-refresh pattern. |
+| [`mcp-surface.md`](reference/mcp-surface.md) | The MCP tool surface over the case domain: the eight tools with schemas, the candidate-write flow (agent writes land as candidates, confirmed only by humans), permission gating, pagination, error vocabulary. Placement: [ADR 0016](adr/0016-mcp-server-is-its-own-service.md). |
 | [`terraform.md`](reference/terraform.md) | Infra state model, modules, naming, deploy order, the ci-trust self-deny, the human IAM users in account-access. |
 | [`package-publishing.md`](reference/package-publishing.md) | How this repo *consumes* the design system and tokens — published from `insolvia-ai/design-system`, installed by version on both surfaces, plus the registry auth and the bundler wiring each consumer owns. |
 | [`email.md`](reference/email.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
@@ -28,6 +29,7 @@ that is rewritten as work lands.
 | Runbook | What | State |
 |---|---|---|
 | [`aws-bootstrap.md`](runbooks/aws-bootstrap.md) | One-time AWS/GitHub bootstrap, incl. the ci-trust anchor. | Executed; kept for a fresh account |
+| [`december-1-forms-cycle.md`](runbooks/december-1-forms-cycle.md) | The annual Official Forms amendment cycle: watch, re-diff, register, release, verify — with a per-cycle log. | Live; walked against the Dec 1 2026 cycle; run every cycle |
 | [`app-deploy-verification.md`](runbooks/app-deploy-verification.md) | Six checks proving a host serves the app, and the right build. | Both envs verified; re-run per deploy |
 | [`iam-mfa-rotation.md`](runbooks/iam-mfa-rotation.md) | Replacing a human IAM user's MFA device — and the two failures that look like missing permissions and are not. | Live; run per device change |
 | [`ses-production-access.md`](runbooks/ses-production-access.md) | The SES sandbox exit: checklist, request text, human console steps. | **Open** — actionable now |
