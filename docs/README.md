@@ -28,6 +28,7 @@ that is rewritten as work lands.
 | Runbook | What | State |
 |---|---|---|
 | [`aws-bootstrap.md`](runbooks/aws-bootstrap.md) | One-time AWS/GitHub bootstrap, incl. the ci-trust anchor. | Executed; kept for a fresh account |
+| [`december-1-forms-cycle.md`](runbooks/december-1-forms-cycle.md) | The annual Official Forms amendment cycle: watch, re-diff, register, release, verify — with a per-cycle log. | Live; walked against the Dec 1 2026 cycle; run every cycle |
 | [`app-deploy-verification.md`](runbooks/app-deploy-verification.md) | Six checks proving a host serves the app, and the right build. | Both envs verified; re-run per deploy |
 | [`iam-mfa-rotation.md`](runbooks/iam-mfa-rotation.md) | Replacing a human IAM user's MFA device — and the two failures that look like missing permissions and are not. | Live; run per device change |
 | [`ses-production-access.md`](runbooks/ses-production-access.md) | The SES sandbox exit: checklist, request text, human console steps. | **Open** — actionable now |
