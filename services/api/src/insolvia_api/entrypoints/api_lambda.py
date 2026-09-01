@@ -7,6 +7,7 @@ from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from mangum import Mangum
 
 from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_api.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
@@ -105,6 +106,9 @@ app = create_app(
         # Same table as the case store, deliberately: a debtor is stored in
         # its case's partition, so this needs no configuration of its own.
         debtor_store=DynamoDbDebtorStore(config.case_table_name),
+        # Likewise: the generic collections (issue #249) are child items of
+        # their case's partition — no new table, no new environment variable.
+        case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

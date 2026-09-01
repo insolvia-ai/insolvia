@@ -7,15 +7,18 @@ is tenant-API-specific.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol, TypeVar
 
 from insolvia_api.core.access import Accessor
 from insolvia_api.core.access_log import AccessEvent
+from insolvia_api.core.case_entities import CaseEntity, EntityKind
 from insolvia_api.core.cases import Case, CaseAssignment, CasePage
 from insolvia_api.core.debtors import Debtor
 from insolvia_api.core.documents import Document, StoredBlob
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
+
+BodyT = TypeVar("BodyT")
 
 
 class WaitlistStore(Protocol):
@@ -270,6 +273,58 @@ class DebtorStore(Protocol):
     def list_for_case(self, case_id: str) -> tuple[Debtor, ...]:
         """Every debtor of one case, ordered by filing role so debtor_1 comes
         before debtor_2 — the order the forms print them in."""
+        ...
+
+
+class CaseEntityStore(Protocol):
+    """Persists the generic case collections (issue #249) — creditors, claims,
+    assets, employments, income summaries, households, expenses, dependents,
+    codebtors and SOFA entries. One port for all ten, because they are one
+    shape: a uuid-keyed record in its case's partition
+    (core/case_entities.py).
+
+    Ownership is NOT a parameter here, the same rule DebtorStore and
+    DocumentStore state: an entity is reached only through its case, the route
+    resolves the case through `CaseStore` first on every path, and a second
+    authorisation path here would eventually disagree with the first.
+
+    What every method DOES enforce is the case scope: `case_id` is half the
+    key, so an entity id from another case does not resolve here. That is what
+    keeps a leaked or guessed id useless without its case.
+    """
+
+    def create(self, entity: CaseEntity[Any]) -> None:
+        """Store a new record. The id is server-minted per request (uuid4), so
+        unlike DebtorStore.create there is no first-save race to lose — but an
+        implementation MUST still refuse to overwrite an existing (case, kind,
+        id) by raising, because a silent replace here would mean the id minting
+        is broken and something just erased a record to prove it."""
+        ...
+
+    def get(
+        self, case_id: str, kind: EntityKind[BodyT], entity_id: str
+    ) -> CaseEntity[BodyT] | None: ...
+
+    def put(self, entity: CaseEntity[Any]) -> bool:
+        """Replace the record, but only over one that still exists — True when
+        it did, False when it was gone. The route turns False into the same
+        404 a foreign id gets, so an edit racing a delete does not silently
+        resurrect the record."""
+        ...
+
+    def delete(self, case_id: str, kind: EntityKind[Any], entity_id: str) -> bool:
+        """Remove the record. True if this call removed it, False if there was
+        nothing there — so two concurrent deletes cannot both report
+        success."""
+        ...
+
+    def list_for_case(
+        self, case_id: str, kind: EntityKind[BodyT]
+    ) -> tuple[CaseEntity[BodyT], ...]:
+        """Every record of one collection in one case, in creation order
+        (core/case_entities.list_order — the sort key is a random uuid, so
+        neither implementation gets this ordering for free). All of them: a
+        caller cannot page, so an implementation that can truncate must not."""
         ...
 
 
