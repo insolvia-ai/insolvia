@@ -6,7 +6,14 @@ in force, and the work ahead. Completed milestones are summarized in one table
 was dropped entirely (D9); this document no longer plans for it.
 
 Status: **foundation shipped; intake shipped; forms & petition engine is the
-current milestone** · Last pruned 2026-08-11
+current milestone** · Last pruned 2026-09-01
+
+**Pivot 2026-09-01 (D11 /
+[ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md)):** no
+direct practice-management integration, ever — Insolvia exposes a remote **MCP
+server** and the attorney's AI harness (Claude Desktop, ChatGPT, any MCP
+client) moves data between their PMS and us. The MyCase spike (old
+Milestone 0) is retired; its successor milestone is below.
 
 ---
 
@@ -17,9 +24,13 @@ current milestone** · Last pruned 2026-08-11
 | Business-plan milestone | Status |
 |---|---|
 | **M0 · Foundation repo** — design system, app shell, CI/CD, infra authored | ✅ Shipped |
-| **M1 · Live staging + MyCase API spike** | Staging **live** (all four surfaces); MyCase spike **open** — see Milestone 0 below |
-| **M2 · MyCase-native intake + AI extraction** | Intake **shipped** (standalone, MyCase-independent); AI extraction **deferred to its own milestone** 2026-08-11 (§ Product milestones) |
+| **M1 · Live staging + MyCase API spike** | Staging **live** (all four surfaces); the spike was **retired unexecuted** by the MCP pivot ([ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md)) — its successor is the [Case-management MCP milestone](https://github.com/insolvia-ai/insolvia/milestone/10) below |
+| **M2 · MyCase-native intake + AI extraction** | Intake **shipped** (standalone, PMS-independent); AI extraction **deferred to its own milestone** 2026-08-11 (§ Product milestones) |
 | **M3 · Compliant Chapter 7 packet** | **Current work** — taken up ahead of extraction (§ Product milestones) |
+
+The business plan's §1/§7/§10/§11 still describe the pre-pivot MyCase wedge;
+reconciling it is [#267](https://github.com/insolvia-ai/insolvia/issues/267)
+(12.8). Until then, where they disagree, ADR 0013 and this plan win.
 
 ---
 
@@ -72,40 +83,45 @@ died in — this plan no longer carries their bodies.
 | D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`email.md`](reference/email.md) |
 | D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
+| D11 | **No direct PMS integration — Insolvia is an MCP server.** The attorney's AI harness moves data between their practice-management system and us; agent writes land as candidates under confirm-before-entry | [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md) |
 
 (D8 — "desktop built but not promoted" — is gone with desktop itself; ADR 0004
 preserves its reasoning and why the answer changed.)
 
 ---
 
-## Milestone 0 · MyCase API spike — the one open foundation milestone
+## Milestone · Case-management MCP — the integration surface (replaces the MyCase spike)
 
-**Not urgent, fully unblocked, and cheap** — a founder's business partner works
-at MyCase, and the API is publicly documented:
+The pivot's constructive half
+([ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md) /
+[milestone 10](https://github.com/insolvia-ai/insolvia/milestone/10)): one
+remote **MCP server** over our own domain, so any harness a firm runs can read
+cases and push data *into* them — instead of Insolvia integrating with N
+practice-management systems, N harnesses integrate with one Insolvia. The old
+Milestone 0 (issues 0.0–0.8) is closed unexecuted; its still-live questions
+carried over (App Bar → 12.6, the MyCase relationship as *channel* → 12.6/12.8).
 
-> https://mycaseapi.stoplight.io/docs/mycase-api-documentation/k5xpc4jyhkom7-getting-started
-
-Run docs-first: most questions (write coverage, data model, rate limits,
-webhook vs. polling) are answerable before holding a credential. The
-relationship covers access and fast answers; it does **not** cover what the API
-can technically do — whether write endpoints exist for bankruptcy-intake fields
-is a property of the API surface, and the no-double-entry promise dies without
-write.
-
-**Outcome:** the integration's technical shape documented well enough to design
-the intake milestone against it.
+The invariant that shapes everything here: **agent writes land as candidate
+records** with provenance, confirmed by a human before they become case data —
+the same seam extraction review (8.9) needs
+([`case-data-model.md`](reference/case-data-model.md)).
 
 | # | Issue | Notes |
 |---|---|---|
-| 0.0 | **Documentation spike** — answer everything answerable without credentials | Do first; free and unblocked. Turns 0.2–0.5 into confirmation rather than discovery. |
-| 0.1 | Obtain MyCase API credentials | Advanced tier (~$89/mo), business-plan §3. Partner relationship — not a blocker. |
-| 0.2 | Authenticate; one **read** round-trip | Proves credentials, scopes, rate limits. |
-| 0.3 | One **write** round-trip | The riskier half — read-generous/write-thin APIs are common. |
-| 0.4 | Map MyCase's data model → bankruptcy intake fields | Gaps here shape the intake milestone. |
-| 0.5 | Document rate limits, pagination, webhook/sync options | Push vs. poll vs. on-demand is an architectural fork for intake. |
-| 0.6 | Investigate App Bar listing requirements | The discovery channel — learn its bar and timeline now. |
-| 0.7 | **Confirm the commercial relationship formally** | Business-plan §10: a personal relationship moves with the person. Formal partnership + a second channel (direct/NACBA) before this is leaned on in a raise. |
-| 0.8 | Write the go/no-go, incl. what changes if MyCase says no | Far better discovered here than in the intake milestone. |
+| 12.1 | [#260](https://github.com/insolvia-ai/insolvia/issues/260) — Design the MCP surface: tools + candidate-write flow | Do first; also decides `services/mcp` vs. inside `services/api`. |
+| 12.2 | [#261](https://github.com/insolvia-ai/insolvia/issues/261) — MCP auth: OAuth against the existing Cognito pool | A session is a `sub` with firm permissions (D10); nothing authorization-bearing in tokens. |
+| 12.3 | [#262](https://github.com/insolvia-ai/insolvia/issues/262) — The service itself, all three environments | Lambda, `insolvia_core`, normal CI/deploy pattern. |
+| 12.4 | [#263](https://github.com/insolvia-ai/insolvia/issues/263) — First end-to-end: harness reads a case, writes a candidate creditor, human confirms | The round-trip that proves the pivot. |
+| 12.5 | [#264](https://github.com/insolvia-ai/insolvia/issues/264) — Verify against Claude Desktop + ChatGPT + an inspector | "Any MCP client" meets reality; per-harness gaps feed back into 12.1. |
+| 12.6 | [#265](https://github.com/insolvia-ai/insolvia/issues/265) — Distribution: MCP/connector directories | The discovery channel that replaces the App Bar (old 0.6). |
+| 12.7 | [#266](https://github.com/insolvia-ai/insolvia/issues/266) — Marketing repositioning off "MyCase-native" | Public story; founder signs off the copy. |
+| 12.8 | [#267](https://github.com/insolvia-ai/insolvia/issues/267) — Business plan §1/§7/§10/§11 rewrite | Founder-owned; tracked so the staleness is visible. |
+
+Sequencing against the forms milestone: forms stay **current** — they are the
+value the MCP exposes. 12.1 (design, cheap) and 12.7 (the public story is
+wrong today) are worth doing early; the build (12.2–12.5) benefits from 9.9
+landing first, since creditors/assets/income are most of what a harness would
+push.
 
 ## Outstanding foundation item · SES production access
 
@@ -121,8 +137,11 @@ leaving it open-ended.
 
 Each is a GitHub milestone with its issues filed; the issue bodies carry the
 scope and "done when", so this table stays one line each. Ordering is the
-dependency order. MyCase sync is deliberately **out** of all five — it waits on
-Milestone 0; the intake data model keeps a sync seam open (issue 8.1).
+dependency order. PMS integration is deliberately **out** of all five — since
+the pivot (D11) it is not sync at all but the
+[Case-management MCP milestone](https://github.com/insolvia-ai/insolvia/milestone/10)
+above; the intake data model's old sync seam narrowed to an origin pointer
+([`case-data-model.md`](reference/case-data-model.md)).
 
 | Milestone | Business plan | Issues | One-line scope |
 |---|---|---|---|
@@ -176,12 +195,18 @@ milestone (10.1).
 
 In order of likely bite:
 
-1. **MyCase write coverage (0.3–0.4).** Access is de-risked; whether the API
-   exposes write endpoints for intake fields is not. Cheap to answer, shapes
-   the intake milestone.
-2. **Channel formality (0.7).** The warm channel rests on a personal
-   relationship. Business-plan §10 calls for a formal partnership plus a
-   second channel before it is leaned on in a raise.
+1. **Harness capability and adoption (12.4–12.5).** The pivot retired the
+   MyCase write-coverage risk and bought this one: "no double entry" now
+   depends on the attorney's harness actually being able to read their PMS
+   and drive our MCP tools well — and on firms running a harness at all,
+   which narrows the early market to AI-adopting firms. Cheap to test the
+   technical half (12.4/12.5); the adoption half joins the web-first bet in
+   front of the design partner (8.10).
+2. **The channel changed shape (12.6–12.8).** The warm MyCase relationship no
+   longer shortcuts an integration; distribution now runs through connector
+   directories whose review bars and timelines we have not measured, plus the
+   relationship as a door-opener. Business-plan §10's channel section is stale
+   until 12.8 lands.
 3. **Web-first is a bet on attorney behaviour — and D9 raised the stake.** The
    market is described as desktop-loyal, and counter-evidence now costs a port
    rather than a marketing decision. **Test it explicitly with the
