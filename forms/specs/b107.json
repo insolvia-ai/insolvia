@@ -1,0 +1,6209 @@
+{
+ "form": "b107",
+ "official_number": "107",
+ "title": "Statement of Financial Affairs for Individuals Filing for Bankruptcy",
+ "revision": "04/25",
+ "effective_date": "2025-04-01",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Give Details About Your Marital Status and Where You Lived Before"
+  },
+  {
+   "number": 2,
+   "title": "Explain the Sources of Your Income"
+  },
+  {
+   "number": 3,
+   "title": "List Certain Payments You Made Before You Filed for Bankruptcy"
+  },
+  {
+   "number": 4,
+   "title": "Identify Legal Actions, Repossessions, and Foreclosures"
+  },
+  {
+   "number": 5,
+   "title": "List Certain Gifts and Contributions"
+  },
+  {
+   "number": 6,
+   "title": "List Certain Losses"
+  },
+  {
+   "number": 7,
+   "title": "List Certain Payments or Transfers"
+  },
+  {
+   "number": 8,
+   "title": "List Certain Financial Accounts, Instruments, Safe Deposit Boxes, and Storage Units"
+  },
+  {
+   "number": 9,
+   "title": "Identify Property You Hold or Control for Someone Else"
+  },
+  {
+   "number": 10,
+   "title": "Give Details About Environmental Information"
+  },
+  {
+   "number": 11,
+   "title": "Give Details About Your Business or Connections to Any Business"
+  },
+  {
+   "number": 12,
+   "title": "Sign Below"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; one field whose widgets repeat in every page header"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   }
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is an"
+    ]
+   }
+  },
+  {
+   "id": "q1_marital_status",
+   "part": 1,
+   "line": "1",
+   "label": "What is your current marital status?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=marital_status; the singleton marital-status answer"
+   },
+   "pdf": {
+    "names": [
+     "check1"
+    ]
+   },
+   "options": [
+    {
+     "value": "married",
+     "label": "Married"
+    },
+    {
+     "value": "yes",
+     "label": "Not married",
+     "notes": "quirky export value in the official PDF"
+    }
+   ]
+  },
+  {
+   "id": "q2_gate",
+   "part": 1,
+   "line": "2",
+   "label": "During the last 3 years, have you lived anywhere other than where you live now?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=prior_address exists"
+   },
+   "pdf": {
+    "names": [
+     "check2"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q2_debtor1_street",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 prior address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; street, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "Street address 1b Debtor 1",
+     "Street address 1c Debtor 1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_street2",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 prior address \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; second street line, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "Street address 2b Debtor 1",
+     "Street address 2c Debtor 1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_city",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 prior address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; city, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "City 1b Debtor1",
+     "City 1c Debtor1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_state",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 prior address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; state, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "State 1b Debtor1",
+     "State 1c Debtor1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 prior address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; zip, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 1b Debtor 1",
+     "ZIP Code 1c Debtor 1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_from",
+   "part": 1,
+   "line": "2",
+   "label": "Dates Debtor 1 lived there \u2014 From",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; from date, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "Date from 1b Debtor1",
+     "Date from 1c Debtor1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor1_to",
+   "part": 1,
+   "line": "2",
+   "label": "Dates Debtor 1 lived there \u2014 To",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; to date, debtor 1 column"
+   },
+   "pdf": {
+    "names": [
+     "Date to 1b Debtor1",
+     "Date to 1c Debtor1"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_street",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 prior address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; street, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "Street address 1b Debtor 2",
+     "Street address 1c Debtor 2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_street2",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 prior address \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; second street line, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "Street address 2b Debtor 2",
+     "Street address 2c Debtor 2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_city",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 prior address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; city, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "City 1b Debtor2",
+     "City 1c Debtor2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_state",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 prior address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; state, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "State 1b Debtor2",
+     "State 1c Debtor2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 prior address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; zip, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 1b Debtor 2",
+     "ZIP Code 1c Debtor 2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_from",
+   "part": 1,
+   "line": "2",
+   "label": "Dates Debtor 2 lived there \u2014 From",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; from date, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "Date from 1b Debtor2",
+     "Date from 1c Debtor2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_to",
+   "part": 1,
+   "line": "2",
+   "label": "Dates Debtor 2 lived there \u2014 To",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; to date, debtor 2 column"
+   },
+   "pdf": {
+    "names": [
+     "Date to 1b Debtor2",
+     "Date to 1c Debtor2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   }
+  },
+  {
+   "id": "q2_debtor2_same_as_debtor1",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 column \u2014 Same as Debtor 1 (address box)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; debtor 2's address equals debtor 1's for the row"
+   },
+   "pdf": {
+    "names": [
+     "check1b",
+     "check1c"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   },
+   "notes": "Single export state 'no' in the official PDF \u2014 quirky, but it is just a checkbox."
+  },
+  {
+   "id": "q2_debtor2_same_dates",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 column \u2014 Same as Debtor 1 (dates box)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=prior_address; debtor 2's dates equal debtor 1's for the row"
+   },
+   "pdf": {
+    "names": [
+     "check1b2",
+     "check1c2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "prior_address",
+    "continuation": "two rows (the PDF names them 'b' and 'c'), each with a Debtor 1 and a Debtor 2 column; more prior addresses go on an attached sheet"
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q3_community_property",
+   "part": 1,
+   "line": "3",
+   "label": "Within the last 8 years, did you ever live with a spouse or legal equivalent in a community property state or territory?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "a community_household_member record exists (the same fact B106H line 2 records); yes directs the filer to Schedule H"
+   },
+   "pdf": {
+    "names": [
+     "check3"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q4_gate",
+   "part": 2,
+   "line": "4",
+   "label": "Did you have any income from employment or from operating a business during this year or the two previous calendar years?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=employment_income exists"
+   },
+   "pdf": {
+    "names": [
+     "check4"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q4_debtor1_current_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, From January 1 of current year until the date you filed \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 1, period=current"
+   },
+   "pdf": {
+    "names": [
+     "check4a Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_current_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, From January 1 of current year until the date you filed \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 1, period=current"
+   },
+   "pdf": {
+    "names": [
+     "check4d Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_current_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, From January 1 of current year until the date you filed \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 1, period=current"
+   },
+   "pdf": {
+    "names": [
+     "Income 4a Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "q4_debtor1_last_year_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For last calendar year \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 1, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "check4b Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_last_year_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For last calendar year \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 1, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "check4e Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_last_year_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For last calendar year \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 1, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "Income 4b Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "q4_debtor1_year_before_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For the calendar year before that \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 1, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "check4c Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_year_before_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For the calendar year before that \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 1, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "check4f Debtor 1"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor1_year_before_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 1, For the calendar year before that \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 1, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "Income 4c Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "q4_debtor2_current_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, From January 1 of current year until the date you filed \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 2, period=current"
+   },
+   "pdf": {
+    "names": [
+     "check4a Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_current_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, From January 1 of current year until the date you filed \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 2, period=current"
+   },
+   "pdf": {
+    "names": [
+     "check4d Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_current_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, From January 1 of current year until the date you filed \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 2, period=current"
+   },
+   "pdf": {
+    "names": [
+     "Income 4a Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "q4_debtor2_last_year_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For last calendar year \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 2, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "check4b Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_last_year_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For last calendar year \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 2, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "check4e Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_last_year_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For last calendar year \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 2, period=last_year"
+   },
+   "pdf": {
+    "names": [
+     "Income 4b Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "q4_debtor2_year_before_wages",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For the calendar year before that \u2014 source: wages, commissions, bonuses, tips",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=wages flag, debtor 2, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "check4c Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_year_before_business",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For the calendar year before that \u2014 source: operating a business",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; source=operating_business flag, debtor 2, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "check4f Debtor 2"
+    ]
+   },
+   "notes": "Single export state 'no' \u2014 quirky."
+  },
+  {
+   "id": "q4_debtor2_year_before_gross",
+   "part": 2,
+   "line": "4",
+   "label": "Debtor 2, For the calendar year before that \u2014 gross income (before deductions and exclusions)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=employment_income; gross income, debtor 2, period=year_before"
+   },
+   "pdf": {
+    "names": [
+     "Income 4c Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "q4_last_year_yyyy",
+   "part": 2,
+   "line": "4",
+   "label": "For last calendar year: (January 1 to December 31, ____ YYYY)",
+   "type": "year",
+   "maps_to": {
+    "derived": "the calendar year before the filing year"
+   },
+   "pdf": {
+    "names": [
+     "Year from 4b Debtor1"
+    ]
+   }
+  },
+  {
+   "id": "q4_year_before_yyyy",
+   "part": 2,
+   "line": "4",
+   "label": "For the calendar year before that: (January 1 to December 31, ____ YYYY)",
+   "type": "year",
+   "maps_to": {
+    "derived": "two calendar years before the filing year"
+   },
+   "pdf": {
+    "names": [
+     "Year from 4c Debtor1"
+    ]
+   }
+  },
+  {
+   "id": "q5_gate",
+   "part": 2,
+   "line": "5",
+   "label": "Did you receive any other income during this year or the two previous calendar years?",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=other_income exists"
+   },
+   "pdf": {
+    "names": [
+     "check5"
+    ]
+   },
+   "notes": "Official-PDF defect: only the 'no' box is wired to this field (single state 'no'); the Yes box carries no widget. The engine sets the appearance for yes."
+  },
+  {
+   "id": "q5_debtor1_source",
+   "part": 2,
+   "line": "5",
+   "label": "Debtor 1 \u2014 sources of income (three ruled rows per period: current year, last year, year before)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=other_income; source description, debtor 1"
+   },
+   "pdf": {
+    "names": [
+     "Income source 5a Debtor 1",
+     "Income source 5b Debtor 1",
+     "Income source 5c Debtor 1",
+     "Income source 5d Debtor 1",
+     "Income source 5e Debtor 1",
+     "Income source 5f Debtor 1",
+     "Income source 5g Debtor 1",
+     "Income source 5h Debtor 1",
+     "Income source 5i Debtor 1"
+    ]
+   },
+   "repeats": {
+    "count": 9,
+    "group": "other_income_debtor1",
+    "continuation": "rows a\u2013c are the current year, d\u2013f last calendar year, g\u2013i the year before"
+   }
+  },
+  {
+   "id": "q5_debtor1_gross",
+   "part": 2,
+   "line": "5",
+   "label": "Debtor 1 \u2014 gross income from each source",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=other_income; gross income, debtor 1"
+   },
+   "pdf": {
+    "names": [
+     "Income 5a Debtor 1",
+     "Income 5b Debtor 1",
+     "Income 5c Debtor 1",
+     "Income 5d Debtor 1",
+     "Income 5e Debtor 1",
+     "Income 5f Debtor 1",
+     "Income 5g Debtor 1",
+     "Income 5h Debtor 1",
+     "Income 5i Debtor 1"
+    ]
+   },
+   "repeats": {
+    "count": 9,
+    "group": "other_income_debtor1"
+   }
+  },
+  {
+   "id": "q5_debtor2_source",
+   "part": 2,
+   "line": "5",
+   "label": "Debtor 2 \u2014 sources of income (three ruled rows per period: current year, last year, year before)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=other_income; source description, debtor 2"
+   },
+   "pdf": {
+    "names": [
+     "Income source 5a Debtor 2",
+     "Income source 5b Debtor 2",
+     "Income source 5c Debtor 2",
+     "Income source 5d Debtor 2",
+     "Income source 5e Debtor 2",
+     "Income source 5f Debtor 2",
+     "Income source 5g Debtor 2",
+     "Income source 5h Debtor 2",
+     "Income source 5i Debtor 2"
+    ]
+   },
+   "repeats": {
+    "count": 9,
+    "group": "other_income_debtor2",
+    "continuation": "rows a\u2013c are the current year, d\u2013f last calendar year, g\u2013i the year before"
+   }
+  },
+  {
+   "id": "q5_debtor2_gross",
+   "part": 2,
+   "line": "5",
+   "label": "Debtor 2 \u2014 gross income from each source",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=other_income; gross income, debtor 2"
+   },
+   "pdf": {
+    "names": [
+     "Income 5a Debtor 2",
+     "Income 5b Debtor 2",
+     "Income 5c Debtor 2",
+     "Income 5d Debtor 2",
+     "Income 5e Debtor 2",
+     "Income 5f Debtor 2",
+     "Income 5g Debtor 2",
+     "Income 5h Debtor 2",
+     "Income 5i Debtor 2"
+    ]
+   },
+   "repeats": {
+    "count": 9,
+    "group": "other_income_debtor2"
+   }
+  },
+  {
+   "id": "q6_consumer_debts",
+   "part": 3,
+   "line": "6",
+   "label": "Are either Debtor 1's or Debtor 2's debts primarily consumer debts?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "debt_character",
+    "notes": "the SOFA re-asks B101 line 16's fact; the engine renders it from the same attribute"
+   },
+   "pdf": {
+    "names": [
+     "check6"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q6_paid_8575",
+   "part": 3,
+   "line": "6",
+   "label": "(No path) During the 90 days before you filed, did you pay any creditor a total of $8,575* or more?",
+   "type": "radio",
+   "maps_to": {
+    "constant": "the $8,575 floor is a \u00a7104 dollar amount from the case's effective constant set (04/25 revision figure; adjusts 4/01/28); the answer derives from creditor_payment entries"
+   },
+   "pdf": {
+    "names": [
+     "check6a"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to line 7."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. List below each creditor paid $8,575 or more."
+    }
+   ]
+  },
+  {
+   "id": "q6_paid_600",
+   "part": 3,
+   "line": "6",
+   "label": "(Yes path) During the 90 days before you filed, did you pay any creditor a total of $600 or more?",
+   "type": "radio",
+   "maps_to": {
+    "constant": "the $600 floor is statutory (11 U.S.C. \u00a7 547(c)(8)); the answer derives from creditor_payment entries"
+   },
+   "pdf": {
+    "names": [
+     "check6b"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to line 7."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. List below each creditor paid $600 or more."
+    }
+   ]
+  },
+  {
+   "id": "q6_creditor_name",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; creditor name"
+   },
+   "pdf": {
+    "pattern": "Creditors Name [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_creditor_street",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; street"
+   },
+   "pdf": {
+    "pattern": "Creditors address a [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_creditor_street2",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; second street line"
+   },
+   "pdf": {
+    "pattern": "Creditors address b [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_creditor_city",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; city"
+   },
+   "pdf": {
+    "pattern": "Creditors City [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_creditor_state",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; state"
+   },
+   "pdf": {
+    "pattern": "Creditors State [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_creditor_zip",
+   "part": 3,
+   "line": "6",
+   "label": "Creditor \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; zip"
+   },
+   "pdf": {
+    "pattern": "Creditors ZIP Code [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_payment_dates",
+   "part": 3,
+   "line": "6",
+   "label": "Dates of payment (three ruled lines per creditor)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; payment dates"
+   },
+   "pdf": {
+    "pattern": "Creditors payment Date [1-3][abc]"
+   },
+   "repeats": {
+    "count": 9,
+    "group": "creditor_payment"
+   }
+  },
+  {
+   "id": "q6_total_paid",
+   "part": 3,
+   "line": "6",
+   "label": "Total amount paid",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; total paid"
+   },
+   "pdf": {
+    "pattern": "Creditors amount paid [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_still_owe",
+   "part": 3,
+   "line": "6",
+   "label": "Amount you still owe",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; amount still owed"
+   },
+   "pdf": {
+    "pattern": "Creditors amount owe [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q6_was_payment_for_mortgage",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Mortgage",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=mortgage flag"
+   },
+   "pdf": {
+    "pattern": "check mortgage [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_was_payment_for_car",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Car",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=car flag"
+   },
+   "pdf": {
+    "pattern": "check car [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_was_payment_for_credit_card",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Credit card",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=credit_card flag"
+   },
+   "pdf": {
+    "pattern": "check credit card [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_was_payment_for_loan",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Loan repayment",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=loan flag"
+   },
+   "pdf": {
+    "pattern": "check loan [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_was_payment_for_vendors",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Suppliers or vendors",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=vendors flag"
+   },
+   "pdf": {
+    "pattern": "check vendors [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_was_payment_for_other",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Other",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose=other flag"
+   },
+   "pdf": {
+    "pattern": "check other [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state ('no' or 'yes') in the official PDF."
+  },
+  {
+   "id": "q6_other_specify",
+   "part": 3,
+   "line": "6",
+   "label": "Was this payment for\u2026 Other \u2014 specify",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_payment; purpose other text"
+   },
+   "pdf": {
+    "pattern": "Other [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "creditor_payment",
+    "continuation": "three creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_gate",
+   "part": 3,
+   "line": "7",
+   "label": "Within 1 year before you filed for bankruptcy, did you make a payment on a debt you owed anyone who was an insider?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=insider_payment exists"
+   },
+   "pdf": {
+    "names": [
+     "check7"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q8_gate",
+   "part": 3,
+   "line": "8",
+   "label": "Within 1 year before you filed, did you make any payments or transfer any property on account of a debt that benefited an insider?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=insider_benefit_payment exists"
+   },
+   "pdf": {
+    "names": [
+     "check8"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q7_insider_name",
+   "part": 3,
+   "line": "7",
+   "label": "Insider's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; insider name"
+   },
+   "pdf": {
+    "pattern": "Insider Name 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_insider_street",
+   "part": 3,
+   "line": "7",
+   "label": "Insider \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; street"
+   },
+   "pdf": {
+    "pattern": "Insiders address 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_insider_street2",
+   "part": 3,
+   "line": "7",
+   "label": "Insider \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; second street line"
+   },
+   "pdf": {
+    "pattern": "Insiderss address2 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_insider_city",
+   "part": 3,
+   "line": "7",
+   "label": "Insider \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; city"
+   },
+   "pdf": {
+    "pattern": "Insiders City 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_insider_state",
+   "part": 3,
+   "line": "7",
+   "label": "Insider \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; state"
+   },
+   "pdf": {
+    "pattern": "Insiders State 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_insider_zip",
+   "part": 3,
+   "line": "7",
+   "label": "Insider \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; zip"
+   },
+   "pdf": {
+    "pattern": "Insiders ZIP Code 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_payment_dates",
+   "part": 3,
+   "line": "7",
+   "label": "Dates of payment (three ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; payment dates"
+   },
+   "pdf": {
+    "pattern": "Insiders payment Date[1-3] 7[ab]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "insider_payment"
+   }
+  },
+  {
+   "id": "q7_total_paid",
+   "part": 3,
+   "line": "7",
+   "label": "Total amount paid",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; total paid"
+   },
+   "pdf": {
+    "pattern": "Insiders amount paid 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_still_owe",
+   "part": 3,
+   "line": "7",
+   "label": "Amount you still owe",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; amount still owed"
+   },
+   "pdf": {
+    "pattern": "Insiders amount owe 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q7_reason",
+   "part": 3,
+   "line": "7",
+   "label": "Reason for this payment",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_payment; reason"
+   },
+   "pdf": {
+    "pattern": "Insider reason of pay 7[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_name",
+   "part": 3,
+   "line": "8",
+   "label": "Insider's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; insider name"
+   },
+   "pdf": {
+    "pattern": "Insider Name 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_street",
+   "part": 3,
+   "line": "8",
+   "label": "Insider \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; street"
+   },
+   "pdf": {
+    "pattern": "Insiders address 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_street2",
+   "part": 3,
+   "line": "8",
+   "label": "Insider \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; second street line"
+   },
+   "pdf": {
+    "pattern": "Insiderss address2 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_city",
+   "part": 3,
+   "line": "8",
+   "label": "Insider \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; city"
+   },
+   "pdf": {
+    "pattern": "Insiders City 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_state",
+   "part": 3,
+   "line": "8",
+   "label": "Insider \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; state"
+   },
+   "pdf": {
+    "pattern": "Insiders State 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_insider_zip",
+   "part": 3,
+   "line": "8",
+   "label": "Insider \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; zip"
+   },
+   "pdf": {
+    "pattern": "Insiders ZIP Code 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_payment_dates",
+   "part": 3,
+   "line": "8",
+   "label": "Dates of payment (three ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; payment dates"
+   },
+   "pdf": {
+    "pattern": "Insiders payment Date[1-3] 8[ab]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "insider_benefit_payment"
+   }
+  },
+  {
+   "id": "q8_total_paid",
+   "part": 3,
+   "line": "8",
+   "label": "Total amount paid",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; total paid"
+   },
+   "pdf": {
+    "pattern": "Insiders amount paid 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_still_owe",
+   "part": 3,
+   "line": "8",
+   "label": "Amount you still owe",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; amount still owed"
+   },
+   "pdf": {
+    "pattern": "Insiders amount owe 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q8_reason",
+   "part": 3,
+   "line": "8",
+   "label": "Reason for this payment \u2014 include creditor's name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=insider_benefit_payment; reason"
+   },
+   "pdf": {
+    "pattern": "Insider reason of pay 8[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "insider_benefit_payment",
+    "continuation": "two insider blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_gate",
+   "part": 4,
+   "line": "9",
+   "label": "Within 1 year before you filed for bankruptcy, were you a party in any lawsuit, court action, or administrative proceeding?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=lawsuit exists"
+   },
+   "pdf": {
+    "names": [
+     "check9"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q9_case_title",
+   "part": 4,
+   "line": "9",
+   "label": "Case title (two ruled lines)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; case title"
+   },
+   "pdf": {
+    "pattern": "Case title[12] 9[ab]"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "lawsuit"
+   }
+  },
+  {
+   "id": "q9_case_number",
+   "part": 4,
+   "line": "9",
+   "label": "Case number",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; case number"
+   },
+   "pdf": {
+    "pattern": "Case number 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_case_nature",
+   "part": 4,
+   "line": "9",
+   "label": "Nature of the case",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; nature"
+   },
+   "pdf": {
+    "pattern": "Case nature 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_court_name",
+   "part": 4,
+   "line": "9",
+   "label": "Court or agency \u2014 Court Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; court name"
+   },
+   "pdf": {
+    "pattern": "Court Name 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_court_street",
+   "part": 4,
+   "line": "9",
+   "label": "Court \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; court street"
+   },
+   "pdf": {
+    "pattern": "Court address 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_court_city",
+   "part": 4,
+   "line": "9",
+   "label": "Court \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; court city"
+   },
+   "pdf": {
+    "pattern": "Court City 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_court_state",
+   "part": 4,
+   "line": "9",
+   "label": "Court \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; court state"
+   },
+   "pdf": {
+    "pattern": "Court State 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_court_zip",
+   "part": 4,
+   "line": "9",
+   "label": "Court \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; court zip"
+   },
+   "pdf": {
+    "pattern": "Court ZIP Code 9[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q9_status",
+   "part": 4,
+   "line": "9",
+   "label": "Status of the case",
+   "type": "radio",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=lawsuit; status"
+   },
+   "pdf": {
+    "names": [
+     "check9a",
+     "check9b"
+    ]
+   },
+   "options": [
+    {
+     "value": "pending",
+     "label": "Pending"
+    },
+    {
+     "value": "on appeal",
+     "label": "On appeal"
+    },
+    {
+     "value": "concluded",
+     "label": "Concluded"
+    }
+   ],
+   "repeats": {
+    "count": 2,
+    "group": "lawsuit",
+    "continuation": "two case blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_gate",
+   "part": 4,
+   "line": "10",
+   "label": "Within 1 year before you filed for bankruptcy, was any of your property repossessed, foreclosed, garnished, attached, seized, or levied?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=repossession exists"
+   },
+   "pdf": {
+    "names": [
+     "check10"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to line 11."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Fill in the information below."
+    }
+   ]
+  },
+  {
+   "id": "q10_creditor_name",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; creditor name"
+   },
+   "pdf": {
+    "pattern": "Creditors Name 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_creditor_street",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; street"
+   },
+   "pdf": {
+    "pattern": "Creditors address 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_creditor_street2",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; second street line"
+   },
+   "pdf": {
+    "pattern": "Creditors address2 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_creditor_city",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; city"
+   },
+   "pdf": {
+    "pattern": "Creditors City 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_creditor_state",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; state"
+   },
+   "pdf": {
+    "pattern": "Creditors State 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_creditor_zip",
+   "part": 4,
+   "line": "10",
+   "label": "Creditor \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; zip"
+   },
+   "pdf": {
+    "pattern": "Creditors ZIP Code 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_describe_property",
+   "part": 4,
+   "line": "10",
+   "label": "Describe the property",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; property description"
+   },
+   "pdf": {
+    "pattern": "Describe property 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_date",
+   "part": 4,
+   "line": "10",
+   "label": "Date",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; date"
+   },
+   "pdf": {
+    "pattern": "Creditor Date3 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_value",
+   "part": 4,
+   "line": "10",
+   "label": "Value of the property",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; property value"
+   },
+   "pdf": {
+    "pattern": "Property value 10[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_happened_repossessed",
+   "part": 4,
+   "line": "10",
+   "label": "Explain what happened \u2014 Property was repossessed.",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; what_happened=repossessed flag"
+   },
+   "pdf": {
+    "pattern": "check10[ab]1"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_happened_foreclosed",
+   "part": 4,
+   "line": "10",
+   "label": "Explain what happened \u2014 Property was foreclosed.",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; what_happened=foreclosed flag"
+   },
+   "pdf": {
+    "pattern": "check10[ab]2"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_happened_garnished",
+   "part": 4,
+   "line": "10",
+   "label": "Explain what happened \u2014 Property was garnished.",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; what_happened=garnished flag"
+   },
+   "pdf": {
+    "pattern": "check10[ab]3"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q10_happened_attached",
+   "part": 4,
+   "line": "10",
+   "label": "Explain what happened \u2014 Property was attached, seized, or levied.",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=repossession; what_happened=attached flag"
+   },
+   "pdf": {
+    "pattern": "check10[ab]4"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "repossession",
+    "continuation": "two creditor blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q11_gate",
+   "part": 4,
+   "line": "11",
+   "label": "Within 90 days before you filed, did any creditor, including a bank or financial institution, set off any amounts from your accounts or refuse to make a payment because you owed a debt?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=setoff exists"
+   },
+   "pdf": {
+    "names": [
+     "check11"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q11_creditor_name",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; creditor name"
+   },
+   "pdf": {
+    "names": [
+     "Creditors Name 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_creditor_street",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; street"
+   },
+   "pdf": {
+    "names": [
+     "Creditors address 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_creditor_street2",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Creditors address2 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_creditor_city",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; city"
+   },
+   "pdf": {
+    "names": [
+     "Creditors City 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_creditor_state",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; state"
+   },
+   "pdf": {
+    "names": [
+     "Creditors State 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_creditor_zip",
+   "part": 4,
+   "line": "11",
+   "label": "Creditor \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; zip"
+   },
+   "pdf": {
+    "names": [
+     "Creditors ZIP Code 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_describe_action",
+   "part": 4,
+   "line": "11",
+   "label": "Describe the action the creditor took",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; action description"
+   },
+   "pdf": {
+    "names": [
+     "Describe action 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_date",
+   "part": 4,
+   "line": "11",
+   "label": "Date action was taken",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; date"
+   },
+   "pdf": {
+    "names": [
+     "Creditor Date 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_amount",
+   "part": 4,
+   "line": "11",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; amount"
+   },
+   "pdf": {
+    "names": [
+     "Amount 11"
+    ]
+   }
+  },
+  {
+   "id": "q11_account_last4",
+   "part": 4,
+   "line": "11",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=setoff; account last4"
+   },
+   "pdf": {
+    "names": [
+     "account number 11"
+    ]
+   }
+  },
+  {
+   "id": "q12_assignee",
+   "part": 4,
+   "line": "12",
+   "label": "Within 1 year before you filed, was any of your property in the possession of an assignee for the benefit of creditors, a court-appointed receiver, a custodian, or another official?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=assignee_custodian exists"
+   },
+   "pdf": {
+    "names": [
+     "check12"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ],
+   "notes": "The form takes only yes/no; the entry's details, if any, go on an attached sheet."
+  },
+  {
+   "id": "q13_gate",
+   "part": 5,
+   "line": "13",
+   "label": "Within 2 years before you filed, did you give any gifts with a total value of more than $600 per person?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=gift exists"
+   },
+   "pdf": {
+    "names": [
+     "check13"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ],
+   "notes": "The $600 floor is statutory, not an adjusted constant."
+  },
+  {
+   "id": "q13_recipient_name",
+   "part": 5,
+   "line": "13",
+   "label": "Person to Whom You Gave the Gift",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; recipient name"
+   },
+   "pdf": {
+    "pattern": "Name to who you gave gift 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_recipient_street",
+   "part": 5,
+   "line": "13",
+   "label": "Recipient \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; street"
+   },
+   "pdf": {
+    "pattern": "address 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_recipient_street2",
+   "part": 5,
+   "line": "13",
+   "label": "Recipient \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; second street line"
+   },
+   "pdf": {
+    "pattern": "Address2 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_recipient_city",
+   "part": 5,
+   "line": "13",
+   "label": "Recipient \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; city"
+   },
+   "pdf": {
+    "pattern": "City 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_recipient_state",
+   "part": 5,
+   "line": "13",
+   "label": "Recipient \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; state"
+   },
+   "pdf": {
+    "pattern": "State 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_recipient_zip",
+   "part": 5,
+   "line": "13",
+   "label": "Recipient \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; zip"
+   },
+   "pdf": {
+    "pattern": "ZIP Code 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_relationship",
+   "part": 5,
+   "line": "13",
+   "label": "Person's relationship to you",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; relationship"
+   },
+   "pdf": {
+    "pattern": "Relation 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_describe",
+   "part": 5,
+   "line": "13",
+   "label": "Describe the gifts",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; description"
+   },
+   "pdf": {
+    "pattern": "Describe 13[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "gift",
+    "continuation": "two gift blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q13_dates",
+   "part": 5,
+   "line": "13",
+   "label": "Dates you gave the gifts (two ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; dates"
+   },
+   "pdf": {
+    "pattern": "Date[12] 13[ab]"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "gift"
+   }
+  },
+  {
+   "id": "q13_values",
+   "part": 5,
+   "line": "13",
+   "label": "Value (two ruled lines)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=gift; values"
+   },
+   "pdf": {
+    "pattern": "Amount[12] 13[ab]"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "gift"
+   }
+  },
+  {
+   "id": "q14_gate",
+   "part": 5,
+   "line": "14",
+   "label": "Within 2 years before you filed, did you give any gifts or contributions with a total value of more than $600 to any charity?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=charitable_contribution exists"
+   },
+   "pdf": {
+    "names": [
+     "check14"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q14_charity_name",
+   "part": 5,
+   "line": "14",
+   "label": "Charity's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; charity name"
+   },
+   "pdf": {
+    "names": [
+     "Charitys Name 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_charity_street",
+   "part": 5,
+   "line": "14",
+   "label": "Charity \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; street"
+   },
+   "pdf": {
+    "names": [
+     "address 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_charity_street2",
+   "part": 5,
+   "line": "14",
+   "label": "Charity \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_charity_city",
+   "part": 5,
+   "line": "14",
+   "label": "Charity \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; city"
+   },
+   "pdf": {
+    "names": [
+     "City 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_charity_state",
+   "part": 5,
+   "line": "14",
+   "label": "Charity \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; state"
+   },
+   "pdf": {
+    "names": [
+     "State 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_charity_zip",
+   "part": 5,
+   "line": "14",
+   "label": "Charity \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_describe",
+   "part": 5,
+   "line": "14",
+   "label": "Describe what you contributed",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; description"
+   },
+   "pdf": {
+    "names": [
+     "Describe 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_dates",
+   "part": 5,
+   "line": "14",
+   "label": "Date you contributed (two ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; dates"
+   },
+   "pdf": {
+    "names": [
+     "Date1 14",
+     "Date2 14"
+    ]
+   }
+  },
+  {
+   "id": "q14_values",
+   "part": 5,
+   "line": "14",
+   "label": "Value (two ruled lines)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=charitable_contribution; values"
+   },
+   "pdf": {
+    "names": [
+     "Amount1 14",
+     "Amount2 14"
+    ]
+   }
+  },
+  {
+   "id": "q15_gate",
+   "part": 6,
+   "line": "15",
+   "label": "Within 1 year before you filed for bankruptcy or since you filed, did you lose anything because of theft, fire, other disaster, or gambling?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=loss exists"
+   },
+   "pdf": {
+    "names": [
+     "check15"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q15_describe_loss",
+   "part": 6,
+   "line": "15",
+   "label": "Describe the property you lost and how the loss occurred",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=loss; description"
+   },
+   "pdf": {
+    "names": [
+     "Describe1 15"
+    ]
+   }
+  },
+  {
+   "id": "q15_describe_insurance",
+   "part": 6,
+   "line": "15",
+   "label": "Describe any insurance coverage for the loss (include the amount insurance has paid; pending claims go on Schedule A/B line 33)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=loss; insurance coverage"
+   },
+   "pdf": {
+    "names": [
+     "Describe2 15"
+    ]
+   }
+  },
+  {
+   "id": "q15_date",
+   "part": 6,
+   "line": "15",
+   "label": "Date of your loss",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=loss; date"
+   },
+   "pdf": {
+    "names": [
+     "Date1 15"
+    ]
+   }
+  },
+  {
+   "id": "q15_value",
+   "part": 6,
+   "line": "15",
+   "label": "Value of property lost",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=loss; value"
+   },
+   "pdf": {
+    "names": [
+     "Amount1 15"
+    ]
+   }
+  },
+  {
+   "id": "q16_gate",
+   "part": 7,
+   "line": "16",
+   "label": "Within 1 year before you filed, did you or anyone else acting on your behalf pay or transfer any property to anyone you consulted about seeking bankruptcy or preparing a bankruptcy petition?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=bankruptcy_consultant_payment exists"
+   },
+   "pdf": {
+    "names": [
+     "check16"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q16_payee_name",
+   "part": 7,
+   "line": "16",
+   "label": "Person Who Was Paid",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; payee name"
+   },
+   "pdf": {
+    "pattern": "Name to who you was paid 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payee_street",
+   "part": 7,
+   "line": "16",
+   "label": "Payee \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; street"
+   },
+   "pdf": {
+    "pattern": "address 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payee_street2",
+   "part": 7,
+   "line": "16",
+   "label": "Payee \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; second street line"
+   },
+   "pdf": {
+    "pattern": "Address2 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payee_city",
+   "part": 7,
+   "line": "16",
+   "label": "Payee \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; city"
+   },
+   "pdf": {
+    "pattern": "City 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payee_state",
+   "part": 7,
+   "line": "16",
+   "label": "Payee \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; state"
+   },
+   "pdf": {
+    "pattern": "State 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payee_zip",
+   "part": 7,
+   "line": "16",
+   "label": "Payee \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; zip"
+   },
+   "pdf": {
+    "pattern": "ZIP Code 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_email",
+   "part": 7,
+   "line": "16",
+   "label": "Email or website address",
+   "type": "email",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; email or website"
+   },
+   "pdf": {
+    "pattern": "Email 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_payer",
+   "part": 7,
+   "line": "16",
+   "label": "Person Who Made the Payment, if Not You",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; payer, when not the debtor"
+   },
+   "pdf": {
+    "pattern": "Person who paid 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_describe",
+   "part": 7,
+   "line": "16",
+   "label": "Description and value of any property transferred",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; property description and value"
+   },
+   "pdf": {
+    "pattern": "Describe 16[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "bankruptcy_consultant_payment",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q16_dates",
+   "part": 7,
+   "line": "16",
+   "label": "Date payment or transfer was made (two ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; dates"
+   },
+   "pdf": {
+    "pattern": "Date[12] 16[ab]"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "bankruptcy_consultant_payment"
+   }
+  },
+  {
+   "id": "q16_amounts",
+   "part": 7,
+   "line": "16",
+   "label": "Amount of payment (two ruled lines)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=bankruptcy_consultant_payment; amounts"
+   },
+   "pdf": {
+    "pattern": "Amount[12] 16[ab]"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "bankruptcy_consultant_payment"
+   }
+  },
+  {
+   "id": "q17_gate",
+   "part": 7,
+   "line": "17",
+   "label": "Within 1 year before you filed, did you or anyone else acting on your behalf pay or transfer any property to anyone who promised to help you deal with your creditors or to make payments to your creditors?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=creditor_workout_payment exists"
+   },
+   "pdf": {
+    "names": [
+     "check17"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q17_payee_name",
+   "part": 7,
+   "line": "17",
+   "label": "Person Who Was Paid",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; payee name"
+   },
+   "pdf": {
+    "names": [
+     "Name to who you was paid 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_payee_street",
+   "part": 7,
+   "line": "17",
+   "label": "Payee \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; street"
+   },
+   "pdf": {
+    "names": [
+     "address 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_payee_street2",
+   "part": 7,
+   "line": "17",
+   "label": "Payee \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_payee_city",
+   "part": 7,
+   "line": "17",
+   "label": "Payee \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; city"
+   },
+   "pdf": {
+    "names": [
+     "City 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_payee_state",
+   "part": 7,
+   "line": "17",
+   "label": "Payee \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; state"
+   },
+   "pdf": {
+    "names": [
+     "State 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_payee_zip",
+   "part": 7,
+   "line": "17",
+   "label": "Payee \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_describe",
+   "part": 7,
+   "line": "17",
+   "label": "Description and value of any property transferred",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; property description and value"
+   },
+   "pdf": {
+    "names": [
+     "Describe 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_dates",
+   "part": 7,
+   "line": "17",
+   "label": "Date payment or transfer was made (two ruled lines)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; dates"
+   },
+   "pdf": {
+    "names": [
+     "Date1 17",
+     "Date2 17"
+    ]
+   }
+  },
+  {
+   "id": "q17_amounts",
+   "part": 7,
+   "line": "17",
+   "label": "Amount of payment (two ruled lines)",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=creditor_workout_payment; amounts"
+   },
+   "pdf": {
+    "names": [
+     "Amount1 17",
+     "Amount2 17"
+    ]
+   }
+  },
+  {
+   "id": "q18_gate",
+   "part": 7,
+   "line": "18",
+   "label": "Within 2 years before you filed, did you sell, trade, or otherwise transfer any property to anyone, other than property transferred in the ordinary course of your business or financial affairs?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=property_transfer exists"
+   },
+   "pdf": {
+    "names": [
+     "check18"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q18_recipient_name",
+   "part": 7,
+   "line": "18",
+   "label": "Person Who Received Transfer",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; recipient name"
+   },
+   "pdf": {
+    "pattern": "Name to who you received transfer 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_recipient_street",
+   "part": 7,
+   "line": "18",
+   "label": "Recipient \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; street"
+   },
+   "pdf": {
+    "pattern": "address 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_recipient_street2",
+   "part": 7,
+   "line": "18",
+   "label": "Recipient \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; second street line"
+   },
+   "pdf": {
+    "pattern": "Address2 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_recipient_city",
+   "part": 7,
+   "line": "18",
+   "label": "Recipient \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; city"
+   },
+   "pdf": {
+    "pattern": "City 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_recipient_state",
+   "part": 7,
+   "line": "18",
+   "label": "Recipient \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; state"
+   },
+   "pdf": {
+    "pattern": "State 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_recipient_zip",
+   "part": 7,
+   "line": "18",
+   "label": "Recipient \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; zip"
+   },
+   "pdf": {
+    "pattern": "ZIP Code 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_relationship",
+   "part": 7,
+   "line": "18",
+   "label": "Person's relationship to you",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; relationship"
+   },
+   "pdf": {
+    "pattern": "Relation 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_describe_property",
+   "part": 7,
+   "line": "18",
+   "label": "Description and value of property transferred",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; property description and value"
+   },
+   "pdf": {
+    "pattern": "Describe1 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_describe_exchange",
+   "part": 7,
+   "line": "18",
+   "label": "Describe any property or payments received or debts paid in exchange",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; consideration received"
+   },
+   "pdf": {
+    "pattern": "Describe2 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q18_date",
+   "part": 7,
+   "line": "18",
+   "label": "Date transfer was made",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_transfer; date"
+   },
+   "pdf": {
+    "pattern": "Date1 18[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "property_transfer",
+    "continuation": "two blocks; more go on an attached sheet"
+   },
+   "notes": "Official-PDF defect: 'Date1 18b' has a second widget on page 9 sitting in line 19's date box, so those two boxes always match."
+  },
+  {
+   "id": "q19_gate",
+   "part": 7,
+   "line": "19",
+   "label": "Within 10 years before you filed, did you transfer any property to a self-settled trust or similar device of which you are a beneficiary?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=self_settled_trust_transfer exists"
+   },
+   "pdf": {
+    "names": [
+     "check19"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q19_trust_name",
+   "part": 7,
+   "line": "19",
+   "label": "Name of trust (two ruled lines)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=self_settled_trust_transfer; trust name"
+   },
+   "pdf": {
+    "names": [
+     "Name of trust1 19",
+     "Name of trust2 19"
+    ]
+   }
+  },
+  {
+   "id": "q19_describe",
+   "part": 7,
+   "line": "19",
+   "label": "Description and value of the property transferred",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=self_settled_trust_transfer; property description and value"
+   },
+   "pdf": {
+    "names": [
+     "Describe 19"
+    ]
+   },
+   "notes": "The 'Date transfer was made' box is a second widget of 'Date1 18b' \u2014 see q18_date."
+  },
+  {
+   "id": "q20_gate",
+   "part": 8,
+   "line": "20",
+   "label": "Within 1 year before you filed, were any financial accounts or instruments held in your name, or for your benefit, closed, sold, moved, or transferred?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=closed_account exists"
+   },
+   "pdf": {
+    "names": [
+     "check20"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q20_institution_name",
+   "part": 8,
+   "line": "20",
+   "label": "Name of Financial Institution",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; institution name"
+   },
+   "pdf": {
+    "pattern": "Name of financial institution 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_institution_street",
+   "part": 8,
+   "line": "20",
+   "label": "Institution \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; street"
+   },
+   "pdf": {
+    "pattern": "address 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_institution_street2",
+   "part": 8,
+   "line": "20",
+   "label": "Institution \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; second street line"
+   },
+   "pdf": {
+    "pattern": "Address2 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_institution_city",
+   "part": 8,
+   "line": "20",
+   "label": "Institution \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; city"
+   },
+   "pdf": {
+    "pattern": "City 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_institution_state",
+   "part": 8,
+   "line": "20",
+   "label": "Institution \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; state"
+   },
+   "pdf": {
+    "pattern": "State 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_institution_zip",
+   "part": 8,
+   "line": "20",
+   "label": "Institution \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 20a"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Official-PDF defect: 'ZIP Code 20a' has a second widget in row 20b's ZIP box, so both rows always show the same ZIP; there is no separate 20b field."
+  },
+  {
+   "id": "q20_account_last4",
+   "part": 8,
+   "line": "20",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account last4"
+   },
+   "pdf": {
+    "pattern": "account number 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_type_checking",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account or instrument \u2014 Checking",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account_type=checking flag"
+   },
+   "pdf": {
+    "pattern": "check Checking 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q20_type_savings",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account or instrument \u2014 Savings",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account_type=savings flag"
+   },
+   "pdf": {
+    "pattern": "check Savings 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q20_type_money_market",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account or instrument \u2014 Money market",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account_type=money_market flag"
+   },
+   "pdf": {
+    "pattern": "check Money market 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q20_type_brokerage",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account or instrument \u2014 Brokerage",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account_type=brokerage flag"
+   },
+   "pdf": {
+    "pattern": "check brokerage 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q20_type_other",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account or instrument \u2014 Other",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account_type=other flag"
+   },
+   "pdf": {
+    "pattern": "check other 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q20_type_other_specify",
+   "part": 8,
+   "line": "20",
+   "label": "Type of account \u2014 Other, specify",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; account type other text"
+   },
+   "pdf": {
+    "pattern": "Other 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_date_closed",
+   "part": 8,
+   "line": "20",
+   "label": "Date account was closed, sold, moved, or transferred",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; date closed"
+   },
+   "pdf": {
+    "pattern": "Date closed 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q20_balance",
+   "part": 8,
+   "line": "20",
+   "label": "Last balance before closing or transfer",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=closed_account; last balance"
+   },
+   "pdf": {
+    "pattern": "Balance 20[ab]"
+   },
+   "repeats": {
+    "count": 2,
+    "group": "closed_account",
+    "continuation": "two institution blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q21_gate",
+   "part": 8,
+   "line": "21",
+   "label": "Do you now have, or did you have within 1 year before you filed for bankruptcy, any safe deposit box or other depository for securities, cash, or other valuables?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=safe_deposit_box exists"
+   },
+   "pdf": {
+    "names": [
+     "check21"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q21_institution_name",
+   "part": 8,
+   "line": "21",
+   "label": "Name of Financial Institution",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; institution name"
+   },
+   "pdf": {
+    "names": [
+     "Name of financial institution 21a"
+    ]
+   }
+  },
+  {
+   "id": "q21_institution_street",
+   "part": 8,
+   "line": "21",
+   "label": "Institution \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; street"
+   },
+   "pdf": {
+    "names": [
+     "address 21a"
+    ]
+   }
+  },
+  {
+   "id": "q21_institution_street2",
+   "part": 8,
+   "line": "21",
+   "label": "Institution \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 21"
+    ]
+   },
+   "notes": "The official PDF ships one second-line box for this question."
+  },
+  {
+   "id": "q21_institution_city",
+   "part": 8,
+   "line": "21",
+   "label": "Institution \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; city"
+   },
+   "pdf": {
+    "names": [
+     "City 21a"
+    ]
+   }
+  },
+  {
+   "id": "q21_institution_state",
+   "part": 8,
+   "line": "21",
+   "label": "Institution \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; state"
+   },
+   "pdf": {
+    "names": [
+     "State 21a"
+    ]
+   }
+  },
+  {
+   "id": "q21_institution_zip",
+   "part": 8,
+   "line": "21",
+   "label": "Institution \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 21a"
+    ]
+   },
+   "notes": "Official-PDF defect: 'ZIP Code 21a' has a second widget in the access holder's ZIP box, so both always show the same ZIP."
+  },
+  {
+   "id": "q21_access_name",
+   "part": 8,
+   "line": "21",
+   "label": "Who else had access to it? \u2014 Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; who else had access"
+   },
+   "pdf": {
+    "names": [
+     "Name of who else had access 21b"
+    ]
+   }
+  },
+  {
+   "id": "q21_access_street",
+   "part": 8,
+   "line": "21",
+   "label": "Who else had access \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; access holder street"
+   },
+   "pdf": {
+    "names": [
+     "address 21b"
+    ]
+   }
+  },
+  {
+   "id": "q21_access_city",
+   "part": 8,
+   "line": "21",
+   "label": "Who else had access \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; access holder city"
+   },
+   "pdf": {
+    "names": [
+     "City 21b"
+    ]
+   }
+  },
+  {
+   "id": "q21_access_state",
+   "part": 8,
+   "line": "21",
+   "label": "Who else had access \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; access holder state"
+   },
+   "pdf": {
+    "names": [
+     "State 21b"
+    ]
+   },
+   "notes": "The access holder's ZIP box is a second widget of 'ZIP Code 21a' \u2014 see q21_institution_zip."
+  },
+  {
+   "id": "q21_describe",
+   "part": 8,
+   "line": "21",
+   "label": "Describe the contents",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; contents"
+   },
+   "pdf": {
+    "names": [
+     "Describe 21"
+    ]
+   }
+  },
+  {
+   "id": "q21_still_have",
+   "part": 8,
+   "line": "21",
+   "label": "Do you still have it?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=safe_deposit_box; still held"
+   },
+   "pdf": {
+    "names": [
+     "check21a"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q22_gate",
+   "part": 8,
+   "line": "22",
+   "label": "Have you stored property in a storage unit or place other than your home within 1 year before you filed for bankruptcy?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=storage_unit exists"
+   },
+   "pdf": {
+    "names": [
+     "check22"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q22_facility_name",
+   "part": 8,
+   "line": "22",
+   "label": "Name of Storage Facility",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; facility name"
+   },
+   "pdf": {
+    "names": [
+     "Name of financial institution 22a"
+    ]
+   },
+   "notes": "The PDF field is misnamed 'financial institution'; the printed label reads Name of Storage Facility."
+  },
+  {
+   "id": "q22_facility_street",
+   "part": 8,
+   "line": "22",
+   "label": "Facility \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; street"
+   },
+   "pdf": {
+    "names": [
+     "address 22a"
+    ]
+   }
+  },
+  {
+   "id": "q22_facility_street2",
+   "part": 8,
+   "line": "22",
+   "label": "Facility \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 22a"
+    ]
+   }
+  },
+  {
+   "id": "q22_facility_city",
+   "part": 8,
+   "line": "22",
+   "label": "Facility \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; city"
+   },
+   "pdf": {
+    "names": [
+     "City 22a"
+    ]
+   }
+  },
+  {
+   "id": "q22_facility_state",
+   "part": 8,
+   "line": "22",
+   "label": "Facility \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; state"
+   },
+   "pdf": {
+    "names": [
+     "State 22a"
+    ]
+   }
+  },
+  {
+   "id": "q22_facility_zip",
+   "part": 8,
+   "line": "22",
+   "label": "Facility \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 22a"
+    ]
+   }
+  },
+  {
+   "id": "q22_access_name",
+   "part": 8,
+   "line": "22",
+   "label": "Who else has or had access to it? \u2014 Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; who else had access"
+   },
+   "pdf": {
+    "names": [
+     "Name of who else had access 22b"
+    ]
+   }
+  },
+  {
+   "id": "q22_access_street",
+   "part": 8,
+   "line": "22",
+   "label": "Who else has access \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; access holder street"
+   },
+   "pdf": {
+    "names": [
+     "address 22b"
+    ]
+   }
+  },
+  {
+   "id": "q22_access_city",
+   "part": 8,
+   "line": "22",
+   "label": "Who else has access \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; access holder city"
+   },
+   "pdf": {
+    "names": [
+     "City 22b"
+    ]
+   }
+  },
+  {
+   "id": "q22_access_state",
+   "part": 8,
+   "line": "22",
+   "label": "Who else has access \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; access holder state"
+   },
+   "pdf": {
+    "names": [
+     "State 22b"
+    ]
+   },
+   "notes": "No ZIP box for the access holder's address in the official PDF."
+  },
+  {
+   "id": "q22_describe",
+   "part": 8,
+   "line": "22",
+   "label": "Describe the contents",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; contents"
+   },
+   "pdf": {
+    "names": [
+     "Describe 22"
+    ]
+   }
+  },
+  {
+   "id": "q22_still_have",
+   "part": 8,
+   "line": "22",
+   "label": "Do you still have it?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=storage_unit; still held"
+   },
+   "pdf": {
+    "names": [
+     "check22a"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q23_gate",
+   "part": 9,
+   "line": "23",
+   "label": "Do you hold or control any property that someone else owns? Include any property you borrowed from, are storing for, or hold in trust for someone.",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=property_held_for_another exists"
+   },
+   "pdf": {
+    "names": [
+     "check23"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q23_owner_name",
+   "part": 9,
+   "line": "23",
+   "label": "Owner's Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner name"
+   },
+   "pdf": {
+    "names": [
+     "Name of owner 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_owner_street",
+   "part": 9,
+   "line": "23",
+   "label": "Owner \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner street"
+   },
+   "pdf": {
+    "names": [
+     "address 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_owner_street2",
+   "part": 9,
+   "line": "23",
+   "label": "Owner \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_owner_city",
+   "part": 9,
+   "line": "23",
+   "label": "Owner \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner city"
+   },
+   "pdf": {
+    "names": [
+     "City 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_owner_state",
+   "part": 9,
+   "line": "23",
+   "label": "Owner \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner state"
+   },
+   "pdf": {
+    "names": [
+     "State 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_owner_zip",
+   "part": 9,
+   "line": "23",
+   "label": "Owner \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; owner zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 23a"
+    ]
+   }
+  },
+  {
+   "id": "q23_where_street",
+   "part": 9,
+   "line": "23",
+   "label": "Where is the property? \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; property location street"
+   },
+   "pdf": {
+    "names": [
+     "address 23b"
+    ]
+   }
+  },
+  {
+   "id": "q23_where_street2",
+   "part": 9,
+   "line": "23",
+   "label": "Where is the property? \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; property location second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 23b"
+    ]
+   }
+  },
+  {
+   "id": "q23_where_city",
+   "part": 9,
+   "line": "23",
+   "label": "Where is the property? \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; property location city"
+   },
+   "pdf": {
+    "names": [
+     "City 23b"
+    ]
+   }
+  },
+  {
+   "id": "q23_where_state",
+   "part": 9,
+   "line": "23",
+   "label": "Where is the property? \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; property location state"
+   },
+   "pdf": {
+    "names": [
+     "State 23b"
+    ]
+   }
+  },
+  {
+   "id": "q23_where_zip",
+   "part": 9,
+   "line": "23",
+   "label": "Where is the property? \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; property location zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 23b"
+    ]
+   }
+  },
+  {
+   "id": "q23_describe",
+   "part": 9,
+   "line": "23",
+   "label": "Describe the property",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; description"
+   },
+   "pdf": {
+    "names": [
+     "Describe 23"
+    ]
+   }
+  },
+  {
+   "id": "q23_value",
+   "part": 9,
+   "line": "23",
+   "label": "Value",
+   "type": "money",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=property_held_for_another; value"
+   },
+   "pdf": {
+    "names": [
+     "Value 23b"
+    ]
+   }
+  },
+  {
+   "id": "q24_gate",
+   "part": 10,
+   "line": "24",
+   "label": "Has any governmental unit notified you that you may be liable or potentially liable under or in violation of an environmental law?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=environmental_notice exists"
+   },
+   "pdf": {
+    "names": [
+     "check24"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q24_site_name",
+   "part": 10,
+   "line": "24",
+   "label": "Name of site",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site name"
+   },
+   "pdf": {
+    "names": [
+     "Name of site 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_site_street",
+   "part": 10,
+   "line": "24",
+   "label": "Site \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site street"
+   },
+   "pdf": {
+    "names": [
+     "address 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_site_street2",
+   "part": 10,
+   "line": "24",
+   "label": "Site \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_site_city",
+   "part": 10,
+   "line": "24",
+   "label": "Site \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site city"
+   },
+   "pdf": {
+    "names": [
+     "City 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_site_state",
+   "part": 10,
+   "line": "24",
+   "label": "Site \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site state"
+   },
+   "pdf": {
+    "names": [
+     "State 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_site_zip",
+   "part": 10,
+   "line": "24",
+   "label": "Site \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; site zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 24a"
+    ]
+   }
+  },
+  {
+   "id": "q24_gov_unit",
+   "part": 10,
+   "line": "24",
+   "label": "Governmental unit",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; governmental unit"
+   },
+   "pdf": {
+    "names": [
+     "Government unit 24b"
+    ]
+   }
+  },
+  {
+   "id": "q24_gov_street",
+   "part": 10,
+   "line": "24",
+   "label": "Governmental unit \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; governmental unit street"
+   },
+   "pdf": {
+    "names": [
+     "Address2 24b"
+    ]
+   },
+   "notes": "The PDF names this box 'Address2'; by position it is the unit's street line."
+  },
+  {
+   "id": "q24_gov_city",
+   "part": 10,
+   "line": "24",
+   "label": "Governmental unit \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; governmental unit city"
+   },
+   "pdf": {
+    "names": [
+     "City 24b"
+    ]
+   }
+  },
+  {
+   "id": "q24_gov_state",
+   "part": 10,
+   "line": "24",
+   "label": "Governmental unit \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; governmental unit state"
+   },
+   "pdf": {
+    "names": [
+     "State 24b"
+    ]
+   }
+  },
+  {
+   "id": "q24_gov_zip",
+   "part": 10,
+   "line": "24",
+   "label": "Governmental unit \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; governmental unit zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 24b"
+    ]
+   }
+  },
+  {
+   "id": "q24_law",
+   "part": 10,
+   "line": "24",
+   "label": "Environmental law, if you know it",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; environmental law"
+   },
+   "pdf": {
+    "names": [
+     "Describe 24"
+    ]
+   }
+  },
+  {
+   "id": "q24_date",
+   "part": 10,
+   "line": "24",
+   "label": "Date of notice",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_notice; date of notice"
+   },
+   "pdf": {
+    "names": [
+     "Date 24"
+    ]
+   }
+  },
+  {
+   "id": "q25_gate",
+   "part": 10,
+   "line": "25",
+   "label": "Have you notified any governmental unit of any release of hazardous material?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=environmental_release_notice exists"
+   },
+   "pdf": {
+    "names": [
+     "check25"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q25_site_name",
+   "part": 10,
+   "line": "25",
+   "label": "Name of site",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site name"
+   },
+   "pdf": {
+    "names": [
+     "Name of site 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_site_street",
+   "part": 10,
+   "line": "25",
+   "label": "Site \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site street"
+   },
+   "pdf": {
+    "names": [
+     "address 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_site_street2",
+   "part": 10,
+   "line": "25",
+   "label": "Site \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_site_city",
+   "part": 10,
+   "line": "25",
+   "label": "Site \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site city"
+   },
+   "pdf": {
+    "names": [
+     "City 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_site_state",
+   "part": 10,
+   "line": "25",
+   "label": "Site \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site state"
+   },
+   "pdf": {
+    "names": [
+     "State 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_site_zip",
+   "part": 10,
+   "line": "25",
+   "label": "Site \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; site zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 25a"
+    ]
+   }
+  },
+  {
+   "id": "q25_gov_unit",
+   "part": 10,
+   "line": "25",
+   "label": "Governmental unit",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; governmental unit"
+   },
+   "pdf": {
+    "names": [
+     "Government unit 25b"
+    ]
+   }
+  },
+  {
+   "id": "q25_gov_street",
+   "part": 10,
+   "line": "25",
+   "label": "Governmental unit \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; governmental unit street"
+   },
+   "pdf": {
+    "names": [
+     "Address2 25b"
+    ]
+   },
+   "notes": "The PDF names this box 'Address2'; by position it is the unit's street line."
+  },
+  {
+   "id": "q25_gov_city",
+   "part": 10,
+   "line": "25",
+   "label": "Governmental unit \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; governmental unit city"
+   },
+   "pdf": {
+    "names": [
+     "City 25b"
+    ]
+   }
+  },
+  {
+   "id": "q25_gov_state",
+   "part": 10,
+   "line": "25",
+   "label": "Governmental unit \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; governmental unit state"
+   },
+   "pdf": {
+    "names": [
+     "State 25b"
+    ]
+   }
+  },
+  {
+   "id": "q25_gov_zip",
+   "part": 10,
+   "line": "25",
+   "label": "Governmental unit \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; governmental unit zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 25b"
+    ]
+   }
+  },
+  {
+   "id": "q25_law",
+   "part": 10,
+   "line": "25",
+   "label": "Environmental law, if you know it",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; environmental law"
+   },
+   "pdf": {
+    "names": [
+     "Describe 25"
+    ]
+   }
+  },
+  {
+   "id": "q25_date",
+   "part": 10,
+   "line": "25",
+   "label": "Date of notice",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_release_notice; date of notice"
+   },
+   "pdf": {
+    "names": [
+     "Date 25"
+    ]
+   }
+  },
+  {
+   "id": "q26_gate_and_status",
+   "part": 10,
+   "line": "26",
+   "label": "Have you been a party in any judicial or administrative proceeding under any environmental law? / Status of the case",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=environmental_proceeding exists"
+   },
+   "pdf": {
+    "names": [
+     "check26"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Fill in the details."
+    },
+    {
+     "value": "pending",
+     "label": "Status: Pending"
+    },
+    {
+     "value": "on appeal",
+     "label": "Status: On appeal"
+    },
+    {
+     "value": "concluded",
+     "label": "Status: Concluded"
+    }
+   ],
+   "notes": "Official-PDF defect: the no/yes gate and the three status boxes are one exclusive radio group, so checking a status clears the yes box. The engine must set widget appearances directly."
+  },
+  {
+   "id": "q26_case_title",
+   "part": 10,
+   "line": "26",
+   "label": "Case title (two ruled lines)",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; case title"
+   },
+   "pdf": {
+    "names": [
+     "Case title1 26",
+     "Case title2 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_case_number",
+   "part": 10,
+   "line": "26",
+   "label": "Case number",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; case number"
+   },
+   "pdf": {
+    "names": [
+     "Case number 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_case_nature",
+   "part": 10,
+   "line": "26",
+   "label": "Nature of the case",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; nature"
+   },
+   "pdf": {
+    "names": [
+     "Case nature 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_court_name",
+   "part": 10,
+   "line": "26",
+   "label": "Court or agency \u2014 Court Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; court name"
+   },
+   "pdf": {
+    "names": [
+     "Court Name 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_court_street",
+   "part": 10,
+   "line": "26",
+   "label": "Court \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; court street"
+   },
+   "pdf": {
+    "names": [
+     "Court address 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_court_city",
+   "part": 10,
+   "line": "26",
+   "label": "Court \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; court city"
+   },
+   "pdf": {
+    "names": [
+     "Court City 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_court_state",
+   "part": 10,
+   "line": "26",
+   "label": "Court \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; court state"
+   },
+   "pdf": {
+    "names": [
+     "Court State 26"
+    ]
+   }
+  },
+  {
+   "id": "q26_court_zip",
+   "part": 10,
+   "line": "26",
+   "label": "Court \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=environmental_proceeding; court zip"
+   },
+   "pdf": {
+    "names": [
+     "Court ZIP Code 26"
+    ]
+   }
+  },
+  {
+   "id": "q27_gate",
+   "part": 11,
+   "line": "27",
+   "label": "Within 4 years before you filed for bankruptcy, did you own a business or have any of the following connections to any business?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=business_connection exists"
+   },
+   "pdf": {
+    "names": [
+     "check27a"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. None of the above applies. Go to Part 12."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Check all that apply above and fill in the details below for each business."
+    }
+   ]
+  },
+  {
+   "id": "q27_connection_sole_proprietor",
+   "part": 11,
+   "line": "27",
+   "label": "Connection: A sole proprietor or self-employed in a trade, profession, or other activity, either full-time or part-time",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; connection=sole_proprietor flag"
+   },
+   "pdf": {
+    "names": [
+     "check Sole Proprietor 27"
+    ]
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q27_connection_llc_member",
+   "part": 11,
+   "line": "27",
+   "label": "Connection: A member of a limited liability company (LLC) or limited liability partnership (LLP)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; connection=llc_member flag"
+   },
+   "pdf": {
+    "names": [
+     "check LLC 27"
+    ]
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q27_connection_partner",
+   "part": 11,
+   "line": "27",
+   "label": "Connection: A partner in a partnership",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; connection=partner flag"
+   },
+   "pdf": {
+    "names": [
+     "check Partner 27"
+    ]
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q27_connection_officer",
+   "part": 11,
+   "line": "27",
+   "label": "Connection: An officer, director, or managing executive of a corporation",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; connection=officer flag"
+   },
+   "pdf": {
+    "names": [
+     "check Executive 27"
+    ]
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q27_connection_owner_5pct",
+   "part": 11,
+   "line": "27",
+   "label": "Connection: An owner of at least 5% of the voting or equity securities of a corporation",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; connection=owner_5pct flag"
+   },
+   "pdf": {
+    "names": [
+     "check CorpOwner 27"
+    ]
+   },
+   "notes": "Quirky single export state in the official PDF."
+  },
+  {
+   "id": "q27_business_name",
+   "part": 11,
+   "line": "27",
+   "label": "Business Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; business name"
+   },
+   "pdf": {
+    "pattern": "Business Name 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_business_street",
+   "part": 11,
+   "line": "27",
+   "label": "Business \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; street"
+   },
+   "pdf": {
+    "pattern": "address 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_business_street2",
+   "part": 11,
+   "line": "27",
+   "label": "Business \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; second street line"
+   },
+   "pdf": {
+    "pattern": "Address2 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_business_city",
+   "part": 11,
+   "line": "27",
+   "label": "Business \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; city"
+   },
+   "pdf": {
+    "pattern": "City 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_business_state",
+   "part": 11,
+   "line": "27",
+   "label": "Business \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; state"
+   },
+   "pdf": {
+    "pattern": "State 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_business_zip",
+   "part": 11,
+   "line": "27",
+   "label": "Business \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; zip"
+   },
+   "pdf": {
+    "pattern": "ZIP Code 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_nature",
+   "part": 11,
+   "line": "27",
+   "label": "Describe the nature of the business",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; nature"
+   },
+   "pdf": {
+    "pattern": "Describe nature 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_ein",
+   "part": 11,
+   "line": "27",
+   "label": "Employer Identification Number (do not include SSN or ITIN)",
+   "type": "ein",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; EIN"
+   },
+   "pdf": {
+    "pattern": "Debtor1\\.Employer Identification Number27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_accountant",
+   "part": 11,
+   "line": "27",
+   "label": "Name of accountant or bookkeeper",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; accountant or bookkeeper"
+   },
+   "pdf": {
+    "pattern": "Accountant Name 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_date_from",
+   "part": 11,
+   "line": "27",
+   "label": "Dates business existed \u2014 From",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; from date"
+   },
+   "pdf": {
+    "pattern": "Date from 27[abc]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "q27_date_to",
+   "part": 11,
+   "line": "27",
+   "label": "Dates business existed \u2014 To",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=business_connection; to date"
+   },
+   "pdf": {
+    "pattern": "Date to 27[ab]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "business_connection",
+    "continuation": "three business blocks; more go on an attached sheet"
+   },
+   "notes": "Official-PDF defect: 'Date to 27b' has a second widget in row 27c's To box, so those two boxes always match; there is no separate 27c field."
+  },
+  {
+   "id": "q28_gate",
+   "part": 11,
+   "line": "28",
+   "label": "Within 2 years before you filed for bankruptcy, did you give a financial statement to anyone about your business?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sofa_entry with entry_type=financial_statement_issued exists"
+   },
+   "pdf": {
+    "names": [
+     "check28"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "q28_name",
+   "part": 11,
+   "line": "28",
+   "label": "Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; recipient name"
+   },
+   "pdf": {
+    "names": [
+     "Name 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_street",
+   "part": 11,
+   "line": "28",
+   "label": "Recipient \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; street"
+   },
+   "pdf": {
+    "names": [
+     "address 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_street2",
+   "part": 11,
+   "line": "28",
+   "label": "Recipient \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; second street line"
+   },
+   "pdf": {
+    "names": [
+     "Address2 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_city",
+   "part": 11,
+   "line": "28",
+   "label": "Recipient \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; city"
+   },
+   "pdf": {
+    "names": [
+     "City 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_state",
+   "part": 11,
+   "line": "28",
+   "label": "Recipient \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; state"
+   },
+   "pdf": {
+    "names": [
+     "State 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_zip",
+   "part": 11,
+   "line": "28",
+   "label": "Recipient \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; zip"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code 28"
+    ]
+   }
+  },
+  {
+   "id": "q28_date_issued",
+   "part": 11,
+   "line": "28",
+   "label": "Date issued (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "sofa_entry",
+    "attribute": "payload",
+    "notes": "entry_type=financial_statement_issued; date issued"
+   },
+   "pdf": {
+    "names": [
+     "Date 28"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor1_signature",
+   "part": 12,
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Signature of Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_signature",
+   "part": 12,
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Signature of Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor1_date",
+   "part": 12,
+   "label": "Date (Debtor 1)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Date signed Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_date",
+   "part": 12,
+   "label": "Date (Debtor 2)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Date signed Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "sign.attached_pages",
+   "part": 12,
+   "label": "Did you attach additional pages to Your Statement of Financial Affairs?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "whether any question's entries overflow onto attached sheets"
+   },
+   "pdf": {
+    "names": [
+     "check29"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "sign.paid_preparer",
+   "part": 12,
+   "label": "Did you pay or agree to pay someone who is not an attorney to help you fill out bankruptcy forms?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "a filing_professional with kind=bankruptcy_petition_preparer exists"
+   },
+   "pdf": {
+    "names": [
+     "check30"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "sign.preparer_name",
+   "part": 12,
+   "label": "Yes. Name of person (attach Official Form 119)",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "name",
+    "notes": "the bankruptcy petition preparer"
+   },
+   "pdf": {
+    "names": [
+     "Name of person agreed to pay"
+    ]
+   }
+  }
+ ]
+}

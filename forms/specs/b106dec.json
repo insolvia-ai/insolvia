@@ -1,0 +1,104 @@
+{
+ "form": "b106dec",
+ "official_number": "106Dec",
+ "title": "Declaration About an Individual Debtor's Schedules",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "Sign Below"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "paid_nonattorney_preparer",
+   "part": 1,
+   "label": "Did you pay or agree to pay someone who is NOT an attorney to help you fill out bankruptcy forms?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes. Attach Bankruptcy Petition Preparer's Notice, Declaration, and Signature (Official Form 119)."}
+   ],
+   "maps_to": {"derived": "filing_professional with kind=bankruptcy_petition_preparer exists on the case"},
+   "pdf": {"names": ["check1"]}
+  },
+  {
+   "id": "preparer_name",
+   "part": 1,
+   "label": "Yes. Name of person",
+   "type": "text",
+   "maps_to": {"entity": "filing_professional", "attribute": "name", "notes": "the bankruptcy petition preparer's printed name; only when paid_nonattorney_preparer=yes"},
+   "pdf": {"names": ["Name of person payed to help file"]}
+  },
+  {
+   "id": "debtor1_signature",
+   "part": 1,
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {"unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"},
+   "pdf": {"names": ["Debtor1.signature"]}
+  },
+  {
+   "id": "debtor2_signature",
+   "part": 1,
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {"unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"},
+   "pdf": {"names": ["Debtor2.signature"]}
+  },
+  {
+   "id": "debtor1_signature_date",
+   "part": 1,
+   "label": "Date (Debtor 1, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Executed on"]}
+  },
+  {
+   "id": "debtor2_signature_date",
+   "part": 1,
+   "label": "Date (Debtor 2, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor2.Executed on"]}
+  }
+ ]
+}

@@ -1,0 +1,435 @@
+{
+ "form": "b106d",
+ "official_number": "106D",
+ "title": "Schedule D: Creditors Who Have Claims Secured by Property",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "List All Secured Claims"},
+  {"number": 2, "title": "List Others to Be Notified for a Debt That You Already Listed"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "page_counts",
+   "part": null,
+   "label": "page 1 of __ / page __ of __ (sheet numbering)",
+   "type": "integer",
+   "maps_to": {"derived": "pagination, assigned when the packet is assembled"},
+   "pdf": {"names": ["fill_27.0", "fill_27.1.0", "fill_27.1.1", "fill_28.1.1", "fill_28.1.2"]}
+  },
+  {
+   "id": "line_1_any_secured_claims",
+   "part": null,
+   "line": "1",
+   "label": "Do any creditors have claims secured by your property?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No. Check this box and submit this form to the court with your other schedules."},
+    {"value": "yes", "label": "Yes. Fill in all of the information below."}
+   ],
+   "maps_to": {"derived": "at least one claim with class=secured exists on the case"},
+   "pdf": {"names": ["check1"]}
+  },
+  {
+   "id": "claim.entry_number",
+   "part": 1,
+   "line": "2",
+   "label": "2._ (entry number on the Additional Page; number entries beginning with 2.3)",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 2, "continuation": "the Additional Page carries the boxes; the official PDF wires rows 2.4 and 2.5 to ONE shared field (undefined_19)"},
+   "maps_to": {"derived": "row numbering, assigned when the packet is assembled"},
+   "pdf": {"names": ["undefined_12", "undefined_19"]}
+  },
+  {
+   "id": "claim.creditor_name",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor's Name",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5, "continuation": "2 rows on page 1 (2.1–2.2), 3 on the Additional Page (2.3–2.5); more pages are copies"},
+   "maps_to": {"entity": "creditor", "attribute": "name", "notes": "via claim.creditor_id — the deduplicated creditor record"},
+   "pdf": {"pattern": "Creditors Name(_[2-5])?"}
+  },
+  {
+   "id": "claim.creditor_street",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address — Number, Street",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "creditor", "attribute": "address", "notes": "street part of the structured address"},
+   "pdf": {"pattern": "Street(_[2-5])?"}
+  },
+  {
+   "id": "claim.creditor_street2",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address — second address line",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "creditor", "attribute": "address", "notes": "second street line of the structured address"},
+   "pdf": {"pattern": "1(_[2-5])?"}
+  },
+  {
+   "id": "claim.creditor_city",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address — City",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "creditor", "attribute": "address", "notes": "city part of the structured address"},
+   "pdf": {"pattern": "2(_[2-5])?"}
+  },
+  {
+   "id": "claim.creditor_state",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address — State",
+   "type": "state",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "creditor", "attribute": "address", "notes": "state part of the structured address"},
+   "pdf": {"pattern": "3(_[2-5])?"}
+  },
+  {
+   "id": "claim.creditor_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address — ZIP Code",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "creditor", "attribute": "address", "notes": "zip part of the structured address"},
+   "pdf": {"pattern": "4(_[2-5])?"}
+  },
+  {
+   "id": "claim.collateral_description",
+   "part": 1,
+   "line": "2",
+   "label": "Describe the property that secures the claim",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "collateral_description"},
+   "pdf": {"pattern": "As of the date you file the claim is Check all that apply(_[2-5])?"},
+   "notes": "The PDF field is misnamed after the neighbouring caption; by position it is the collateral description box."
+  },
+  {
+   "id": "claim.amount",
+   "part": 1,
+   "line": "2",
+   "label": "Column A — Amount of claim. Do not deduct the value of collateral.",
+   "type": "money",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "amount"},
+   "pdf": {"names": ["undefined", "undefined_5", "undefined_10", "undefined_14", "undefined_20"]},
+   "notes": "Columns disambiguated by widget x-position (A=400, B=476, C=544); the PDF names are meaningless 'undefined_N'."
+  },
+  {
+   "id": "claim.collateral_value",
+   "part": 1,
+   "line": "2",
+   "label": "Column B — Value of collateral that supports this claim",
+   "type": "money",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "collateral_value"},
+   "pdf": {"names": ["undefined_2", "undefined_6", "undefined_13", "undefined_17", "undefined_22"]}
+  },
+  {
+   "id": "claim.unsecured_portion",
+   "part": 1,
+   "line": "2",
+   "label": "Column C — Unsecured portion, if any",
+   "type": "money",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"derived": "claim amount less collateral value — arithmetic, never stored (case-data-model.md)"},
+   "pdf": {"names": ["undefined_3", "undefined_7", "undefined_15", "undefined_18", "undefined_25"]}
+  },
+  {
+   "id": "claim.contingent",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Contingent",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "contingent"},
+   "pdf": {"pattern": "Contingent(_[2-5])?"}
+  },
+  {
+   "id": "claim.unliquidated",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Unliquidated",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "unliquidated"},
+   "pdf": {"pattern": "Unliquidated(_[2-5])?"}
+  },
+  {
+   "id": "claim.disputed",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Disputed",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "disputed"},
+   "pdf": {"pattern": "Disputed(_[2-5])?"}
+  },
+  {
+   "id": "claim.lien_agreement",
+   "part": 1,
+   "line": "2",
+   "label": "Nature of lien (check all that apply): An agreement you made (such as mortgage or secured car loan)",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "lien_nature", "notes": "value=agreement in the check-all list"},
+   "pdf": {"pattern": "An agreement you made such as mortgage or secured(_[2-5])?"}
+  },
+  {
+   "id": "claim.lien_statutory",
+   "part": 1,
+   "line": "2",
+   "label": "Nature of lien: Statutory lien (such as tax lien, mechanic's lien)",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "lien_nature", "notes": "value=statutory"},
+   "pdf": {"pattern": "Statutory lien such as tax lien mechanics lien(_[2-5])?"}
+  },
+  {
+   "id": "claim.lien_judgment",
+   "part": 1,
+   "line": "2",
+   "label": "Nature of lien: Judgment lien from a lawsuit",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "lien_nature", "notes": "value=judgment"},
+   "pdf": {"pattern": "Judgment lien from a lawsuit(_[2-5])?"}
+  },
+  {
+   "id": "claim.lien_other",
+   "part": 1,
+   "line": "2",
+   "label": "Nature of lien: Other (including a right to offset)",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "lien_nature", "notes": "value=other, with its text"},
+   "pdf": {"pattern": "Other including a right to offset(_[2-5])?"}
+  },
+  {
+   "id": "claim.lien_other_specify",
+   "part": 1,
+   "line": "2",
+   "label": "Nature of lien: Other — specify",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "lien_nature", "notes": "the free text carried with value=other"},
+   "pdf": {"names": ["undefined_4", "undefined_8", "undefined_11", "undefined_16", "undefined_21"]}
+  },
+  {
+   "id": "claim.who_owes",
+   "part": 1,
+   "line": "2",
+   "label": "Who owes the debt? Check one.",
+   "type": "radio",
+   "options": [
+    {"value": "debtor 1", "label": "Debtor 1 only", "maps_to_value": "debtor_1"},
+    {"value": "debtor 2", "label": "Debtor 2 only", "maps_to_value": "debtor_2"},
+    {"value": "Debtor 1 and 2", "label": "Debtor 1 and Debtor 2 only", "maps_to_value": "both"},
+    {"value": "debtor 1 and 2", "label": "Debtor 1 and Debtor 2 only", "maps_to_value": "both", "notes": "row 2.2 ('check 3') exports this state lowercase; the other rows use 'Debtor 1 and 2'"},
+    {"value": "One of debtors and another", "label": "At least one of the debtors and another", "maps_to_value": "at_least_one_plus_another"}
+   ],
+   "repeats": {"group": "secured_claim", "count": 3},
+   "maps_to": {"entity": "claim", "attribute": "who_incurred"},
+   "pdf": {"names": ["check 2", "check 3", "check 4"]},
+   "notes": "Rows 2.1–2.3 are proper radio groups; rows 2.4 and 2.5 are wired differently in the official PDF — see the two fields below."
+  },
+  {
+   "id": "claim.who_owes_row_2_4",
+   "part": 1,
+   "line": "2",
+   "label": "Who owes the debt? Check one. (row 2.4)",
+   "type": "checkbox",
+   "maps_to": {"entity": "claim", "attribute": "who_incurred"},
+   "pdf": {"names": ["check 5"]},
+   "notes": "Official-PDF defect: all four option widgets of row 2.4 share one field with a single 'On' export, so checking any option checks all four. The engine must fill this row by widget appearance, not by field value."
+  },
+  {
+   "id": "claim.who_owes_row_2_5",
+   "part": 1,
+   "line": "2",
+   "label": "Who owes the debt? Check one. (row 2.5)",
+   "type": "checkbox",
+   "maps_to": {"entity": "claim", "attribute": "who_incurred"},
+   "pdf": {"names": ["Debtor 1 only_5", "Debtor 2 only_5", "Debtor 1 and Debtor 2 only_5", "At least one of the debtors and another_5"]},
+   "notes": "Row 2.5's four options are four independent checkboxes; the engine checks exactly one, per the claim's who_incurred."
+  },
+  {
+   "id": "claim.community_debt",
+   "part": 1,
+   "line": "2",
+   "label": "Check if this claim relates to a community debt",
+   "type": "checkbox",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "community_debt"},
+   "pdf": {"pattern": "Check if this claim relates to a(_[2-5])?"}
+  },
+  {
+   "id": "claim.date_incurred",
+   "part": 1,
+   "line": "2",
+   "label": "Date debt was incurred",
+   "type": "date",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "date_incurred"},
+   "pdf": {"pattern": "Date debt was incurred(_[2-5])?"}
+  },
+  {
+   "id": "claim.account_last4",
+   "part": 1,
+   "line": "2",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "repeats": {"group": "secured_claim", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "account_last4"},
+   "pdf": {"names": ["account number", "account number 2", "account number 3", "account number 4", "account number 5"]},
+   "notes": "Official-PDF defect: the field 'account number' (row 2.1) has a second widget on the Part 2 page (its fourth notify row), so those two boxes always show the same value."
+  },
+  {
+   "id": "part1_page_subtotal",
+   "part": 1,
+   "line": "2",
+   "label": "Add the dollar value of your entries in Column A on this page. Write that number here.",
+   "type": "money",
+   "maps_to": {"derived": "sum of Column A entries on the page"},
+   "pdf": {"names": ["undefined_9", "undefined_23"]}
+  },
+  {
+   "id": "part1_total",
+   "part": 1,
+   "line": "2",
+   "label": "If this is the last page of your form, add the dollar value totals from all pages. Write that number here.",
+   "type": "money",
+   "maps_to": {"derived": "sum of Column A across all pages; copied to B106Sum line 2"},
+   "pdf": {"names": ["undefined_24"]}
+  },
+  {
+   "id": "notify.row_marker",
+   "part": 2,
+   "label": "Unlabeled left-margin box on each Part 2 row (no printed caption)",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"unmapped": "the printed form gives this box no label; it appears to exist only for row marking on copies"},
+   "pdf": {"pattern": "be notified for any debts in Part 1 do not fill out or submit this page\\.(0|1|2|3|4\\.0|4\\.1)"}
+  },
+  {
+   "id": "notify.name",
+   "part": 2,
+   "label": "Name (person or entity to be notified)",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6, "continuation": "six rows per Part 2 page; more pages are copies"},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "name of the notice party on the referenced claim"},
+   "pdf": {"pattern": "Name(_[2-6])?"}
+  },
+  {
+   "id": "notify.street",
+   "part": 2,
+   "label": "Notice party address — Number, Street",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "street part of the notice party's address"},
+   "pdf": {"pattern": "Number_(6|7|8|9|10|11)"}
+  },
+  {
+   "id": "notify.street2",
+   "part": 2,
+   "label": "Notice party address — second address line",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "second street line of the notice party's address"},
+   "pdf": {"pattern": "Street 1(_[2-6])?"}
+  },
+  {
+   "id": "notify.city",
+   "part": 2,
+   "label": "Notice party address — City",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "city part of the notice party's address"},
+   "pdf": {"pattern": "Street 2(_[2-6])?"}
+  },
+  {
+   "id": "notify.state",
+   "part": 2,
+   "label": "Notice party address — State",
+   "type": "state",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "state part of the notice party's address"},
+   "pdf": {"pattern": "Street 3(_[2-6])?"}
+  },
+  {
+   "id": "notify.zip",
+   "part": 2,
+   "label": "Notice party address — ZIP Code",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "zip part of the notice party's address"},
+   "pdf": {"pattern": "Street 4(_[2-6])?"}
+  },
+  {
+   "id": "notify.part1_line",
+   "part": 2,
+   "label": "On which line in Part 1 did you enter the creditor? Line 2.__",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 6},
+   "maps_to": {"derived": "the referenced claim's row number, assigned at packet assembly"},
+   "pdf": {"names": ["On which line in Part 1 did you enter the creditor", "undefined_26", "undefined_27", "On which line in Part 1 did you enter the creditor_4", "On which line in Part 1 did you enter the creditor_5", "On which line in Part 1 did you enter the creditor_6"]}
+  },
+  {
+   "id": "notify.account_last4",
+   "part": 2,
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "repeats": {"group": "notice_party", "count": 5},
+   "maps_to": {"entity": "claim", "attribute": "notice_parties", "notes": "account_last4 on the notice party"},
+   "pdf": {"names": ["account number 6", "account number 7", "account number 8", "account number 10", "account number 11"]},
+   "notes": "Five of six rows; the fourth row's box is a second widget of Part 1 row 2.1's 'account number' field (see claim.account_last4)."
+  }
+ ]
+}

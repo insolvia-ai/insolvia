@@ -1,0 +1,4203 @@
+{
+ "form": "b106ab",
+ "official_number": "106A/B",
+ "title": "Schedule A/B: Property",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Describe Each Residence, Building, Land, or Other Real Estate You Own or Have an Interest In"
+  },
+  {
+   "number": 2,
+   "title": "Describe Your Vehicles"
+  },
+  {
+   "number": 3,
+   "title": "Describe Your Personal and Household Items"
+  },
+  {
+   "number": 4,
+   "title": "Describe Your Financial Assets"
+  },
+  {
+   "number": 5,
+   "title": "Describe Any Business-Related Property You Own or Have an Interest In"
+  },
+  {
+   "number": 6,
+   "title": "Describe Any Farm- and Commercial Fishing-Related Property You Own or Have an Interest In"
+  },
+  {
+   "number": 7,
+   "title": "Describe All Property You Own or Have an Interest in That You Did Not List Above"
+  },
+  {
+   "number": 8,
+   "title": "List the Totals of Each Part of this Form"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   }
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check 1"
+    ]
+   }
+  },
+  {
+   "id": "line_1_any_real_estate",
+   "part": 1,
+   "line": "1",
+   "label": "Do you own or have any legal or equitable interest in any residence, building, land, or similar property?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset with a real-estate category exists on the case"
+   },
+   "pdf": {
+    "names": [
+     "Check 2"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Where is the property?",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Where is the property?"
+    }
+   ]
+  },
+  {
+   "id": "real_estate.street",
+   "part": 1,
+   "line": "1",
+   "label": "Street address, if available, or other description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the address line doubles as the property description"
+   },
+   "pdf": {
+    "names": [
+     "1 1",
+     "12",
+     "13"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.street2",
+   "part": 1,
+   "line": "1",
+   "label": "Street address \u2014 second line",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "second address line"
+   },
+   "pdf": {
+    "names": [
+     "1 1a",
+     "undefined_5",
+     "undefined_9"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.city",
+   "part": 1,
+   "line": "1",
+   "label": "City",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "city of the property address"
+   },
+   "pdf": {
+    "pattern": "City(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.state",
+   "part": 1,
+   "line": "1",
+   "label": "State",
+   "type": "state",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "state of the property address"
+   },
+   "pdf": {
+    "pattern": "State(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.zip",
+   "part": 1,
+   "line": "1",
+   "label": "ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "zip of the property address"
+   },
+   "pdf": {
+    "pattern": "ZIP Code(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.county",
+   "part": 1,
+   "line": "1",
+   "label": "County",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "county"
+   },
+   "pdf": {
+    "pattern": "County(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_single_family_home",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Single-family home",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=single_family_home in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Singlefamily home",
+     "Singlefamily home_2",
+     "Singlefamily home_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_duplex_or_multi_unit_building",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Duplex or multi-unit building",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=duplex_or_multi_unit_building in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Duplex or multiunit building",
+     "Duplex or multiunit building_2",
+     "Duplex or multiunit building_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_condominium_or_cooperative",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Condominium or cooperative",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=condominium_or_cooperative in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Condominium or cooperative",
+     "Condominium or cooperative_2",
+     "Condominium or cooperative_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_manufactured_or_mobile_home",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Manufactured or mobile home",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=manufactured_or_mobile_home in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Manufactured or mobile home",
+     "Manufactured or mobile home_2",
+     "Manufactured or mobile home_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_land",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Land",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=land in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Land",
+     "Land_2",
+     "Land_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_investment_property",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Investment property",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=investment_property in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Investment property",
+     "Investment property_2",
+     "Investment property_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_timeshare",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Timeshare",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=timeshare in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Timeshare",
+     "Timeshare_2",
+     "Timeshare_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_other",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Check all that apply: Other",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "value=other in the check-all list"
+   },
+   "pdf": {
+    "names": [
+     "Other",
+     "Other_2",
+     "Other_3"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.type_other_specify",
+   "part": 1,
+   "line": "1",
+   "label": "What is the property? Other \u2014 specify",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "property_types",
+    "notes": "the free text carried with value=other"
+   },
+   "pdf": {
+    "names": [
+     "undefined_4",
+     "undefined_8",
+     "undefined_12"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.value_entire",
+   "part": 1,
+   "line": "1",
+   "label": "Current value of the entire property? (Do not deduct secured claims or exemptions.)",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_entire"
+   },
+   "pdf": {
+    "names": [
+     "undefined_2",
+     "undefined_6",
+     "undefined_10"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   },
+   "notes": "Column disambiguated by widget x-position (x=429); the PDF names are meaningless 'undefined_N'."
+  },
+  {
+   "id": "real_estate.value_portion",
+   "part": 1,
+   "line": "1",
+   "label": "Current value of the portion you own?",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_3",
+     "undefined_7",
+     "undefined_11"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   },
+   "notes": "Column disambiguated by widget x-position (x=514)."
+  },
+  {
+   "id": "real_estate.who_has_interest",
+   "part": 1,
+   "line": "1",
+   "label": "Who has an interest in the property? Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "ownership_interest"
+   },
+   "pdf": {
+    "names": [
+     "Who has interest in property",
+     "Who has interest in property 2",
+     "Who has interest in property 3"
+    ]
+   },
+   "options": [
+    {
+     "value": "Debtor 1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1"
+    },
+    {
+     "value": "Debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "Debtor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2"
+    },
+    {
+     "value": "One of debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    },
+    {
+     "value": "Dentor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2",
+     "notes": "misspelled/quirky export value in the official PDF"
+    },
+    {
+     "value": "Debtor1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1",
+     "notes": "misspelled/quirky export value in the official PDF"
+    },
+    {
+     "value": "On",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another",
+     "notes": "misspelled/quirky export value in the official PDF"
+    }
+   ],
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   },
+   "notes": "Export values differ per row in the official PDF (including a 'Dentor 2' typo and an 'On' state); each option's maps_to_value is the canonical enum."
+  },
+  {
+   "id": "real_estate.ownership_nature",
+   "part": 1,
+   "line": "1",
+   "label": "Describe the nature of your ownership interest (such as fee simple, tenancy by the entireties, or a life estate), if known",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "ownership_interest_description"
+   },
+   "pdf": {
+    "names": [
+     "the entireties or a life estate if known",
+     "Who has an interest in the property Check one",
+     "Who has an interest in the property Check one_2"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   },
+   "notes": "Rows 1.2 and 1.3 carry misnamed PDF fields ('Who has an interest\u2026'); by position they are the ownership-nature text boxes."
+  },
+  {
+   "id": "real_estate.community_property",
+   "part": 1,
+   "line": "1",
+   "label": "Check if this is community property (see instructions)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "community_property"
+   },
+   "pdf": {
+    "pattern": "Check if this is community property(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "real_estate.other_information",
+   "part": 1,
+   "line": "1",
+   "label": "Other information you wish to add about this item, such as local property identification number",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "free-text extras for the category"
+   },
+   "pdf": {
+    "pattern": "property identification number(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_real_estate",
+    "continuation": "rows 1.1\u20131.3; more real estate goes on an attached sheet per the form header"
+   }
+  },
+  {
+   "id": "line_2_part1_total",
+   "part": 1,
+   "line": "2",
+   "label": "Add the dollar value of the portion you own for all of your entries from Part 1. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of value_portion_owned over Part 1 entries"
+   },
+   "pdf": {
+    "names": [
+     "undefined_13"
+    ]
+   }
+  },
+  {
+   "id": "line_3_any_vehicles",
+   "part": 2,
+   "line": "3",
+   "label": "Cars, vans, trucks, tractors, sport utility vehicles, motorcycles",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset with the vehicle category exists"
+   },
+   "pdf": {
+    "names": [
+     "Check 3"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "vehicle.make",
+   "part": 2,
+   "line": "3",
+   "label": "Make",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "make"
+   },
+   "pdf": {
+    "names": [
+     "3 1",
+     "If you own or have more than one describe here",
+     "1_3",
+     "1_4"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   },
+   "notes": "Rows 3.2\u20133.4 carry misnamed PDF fields; identified by position."
+  },
+  {
+   "id": "vehicle.model",
+   "part": 2,
+   "line": "3",
+   "label": "Model",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "model"
+   },
+   "pdf": {
+    "names": [
+     "3 2",
+     "1_2",
+     "2_3",
+     "2_4"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.year",
+   "part": 2,
+   "line": "3",
+   "label": "Year",
+   "type": "year",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "year"
+   },
+   "pdf": {
+    "names": [
+     "3 3",
+     "2_2",
+     "3_2",
+     "3_3"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.mileage",
+   "part": 2,
+   "line": "3",
+   "label": "Approximate mileage",
+   "type": "integer",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "mileage"
+   },
+   "pdf": {
+    "names": [
+     "3 4",
+     "Approximate mileage_2",
+     "Approximate mileage_3",
+     "Approximate mileage_4"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.other_information",
+   "part": 2,
+   "line": "3",
+   "label": "Other information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "free-text extras"
+   },
+   "pdf": {
+    "pattern": "Other information(_[234])?"
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.who_has_interest",
+   "part": 2,
+   "line": "3",
+   "label": "Who has an interest in the property? Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "ownership_interest"
+   },
+   "pdf": {
+    "names": [
+     "Who has interest in property 4",
+     "Who has interest in property 5",
+     "Who has interest in property 6",
+     "Who has interest in property 7"
+    ]
+   },
+   "options": [
+    {
+     "value": "Debtor 1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1"
+    },
+    {
+     "value": "Debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "Debtor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2"
+    },
+    {
+     "value": "One of Debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    },
+    {
+     "value": "On",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another",
+     "notes": "misspelled/quirky export value in the official PDF"
+    }
+   ],
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   },
+   "notes": "Export values differ per row; maps_to_value is the canonical enum."
+  },
+  {
+   "id": "vehicle.community_property",
+   "part": 2,
+   "line": "3",
+   "label": "Check if this is community property (see instructions)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "community_property"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is community property see",
+     "Check if this is community property see_2",
+     "Check if this is community property see_3",
+     "Check if this is community property see_4"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.value_entire",
+   "part": 2,
+   "line": "3",
+   "label": "Current value of the entire property?",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_entire"
+   },
+   "pdf": {
+    "names": [
+     "undefined_14",
+     "undefined_16",
+     "undefined_18",
+     "undefined_20"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "vehicle.value_portion",
+   "part": 2,
+   "line": "3",
+   "label": "Current value of the portion you own?",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_15",
+     "undefined_17",
+     "undefined_19",
+     "undefined_21"
+    ]
+   },
+   "repeats": {
+    "count": 4,
+    "group": "asset_vehicle",
+    "continuation": "rows 3.1\u20133.4; more vehicles go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_4_any_other_vehicles",
+   "part": 2,
+   "line": "4",
+   "label": "Watercraft, aircraft, motor homes, ATVs and other recreational vehicles, other vehicles, and accessories",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset with the other-vehicle category exists"
+   },
+   "pdf": {
+    "names": [
+     "Examples Boats trailers motors personal watercraft fishing vessels snowmobiles motorcycle accessories"
+    ]
+   },
+   "options": [
+    {
+     "value": "No_2",
+     "label": "No"
+    },
+    {
+     "value": "Yes_2",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "other_vehicle.make",
+   "part": 2,
+   "line": "4",
+   "label": "Make",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "make"
+   },
+   "pdf": {
+    "names": [
+     "Make",
+     "Make_2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.model",
+   "part": 2,
+   "line": "4",
+   "label": "Model",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "model"
+   },
+   "pdf": {
+    "names": [
+     "Model",
+     "Model_2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.year",
+   "part": 2,
+   "line": "4",
+   "label": "Year",
+   "type": "year",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "year"
+   },
+   "pdf": {
+    "names": [
+     "Year",
+     "Year_2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.other_information",
+   "part": 2,
+   "line": "4",
+   "label": "Other information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "free-text extras"
+   },
+   "pdf": {
+    "names": [
+     "Other information_5",
+     "Other information_6"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.who_has_interest",
+   "part": 2,
+   "line": "4",
+   "label": "Who has an interest in the property? Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "ownership_interest"
+   },
+   "pdf": {
+    "names": [
+     "Who has interest in property 8",
+     "Who has interest in property 9"
+    ]
+   },
+   "options": [
+    {
+     "value": "Debtor 1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1"
+    },
+    {
+     "value": "Debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "Debtor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2"
+    },
+    {
+     "value": "One of Debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    },
+    {
+     "value": "Debtor1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1",
+     "notes": "misspelled/quirky export value in the official PDF"
+    },
+    {
+     "value": "On",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another",
+     "notes": "misspelled/quirky export value in the official PDF"
+    }
+   ],
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   },
+   "notes": "Export values differ per row; maps_to_value is the canonical enum."
+  },
+  {
+   "id": "other_vehicle.community_property",
+   "part": 2,
+   "line": "4",
+   "label": "Check if this is community property (see instructions)",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "community_property"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is community property see_5",
+     "Check if this is community property see_6"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.value_entire",
+   "part": 2,
+   "line": "4",
+   "label": "Current value of the entire property?",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_entire"
+   },
+   "pdf": {
+    "names": [
+     "undefined_22",
+     "undefined_24"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "other_vehicle.value_portion",
+   "part": 2,
+   "line": "4",
+   "label": "Current value of the portion you own?",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_23",
+     "undefined_25"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "asset_other_vehicle",
+    "continuation": "rows 4.1\u20134.2; more go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_5_part2_total",
+   "part": 2,
+   "line": "5",
+   "label": "Add the dollar value of the portion you own for all of your entries from Part 2. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of value_portion_owned over Part 2 entries"
+   },
+   "pdf": {
+    "names": [
+     "undefined_26"
+    ]
+   }
+  },
+  {
+   "id": "line_6_gate",
+   "part": 3,
+   "line": "6",
+   "label": "Household goods and furnishings \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-6 category exists"
+   },
+   "pdf": {
+    "names": [
+     "6 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_6_description",
+   "part": 3,
+   "line": "6",
+   "label": "Household goods and furnishings \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-6 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "6 description"
+    ]
+   }
+  },
+  {
+   "id": "line_6_amount",
+   "part": 3,
+   "line": "6",
+   "label": "Household goods and furnishings \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-6 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "6 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_7_gate",
+   "part": 3,
+   "line": "7",
+   "label": "Electronics \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-7 category exists"
+   },
+   "pdf": {
+    "names": [
+     "7 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_7_description",
+   "part": 3,
+   "line": "7",
+   "label": "Electronics \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-7 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "7 description"
+    ]
+   }
+  },
+  {
+   "id": "line_7_amount",
+   "part": 3,
+   "line": "7",
+   "label": "Electronics \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-7 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "7 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_8_gate",
+   "part": 3,
+   "line": "8",
+   "label": "Collectibles of value \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-8 category exists"
+   },
+   "pdf": {
+    "names": [
+     "8 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_8_description",
+   "part": 3,
+   "line": "8",
+   "label": "Collectibles of value \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-8 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "8 description"
+    ]
+   }
+  },
+  {
+   "id": "line_8_amount",
+   "part": 3,
+   "line": "8",
+   "label": "Collectibles of value \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-8 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "8 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_9_gate",
+   "part": 3,
+   "line": "9",
+   "label": "Equipment for sports and hobbies \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-9 category exists"
+   },
+   "pdf": {
+    "names": [
+     "9 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Describe.",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_9_description",
+   "part": 3,
+   "line": "9",
+   "label": "Equipment for sports and hobbies \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-9 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "9 description"
+    ]
+   }
+  },
+  {
+   "id": "line_9_amount",
+   "part": 3,
+   "line": "9",
+   "label": "Equipment for sports and hobbies \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-9 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "9 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_10_gate",
+   "part": 3,
+   "line": "10",
+   "label": "Firearms \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-10 category exists"
+   },
+   "pdf": {
+    "names": [
+     "10 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_10_description",
+   "part": 3,
+   "line": "10",
+   "label": "Firearms \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-10 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "10 description"
+    ]
+   }
+  },
+  {
+   "id": "line_10_amount",
+   "part": 3,
+   "line": "10",
+   "label": "Firearms \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-10 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "10 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_11_gate",
+   "part": 3,
+   "line": "11",
+   "label": "Clothes \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-11 category exists"
+   },
+   "pdf": {
+    "names": [
+     "11 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_11_description",
+   "part": 3,
+   "line": "11",
+   "label": "Clothes \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-11 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "11 description"
+    ]
+   }
+  },
+  {
+   "id": "line_11_amount",
+   "part": 3,
+   "line": "11",
+   "label": "Clothes \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-11 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "11 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_12_gate",
+   "part": 3,
+   "line": "12",
+   "label": "Jewelry \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-12 category exists"
+   },
+   "pdf": {
+    "names": [
+     "12 check"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_12_description",
+   "part": 3,
+   "line": "12",
+   "label": "Jewelry \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-12 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "12 description"
+    ]
+   }
+  },
+  {
+   "id": "line_12_amount",
+   "part": 3,
+   "line": "12",
+   "label": "Jewelry \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-12 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "12 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_13_gate",
+   "part": 3,
+   "line": "13",
+   "label": "Non-farm animals \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-13 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 13"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_13_description",
+   "part": 3,
+   "line": "13",
+   "label": "Non-farm animals \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-13 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "13 description"
+    ]
+   }
+  },
+  {
+   "id": "line_13_amount",
+   "part": 3,
+   "line": "13",
+   "label": "Non-farm animals \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-13 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "13 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_14_gate",
+   "part": 3,
+   "line": "14",
+   "label": "Any other personal and household items you did not already list, including any health aids you did not list \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset in the line-14 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 14"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_14_description",
+   "part": 3,
+   "line": "14",
+   "label": "Any other personal and household items you did not already list, including any health aids you did not list \u2014 Yes. Describe.",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "assets in the line-14 category; the single box carries every such asset's description"
+   },
+   "pdf": {
+    "names": [
+     "14 description"
+    ]
+   }
+  },
+  {
+   "id": "line_14_amount",
+   "part": 3,
+   "line": "14",
+   "label": "Any other personal and household items you did not already list, including any health aids you did not list \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-14 category's assets"
+   },
+   "pdf": {
+    "names": [
+     "14 description amount"
+    ]
+   }
+  },
+  {
+   "id": "line_15_part3_total",
+   "part": 3,
+   "line": "15",
+   "label": "Add the dollar value of all of your entries from Part 3. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of lines 6\u201314"
+   },
+   "pdf": {
+    "names": [
+     "15 amount"
+    ]
+   }
+  },
+  {
+   "id": "line_16_gate",
+   "part": 4,
+   "line": "16",
+   "label": "Cash \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the cash category exists"
+   },
+   "pdf": {
+    "names": [
+     "Check 16"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_16_amount",
+   "part": 4,
+   "line": "16",
+   "label": "Cash",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "the cash category"
+   },
+   "pdf": {
+    "names": [
+     "16 Cash amount"
+    ]
+   }
+  },
+  {
+   "id": "line_17_gate",
+   "part": 4,
+   "line": "17",
+   "label": "Deposits of money \u2014 do you own or have any legal or equitable interest?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the deposits category exists"
+   },
+   "pdf": {
+    "names": [
+     "Check 17"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_17_institution",
+   "part": 4,
+   "line": "17",
+   "label": "Institution name (rows 17.1\u201317.9)",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "institution and account type; the row's printed label fixes the account type"
+   },
+   "pdf": {
+    "pattern": "17\\.[1-9] (Checking|Certificates of deposit|Other financial) account"
+   },
+   "repeats": {
+    "count": 9,
+    "group": "asset_deposit",
+    "continuation": "rows 17.1\u201317.9, each pre-labelled with an account type (checking \u00d72, savings \u00d72, CD, other \u00d74)"
+   },
+   "notes": "The PDF names rows 17.3/17.4 'Checking account' although the printed labels read 'Savings account'."
+  },
+  {
+   "id": "line_17_amount",
+   "part": 4,
+   "line": "17",
+   "label": "Amount (rows 17.1\u201317.9)",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "per deposit-account asset"
+   },
+   "pdf": {
+    "pattern": "17\\.[1-9] (Checking|Certificates of deposit|Other financial) amount"
+   },
+   "repeats": {
+    "count": 9,
+    "group": "asset_deposit",
+    "continuation": "rows 17.1\u201317.9, each pre-labelled with an account type (checking \u00d72, savings \u00d72, CD, other \u00d74)"
+   }
+  },
+  {
+   "id": "line_18_gate",
+   "part": 4,
+   "line": "18",
+   "label": "Bonds, mutual funds, or publicly traded stocks",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the public-securities category exists"
+   },
+   "pdf": {
+    "names": [
+     "Check 18"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_18_institution",
+   "part": 4,
+   "line": "18",
+   "label": "Institution or issuer name",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "institution or issuer"
+   },
+   "pdf": {
+    "pattern": "18\\.[1-3] Institution or issuer name"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_public_security",
+    "continuation": "rows 18.1\u201318.3"
+   }
+  },
+  {
+   "id": "line_18_amount",
+   "part": 4,
+   "line": "18",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "18\\.[1-3] Institution or issuer name( 1)? amount"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_public_security",
+    "continuation": "rows 18.1\u201318.3"
+   }
+  },
+  {
+   "id": "line_19_gate",
+   "part": 4,
+   "line": "19",
+   "label": "Non-publicly traded stock and interests in incorporated and unincorporated businesses",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the business-interest category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 19"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_19_entity",
+   "part": 4,
+   "line": "19",
+   "label": "Name of entity",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the entity"
+   },
+   "pdf": {
+    "pattern": "19\\.[1-3] Name of entity"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_business_interest",
+    "continuation": "rows 19.1\u201319.3"
+   }
+  },
+  {
+   "id": "line_19_ownership_pct",
+   "part": 4,
+   "line": "19",
+   "label": "% of ownership",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "percentage ownership"
+   },
+   "pdf": {
+    "pattern": "19\\.[1-3] % of ownership"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_business_interest",
+    "continuation": "rows 19.1\u201319.3"
+   }
+  },
+  {
+   "id": "line_19_amount",
+   "part": 4,
+   "line": "19",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "19\\.[1-3] amount"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_business_interest",
+    "continuation": "rows 19.1\u201319.3"
+   }
+  },
+  {
+   "id": "line_20_gate",
+   "part": 4,
+   "line": "20",
+   "label": "Government and corporate bonds and other negotiable and non-negotiable instruments",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the instruments category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 20"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_20_issuer",
+   "part": 4,
+   "line": "20",
+   "label": "Issuer name",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "issuer"
+   },
+   "pdf": {
+    "pattern": "20\\.[1-3] Issuer name"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_instrument",
+    "continuation": "rows 20.1\u201320.3"
+   }
+  },
+  {
+   "id": "line_20_amount",
+   "part": 4,
+   "line": "20",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "20\\.[1-3] Issuer name amount"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_instrument",
+    "continuation": "rows 20.1\u201320.3"
+   }
+  },
+  {
+   "id": "line_21_gate",
+   "part": 4,
+   "line": "21",
+   "label": "Retirement or pension accounts",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the retirement category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 21"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. List each account separately."
+    }
+   ]
+  },
+  {
+   "id": "line_21_institution",
+   "part": 4,
+   "line": "21",
+   "label": "Type of account / Institution name",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "institution and account type; the row's printed label fixes the type"
+   },
+   "pdf": {
+    "pattern": "21\\.[1-7] (401k or similar plan|Pension plan|IRA|Retirement account|Keogh|Additional account)"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "asset_retirement",
+    "continuation": "rows 21.1\u201321.7, each pre-labelled with a type (401(k), pension, IRA, retirement, Keogh, additional \u00d72)"
+   }
+  },
+  {
+   "id": "line_21_amount",
+   "part": 4,
+   "line": "21",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "21\\.[1-7] (401k or similar plan|Pension plan|IRA|Retirement account|Keogh|Additional account) amount"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "asset_retirement",
+    "continuation": "rows 21.1\u201321.7, each pre-labelled with a type (401(k), pension, IRA, retirement, Keogh, additional \u00d72)"
+   }
+  },
+  {
+   "id": "line_22_gate",
+   "part": 4,
+   "line": "22",
+   "label": "Security deposits and prepayments",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the deposits-prepayments category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 22"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_22_institution",
+   "part": 4,
+   "line": "22",
+   "label": "Institution name or individual",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "who holds the deposit; the row's printed label fixes the kind"
+   },
+   "pdf": {
+    "pattern": "22\\.[1-9] (Electric|Gas|Heating oil|Security deposit on rental unit|Prepaid rent|Telephone|Water|Rented furniture|Other)"
+   },
+   "repeats": {
+    "count": 9,
+    "group": "asset_security_deposit",
+    "continuation": "rows 22.1\u201322.9, each pre-labelled (electric, gas, heating oil, rental deposit, prepaid rent, telephone, water, rented furniture, other)"
+   }
+  },
+  {
+   "id": "line_22_amount",
+   "part": 4,
+   "line": "22",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "22\\.[1-9] (Electric|Gas|Heating oil|Security deposit on rental unit|Prepaid rent|Telephone|Water|Rented furniture|Other) amount"
+   },
+   "repeats": {
+    "count": 9,
+    "group": "asset_security_deposit",
+    "continuation": "rows 22.1\u201322.9, each pre-labelled (electric, gas, heating oil, rental deposit, prepaid rent, telephone, water, rented furniture, other)"
+   }
+  },
+  {
+   "id": "line_23_gate",
+   "part": 4,
+   "line": "23",
+   "label": "Annuities",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the annuities category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 23"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_23_issuer",
+   "part": 4,
+   "line": "23",
+   "label": "Issuer name and description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "pattern": "23\\.[1-3] Annuities"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_annuity",
+    "continuation": "rows 23.1\u201323.3"
+   }
+  },
+  {
+   "id": "line_23_amount",
+   "part": 4,
+   "line": "23",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "pattern": "23\\.[1-3] Annuities amount"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_annuity",
+    "continuation": "rows 23.1\u201323.3"
+   }
+  },
+  {
+   "id": "line_24_gate",
+   "part": 4,
+   "line": "24",
+   "label": "Interests in an education IRA, qualified ABLE program, or qualified state tuition program",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the education-account category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 24"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_24_institution",
+   "part": 4,
+   "line": "24",
+   "label": "Institution name and description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "24.1 Interest in an education IRA",
+     "24.2 Interest in an education IRA"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_education_account",
+    "continuation": "three rows"
+   },
+   "notes": "Official-PDF defect: the third name row reuses the field of row one ('24.1 Interest in an education IRA' has two widgets), so rows one and three always show the same text."
+  },
+  {
+   "id": "line_24_amount",
+   "part": 4,
+   "line": "24",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "24.1 Interest in an education IRA amount",
+     "24.3 Interest in an education IRA"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_education_account",
+    "continuation": "three rows"
+   },
+   "notes": "The third amount box is misnamed '24.3 Interest in an education IRA'; the second row's amount box is a second widget of the '24.2 Interest in an education IRA' name field (another official-PDF defect), so that row's name and amount always match."
+  },
+  {
+   "id": "line_25_gate",
+   "part": 4,
+   "line": "25",
+   "label": "Trusts, equitable or future interests in property (other than anything listed in line 1), and rights or powers exercisable for your benefit",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-25 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 25"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information about them."
+    }
+   ]
+  },
+  {
+   "id": "line_25_description",
+   "part": 4,
+   "line": "25",
+   "label": "Trusts, equitable or future interests in property (other than anything listed in line 1), and rights or powers exercisable for your benefit \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-25 category"
+   },
+   "pdf": {
+    "names": [
+     "25 Trusts, equitable or future interests in property"
+    ]
+   }
+  },
+  {
+   "id": "line_25_amount",
+   "part": 4,
+   "line": "25",
+   "label": "Trusts, equitable or future interests in property (other than anything listed in line 1), and rights or powers exercisable for your benefit \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-25 category"
+   },
+   "pdf": {
+    "names": [
+     "25 Trusts, equitable or future interests in property amount"
+    ]
+   }
+  },
+  {
+   "id": "line_26_gate",
+   "part": 4,
+   "line": "26",
+   "label": "Patents, copyrights, trademarks, trade secrets, and other intellectual property",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-26 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 26"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information about them."
+    }
+   ]
+  },
+  {
+   "id": "line_26_description",
+   "part": 4,
+   "line": "26",
+   "label": "Patents, copyrights, trademarks, trade secrets, and other intellectual property \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-26 category"
+   },
+   "pdf": {
+    "names": [
+     "26 Patents, copyrights, trademarks, trade secrets"
+    ]
+   }
+  },
+  {
+   "id": "line_26_amount",
+   "part": 4,
+   "line": "26",
+   "label": "Patents, copyrights, trademarks, trade secrets, and other intellectual property \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-26 category"
+   },
+   "pdf": {
+    "names": [
+     "26 Patents, copyrights, trademarks, trade secrets amount"
+    ]
+   }
+  },
+  {
+   "id": "line_27_gate",
+   "part": 4,
+   "line": "27",
+   "label": "Licenses, franchises, and other general intangibles",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-27 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 27"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information about them."
+    }
+   ]
+  },
+  {
+   "id": "line_27_description",
+   "part": 4,
+   "line": "27",
+   "label": "Licenses, franchises, and other general intangibles \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-27 category"
+   },
+   "pdf": {
+    "names": [
+     "27 Liscenses, Franchises"
+    ]
+   }
+  },
+  {
+   "id": "line_27_amount",
+   "part": 4,
+   "line": "27",
+   "label": "Licenses, franchises, and other general intangibles \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-27 category"
+   },
+   "pdf": {
+    "names": [
+     "27 Liscenses, Franchises amount"
+    ]
+   }
+  },
+  {
+   "id": "line_28_gate",
+   "part": 4,
+   "line": "28",
+   "label": "Tax refunds owed to you",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the tax-refund category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 28"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Give specific information, including whether you already filed the returns and the tax years.",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_28_description",
+   "part": 4,
+   "line": "28",
+   "label": "Tax refunds \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "28 Tax refunds owed"
+    ]
+   }
+  },
+  {
+   "id": "line_28_amount_federal",
+   "part": 4,
+   "line": "28",
+   "label": "Tax refunds \u2014 Federal",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records federal"
+   },
+   "pdf": {
+    "names": [
+     "28 Tax refunds owed amout1"
+    ]
+   }
+  },
+  {
+   "id": "line_28_amount_state",
+   "part": 4,
+   "line": "28",
+   "label": "Tax refunds \u2014 State",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records state"
+   },
+   "pdf": {
+    "names": [
+     "28 Tax refunds owed amout2"
+    ]
+   }
+  },
+  {
+   "id": "line_28_amount_local",
+   "part": 4,
+   "line": "28",
+   "label": "Tax refunds \u2014 Local",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records local"
+   },
+   "pdf": {
+    "names": [
+     "28 Tax refunds owed amout3"
+    ]
+   }
+  },
+  {
+   "id": "line_29_gate",
+   "part": 4,
+   "line": "29",
+   "label": "Family support",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the family-support category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 29"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Give specific information.",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_29_description",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support"
+    ]
+   }
+  },
+  {
+   "id": "line_29_amount_alimony",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 Alimony",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records alimony"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support amount1"
+    ]
+   }
+  },
+  {
+   "id": "line_29_amount_maintenance",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 Maintenance",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records maintenance"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support amount2"
+    ]
+   }
+  },
+  {
+   "id": "line_29_amount_support",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 Support",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records support"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support amount3"
+    ]
+   }
+  },
+  {
+   "id": "line_29_amount_divorce_settlement",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 Divorce Settlement",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records divorce settlement"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support amount4"
+    ]
+   }
+  },
+  {
+   "id": "line_29_amount_property_settlement",
+   "part": 4,
+   "line": "29",
+   "label": "Family support \u2014 Property Settlement",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "detail records property settlement"
+   },
+   "pdf": {
+    "names": [
+     "29 Family support amount5"
+    ]
+   }
+  },
+  {
+   "id": "line_30_gate",
+   "part": 4,
+   "line": "30",
+   "label": "Other amounts someone owes you",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the amounts-owed category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 30"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information."
+    }
+   ]
+  },
+  {
+   "id": "line_30_description",
+   "part": 4,
+   "line": "30",
+   "label": "Other amounts someone owes you \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "undefined_107"
+    ]
+   }
+  },
+  {
+   "id": "line_30_amount",
+   "part": 4,
+   "line": "30",
+   "label": "Other amounts someone owes you \u2014 value",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_108"
+    ]
+   }
+  },
+  {
+   "id": "line_31_gate",
+   "part": 4,
+   "line": "31",
+   "label": "Interests in insurance policies",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the insurance-interest category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 31"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Name the insurance company of each policy and list its value."
+    }
+   ]
+  },
+  {
+   "id": "line_31_company",
+   "part": 4,
+   "line": "31",
+   "label": "Company name",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the policy/company"
+   },
+   "pdf": {
+    "pattern": "Company name [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_insurance",
+    "continuation": "three rows"
+   }
+  },
+  {
+   "id": "line_31_beneficiary",
+   "part": 4,
+   "line": "31",
+   "label": "Beneficiary",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "beneficiary"
+   },
+   "pdf": {
+    "pattern": "Beneficiary [1-3]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_insurance",
+    "continuation": "three rows"
+   }
+  },
+  {
+   "id": "line_31_value",
+   "part": 4,
+   "line": "31",
+   "label": "Surrender or refund value",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_109",
+     "undefined_110",
+     "undefined_111"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_insurance",
+    "continuation": "three rows"
+   }
+  },
+  {
+   "id": "line_32_gate",
+   "part": 4,
+   "line": "32",
+   "label": "Any interest in property that is due you from someone who has died",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-32 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 32"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information."
+    }
+   ]
+  },
+  {
+   "id": "line_32_description",
+   "part": 4,
+   "line": "32",
+   "label": "Any interest in property that is due you from someone who has died \u2014 description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-32 category"
+   },
+   "pdf": {
+    "names": [
+     "32 Interest in property due you from someone who died"
+    ]
+   }
+  },
+  {
+   "id": "line_32_amount",
+   "part": 4,
+   "line": "32",
+   "label": "Any interest in property that is due you from someone who has died \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-32 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_114"
+    ]
+   }
+  },
+  {
+   "id": "line_33_gate",
+   "part": 4,
+   "line": "33",
+   "label": "Claims against third parties, whether or not you have filed a lawsuit or made a demand for payment",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-33 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 33"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe each claim."
+    }
+   ]
+  },
+  {
+   "id": "line_33_description",
+   "part": 4,
+   "line": "33",
+   "label": "Claims against third parties, whether or not you have filed a lawsuit or made a demand for payment \u2014 description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-33 category"
+   },
+   "pdf": {
+    "names": [
+     "33"
+    ]
+   }
+  },
+  {
+   "id": "line_33_amount",
+   "part": 4,
+   "line": "33",
+   "label": "Claims against third parties, whether or not you have filed a lawsuit or made a demand for payment \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-33 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_117"
+    ]
+   }
+  },
+  {
+   "id": "line_34_gate",
+   "part": 4,
+   "line": "34",
+   "label": "Other contingent and unliquidated claims of every nature, including counterclaims of the debtor and rights to set off claims",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-34 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 34"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Describe each claim.",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_34_description",
+   "part": 4,
+   "line": "34",
+   "label": "Other contingent and unliquidated claims of every nature, including counterclaims of the debtor and rights to set off claims \u2014 description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-34 category"
+   },
+   "pdf": {
+    "names": [
+     "34"
+    ]
+   }
+  },
+  {
+   "id": "line_34_amount",
+   "part": 4,
+   "line": "34",
+   "label": "Other contingent and unliquidated claims of every nature, including counterclaims of the debtor and rights to set off claims \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-34 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_120"
+    ]
+   }
+  },
+  {
+   "id": "line_35_gate",
+   "part": 4,
+   "line": "35",
+   "label": "Any financial assets you did not already list",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-35 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 35"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information."
+    }
+   ]
+  },
+  {
+   "id": "line_35_description",
+   "part": 4,
+   "line": "35",
+   "label": "Any financial assets you did not already list \u2014 description",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-35 category"
+   },
+   "pdf": {
+    "names": [
+     "35"
+    ]
+   }
+  },
+  {
+   "id": "line_35_amount",
+   "part": 4,
+   "line": "35",
+   "label": "Any financial assets you did not already list \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-35 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_123"
+    ]
+   }
+  },
+  {
+   "id": "line_36_part4_total",
+   "part": 4,
+   "line": "36",
+   "label": "Add the dollar value of all of your entries from Part 4. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of lines 16\u201335"
+   },
+   "pdf": {
+    "names": [
+     "undefined_124"
+    ]
+   }
+  },
+  {
+   "id": "line_37_gate",
+   "part": 5,
+   "line": "37",
+   "label": "Do you own or have any legal or equitable interest in any business-related property?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset with a business category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 37"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to Part 6."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Go to line 38."
+    }
+   ]
+  },
+  {
+   "id": "line_38_gate",
+   "part": 5,
+   "line": "38",
+   "label": "Accounts receivable or commissions you already earned",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-38 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 38"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_38_description",
+   "part": 5,
+   "line": "38",
+   "label": "Accounts receivable or commissions you already earned \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-38 category"
+   },
+   "pdf": {
+    "names": [
+     "38 Accounts receivable or commissions already earned"
+    ]
+   }
+  },
+  {
+   "id": "line_38_amount",
+   "part": 5,
+   "line": "38",
+   "label": "Accounts receivable or commissions you already earned \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-38 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_125"
+    ]
+   }
+  },
+  {
+   "id": "line_39_gate",
+   "part": 5,
+   "line": "39",
+   "label": "Office equipment, furnishings, and supplies",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-39 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 39"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_39_description",
+   "part": 5,
+   "line": "39",
+   "label": "Office equipment, furnishings, and supplies \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-39 category"
+   },
+   "pdf": {
+    "names": [
+     "39 Office equipment furnishings and supplies"
+    ]
+   }
+  },
+  {
+   "id": "line_39_amount",
+   "part": 5,
+   "line": "39",
+   "label": "Office equipment, furnishings, and supplies \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-39 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_126"
+    ]
+   }
+  },
+  {
+   "id": "line_40_gate",
+   "part": 5,
+   "line": "40",
+   "label": "Machinery, fixtures, equipment, supplies you use in business, and tools of your trade",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-40 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 40"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_40_description",
+   "part": 5,
+   "line": "40",
+   "label": "Machinery, fixtures, equipment, supplies you use in business, and tools of your trade \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-40 category"
+   },
+   "pdf": {
+    "names": [
+     "40 Machinery fixtures equipment and tools of your trade"
+    ]
+   }
+  },
+  {
+   "id": "line_40_amount",
+   "part": 5,
+   "line": "40",
+   "label": "Machinery, fixtures, equipment, supplies you use in business, and tools of your trade \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-40 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_127"
+    ]
+   }
+  },
+  {
+   "id": "line_41_gate",
+   "part": 5,
+   "line": "41",
+   "label": "Inventory",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-41 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 41"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_41_description",
+   "part": 5,
+   "line": "41",
+   "label": "Inventory \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-41 category"
+   },
+   "pdf": {
+    "names": [
+     "41 Inventory"
+    ]
+   }
+  },
+  {
+   "id": "line_41_amount",
+   "part": 5,
+   "line": "41",
+   "label": "Inventory \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-41 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_128"
+    ]
+   }
+  },
+  {
+   "id": "line_42_gate",
+   "part": 5,
+   "line": "42",
+   "label": "Interests in partnerships or joint ventures",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the partnership-interest category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 42"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_42_entity",
+   "part": 5,
+   "line": "42",
+   "label": "Name of entity",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the entity"
+   },
+   "pdf": {
+    "pattern": "42\\.[1-3] Name of entity"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_partnership",
+    "continuation": "rows 42.1\u201342.3"
+   }
+  },
+  {
+   "id": "line_42_ownership_pct",
+   "part": 5,
+   "line": "42",
+   "label": "% of ownership",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "percentage ownership"
+   },
+   "pdf": {
+    "names": [
+     "undefined_130",
+     "undefined_131",
+     "undefined_133"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_partnership",
+    "continuation": "rows 42.1\u201342.3"
+   },
+   "notes": "Column disambiguated by widget x-position (x=421)."
+  },
+  {
+   "id": "line_42_amount",
+   "part": 5,
+   "line": "42",
+   "label": "Amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_129",
+     "undefined_132",
+     "undefined_134"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_partnership",
+    "continuation": "rows 42.1\u201342.3"
+   },
+   "notes": "Column disambiguated by widget x-position (x=494)."
+  },
+  {
+   "id": "line_43_gate",
+   "part": 5,
+   "line": "43",
+   "label": "Customer lists, mailing lists, or other compilations",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the customer-lists category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 43"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_43_pii_gate",
+   "part": 5,
+   "line": "43",
+   "label": "Do your lists include personally identifiable information (as defined in 11 U.S.C. \u00a7 101(41A))?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "detail",
+    "notes": "whether the lists carry PII"
+   },
+   "pdf": {
+    "names": [
+     "check 43_1"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Describe."
+    }
+   ]
+  },
+  {
+   "id": "line_43_description",
+   "part": 5,
+   "line": "43",
+   "label": "Customer lists \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "43 Identifiable information"
+    ]
+   }
+  },
+  {
+   "id": "line_43_amount",
+   "part": 5,
+   "line": "43",
+   "label": "Customer lists \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_135"
+    ]
+   }
+  },
+  {
+   "id": "line_44_gate",
+   "part": 5,
+   "line": "44",
+   "label": "Any business-related property you did not already list",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the other-business category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 44"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Give specific information."
+    }
+   ]
+  },
+  {
+   "id": "line_44_description",
+   "part": 5,
+   "line": "44",
+   "label": "Description (rows 44.1\u201344.6)",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "pattern": "44\\.[1-6]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "asset_other_business",
+    "continuation": "rows 44.1\u201344.6"
+   }
+  },
+  {
+   "id": "line_44_amount",
+   "part": 5,
+   "line": "44",
+   "label": "Amount (rows 44.1\u201344.6)",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_137",
+     "undefined_138",
+     "undefined_139",
+     "undefined_140",
+     "undefined_141",
+     "undefined_142"
+    ]
+   },
+   "repeats": {
+    "count": 6,
+    "group": "asset_other_business",
+    "continuation": "rows 44.1\u201344.6"
+   }
+  },
+  {
+   "id": "line_45_part5_total",
+   "part": 5,
+   "line": "45",
+   "label": "Add the dollar value of all of your entries from Part 5. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of lines 38\u201344"
+   },
+   "pdf": {
+    "names": [
+     "undefined_143"
+    ]
+   }
+  },
+  {
+   "id": "line_46_gate",
+   "part": 6,
+   "line": "46",
+   "label": "Do you own or have any legal or equitable interest in any farm- or commercial fishing-related property?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one asset with a farm/fishing category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 46"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to Part 7."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Go to line 47."
+    }
+   ]
+  },
+  {
+   "id": "line_47_gate",
+   "part": 6,
+   "line": "47",
+   "label": "Farm animals",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-47 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 47"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_47_description",
+   "part": 6,
+   "line": "47",
+   "label": "Farm animals \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-47 category"
+   },
+   "pdf": {
+    "names": [
+     "47 Farm Animals"
+    ]
+   }
+  },
+  {
+   "id": "line_47_amount",
+   "part": 6,
+   "line": "47",
+   "label": "Farm animals \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-47 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_144"
+    ]
+   }
+  },
+  {
+   "id": "line_48_gate",
+   "part": 6,
+   "line": "48",
+   "label": "Crops \u2014 either growing or harvested",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-48 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 48"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_48_description",
+   "part": 6,
+   "line": "48",
+   "label": "Crops \u2014 either growing or harvested \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-48 category"
+   },
+   "pdf": {
+    "names": [
+     "48 Cropseither growing or harvested"
+    ]
+   }
+  },
+  {
+   "id": "line_48_amount",
+   "part": 6,
+   "line": "48",
+   "label": "Crops \u2014 either growing or harvested \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-48 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_145"
+    ]
+   }
+  },
+  {
+   "id": "line_49_gate",
+   "part": 6,
+   "line": "49",
+   "label": "Farm and fishing equipment, implements, machinery, fixtures, and tools of trade",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-49 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 49"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_49_description",
+   "part": 6,
+   "line": "49",
+   "label": "Farm and fishing equipment, implements, machinery, fixtures, and tools of trade \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-49 category"
+   },
+   "pdf": {
+    "names": [
+     "49"
+    ]
+   }
+  },
+  {
+   "id": "line_49_amount",
+   "part": 6,
+   "line": "49",
+   "label": "Farm and fishing equipment, implements, machinery, fixtures, and tools of trade \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-49 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_148"
+    ]
+   }
+  },
+  {
+   "id": "line_50_gate",
+   "part": 6,
+   "line": "50",
+   "label": "Farm and fishing supplies, chemicals, and feed",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-50 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 50"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_50_description",
+   "part": 6,
+   "line": "50",
+   "label": "Farm and fishing supplies, chemicals, and feed \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-50 category"
+   },
+   "pdf": {
+    "names": [
+     "50"
+    ]
+   }
+  },
+  {
+   "id": "line_50_amount",
+   "part": 6,
+   "line": "50",
+   "label": "Farm and fishing supplies, chemicals, and feed \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-50 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_151"
+    ]
+   }
+  },
+  {
+   "id": "line_51_gate",
+   "part": 6,
+   "line": "51",
+   "label": "Any farm- and commercial fishing-related property you did not already list",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the line-51 category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 51"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_51_description",
+   "part": 6,
+   "line": "51",
+   "label": "Any farm- and commercial fishing-related property you did not already list \u2014 describe",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description",
+    "notes": "the line-51 category"
+   },
+   "pdf": {
+    "names": [
+     "51"
+    ]
+   }
+  },
+  {
+   "id": "line_51_amount",
+   "part": 6,
+   "line": "51",
+   "label": "Any farm- and commercial fishing-related property you did not already list \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned",
+    "notes": "aggregated over the line-51 category"
+   },
+   "pdf": {
+    "names": [
+     "undefined_153"
+    ]
+   }
+  },
+  {
+   "id": "line_52_part6_total",
+   "part": 6,
+   "line": "52",
+   "label": "Add the dollar value of all of your entries from Part 6. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of lines 47\u201351"
+   },
+   "pdf": {
+    "names": [
+     "undefined_154"
+    ]
+   }
+  },
+  {
+   "id": "line_53_gate",
+   "part": 7,
+   "line": "53",
+   "label": "Do you have other property of any kind you did not already list? (Examples: season tickets, country club membership)",
+   "type": "radio",
+   "maps_to": {
+    "derived": "an asset in the other category exists"
+   },
+   "pdf": {
+    "names": [
+     "check 53"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "Yes. Give specific information.",
+     "notes": "quirky export value in the official PDF; means the box printed with this label"
+    },
+    {
+     "value": "no",
+     "label": "No"
+    }
+   ]
+  },
+  {
+   "id": "line_53_description",
+   "part": 7,
+   "line": "53",
+   "label": "Other property \u2014 specific information",
+   "type": "text",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "description"
+   },
+   "pdf": {
+    "names": [
+     "53 Examples Season tickets country club membership"
+    ]
+   }
+  },
+  {
+   "id": "line_53_amount",
+   "part": 7,
+   "line": "53",
+   "label": "Other property \u2014 current value of the portion you own",
+   "type": "money",
+   "maps_to": {
+    "entity": "asset",
+    "attribute": "value_portion_owned"
+   },
+   "pdf": {
+    "names": [
+     "undefined_155",
+     "undefined_156",
+     "undefined_157"
+    ]
+   },
+   "repeats": {
+    "count": 3,
+    "group": "asset_other",
+    "continuation": "three value boxes"
+   }
+  },
+  {
+   "id": "line_54_part7_total",
+   "part": 7,
+   "line": "54",
+   "label": "Add the dollar value of all of your entries from Part 7. Write that number here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of line 53"
+   },
+   "pdf": {
+    "names": [
+     "undefined_158"
+    ]
+   }
+  },
+  {
+   "id": "line_55_total",
+   "part": 8,
+   "line": "55",
+   "label": "Part 1: Total real estate, line 2",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 2"
+   },
+   "pdf": {
+    "names": [
+     "undefined_159"
+    ]
+   }
+  },
+  {
+   "id": "line_56_total",
+   "part": 8,
+   "line": "56",
+   "label": "Part 2: Total vehicles, line 5",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 5"
+   },
+   "pdf": {
+    "names": [
+     "undefined_160"
+    ]
+   }
+  },
+  {
+   "id": "line_57_total",
+   "part": 8,
+   "line": "57",
+   "label": "Part 3: Total personal and household items, line 15",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 15"
+   },
+   "pdf": {
+    "names": [
+     "undefined_161"
+    ]
+   }
+  },
+  {
+   "id": "line_58_total",
+   "part": 8,
+   "line": "58",
+   "label": "Part 4: Total financial assets, line 36",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 36"
+   },
+   "pdf": {
+    "names": [
+     "undefined_162"
+    ]
+   }
+  },
+  {
+   "id": "line_59_total",
+   "part": 8,
+   "line": "59",
+   "label": "Part 5: Total business-related property, line 45",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 45"
+   },
+   "pdf": {
+    "names": [
+     "undefined_163"
+    ]
+   }
+  },
+  {
+   "id": "line_60_total",
+   "part": 8,
+   "line": "60",
+   "label": "Part 6: Total farm- and fishing-related property, line 52",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 52"
+   },
+   "pdf": {
+    "names": [
+     "undefined_164"
+    ]
+   }
+  },
+  {
+   "id": "line_61_total",
+   "part": 8,
+   "line": "61",
+   "label": "Part 7: Total other property not listed, line 54",
+   "type": "money",
+   "maps_to": {
+    "derived": "copy of line 54"
+   },
+   "pdf": {
+    "names": [
+     "undefined_165"
+    ]
+   }
+  },
+  {
+   "id": "line_62_total_personal_property",
+   "part": 8,
+   "line": "62",
+   "label": "Total personal property. Add lines 56 through 61.",
+   "type": "money",
+   "maps_to": {
+    "derived": "sum of lines 56\u201361; the field's second widget is the 'Copy personal property total' box"
+   },
+   "pdf": {
+    "names": [
+     "undefined_166"
+    ]
+   }
+  },
+  {
+   "id": "line_63_total_all_property",
+   "part": 8,
+   "line": "63",
+   "label": "Total of all property on Schedule A/B. Add line 55 + line 62.",
+   "type": "money",
+   "maps_to": {
+    "derived": "line 55 + line 62; copied to B106Sum line 1c"
+   },
+   "pdf": {
+    "names": [
+     "undefined_167"
+    ]
+   }
+  }
+ ]
+}
