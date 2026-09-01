@@ -7,6 +7,7 @@ import {
   PROVENANCE_SOURCES,
   VENUE_BASES,
   addFirmUserRequestToJson,
+  caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
   listCasesQuery,
@@ -43,6 +44,9 @@ import type {
   DocumentDownload,
   DocumentStatus,
   DocumentUpload,
+  CaseCollection,
+  CaseEntity,
+  CaseEntityRequest,
   CreditCounseling,
   Debtor,
   FilingRole,
@@ -640,6 +644,130 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireDebtorArray(decoded, 'debtors');
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/{collection}` — add one record to a generic case
+   * collection (issue #249): creditors, claims, assets, employments,
+   * income_summaries, households, expenses, dependents, codebtors,
+   * sofa_entries. The server mints the id and answers 201 with the stored
+   * record.
+   *
+   * The provenance rules are the debtor's, enforced identically: every
+   * populated field needs an entry ({@link staffTypedProvenance} builds the
+   * ordinary map), and machine-supplied values must be confirmed. Like
+   * {@link getCase}, a 404 means the case is unknown *or* not the caller's.
+   */
+  async addCaseEntity<C extends CaseCollection>(
+    caseId: string,
+    collection: C,
+    request: CaseEntityRequest<C>,
+  ): Promise<CaseEntity<C>> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#collectionUrl(caseId, collection), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(caseEntityRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return caseEntityFromJson<C>(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/{collection}` — every record of one collection in
+   * one case, in creation order (the order the rows were added, which holds
+   * still while someone works down the schedule).
+   *
+   * The wire body is `{"<collection>": [...]}`; this returns the array. No
+   * pagination — the answer is bounded by one case's schedule, and the server
+   * promises all of it.
+   */
+  async listCaseEntities<C extends CaseCollection>(
+    caseId: string,
+    collection: C,
+  ): Promise<readonly CaseEntity<C>[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#collectionUrl(caseId, collection), {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireCaseEntityArray<C>(decoded, collection);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/{collection}/{entityId}` — one record. A 404
+   * covers the unknown id, the foreign case, AND an id that belongs to a
+   * different collection of the same case — none are distinguishable, by the
+   * same anti-oracle rule {@link getCase} states.
+   */
+  async getCaseEntity<C extends CaseCollection>(
+    caseId: string,
+    collection: C,
+    entityId: string,
+  ): Promise<CaseEntity<C>> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#collectionUrl(caseId, collection)}/${encodeURIComponent(entityId)}`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseEntityFromJson<C>(decoded);
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/{collection}/{entityId}` — replace one record,
+   * WHOLE: anything left out is gone, for the same invariant-1 reason
+   * {@link putDebtor} states. There is no upsert — ids are server-minted, so
+   * an id the server never issued answers 404 rather than creating.
+   */
+  async putCaseEntity<C extends CaseCollection>(
+    caseId: string,
+    collection: C,
+    entityId: string,
+    request: CaseEntityRequest<C>,
+  ): Promise<CaseEntity<C>> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#collectionUrl(caseId, collection)}/${encodeURIComponent(entityId)}`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(caseEntityRequestToJson(request)),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseEntityFromJson<C>(decoded);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/{collection}/{entityId}` — remove one record.
+   * 204 with no body; a second delete of the same id answers 404.
+   *
+   * References are not cascaded server-side: a claim naming a deleted
+   * creditor keeps its `creditor_id`, and the completeness gate (9.6) is
+   * where the dangling reference becomes an error.
+   */
+  async deleteCaseEntity(
+    caseId: string,
+    collection: CaseCollection,
+    entityId: string,
+  ): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#collectionUrl(caseId, collection)}/${encodeURIComponent(entityId)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * The base URL of one collection. `collection` is a union of URL-safe
+   * literals, encoded anyway — the same rule {@link putDebtor} states about
+   * its role segment.
+   */
+  #collectionUrl(caseId: string, collection: CaseCollection): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/${encodeURIComponent(collection)}`;
   }
 
   /**
@@ -1626,6 +1754,73 @@ function requireDebtorArray(response: DecodedResponse, key: string): readonly De
       body: response.body,
       json: item as JsonObject,
       path: label,
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Generic case-entity decoding (issue #249). Mirrors `entity_json` in
+// `services/api/src/insolvia_api/core/case_entities.py`: server-stamped
+// identity and `provenance` are always present; every body member is absent
+// when it holds nothing.
+//
+// THE IDENTITY ENVELOPE IS CHECKED; THE BODY IS PASSED THROUGH. That is a
+// deliberate departure from `debtorFromJson`, which re-types every field. The
+// ten collection bodies span some hundred members plus twenty-seven SOFA
+// payload shapes, all owned and validated by the server's one parse path —
+// re-deriving each per-field check here would be a second hand-written copy of
+// that contract, maintained forever, whose only reader today re-serialises the
+// record straight back to the same server. The contract tests still pin the
+// exact wire literals per collection, so a server rename still fails this
+// package first. If the app ever computes on a body field, promote that field
+// to a checked read here.
+// ---------------------------------------------------------------------------
+
+/** The five members `entity_json` stamps; everything else is the body. */
+const ENTITY_IDENTITY_KEYS: readonly string[] = [
+  'id',
+  'case_id',
+  'created_at',
+  'updated_at',
+  'provenance',
+];
+
+/** Decodes a {@link CaseEntity} — `entity_json`'s exact shape. */
+function caseEntityFromJson<C extends CaseCollection>(response: DecodedResponse): CaseEntity<C> {
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(response.json)) {
+    if (!ENTITY_IDENTITY_KEYS.includes(key)) {
+      body[key] = value;
+    }
+  }
+  return {
+    ...body,
+    id: requireString(response, 'id'),
+    case_id: requireString(response, 'case_id'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    provenance: requireProvenanceMap(response, 'provenance'),
+  } as CaseEntity<C>;
+}
+
+/** The `{"<collection>": [...]}` envelope's array, checked per element. */
+function requireCaseEntityArray<C extends CaseCollection>(
+  response: DecodedResponse,
+  key: C,
+): readonly CaseEntity<C>[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'CaseEntity[]');
+  }
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, `${key}[${index}]`, 'object');
+    }
+    return caseEntityFromJson<C>({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: `${key}[${index}]`,
     });
   });
 }

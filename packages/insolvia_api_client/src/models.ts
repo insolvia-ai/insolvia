@@ -1503,3 +1503,495 @@ function populatedPaths(record: unknown, prefix = ''): string[] {
   // Numbers and booleans land here — `false` and `0` included, deliberately.
   return prefix === '' ? [] : [prefix];
 }
+
+// ---------------------------------------------------------------------------
+// The generic case collections (issue #249): creditors, claims, assets,
+// employments, income summaries, households, expenses, dependents, codebtors
+// and SOFA entries. Mirrors services/api/src/insolvia_api/core/
+// {case_entities,case_collections,creditors,claims,assets,income,expenses,
+// codebtors,sofa}.py.
+//
+// The bodies are typed as interfaces (compile-time) while the enums below are
+// exported as VALUES — each one is a picker in the questionnaire, the same
+// argument the debtor enums make. The provenance rules are identical to the
+// debtor's: every populated field carries an entry, machine-supplied values
+// must be confirmed, and {@link staffTypedProvenance} builds the ordinary map.
+// ---------------------------------------------------------------------------
+
+/** 106D/E/F's claim classes — which schedule a claim prints on. */
+export const CLAIM_CLASSES = ['secured', 'priority_unsecured', 'nonpriority_unsecured'] as const;
+export type ClaimClass = (typeof CLAIM_CLASSES)[number];
+
+/** 106D line 2's "check all that apply". `other` carries `lien_nature_other`. */
+export const LIEN_NATURES = ['agreement', 'statutory', 'judgment', 'other'] as const;
+export type LienNature = (typeof LIEN_NATURES)[number];
+
+/** The three priority categories printed on 106E/F, plus `other`. */
+export const PRIORITY_TYPES = [
+  'domestic_support',
+  'tax_and_government',
+  'death_or_injury_while_intoxicated',
+  'other',
+] as const;
+export type PriorityType = (typeof PRIORITY_TYPES)[number];
+
+/** 106E/F Part 2's type line. `other` carries `nonpriority_type_other`. */
+export const NONPRIORITY_TYPES = [
+  'student_loan',
+  'separation_or_divorce',
+  'pension_or_profit_sharing',
+  'other',
+] as const;
+export type NonpriorityType = (typeof NONPRIORITY_TYPES)[number];
+
+/**
+ * The "which debtor" column that recurs across the schedules — who incurred a
+ * claim, who owns an asset. One vocabulary, verbatim from the forms.
+ */
+export const DEBTOR_ATTRIBUTION = [
+  'debtor_1',
+  'debtor_2',
+  'both',
+  'at_least_one_plus_another',
+] as const;
+export type DebtorAttribution = (typeof DEBTOR_ATTRIBUTION)[number];
+
+/** The 106A/B line set, named for what the line asks about, never numbered. */
+export const ASSET_CATEGORIES = [
+  'real_property',
+  'vehicle',
+  'watercraft_aircraft_or_recreational_vehicle',
+  'household_goods',
+  'electronics',
+  'collectibles',
+  'sports_and_hobby_equipment',
+  'firearms',
+  'clothes',
+  'jewelry',
+  'non_farm_animals',
+  'other_personal_or_household',
+  'cash',
+  'deposits_of_money',
+  'bonds_and_mutual_funds',
+  'non_publicly_traded_stock_and_business_interests',
+  'government_and_corporate_bonds',
+  'retirement_accounts',
+  'security_deposits_and_prepayments',
+  'annuities',
+  'education_accounts',
+  'trusts_and_future_interests',
+  'intellectual_property',
+  'licenses_and_franchises',
+  'money_owed_to_you',
+  'family_support_owed',
+  'other_amounts_owed',
+  'insurance_policy_interests',
+  'property_due_from_a_death',
+  'claims_against_third_parties',
+  'other_contingent_and_unliquidated_claims',
+  'other_financial_assets',
+  'accounts_receivable',
+  'office_equipment',
+  'machinery_and_tools_of_trade',
+  'inventory',
+  'partnership_and_joint_venture_interests',
+  'customer_lists_and_intangibles',
+  'other_business_property',
+  'farm_animals',
+  'crops',
+  'farm_and_fishing_equipment',
+  'farm_and_fishing_supplies',
+  'other_farm_property',
+  'other_property_not_listed',
+] as const;
+export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
+
+/** 106A/B Part 1's real-property "check all that apply". */
+export const PROPERTY_TYPES = [
+  'single_family_home',
+  'duplex_or_multi_unit',
+  'condominium_or_cooperative',
+  'manufactured_or_mobile_home',
+  'land',
+  'investment_property',
+  'timeshare',
+  'other',
+] as const;
+export type PropertyType = (typeof PROPERTY_TYPES)[number];
+
+/** 106I Part 1's employment box. */
+export const EMPLOYMENT_STATUSES = ['employed', 'not_employed'] as const;
+export type EmploymentStatus = (typeof EMPLOYMENT_STATUSES)[number];
+
+/** Which of 106J's two schedules a household row is: 106J or 106J-2. */
+export const WHICH_HOUSEHOLDS = ['main', 'debtor_2_separate'] as const;
+export type WhichHousehold = (typeof WHICH_HOUSEHOLDS)[number];
+
+/** The 106J line set, named for what the line asks about, never numbered. */
+export const EXPENSE_CATEGORIES = [
+  'rent_or_home_ownership',
+  'real_estate_taxes',
+  'property_insurance',
+  'home_maintenance',
+  'homeowners_association_dues',
+  'additional_mortgage_payments',
+  'electricity_heat_gas',
+  'water_sewer_garbage',
+  'telephone_and_internet',
+  'other_utilities',
+  'food_and_housekeeping',
+  'childcare_and_education',
+  'clothing_and_laundry',
+  'personal_care',
+  'medical_and_dental',
+  'transportation',
+  'entertainment_and_recreation',
+  'charitable_contributions',
+  'life_insurance',
+  'health_insurance',
+  'vehicle_insurance',
+  'other_insurance',
+  'taxes',
+  'vehicle_installment_payments',
+  'other_installment_payments',
+  'alimony_and_support_payments',
+  'support_of_others',
+  'other_property_mortgages',
+  'other_property_taxes',
+  'other_property_insurance',
+  'other_property_maintenance',
+  'other_property_association_dues',
+  'other',
+] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+/**
+ * B107's entry types — the closed enum behind `sofa_entries`. Named for what
+ * the question asks about, never numbered: the annual form cycle renumbers.
+ * The payload SHAPES are owned by `core/sofa.py` server-side; the client
+ * carries them as {@link SofaPayload} and the API validates every field.
+ */
+export const SOFA_ENTRY_TYPES = [
+  'marital_status',
+  'prior_address',
+  'community_property_residence',
+  'income_by_period',
+  'consumer_debt_declaration',
+  'creditor_payment',
+  'insider_payment',
+  'insider_benefit_payment',
+  'lawsuit',
+  'repossession',
+  'setoff',
+  'receivership',
+  'gift',
+  'charitable_contribution',
+  'loss',
+  'consultant_payment',
+  'creditor_assistance_payment',
+  'property_transfer',
+  'self_settled_trust',
+  'closed_account',
+  'safe_deposit_box',
+  'storage_unit',
+  'held_for_another',
+  'environmental_notice',
+  'environmental_proceeding',
+  'business_connection',
+  'financial_statement_issued',
+] as const;
+export type SofaEntryType = (typeof SOFA_ENTRY_TYPES)[number];
+
+/**
+ * A dollar amount on the wire: a fixed-scale decimal CARRIED AS A STRING,
+ * `"1200.00"`. Never a number — a JSON number has been through the sender's
+ * binary floating point, which is the corruption the string exists to
+ * prevent. The API canonicalises to two decimal places and rejects negatives.
+ */
+export type Money = string;
+
+/** A calendar date, `YYYY-MM-DD` — no time, no zone. The API parses it. */
+export type FormDate = string;
+
+/** One deduplicated name-and-address for the creditor matrix. */
+export interface CreditorBody {
+  /** One free-text line — creditors are predominantly entities. */
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+}
+
+/**
+ * 106D Part 2 / 106E/F Part 3: someone else to be notified about a debt.
+ * {@link id} is the client-chosen row id, required for the same reason
+ * {@link OtherName.id} is: provenance addresses the row by it.
+ */
+export interface NoticeParty {
+  readonly id: string;
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly account_last4?: string | undefined;
+}
+
+/**
+ * One claim spanning 106D and both parts of 106E/F, discriminated by
+ * {@link claim_class}. The class-specific members are accepted regardless of
+ * the class (intake is progressive; the class may be decided last). The
+ * unsecured portion of a secured claim and a priority claim's total are
+ * arithmetic and never stored or sent.
+ */
+export interface ClaimBody {
+  /**
+   * The creditor record this claim names. Not checked server-side — a claim
+   * typed before its creditor is saved must persist.
+   */
+  readonly creditor_id?: string | undefined;
+  readonly claim_class?: ClaimClass | undefined;
+  /** Up to four digits. Never a full account number. */
+  readonly account_last4?: string | undefined;
+  readonly date_incurred?: FormDate | undefined;
+  readonly amount?: Money | undefined;
+  readonly contingent?: boolean | undefined;
+  readonly unliquidated?: boolean | undefined;
+  readonly disputed?: boolean | undefined;
+  readonly subject_to_offset?: boolean | undefined;
+  readonly who_incurred?: DebtorAttribution | undefined;
+  readonly community_debt?: boolean | undefined;
+  readonly notice_parties?: readonly NoticeParty[] | undefined;
+  readonly collateral_description?: string | undefined;
+  readonly collateral_value?: Money | undefined;
+  readonly lien_nature?: readonly LienNature[] | undefined;
+  readonly lien_nature_other?: string | undefined;
+  readonly priority_amount?: Money | undefined;
+  readonly nonpriority_amount?: Money | undefined;
+  readonly priority_type?: PriorityType | undefined;
+  readonly priority_type_other?: string | undefined;
+  readonly nonpriority_type?: NonpriorityType | undefined;
+  readonly nonpriority_type_other?: string | undefined;
+}
+
+/** One row of 106A/B. Both value boxes are stored; subtotals never are. */
+export interface AssetBody {
+  readonly category?: AssetCategory | undefined;
+  readonly property_types?: readonly PropertyType[] | undefined;
+  readonly description?: string | undefined;
+  readonly county?: string | undefined;
+  readonly value_entire?: Money | undefined;
+  readonly value_portion_owned?: Money | undefined;
+  readonly ownership_interest?: DebtorAttribution | undefined;
+  readonly ownership_interest_description?: string | undefined;
+  readonly community_property?: boolean | undefined;
+  /** Category-specific free text: make/model/year, institution, percentage. */
+  readonly detail?: string | undefined;
+}
+
+/** 106I Part 1: where a debtor works. */
+export interface EmploymentBody {
+  readonly debtor_id?: string | undefined;
+  readonly status?: EmploymentStatus | undefined;
+  readonly occupation?: string | undefined;
+  readonly employer_name?: string | undefined;
+  readonly employer_address?: Address | undefined;
+  readonly employed_since?: FormDate | undefined;
+}
+
+/**
+ * 106I Part 2, one column per debtor. ENTERED AND CONFIRMED, NOT COMPUTED —
+ * the form asks for an estimate of what income will be, and the derived lines
+ * (gross, totals, take-home, combined) are never stored or sent.
+ */
+export interface IncomeSummaryBody {
+  readonly debtor_id?: string | undefined;
+  readonly wages?: Money | undefined;
+  readonly overtime?: Money | undefined;
+  readonly deduction_tax?: Money | undefined;
+  readonly deduction_mandatory_retirement?: Money | undefined;
+  readonly deduction_voluntary_retirement?: Money | undefined;
+  readonly deduction_retirement_loan_repayment?: Money | undefined;
+  readonly deduction_insurance?: Money | undefined;
+  readonly deduction_domestic_support?: Money | undefined;
+  readonly deduction_union_dues?: Money | undefined;
+  readonly deduction_other?: Money | undefined;
+  readonly deduction_other_specify?: string | undefined;
+  readonly business_net_income?: Money | undefined;
+  readonly interest_and_dividends?: Money | undefined;
+  readonly family_support?: Money | undefined;
+  readonly unemployment?: Money | undefined;
+  readonly social_security?: Money | undefined;
+  readonly other_government_assistance?: Money | undefined;
+  readonly other_government_assistance_specify?: string | undefined;
+  readonly pension_or_retirement?: Money | undefined;
+  readonly other_monthly_income?: Money | undefined;
+  readonly other_monthly_income_specify?: string | undefined;
+  /** Line 11 — case-level on the form; carried on the debtor-1 summary. */
+  readonly household_contributions?: Money | undefined;
+  readonly household_contributions_specify?: string | undefined;
+  readonly change_expected?: boolean | undefined;
+  readonly change_explanation?: string | undefined;
+}
+
+/** 106J Part 1's frame: which schedule, and the change narrative. */
+export interface HouseholdBody {
+  readonly which_household?: WhichHousehold | undefined;
+  readonly separate_household?: boolean | undefined;
+  readonly change_expected?: boolean | undefined;
+  readonly change_explanation?: string | undefined;
+}
+
+/** One 106J expense line: a row, not a column. */
+export interface ExpenseBody {
+  readonly household_id?: string | undefined;
+  readonly category?: ExpenseCategory | undefined;
+  readonly specify_text?: string | undefined;
+  readonly amount?: Money | undefined;
+}
+
+/**
+ * A 106J dependent. There is deliberately NO name member: the form does not
+ * ask for dependents' names, and the API refuses one with a 400 rather than
+ * dropping it.
+ */
+export interface DependentBody {
+  readonly household_id?: string | undefined;
+  readonly relationship?: string | undefined;
+  readonly age?: number | undefined;
+  readonly lives_with_debtor?: boolean | undefined;
+}
+
+/** 106H Part 2: who else is liable, and on which claims. */
+export interface CodebtorBody {
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  /** Claim record ids — the fact behind the form's "Schedule D, line __". */
+  readonly claim_ids?: readonly string[] | undefined;
+}
+
+/**
+ * A SOFA payload's members, typed loosely on the wire. The per-type shapes
+ * are owned and validated by `core/sofa.py` server-side — the one dispatch
+ * table — and re-declaring all twenty-seven here would be a second copy of
+ * that contract with no second reader yet. The intake UI narrows what it
+ * renders per {@link SofaEntryType}.
+ */
+export type SofaPayload = Readonly<Record<string, unknown>>;
+
+/** One B107 answer: a typed row in the single SOFA table. */
+export interface SofaEntryBody {
+  readonly entry_type?: SofaEntryType | undefined;
+  /** Refused with a 400 when sent without {@link entry_type}. */
+  readonly payload?: SofaPayload | undefined;
+}
+
+/**
+ * The URL segment and listing key of each generic collection, and the body
+ * each one carries. `debtors` and `documents` are deliberately not here —
+ * they have their own endpoints and their own shapes.
+ */
+export interface CaseCollections {
+  readonly creditors: CreditorBody;
+  readonly claims: ClaimBody;
+  readonly assets: AssetBody;
+  readonly employments: EmploymentBody;
+  readonly income_summaries: IncomeSummaryBody;
+  readonly households: HouseholdBody;
+  readonly expenses: ExpenseBody;
+  readonly dependents: DependentBody;
+  readonly codebtors: CodebtorBody;
+  readonly sofa_entries: SofaEntryBody;
+}
+
+/** A collection's URL segment: `creditors`, `claims`, … */
+export type CaseCollection = keyof CaseCollections;
+
+/** Every collection, as a runtime list — mirrors `core/case_collections.py`. */
+export const CASE_COLLECTIONS = [
+  'creditors',
+  'claims',
+  'assets',
+  'employments',
+  'income_summaries',
+  'households',
+  'expenses',
+  'dependents',
+  'codebtors',
+  'sofa_entries',
+] as const satisfies readonly CaseCollection[];
+
+/**
+ * The body of a POST or PUT to a generic collection: the collection's body
+ * plus its {@link ProvenanceMap}. Whole, not partial — the endpoints replace
+ * the record, for the same invariant-1 reason {@link PutDebtorRequest}
+ * states. Build the ordinary provenance with {@link staffTypedProvenance}.
+ */
+export type CaseEntityRequest<C extends CaseCollection> = CaseCollections[C] & {
+  readonly provenance?: ProvenanceMap | undefined;
+};
+
+/**
+ * A stored record as every entity endpoint returns it: server-stamped
+ * identity, an always-present `provenance` map, and whatever of the body is
+ * populated — absent members are absent, never null, exactly as on
+ * {@link Debtor}.
+ */
+export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
+  /** The server-generated id, stable across saves. */
+  readonly id: string;
+  readonly case_id: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  /** Always present — `{}` on a record with nothing in it. */
+  readonly provenance: ProvenanceMap;
+};
+
+/**
+ * A generic collection request body as JSON, with absent members omitted
+ * entirely — the entity counterpart of {@link putDebtorRequestToJson}, and
+ * the same recursive rule as the server's `prune`: `undefined` members are
+ * dropped, and a sub-object or list that ends up empty is dropped with it, so
+ * a record sent and the record returned compare equal. `provenance` entries
+ * keep the weaker per-entry rule — see {@link putDebtorRequestToJson}.
+ */
+export function caseEntityRequestToJson(
+  request: CaseEntityRequest<CaseCollection>,
+): Record<string, unknown> {
+  const json: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(request)) {
+    if (key === 'provenance') {
+      continue;
+    }
+    const pruned = pruneJsonValue(value);
+    if (pruned !== undefined) {
+      json[key] = pruned;
+    }
+  }
+  const provenance = provenanceToJson(request.provenance);
+  if (provenance !== undefined) {
+    json.provenance = provenance;
+  }
+  return json;
+}
+
+/**
+ * The recursive half of {@link caseEntityRequestToJson}. `null` is treated as
+ * absent alongside `undefined` — the server stores neither — and `false` and
+ * `0` survive, because they are answers.
+ */
+function pruneJsonValue(value: unknown): unknown {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    const members = value.map(pruneJsonValue);
+    return members.length === 0 ? undefined : members;
+  }
+  if (isPlainObject(value)) {
+    const built: Record<string, unknown> = {};
+    for (const [key, member] of Object.entries(value)) {
+      const pruned = pruneJsonValue(member);
+      if (pruned !== undefined) {
+        built[key] = pruned;
+      }
+    }
+    return Object.keys(built).length === 0 ? undefined : built;
+  }
+  return value;
+}

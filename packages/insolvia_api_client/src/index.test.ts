@@ -27,6 +27,9 @@ import {
   ApiException,
   ApiUnauthorizedException,
   ApiValidationException,
+  CASE_COLLECTIONS,
+  CLAIM_CLASSES,
+  SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
   DOCUMENT_KINDS,
   DOCUMENT_STATUSES,
@@ -3348,5 +3351,336 @@ describe('case assignment', () => {
     await expect(client.unassignCase(CASE_ID, SUBJECT_ID)).resolves.toBeUndefined();
     expect(stub.lastRequest().method).toBe('DELETE');
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/assignees/${SUBJECT_ID}`);
+  });
+});
+
+// The generic case-collection endpoints (issue #249) are pinned against
+// services/api/src/insolvia_api/api/routes/case_entities.py and
+// .../core/{case_entities,case_collections,creditors,claims,sofa,...}.py.
+// The bodies follow the debtor rules exactly: snake_case, absent means
+// absent, provenance always present on a response and required per populated
+// field on a request.
+const ENTITY_CASE_ID = 'b4e2f0a1-5c3d-4e2f-8b90-7d9f1e2a3b4c';
+const ENTITY_ID = '8dae7780-8536-41ef-a55c-f180d2a01bf8';
+
+/** A saved creditor as `entity_json` builds it. */
+const CREDITOR_RECORD = {
+  id: ENTITY_ID,
+  case_id: ENTITY_CASE_ID,
+  created_at: '2026-09-01T10:00:00.123456Z',
+  updated_at: '2026-09-01T10:00:00.123456Z',
+  provenance: {
+    name: { source: 'staff_typed' },
+    'address.line1': { source: 'staff_typed' },
+  },
+  name: 'Example Bank',
+  address: { line1: '1 Example Way' },
+};
+
+describe('addCaseEntity', () => {
+  const REQUEST = {
+    name: 'Example Bank',
+    address: { line1: '1 Example Way' },
+    provenance: {
+      name: { source: 'staff_typed' },
+      'address.line1': { source: 'staff_typed' },
+    },
+  } as const;
+
+  test('POSTs /v1/cases/{caseId}/{collection} and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addCaseEntity(ENTITY_CASE_ID, 'creditors', REQUEST);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/creditors`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({
+      name: 'Example Bank',
+      address: { line1: '1 Example Way' },
+      provenance: REQUEST.provenance,
+    });
+    expect(saved).toEqual(CREDITOR_RECORD);
+  });
+
+  test('prunes absent members and empty sub-objects from the request', async () => {
+    // Mirrors the server's own prune, so the record sent and the record
+    // returned compare equal. `false` survives — it is an answer.
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addCaseEntity(ENTITY_CASE_ID, 'claims', {
+      creditor_id: undefined,
+      contingent: false,
+      notice_parties: [],
+      provenance: { contingent: { source: 'staff_typed' } },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      contingent: false,
+      provenance: { contingent: { source: 'staff_typed' } },
+    });
+  });
+
+  test('a sofa entry sends its typed payload verbatim', async () => {
+    const RECORD = {
+      id: ENTITY_ID,
+      case_id: ENTITY_CASE_ID,
+      created_at: '2026-09-01T10:00:00.123456Z',
+      updated_at: '2026-09-01T10:00:00.123456Z',
+      provenance: {
+        entry_type: { source: 'staff_typed' },
+        'payload.recipient.name': { source: 'staff_typed' },
+        'payload.value': { source: 'staff_typed' },
+      },
+      entry_type: 'gift',
+      payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
+    };
+    const stub = stubFetch(() => jsonResponse(RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addCaseEntity(ENTITY_CASE_ID, 'sofa_entries', {
+      entry_type: 'gift',
+      payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
+      provenance: {
+        entry_type: { source: 'staff_typed' },
+        'payload.recipient.name': { source: 'staff_typed' },
+        'payload.value': { source: 'staff_typed' },
+      },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body).payload).toEqual({
+      recipient: { name: 'Example Recipient' },
+      value: '700.00',
+    });
+    expect(saved).toEqual(RECORD);
+  });
+
+  test('a 400 with fields becomes ApiValidationException keyed by field path', async () => {
+    // The server's shape for a missing provenance entry — the failure a
+    // caller that skipped staffTypedProvenance sees.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: { 'provenance.name': 'This field has a value but no provenance.' },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.addCaseEntity(ENTITY_CASE_ID, 'creditors', { name: 'X' })),
+    );
+    expect(error.fields['provenance.name']).toBe('This field has a value but no provenance.');
+  });
+
+  test('staffTypedProvenance covers an entity body, ready to send', async () => {
+    // The same walk the debtor uses works for every collection — the sample
+    // here carries a nested object, a boolean false, and a plain string list
+    // (attributed whole, the employer_ids rule).
+    const body = {
+      name: 'Example Cosigner',
+      address: { city: 'Exampleville' },
+      claim_ids: ['cl-1', 'cl-2'],
+    };
+    expect(staffTypedProvenance(body)).toEqual({
+      name: { source: 'staff_typed' },
+      'address.city': { source: 'staff_typed' },
+      claim_ids: { source: 'staff_typed' },
+    });
+  });
+});
+
+describe('listCaseEntities', () => {
+  test('GETs the collection and unwraps its own envelope key', async () => {
+    const stub = stubFetch(() => jsonResponse({ creditors: [CREDITOR_RECORD] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const listed = await client.listCaseEntities(ENTITY_CASE_ID, 'creditors');
+
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/creditors`);
+    expect(listed).toEqual([CREDITOR_RECORD]);
+  });
+
+  test('an empty collection is an empty array, not a failure', async () => {
+    const stub = stubFetch(() => jsonResponse({ expenses: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.listCaseEntities(ENTITY_CASE_ID, 'expenses')).resolves.toEqual([]);
+  });
+
+  test('a response missing the collection key is a contract failure', async () => {
+    // The envelope is keyed by the collection's own name; `{"entities": []}`
+    // would be a different server.
+    const stub = stubFetch(() => jsonResponse({ entities: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.listCaseEntities(ENTITY_CASE_ID, 'creditors')),
+    );
+    expect(error.message).toContain('creditors');
+  });
+});
+
+describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
+  test('GETs one record by id, with every segment encoded', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.getCaseEntity('id with spaces/slash', 'creditors', 'entity/id');
+
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/id%20with%20spaces%2Fslash/creditors/entity%2Fid`,
+    );
+  });
+
+  test('PUTs the whole record and maps the 200', async () => {
+    const renamed = { ...CREDITOR_RECORD, name: 'Renamed Bank' };
+    const stub = stubFetch(() => jsonResponse(renamed, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putCaseEntity(ENTITY_CASE_ID, 'creditors', ENTITY_ID, {
+      name: 'Renamed Bank',
+      address: { line1: '1 Example Way' },
+      provenance: {
+        name: { source: 'staff_typed' },
+        'address.line1': { source: 'staff_typed' },
+      },
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/creditors/${ENTITY_ID}`);
+    expect(saved).toEqual(renamed);
+  });
+
+  test('a PUT to an id the server never minted surfaces the 404', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'record not found' }, 404),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putCaseEntity(ENTITY_CASE_ID, 'creditors', 'never-minted', {})),
+    );
+    expect(error.statusCode).toBe(404);
+  });
+
+  test('DELETEs one record and resolves on the bodyless 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(
+      client.deleteCaseEntity(ENTITY_CASE_ID, 'creditors', ENTITY_ID),
+    ).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/creditors/${ENTITY_ID}`,
+    );
+  });
+
+  test('no access token throws without calling fetch at all', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.getCaseEntity(ENTITY_CASE_ID, 'creditors', ENTITY_ID)),
+    );
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+describe('the case-collection enums', () => {
+  test('CASE_COLLECTIONS mirrors core/case_collections.py, in order', () => {
+    expect(CASE_COLLECTIONS).toEqual([
+      'creditors',
+      'claims',
+      'assets',
+      'employments',
+      'income_summaries',
+      'households',
+      'expenses',
+      'dependents',
+      'codebtors',
+      'sofa_entries',
+    ]);
+  });
+
+  test('SOFA_ENTRY_TYPES mirrors the dispatch table in core/sofa.py', () => {
+    // Member for member: a type added to one side and not the other must
+    // fail here, because the app's picker renders THIS list.
+    expect(SOFA_ENTRY_TYPES).toEqual([
+      'marital_status',
+      'prior_address',
+      'community_property_residence',
+      'income_by_period',
+      'consumer_debt_declaration',
+      'creditor_payment',
+      'insider_payment',
+      'insider_benefit_payment',
+      'lawsuit',
+      'repossession',
+      'setoff',
+      'receivership',
+      'gift',
+      'charitable_contribution',
+      'loss',
+      'consultant_payment',
+      'creditor_assistance_payment',
+      'property_transfer',
+      'self_settled_trust',
+      'closed_account',
+      'safe_deposit_box',
+      'storage_unit',
+      'held_for_another',
+      'environmental_notice',
+      'environmental_proceeding',
+      'business_connection',
+      'financial_statement_issued',
+    ]);
+  });
+
+  test('CLAIM_CLASSES mirrors core/claims.py', () => {
+    expect(CLAIM_CLASSES).toEqual(['secured', 'priority_unsecured', 'nonpriority_unsecured']);
   });
 });

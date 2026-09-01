@@ -7,6 +7,7 @@
 // literal in this package in sync with:
 //   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,documents}.py
 //   services/api/src/insolvia_api/api/routes/{health,waitlist,me,cases,debtors}.py
+//   services/api/src/insolvia_api/api/routes/case_entities.py (+ core/case_*.py)
 //   services/api/src/insolvia_api/api/app_factory.py (error handlers)
 //   services/api/src/insolvia_api/api/auth.py (the 401 body)
 //   services/api/src/insolvia_api/core/{waitlist,auth,documents}.py
@@ -36,6 +37,7 @@ export {
   DOCUMENT_STATUSES,
   MAX_DOCUMENT_BYTE_SIZE,
   addFirmUserRequestToJson,
+  caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
   isDocumentContentType,
@@ -60,6 +62,54 @@ export {
   FILING_ROLES,
   PROVENANCE_SOURCES,
   VENUE_BASES,
+} from './models.ts';
+// The case-collection enums (issue #249), values for the same reason: each is
+// a picker or a checkbox set in the intake UI, mirrored from the API's core
+// modules — the tests pin them member for member.
+export {
+  ASSET_CATEGORIES,
+  CASE_COLLECTIONS,
+  CLAIM_CLASSES,
+  DEBTOR_ATTRIBUTION,
+  EMPLOYMENT_STATUSES,
+  EXPENSE_CATEGORIES,
+  LIEN_NATURES,
+  NONPRIORITY_TYPES,
+  PRIORITY_TYPES,
+  PROPERTY_TYPES,
+  SOFA_ENTRY_TYPES,
+  WHICH_HOUSEHOLDS,
+} from './models.ts';
+export type {
+  AssetBody,
+  AssetCategory,
+  CaseCollection,
+  CaseCollections,
+  CaseEntity,
+  CaseEntityRequest,
+  ClaimBody,
+  ClaimClass,
+  CodebtorBody,
+  CreditorBody,
+  DebtorAttribution,
+  DependentBody,
+  EmploymentBody,
+  EmploymentStatus,
+  ExpenseBody,
+  ExpenseCategory,
+  FormDate,
+  HouseholdBody,
+  IncomeSummaryBody,
+  LienNature,
+  Money,
+  NonpriorityType,
+  NoticeParty,
+  PriorityType,
+  PropertyType,
+  SofaEntryBody,
+  SofaEntryType,
+  SofaPayload,
+  WhichHousehold,
 } from './models.ts';
 export type {
   AddFirmUserRequest,
