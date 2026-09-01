@@ -18,6 +18,7 @@ that is rewritten as work lands.
 |---|---|
 | [`architecture.md`](reference/architecture.md) | Monorepo shape, toolchain (incl. the Expo free-tier constraint), environment model, hosting topology, CI/CD, PR-gate design + the required-check contract. |
 | [`case-data-model.md`](reference/case-data-model.md) | The case schema: entities mapped to B101/B106/B107, per-field provenance and the confirm-before-entry invariant, derived values, the external-system seam (an origin pointer since [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md)). |
+| [`effective-dating.md`](reference/effective-dating.md) | How form revisions and regulatory datasets are versioned: series, immutable effective-dated releases, date resolution, float-then-pin on cases, and the scheduled-refresh pattern. |
 | [`terraform.md`](reference/terraform.md) | Infra state model, modules, naming, deploy order, the ci-trust self-deny, the human IAM users in account-access. |
 | [`package-publishing.md`](reference/package-publishing.md) | How this repo *consumes* the design system and tokens — published from `insolvia-ai/design-system`, installed by version on both surfaces, plus the registry auth and the bundler wiring each consumer owns. |
 | [`email.md`](reference/email.md) | `insolvia.ai` mail: address map, DNS records + owners, Google Workspace inbound + SES outbound. |
