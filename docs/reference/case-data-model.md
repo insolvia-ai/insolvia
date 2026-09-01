@@ -467,24 +467,32 @@ applied when it was prepared**, via `constants_set_id`. Where those sets live
 and how they are versioned is shared with the forms engine's effective-dating
 problem and is settled there, not here.
 
-## The MyCase sync seam — designed, not built
+## The external-system seam — an origin pointer, not sync
 
-Room for sync, and nothing more. No sync code, no polling, no webhook handler:
-those wait on the MyCase spike answering write coverage and push-versus-poll.
+[ADR 0013](../adr/0013-mcp-server-replaces-direct-pms-integration.md) ended
+direct practice-management integration: an attorney's AI harness moves data
+between their PMS and us through our MCP server, so there is no sync engine on
+our side — no polling, no webhooks, no push/pull bookkeeping. What survives of
+the old seam is provenance:
 
 ```
 external_refs: [ { system, external_id, external_url, last_seen_at } ]
-sync_state:    { last_pushed_at, last_pulled_at, content_hash }
 ```
 
-Every case-scoped entity carries both fields, unused. `extraction_candidate`
-does not — it is scratch space that never leaves this system.
+Every case-scoped entity may carry it: a record a harness sourced from MyCase
+(or any other system) should say where it came from, the same way a confirmed
+value says who confirmed it. `extraction_candidate` does not — it is scratch
+space that never leaves this system.
 
-`content_hash` is record-level, and this is a **deliberate narrowing** of the
-per-field sync state the milestone asked for. Per-field state is only worth its
-complexity once we know whether MyCase writes are field-granular, which is
-exactly what the spike is for; widening a record-level hash into a field map
-later is additive, and the reverse is not.
+`sync_state` (`last_pushed_at` / `last_pulled_at` / `content_hash`) was
+specified alongside it and is **deleted from the model** — nothing ever
+implemented it, and it described the sync engine ADR 0013 decided against.
+
+The seam's real successor is behavioural, not a field: **an MCP client writes
+candidate records, never confirmed case data** — the confirm-before-entry
+invariant above governs agent writes exactly as it governs extraction. The
+tool surface that enforces this is the MCP milestone's design issue
+([#260](https://github.com/insolvia-ai/insolvia/issues/260)).
 
 ## What this demands of the store
 
@@ -574,7 +582,10 @@ written before it was named.
 - **The forms-engine field mapping.** Which entity attribute lands on which
   form line, per revision — including the completeness check and the constant
   sets above. That is the forms milestone's artifact.
-- **MyCase sync itself** — seam only, above.
+- **The MCP tool surface.** Which tools expose these entities to a harness,
+  and the candidate-write flow — the MCP milestone's design artifact
+  ([#260](https://github.com/insolvia-ai/insolvia/issues/260)); the seam it
+  builds on is above.
 - **Claims filing.** A separate CM/ECF specification from the petition IEPD,
   and a later concern.
 
