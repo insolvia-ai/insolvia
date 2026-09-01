@@ -118,10 +118,10 @@ the same seam extraction review (8.9) needs
 | 12.8 | [#267](https://github.com/insolvia-ai/insolvia/issues/267) — Business plan §1/§7/§10/§11 rewrite | Founder-owned; tracked so the staleness is visible. |
 
 Sequencing against the forms milestone: forms stay **current** — they are the
-value the MCP exposes. 12.1 (design, cheap) and 12.7 (the public story is
-wrong today) are worth doing early; the build (12.2–12.5) benefits from 9.9
-landing first, since creditors/assets/income are most of what a harness would
-push.
+value the MCP exposes. 12.1 (design, cheap) is worth doing early; 12.7 can
+wait until the site is actually serving production traffic; the build
+(12.2–12.5) benefits from 9.9 landing first, since creditors/assets/income
+are most of what a harness would push.
 
 ## Outstanding foundation item · SES production access
 

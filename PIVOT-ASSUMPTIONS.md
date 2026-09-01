@@ -55,8 +55,9 @@ delete the file at merge.
 11. **Marketing repositioning (#266) and the business-plan rewrite (#267) are
     issues, not changes in this PR.** Both are public/strategic artifacts —
     the site copy and the business plan are founder-signoff territory, so I
-    filed the work instead of doing it. The site currently promises a direct
-    MyCase integration; that's flagged as urgent in the plan.
+    filed the work instead of doing it. Not urgent: the marketing site is not
+    serving production traffic yet (founder, 2026-09-01), so the stale
+    positioning misleads no one — the copy just needs to change before launch.
 12. **Left alone on purpose**: ADR 0009 / `insolvia_core.firms` /
     `access.py` / `cases.py` / the team screen — their MyCase mentions are
     borrowed *vocabulary* ("nothing here integrates with MyCase", their own
