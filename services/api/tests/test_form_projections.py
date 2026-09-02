@@ -50,6 +50,27 @@ from insolvia_api.core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_api.core.sofa import (
+    BusinessConnection,
+    CharitableContribution,
+    ClosedAccount,
+    ConsultantPayment,
+    CreditorPayment,
+    EnvironmentalProceeding,
+    FinancialStatementIssued,
+    Gift,
+    HeldForAnother,
+    IncomeByPeriod,
+    InsiderPayment,
+    Lawsuit,
+    Loss,
+    MaritalStatus,
+    Party,
+    PriorAddress,
+    PropertyTransfer,
+    SofaEntryBody,
+    StorageUnit,
+)
 
 from tests.test_form_fill import read_form
 
@@ -634,6 +655,340 @@ def _dependents() -> tuple[DependentBody, ...]:
     )
 
 
+def _sofa_entries() -> tuple[SofaEntryBody, ...]:
+    """The reference SOFA, coherent with the rest of the case: the mortgage
+    payments name the mortgage creditor, the insider is the car loan's
+    cosigner, the storage unit is Schedule G's lease, and the consultant is
+    the attorney."""
+
+    def entry(entry_type: str, payload: object) -> SofaEntryBody:
+        return SofaEntryBody(entry_type=entry_type, payload=payload)  # type: ignore[arg-type]
+
+    return (
+        entry("marital_status", MaritalStatus(status="married")),
+        entry(
+            "prior_address",
+            PriorAddress(
+                which_debtor="debtor_1",
+                address=Address(
+                    line1="3 Difference Court",
+                    city="Tampa",
+                    state="FL",
+                    postal_code="33604",
+                ),
+                from_date="2023-01-01",
+                to_date="2024-06-30",
+            ),
+        ),
+        entry(
+            "prior_address",
+            PriorAddress(
+                which_debtor="debtor_2",
+                address=Address(
+                    line1="8 Peachtree Lane",
+                    city="Decatur",
+                    state="GA",
+                    postal_code="30030",
+                ),
+                from_date="2024-11-01",
+                to_date="2026-07-01",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_1",
+                kind="wages_and_commissions",
+                period_start="2026-01-01",
+                period_end="2026-08-01",
+                gross_amount="41600.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_1",
+                kind="wages_and_commissions",
+                period_start="2025-01-01",
+                period_end="2025-12-31",
+                gross_amount="61000.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_1",
+                kind="operating_a_business",
+                description="Ada's Analytical Engines",
+                period_start="2025-01-01",
+                period_end="2025-12-31",
+                gross_amount="4200.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_1",
+                kind="wages_and_commissions",
+                period_start="2024-01-01",
+                period_end="2024-12-31",
+                gross_amount="58300.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_2",
+                kind="wages_and_commissions",
+                period_start="2026-01-01",
+                period_end="2026-08-01",
+                gross_amount="24000.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_2",
+                kind="wages_and_commissions",
+                period_start="2025-01-01",
+                period_end="2025-12-31",
+                gross_amount="35000.00",
+            ),
+        ),
+        entry(
+            "income_by_period",
+            IncomeByPeriod(
+                which_debtor="debtor_1",
+                kind="other",
+                description="Unemployment compensation",
+                period_start="2024-03-01",
+                period_end="2024-08-31",
+                gross_amount="3100.00",
+            ),
+        ),
+        entry(
+            "creditor_payment",
+            CreditorPayment(
+                creditor=Party(
+                    name="Gulf Coast Home Loans",
+                    address=Address(
+                        line1="100 Lender Way",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33602",
+                    ),
+                ),
+                dates=("2026-05-01", "2026-06-01", "2026-07-01"),
+                total_paid="4440.00",
+                amount_still_owed="195000.00",
+                payment_for=("mortgage",),
+            ),
+        ),
+        entry(
+            "insider_payment",
+            InsiderPayment(
+                insider=Party(
+                    name="Margaret Lovelace",
+                    address=Address(
+                        line1="9 Garden Lane",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33603",
+                    ),
+                ),
+                relationship="Mother of Debtor 2",
+                dates=("2025-12-20",),
+                total_paid="1200.00",
+                amount_still_owed="0.00",
+                reason="Repayment of a family loan",
+            ),
+        ),
+        entry(
+            "lawsuit",
+            Lawsuit(
+                case_title="Meridian Bank Card Services v. Lovelace",
+                case_number="26-CC-1184",
+                nature_of_case="Credit card collection",
+                court=Party(
+                    name="Hillsborough County Court",
+                    address=Address(
+                        line1="800 E Twiggs Street",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33602",
+                    ),
+                ),
+                status="pending",
+            ),
+        ),
+        entry(
+            "gift",
+            Gift(
+                recipient=Party(
+                    name="Clara Byron",
+                    address=Address(
+                        line1="15 Loom Lane",
+                        city="Atlanta",
+                        state="GA",
+                        postal_code="30301",
+                    ),
+                ),
+                relationship="Niece",
+                description="Wedding gift",
+                dates=("2025-10-12",),
+                value="650.00",
+            ),
+        ),
+        entry(
+            "charitable_contribution",
+            CharitableContribution(
+                organization=Party(
+                    name="Tampa Bay Food Bank",
+                    address=Address(
+                        line1="5 Harvest Road",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33610",
+                    ),
+                ),
+                description="Cash donations",
+                dates=("2025-11-30",),
+                value="700.00",
+            ),
+        ),
+        entry(
+            "loss",
+            Loss(
+                description="Hurricane damage to the back fence",
+                insurance_coverage="Not covered; below the deductible",
+                date="2025-09-28",
+                value="1400.00",
+            ),
+        ),
+        entry(
+            "consultant_payment",
+            ConsultantPayment(
+                person=Party(
+                    name="Counsel & Counsel PA",
+                    address=Address(
+                        line1="1 Example Way",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33604",
+                    ),
+                ),
+                email_or_website="alex@example.com",
+                description="Attorney fees for this bankruptcy case",
+                date="2026-07-15",
+                amount="1500.00",
+            ),
+        ),
+        entry(
+            "property_transfer",
+            PropertyTransfer(
+                transferee=Party(
+                    name="Charles Menabrea",
+                    address=Address(
+                        line1="41 Engine Row",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33605",
+                    ),
+                ),
+                relationship="Friend",
+                description="Sold a spare engine lathe valued at about $800",
+                value_received="$500 cash",
+                date="2025-03-15",
+            ),
+        ),
+        entry(
+            "closed_account",
+            ClosedAccount(
+                institution=Party(
+                    name="First Gulf Bank",
+                    address=Address(
+                        line1="12 Bay Street",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33601",
+                    ),
+                ),
+                account_last4="2210",
+                account_type="checking",
+                date_closed="2026-01-15",
+                last_balance="25.00",
+            ),
+        ),
+        entry(
+            "storage_unit",
+            StorageUnit(
+                facility=Party(
+                    name="StorSafe Tampa LLC",
+                    address=Address(
+                        line1="77 Keeper Street",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33605",
+                    ),
+                ),
+                who_has_access=("Ada Lovelace",),
+                description="Business records and spare parts",
+                still_have=True,
+            ),
+        ),
+        entry(
+            "held_for_another",
+            HeldForAnother(
+                owner=Party(
+                    name="Menabrea Machines Inc",
+                    address=Address(
+                        line1="200 Engine Row",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33605",
+                    ),
+                ),
+                location="Workshop shelf at 12 Byron Court",
+                description="Loaned test equipment",
+                value="900.00",
+            ),
+        ),
+        entry(
+            "business_connection",
+            BusinessConnection(
+                business=Party(
+                    name="Ada's Analytical Engines",
+                    address=Address(
+                        line1="88 Difference Drive",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33603",
+                    ),
+                ),
+                nature_of_business="Repair and resale of analytical engines",
+                ein="12-3456789",
+                from_date="2019-01-01",
+                connection=("sole_proprietor",),
+            ),
+        ),
+        entry(
+            "financial_statement_issued",
+            FinancialStatementIssued(
+                recipient=Party(
+                    name="Suncoast Credit Union",
+                    address=Address(
+                        line1="6801 Croom Road",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33607",
+                    ),
+                ),
+                date_issued="2025-06-01",
+            ),
+        ),
+    )
+
+
 def reference_case_file() -> CaseFile:
     return CaseFile(
         case=REFERENCE_CASE,
@@ -737,6 +1092,7 @@ def reference_case_file() -> CaseFile:
         households=_households(),
         expenses=_expenses(),
         dependents=_dependents(),
+        sofa_entries=_sofa_entries(),
         income_summaries=(
             IncomeSummaryBody(
                 debtor_id="debtor-0001",
@@ -776,6 +1132,7 @@ def reference_case_file() -> CaseFile:
         "form/b106j",
         "form/b106j2",
         "form/b106sum",
+        "form/b107",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
@@ -1440,6 +1797,170 @@ def test_b106dec_answers_the_preparer_question_and_dates_the_signatures() -> Non
     assert values["debtor1_signature_date"] == Text("08/30/2026")
     assert values["debtor2_signature_date"] == Text("08/30/2026")
     assert "debtor1_signature" not in values
+
+
+# --- B107 ---------------------------------------------------------------------
+
+
+def b107_values() -> dict[str, object]:
+    release = latest_form("form/b107")
+    return dict(project(release, reference_case_file()))
+
+
+def test_b107_q4_buckets_income_by_period_start_year() -> None:
+    # 2026 is the case's creation year (the filing-date stand-in): 2026
+    # entries take the current row, 2025 the last-year row (Ada's wages and
+    # business income summing there), 2024 the year before.
+    values = b107_values()
+    assert values["q4_debtor1_current_gross"] == Text("41,600.00")
+    assert values["q4_debtor1_last_year_gross"] == Text("65,200.00")
+    assert values["q4_debtor1_last_year_wages"] == Check()
+    assert values["q4_debtor1_last_year_business"] == Check()
+    assert values["q4_debtor1_year_before_gross"] == Text("58,300.00")
+    assert values["q4_debtor2_current_gross"] == Text("24,000.00")
+    assert values["q4_last_year_yyyy"] == Text("2025")
+    assert values["q4_year_before_yyyy"] == Text("2024")
+    # Q5: the other-income row; its gate is the PDF quirk where only the
+    # No box has a widget, so a Yes leaves the field untouched.
+    release = latest_form("form/b107")
+    assert row(values, release, "q5_debtor1_source", 0) == Text(
+        "Unemployment compensation"
+    )
+    assert "q5_gate" not in values
+
+
+def test_b107_q4_refuses_a_period_outside_the_three_printed_years() -> None:
+    case_file = reference_case_file()
+    stale = SofaEntryBody(
+        entry_type="income_by_period",
+        payload=IncomeByPeriod(
+            which_debtor="debtor_1",
+            kind="wages_and_commissions",
+            period_start="2020-01-01",
+            gross_amount="100.00",
+        ),
+    )
+    with pytest.raises(FormProjectionError, match="fits none"):
+        project(
+            latest_form("form/b107"),
+            CaseFile(
+                **{
+                    **case_file.__dict__,
+                    "sofa_entries": (*case_file.sofa_entries, stale),
+                }
+            ),
+        )
+
+
+def test_b107_q6_answers_the_consumer_branch_from_the_entries() -> None:
+    values = b107_values()
+    assert values["q6_consumer_debts"] == Option("yes")
+    assert values["q6_paid_600"] == Option("yes")
+    assert "q6_paid_8575" not in values
+    release = latest_form("form/b107")
+    assert row(values, release, "q6_payment_dates", 0) == Text("05/01/2026")
+    assert row(values, release, "q6_payment_dates", 2) == Text("07/01/2026")
+
+
+def test_b107_q2_both_debtors_share_a_row_via_the_same_as_boxes() -> None:
+    case_file = reference_case_file()
+    shared = SofaEntryBody(
+        entry_type="prior_address",
+        payload=PriorAddress(
+            which_debtor="both",
+            address=Address(
+                line1="2 Shared Street", city="Tampa", state="FL", postal_code="33601"
+            ),
+            from_date="2022-01-01",
+            to_date="2022-12-31",
+        ),
+    )
+    release = latest_form("form/b107")
+    values = dict(
+        project(
+            release,
+            CaseFile(**{**case_file.__dict__, "sofa_entries": (shared,)}),
+        )
+    )
+    assert row(values, release, "q2_debtor1_street", 0) == Text("2 Shared Street")
+    assert row(values, release, "q2_debtor2_same_as_debtor1", 0) == Check()
+    assert row(values, release, "q2_debtor2_same_dates", 0) == Check()
+
+
+def test_b107_q26_merged_group_needs_the_widget_escape_hatch() -> None:
+    values = b107_values()
+    assert values["q26_gate_and_status"] == Option("no")
+
+    case_file = reference_case_file()
+    proceeding = SofaEntryBody(
+        entry_type="environmental_proceeding",
+        payload=EnvironmentalProceeding(
+            case_title="State of Florida v. Lovelace",
+            case_number="26-ENV-001",
+            court=Party(name="Second District Court of Appeal"),
+            nature_of_case="Stormwater runoff citation appeal",
+            status="on_appeal",
+        ),
+    )
+    values = dict(
+        project(
+            latest_form("form/b107"),
+            CaseFile(
+                **{
+                    **case_file.__dict__,
+                    "sofa_entries": (*case_file.sofa_entries, proceeding),
+                }
+            ),
+        )
+    )
+    assert values["q26_gate_and_status"] == WidgetStates(states=("yes", "on appeal"))
+    assert values["q26_case_number"] == Text("26-ENV-001")
+
+
+def test_b107_shared_widget_boxes_refuse_a_value_they_cannot_hold() -> None:
+    # Q20 row two's ZIP box is the PDF's second widget of row one's — a
+    # second closed account in a different ZIP cannot land.
+    case_file = reference_case_file()
+    second = SofaEntryBody(
+        entry_type="closed_account",
+        payload=ClosedAccount(
+            institution=Party(
+                name="Second Bank",
+                address=Address(
+                    line1="9 Other Road", city="Ocala", state="FL", postal_code="34470"
+                ),
+            ),
+            account_last4="7788",
+            account_type="savings",
+        ),
+    )
+    with pytest.raises(FormProjectionError, match="second widget of row one"):
+        project(
+            latest_form("form/b107"),
+            CaseFile(
+                **{
+                    **case_file.__dict__,
+                    "sofa_entries": (*case_file.sofa_entries, second),
+                }
+            ),
+        )
+
+
+def test_b107_q27_strips_the_ein_and_checks_the_connection() -> None:
+    values = b107_values()
+    entry = values["q27_ein"]
+    assert entry == Text("123456789") or (
+        isinstance(entry, dict) and Text("123456789") in entry.values()
+    )
+    assert values["q27_connection_sole_proprietor"] == Check()
+    assert "q27_connection_partner" not in values
+
+
+def test_b107_signature_block_prints_dates_and_the_preparer_answer() -> None:
+    values = b107_values()
+    assert values["sign.debtor1_date"] == Text("08/30/2026")
+    assert values["sign.paid_preparer"] == Option("no")
+    assert "sign.attached_pages" not in values
 
 
 @pytest.mark.parametrize(
