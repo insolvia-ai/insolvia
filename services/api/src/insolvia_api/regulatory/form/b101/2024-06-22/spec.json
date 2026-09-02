@@ -1,0 +1,2715 @@
+{
+ "form": "b101",
+ "official_number": "101",
+ "title": "Voluntary Petition for Individuals Filing for Bankruptcy",
+ "revision": "06/24",
+ "effective_date": "2024-06-22",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Identify Yourself"
+  },
+  {
+   "number": 2,
+   "title": "Tell the Court About Your Bankruptcy Case"
+  },
+  {
+   "number": 3,
+   "title": "Report About Any Businesses You Own as a Sole Proprietor"
+  },
+  {
+   "number": 4,
+   "title": "Report if You Own or Have Any Hazardous Property or Any Property That Needs Immediate Attention"
+  },
+  {
+   "number": 5,
+   "title": "Explain Your Efforts to Receive a Briefing About Credit Counseling"
+  },
+  {
+   "number": 6,
+   "title": "Answer These Questions for Reporting Purposes"
+  },
+  {
+   "number": 7,
+   "title": "Sign Below"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number1"
+    ]
+   },
+   "notes": "One field whose widgets repeat in the running header of every page."
+  },
+  {
+   "id": "caption.header_debtor1_name",
+   "part": null,
+   "label": "Debtor 1 \u2014 running-header name (pages 2\u20139)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; composed display of the four name parts"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Name"
+    ]
+   }
+  },
+  {
+   "id": "caption.chapter",
+   "part": null,
+   "label": "Chapter you are filing under (caption box; one PDF field shared with line 7)",
+   "type": "radio",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "chapter"
+   },
+   "pdf": {
+    "names": [
+     "Check Box1"
+    ]
+   },
+   "options": [
+    {
+     "value": "Chapter 7",
+     "label": "Chapter 7",
+     "maps_to_value": "7"
+    },
+    {
+     "value": "Chapter 11",
+     "label": "Chapter 11",
+     "maps_to_value": "11"
+    },
+    {
+     "value": "Chapter 12",
+     "label": "Chapter 12",
+     "maps_to_value": "12"
+    },
+    {
+     "value": "Chapter 13",
+     "label": "Chapter 13",
+     "maps_to_value": "13"
+    }
+   ],
+   "notes": "The caption checkboxes on page 1 and line 7's checkboxes on page 3 are widgets of the same PDF field, so they always agree."
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check Box2"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor1_first_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 1 \u2014 First name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; part=given"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.First name"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor1_middle_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 1 \u2014 Middle name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; part=middle"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Middle name"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor1_last_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 1 \u2014 Last name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; part=surname"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Last name"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor1_suffix",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 1 \u2014 Suffix (Sr., Jr., II, III)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; part=suffix"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Suffix Sr Jr II III"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor2_first_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 2 \u2014 First name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2; part=given"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.First name"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor2_middle_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 2 \u2014 Middle name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2; part=middle"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Middle name_2"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor2_last_name",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 2 \u2014 Last name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2; part=surname"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Last name"
+    ]
+   }
+  },
+  {
+   "id": "line_1_debtor2_suffix",
+   "part": 1,
+   "line": "1",
+   "label": "Debtor 2 \u2014 Suffix (Sr., Jr., II, III)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2; part=suffix"
+   },
+   "pdf": {
+    "names": [
+     "Suffix Sr Jr II III_2"
+    ]
+   }
+  },
+  {
+   "id": "line_2_debtor1_other_given",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 \u2014 All other names you have used in the last 8 years: First name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_1; part=given; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.First name_3",
+     "Debtor1.First name_5"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor1_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor1_other_middle",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 \u2014 All other names you have used in the last 8 years: Middle name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_1; part=middle; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Middle name_3",
+     "Debtor1.Middle name_5"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor1_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor1_other_surname",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 \u2014 All other names you have used in the last 8 years: Last name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_1; part=surname; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Last name_3",
+     "Debtor1.Last name_5"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor1_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor1_business_name",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 1 \u2014 Business name (if applicable)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_1; part=business_name"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Business name",
+     "Debtor1.Business name_3"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor1_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor2_other_given",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 \u2014 All other names you have used in the last 8 years: First name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_2; part=given; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.First name_4",
+     "Debtor2.First name_6"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor2_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor2_other_middle",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 \u2014 All other names you have used in the last 8 years: Middle name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_2; part=middle; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Middle name_4",
+     "Debtor2.Middle name_6"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor2_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor2_other_surname",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 \u2014 All other names you have used in the last 8 years: Last name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_2; part=surname; 8-year lookback"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Last name_4",
+     "Debtor2.Last name_6"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor2_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_2_debtor2_business_name",
+   "part": 1,
+   "line": "2",
+   "label": "Debtor 2 \u2014 Business name (if applicable)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "other_names_used",
+    "notes": "filing_role=debtor_2; part=business_name"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Business name",
+     "Debtor2.Business name_4"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor2_other_name",
+    "continuation": "two rows on the form; more names go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_3_debtor1_ssn_last4",
+   "part": 1,
+   "line": "3",
+   "label": "Debtor 1 \u2014 last 4 digits of Social Security number",
+   "type": "ssn_itin",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "tax_id",
+    "notes": "filing_role=debtor_1; kind=ssn; the form takes only the last four digits \u2014 the model stores the full value encrypted and serves last-four by default"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.SSNum"
+    ]
+   }
+  },
+  {
+   "id": "line_3_debtor1_itin_last4",
+   "part": 1,
+   "line": "3",
+   "label": "Debtor 1 \u2014 last 4 digits of federal Individual Taxpayer Identification number (ITIN)",
+   "type": "ssn_itin",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "tax_id",
+    "notes": "filing_role=debtor_1; kind=itin"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1 Tax Payer IDNum"
+    ]
+   }
+  },
+  {
+   "id": "line_3_debtor2_ssn_last4",
+   "part": 1,
+   "line": "3",
+   "label": "Debtor 2 \u2014 last 4 digits of Social Security number",
+   "type": "ssn_itin",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "tax_id",
+    "notes": "filing_role=debtor_2; kind=ssn"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2 SSNum"
+    ]
+   }
+  },
+  {
+   "id": "line_3_debtor2_itin_last4",
+   "part": 1,
+   "line": "3",
+   "label": "Debtor 2 \u2014 last 4 digits of ITIN",
+   "type": "ssn_itin",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "tax_id",
+    "notes": "filing_role=debtor_2; kind=itin"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Tax Payer IDNum"
+    ]
+   }
+  },
+  {
+   "id": "line_4_debtor1_ein",
+   "part": 1,
+   "line": "4",
+   "label": "Debtor 1 \u2014 Employer Identification Number (EIN), if any",
+   "type": "ein",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "employer_ids",
+    "notes": "filing_role=debtor_1; two EIN rows on the form"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Employer Identification Number1",
+     "Debtor1.Employer Identification Number2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor1_ein"
+   }
+  },
+  {
+   "id": "line_4_debtor2_ein",
+   "part": 1,
+   "line": "4",
+   "label": "Debtor 2 \u2014 Employer Identification Number (EIN), if any",
+   "type": "ein",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "employer_ids",
+    "notes": "filing_role=debtor_2; two EIN rows on the form"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Employer Identification Number1",
+     "Debtor2 Employer Identification Number2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "debtor2_ein"
+   }
+  },
+  {
+   "id": "line_5_debtor1_street",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; street part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Street"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_street2",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; second street line part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Street1"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_city",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; city part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.City"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_state",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; state part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.State"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_zip",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; zip part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.ZIP Code"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_county",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 residence \u2014 County",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_1; county part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.County"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_mailing_street",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 mailing address (if different) \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_1; street part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Street_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_mailing_pobox",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 mailing address \u2014 P.O. Box",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_1; po box part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.PO Box"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_mailing_city",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 mailing address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_1; city part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.City_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_mailing_state",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 mailing address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_1; state part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.State_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor1_mailing_zip",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 1 mailing address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_1; zip part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.ZIP Code_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_street",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence (if different) \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; street part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Street"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_street2",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; second street line part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Street2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_city",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; city part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.City"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_state",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; state part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.State"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_zip",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; zip part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.ZIP"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_county",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 residence \u2014 County",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "residence_address",
+    "notes": "filing_role=debtor_2; county part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "County_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_mailing_street",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 mailing address (if different) \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_2; street part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Street_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_mailing_pobox",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 mailing address \u2014 P.O. Box",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_2; po box part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.PO Box"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_mailing_city",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 mailing address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_2; city part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.City_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_mailing_state",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 mailing address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_2; state part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.State_2"
+    ]
+   }
+  },
+  {
+   "id": "line_5_debtor2_mailing_zip",
+   "part": 1,
+   "line": "5",
+   "label": "Debtor 2 mailing address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mailing_address",
+    "notes": "filing_role=debtor_2; zip part of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code_4"
+    ]
+   }
+  },
+  {
+   "id": "line_6_debtor1_venue_basis",
+   "part": 1,
+   "line": "6",
+   "label": "Debtor 1 \u2014 Why you are choosing this district to file for bankruptcy. Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "venue",
+    "notes": "filing_role=debtor_1; basis"
+   },
+   "pdf": {
+    "names": [
+     "Check Box5"
+    ]
+   },
+   "options": [
+    {
+     "value": "Lived in this district",
+     "label": "Over the last 180 days before filing this petition, I have lived in this district longer than in any other district.",
+     "maps_to_value": "lived_longest_180_days"
+    },
+    {
+     "value": "Other",
+     "label": "I have another reason. Explain. (See 28 U.S.C. \u00a7 1408.)",
+     "maps_to_value": "other"
+    }
+   ]
+  },
+  {
+   "id": "line_6_debtor1_venue_explanation",
+   "part": 1,
+   "line": "6",
+   "label": "Debtor 1 \u2014 venue: I have another reason. Explain.",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "venue",
+    "notes": "filing_role=debtor_1; explanation, four ruled lines"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.See 28 USC  1408 1",
+     "Debtor1.See 28 USC  1408 2",
+     "Debtor1.See 28 USC  1408 3",
+     "Debtor1.See 28 USC  1408 4"
+    ]
+   }
+  },
+  {
+   "id": "line_6_debtor2_venue_basis",
+   "part": 1,
+   "line": "6",
+   "label": "Debtor 2 \u2014 Why you are choosing this district to file for bankruptcy. Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "venue",
+    "notes": "filing_role=debtor_2; basis"
+   },
+   "pdf": {
+    "names": [
+     "Check Box6"
+    ]
+   },
+   "options": [
+    {
+     "value": "Lived in this district",
+     "label": "Over the last 180 days before filing this petition, I have lived in this district longer than in any other district.",
+     "maps_to_value": "lived_longest_180_days"
+    },
+    {
+     "value": "Other",
+     "label": "I have another reason. Explain. (See 28 U.S.C. \u00a7 1408.)",
+     "maps_to_value": "other"
+    }
+   ]
+  },
+  {
+   "id": "line_6_debtor2_venue_explanation",
+   "part": 1,
+   "line": "6",
+   "label": "Debtor 2 \u2014 venue: I have another reason. Explain.",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "venue",
+    "notes": "filing_role=debtor_2; explanation, four ruled lines"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.See 28 USC  1408 1_2",
+     "Debtor2.See 28 USC  1408 2_2",
+     "Debtor2.See 28 USC  1408 3_2",
+     "Debtor2.See 28 USC  1408 4_2"
+    ]
+   }
+  },
+  {
+   "id": "line_7_chapter",
+   "part": 2,
+   "line": "7",
+   "label": "The chapter of the Bankruptcy Code you are choosing to file under (see caption.chapter)",
+   "type": "text",
+   "maps_to": {
+    "derived": "same PDF field as the caption chapter box \u2014 see caption.chapter; no separate widget value"
+   },
+   "pdf": {
+    "names": []
+   },
+   "notes": "Line 7's checkboxes are additional widgets of 'Check Box1', claimed by caption.chapter. This row exists so line 7 is visibly accounted for."
+  },
+  {
+   "id": "line_8_fee_handling",
+   "part": 2,
+   "line": "8",
+   "label": "How you will pay the fee",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "fee_handling"
+   },
+   "pdf": {
+    "names": [
+     "Check Box7"
+    ]
+   },
+   "options": [
+    {
+     "value": "Pay entirely",
+     "label": "I will pay the entire fee when I file my petition.",
+     "maps_to_value": "full"
+    },
+    {
+     "value": "Pay in installments",
+     "label": "I need to pay the fee in installments (attach Official Form 103A).",
+     "maps_to_value": "installments"
+    },
+    {
+     "value": "Request fees waived",
+     "label": "I request that my fee be waived (Chapter 7 only; attach Official Form 103B).",
+     "maps_to_value": "waiver"
+    }
+   ]
+  },
+  {
+   "id": "line_9_prior_bankruptcy",
+   "part": 2,
+   "line": "9",
+   "label": "Have you filed for bankruptcy within the last 8 years?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one prior_case record exists"
+   },
+   "pdf": {
+    "names": [
+     "Check Box8"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_9_prior_district",
+   "part": 2,
+   "line": "9",
+   "label": "Prior case \u2014 District",
+   "type": "text",
+   "maps_to": {
+    "entity": "prior_case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "pattern": "District(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "prior_case",
+    "continuation": "three rows; more prior cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_9_prior_when",
+   "part": 2,
+   "line": "9",
+   "label": "Prior case \u2014 When (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "prior_case",
+    "attribute": "filed_on"
+   },
+   "pdf": {
+    "pattern": "When(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "prior_case",
+    "continuation": "three rows; more prior cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_9_prior_case_number",
+   "part": 2,
+   "line": "9",
+   "label": "Prior case \u2014 Case number",
+   "type": "text",
+   "maps_to": {
+    "entity": "prior_case",
+    "attribute": "case_number"
+   },
+   "pdf": {
+    "pattern": "Case number(_[23])?"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "prior_case",
+    "continuation": "three rows; more prior cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_10_related_pending",
+   "part": 2,
+   "line": "10",
+   "label": "Are any bankruptcy cases pending or being filed by a spouse who is not filing this case with you, or by a business partner, or by an affiliate?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one related_case record exists"
+   },
+   "pdf": {
+    "names": [
+     "Check Box9"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_10_related_debtor",
+   "part": 2,
+   "line": "10",
+   "label": "Related case \u2014 Debtor",
+   "type": "text",
+   "maps_to": {
+    "entity": "related_case",
+    "attribute": "debtor_name"
+   },
+   "pdf": {
+    "names": [
+     "Debtor",
+     "Debtor_2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "related_case",
+    "continuation": "two rows; more related cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_10_related_relationship",
+   "part": 2,
+   "line": "10",
+   "label": "Related case \u2014 Relationship to you",
+   "type": "text",
+   "maps_to": {
+    "entity": "related_case",
+    "attribute": "relationship"
+   },
+   "pdf": {
+    "names": [
+     "Relationship to you",
+     "Relationship to you_2"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "related_case",
+    "continuation": "two rows; more related cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_10_related_district",
+   "part": 2,
+   "line": "10",
+   "label": "Related case \u2014 District",
+   "type": "text",
+   "maps_to": {
+    "entity": "related_case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "District_4",
+     "District_5"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "related_case",
+    "continuation": "two rows; more related cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_10_related_when",
+   "part": 2,
+   "line": "10",
+   "label": "Related case \u2014 When (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "related_case",
+    "attribute": "filed_on"
+   },
+   "pdf": {
+    "names": [
+     "When_4",
+     "When_5"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "related_case",
+    "continuation": "two rows; more related cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_10_related_case_number",
+   "part": 2,
+   "line": "10",
+   "label": "Related case \u2014 Case number, if known",
+   "type": "text",
+   "maps_to": {
+    "entity": "related_case",
+    "attribute": "case_number"
+   },
+   "pdf": {
+    "names": [
+     "Case number if known_3",
+     "Case number if known_4"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "related_case",
+    "continuation": "two rows; more related cases go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_11_rents_residence",
+   "part": 2,
+   "line": "11",
+   "label": "Do you rent your residence?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "rents_residence"
+   },
+   "pdf": {
+    "names": [
+     "Check Box10"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. Go to line 12."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_11_eviction_judgment",
+   "part": 2,
+   "line": "11",
+   "label": "Yes. Has your landlord obtained an eviction judgment against you?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "eviction_judgment_against_you",
+    "notes": "yes requires Form 101A filed with the petition"
+   },
+   "pdf": {
+    "names": [
+     "Check Box11"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. Go to line 12."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. Fill out Initial Statement About an Eviction Judgment Against You (Form 101A)."
+    }
+   ],
+   "notes": "Only answered when line 11 = yes."
+  },
+  {
+   "id": "line_12_sole_proprietor",
+   "part": 3,
+   "line": "12",
+   "label": "Are you a sole proprietor of any full- or part-time business?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one sole_proprietorship record exists"
+   },
+   "pdf": {
+    "names": [
+     "Check Box12"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. Go to Part 4."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. Name and location of business"
+    }
+   ],
+   "notes": "The form holds one business; more sole proprietorships go on a separate attached sheet."
+  },
+  {
+   "id": "line_12_business_name",
+   "part": 3,
+   "line": "12",
+   "label": "Name of business, if any",
+   "type": "text",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "name"
+   },
+   "pdf": {
+    "names": [
+     "Name of business if any"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_street",
+   "part": 3,
+   "line": "12",
+   "label": "Business address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "address",
+    "notes": "street part"
+   },
+   "pdf": {
+    "names": [
+     "Business Street address"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_street2",
+   "part": 3,
+   "line": "12",
+   "label": "Business address \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "address",
+    "notes": "second street line"
+   },
+   "pdf": {
+    "names": [
+     "Business Street address2"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_city",
+   "part": 3,
+   "line": "12",
+   "label": "Business address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "address",
+    "notes": "city part"
+   },
+   "pdf": {
+    "names": [
+     "Business City"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_state",
+   "part": 3,
+   "line": "12",
+   "label": "Business address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "address",
+    "notes": "state part"
+   },
+   "pdf": {
+    "names": [
+     "Business State"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_zip",
+   "part": 3,
+   "line": "12",
+   "label": "Business address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "address",
+    "notes": "zip part"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code_5"
+    ]
+   },
+   "repeats": {
+    "count": 1,
+    "group": "sole_proprietorship",
+    "continuation": "one block on the form; additional sole proprietorships go on an attached sheet"
+   }
+  },
+  {
+   "id": "line_12_business_type",
+   "part": 3,
+   "line": "12",
+   "label": "Check the appropriate box to describe your business",
+   "type": "radio",
+   "maps_to": {
+    "entity": "sole_proprietorship",
+    "attribute": "business_type"
+   },
+   "pdf": {
+    "names": [
+     "Check Box13"
+    ]
+   },
+   "options": [
+    {
+     "value": "Health Care Business",
+     "label": "Health Care Business (11 U.S.C. \u00a7 101(27A))"
+    },
+    {
+     "value": "Single asset real estate",
+     "label": "Single Asset Real Estate (11 U.S.C. \u00a7 101(51B))"
+    },
+    {
+     "value": "Stockbroker",
+     "label": "Stockbroker (11 U.S.C. \u00a7 101(53A))"
+    },
+    {
+     "value": "Commodity Broker",
+     "label": "Commodity Broker (11 U.S.C. \u00a7 101(6))"
+    },
+    {
+     "value": "None of above",
+     "label": "None of the above"
+    }
+   ]
+  },
+  {
+   "id": "line_13_small_business_status",
+   "part": 3,
+   "line": "13",
+   "label": "Are you filing under Chapter 11 of the Bankruptcy Code, and are you a small business debtor?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "small_business_status",
+    "notes": "includes the Subchapter V election"
+   },
+   "pdf": {
+    "names": [
+     "Check Box14"
+    ]
+   },
+   "options": [
+    {
+     "value": "Not filing under Chapter 11",
+     "label": "No. I am not filing under Chapter 11."
+    },
+    {
+     "value": "Filing under Chapter 11 but not small business",
+     "label": "No. I am filing under Chapter 11, but I am NOT a small business debtor according to the definition in the Bankruptcy Code."
+    },
+    {
+     "value": "Yes filing under Chapter 11 but not small business",
+     "label": "Yes. I am filing under Chapter 11, I am a small business debtor, and I do not choose to proceed under Subchapter V of Chapter 11.",
+     "notes": "the export value is mislabelled in the official PDF; it is the third printed option"
+    },
+    {
+     "value": "Yes filling under chapter",
+     "label": "Yes. I am filing under Chapter 11, I am a small business debtor, and I choose to proceed under Subchapter V of Chapter 11.",
+     "notes": "quirky export value in the official PDF; fourth printed option"
+    }
+   ]
+  },
+  {
+   "id": "line_14_hazardous_property",
+   "part": 4,
+   "line": "14",
+   "label": "Do you own or have any property that poses or is alleged to pose a threat of imminent and identifiable hazard to public health or safety? Or do you own any property that needs immediate attention?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "petition.hazardous_property is present"
+   },
+   "pdf": {
+    "names": [
+     "Check Box15"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "line_14_hazard_description",
+   "part": 4,
+   "line": "14",
+   "label": "Yes. What is the hazard?",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "description; two ruled lines"
+   },
+   "pdf": {
+    "names": [
+     "What is the hazard1",
+     "What is the hazard2"
+    ]
+   }
+  },
+  {
+   "id": "line_14_why_immediate",
+   "part": 4,
+   "line": "14",
+   "label": "If immediate attention is needed, why is it needed?",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "why_immediate; two ruled lines"
+   },
+   "pdf": {
+    "names": [
+     "If immediate attention is needed why is it needed1",
+     "If immediate attention is needed why is it needed2"
+    ]
+   }
+  },
+  {
+   "id": "line_14_property_street",
+   "part": 4,
+   "line": "14",
+   "label": "Where is the property? \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "address, street part"
+   },
+   "pdf": {
+    "names": [
+     "Street_6"
+    ]
+   }
+  },
+  {
+   "id": "line_14_property_street2",
+   "part": 4,
+   "line": "14",
+   "label": "Where is the property? \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "address, second street line"
+   },
+   "pdf": {
+    "names": [
+     "Street_7"
+    ]
+   }
+  },
+  {
+   "id": "line_14_property_city",
+   "part": 4,
+   "line": "14",
+   "label": "Where is the property? \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "address, city part"
+   },
+   "pdf": {
+    "names": [
+     "City_2"
+    ]
+   }
+  },
+  {
+   "id": "line_14_property_state",
+   "part": 4,
+   "line": "14",
+   "label": "Where is the property? \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "address, state part"
+   },
+   "pdf": {
+    "names": [
+     "State_6"
+    ]
+   }
+  },
+  {
+   "id": "line_14_property_zip",
+   "part": 4,
+   "line": "14",
+   "label": "Where is the property? \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "hazardous_property",
+    "notes": "address, zip part"
+   },
+   "pdf": {
+    "names": [
+     "ZIP Code_6"
+    ]
+   }
+  },
+  {
+   "id": "line_15_debtor1_credit_counseling",
+   "part": 5,
+   "line": "15",
+   "label": "Debtor 1 \u2014 tell the court whether you have received a briefing about credit counseling. You must check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "credit_counseling",
+    "notes": "filing_role=debtor_1; status \u2014 the four-way of B101 line 15"
+   },
+   "pdf": {
+    "names": [
+     "Check Box16"
+    ]
+   },
+   "options": [
+    {
+     "value": "1",
+     "label": "I received a briefing \u2026 within the 180 days before I filed this bankruptcy petition, and I received a certificate of completion.",
+     "maps_to_value": "received_with_certificate"
+    },
+    {
+     "value": "2",
+     "label": "I received a briefing \u2026 but I do not have a certificate of completion.",
+     "maps_to_value": "received_no_certificate"
+    },
+    {
+     "value": "On",
+     "label": "I certify that I asked for credit counseling services \u2026 but was unable to obtain those services during the 7 days after I made my request, and exigent circumstances merit a 30-day temporary waiver.",
+     "maps_to_value": "exigent_circumstances",
+     "notes": "quirky export value in the official PDF; third printed option"
+    },
+    {
+     "value": "4",
+     "label": "I am not required to receive a briefing about credit counseling because of incapacity, disability, or active duty.",
+     "maps_to_value": "not_required"
+    }
+   ],
+   "notes": "The '1'/'2'/'On'/'4' export values are assumed to follow the printed option order; verify against a filled sample before the forms engine relies on them."
+  },
+  {
+   "id": "line_15_debtor1_exemption_reason",
+   "part": 5,
+   "line": "15",
+   "label": "Debtor 1 \u2014 I am not required to receive a briefing because of:",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "credit_counseling",
+    "notes": "filing_role=debtor_1; exemption_reason"
+   },
+   "pdf": {
+    "names": [
+     "Check Box16A"
+    ]
+   },
+   "options": [
+    {
+     "value": "Incapacity",
+     "label": "Incapacity \u2014 a mental illness or deficiency that makes me incapable of realizing or making rational decisions about finances",
+     "maps_to_value": "incapacity"
+    },
+    {
+     "value": "Disability",
+     "label": "Disability \u2014 a physical disability that prevents participation in a briefing in person, by phone, or through the internet",
+     "maps_to_value": "disability"
+    },
+    {
+     "value": "Active duty",
+     "label": "Active duty \u2014 currently on active military duty in a military combat zone",
+     "maps_to_value": "active_duty"
+    }
+   ],
+   "notes": "Only answered when the fourth choice of line 15 is checked."
+  },
+  {
+   "id": "line_15_debtor2_credit_counseling",
+   "part": 5,
+   "line": "15",
+   "label": "Debtor 2 \u2014 tell the court whether you have received a briefing about credit counseling. You must check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "credit_counseling",
+    "notes": "filing_role=debtor_2; status"
+   },
+   "pdf": {
+    "names": [
+     "Check Box17"
+    ]
+   },
+   "options": [
+    {
+     "value": "1",
+     "label": "I received a briefing \u2026 within the 180 days before I filed this bankruptcy petition, and I received a certificate of completion.",
+     "maps_to_value": "received_with_certificate"
+    },
+    {
+     "value": "2",
+     "label": "I received a briefing \u2026 but I do not have a certificate of completion.",
+     "maps_to_value": "received_no_certificate"
+    },
+    {
+     "value": "On",
+     "label": "I certify that I asked for credit counseling services \u2026 but was unable to obtain those services during the 7 days after I made my request, and exigent circumstances merit a 30-day temporary waiver.",
+     "maps_to_value": "exigent_circumstances",
+     "notes": "quirky export value in the official PDF; third printed option"
+    },
+    {
+     "value": "4",
+     "label": "I am not required to receive a briefing about credit counseling because of incapacity, disability, or active duty.",
+     "maps_to_value": "not_required"
+    }
+   ]
+  },
+  {
+   "id": "line_15_debtor2_exemption_reason",
+   "part": 5,
+   "line": "15",
+   "label": "Debtor 2 \u2014 I am not required to receive a briefing because of:",
+   "type": "radio",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "credit_counseling",
+    "notes": "filing_role=debtor_2; exemption_reason"
+   },
+   "pdf": {
+    "names": [
+     "Check Box17A"
+    ]
+   },
+   "options": [
+    {
+     "value": "Incapacity",
+     "label": "Incapacity \u2014 a mental illness or deficiency that makes me incapable of realizing or making rational decisions about finances",
+     "maps_to_value": "incapacity"
+    },
+    {
+     "value": "Disability",
+     "label": "Disability \u2014 a physical disability that prevents participation in a briefing in person, by phone, or through the internet",
+     "maps_to_value": "disability"
+    },
+    {
+     "value": "Active duty",
+     "label": "Active duty \u2014 currently on active military duty in a military combat zone",
+     "maps_to_value": "active_duty"
+    }
+   ]
+  },
+  {
+   "id": "line_16a_consumer_debts",
+   "part": 6,
+   "line": "16a",
+   "label": "16a. Are your debts primarily consumer debts?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "debt_character",
+    "notes": "yes \u2192 consumer"
+   },
+   "pdf": {
+    "names": [
+     "Check Box18"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. Go to line 16b."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. Go to line 17."
+    }
+   ]
+  },
+  {
+   "id": "line_16b_business_debts",
+   "part": 6,
+   "line": "16b",
+   "label": "16b. Are your debts primarily business debts?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "debt_character",
+    "notes": "yes \u2192 business"
+   },
+   "pdf": {
+    "names": [
+     "Check Box19"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. Go to line 16c."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. Go to line 17."
+    }
+   ]
+  },
+  {
+   "id": "line_16c_other_debts",
+   "part": 6,
+   "line": "16c",
+   "label": "16c. State the type of debts you owe that are not consumer debts or business debts",
+   "type": "text",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "debt_character",
+    "notes": "the free text carried with value=other"
+   },
+   "pdf": {
+    "names": [
+     "16c State the type of debts you owe that are not consumer debts or business debts"
+    ]
+   }
+  },
+  {
+   "id": "line_17_filing_under_ch7",
+   "part": 6,
+   "line": "17",
+   "label": "Are you filing under Chapter 7?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "case.chapter == 7"
+   },
+   "pdf": {
+    "names": [
+     "Check Box20"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No. I am not filing under Chapter 7. Go to line 18."
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. I am filing under Chapter 7."
+    }
+   ]
+  },
+  {
+   "id": "line_17_funds_available",
+   "part": 6,
+   "line": "17",
+   "label": "Do you estimate that after any exempt property is excluded and administrative expenses are paid that funds will be available to distribute to unsecured creditors?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "ch7_funds_available_for_creditors"
+   },
+   "pdf": {
+    "names": [
+     "Check Box20A"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ],
+   "notes": "Only answered when line 17 = yes."
+  },
+  {
+   "id": "line_18_estimated_creditors",
+   "part": 6,
+   "line": "18",
+   "label": "How many creditors do you estimate that you owe?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "estimated_creditors",
+    "notes": "banded enum, self-selected"
+   },
+   "pdf": {
+    "names": [
+     "Check Box21"
+    ]
+   },
+   "options": [
+    {
+     "value": "1-49",
+     "label": "1-49"
+    },
+    {
+     "value": "50-99",
+     "label": "50-99"
+    },
+    {
+     "value": "100-199",
+     "label": "100-199"
+    },
+    {
+     "value": "200-999",
+     "label": "200-999"
+    },
+    {
+     "value": "1000-5000",
+     "label": "1,000-5,000"
+    },
+    {
+     "value": "5001-10000",
+     "label": "5,001-10,000"
+    },
+    {
+     "value": "10001-25000",
+     "label": "10,001-25,000"
+    },
+    {
+     "value": "25001-50000",
+     "label": "25,001-50,000"
+    },
+    {
+     "value": "50001-100000",
+     "label": "50,001-100,000"
+    },
+    {
+     "value": "More than 100000",
+     "label": "More than 100,000"
+    }
+   ]
+  },
+  {
+   "id": "line_19_estimated_assets",
+   "part": 6,
+   "line": "19",
+   "label": "How much do you estimate your assets to be worth?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "estimated_assets",
+    "notes": "banded enum, self-selected"
+   },
+   "pdf": {
+    "names": [
+     "Check Box22"
+    ]
+   },
+   "options": [
+    {
+     "value": "0-50000",
+     "label": "$0-$50,000"
+    },
+    {
+     "value": "50001-100000",
+     "label": "$50,001-$100,000"
+    },
+    {
+     "value": "100001-500000",
+     "label": "$100,001-$500,000"
+    },
+    {
+     "value": "500001-1000000",
+     "label": "$500,001-$1 million"
+    },
+    {
+     "value": "1000001-10000000",
+     "label": "$1,000,001-$10 million"
+    },
+    {
+     "value": "10000001-50000000",
+     "label": "$10,000,001-$50 million"
+    },
+    {
+     "value": "50000001-100000000",
+     "label": "$50,000,001-$100 million"
+    },
+    {
+     "value": "100000000-500000000",
+     "label": "$100,000,001-$500 million",
+     "notes": "export value drops the +1 digit in the official PDF"
+    },
+    {
+     "value": "500000001-1000000000",
+     "label": "$500,000,001-$1 billion"
+    },
+    {
+     "value": "1000000001-10000000000",
+     "label": "$1,000,000,001-$10 billion"
+    },
+    {
+     "value": "10000000001-50000000000",
+     "label": "$10,000,000,001-$50 billion"
+    },
+    {
+     "value": "More than 50000000000",
+     "label": "More than $50 billion"
+    }
+   ]
+  },
+  {
+   "id": "line_20_estimated_liabilities",
+   "part": 6,
+   "line": "20",
+   "label": "How much do you estimate your liabilities to be?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "estimated_liabilities",
+    "notes": "banded enum, self-selected"
+   },
+   "pdf": {
+    "names": [
+     "Check Box23"
+    ]
+   },
+   "options": [
+    {
+     "value": "0-50000",
+     "label": "$0-$50,000"
+    },
+    {
+     "value": "50001-100000",
+     "label": "$50,001-$100,000"
+    },
+    {
+     "value": "100001-500000",
+     "label": "$100,001-$500,000"
+    },
+    {
+     "value": "500001-1000000",
+     "label": "$500,001-$1 million"
+    },
+    {
+     "value": "1000001-10000000",
+     "label": "$1,000,001-$10 million"
+    },
+    {
+     "value": "10000001-50000000",
+     "label": "$10,000,001-$50 million"
+    },
+    {
+     "value": "50000001-100000000",
+     "label": "$50,000,001-$100 million"
+    },
+    {
+     "value": "100000001-500000000",
+     "label": "$100,000,001-$500 million"
+    },
+    {
+     "value": "500000001-1000000000",
+     "label": "$500,000,001-$1 billion"
+    },
+    {
+     "value": "1000000001-10000000000",
+     "label": "$1,000,000,001-$10 billion"
+    },
+    {
+     "value": "10000000001-50000000000",
+     "label": "$10,000,000,001-$50 billion"
+    },
+    {
+     "value": "More than 50000000000",
+     "label": "More than $50 billion"
+    }
+   ]
+  },
+  {
+   "id": "sign.debtor1_signature",
+   "part": 7,
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.signature"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor1_executed_on",
+   "part": 7,
+   "label": "Debtor 1 \u2014 Executed on (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Executed on"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_signature",
+   "part": 7,
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.signature"
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_executed_on",
+   "part": 7,
+   "label": "Debtor 2 \u2014 Executed on (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Executed on"
+    ]
+   }
+  },
+  {
+   "id": "attorney.signature",
+   "part": 7,
+   "label": "Signature of Attorney for Debtor",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; filing_professional records who signs, not a signature image"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Sig"
+    ]
+   }
+  },
+  {
+   "id": "attorney.date_signed",
+   "part": 7,
+   "label": "Attorney \u2014 Date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "signature_date",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Date signed"
+    ]
+   }
+  },
+  {
+   "id": "attorney.printed_name",
+   "part": 7,
+   "label": "Attorney \u2014 Printed name",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "name",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Printed name"
+    ]
+   }
+  },
+  {
+   "id": "attorney.firm_name",
+   "part": 7,
+   "label": "Attorney \u2014 Firm name",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "firm_name",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Firm name"
+    ]
+   }
+  },
+  {
+   "id": "attorney.street",
+   "part": 7,
+   "label": "Attorney \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "address",
+    "notes": "the attorney block; street/city/state/zip are parts of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Street address_2"
+    ]
+   }
+  },
+  {
+   "id": "attorney.street2",
+   "part": 7,
+   "label": "Attorney \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "address",
+    "notes": "the attorney block; street/city/state/zip are parts of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Street address_3"
+    ]
+   }
+  },
+  {
+   "id": "attorney.city",
+   "part": 7,
+   "label": "Attorney \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "address",
+    "notes": "the attorney block; street/city/state/zip are parts of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.City"
+    ]
+   }
+  },
+  {
+   "id": "attorney.state",
+   "part": 7,
+   "label": "Attorney \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "address",
+    "notes": "the attorney block; street/city/state/zip are parts of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.State"
+    ]
+   }
+  },
+  {
+   "id": "attorney.zip",
+   "part": 7,
+   "label": "Attorney \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "address",
+    "notes": "the attorney block; street/city/state/zip are parts of the structured address"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Zip"
+    ]
+   }
+  },
+  {
+   "id": "attorney.phone",
+   "part": 7,
+   "label": "Attorney \u2014 Contact phone",
+   "type": "phone",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "phone",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.phone"
+    ]
+   }
+  },
+  {
+   "id": "attorney.email",
+   "part": 7,
+   "label": "Attorney \u2014 Email address",
+   "type": "email",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "email",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Email address"
+    ]
+   }
+  },
+  {
+   "id": "attorney.bar_number",
+   "part": 7,
+   "label": "Attorney \u2014 Bar number",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "bar_number",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Bar number"
+    ]
+   }
+  },
+  {
+   "id": "attorney.bar_state",
+   "part": 7,
+   "label": "Attorney \u2014 Bar state",
+   "type": "state",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "bar_state",
+    "notes": "the attorney block"
+   },
+   "pdf": {
+    "names": [
+     "Attorney.Bar State"
+    ]
+   }
+  },
+  {
+   "id": "prose.aware_serious_action",
+   "part": 7,
+   "label": "Are you aware that filing for bankruptcy is a serious action with long-term financial and legal consequences?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "pro se acknowledgment on the without-an-attorney page; a procedural attestation with no case-data attribute"
+   },
+   "pdf": {
+    "names": [
+     "Check Box24"
+    ]
+   },
+   "options": [
+    {
+     "value": "No",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "prose.aware_fraud_crime",
+   "part": 7,
+   "label": "Are you aware that bankruptcy fraud is a serious crime and that if your bankruptcy forms are inaccurate or incomplete, you could be fined or imprisoned?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "pro se acknowledgment; no case-data attribute"
+   },
+   "pdf": {
+    "names": [
+     "Check Box25"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "prose.paid_preparer",
+   "part": 7,
+   "label": "Did you pay or agree to pay someone who is not an attorney to help you fill out your bankruptcy forms?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "a filing_professional with kind=bankruptcy_petition_preparer exists"
+   },
+   "pdf": {
+    "names": [
+     "Check Box26"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "Yes",
+     "label": "Yes. Attach Bankruptcy Petition Preparer's Notice, Declaration, and Signature (Official Form 119)."
+    }
+   ]
+  },
+  {
+   "id": "prose.preparer_name",
+   "part": 7,
+   "label": "Yes. Name of Person",
+   "type": "text",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "name",
+    "notes": "the bankruptcy petition preparer"
+   },
+   "pdf": {
+    "names": [
+     "Name of person payed to help file"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor1_signature",
+   "part": 7,
+   "label": "Signature of Debtor 1 (without-an-attorney page)",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Signature"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor1_date",
+   "part": 7,
+   "label": "Debtor 1 \u2014 Date (without-an-attorney page)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1; the pro se page's date"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Date signed"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor2_signature",
+   "part": 7,
+   "label": "Signature of Debtor 2 (without-an-attorney page)",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a signature line; the model records debtor.signed_at"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Signature"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor2_date",
+   "part": 7,
+   "label": "Debtor 2 \u2014 Date (without-an-attorney page)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2; the pro se page's date"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Date signed"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor1_phone",
+   "part": 7,
+   "label": "Debtor 1 \u2014 Contact phone",
+   "type": "phone",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "phone",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Contact phone_2"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor1_cell",
+   "part": 7,
+   "label": "Debtor 1 \u2014 Cell phone",
+   "type": "phone",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mobile",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Cell phone"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor1_email",
+   "part": 7,
+   "label": "Debtor 1 \u2014 Email address",
+   "type": "email",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "email",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Email address_2"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor2_phone",
+   "part": 7,
+   "label": "Debtor 2 \u2014 Contact phone",
+   "type": "phone",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "phone",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Contact phone"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor2_cell",
+   "part": 7,
+   "label": "Debtor 2 \u2014 Cell phone",
+   "type": "phone",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "mobile",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Cell phone"
+    ]
+   }
+  },
+  {
+   "id": "prose.debtor2_email",
+   "part": 7,
+   "label": "Debtor 2 \u2014 Email address",
+   "type": "email",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "email",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Email address"
+    ]
+   }
+  }
+ ]
+}

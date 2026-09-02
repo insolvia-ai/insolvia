@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b101",
+  "effective_date": "2024-06-22",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b_101_0624_fillable_clean.pdf",
+    "published": null,
+    "sha256": "23c1eaec370df54c59f996a3517bc4d5c010dd039af981b45ef11e58d1373651"
+  },
+  "notes": "Official Form 101, Voluntary Petition for Individuals Filing for Bankruptcy, printed revision 06/24 (the June 22, 2024 interim amendment). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-9.2 field spec and AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. The 06/24 line-15 export values 1/2/On/4 were verified against the PDF's own widget geometry (kids top-to-bottom carry exactly those states, matching the printed option order) before the engine relies on them."
+}
