@@ -1,0 +1,209 @@
+{
+  "scheme_id": "ga",
+  "jurisdiction": "GA",
+  "name": "Georgia exemptions (O.C.G.A. § 44-13-100)",
+  "opted_out_of_federal": true,
+  "opt_out_citation": "O.C.G.A. § 44-13-100(b)",
+  "notes": "Opt-out: a debtor domiciled in Georgia may not use 11 U.S.C. § 522(d) (O.C.G.A. § 44-13-100(b)). H.B. 1024 (Act 480, 2026) amended ONLY paragraph (a)(1) — the homestead — leaving every other figure, including the (a)(6) carryover cap, unchanged; the homestead begins annual inflation indexing on 2031-07-01, which is a scheduled maintenance event for this dataset.",
+  "entries": [
+    {
+      "entry_id": "ga-homestead",
+      "category": "homestead",
+      "description": "Real or personal property used as a residence by the debtor or a dependent, a co-op interest, or a burial plot",
+      "citation": "O.C.G.A. § 44-13-100(a)(1) (as amended by H.B. 1024)",
+      "amount": "50000.00",
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "Ga. H.B. 1024 (2025-2026 Reg. Sess.), as passed and signed (Act 480, May 11, 2026), eff. July 1, 2026",
+          "url": "https://gov.georgia.gov/document/2026-signed-legislation/hb-1024/download",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": "100000.00",
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "$100,000.00 where title is in one of two spouses who is a debtor AND the property is the primary residence of both. From 2031-07-01 the figures index annually for inflation (method set by the state revenue commissioner).",
+      "figure_since": "2026-07-01"
+    },
+    {
+      "entry_id": "ga-support-benefits",
+      "category": "support_and_benefits",
+      "description": "Social Security, unemployment, public assistance, veterans', disability and illness benefits; alimony and support; pension, annuity, IRA and similar payments",
+      "citation": "O.C.G.A. § 44-13-100(a)(2)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No flat dollar cap; support-type and retirement payments are exempt to the extent reasonably necessary for support.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-vehicle",
+      "category": "vehicle",
+      "description": "All motor vehicles, in aggregate",
+      "citation": "O.C.G.A. § 44-13-100(a)(3)",
+      "amount": "5000.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-household-goods",
+      "category": "household_goods",
+      "description": "Household furnishings, goods, apparel, appliances, books, animals, crops, musical instruments (personal, family, or household use)",
+      "citation": "O.C.G.A. § 44-13-100(a)(4)",
+      "amount": "5000.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": "300.00",
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "$300.00 per item, $5,000.00 aggregate.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-jewelry",
+      "category": "jewelry",
+      "description": "Jewelry held primarily for personal, family, or household use",
+      "citation": "O.C.G.A. § 44-13-100(a)(5)",
+      "amount": "500.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-wildcard",
+      "category": "wildcard",
+      "description": "Any property",
+      "citation": "O.C.G.A. § 44-13-100(a)(6)",
+      "amount": "1200.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": "ga-homestead",
+      "wildcard_carryover_cap": "10000.00",
+      "notes": "$1,200.00 plus up to $10,000.00 of any unused (a)(1) homestead amount. H.B. 1024 did not change these figures.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-tools-of-trade",
+      "category": "tools_of_trade",
+      "description": "Implements, professional books, or tools of the trade of the debtor or a dependent",
+      "citation": "O.C.G.A. § 44-13-100(a)(7)",
+      "amount": "1500.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-health-aids",
+      "category": "health_aids",
+      "description": "Professionally prescribed health aids for the debtor or a dependent",
+      "citation": "O.C.G.A. § 44-13-100(a)(10)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "unverified",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "UNVERIFIED at build time: the exemption exists, but the paragraph number (a)(10) was not independently confirmed against the statute text. Verify before Schedule C cites it.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "ga-personal-injury",
+      "category": "personal_injury",
+      "description": "Payment on account of personal bodily injury (excluding pain and suffering and actual pecuniary loss)",
+      "citation": "O.C.G.A. § 44-13-100(a)(11)(D)",
+      "amount": "10000.00",
+      "unlimited": false,
+      "verification": "mirror",
+      "sources": [
+        {
+          "title": "O.C.G.A. § 44-13-100 (FindLaw mirror, current through Mar. 28, 2024)",
+          "url": "https://codes.findlaw.com/ga/title-44-property/ga-code-sect-44-13-100/",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    }
+  ],
+  "limits": []
+}

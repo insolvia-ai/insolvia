@@ -1,0 +1,448 @@
+{
+  "scheme_id": "us-522d",
+  "jurisdiction": "US",
+  "name": "Federal bankruptcy exemptions, 11 U.S.C. § 522(d)",
+  "opted_out_of_federal": null,
+  "opt_out_citation": null,
+  "notes": "Available only where the debtor's domicile state has not opted out under § 522(b)(2). In a joint case each debtor claims a full set (§ 522(m)) — doubling is per-debtor, not a statutory joint figure. Which state's law applies at all is § 522(b)(3)(A)'s 730-day domicile rule; that lookup is the analyzer's job, not this dataset's. All dollar figures reflect the Apr. 1, 2025 § 104(b) adjustment (90 Fed. Reg. 8941); next adjustment Apr. 1, 2028.",
+  "entries": [
+    {
+      "entry_id": "us-homestead",
+      "category": "homestead",
+      "description": "Residence (real or personal property used as a residence, co-op, or burial plot)",
+      "citation": "11 U.S.C. § 522(d)(1)",
+      "amount": "31575.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-vehicle",
+      "category": "vehicle",
+      "description": "One motor vehicle",
+      "citation": "11 U.S.C. § 522(d)(2)",
+      "amount": "5025.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-household-goods",
+      "category": "household_goods",
+      "description": "Household furnishings, goods, apparel, appliances, books, animals, crops, musical instruments (held primarily for personal, family, or household use)",
+      "citation": "11 U.S.C. § 522(d)(3)",
+      "amount": "16850.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": "800.00",
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "$800.00 per item, $16,850.00 aggregate.",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-jewelry",
+      "category": "jewelry",
+      "description": "Jewelry held primarily for personal, family, or household use",
+      "citation": "11 U.S.C. § 522(d)(4)",
+      "amount": "2125.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-wildcard",
+      "category": "wildcard",
+      "description": "Any property",
+      "citation": "11 U.S.C. § 522(d)(5)",
+      "amount": "1675.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": "us-homestead",
+      "wildcard_carryover_cap": "15800.00",
+      "notes": "$1,675.00 plus up to $15,800.00 of any unused amount of the § 522(d)(1) homestead exemption.",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-tools-of-trade",
+      "category": "tools_of_trade",
+      "description": "Implements, professional books, or tools of the trade of the debtor or a dependent",
+      "citation": "11 U.S.C. § 522(d)(6)",
+      "amount": "3175.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-life-insurance-unmatured",
+      "category": "life_insurance",
+      "description": "Unmatured life insurance contracts owned by the debtor (other than credit life insurance)",
+      "citation": "11 U.S.C. § 522(d)(7)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "us-life-insurance-value",
+      "category": "life_insurance",
+      "description": "Accrued dividend, interest, or loan value under an unmatured life insurance contract insuring the debtor or a person the debtor depends on",
+      "citation": "11 U.S.C. § 522(d)(8)",
+      "amount": "16850.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-health-aids",
+      "category": "health_aids",
+      "description": "Professionally prescribed health aids for the debtor or a dependent",
+      "citation": "11 U.S.C. § 522(d)(9)",
+      "amount": null,
+      "unlimited": true,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": null
+    },
+    {
+      "entry_id": "us-support-benefits",
+      "category": "support_and_benefits",
+      "description": "Social Security, unemployment, public assistance, veterans', disability and illness benefits; alimony and support; certain pension and retirement payments",
+      "citation": "11 U.S.C. § 522(d)(10)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No flat dollar cap. Alimony/support and § 522(d)(10)(E) pension payments are exempt only to the extent reasonably necessary for the support of the debtor and dependents.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "us-personal-injury",
+      "category": "personal_injury",
+      "description": "Payment on account of personal bodily injury (excluding pain and suffering and actual pecuniary loss)",
+      "citation": "11 U.S.C. § 522(d)(11)(D)",
+      "amount": "31575.00",
+      "unlimited": false,
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "",
+      "figure_since": "2025-04-01"
+    },
+    {
+      "entry_id": "us-lost-earnings",
+      "category": "personal_injury",
+      "description": "Payment in compensation of loss of future earnings of the debtor or a person the debtor depended on",
+      "citation": "11 U.S.C. § 522(d)(11)(E)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "No flat dollar cap; exempt to the extent reasonably necessary for support. §§ 522(d)(11)(A)-(C) (crime-victim reparation, wrongful death, life insurance on a person the debtor depended on) are likewise uncapped and cited from the same subsection.",
+      "figure_since": null
+    },
+    {
+      "entry_id": "us-retirement",
+      "category": "retirement",
+      "description": "Retirement funds in a fund or account exempt from taxation under IRC §§ 401, 403, 408, 408A, 414, 457, or 501(a)",
+      "citation": "11 U.S.C. § 522(d)(12)",
+      "amount": null,
+      "unlimited": false,
+      "verification": "primary",
+      "sources": [
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "per_item_amount": null,
+      "joint_amount": null,
+      "wildcard_carryover_from": null,
+      "wildcard_carryover_cap": null,
+      "notes": "Uncapped here, but IRAs are subject to the § 522(n) aggregate cap (see FEDERAL_LIMITS).",
+      "figure_since": null
+    }
+  ],
+  "limits": [
+    {
+      "limit_id": "us-lien-avoidance-tools",
+      "citation": "11 U.S.C. § 522(f)(3)",
+      "description": "Cap on lien avoidance against implements, professional books, tools of the trade, farm animals, and crops",
+      "amount": "8575.00",
+      "effective_date": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "limit_id": "us-lien-avoidance-household",
+      "citation": "11 U.S.C. § 522(f)(4)",
+      "description": "Per-item value above which household goods fall outside the nonpossessory, nonpurchase-money lien avoidance definition",
+      "amount": "900.00",
+      "effective_date": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "limit_id": "us-ira-cap",
+      "citation": "11 U.S.C. § 522(n)",
+      "description": "Aggregate cap on exempt traditional and Roth IRA assets (rollovers excluded), applicable under every scheme",
+      "amount": "1711975.00",
+      "effective_date": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "limit_id": "us-homestead-1215-day-cap",
+      "citation": "11 U.S.C. § 522(p)",
+      "description": "Cap on the homestead interest a debtor may exempt in property acquired within 1,215 days before filing — binds even under unlimited state homesteads (FL, TX); pairs with the exemption entity's acquired_within_1215_days fact",
+      "amount": "214000.00",
+      "effective_date": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "limit_id": "us-homestead-misconduct-cap",
+      "citation": "11 U.S.C. § 522(q)",
+      "description": "Homestead cap where the debtor has certain felony convictions or debts from securities fraud or similar misconduct — the question 106C asks every filer",
+      "amount": "214000.00",
+      "effective_date": "2025-04-01",
+      "next_adjustment": "2028-04-01",
+      "verification": "primary_corroborated",
+      "sources": [
+        {
+          "title": "Adjustment of Certain Dollar Amounts Applicable to Bankruptcy Cases, 90 Fed. Reg. 8941 (Feb. 4, 2025), effective Apr. 1, 2025",
+          "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+          "accessed": "2026-09-01"
+        },
+        {
+          "title": "11 U.S.C. § 522 (Cornell LII, showing amounts as adjusted eff. Apr. 1, 2025)",
+          "url": "https://www.law.cornell.edu/uscode/text/11/522",
+          "accessed": "2026-09-01"
+        }
+      ],
+      "notes": ""
+    }
+  ]
+}
