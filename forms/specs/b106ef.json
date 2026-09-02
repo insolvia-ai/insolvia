@@ -1,0 +1,1480 @@
+{
+ "form": "b106ef",
+ "official_number": "106E/F",
+ "title": "Schedule E/F: Creditors Who Have Unsecured Claims",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {
+   "number": 1,
+   "title": "List All of Your PRIORITY Unsecured Claims"
+  },
+  {
+   "number": 2,
+   "title": "List All of Your NONPRIORITY Unsecured Claims"
+  },
+  {
+   "number": 3,
+   "title": "List Others to Be Notified About a Debt That You Already Listed"
+  },
+  {
+   "number": 4,
+   "title": "Add the Amounts for Each Type of Unsecured Claim"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   }
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   }
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is an"
+    ]
+   }
+  },
+  {
+   "id": "page_counts",
+   "part": null,
+   "label": "page 1 of __ / page __ of __ (sheet numbering)",
+   "type": "integer",
+   "maps_to": {
+    "derived": "pagination, assigned when the packet is assembled"
+   },
+   "pdf": {
+    "pattern": "fill_27\\.(0|1\\.[0-8])"
+   }
+  },
+  {
+   "id": "line_1_any_priority_claims",
+   "part": 1,
+   "line": "1",
+   "label": "Do any creditors have priority unsecured claims against you?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one claim with class=priority_unsecured exists"
+   },
+   "pdf": {
+    "names": [
+     "check1"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. Go to Part 2."
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Go to line 2."
+    }
+   ]
+  },
+  {
+   "id": "priority.entry_number",
+   "part": 1,
+   "line": "2",
+   "label": "2._ (entry number on the additional page)",
+   "type": "text",
+   "maps_to": {
+    "derived": "row numbering, assigned when the packet is assembled"
+   },
+   "pdf": {
+    "names": [
+     "undefined_12",
+     "undefined_19"
+    ]
+   },
+   "repeats": {
+    "count": 2,
+    "group": "priority_claim",
+    "continuation": "the official PDF wires rows 2.4 and 2.5 to ONE shared field (undefined_19)"
+   }
+  },
+  {
+   "id": "priority.creditor_name",
+   "part": 1,
+   "line": "2",
+   "label": "Priority creditor's name",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "name",
+    "notes": "via claim.creditor_id"
+   },
+   "pdf": {
+    "pattern": "Creditors Name(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.creditor_street",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "street part of the structured address"
+   },
+   "pdf": {
+    "pattern": "Street(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.creditor_street2",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "second street line"
+   },
+   "pdf": {
+    "pattern": "1(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.creditor_city",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "city part"
+   },
+   "pdf": {
+    "pattern": "2(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.creditor_state",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "state part"
+   },
+   "pdf": {
+    "pattern": "3(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.creditor_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Creditor address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "zip part"
+   },
+   "pdf": {
+    "pattern": "4(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.account_last4",
+   "part": 1,
+   "line": "2",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "account_last4"
+   },
+   "pdf": {
+    "pattern": "account number( [2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.date_incurred",
+   "part": 1,
+   "line": "2",
+   "label": "When was the debt incurred?",
+   "type": "date",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "date_incurred"
+   },
+   "pdf": {
+    "pattern": "Date debt was incurred(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.total_claim",
+   "part": 1,
+   "line": "2",
+   "label": "Total claim",
+   "type": "money",
+   "maps_to": {
+    "derived": "priority_amount + nonpriority_amount \u2014 a priority claim's total is arithmetic, never stored (case-data-model.md)"
+   },
+   "pdf": {
+    "names": [
+     "undefined",
+     "undefined_5",
+     "undefined_10",
+     "undefined_14",
+     "undefined_20"
+    ]
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   },
+   "notes": "Columns disambiguated by widget x-position (total=432/438, priority=491/492, nonpriority=542); the PDF names are meaningless 'undefined_N'."
+  },
+  {
+   "id": "priority.priority_amount",
+   "part": 1,
+   "line": "2",
+   "label": "Priority amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_amount"
+   },
+   "pdf": {
+    "names": [
+     "undefined_2",
+     "undefined_6",
+     "undefined_13",
+     "undefined_17",
+     "undefined_22"
+    ]
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.nonpriority_amount",
+   "part": 1,
+   "line": "2",
+   "label": "Nonpriority amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_amount"
+   },
+   "pdf": {
+    "names": [
+     "undefined_3",
+     "undefined_7",
+     "undefined_15",
+     "undefined_18",
+     "undefined_25"
+    ]
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.who_incurred",
+   "part": 1,
+   "line": "2",
+   "label": "Who incurred the debt? Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "who_incurred"
+   },
+   "pdf": {
+    "names": [
+     "check 1",
+     "check 2",
+     "check 3",
+     "check 4",
+     "check 5"
+    ]
+   },
+   "options": [
+    {
+     "value": "Debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "One of debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    },
+    {
+     "value": "debtor 1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1"
+    },
+    {
+     "value": "debtor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2"
+    },
+    {
+     "value": "debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "On",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another",
+     "notes": "quirky export value in the official PDF"
+    },
+    {
+     "value": "one of debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    }
+   ],
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   },
+   "notes": "Export values differ per row (rows 2.3/2.4 export 'On' for the fourth option); maps_to_value is the canonical enum."
+  },
+  {
+   "id": "priority.community_debt",
+   "part": 1,
+   "line": "2",
+   "label": "Check if this claim is for a community debt",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "community_debt"
+   },
+   "pdf": {
+    "pattern": "Check if this claim relates to a(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.contingent",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Contingent",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "contingent"
+   },
+   "pdf": {
+    "pattern": "Contingent(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.unliquidated",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Unliquidated",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "unliquidated"
+   },
+   "pdf": {
+    "pattern": "Unliquidated(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.disputed",
+   "part": 1,
+   "line": "2",
+   "label": "As of the date you file, the claim is: Disputed",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "disputed"
+   },
+   "pdf": {
+    "pattern": "Disputed(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.type_domestic_support",
+   "part": 1,
+   "line": "2",
+   "label": "Type of PRIORITY unsecured claim: Domestic support obligations",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_type",
+    "notes": "value=domestic_support"
+   },
+   "pdf": {
+    "pattern": "Domestic support obligations(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.type_taxes",
+   "part": 1,
+   "line": "2",
+   "label": "Type of PRIORITY unsecured claim: Taxes and certain other debts you owe the government",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_type",
+    "notes": "value=tax_and_government"
+   },
+   "pdf": {
+    "pattern": "Taxes and ceratin other debts you owe the government(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.type_intoxicated",
+   "part": 1,
+   "line": "2",
+   "label": "Type of PRIORITY unsecured claim: Claims for death or personal injury while you were intoxicated",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_type",
+    "notes": "value=death_or_injury_while_intoxicated"
+   },
+   "pdf": {
+    "pattern": "Claims for death or personal injury while intoxicated(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.type_other",
+   "part": 1,
+   "line": "2",
+   "label": "Type of PRIORITY unsecured claim: Other. Specify",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_type",
+    "notes": "value=other, with its text"
+   },
+   "pdf": {
+    "pattern": "Other(_[2-5])?"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.type_other_specify",
+   "part": 1,
+   "line": "2",
+   "label": "Type of PRIORITY unsecured claim: Other \u2014 specify text",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "priority_type",
+    "notes": "the free text carried with value=other"
+   },
+   "pdf": {
+    "pattern": "Other unsecurecured claim 2\\.[1-5]"
+   },
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "priority.subject_to_offset",
+   "part": 1,
+   "line": "2",
+   "label": "Is the claim subject to offset?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "subject_to_offset"
+   },
+   "pdf": {
+    "names": [
+     "check2",
+     "check3",
+     "check4",
+     "check5",
+     "check6"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ],
+   "repeats": {
+    "count": 5,
+    "group": "priority_claim",
+    "continuation": "2 rows on page 1 (2.1\u20132.2), 3 on the additional page (2.3\u20132.5); more pages are copies"
+   }
+  },
+  {
+   "id": "line_3_any_nonpriority_claims",
+   "part": 2,
+   "line": "3",
+   "label": "Do any creditors have nonpriority unsecured claims against you?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "at least one claim with class=nonpriority_unsecured exists"
+   },
+   "pdf": {
+    "names": [
+     "check7"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No. You have nothing to report in this part."
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "nonpriority.entry_number",
+   "part": 2,
+   "line": "4",
+   "label": "4._ (entry number on the additional page)",
+   "type": "text",
+   "maps_to": {
+    "derived": "row numbering, assigned when the packet is assembled"
+   },
+   "pdf": {
+    "pattern": "undefined_4\\.[4-6]"
+   },
+   "repeats": {
+    "count": 3,
+    "group": "nonpriority_claim"
+   }
+  },
+  {
+   "id": "nonpriority.creditor_name",
+   "part": 2,
+   "line": "4",
+   "label": "Nonpriority creditor's name",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "name",
+    "notes": "via claim.creditor_id"
+   },
+   "pdf": {
+    "pattern": "Creditors Name_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.creditor_street",
+   "part": 2,
+   "line": "4",
+   "label": "Creditor address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "street part of the structured address"
+   },
+   "pdf": {
+    "pattern": "Street_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.creditor_city",
+   "part": 2,
+   "line": "4",
+   "label": "Creditor address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "city part"
+   },
+   "pdf": {
+    "pattern": "City 4\\.[1-6]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.creditor_state",
+   "part": 2,
+   "line": "4",
+   "label": "Creditor address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "state part"
+   },
+   "pdf": {
+    "pattern": "State 4\\.[1-6]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.creditor_zip",
+   "part": 2,
+   "line": "4",
+   "label": "Creditor address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "address",
+    "notes": "zip part"
+   },
+   "pdf": {
+    "pattern": "Zip 4\\.[1-6]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.account_last4",
+   "part": 2,
+   "line": "4",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "account_last4"
+   },
+   "pdf": {
+    "pattern": "account number (6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.date_incurred",
+   "part": 2,
+   "line": "4",
+   "label": "When was the debt incurred?",
+   "type": "date",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "date_incurred"
+   },
+   "pdf": {
+    "pattern": "Date debt was incurred_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.amount",
+   "part": 2,
+   "line": "4",
+   "label": "Total claim",
+   "type": "money",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "amount"
+   },
+   "pdf": {
+    "pattern": "Total_(2[6-9]|3[01])"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.who_incurred",
+   "part": 2,
+   "line": "4",
+   "label": "Who incurred the debt? Check one.",
+   "type": "radio",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "who_incurred"
+   },
+   "pdf": {
+    "names": [
+     "check 6",
+     "check 7",
+     "check 8",
+     "check 9",
+     "check 10",
+     "check 11"
+    ]
+   },
+   "options": [
+    {
+     "value": "On",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another",
+     "notes": "quirky export value in the official PDF"
+    },
+    {
+     "value": "debtor 1",
+     "label": "Debtor 1 only",
+     "maps_to_value": "debtor_1"
+    },
+    {
+     "value": "debtor 1 and 2",
+     "label": "Debtor 1 and Debtor 2 only",
+     "maps_to_value": "both"
+    },
+    {
+     "value": "debtor 2",
+     "label": "Debtor 2 only",
+     "maps_to_value": "debtor_2"
+    },
+    {
+     "value": "one of debtors and another",
+     "label": "At least one of the debtors and another",
+     "maps_to_value": "at_least_one_plus_another"
+    }
+   ],
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   },
+   "notes": "Export values differ per row (several rows export 'On' for the fourth option); maps_to_value is the canonical enum."
+  },
+  {
+   "id": "nonpriority.community_debt",
+   "part": 2,
+   "line": "4",
+   "label": "Check if this claim is for a community debt",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "community_debt"
+   },
+   "pdf": {
+    "pattern": "Check if this claim relates to a_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.contingent",
+   "part": 2,
+   "line": "4",
+   "label": "As of the date you file, the claim is: Contingent",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "contingent"
+   },
+   "pdf": {
+    "pattern": "Contingent_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.unliquidated",
+   "part": 2,
+   "line": "4",
+   "label": "As of the date you file, the claim is: Unliquidated",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "unliquidated"
+   },
+   "pdf": {
+    "pattern": "Unliquidated_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.disputed",
+   "part": 2,
+   "line": "4",
+   "label": "As of the date you file, the claim is: Disputed",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "disputed"
+   },
+   "pdf": {
+    "pattern": "Disputed_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.type_student_loans",
+   "part": 2,
+   "line": "4",
+   "label": "Type of NONPRIORITY unsecured claim: Student loans",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_type",
+    "notes": "value=student_loan"
+   },
+   "pdf": {
+    "pattern": "Student loans_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.type_divorce",
+   "part": 2,
+   "line": "4",
+   "label": "Type of NONPRIORITY unsecured claim: Obligations arising out of a separation agreement or divorce that you did not report as priority claims",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_type",
+    "notes": "value=separation_or_divorce"
+   },
+   "pdf": {
+    "pattern": "Obligations arising out of divorce_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.type_pension",
+   "part": 2,
+   "line": "4",
+   "label": "Type of NONPRIORITY unsecured claim: Debts to pension or profit-sharing plans, and other similar debts",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_type",
+    "notes": "value=pension_or_profit_sharing"
+   },
+   "pdf": {
+    "pattern": "Debts in pension plans_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.type_other",
+   "part": 2,
+   "line": "4",
+   "label": "Type of NONPRIORITY unsecured claim: Other. Specify",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_type",
+    "notes": "value=other, with its text"
+   },
+   "pdf": {
+    "pattern": "Other_(6|7|8|9|10|11)"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.type_other_specify",
+   "part": 2,
+   "line": "4",
+   "label": "Type of NONPRIORITY unsecured claim: Other \u2014 specify text",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "nonpriority_type",
+    "notes": "the free text carried with value=other"
+   },
+   "pdf": {
+    "pattern": "Other unsecurecured claim 4\\.[1-6]"
+   },
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "nonpriority.subject_to_offset",
+   "part": 2,
+   "line": "4",
+   "label": "Is the claim subject to offset?",
+   "type": "radio",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "subject_to_offset"
+   },
+   "pdf": {
+    "names": [
+     "check8",
+     "check9",
+     "check10",
+     "check11",
+     "check12",
+     "check13"
+    ]
+   },
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ],
+   "repeats": {
+    "count": 6,
+    "group": "nonpriority_claim",
+    "continuation": "3 rows on the first Part 2 page (4.1\u20134.3), 3 on the additional page (4.4\u20134.6); more pages are copies"
+   }
+  },
+  {
+   "id": "notify.name",
+   "part": 3,
+   "line": "5",
+   "label": "Name (person or entity to be notified)",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "name of the notice party on the referenced claim"
+   },
+   "pdf": {
+    "pattern": "Creditors Name_1[2-8]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.street",
+   "part": 3,
+   "line": "5",
+   "label": "Notice party address \u2014 Number, Street",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "street part of the address"
+   },
+   "pdf": {
+    "pattern": "Street_1[2-8]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.street2",
+   "part": 3,
+   "line": "5",
+   "label": "Notice party address \u2014 second address line",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "second street line"
+   },
+   "pdf": {
+    "pattern": "Street2_1[2-8]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.city",
+   "part": 3,
+   "line": "5",
+   "label": "Notice party address \u2014 City",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "city part"
+   },
+   "pdf": {
+    "pattern": "City 5\\.[1-7]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.state",
+   "part": 3,
+   "line": "5",
+   "label": "Notice party address \u2014 State",
+   "type": "state",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "state part"
+   },
+   "pdf": {
+    "pattern": "State 5\\.[1-7]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.zip",
+   "part": 3,
+   "line": "5",
+   "label": "Notice party address \u2014 ZIP Code",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "zip part"
+   },
+   "pdf": {
+    "pattern": "Zip 5\\.[1-7]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.referenced_line",
+   "part": 3,
+   "line": "5",
+   "label": "On which entry in Part 1 or Part 2 did you list the original creditor? Line __",
+   "type": "text",
+   "maps_to": {
+    "derived": "the referenced claim's row number, assigned at packet assembly"
+   },
+   "pdf": {
+    "pattern": "Referenced line 5\\.[1-7]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.referenced_part",
+   "part": 3,
+   "line": "5",
+   "label": "Is the referenced entry a Part 1 (priority) or Part 2 (nonpriority) claim?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the referenced claim's class"
+   },
+   "pdf": {
+    "names": [
+     "check14",
+     "check15",
+     "check16",
+     "check17",
+     "check18",
+     "check19",
+     "check20"
+    ]
+   },
+   "options": [
+    {
+     "value": "Part 1",
+     "label": "Line __ of (Part 1) Creditors with Priority Unsecured Claims"
+    },
+    {
+     "value": "yes",
+     "label": "Line __ of (Part 2) Creditors with Nonpriority Unsecured Claims",
+     "notes": "quirky export value in the official PDF; means the Part 2 box"
+    }
+   ],
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "notify.account_last4",
+   "part": 3,
+   "line": "5",
+   "label": "Last 4 digits of account number",
+   "type": "text",
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "notice_parties",
+    "notes": "account_last4 on the notice party"
+   },
+   "pdf": {
+    "pattern": "account number 1[2-8]"
+   },
+   "repeats": {
+    "count": 7,
+    "group": "notice_party",
+    "continuation": "seven rows per Part 3 page; more pages are copies"
+   }
+  },
+  {
+   "id": "line_6a_total",
+   "part": 4,
+   "line": "6a",
+   "label": "Total claim: Domestic support obligations",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of priority claims typed domestic_support"
+   },
+   "pdf": {
+    "names": [
+     "Total_6a"
+    ]
+   }
+  },
+  {
+   "id": "line_6b_total",
+   "part": 4,
+   "line": "6b",
+   "label": "Total claim: Taxes and certain other debts you owe the government",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of priority claims typed tax_and_government"
+   },
+   "pdf": {
+    "names": [
+     "Total_6b"
+    ]
+   }
+  },
+  {
+   "id": "line_6c_total",
+   "part": 4,
+   "line": "6c",
+   "label": "Total claim: Claims for death or personal injury while you were intoxicated",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of priority claims typed death_or_injury_while_intoxicated"
+   },
+   "pdf": {
+    "names": [
+     "Total_6c"
+    ]
+   }
+  },
+  {
+   "id": "line_6d_total",
+   "part": 4,
+   "line": "6d",
+   "label": "Total claim: Other. Add all other priority unsecured claims. Write that amount here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of priority claims typed other"
+   },
+   "pdf": {
+    "names": [
+     "Total_6d"
+    ]
+   }
+  },
+  {
+   "id": "line_6e_total",
+   "part": 4,
+   "line": "6e",
+   "label": "Total claim: Total. Add lines 6a through 6d.",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 6a + 6b + 6c + 6d; copied to B106Sum line 3a"
+   },
+   "pdf": {
+    "names": [
+     "Total_6e"
+    ]
+   }
+  },
+  {
+   "id": "line_6f_total",
+   "part": 4,
+   "line": "6f",
+   "label": "Total claim: Student loans",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of nonpriority claims typed student_loan"
+   },
+   "pdf": {
+    "names": [
+     "Total_6f"
+    ]
+   }
+  },
+  {
+   "id": "line_6g_total",
+   "part": 4,
+   "line": "6g",
+   "label": "Total claim: Obligations arising out of a separation agreement or divorce that you did not report as priority claims",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of nonpriority claims typed separation_or_divorce"
+   },
+   "pdf": {
+    "names": [
+     "Total_6g"
+    ]
+   }
+  },
+  {
+   "id": "line_6h_total",
+   "part": 4,
+   "line": "6h",
+   "label": "Total claim: Debts to pension or profit-sharing plans, and other similar debts",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of nonpriority claims typed pension_or_profit_sharing"
+   },
+   "pdf": {
+    "names": [
+     "Total_6h"
+    ]
+   }
+  },
+  {
+   "id": "line_6i_total",
+   "part": 4,
+   "line": "6i",
+   "label": "Total claim: Other. Add all other nonpriority unsecured claims. Write that amount here.",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 sum of nonpriority claims typed other"
+   },
+   "pdf": {
+    "names": [
+     "Total_6i"
+    ]
+   }
+  },
+  {
+   "id": "line_6j_total",
+   "part": 4,
+   "line": "6j",
+   "label": "Total claim: Total. Add lines 6f through 6i.",
+   "type": "money",
+   "maps_to": {
+    "derived": "Part 4 statistical rollup \u2014 6f + 6g + 6h + 6i; copied to B106Sum line 3b"
+   },
+   "pdf": {
+    "names": [
+     "Total_6j"
+    ]
+   }
+  }
+ ]
+}

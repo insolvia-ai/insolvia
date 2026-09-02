@@ -1,0 +1,38 @@
+name: Form specs · PR
+
+# Validates forms/specs/*.json against forms/acroform/*.json — structure,
+# entity vocabulary, and full coverage of every fillable widget in the official
+# PDFs. See forms/README.md; the checker is stdlib-only Python, so this job
+# needs no install step.
+#
+# No `on.pull_request.paths:` filter, matching every other *-pr.yml — see
+# `.github/actions/changed-paths/action.yml`: if this job ever becomes a
+# required check on `protect-main`, a paths: filter would deadlock unrelated
+# PRs, so the `steps.filter` guard is what keeps them cheap instead.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  forms:
+    name: Form specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            forms/**
+            .github/workflows/forms-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - name: Check form specs
+        if: steps.filter.outputs.run == 'true'
+        run: python3 forms/scripts/check.py

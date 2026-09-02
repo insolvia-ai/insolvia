@@ -1,0 +1,143 @@
+{
+ "form": "b106g",
+ "official_number": "106G",
+ "title": "Schedule G: Executory Contracts and Unexpired Leases",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "Lines 1–2 (the form has no numbered parts)"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "page_counts",
+   "part": null,
+   "label": "page 1 of __ / page __ of __ (sheet numbering)",
+   "type": "integer",
+   "maps_to": {"derived": "pagination, assigned when the packet is assembled"},
+   "pdf": {"names": ["fill_27.0", "fill_27.1.0", "fill_27.1.1"]}
+  },
+  {
+   "id": "line_1_any_contracts",
+   "part": 1,
+   "line": "1",
+   "label": "Do you have any executory contracts or unexpired leases?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No. Check this box and file this form with the court with your other schedules."},
+    {"value": "yes", "label": "Yes. Fill in all of the information below even if the contracts or leases are listed on Schedule A/B."}
+   ],
+   "maps_to": {"derived": "at least one contract_lease record exists on the case"},
+   "pdf": {"names": ["check1"]}
+  },
+  {
+   "id": "line_2_entry_number",
+   "part": 1,
+   "line": "2",
+   "label": "2._ (entry number on the additional page)",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 8, "continuation": "rows 2.6–2.13 live on the Additional Page; the instruction is to copy that page and number the entries"},
+   "maps_to": {"derived": "row numbering, assigned when the packet is assembled"},
+   "pdf": {"pattern": "fill 2\\.(6|7|8|9|10|11|12|13)"}
+  },
+  {
+   "id": "line_2_counterparty_name",
+   "part": 1,
+   "line": "2",
+   "label": "Person or company with whom you have the contract or lease — Name",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 13, "continuation": "5 rows on page 1 (2.1–2.5), 8 on the Additional Page (2.6–2.13); more pages are copies"},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_name"},
+   "pdf": {"pattern": "Company Name 2\\.(1[0-3]|[1-9])"}
+  },
+  {
+   "id": "line_2_counterparty_street",
+   "part": 1,
+   "line": "2",
+   "label": "Counterparty address — Number, Street",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 13},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_address", "notes": "street part of the structured address"},
+   "pdf": {"pattern": "Street 2\\.(1[0-3]|[1-9])"}
+  },
+  {
+   "id": "line_2_counterparty_city",
+   "part": 1,
+   "line": "2",
+   "label": "Counterparty address — City",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 13},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_address", "notes": "city part of the structured address"},
+   "pdf": {"pattern": "City 2\\.(1[0-3]|[1-9])"}
+  },
+  {
+   "id": "line_2_counterparty_state",
+   "part": 1,
+   "line": "2",
+   "label": "Counterparty address — State",
+   "type": "state",
+   "repeats": {"group": "contract_lease", "count": 13},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_address", "notes": "state part of the structured address"},
+   "pdf": {"pattern": "State 2\\.(1[0-3]|[1-9])"}
+  },
+  {
+   "id": "line_2_counterparty_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Counterparty address — ZIP Code",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 13},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_address", "notes": "zip part of the structured address"},
+   "pdf": {"pattern": "Zip 2\\.(1[0-3]|[1-9])"}
+  },
+  {
+   "id": "line_2_contract_description",
+   "part": 1,
+   "line": "2",
+   "label": "State what the contract or lease is for (for example, rent, vehicle lease, cell phone)",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 13},
+   "maps_to": {"entity": "contract_lease", "attribute": "description"},
+   "pdf": {"pattern": "Contact Info 2\\.(1[0-3]|[1-9])"}
+  }
+ ]
+}

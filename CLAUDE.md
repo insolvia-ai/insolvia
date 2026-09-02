@@ -38,6 +38,7 @@ not here.
 apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff portal, Vite SPA) · insolvia_marketing (React SSR)
 packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
 services/   api · admin · mailer    (Python on Lambda)
+forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 infra/      Terraform: ci-trust · shared · staging · prod
 tool/       reconcile-cognito-branding.ts  (the sign-in page's colours)
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
@@ -102,6 +103,7 @@ before you touch anything:
 | publishing a package / bumping versions | [`docs/reference/package-publishing.md`](docs/reference/package-publishing.md) |
 | touching env model, hosting, or PR-gate design | [`docs/reference/architecture.md`](docs/reference/architecture.md) |
 | **touching the case schema** — case CRUD, intake fields, extraction output, anything storing case data | [`docs/reference/case-data-model.md`](docs/reference/case-data-model.md) — provenance and confirm-before-entry are invariants, not conventions |
+| **touching the official-form field specs** — form fields, revisions, the forms engine's input | [`forms/CLAUDE.md`](forms/CLAUDE.md) — the AcroForm dumps are ground truth; `forms/scripts/dev-test.sh` gates every edit |
 | touching Terraform state / naming / deploy order | [`docs/reference/terraform.md`](docs/reference/terraform.md) |
 | doing one-time AWS/GitHub bootstrap | [`docs/runbooks/aws-bootstrap.md`](docs/runbooks/aws-bootstrap.md) |
 | working on mail / SES | [`docs/reference/email.md`](docs/reference/email.md) · [`docs/runbooks/ses-production-access.md`](docs/runbooks/ses-production-access.md) |
