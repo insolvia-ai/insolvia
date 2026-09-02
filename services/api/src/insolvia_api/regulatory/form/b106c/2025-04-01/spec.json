@@ -1,0 +1,167 @@
+{
+ "form": "b106c",
+ "official_number": "106C",
+ "title": "Schedule C: The Property You Claim as Exempt",
+ "revision": "04/25",
+ "effective_date": "2025-04-01",
+ "parts": [
+  {"number": 1, "title": "Identify the Property You Claim as Exempt"},
+  {"number": 2, "title": "Additional Page"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "page_counts",
+   "part": null,
+   "label": "page 1 of __ / page __ of __ (sheet numbering)",
+   "type": "integer",
+   "maps_to": {"derived": "pagination, assigned when the packet is assembled"},
+   "pdf": {"names": ["page", "page 2"]}
+  },
+  {
+   "id": "line_1_exemption_set",
+   "part": 1,
+   "line": "1",
+   "label": "Which set of exemptions are you claiming? Check one only, even if your spouse is filing with you.",
+   "type": "radio",
+   "options": [
+    {"value": "state and federal", "label": "You are claiming state and federal nonbankruptcy exemptions. 11 U.S.C. § 522(b)(3)", "maps_to_value": "state_and_federal_nonbankruptcy"},
+    {"value": "federal", "label": "You are claiming federal exemptions. 11 U.S.C. § 522(b)(2)", "maps_to_value": "federal"}
+   ],
+   "maps_to": {"entity": "case", "attribute": "exemption_set"},
+   "pdf": {"names": ["check 1"]}
+  },
+  {
+   "id": "line_2_property_description",
+   "part": 1,
+   "line": "2",
+   "label": "Brief description of the property",
+   "type": "text",
+   "repeats": {"group": "exemption", "count": 15, "continuation": "3 rows on page 1, 12 on the Part 2 Additional Page; more pages are copies of Part 2"},
+   "maps_to": {"derived": "the linked asset's description (exemption references an asset; the form copies its description)"},
+   "pdf": {"names": ["description", "description_2", "description_3", "description_4", "description_5", "description_6", "description_7", "description_8", "description_9", "description_10", "description_11", "description_12", "description_13", "description_14", "description_15"]}
+  },
+  {
+   "id": "line_2_schedule_ab_line",
+   "part": 1,
+   "line": "2",
+   "label": "Line from Schedule A/B that lists this property",
+   "type": "text",
+   "repeats": {"group": "exemption", "count": 15},
+   "maps_to": {"derived": "the linked asset's line number on Schedule A/B (the 106A/B line set), assigned at packet assembly"},
+   "pdf": {"names": ["Schedule AB", "Schedule AB_2", "Schedule AB_3", "Line from", "Schedule AB_4", "Schedule AB_5", "Line from_2", "Schedule AB_6", "Schedule AB_7", "Line from_3", "Schedule AB_8", "Schedule AB_9", "Line from_4", "Schedule AB_10", "Schedule AB_11"]}
+  },
+  {
+   "id": "line_2_current_value",
+   "part": 1,
+   "line": "2",
+   "label": "Current value of the portion you own (copy the value from Schedule A/B)",
+   "type": "money",
+   "repeats": {"group": "exemption", "count": 15},
+   "maps_to": {"derived": "the linked asset's value_portion_owned — 106C copies the portion owned, per case-data-model.md"},
+   "pdf": {"names": ["undefined", "undefined_6", "undefined_8", "undefined_11", "undefined_13", "undefined_27", "undefined_29", "undefined_31", "undefined_34", "undefined_36", "undefined_38", "undefined_40", "undefined_42", "undefined_44", "undefined_47"]},
+   "notes": "Column disambiguated by widget x-position (x=231); the PDF names are meaningless 'undefined_N'."
+  },
+  {
+   "id": "line_2_exemption_kind",
+   "part": 1,
+   "line": "2",
+   "label": "Amount of the exemption you claim — check only one box for each exemption",
+   "type": "radio",
+   "options": [
+    {"value": "On", "label": "$ __ (a specific dollar amount)", "maps_to_value": "claims_full_fmv=false; the amount is exemption.amount"},
+    {"value": "fair market", "label": "100% of fair market value, up to any applicable statutory limit", "maps_to_value": "claims_full_fmv=true"}
+   ],
+   "repeats": {"group": "exemption", "count": 15},
+   "maps_to": {"entity": "exemption", "attribute": "claims_full_fmv"},
+   "pdf": {"names": ["check 2.1", "check 2.2", "check 2.3", "check 4", "check 5", "check 6", "check 7", "check 8", "check 9", "check 10", "check 11", "check 12", "check 13", "check 14", "check 15"]}
+  },
+  {
+   "id": "line_2_exemption_amount",
+   "part": 1,
+   "line": "2",
+   "label": "Amount of the exemption you claim — the specific dollar amount",
+   "type": "money",
+   "repeats": {"group": "exemption", "count": 15},
+   "maps_to": {"entity": "exemption", "attribute": "amount", "notes": "nullable; mutually exclusive with claims_full_fmv per the model"},
+   "pdf": {"names": ["undefined_2", "undefined_7", "undefined_9", "undefined_12", "undefined_26", "undefined_28", "undefined_30", "undefined_32", "undefined_35", "undefined_37", "undefined_39", "undefined_41", "undefined_43", "undefined_45", "undefined_48"]},
+   "notes": "Column disambiguated by widget x-position (x=331)."
+  },
+  {
+   "id": "line_2_statute_citation",
+   "part": 1,
+   "line": "2",
+   "label": "Specific laws that allow exemption",
+   "type": "text",
+   "repeats": {"group": "exemption", "count": 15},
+   "maps_to": {"entity": "exemption", "attribute": "statute_citation"},
+   "pdf": {"names": ["2.1", "2.2", "2.3", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]}
+  },
+  {
+   "id": "line_3_homestead_over_cap",
+   "part": 1,
+   "line": "3",
+   "label": "Are you claiming a homestead exemption of more than $214,000? (Subject to adjustment on 4/01/28 and every 3 years after that for cases filed on or after the date of adjustment.)",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes"}
+   ],
+   "maps_to": {"constant": "comparison of the claimed homestead exemption against the § 522(q) cap ($214,000 on this 04/25 revision) from the case's effective constant set — the regulatory source register owns the figure"},
+   "pdf": {"names": ["check 3"]}
+  },
+  {
+   "id": "line_3_acquired_within_1215_days",
+   "part": 1,
+   "line": "3",
+   "label": "Yes. Did you acquire the property covered by the exemption within 1,215 days before you filed this case?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes"}
+   ],
+   "maps_to": {"entity": "exemption", "attribute": "acquired_within_1215_days", "notes": "a fact the debtor supplies, not a threshold we configure — case-data-model.md"},
+   "pdf": {"names": ["check 3-1"]},
+   "notes": "Only answered when line 3 = yes."
+  }
+ ]
+}

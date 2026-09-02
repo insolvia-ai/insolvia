@@ -1,0 +1,241 @@
+{
+ "form": "b106dec",
+ "official_number": "106Dec",
+ "title": "Declaration About an Individual Debtor's Schedules",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/declaration-about-individual-debtors-schedules",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/form_b106dec.pdf",
+  "pdf_sha256": "02d5e9fce22e437143779e219ae836b2271a487e6af7788b4c203bab5cb70b5c",
+  "retrieved": "2026-09-01"
+ },
+ "pages": 1,
+ "field_count": 15,
+ "fields": [
+  {
+   "name": "Debtor 1",
+   "kind": "text",
+   "tooltip": "Debtor 1",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor 2",
+   "kind": "text",
+   "tooltip": "Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Case number",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "check1",
+   "kind": "checkbox",
+   "tooltip": "Any creditors clims secured by property",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Check if this is an",
+   "kind": "checkbox",
+   "tooltip": "Check if this is an",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor1.signature",
+   "kind": "text",
+   "tooltip": "Signature of Debtor 1",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor2.Executed on",
+   "kind": "text",
+   "tooltip": "Executed on (date mm/dd/yyyy)",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor2.signature",
+   "kind": "text",
+   "tooltip": "Signature of Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Executed on",
+   "kind": "text",
+   "tooltip": "Executed on (Date mm/dd/yyyy)",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Name of person payed to help file",
+   "kind": "text",
+   "tooltip": "Name of person (other than Attorney) payed to help file",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  }
+ ]
+}

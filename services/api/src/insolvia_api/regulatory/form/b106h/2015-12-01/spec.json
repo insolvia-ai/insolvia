@@ -1,0 +1,274 @@
+{
+ "form": "b106h",
+ "official_number": "106H",
+ "title": "Schedule H: Your Codebtors",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "Lines 1–3 (the form has no numbered parts)"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "page_counts",
+   "part": null,
+   "label": "page 1 of __ / page __ of __ (sheet numbering)",
+   "type": "integer",
+   "maps_to": {"derived": "pagination, assigned when the packet is assembled"},
+   "pdf": {"names": ["fill_27.0", "fill_27.1.0", "fill_27.1.1"]}
+  },
+  {
+   "id": "line_1_any_codebtors",
+   "part": 1,
+   "line": "1",
+   "label": "Do you have any codebtors? (If you are filing a joint case, do not list either spouse as a codebtor.)",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes"}
+   ],
+   "maps_to": {"derived": "at least one codebtor record exists on the case"},
+   "pdf": {"names": ["check1"]}
+  },
+  {
+   "id": "line_2_lived_in_community_state",
+   "part": 1,
+   "line": "2",
+   "label": "Within the last 8 years, have you lived in a community property state or territory?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No. Go to line 3."},
+    {"value": "yes", "label": "Yes"}
+   ],
+   "maps_to": {"derived": "a community_household_member record (or the community-residence fact backing it) exists"},
+   "pdf": {"names": ["check2"]}
+  },
+  {
+   "id": "line_2_spouse_lived_with_you",
+   "part": 1,
+   "line": "2",
+   "label": "Yes. Did your spouse, former spouse, or legal equivalent live with you at the time?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes. In which community state or territory did you live? Fill in the name and current address of that person."}
+   ],
+   "maps_to": {"entity": "community_household_member", "attribute": "lived_with_debtor"},
+   "pdf": {"names": ["check3"]},
+   "notes": "Only answered when line 2 = yes."
+  },
+  {
+   "id": "line_2_community_state",
+   "part": 1,
+   "line": "2",
+   "label": "In which community state or territory did you live?",
+   "type": "text",
+   "maps_to": {"entity": "community_household_member", "attribute": "community_state"},
+   "pdf": {"names": ["Community state"]}
+  },
+  {
+   "id": "line_2_spouse_name",
+   "part": 1,
+   "line": "2",
+   "label": "Name of your spouse, former spouse, or legal equivalent",
+   "type": "text",
+   "maps_to": {"entity": "community_household_member", "attribute": "name"},
+   "pdf": {"names": ["Spouse Name"]}
+  },
+  {
+   "id": "line_2_spouse_street",
+   "part": 1,
+   "line": "2",
+   "label": "Spouse's current address — Number, Street",
+   "type": "text",
+   "maps_to": {"entity": "community_household_member", "attribute": "address", "notes": "street part of the structured address"},
+   "pdf": {"names": ["Spouse Street"]}
+  },
+  {
+   "id": "line_2_spouse_city",
+   "part": 1,
+   "line": "2",
+   "label": "Spouse's current address — City",
+   "type": "text",
+   "maps_to": {"entity": "community_household_member", "attribute": "address", "notes": "city part of the structured address"},
+   "pdf": {"names": ["Spouse City"]}
+  },
+  {
+   "id": "line_2_spouse_state",
+   "part": 1,
+   "line": "2",
+   "label": "Spouse's current address — State",
+   "type": "state",
+   "maps_to": {"entity": "community_household_member", "attribute": "address", "notes": "state part of the structured address"},
+   "pdf": {"names": ["Spouse State"]}
+  },
+  {
+   "id": "line_2_spouse_zip",
+   "part": 1,
+   "line": "2",
+   "label": "Spouse's current address — ZIP Code",
+   "type": "text",
+   "maps_to": {"entity": "community_household_member", "attribute": "address", "notes": "zip part of the structured address"},
+   "pdf": {"names": ["Spouse Zip"]}
+  },
+  {
+   "id": "line_3_entry_number",
+   "part": 1,
+   "line": "3",
+   "label": "3._ (entry number on the Additional Page)",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 8, "continuation": "rows 3.4–3.11 live on the Additional Page; the instruction is to copy it and number the entries"},
+   "maps_to": {"derived": "row numbering, assigned when the packet is assembled"},
+   "pdf": {"pattern": "fill 3\\.(1[01]|[4-9])"}
+  },
+  {
+   "id": "line_3_codebtor_name",
+   "part": 1,
+   "line": "3",
+   "label": "Column 1: Your codebtor — Name",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11, "continuation": "3 rows on page 1 (3.1–3.3), 8 on the Additional Page (3.4–3.11)"},
+   "maps_to": {"entity": "codebtor", "attribute": "name"},
+   "pdf": {"pattern": "Codebtor Name 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_codebtor_street",
+   "part": 1,
+   "line": "3",
+   "label": "Column 1: Your codebtor — Number, Street",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "address", "notes": "street part of the structured address"},
+   "pdf": {"pattern": "Codebtor Street 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_codebtor_city",
+   "part": 1,
+   "line": "3",
+   "label": "Column 1: Your codebtor — City",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "address", "notes": "city part of the structured address"},
+   "pdf": {"pattern": "Codebtor City 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_codebtor_state",
+   "part": 1,
+   "line": "3",
+   "label": "Column 1: Your codebtor — State",
+   "type": "state",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "address", "notes": "state part of the structured address"},
+   "pdf": {"pattern": "Codebtor State 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_codebtor_zip",
+   "part": 1,
+   "line": "3",
+   "label": "Column 1: Your codebtor — ZIP Code",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "address", "notes": "zip part of the structured address"},
+   "pdf": {"pattern": "Codebtor Zip 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_d_applies",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: check Schedule D",
+   "type": "checkbox",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "liable_on", "notes": "the codebtor's link to a secured claim on Schedule D"},
+   "pdf": {"pattern": "check schedule line D 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_d_line",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: Schedule D, line __",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"derived": "the linked claim's row number on Schedule D, assigned at packet assembly"},
+   "pdf": {"pattern": "Schedule line D 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_ef_applies",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: check Schedule E/F",
+   "type": "checkbox",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "liable_on", "notes": "the codebtor's link to an unsecured claim on Schedule E/F"},
+   "pdf": {"pattern": "check schedule line E/F 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_ef_line",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: Schedule E/F, line __",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"derived": "the linked claim's row number on Schedule E/F, assigned at packet assembly"},
+   "pdf": {"pattern": "Schedule line E/F 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_g_applies",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: check Schedule G",
+   "type": "checkbox",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"entity": "codebtor", "attribute": "liable_on", "notes": "the codebtor's link to a contract/lease on Schedule G"},
+   "pdf": {"pattern": "check schedule line G 3\\.(1[01]|[1-9])"}
+  },
+  {
+   "id": "line_3_schedule_g_line",
+   "part": 1,
+   "line": "3",
+   "label": "Column 2: Schedule G, line __",
+   "type": "text",
+   "repeats": {"group": "codebtor", "count": 11},
+   "maps_to": {"derived": "the linked contract_lease's row number on Schedule G, assigned at packet assembly"},
+   "pdf": {"pattern": "Schedule line G 3\\.(1[01]|[1-9])"}
+  }
+ ]
+}

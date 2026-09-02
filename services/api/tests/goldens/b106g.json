@@ -1,0 +1,298 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "City 2.1": {
+   "value": "S10.0 line_2_counterparty_city"
+  },
+  "City 2.10": {
+   "value": "S10.9 line_2_counterparty_city"
+  },
+  "City 2.11": {
+   "value": "S10.10 line_2_counterparty_city"
+  },
+  "City 2.12": {
+   "value": "S10.11 line_2_counterparty_city"
+  },
+  "City 2.13": {
+   "value": "S10.12 line_2_counterparty_city"
+  },
+  "City 2.2": {
+   "value": "S10.1 line_2_counterparty_city"
+  },
+  "City 2.3": {
+   "value": "S10.2 line_2_counterparty_city"
+  },
+  "City 2.4": {
+   "value": "S10.3 line_2_counterparty_city"
+  },
+  "City 2.5": {
+   "value": "S10.4 line_2_counterparty_city"
+  },
+  "City 2.6": {
+   "value": "S10.5 line_2_counterparty_city"
+  },
+  "City 2.7": {
+   "value": "S10.6 line_2_counterparty_city"
+  },
+  "City 2.8": {
+   "value": "S10.7 line_2_counterparty_city"
+  },
+  "City 2.9": {
+   "value": "S10.8 line_2_counterparty_city"
+  },
+  "Company Name 2.1": {
+   "value": "S8.0 line_2_counterparty_name"
+  },
+  "Company Name 2.10": {
+   "value": "S8.9 line_2_counterparty_name"
+  },
+  "Company Name 2.11": {
+   "value": "S8.10 line_2_counterparty_name"
+  },
+  "Company Name 2.12": {
+   "value": "S8.11 line_2_counterparty_name"
+  },
+  "Company Name 2.13": {
+   "value": "S8.12 line_2_counterparty_name"
+  },
+  "Company Name 2.2": {
+   "value": "S8.1 line_2_counterparty_name"
+  },
+  "Company Name 2.3": {
+   "value": "S8.2 line_2_counterparty_name"
+  },
+  "Company Name 2.4": {
+   "value": "S8.3 line_2_counterparty_name"
+  },
+  "Company Name 2.5": {
+   "value": "S8.4 line_2_counterparty_name"
+  },
+  "Company Name 2.6": {
+   "value": "S8.5 line_2_counterparty_name"
+  },
+  "Company Name 2.7": {
+   "value": "S8.6 line_2_counterparty_name"
+  },
+  "Company Name 2.8": {
+   "value": "S8.7 line_2_counterparty_name"
+  },
+  "Company Name 2.9": {
+   "value": "S8.8 line_2_counterparty_name"
+  },
+  "Contact Info 2.1": {
+   "value": "S13.0 line_2_contract_description"
+  },
+  "Contact Info 2.10": {
+   "value": "S13.9 line_2_contract_description"
+  },
+  "Contact Info 2.11": {
+   "value": "S13.11 line_2_contract_description"
+  },
+  "Contact Info 2.12": {
+   "value": "S13.10 line_2_contract_description"
+  },
+  "Contact Info 2.13": {
+   "value": "S13.12 line_2_contract_description"
+  },
+  "Contact Info 2.2": {
+   "value": "S13.1 line_2_contract_description"
+  },
+  "Contact Info 2.3": {
+   "value": "S13.2 line_2_contract_description"
+  },
+  "Contact Info 2.4": {
+   "value": "S13.3 line_2_contract_description"
+  },
+  "Contact Info 2.5": {
+   "value": "S13.4 line_2_contract_description"
+  },
+  "Contact Info 2.6": {
+   "value": "S13.5 line_2_contract_description"
+  },
+  "Contact Info 2.7": {
+   "value": "S13.6 line_2_contract_description"
+  },
+  "Contact Info 2.8": {
+   "value": "S13.7 line_2_contract_description"
+  },
+  "Contact Info 2.9": {
+   "value": "S13.8 line_2_contract_description"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "State 2.1": {
+   "value": "FL"
+  },
+  "State 2.10": {
+   "value": "FL"
+  },
+  "State 2.11": {
+   "value": "FL"
+  },
+  "State 2.12": {
+   "value": "FL"
+  },
+  "State 2.13": {
+   "value": "FL"
+  },
+  "State 2.2": {
+   "value": "FL"
+  },
+  "State 2.3": {
+   "value": "FL"
+  },
+  "State 2.4": {
+   "value": "FL"
+  },
+  "State 2.5": {
+   "value": "FL"
+  },
+  "State 2.6": {
+   "value": "FL"
+  },
+  "State 2.7": {
+   "value": "FL"
+  },
+  "State 2.8": {
+   "value": "FL"
+  },
+  "State 2.9": {
+   "value": "FL"
+  },
+  "Street 2.1": {
+   "value": "S9.0 line_2_counterparty_street"
+  },
+  "Street 2.10": {
+   "value": "S9.9 line_2_counterparty_street"
+  },
+  "Street 2.11": {
+   "value": "S9.10 line_2_counterparty_street"
+  },
+  "Street 2.12": {
+   "value": "S9.11 line_2_counterparty_street"
+  },
+  "Street 2.13": {
+   "value": "S9.12 line_2_counterparty_street"
+  },
+  "Street 2.2": {
+   "value": "S9.1 line_2_counterparty_street"
+  },
+  "Street 2.3": {
+   "value": "S9.2 line_2_counterparty_street"
+  },
+  "Street 2.4": {
+   "value": "S9.3 line_2_counterparty_street"
+  },
+  "Street 2.5": {
+   "value": "S9.4 line_2_counterparty_street"
+  },
+  "Street 2.6": {
+   "value": "S9.5 line_2_counterparty_street"
+  },
+  "Street 2.7": {
+   "value": "S9.6 line_2_counterparty_street"
+  },
+  "Street 2.8": {
+   "value": "S9.7 line_2_counterparty_street"
+  },
+  "Street 2.9": {
+   "value": "S9.8 line_2_counterparty_street"
+  },
+  "Zip 2.1": {
+   "value": "S12.0 line_2_counterparty_zip"
+  },
+  "Zip 2.10": {
+   "value": "S12.9 line_2_counterparty_zip"
+  },
+  "Zip 2.11": {
+   "value": "S12.10 line_2_counterparty_zip"
+  },
+  "Zip 2.12": {
+   "value": "S12.11 line_2_counterparty_zip"
+  },
+  "Zip 2.13": {
+   "value": "S12.12 line_2_counterparty_zip"
+  },
+  "Zip 2.2": {
+   "value": "S12.1 line_2_counterparty_zip"
+  },
+  "Zip 2.3": {
+   "value": "S12.2 line_2_counterparty_zip"
+  },
+  "Zip 2.4": {
+   "value": "S12.3 line_2_counterparty_zip"
+  },
+  "Zip 2.5": {
+   "value": "S12.4 line_2_counterparty_zip"
+  },
+  "Zip 2.6": {
+   "value": "S12.5 line_2_counterparty_zip"
+  },
+  "Zip 2.7": {
+   "value": "S12.6 line_2_counterparty_zip"
+  },
+  "Zip 2.8": {
+   "value": "S12.7 line_2_counterparty_zip"
+  },
+  "Zip 2.9": {
+   "value": "S12.8 line_2_counterparty_zip"
+  },
+  "check1": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "fill 2.10": {
+   "value": "S"
+  },
+  "fill 2.11": {
+   "value": "S"
+  },
+  "fill 2.12": {
+   "value": "S"
+  },
+  "fill 2.13": {
+   "value": "S"
+  },
+  "fill 2.6": {
+   "value": "S"
+  },
+  "fill 2.7": {
+   "value": "S"
+  },
+  "fill 2.8": {
+   "value": "S"
+  },
+  "fill 2.9": {
+   "value": "S"
+  },
+  "fill_27.0": {
+   "value": "8"
+  },
+  "fill_27.1.0": {
+   "value": "6"
+  },
+  "fill_27.1.1": {
+   "value": "7"
+  }
+ },
+ "release": "form/b106g@2015-12-01",
+ "sha256": "16b625c6896ceeeeeb6ed74ef3deb33f51340041694a23b134af8a714a09a99b"
+}

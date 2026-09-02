@@ -66,7 +66,21 @@ from pypdf.generic import ArrayObject, DictionaryObject
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "goldens"
 
-FORM_SERIES = ("form/b101", "form/b106i")
+FORM_SERIES = (
+    "form/b101",
+    "form/b106ab",
+    "form/b106c",
+    "form/b106d",
+    "form/b106dec",
+    "form/b106ef",
+    "form/b106g",
+    "form/b106h",
+    "form/b106i",
+    "form/b106j",
+    "form/b106j2",
+    "form/b106sum",
+    "form/b107",
+)
 
 
 # --- synthetic full-coverage values -------------------------------------------

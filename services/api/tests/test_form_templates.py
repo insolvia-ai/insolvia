@@ -53,7 +53,23 @@ def _release_params() -> list[object]:
 
 
 def test_the_registry_holds_the_expected_series() -> None:
-    assert form_series_ids() == ("form/b101", "form/b106i")
+    """The full Chapter 7 individual filing set — one series per form in
+    forms/, which the drift test below keeps in lockstep."""
+    assert form_series_ids() == (
+        "form/b101",
+        "form/b106ab",
+        "form/b106c",
+        "form/b106d",
+        "form/b106dec",
+        "form/b106ef",
+        "form/b106g",
+        "form/b106h",
+        "form/b106i",
+        "form/b106j",
+        "form/b106j2",
+        "form/b106sum",
+        "form/b107",
+    )
 
 
 @pytest.mark.parametrize("release", _release_params())
@@ -165,7 +181,18 @@ def test_form_revisions_as_of_is_the_case_pin_map() -> None:
     pins = form_revisions_as_of(date(2026, 9, 1))
     assert pins == {
         "form/b101": "2024-06-22",
+        "form/b106ab": "2015-12-01",
+        "form/b106c": "2025-04-01",
+        "form/b106d": "2015-12-01",
+        "form/b106dec": "2015-12-01",
+        "form/b106ef": "2015-12-01",
+        "form/b106g": "2015-12-01",
+        "form/b106h": "2015-12-01",
         "form/b106i": "2015-12-01",
+        "form/b106j": "2015-12-01",
+        "form/b106j2": "2015-12-01",
+        "form/b106sum": "2015-12-01",
+        "form/b107": "2025-04-01",
     }
     # And every pin round-trips through get_form, which is what makes a
     # filed case reproducible forever.

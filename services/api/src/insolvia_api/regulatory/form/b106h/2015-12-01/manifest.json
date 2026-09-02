@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b106h",
+  "effective_date": "2015-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b106h.pdf",
+    "published": null,
+    "sha256": "e20d32f18c2d3f80c75079dc821372ddc1ecfc8be228ad93a636b67a0778bdb8"
+  },
+  "notes": "Official Form 106H, Schedule H: Your Codebtors, printed revision 12/15 (current as of ingestion). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-92 field spec and AcroForm dump for this revision, copied from forms/ at ingestion \u2014 tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision."
+}

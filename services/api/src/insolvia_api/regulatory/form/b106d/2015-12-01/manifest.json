@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b106d",
+  "effective_date": "2015-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b106d.pdf",
+    "published": null,
+    "sha256": "0d0a009235bf4c70d5dd89c80616712c8c681537e49f17d7473e7367d608428b"
+  },
+  "notes": "Official Form 106D, Schedule D: Creditors Who Have Claims Secured by Property, printed revision 12/15 (current as of ingestion). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-92 field spec and AcroForm dump for this revision, copied from forms/ at ingestion \u2014 tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. Known defects carried from the spec: row 2.4's who-owes options all export 'On' (fill by widget appearance, never field value), and row 2.1's account-number field owns a second widget in Part 2's fourth notify row."
+}

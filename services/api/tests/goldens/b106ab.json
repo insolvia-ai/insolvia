@@ -1,0 +1,1446 @@
+{
+ "fields": {
+  "1 1": {
+   "value": "S6.2 real_estate.street"
+  },
+  "1 1a": {
+   "value": "S7.2 real_estate.street2"
+  },
+  "10 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "10 description": {
+   "value": "S61.0 line_10_description"
+  },
+  "10 description amount": {
+   "value": "1,224.56"
+  },
+  "11 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "11 description": {
+   "value": "S64.0 line_11_description"
+  },
+  "11 description amount": {
+   "value": "1,254.56"
+  },
+  "12": {
+   "value": "S6.0 real_estate.street"
+  },
+  "12 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "12 description": {
+   "value": "S67.0 line_12_description"
+  },
+  "12 description amount": {
+   "value": "1,284.56"
+  },
+  "13": {
+   "value": "S6.1 real_estate.street"
+  },
+  "13 description": {
+   "value": "S70.0 line_13_description"
+  },
+  "13 description amount": {
+   "value": "1,214.56"
+  },
+  "14 description": {
+   "value": "S73.0 line_14_description"
+  },
+  "14 description amount": {
+   "value": "1,244.56"
+  },
+  "15 amount": {
+   "value": "1,254.56"
+  },
+  "16 Cash amount": {
+   "value": "1,274.56"
+  },
+  "17.1 Checking account": {
+   "value": "S79.0 line_17_institution"
+  },
+  "17.1 Checking amount": {
+   "value": "1,204.56"
+  },
+  "17.2 Checking account": {
+   "value": "S79.4 line_17_institution"
+  },
+  "17.2 Checking amount": {
+   "value": "1,214.56"
+  },
+  "17.3 Checking account": {
+   "value": "S79.5 line_17_institution"
+  },
+  "17.3 Checking amount": {
+   "value": "1,224.56"
+  },
+  "17.4 Checking account": {
+   "value": "S79.6 line_17_institution"
+  },
+  "17.4 Checking amount": {
+   "value": "1,234.56"
+  },
+  "17.5 Certificates of deposit account": {
+   "value": "S79.7 line_17_institution"
+  },
+  "17.5 Certificates of deposit amount": {
+   "value": "1,244.56"
+  },
+  "17.6 Other financial account": {
+   "value": "S79.1 line_17_institution"
+  },
+  "17.6 Other financial amount": {
+   "value": "1,254.56"
+  },
+  "17.7 Other financial account": {
+   "value": "S79.2 line_17_institution"
+  },
+  "17.7 Other financial amount": {
+   "value": "1,264.56"
+  },
+  "17.8 Other financial account": {
+   "value": "S79.3 line_17_institution"
+  },
+  "17.8 Other financial amount": {
+   "value": "1,274.56"
+  },
+  "17.9 Other financial account": {
+   "value": "S79.8 line_17_institution"
+  },
+  "17.9 Other financial amount": {
+   "value": "1,284.56"
+  },
+  "18.1 Institution or issuer name": {
+   "value": "S82.0 line_18_institution"
+  },
+  "18.1 Institution or issuer name 1 amount": {
+   "value": "1,234.56"
+  },
+  "18.2 Institution or issuer name": {
+   "value": "S82.2 line_18_institution"
+  },
+  "18.2 Institution or issuer name amount": {
+   "value": "1,254.56"
+  },
+  "18.3 Institution or issuer name": {
+   "value": "S82.1 line_18_institution"
+  },
+  "18.3 Institution or issuer name amount": {
+   "value": "1,244.56"
+  },
+  "19.1 % of ownership": {
+   "value": "S86.0 line_19_ownership_pct"
+  },
+  "19.1 Name of entity": {
+   "value": "S85.0 line_19_entity"
+  },
+  "19.1 amount": {
+   "value": "1,284.56"
+  },
+  "19.2 % of ownership": {
+   "value": "S86.1 line_19_ownership_pct"
+  },
+  "19.2 Name of entity": {
+   "value": "S85.1 line_19_entity"
+  },
+  "19.2 amount": {
+   "value": "1,274.56"
+  },
+  "19.3 % of ownership": {
+   "value": "S86.2 line_19_ownership_pct"
+  },
+  "19.3 Name of entity": {
+   "value": "S85.2 line_19_entity"
+  },
+  "19.3 amount": {
+   "value": "1,294.56"
+  },
+  "1_2": {
+   "value": "S30.0 vehicle.model"
+  },
+  "1_3": {
+   "value": "S29.1 vehicle.make"
+  },
+  "1_4": {
+   "value": "S29.2 vehicle.make"
+  },
+  "20.1 Issuer name": {
+   "value": "S89.0 line_20_issuer"
+  },
+  "20.1 Issuer name amount": {
+   "value": "1,204.56"
+  },
+  "20.2 Issuer name": {
+   "value": "S89.1 line_20_issuer"
+  },
+  "20.2 Issuer name amount": {
+   "value": "1,214.56"
+  },
+  "20.3 Issuer name": {
+   "value": "S89.2 line_20_issuer"
+  },
+  "20.3 Issuer name amount": {
+   "value": "1,224.56"
+  },
+  "21.1 401k or similar plan": {
+   "value": "S92.6 line_21_institution"
+  },
+  "21.1 401k or similar plan amount": {
+   "value": "1,234.56"
+  },
+  "21.2 Pension plan": {
+   "value": "S92.0 line_21_institution"
+  },
+  "21.2 Pension plan amount": {
+   "value": "1,244.56"
+  },
+  "21.3 IRA": {
+   "value": "S92.1 line_21_institution"
+  },
+  "21.3 IRA amount": {
+   "value": "1,254.56"
+  },
+  "21.4 Retirement account": {
+   "value": "S92.2 line_21_institution"
+  },
+  "21.4 Retirement account amount": {
+   "value": "1,264.56"
+  },
+  "21.5 Keogh": {
+   "value": "S92.3 line_21_institution"
+  },
+  "21.5 Keogh amount": {
+   "value": "1,274.56"
+  },
+  "21.6 Additional account": {
+   "value": "S92.4 line_21_institution"
+  },
+  "21.6 Additional account amount": {
+   "value": "1,284.56"
+  },
+  "21.7 Additional account": {
+   "value": "S92.5 line_21_institution"
+  },
+  "21.7 Additional account amount": {
+   "value": "1,294.56"
+  },
+  "22.1 Electric": {
+   "value": "S95.0 line_22_institution"
+  },
+  "22.1 Electric amount": {
+   "value": "1,264.56"
+  },
+  "22.2 Gas": {
+   "value": "S95.1 line_22_institution"
+  },
+  "22.2 Gas amount": {
+   "value": "1,274.56"
+  },
+  "22.3 Heating oil": {
+   "value": "S95.7 line_22_institution"
+  },
+  "22.3 Heating oil amount": {
+   "value": "1,284.56"
+  },
+  "22.4 Security deposit on rental unit": {
+   "value": "S95.8 line_22_institution"
+  },
+  "22.4 Security deposit on rental unit amount": {
+   "value": "1,294.56"
+  },
+  "22.5 Prepaid rent": {
+   "value": "S95.2 line_22_institution"
+  },
+  "22.5 Prepaid rent amount": {
+   "value": "1,204.56"
+  },
+  "22.6 Telephone": {
+   "value": "S95.6 line_22_institution"
+  },
+  "22.6 Telephone amount": {
+   "value": "1,214.56"
+  },
+  "22.7 Water": {
+   "value": "S95.3 line_22_institution"
+  },
+  "22.7 Water amount": {
+   "value": "1,224.56"
+  },
+  "22.8 Rented furniture": {
+   "value": "S95.4 line_22_institution"
+  },
+  "22.8 Rented furniture amount": {
+   "value": "1,234.56"
+  },
+  "22.9 Other": {
+   "value": "S95.5 line_22_institution"
+  },
+  "22.9 Other amount": {
+   "value": "1,244.56"
+  },
+  "23.1 Annuities": {
+   "value": "S98.1 line_23_issuer"
+  },
+  "23.1 Annuities amount": {
+   "value": "1,294.56"
+  },
+  "23.2 Annuities": {
+   "value": "S98.0 line_23_issuer"
+  },
+  "23.2 Annuities amount": {
+   "value": "1,204.56"
+  },
+  "23.3 Annuities": {
+   "value": "S98.2 line_23_issuer"
+  },
+  "23.3 Annuities amount": {
+   "value": "1,214.56"
+  },
+  "24.1 Interest in an education IRA": {
+   "value": "S101.0 line_24_institution"
+  },
+  "24.1 Interest in an education IRA amount": {
+   "value": "1,224.56"
+  },
+  "24.2 Interest in an education IRA": {
+   "value": "S101.1 line_24_institution"
+  },
+  "24.3 Interest in an education IRA": {
+   "value": "1,234.56"
+  },
+  "25 Trusts, equitable or future interests in property": {
+   "value": "S104.0 line_25_description"
+  },
+  "25 Trusts, equitable or future interests in property amount": {
+   "value": "1,254.56"
+  },
+  "26 Patents, copyrights, trademarks, trade secrets": {
+   "value": "S107.0 line_26_description"
+  },
+  "26 Patents, copyrights, trademarks, trade secrets amount": {
+   "value": "1,284.56"
+  },
+  "27 Liscenses, Franchises": {
+   "value": "S110.0 line_27_description"
+  },
+  "27 Liscenses, Franchises amount": {
+   "value": "1,214.56"
+  },
+  "28 Tax refunds owed": {
+   "value": "S113.0 line_28_description"
+  },
+  "28 Tax refunds owed amout1": {
+   "value": "1,244.56"
+  },
+  "28 Tax refunds owed amout2": {
+   "value": "1,254.56"
+  },
+  "28 Tax refunds owed amout3": {
+   "value": "1,264.56"
+  },
+  "29 Family support": {
+   "value": "S118.0 line_29_description"
+  },
+  "29 Family support amount1": {
+   "value": "1,294.56"
+  },
+  "29 Family support amount2": {
+   "value": "1,204.56"
+  },
+  "29 Family support amount3": {
+   "value": "1,214.56"
+  },
+  "29 Family support amount4": {
+   "value": "1,224.56"
+  },
+  "29 Family support amount5": {
+   "value": "1,234.56"
+  },
+  "2_2": {
+   "value": "2026"
+  },
+  "2_3": {
+   "value": "S30.1 vehicle.model"
+  },
+  "2_4": {
+   "value": "S30.2 vehicle.model"
+  },
+  "3 1": {
+   "value": "S29.3 vehicle.make"
+  },
+  "3 2": {
+   "value": "S30.3 vehicle.model"
+  },
+  "3 3": {
+   "value": "2026"
+  },
+  "3 4": {
+   "value": "9"
+  },
+  "32 Interest in property due you from someone who died": {
+   "value": "S132.0 line_32_description"
+  },
+  "33": {
+   "value": "S135.0 line_33_description"
+  },
+  "34": {
+   "value": "S138.0 line_34_description"
+  },
+  "35": {
+   "value": "S141.0 line_35_description"
+  },
+  "38 Accounts receivable or commissions already earned": {
+   "value": "S146.0 line_38_description"
+  },
+  "39 Office equipment furnishings and supplies": {
+   "value": "S149.0 line_39_description"
+  },
+  "3_2": {
+   "value": "2026"
+  },
+  "3_3": {
+   "value": "2026"
+  },
+  "40 Machinery fixtures equipment and tools of your trade": {
+   "value": "S152.0 line_40_description"
+  },
+  "41 Inventory": {
+   "value": "S155.0 line_41_description"
+  },
+  "42.1 Name of entity": {
+   "value": "S158.1 line_42_entity"
+  },
+  "42.2 Name of entity": {
+   "value": "S158.0 line_42_entity"
+  },
+  "42.3 Name of entity": {
+   "value": "S158.2 line_42_entity"
+  },
+  "43 Identifiable information": {
+   "value": "S163.0 line_43_description"
+  },
+  "44.1": {
+   "value": "S166.0 line_44_description"
+  },
+  "44.2": {
+   "value": "S166.1 line_44_description"
+  },
+  "44.3": {
+   "value": "S166.2 line_44_description"
+  },
+  "44.4": {
+   "value": "S166.3 line_44_description"
+  },
+  "44.5": {
+   "value": "S166.4 line_44_description"
+  },
+  "44.6": {
+   "value": "S166.5 line_44_description"
+  },
+  "47 Farm Animals": {
+   "value": "S171.0 line_47_description"
+  },
+  "48 Cropseither growing or harvested": {
+   "value": "S174.0 line_48_description"
+  },
+  "49": {
+   "value": "S177.0 line_49_description"
+  },
+  "50": {
+   "value": "S180.0 line_50_description"
+  },
+  "51": {
+   "value": "S183.0 line_51_description"
+  },
+  "53 Examples Season tickets country club membership": {
+   "value": "S187.0 line_53_description"
+  },
+  "6 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "6 description": {
+   "value": "S49.0 line_6_description"
+  },
+  "6 description amount": {
+   "value": "1,204.56"
+  },
+  "7 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "7 description": {
+   "value": "S52.0 line_7_description"
+  },
+  "7 description amount": {
+   "value": "1,234.56"
+  },
+  "8 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "8 description": {
+   "value": "S55.0 line_8_description"
+  },
+  "8 description amount": {
+   "value": "1,264.56"
+  },
+  "9 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "9 description": {
+   "value": "S58.0 line_9_description"
+  },
+  "9 description amount": {
+   "value": "1,294.56"
+  },
+  "Approximate mileage_2": {
+   "value": "6"
+  },
+  "Approximate mileage_3": {
+   "value": "7"
+  },
+  "Approximate mileage_4": {
+   "value": "8"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Beneficiary 1": {
+   "value": "S129.0 line_31_beneficiary"
+  },
+  "Beneficiary 2": {
+   "value": "S129.1 line_31_beneficiary"
+  },
+  "Beneficiary 3": {
+   "value": "S129.2 line_31_beneficiary"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check 1": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check 16": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "Check 17": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "Check 18": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check 2": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check 3": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "Check if this is community property": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see_4": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see_5": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property see_6": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check if this is community property_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "City": {
+   "value": "S8.0 real_estate.city"
+  },
+  "City_2": {
+   "value": "S8.1 real_estate.city"
+  },
+  "City_3": {
+   "value": "S8.2 real_estate.city"
+  },
+  "Company name 1": {
+   "value": "S128.0 line_31_company"
+  },
+  "Company name 2": {
+   "value": "S128.1 line_31_company"
+  },
+  "Company name 3": {
+   "value": "S128.2 line_31_company"
+  },
+  "Condominium or cooperative": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Condominium or cooperative_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Condominium or cooperative_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "County": {
+   "value": "S11.0 real_estate.county"
+  },
+  "County_2": {
+   "value": "S11.1 real_estate.county"
+  },
+  "County_3": {
+   "value": "S11.2 real_estate.county"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Duplex or multiunit building": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Duplex or multiunit building_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Duplex or multiunit building_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Examples Boats trailers motors personal watercraft fishing vessels snowmobiles motorcycle accessories": {
+   "value": "/No_2",
+   "widget_states": [
+    "/No_2",
+    "/Off"
+   ]
+  },
+  "If you own or have more than one describe here": {
+   "value": "S29.0 vehicle.make"
+  },
+  "Investment property": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Investment property_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Investment property_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Land": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Land_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Land_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Make": {
+   "value": "S39.0 other_vehicle.make"
+  },
+  "Make_2": {
+   "value": "S39.1 other_vehicle.make"
+  },
+  "Manufactured or mobile home": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Manufactured or mobile home_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Manufactured or mobile home_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Model": {
+   "value": "S40.0 other_vehicle.model"
+  },
+  "Model_2": {
+   "value": "S40.1 other_vehicle.model"
+  },
+  "Other": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Other information": {
+   "value": "S33.0 vehicle.other_information"
+  },
+  "Other information_2": {
+   "value": "S33.1 vehicle.other_information"
+  },
+  "Other information_3": {
+   "value": "S33.2 vehicle.other_information"
+  },
+  "Other information_4": {
+   "value": "S33.3 vehicle.other_information"
+  },
+  "Other information_5": {
+   "value": "S42.0 other_vehicle.other_information"
+  },
+  "Other information_6": {
+   "value": "S42.1 other_vehicle.other_information"
+  },
+  "Other_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Other_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Singlefamily home": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Singlefamily home_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Singlefamily home_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "State": {
+   "value": "FL"
+  },
+  "State_2": {
+   "value": "FL"
+  },
+  "State_3": {
+   "value": "FL"
+  },
+  "Timeshare": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Timeshare_2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Timeshare_3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Who has an interest in the property Check one": {
+   "value": "S24.1 real_estate.ownership_nature"
+  },
+  "Who has an interest in the property Check one_2": {
+   "value": "S24.2 real_estate.ownership_nature"
+  },
+  "Who has interest in property": {
+   "value": "/One of debtors and another",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/One of debtors and another"
+   ]
+  },
+  "Who has interest in property 2": {
+   "value": "/Debtor 1",
+   "widget_states": [
+    "/Debtor 1",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 3": {
+   "value": "/Debtor 2",
+   "widget_states": [
+    "/Off",
+    "/Debtor 2",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 4": {
+   "value": "/Debtor 2",
+   "widget_states": [
+    "/Off",
+    "/Debtor 2",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 5": {
+   "value": "/One of Debtors and another",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/One of Debtors and another"
+   ]
+  },
+  "Who has interest in property 6": {
+   "value": "/Debtor 1",
+   "widget_states": [
+    "/Debtor 1",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 7": {
+   "value": "/Debtor 1 and 2",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Debtor 1 and 2",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 8": {
+   "value": "/One of Debtors and another",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/One of Debtors and another"
+   ]
+  },
+  "Who has interest in property 9": {
+   "value": "/Debtor 1 and 2",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Debtor 1 and 2",
+    "/Off"
+   ]
+  },
+  "Year": {
+   "value": "2026"
+  },
+  "Year_2": {
+   "value": "2026"
+  },
+  "ZIP Code": {
+   "value": "S10.0 real_estate.zip"
+  },
+  "ZIP Code_2": {
+   "value": "S10.1 real_estate.zip"
+  },
+  "ZIP Code_3": {
+   "value": "S10.2 real_estate.zip"
+  },
+  "check 13": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 14": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 19": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 20": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 21": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 22": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 23": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 24": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 25": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 26": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 27": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 28": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "check 29": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 30": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 31": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 32": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 33": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 34": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 35": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 37": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 38": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 39": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 40": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 41": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 42": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 43": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 43_1": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 44": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 46": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 47": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "check 48": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 49": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 50": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 51": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "check 53": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "property identification number": {
+   "value": "S26.0 real_estate.other_information"
+  },
+  "property identification number_2": {
+   "value": "S26.1 real_estate.other_information"
+  },
+  "property identification number_3": {
+   "value": "S26.2 real_estate.other_information"
+  },
+  "the entireties or a life estate if known": {
+   "value": "S24.0 real_estate.ownership_nature"
+  },
+  "undefined_10": {
+   "value": "1,234.56"
+  },
+  "undefined_107": {
+   "value": "S125.0 line_30_description"
+  },
+  "undefined_108": {
+   "value": "1,264.56"
+  },
+  "undefined_109": {
+   "value": "1,204.56"
+  },
+  "undefined_11": {
+   "value": "1,244.56"
+  },
+  "undefined_110": {
+   "value": "1,214.56"
+  },
+  "undefined_111": {
+   "value": "1,224.56"
+  },
+  "undefined_114": {
+   "value": "1,234.56"
+  },
+  "undefined_117": {
+   "value": "1,264.56"
+  },
+  "undefined_12": {
+   "value": "S20.2 real_estate.type_other_specify"
+  },
+  "undefined_120": {
+   "value": "1,294.56"
+  },
+  "undefined_123": {
+   "value": "1,224.56"
+  },
+  "undefined_124": {
+   "value": "1,234.56"
+  },
+  "undefined_125": {
+   "value": "1,274.56"
+  },
+  "undefined_126": {
+   "value": "1,204.56"
+  },
+  "undefined_127": {
+   "value": "1,234.56"
+  },
+  "undefined_128": {
+   "value": "1,264.56"
+  },
+  "undefined_129": {
+   "value": "1,204.56"
+  },
+  "undefined_13": {
+   "value": "1,274.56"
+  },
+  "undefined_130": {
+   "value": "S159.0 line_42_ownership_pct"
+  },
+  "undefined_131": {
+   "value": "S159.1 line_42_ownership_pct"
+  },
+  "undefined_132": {
+   "value": "1,214.56"
+  },
+  "undefined_133": {
+   "value": "S159.2 line_42_ownership_pct"
+  },
+  "undefined_134": {
+   "value": "1,224.56"
+  },
+  "undefined_135": {
+   "value": "1,244.56"
+  },
+  "undefined_137": {
+   "value": "1,274.56"
+  },
+  "undefined_138": {
+   "value": "1,284.56"
+  },
+  "undefined_139": {
+   "value": "1,294.56"
+  },
+  "undefined_14": {
+   "value": "1,264.56"
+  },
+  "undefined_140": {
+   "value": "1,204.56"
+  },
+  "undefined_141": {
+   "value": "1,214.56"
+  },
+  "undefined_142": {
+   "value": "1,224.56"
+  },
+  "undefined_143": {
+   "value": "1,284.56"
+  },
+  "undefined_144": {
+   "value": "1,224.56"
+  },
+  "undefined_145": {
+   "value": "1,254.56"
+  },
+  "undefined_148": {
+   "value": "1,284.56"
+  },
+  "undefined_15": {
+   "value": "1,274.56"
+  },
+  "undefined_151": {
+   "value": "1,214.56"
+  },
+  "undefined_153": {
+   "value": "1,244.56"
+  },
+  "undefined_154": {
+   "value": "1,254.56"
+  },
+  "undefined_155": {
+   "value": "1,284.56"
+  },
+  "undefined_156": {
+   "value": "1,294.56"
+  },
+  "undefined_157": {
+   "value": "1,204.56"
+  },
+  "undefined_158": {
+   "value": "1,294.56"
+  },
+  "undefined_159": {
+   "value": "1,204.56"
+  },
+  "undefined_16": {
+   "value": "1,274.56"
+  },
+  "undefined_160": {
+   "value": "1,214.56"
+  },
+  "undefined_161": {
+   "value": "1,224.56"
+  },
+  "undefined_162": {
+   "value": "1,234.56"
+  },
+  "undefined_163": {
+   "value": "1,244.56"
+  },
+  "undefined_164": {
+   "value": "1,254.56"
+  },
+  "undefined_165": {
+   "value": "1,264.56"
+  },
+  "undefined_166": {
+   "value": "1,274.56"
+  },
+  "undefined_167": {
+   "value": "1,284.56"
+  },
+  "undefined_17": {
+   "value": "1,284.56"
+  },
+  "undefined_18": {
+   "value": "1,284.56"
+  },
+  "undefined_19": {
+   "value": "1,294.56"
+  },
+  "undefined_2": {
+   "value": "1,214.56"
+  },
+  "undefined_20": {
+   "value": "1,294.56"
+  },
+  "undefined_21": {
+   "value": "1,204.56"
+  },
+  "undefined_22": {
+   "value": "1,254.56"
+  },
+  "undefined_23": {
+   "value": "1,264.56"
+  },
+  "undefined_24": {
+   "value": "1,264.56"
+  },
+  "undefined_25": {
+   "value": "1,274.56"
+  },
+  "undefined_26": {
+   "value": "1,274.56"
+  },
+  "undefined_3": {
+   "value": "1,224.56"
+  },
+  "undefined_4": {
+   "value": "S20.0 real_estate.type_other_specify"
+  },
+  "undefined_5": {
+   "value": "S7.0 real_estate.street2"
+  },
+  "undefined_6": {
+   "value": "1,224.56"
+  },
+  "undefined_7": {
+   "value": "1,234.56"
+  },
+  "undefined_8": {
+   "value": "S20.1 real_estate.type_other_specify"
+  },
+  "undefined_9": {
+   "value": "S7.1 real_estate.street2"
+  }
+ },
+ "release": "form/b106ab@2015-12-01",
+ "sha256": "e79ed7256ebf70103a6f1f15a0dcaa0f3b6c2bd2e14ce5a587df4a30e288f396"
+}
