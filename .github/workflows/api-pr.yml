@@ -33,6 +33,12 @@ jobs:
             # The shared domain this service installs from a local path (issue
             # #208) — a core change must re-run this suite and image build.
             packages/insolvia_core/**
+            # The form field specs (issue #92): the form template registry
+            # under src/insolvia_api/regulatory/form/ carries ingestion-time
+            # copies of forms/specs + forms/acroform, and
+            # tests/test_form_templates.py refuses drift between the two — so
+            # a forms/ change must re-run this suite.
+            forms/**
             # Shared root lint config — a rule change must re-lint this service.
             ruff.toml
             .github/workflows/api-pr.yml

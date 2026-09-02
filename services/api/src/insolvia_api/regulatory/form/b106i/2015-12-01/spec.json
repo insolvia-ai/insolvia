@@ -1,0 +1,437 @@
+{
+ "form": "b106i",
+ "official_number": "106I",
+ "title": "Schedule I: Your Income",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "Describe Employment"},
+  {"number": 2, "title": "Give Details About Monthly Income"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_or_supplement",
+   "part": null,
+   "label": "Check if this is: an amended filing / a supplement showing postpetition chapter 13 income",
+   "type": "radio",
+   "options": [
+    {"value": "amended", "label": "An amended filing", "maps_to_value": "case.is_amended"},
+    {"value": "supplemental", "label": "A supplement showing postpetition chapter 13 income as of the following date"}
+   ],
+   "maps_to": {"entity": "case", "attribute": "is_amended", "notes": "the supplemental state pairs with case.ch13_supplement_date"},
+   "pdf": {"names": ["Check 1"]}
+  },
+  {
+   "id": "caption.supplement_date",
+   "part": null,
+   "label": "Postpetition chapter 13 income as of the following date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "case", "attribute": "ch13_supplement_date"},
+   "pdf": {"names": ["Supplemental income date"]}
+  },
+  {
+   "id": "employment_status",
+   "part": 1,
+   "line": "1",
+   "label": "Employment status",
+   "type": "radio",
+   "options": [
+    {"value": "employed", "label": "Employed"},
+    {"value": "unemployed", "label": "Not employed"}
+   ],
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "employment", "attribute": "status"},
+   "pdf": {"pattern": "Check emploment status Debtor [12]"},
+   "notes": "More than one job: the form says attach a separate page with additional employers — employment is a many-cardinality entity; the engine renders extras on a continuation sheet."
+  },
+  {
+   "id": "occupation",
+   "part": 1,
+   "line": "1",
+   "label": "Occupation",
+   "type": "text",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "employment", "attribute": "occupation"},
+   "pdf": {"pattern": "Occupation Debtor [12]"}
+  },
+  {
+   "id": "employer_name",
+   "part": 1,
+   "line": "1",
+   "label": "Employer's name",
+   "type": "text",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "employment", "attribute": "employer_name"},
+   "pdf": {"pattern": "Employers Name Debtor [12]"}
+  },
+  {
+   "id": "employer_address",
+   "part": 1,
+   "line": "1",
+   "label": "Employer's address (Number, Street / City, State, ZIP Code)",
+   "type": "text",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "employment", "attribute": "employer_address", "notes": "one structured address rendered across three street lines + city/state/zip boxes"},
+   "pdf": {"pattern": "Employers (Street[123]|City|State) Debtor [12]|Employers Zip debtor [12]"}
+  },
+  {
+   "id": "how_long_employed",
+   "part": 1,
+   "line": "1",
+   "label": "How long employed there?",
+   "type": "text",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "employment", "attribute": "employed_since", "notes": "the form asks a duration; the engine renders it from the stored start date"},
+   "pdf": {"pattern": "Time employed Debtor [12]"}
+  },
+  {
+   "id": "line_2_gross_wages",
+   "part": 2,
+   "line": "2",
+   "label": "List monthly gross wages, salary, and commissions (before all payroll deductions)",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "wages", "notes": "one income_summary per debtor column; the 106I monthly lines per case-data-model.md"},
+   "pdf": {"pattern": "Amount 2 Debtor [12]"}
+  },
+  {
+   "id": "line_3_overtime",
+   "part": 2,
+   "line": "3",
+   "label": "Estimate and list monthly overtime pay",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "overtime"},
+   "pdf": {"pattern": "Amount 3 Debtor [12]"}
+  },
+  {
+   "id": "line_4_gross_income",
+   "part": 2,
+   "line": "4",
+   "label": "Calculate gross income. Add line 2 + line 3.",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "line 2 + line 3, per debtor column"},
+   "pdf": {"pattern": "Amount 4 Debtor [12]"}
+  },
+  {
+   "id": "line_4_copy",
+   "part": 2,
+   "line": "4",
+   "label": "Copy line 4 here (page 2 carry-forward)",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "copy of line 4 from page 1"},
+   "pdf": {"pattern": "Amount 4 Debtor [12]a"}
+  },
+  {
+   "id": "line_5a_tax_medicare_ss",
+   "part": 2,
+   "line": "5a",
+   "label": "Tax, Medicare, and Social Security deductions",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_tax_medicare_social_security"},
+   "pdf": {"pattern": "Amount 5a Debtor [12]"}
+  },
+  {
+   "id": "line_5b_mandatory_retirement",
+   "part": 2,
+   "line": "5b",
+   "label": "Mandatory contributions for retirement plans",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_mandatory_retirement"},
+   "pdf": {"pattern": "Amount 5b Debtor [12]"}
+  },
+  {
+   "id": "line_5c_voluntary_retirement",
+   "part": 2,
+   "line": "5c",
+   "label": "Voluntary contributions for retirement plans",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_voluntary_retirement"},
+   "pdf": {"pattern": "Amount 5c Debtor [12]"}
+  },
+  {
+   "id": "line_5d_retirement_loan_repayment",
+   "part": 2,
+   "line": "5d",
+   "label": "Required repayments of retirement fund loans",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_retirement_loan_repayment"},
+   "pdf": {"pattern": "Amount 5d Debtor [12]"}
+  },
+  {
+   "id": "line_5e_insurance",
+   "part": 2,
+   "line": "5e",
+   "label": "Insurance",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_insurance"},
+   "pdf": {"pattern": "Amount 5e Debtor [12]"}
+  },
+  {
+   "id": "line_5f_domestic_support",
+   "part": 2,
+   "line": "5f",
+   "label": "Domestic support obligations",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_domestic_support"},
+   "pdf": {"pattern": "Amount 5f Debtor [12]"}
+  },
+  {
+   "id": "line_5g_union_dues",
+   "part": 2,
+   "line": "5g",
+   "label": "Union dues",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_union_dues"},
+   "pdf": {"pattern": "Amount 5g Debtor [12]"}
+  },
+  {
+   "id": "line_5h_other_deductions",
+   "part": 2,
+   "line": "5h",
+   "label": "Other deductions",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_other"},
+   "pdf": {"pattern": "Amount 5h Debtor [12]"}
+  },
+  {
+   "id": "line_5h_other_deductions_specify",
+   "part": 2,
+   "line": "5h",
+   "label": "Other deductions. Specify:",
+   "type": "text",
+   "maps_to": {"entity": "income_summary", "attribute": "deduction_other_specify", "notes": "one specify box shared by both debtor columns"},
+   "pdf": {"names": ["Other deductions 5h"]}
+  },
+  {
+   "id": "line_6_total_deductions",
+   "part": 2,
+   "line": "6",
+   "label": "Add the payroll deductions. Add lines 5a through 5h.",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "sum of lines 5a–5h, per debtor column"},
+   "pdf": {"pattern": "Amount 6 Debtor [12]"}
+  },
+  {
+   "id": "line_7_take_home_pay",
+   "part": 2,
+   "line": "7",
+   "label": "Calculate total monthly take-home pay. Subtract line 6 from line 4.",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "line 4 − line 6, per debtor column"},
+   "pdf": {"pattern": "Amount 7 Debtor [12]"}
+  },
+  {
+   "id": "line_8a_rental_business_net",
+   "part": 2,
+   "line": "8a",
+   "label": "Net income from rental property and from operating a business, profession, or farm (attach a statement for each property and business)",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_rental_business"},
+   "pdf": {"pattern": "Amount 8a Debtor [12]"}
+  },
+  {
+   "id": "line_8b_interest_dividends",
+   "part": 2,
+   "line": "8b",
+   "label": "Interest and dividends",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_interest_dividends"},
+   "pdf": {"pattern": "Amount 8b Debtor [12]"}
+  },
+  {
+   "id": "line_8c_family_support",
+   "part": 2,
+   "line": "8c",
+   "label": "Family support payments that you, a non-filing spouse, or a dependent regularly receive (alimony, spousal support, child support, maintenance, divorce settlement, property settlement)",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_family_support"},
+   "pdf": {"pattern": "Amount 8c Debtor [12]"}
+  },
+  {
+   "id": "line_8d_unemployment",
+   "part": 2,
+   "line": "8d",
+   "label": "Unemployment compensation",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_unemployment"},
+   "pdf": {"pattern": "Amount 8d Debtor [12]"}
+  },
+  {
+   "id": "line_8e_social_security",
+   "part": 2,
+   "line": "8e",
+   "label": "Social Security",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_social_security"},
+   "pdf": {"pattern": "Amount 8e Debtor [12]"}
+  },
+  {
+   "id": "line_8f_government_assistance",
+   "part": 2,
+   "line": "8f",
+   "label": "Other government assistance that you regularly receive (cash assistance and the value, if known, of non-cash assistance)",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_government_assistance"},
+   "pdf": {"pattern": "Amount 8f Debtor [12]"}
+  },
+  {
+   "id": "line_8f_government_assistance_specify",
+   "part": 2,
+   "line": "8f",
+   "label": "Other government assistance. Specify:",
+   "type": "text",
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_government_assistance_specify", "notes": "one specify box shared by both debtor columns"},
+   "pdf": {"names": ["Assistance 8f"]}
+  },
+  {
+   "id": "line_8g_pension_retirement",
+   "part": 2,
+   "line": "8g",
+   "label": "Pension or retirement income",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_pension_retirement"},
+   "pdf": {"pattern": "Amount 8g Debtor [12]"}
+  },
+  {
+   "id": "line_8h_other_income",
+   "part": 2,
+   "line": "8h",
+   "label": "Other monthly income",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_other"},
+   "pdf": {"pattern": "Amount 8h Debtor [12]"}
+  },
+  {
+   "id": "line_8h_other_income_specify",
+   "part": 2,
+   "line": "8h",
+   "label": "Other monthly income. Specify:",
+   "type": "text",
+   "maps_to": {"entity": "income_summary", "attribute": "other_income_other_specify", "notes": "one specify box shared by both debtor columns"},
+   "pdf": {"names": ["Other income 8h"]}
+  },
+  {
+   "id": "line_9_total_other_income",
+   "part": 2,
+   "line": "9",
+   "label": "Add all other income. Add lines 8a through 8h.",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "sum of lines 8a–8h, per debtor column"},
+   "pdf": {"pattern": "Amount 9 Debtor [12]"}
+  },
+  {
+   "id": "line_10_monthly_income",
+   "part": 2,
+   "line": "10",
+   "label": "Calculate monthly income. Add line 7 + line 9.",
+   "type": "money",
+   "repeats": {"group": "debtor_column", "count": 2},
+   "maps_to": {"derived": "line 7 + line 9, per debtor column"},
+   "pdf": {"pattern": "Amount 10 Debtor [12]"}
+  },
+  {
+   "id": "line_10_combined",
+   "part": 2,
+   "line": "10",
+   "label": "Add the entries in line 10 for Debtor 1 and Debtor 2 or non-filing spouse",
+   "type": "money",
+   "maps_to": {"derived": "line 10 Debtor 1 + line 10 Debtor 2"},
+   "pdf": {"names": ["Amount 10"]}
+  },
+  {
+   "id": "line_11_household_contributions",
+   "part": 2,
+   "line": "11",
+   "label": "State all other regular contributions to the expenses that you list in Schedule J",
+   "type": "money",
+   "maps_to": {"entity": "income_summary", "attribute": "household_contributions", "notes": "one value for the household, carried on the debtor-1 summary per case-data-model.md"},
+   "pdf": {"names": ["Amount 11"]},
+   "notes": "The printed form has a 'Specify:' blank on line 11 but the official PDF ships no fillable widget for it; income_summary.household_contributions_specify has nowhere to land on this revision."
+  },
+  {
+   "id": "line_12_combined_monthly_income",
+   "part": 2,
+   "line": "12",
+   "label": "Add the amount in the last column of line 10 to the amount in line 11. The result is the combined monthly income.",
+   "type": "money",
+   "maps_to": {"derived": "line 10 combined + line 11; copied to B106Sum line 4"},
+   "pdf": {"names": ["Amount 12"]}
+  },
+  {
+   "id": "line_13_change_expected",
+   "part": 2,
+   "line": "13",
+   "label": "Do you expect an increase or decrease within the year after you file this form?",
+   "type": "radio",
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes. Explain:"}
+   ],
+   "maps_to": {"entity": "income_summary", "attribute": "change_expected"},
+   "pdf": {"names": ["Check increase"]}
+  },
+  {
+   "id": "line_13_change_explanation",
+   "part": 2,
+   "line": "13",
+   "label": "Yes. Explain:",
+   "type": "text",
+   "maps_to": {"entity": "income_summary", "attribute": "change_explanation"},
+   "pdf": {"names": ["Increase/Decrease 13"]}
+  }
+ ]
+}
