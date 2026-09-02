@@ -121,10 +121,13 @@ class OptionSpec:
 class FieldSpec:
     """One logical field of the form, with its widget claims resolved.
 
-    `pdf_names` is the resolved claim set in acroform-dump order — document
-    order, which for these forms is layout order. A field claiming several
-    PDF fields is a repetition (two debtor columns, table rows); the fill
-    engine addresses those instances by PDF name."""
+    `pdf_names` is the resolved claim set in PRINTED ROW ORDER: an explicit
+    `names` claim keeps the spec's curated order, and a pattern's hits sort
+    by the `NN.M` row marker in their names where every hit carries one
+    (dump order otherwise — see `_pattern_order` for why the dump cannot be
+    trusted). A field claiming several PDF fields is a repetition (two
+    debtor columns, table rows); the fill engine addresses those instances
+    by PDF name."""
 
     id: str
     type: str
@@ -234,6 +237,30 @@ def _widgets(dump: Mapping[str, object], where: str) -> dict[str, Widget]:
     return widgets
 
 
+_ROW_MARKER_RE = re.compile(r"^(\d+)\.(\d+)\b")
+
+
+def _pattern_order(hits: list[str], dump_order: Mapping[str, int]) -> list[str]:
+    """Order a pattern's hits for `pdf_names`.
+
+    A pattern cannot say which hit is which printed row, so the loader
+    derives it: when every hit starts with the official forms' `NN.M` row
+    marker ("17.1 Checking account"), the marker is the row identity —
+    reliable where the dump's field order is not. Otherwise the dump order
+    stands, which is the best remaining approximation.
+    """
+    markers = [_ROW_MARKER_RE.match(name) for name in hits]
+    if all(markers):
+        return sorted(
+            hits,
+            key=lambda name: tuple(
+                int(part)
+                for part in _ROW_MARKER_RE.match(name).groups()  # type: ignore[union-attr]
+            ),
+        )
+    return sorted(hits, key=lambda name: dump_order[name])
+
+
 def _options(raw: object, where: str, fid: str) -> tuple[OptionSpec, ...]:
     if raw is None:
         return ()
@@ -298,11 +325,16 @@ def _field(
         hits = [n for n in widgets if rx.fullmatch(n)]
         if not hits:
             raise _fail(where, f"{fid}: pattern matched nothing: {pattern!r}")
-        claimed.extend(hits)
+        claimed.extend(_pattern_order(hits, dump_order))
 
-    # Dump order — document order — so a repeated field's instances have one
-    # stable, layout-meaningful ordering however the claim was written.
-    claimed_ordered = tuple(sorted(set(claimed), key=lambda n: dump_order[n]))
+    # `pdf_names` is the PRINTED ROW ORDER the projection layer fills by.
+    # An explicit `names` claim keeps the spec's own order: those lists were
+    # curated against the page's geometry (the spec notes record the
+    # x-position analysis), and the AcroForm dump's field order is NOT
+    # reading order — B106A/B's dump interleaves line 17's row names as
+    # 17.1, 17.6, 17.7, …, so sorting by dump position (what this loader
+    # once did) put the second deposit's name on row six.
+    claimed_ordered = tuple(dict.fromkeys(claimed))
     if len(claimed_ordered) != len(claimed):
         raise _fail(where, f"{fid}: claims the same PDF field twice")
 

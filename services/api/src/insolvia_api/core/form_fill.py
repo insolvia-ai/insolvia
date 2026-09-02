@@ -282,6 +282,65 @@ def _apply_widget_states(
                 annotation[NameObject("/AS")] = NameObject(f"/{state}")
 
 
+def _field_nodes(writer: PdfWriter) -> list[tuple[DictionaryObject, str]]:
+    """Every field node that owns widgets, with its fully qualified name —
+    the annotation itself where it carries /FT and /T, its parent otherwise
+    (mirroring pypdf's own resolution)."""
+    nodes: dict[int, tuple[DictionaryObject, str]] = {}
+    for page in writer.pages:
+        for ref in page.get("/Annots") or []:
+            annotation = ref.get_object()
+            if not isinstance(annotation, DictionaryObject):
+                continue  # pragma: no cover - defensive
+            if "/FT" in annotation and "/T" in annotation:
+                node = annotation
+            else:
+                parent = annotation.get("/Parent")
+                if parent is None:
+                    continue  # pragma: no cover - defensive
+                node = parent.get_object()
+            qualified = _widget_field_name(annotation)
+            if qualified is not None:
+                nodes[id(node)] = (node, qualified)
+    return list(nodes.values())
+
+
+def _apply_field_updates(writer: PdfWriter, field_updates: Mapping[str, str]) -> None:
+    """Set each value on exactly the field its QUALIFIED name addresses.
+
+    pypdf's `update_page_form_field_values` also matches a key against every
+    field node's own partial /T, so on a form with hierarchical names a
+    top-level field called "3" would broadcast into "2.3" and "check 2.3" —
+    B106C's statute column collides exactly like this. Each key is therefore
+    applied on its own, with any OTHER field node whose partial /T equals
+    the key renamed out of the way for the duration and restored afterwards
+    (the same object is put back, so the output bytes carry no trace).
+    """
+    nodes = _field_nodes(writer)
+    sentinel = NameObject("/__insolvia_fill_shield__")
+    for key, value in field_updates.items():
+        shielded: list[tuple[DictionaryObject, PdfObject]] = []
+        for node, qualified in nodes:
+            if (
+                qualified != key
+                and node.get("/T") is not None
+                and str(node["/T"]) == key
+            ):
+                shielded.append((node, node.raw_get("/T")))
+                node[NameObject("/T")] = sentinel
+        try:
+            for page in writer.pages:
+                # pypdf updates the widgets present on each page; a field
+                # whose widgets span pages (B101's chapter boxes on pages 1
+                # and 3) is simply updated on each of them.
+                writer.update_page_form_field_values(
+                    page, {key: value}, auto_regenerate=False
+                )
+        finally:
+            for node, original in shielded:
+                node[NameObject("/T")] = original
+
+
 def fill_form(release: FormRelease, values: FieldValues) -> bytes:
     """Fill the release's official template with `values`, deterministically.
 
@@ -306,13 +365,7 @@ def fill_form(release: FormRelease, values: FieldValues) -> bytes:
 
     writer = PdfWriter(clone_from=io.BytesIO(release.template_pdf))
     if field_updates:
-        for page in writer.pages:
-            # pypdf updates the widgets present on each page; a field whose
-            # widgets span pages (B101's chapter boxes on pages 1 and 3) is
-            # simply updated on each of them.
-            writer.update_page_form_field_values(
-                page, dict(field_updates), auto_regenerate=False
-            )
+        _apply_field_updates(writer, field_updates)
     if appearance_targets:
         _apply_widget_states(writer, appearance_targets)
 

@@ -284,15 +284,15 @@
    "value": "S"
   },
   "fill_27.0": {
-   "value": "8"
-  },
-  "fill_27.1.0": {
    "value": "6"
   },
-  "fill_27.1.1": {
+  "fill_27.1.0": {
    "value": "7"
+  },
+  "fill_27.1.1": {
+   "value": "8"
   }
  },
  "release": "form/b106g@2015-12-01",
- "sha256": "16b625c6896ceeeeeb6ed74ef3deb33f51340041694a23b134af8a714a09a99b"
+ "sha256": "c9e8f79781cad2832c50f4fe957f16e217dd13579bbd824fd6e34451882f2a25"
 }
