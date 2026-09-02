@@ -1,15 +1,17 @@
 import { ApiValidationException, staffTypedProvenance } from '@insolvia-ai/api-client';
-import type { Debtor, DebtorBody, FilingRole } from '@insolvia-ai/api-client';
-import { Tabs } from '@insolvia-ai/design-system';
+import type { CaseCollection, Debtor, DebtorBody, FilingRole } from '@insolvia-ai/api-client';
+import { Field, Select, Tabs } from '@insolvia-ai/design-system';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
-import { fontSizes, useTheme } from '@/theme';
+import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { CollectionEditor } from './collection-editor';
+import { COLLECTION_SPECS } from './collections';
 import { DebtorFields } from './debtor-fields';
 
 /**
@@ -33,10 +35,20 @@ import { DebtorFields } from './debtor-fields';
  * role picker switches between whole records rather than revealing more fields
  * — see docs/reference/case-data-model.md.
  *
- * Deliberately only the debtor step. The other twenty-two entities in the
- * field map have no API yet; a step that cannot persist would be a worse lie
- * than an absent one.
+ * Beyond the debtor, the screen is SECTIONED — one section per case
+ * collection (issue #249), chosen from a picker rather than a twelfth tab,
+ * because eleven tabs wrap into an unreadable ribbon. The debtor section
+ * keeps its autosave; each collection section is a `CollectionEditor`, whose
+ * saves are explicit (its header comment says why the difference is
+ * deliberate).
  */
+
+type Section = 'debtor' | CaseCollection;
+
+const SECTION_OPTIONS: readonly { readonly value: Section; readonly label: string }[] = [
+  { value: 'debtor', label: 'About the debtor' },
+  ...COLLECTION_SPECS.map((spec) => ({ value: spec.collection, label: spec.title })),
+];
 
 const ROLES: readonly { readonly value: FilingRole; readonly label: string }[] = [
   { value: 'debtor_1', label: 'Debtor 1' },
@@ -77,6 +89,7 @@ export function Intake() {
   const { call } = useApi();
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
 
+  const [section, setSection] = useState<Section>('debtor');
   const [role, setRole] = useState<FilingRole>('debtor_1');
   const [bodies, setBodies] = useState<Partial<Record<FilingRole, DebtorBody>>>({});
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
@@ -191,6 +204,15 @@ export function Intake() {
     setRole(next);
   };
 
+  const switchSection = (next: string) => {
+    const chosen = SECTION_OPTIONS.find((option) => option.value === next);
+    if (chosen === undefined) return;
+    // Leaving the debtor section is navigation like any other: the pending
+    // debounce flushes rather than being dropped with the section.
+    flush();
+    setSection(chosen.value);
+  };
+
   // FLUSHES on unmount rather than discarding. Clearing the timer alone lost
   // every keystroke typed in the last 800ms whenever the user navigated away —
   // back to the case list, or any in-app link — with the status region still
@@ -200,9 +222,18 @@ export function Intake() {
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const saveState: SaveState = save[role] ?? { kind: 'idle' };
 
+  const spec = COLLECTION_SPECS.find((candidate) => candidate.collection === section);
+
   return (
     <AppShell>
       <Heading level={1}>Intake</Heading>
+
+      <View style={styles.sectionPicker}>
+        <Field.Root>
+          <Field.Label>Section</Field.Label>
+          <Select options={[...SECTION_OPTIONS]} value={section} onValueChange={switchSection} />
+        </Field.Root>
+      </View>
 
       {/* ONE region, always mounted, whose text changes. aria-live announces a
           CHANGE to a region already in the DOM — a region that appears at the
@@ -212,14 +243,20 @@ export function Intake() {
         aria-live={load.kind === 'error' ? 'assertive' : 'polite'}
         style={[styles.status, load.kind === 'error' ? { color: theme.colors.danger } : muted]}
       >
-        {load.kind === 'loading'
+        {section === 'debtor' && load.kind === 'loading'
           ? 'Loading this intake…'
           : load.kind === 'error'
             ? load.message
             : ''}
       </Text>
 
-      {load.kind === 'ready' ? (
+      {spec !== undefined ? (
+        // `key` remounts the editor on a section change so one section's list,
+        // form and errors cannot leak into another's.
+        <CollectionEditor key={spec.collection} caseId={caseId} spec={spec} />
+      ) : null}
+
+      {section === 'debtor' && load.kind === 'ready' ? (
         // The design system's Tabs, not a hand-rolled one. A `Text` with
         // `onPress` renders as a plain div: react-native-web assigns a tabIndex
         // only to the six roles it auto-focuses, and `tab` is not among them —
@@ -271,5 +308,6 @@ export function Intake() {
 }
 
 const styles = StyleSheet.create({
+  sectionPicker: { marginBottom: spacing.sm },
   status: { fontSize: fontSizes.label },
 });
