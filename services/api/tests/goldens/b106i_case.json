@@ -1,0 +1,265 @@
+{
+ "fields": {
+  "Amount 10": {
+   "value": "7,899.50"
+  },
+  "Amount 10 Debtor 1": {
+   "value": "4,899.50"
+  },
+  "Amount 10 Debtor 2": {
+   "value": "3,000.00"
+  },
+  "Amount 11": {
+   "value": "250.00"
+  },
+  "Amount 12": {
+   "value": "8,149.50"
+  },
+  "Amount 2 Debtor 1": {
+   "value": "5,200.00"
+  },
+  "Amount 2 Debtor 2": {
+   "value": "3,000.00"
+  },
+  "Amount 3 Debtor 1": {
+   "value": "250.00"
+  },
+  "Amount 3 Debtor 2": {
+   "value": null
+  },
+  "Amount 4 Debtor 1": {
+   "value": "5,450.00"
+  },
+  "Amount 4 Debtor 1a": {
+   "value": "5,450.00"
+  },
+  "Amount 4 Debtor 2": {
+   "value": "3,000.00"
+  },
+  "Amount 4 Debtor 2a": {
+   "value": "3,000.00"
+  },
+  "Amount 5a Debtor 1": {
+   "value": "830.00"
+  },
+  "Amount 5a Debtor 2": {
+   "value": null
+  },
+  "Amount 5b Debtor 1": {
+   "value": null
+  },
+  "Amount 5b Debtor 2": {
+   "value": null
+  },
+  "Amount 5c Debtor 1": {
+   "value": null
+  },
+  "Amount 5c Debtor 2": {
+   "value": null
+  },
+  "Amount 5d Debtor 1": {
+   "value": null
+  },
+  "Amount 5d Debtor 2": {
+   "value": null
+  },
+  "Amount 5e Debtor 1": {
+   "value": "120.50"
+  },
+  "Amount 5e Debtor 2": {
+   "value": null
+  },
+  "Amount 5f Debtor 1": {
+   "value": null
+  },
+  "Amount 5f Debtor 2": {
+   "value": null
+  },
+  "Amount 5g Debtor 1": {
+   "value": null
+  },
+  "Amount 5g Debtor 2": {
+   "value": null
+  },
+  "Amount 5h Debtor 1": {
+   "value": null
+  },
+  "Amount 5h Debtor 2": {
+   "value": null
+  },
+  "Amount 6 Debtor 1": {
+   "value": "950.50"
+  },
+  "Amount 6 Debtor 2": {
+   "value": "0.00"
+  },
+  "Amount 7 Debtor 1": {
+   "value": "4,499.50"
+  },
+  "Amount 7 Debtor 2": {
+   "value": "3,000.00"
+  },
+  "Amount 8a Debtor 1": {
+   "value": null
+  },
+  "Amount 8a Debtor 2": {
+   "value": null
+  },
+  "Amount 8b Debtor 1": {
+   "value": null
+  },
+  "Amount 8b Debtor 2": {
+   "value": null
+  },
+  "Amount 8c Debtor 1": {
+   "value": "400.00"
+  },
+  "Amount 8c Debtor 2": {
+   "value": null
+  },
+  "Amount 8d Debtor 1": {
+   "value": null
+  },
+  "Amount 8d Debtor 2": {
+   "value": null
+  },
+  "Amount 8e Debtor 1": {
+   "value": null
+  },
+  "Amount 8e Debtor 2": {
+   "value": null
+  },
+  "Amount 8f Debtor 1": {
+   "value": null
+  },
+  "Amount 8f Debtor 2": {
+   "value": null
+  },
+  "Amount 8g Debtor 1": {
+   "value": null
+  },
+  "Amount 8g Debtor 2": {
+   "value": null
+  },
+  "Amount 8h Debtor 1": {
+   "value": null
+  },
+  "Amount 8h Debtor 2": {
+   "value": null
+  },
+  "Amount 9 Debtor 1": {
+   "value": "400.00"
+  },
+  "Amount 9 Debtor 2": {
+   "value": "0.00"
+  },
+  "Assistance 8f": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check 1": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check emploment status Debtor 1": {
+   "value": "/employed",
+   "widget_states": [
+    "/employed",
+    "/Off"
+   ]
+  },
+  "Check emploment status Debtor 2": {
+   "value": "/unemployed",
+   "widget_states": [
+    "/Off",
+    "/unemployed"
+   ]
+  },
+  "Check increase": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Employers City Debtor 1": {
+   "value": "Tampa"
+  },
+  "Employers City Debtor 2": {
+   "value": null
+  },
+  "Employers Name Debtor 1": {
+   "value": "Menabrea Machines Inc"
+  },
+  "Employers Name Debtor 2": {
+   "value": null
+  },
+  "Employers State Debtor 1": {
+   "value": "FL"
+  },
+  "Employers State Debtor 2": {
+   "value": null
+  },
+  "Employers Street1 Debtor 1": {
+   "value": "200 Engine Row"
+  },
+  "Employers Street1 Debtor 2": {
+   "value": null
+  },
+  "Employers Street2 Debtor 1": {
+   "value": null
+  },
+  "Employers Street2 Debtor 2": {
+   "value": null
+  },
+  "Employers Street3 Debtor 1": {
+   "value": null
+  },
+  "Employers Street3 Debtor 2": {
+   "value": null
+  },
+  "Employers Zip debtor 1": {
+   "value": "33605"
+  },
+  "Employers Zip debtor 2": {
+   "value": null
+  },
+  "Increase/Decrease 13": {
+   "value": "Overtime ends in November."
+  },
+  "Occupation Debtor 1": {
+   "value": "Systems analyst"
+  },
+  "Occupation Debtor 2": {
+   "value": null
+  },
+  "Other deductions 5h": {
+   "value": null
+  },
+  "Other income 8h": {
+   "value": null
+  },
+  "Supplemental income date": {
+   "value": null
+  },
+  "Time employed Debtor 1": {
+   "value": "Since 02/14/2019"
+  }
+ },
+ "release": "form/b106i@2015-12-01",
+ "sha256": "8c45a08dbddaaa598ae9cd8d309a0ebdaa89ded5a057e11aff9250725a9f4bf3"
+}

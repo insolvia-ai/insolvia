@@ -75,6 +75,9 @@ class Address:
     city: str | None = None
     state: str | None = None
     postal_code: str | None = None
+    # B101 line 5 prints a County box under the residence address (venue
+    # turns on it); other addresses simply leave it unset.
+    county: str | None = None
     raw: str | None = None
 
 
@@ -318,6 +321,7 @@ def parse_address(value: object, path: str, errors: dict[str, str]) -> Address:
         postal_code=text(
             raw.get("postal_code"), f"{path}.postal_code", errors, limit=12
         ),
+        county=text(raw.get("county"), f"{path}.county", errors, limit=64),
         raw=text(raw.get("raw"), f"{path}.raw", errors, limit=500),
     )
 
