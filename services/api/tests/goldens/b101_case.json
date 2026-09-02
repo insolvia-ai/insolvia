@@ -1,0 +1,624 @@
+{
+ "fields": {
+  "16c State the type of debts you owe that are not consumer debts or business debts": {
+   "value": null
+  },
+  "Attorney.Bar State": {
+   "value": "FL"
+  },
+  "Attorney.Bar number": {
+   "value": "112233"
+  },
+  "Attorney.City": {
+   "value": "Tampa"
+  },
+  "Attorney.Date signed": {
+   "value": "08/31/2026"
+  },
+  "Attorney.Email address": {
+   "value": "alex@example.com"
+  },
+  "Attorney.Firm name": {
+   "value": "Counsel & Counsel PA"
+  },
+  "Attorney.Printed name": {
+   "value": "Alex Counsel"
+  },
+  "Attorney.Sig": {
+   "value": null
+  },
+  "Attorney.State": {
+   "value": "FL"
+  },
+  "Attorney.Street address_2": {
+   "value": "1 Example Way"
+  },
+  "Attorney.Street address_3": {
+   "value": null
+  },
+  "Attorney.Zip": {
+   "value": "33604"
+  },
+  "Attorney.phone": {
+   "value": "(813) 555-0100"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Business City": {
+   "value": "Tampa"
+  },
+  "Business State": {
+   "value": "FL"
+  },
+  "Business Street address": {
+   "value": "88 Difference Drive"
+  },
+  "Business Street address2": {
+   "value": null
+  },
+  "Case number": {
+   "value": "19-01234"
+  },
+  "Case number if known_3": {
+   "value": "26-00042"
+  },
+  "Case number if known_4": {
+   "value": null
+  },
+  "Case number1": {
+   "value": null
+  },
+  "Case number_2": {
+   "value": null
+  },
+  "Case number_3": {
+   "value": null
+  },
+  "Check Box1": {
+   "value": "/Chapter 7",
+   "widget_states": [
+    "/Chapter 7",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Chapter 7",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box10": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box11": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box12": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box13": {
+   "value": "/None of above",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/None of above"
+   ]
+  },
+  "Check Box14": {
+   "value": "/Not filing under Chapter 11",
+   "widget_states": [
+    "/Not filing under Chapter 11",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box15": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box16": {
+   "value": "/1",
+   "widget_states": [
+    "/1",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box16A": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box17": {
+   "value": "/4",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/4"
+   ]
+  },
+  "Check Box17A": {
+   "value": "/Disability",
+   "widget_states": [
+    "/Off",
+    "/Disability",
+    "/Off"
+   ]
+  },
+  "Check Box18": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box19": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check Box20": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box20A": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box21": {
+   "value": "/1-49",
+   "widget_states": [
+    "/1-49",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box22": {
+   "value": "/100000000-500000000",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/100000000-500000000",
+    "/Off"
+   ]
+  },
+  "Check Box23": {
+   "value": "/50001-100000",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/50001-100000",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box24": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box25": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box26": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box5": {
+   "value": "/Lived in this district",
+   "widget_states": [
+    "/Lived in this district",
+    "/Off"
+   ]
+  },
+  "Check Box6": {
+   "value": "/Other",
+   "widget_states": [
+    "/Off",
+    "/Other"
+   ]
+  },
+  "Check Box7": {
+   "value": "/Pay in installments",
+   "widget_states": [
+    "/Off",
+    "/Pay in installments",
+    "/Off"
+   ]
+  },
+  "Check Box8": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box9": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "City_2": {
+   "value": "Tampa"
+  },
+  "County_2": {
+   "value": "Hillsborough"
+  },
+  "Debtor": {
+   "value": "Analytical Engines LLC"
+  },
+  "Debtor1 Tax Payer IDNum": {
+   "value": null
+  },
+  "Debtor1.Business name": {
+   "value": null
+  },
+  "Debtor1.Business name_3": {
+   "value": "Ada's Analytical Engines"
+  },
+  "Debtor1.Cell phone": {
+   "value": null
+  },
+  "Debtor1.City": {
+   "value": "Tampa"
+  },
+  "Debtor1.City_2": {
+   "value": "Tampa"
+  },
+  "Debtor1.Contact phone_2": {
+   "value": null
+  },
+  "Debtor1.County": {
+   "value": "Hillsborough"
+  },
+  "Debtor1.Date signed": {
+   "value": null
+  },
+  "Debtor1.Email address_2": {
+   "value": null
+  },
+  "Debtor1.Employer Identification Number1": {
+   "value": "123456789"
+  },
+  "Debtor1.Employer Identification Number2": {
+   "value": null
+  },
+  "Debtor1.First name": {
+   "value": "Ada"
+  },
+  "Debtor1.First name_3": {
+   "value": "Ada"
+  },
+  "Debtor1.First name_5": {
+   "value": null
+  },
+  "Debtor1.Last name": {
+   "value": "Lovelace"
+  },
+  "Debtor1.Last name_3": {
+   "value": "Byron"
+  },
+  "Debtor1.Last name_5": {
+   "value": null
+  },
+  "Debtor1.Middle name": {
+   "value": "Quinn"
+  },
+  "Debtor1.Middle name_3": {
+   "value": null
+  },
+  "Debtor1.Middle name_5": {
+   "value": null
+  },
+  "Debtor1.Name": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor1.PO Box": {
+   "value": "PO Box 99"
+  },
+  "Debtor1.SSNum": {
+   "value": null
+  },
+  "Debtor1.See 28 USC  1408 1": {
+   "value": null
+  },
+  "Debtor1.See 28 USC  1408 2": {
+   "value": null
+  },
+  "Debtor1.See 28 USC  1408 3": {
+   "value": null
+  },
+  "Debtor1.See 28 USC  1408 4": {
+   "value": null
+  },
+  "Debtor1.Signature": {
+   "value": null
+  },
+  "Debtor1.State": {
+   "value": "FL"
+  },
+  "Debtor1.State_2": {
+   "value": "FL"
+  },
+  "Debtor1.Street": {
+   "value": "12 Byron Court"
+  },
+  "Debtor1.Street1": {
+   "value": "Apt 4"
+  },
+  "Debtor1.Street_2": {
+   "value": "4501 Postal Way"
+  },
+  "Debtor1.Suffix Sr Jr II III": {
+   "value": null
+  },
+  "Debtor1.ZIP Code": {
+   "value": "33601"
+  },
+  "Debtor1.ZIP Code_2": {
+   "value": "33602"
+  },
+  "Debtor1.signature": {
+   "value": null
+  },
+  "Debtor2 Employer Identification Number2": {
+   "value": null
+  },
+  "Debtor2 SSNum": {
+   "value": null
+  },
+  "Debtor2.Business name": {
+   "value": null
+  },
+  "Debtor2.Business name_4": {
+   "value": null
+  },
+  "Debtor2.Cell phone": {
+   "value": null
+  },
+  "Debtor2.City": {
+   "value": "Tampa"
+  },
+  "Debtor2.City_2": {
+   "value": "Tampa"
+  },
+  "Debtor2.Contact phone": {
+   "value": null
+  },
+  "Debtor2.Date signed": {
+   "value": null
+  },
+  "Debtor2.Email address": {
+   "value": null
+  },
+  "Debtor2.Employer Identification Number1": {
+   "value": null
+  },
+  "Debtor2.Executed on": {
+   "value": "08/30/2026"
+  },
+  "Debtor2.First name": {
+   "value": "Ben"
+  },
+  "Debtor2.First name_4": {
+   "value": null
+  },
+  "Debtor2.First name_6": {
+   "value": null
+  },
+  "Debtor2.Last name": {
+   "value": "Lovelace"
+  },
+  "Debtor2.Last name_4": {
+   "value": null
+  },
+  "Debtor2.Last name_6": {
+   "value": null
+  },
+  "Debtor2.Middle name_2": {
+   "value": null
+  },
+  "Debtor2.Middle name_4": {
+   "value": null
+  },
+  "Debtor2.Middle name_6": {
+   "value": null
+  },
+  "Debtor2.PO Box": {
+   "value": null
+  },
+  "Debtor2.See 28 USC  1408 1_2": {
+   "value": "Moved from Georgia in July; the greater part of the last 180 days was spent in this"
+  },
+  "Debtor2.See 28 USC  1408 2_2": {
+   "value": "district."
+  },
+  "Debtor2.See 28 USC  1408 3_2": {
+   "value": null
+  },
+  "Debtor2.See 28 USC  1408 4_2": {
+   "value": null
+  },
+  "Debtor2.Signature": {
+   "value": null
+  },
+  "Debtor2.State": {
+   "value": "FL"
+  },
+  "Debtor2.State_2": {
+   "value": null
+  },
+  "Debtor2.Street": {
+   "value": "12 Byron Court"
+  },
+  "Debtor2.Street2": {
+   "value": "Apt 4"
+  },
+  "Debtor2.Street_2": {
+   "value": null
+  },
+  "Debtor2.Tax Payer IDNum": {
+   "value": null
+  },
+  "Debtor2.ZIP": {
+   "value": "33601"
+  },
+  "Debtor2.signature": {
+   "value": null
+  },
+  "Debtor_2": {
+   "value": null
+  },
+  "District": {
+   "value": "Northern District of Georgia"
+  },
+  "District_2": {
+   "value": null
+  },
+  "District_3": {
+   "value": null
+  },
+  "District_4": {
+   "value": "Middle District of Florida"
+  },
+  "District_5": {
+   "value": null
+  },
+  "Executed on": {
+   "value": "08/30/2026"
+  },
+  "If immediate attention is needed why is it needed1": {
+   "value": "A slow leak was found in August"
+  },
+  "If immediate attention is needed why is it needed2": {
+   "value": null
+  },
+  "Name of business if any": {
+   "value": "Ada's Analytical Engines"
+  },
+  "Name of person payed to help file": {
+   "value": null
+  },
+  "Relationship to you": {
+   "value": "Affiliate"
+  },
+  "Relationship to you_2": {
+   "value": null
+  },
+  "State_6": {
+   "value": "FL"
+  },
+  "Street_6": {
+   "value": "12 Byron Court"
+  },
+  "Street_7": {
+   "value": null
+  },
+  "Suffix Sr Jr II III_2": {
+   "value": "Jr."
+  },
+  "What is the hazard1": {
+   "value": "Two corroding propane tanks behind the shed"
+  },
+  "What is the hazard2": {
+   "value": null
+  },
+  "When": {
+   "value": "03/04/2019"
+  },
+  "When_2": {
+   "value": null
+  },
+  "When_3": {
+   "value": null
+  },
+  "When_4": {
+   "value": "06/15/2026"
+  },
+  "When_5": {
+   "value": null
+  },
+  "ZIP Code_4": {
+   "value": null
+  },
+  "ZIP Code_5": {
+   "value": "33603"
+  },
+  "ZIP Code_6": {
+   "value": "33601"
+  }
+ },
+ "release": "form/b101@2024-06-22",
+ "sha256": "c04df22f6694123b794c31e9c7dfa3b4162148e57712ef150ee01e5ab63eb28f"
+}

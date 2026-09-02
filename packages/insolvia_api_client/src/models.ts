@@ -1060,6 +1060,11 @@ export interface Address {
   readonly state?: string | undefined;
   /** Max 12 characters. */
   readonly postal_code?: string | undefined;
+  /**
+   * B101 line 5's County box (venue turns on it). Only the debtor's
+   * residence address ever needs it; max 64 characters.
+   */
+  readonly county?: string | undefined;
 }
 
 /** B101 line 6: why this district. */
