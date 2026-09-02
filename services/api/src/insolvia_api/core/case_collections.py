@@ -23,6 +23,13 @@ from .codebtors import CODEBTOR
 from .creditors import CREDITOR
 from .expenses import DEPENDENT, EXPENSE, HOUSEHOLD
 from .income import EMPLOYMENT, INCOME_SUMMARY
+from .petitions import (
+    FILING_PROFESSIONAL,
+    PETITION,
+    PRIOR_CASE,
+    RELATED_CASE,
+    SOLE_PROPRIETORSHIP,
+)
 from .sofa import SOFA_ENTRY
 
 # `EntityKind[Any]` rather than a union of the ten body types: callers of this
@@ -42,6 +49,13 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         DEPENDENT,
         CODEBTOR,
         SOFA_ENTRY,
+        # B101's entities (issue #93): the petition answers, its repeating
+        # rows, and the Part 7 signer block.
+        PETITION,
+        PRIOR_CASE,
+        RELATED_CASE,
+        SOLE_PROPRIETORSHIP,
+        FILING_PROFESSIONAL,
     )
 }
 

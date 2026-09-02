@@ -91,6 +91,50 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
             "value": "700.00",
         },
     },
+    "petitions": {
+        "fee_handling": "installments",
+        "rents_residence": True,
+        "eviction_judgment_against_you": False,
+        "small_business_status": "not_filing_under_chapter_11",
+        "hazardous_property": {
+            "description": "Propane tanks at a former stand",
+            "why_immediate": "Leak risk",
+            "address": {"city": "Exampleville"},
+        },
+        "debt_character": "consumer",
+        "ch7_funds_available_for_creditors": False,
+        "estimated_creditors": "1_49",
+        "estimated_assets": "0_50000",
+        "estimated_liabilities": "50001_100000",
+    },
+    "prior_cases": {
+        "district": "Middle District of Florida",
+        "filed_on": "2019-03-04",
+        "case_number": "19-01234",
+    },
+    "related_cases": {
+        "debtor_name": "Example Spouse",
+        "relationship": "Spouse",
+        "district": "Middle District of Florida",
+        "filed_on": "2026-01-15",
+        "case_number": "26-00042",
+    },
+    "sole_proprietorships": {
+        "name": "Example Lawn Care",
+        "address": {"city": "Exampleville"},
+        "business_type": "none_of_the_above",
+    },
+    "filing_professionals": {
+        "role": "attorney",
+        "name": {"given": "Alex", "surname": "Counsel"},
+        "firm_name": "Counsel & Counsel PA",
+        "address": {"line1": "1 Example Way", "city": "Exampleville"},
+        "phone": "(305) 555-0100",
+        "email": "alex@example.com",
+        "bar_number": "112233",
+        "bar_state": "FL",
+        "signature_date": "2026-09-01",
+    },
 }
 
 

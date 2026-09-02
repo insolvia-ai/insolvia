@@ -27,8 +27,15 @@ import {
   ApiException,
   ApiUnauthorizedException,
   ApiValidationException,
+  BUSINESS_TYPES,
   CASE_COLLECTIONS,
   CLAIM_CLASSES,
+  DEBT_CHARACTERS,
+  ESTIMATED_CREDITORS_BANDS,
+  ESTIMATED_DOLLAR_BANDS,
+  FEE_HANDLING,
+  FILING_PROFESSIONAL_ROLES,
+  SMALL_BUSINESS_STATUSES,
   SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
   DOCUMENT_KINDS,
@@ -3754,7 +3761,39 @@ describe('the case-collection enums', () => {
       'dependents',
       'codebtors',
       'sofa_entries',
+      'petitions',
+      'prior_cases',
+      'related_cases',
+      'sole_proprietorships',
+      'filing_professionals',
     ]);
+  });
+
+  test('the B101 enums mirror core/petitions.py, member for member', () => {
+    expect(FEE_HANDLING).toEqual(['full', 'installments', 'waiver']);
+    expect(BUSINESS_TYPES).toEqual([
+      'health_care_business',
+      'single_asset_real_estate',
+      'stockbroker',
+      'commodity_broker',
+      'none_of_the_above',
+    ]);
+    expect(SMALL_BUSINESS_STATUSES).toEqual([
+      'not_filing_under_chapter_11',
+      'chapter_11_not_small_business',
+      'chapter_11_small_business',
+      'chapter_11_subchapter_v',
+    ]);
+    expect(DEBT_CHARACTERS).toEqual(['consumer', 'business', 'other']);
+    expect(FILING_PROFESSIONAL_ROLES).toEqual(['attorney', 'bankruptcy_petition_preparer']);
+    // The estimate bands are the form's own printed brackets; ten creditor
+    // bands, twelve dollar bands shared by lines 19 and 20.
+    expect(ESTIMATED_CREDITORS_BANDS).toHaveLength(10);
+    expect(ESTIMATED_CREDITORS_BANDS[0]).toBe('1_49');
+    expect(ESTIMATED_CREDITORS_BANDS[9]).toBe('more_than_100000');
+    expect(ESTIMATED_DOLLAR_BANDS).toHaveLength(12);
+    expect(ESTIMATED_DOLLAR_BANDS[0]).toBe('0_50000');
+    expect(ESTIMATED_DOLLAR_BANDS[11]).toBe('more_than_50000000000');
   });
 
   test('SOFA_ENTRY_TYPES mirrors the dispatch table in core/sofa.py', () => {
