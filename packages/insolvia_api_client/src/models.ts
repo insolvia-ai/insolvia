@@ -1995,3 +1995,38 @@ function pruneJsonValue(value: unknown): unknown {
   }
   return value;
 }
+
+/**
+ * One reason one creditor cannot go on the matrix as recorded — issue #94.
+ *
+ * `creditorId` is absent on the single case-level problem (a case with no
+ * creditors at all); `field` is the creditor body path the fix belongs to
+ * (`name`, `address.state`, ...), so a screen can put the message next to the
+ * input that needs the edit.
+ */
+export interface CreditorMatrixProblem {
+  readonly creditorId?: string;
+  readonly field: string;
+  readonly message: string;
+}
+
+/**
+ * `GET /v1/cases/{caseId}/creditor-matrix` — the court's mailing list, or
+ * every reason there isn't one yet. `content` is the exact text of the .txt
+ * file (CRLF line endings, plain ASCII) and is present only when `problems`
+ * is empty: the server refuses to produce a partial matrix, because a missing
+ * entry is a bankruptcy notice that never arrives. The court-format rules the
+ * server enforces are cited in
+ * `services/api/src/insolvia_api/core/creditor_matrix.py`.
+ */
+export interface CreditorMatrix {
+  /** The suggested file name for the download, `creditor-matrix.txt`. */
+  readonly fileName: string;
+  /** Entries printed — after identical blocks are deduplicated. */
+  readonly creditorCount: number;
+  /** Blocks dropped because they would print identically to another. */
+  readonly duplicatesOmitted: number;
+  readonly problems: readonly CreditorMatrixProblem[];
+  /** The file text. Absent, never null, while `problems` is non-empty. */
+  readonly content?: string;
+}

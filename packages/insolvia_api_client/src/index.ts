@@ -91,6 +91,8 @@ export type {
   ClaimClass,
   CodebtorBody,
   CreditorBody,
+  CreditorMatrix,
+  CreditorMatrixProblem,
   DebtorAttribution,
   DependentBody,
   EmploymentBody,
