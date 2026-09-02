@@ -1,453 +1,453 @@
 {
  "fields": {
   "1": {
-   "value": "S10.0 priority.creditor_street2"
+   "value": null
   },
   "1_2": {
-   "value": "S10.1 priority.creditor_street2"
+   "value": null
   },
   "1_3": {
-   "value": "S10.2 priority.creditor_street2"
+   "value": null
   },
   "1_4": {
-   "value": "S10.3 priority.creditor_street2"
+   "value": null
   },
   "1_5": {
-   "value": "S10.4 priority.creditor_street2"
+   "value": null
   },
   "2": {
-   "value": "S11.0 priority.creditor_city"
+   "value": "Philadelphia"
   },
   "2_2": {
-   "value": "S11.1 priority.creditor_city"
+   "value": null
   },
   "2_3": {
-   "value": "S11.2 priority.creditor_city"
+   "value": null
   },
   "2_4": {
-   "value": "S11.3 priority.creditor_city"
+   "value": null
   },
   "2_5": {
-   "value": "S11.4 priority.creditor_city"
+   "value": null
   },
   "3": {
-   "value": "FL"
+   "value": "PA"
   },
   "3_2": {
-   "value": "FL"
+   "value": null
   },
   "3_3": {
-   "value": "FL"
+   "value": null
   },
   "3_4": {
-   "value": "FL"
+   "value": null
   },
   "3_5": {
-   "value": "FL"
+   "value": null
   },
   "4": {
-   "value": "S13.0 priority.creditor_zip"
+   "value": "19101"
   },
   "4_2": {
-   "value": "S13.1 priority.creditor_zip"
+   "value": null
   },
   "4_3": {
-   "value": "S13.2 priority.creditor_zip"
+   "value": null
   },
   "4_4": {
-   "value": "S13.3 priority.creditor_zip"
+   "value": null
   },
   "4_5": {
-   "value": "S13.4 priority.creditor_zip"
+   "value": null
   },
   "Bankruptcy District Information": {
    "value": "Middle District of Florida"
   },
   "Case number": {
-   "value": "S3.0 caption.case_number"
+   "value": null
   },
   "Check if this claim relates to a": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this claim relates to a_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Check if this is an": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "City 4.1": {
-   "value": "S34.0 nonpriority.creditor_city"
+   "value": "Wilmington"
   },
   "City 4.2": {
-   "value": "S34.1 nonpriority.creditor_city"
+   "value": "Tampa"
   },
   "City 4.3": {
-   "value": "S34.2 nonpriority.creditor_city"
+   "value": "Lincoln"
   },
   "City 4.4": {
-   "value": "S34.3 nonpriority.creditor_city"
+   "value": null
   },
   "City 4.5": {
-   "value": "S34.4 nonpriority.creditor_city"
+   "value": null
   },
   "City 4.6": {
-   "value": "S34.5 nonpriority.creditor_city"
+   "value": null
   },
   "City 5.1": {
-   "value": "S54.0 notify.city"
+   "value": "Wilmington"
   },
   "City 5.2": {
-   "value": "S54.1 notify.city"
+   "value": null
   },
   "City 5.3": {
-   "value": "S54.2 notify.city"
+   "value": null
   },
   "City 5.4": {
-   "value": "S54.3 notify.city"
+   "value": null
   },
   "City 5.5": {
-   "value": "S54.4 notify.city"
+   "value": null
   },
   "City 5.6": {
-   "value": "S54.5 notify.city"
+   "value": null
   },
   "City 5.7": {
-   "value": "S54.6 notify.city"
+   "value": null
   },
   "Claims for death or personal injury while intoxicated": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Claims for death or personal injury while intoxicated_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Claims for death or personal injury while intoxicated_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Claims for death or personal injury while intoxicated_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Claims for death or personal injury while intoxicated_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Contingent_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Creditors Name": {
-   "value": "S8.0 priority.creditor_name"
+   "value": "Internal Revenue Service"
   },
   "Creditors Name_10": {
-   "value": "S32.4 nonpriority.creditor_name"
+   "value": null
   },
   "Creditors Name_11": {
-   "value": "S32.5 nonpriority.creditor_name"
+   "value": null
   },
   "Creditors Name_12": {
-   "value": "S51.0 notify.name"
+   "value": "Meridian Recovery Services"
   },
   "Creditors Name_13": {
-   "value": "S51.1 notify.name"
+   "value": null
   },
   "Creditors Name_14": {
-   "value": "S51.2 notify.name"
+   "value": null
   },
   "Creditors Name_15": {
-   "value": "S51.3 notify.name"
+   "value": null
   },
   "Creditors Name_16": {
-   "value": "S51.4 notify.name"
+   "value": null
   },
   "Creditors Name_17": {
-   "value": "S51.5 notify.name"
+   "value": null
   },
   "Creditors Name_18": {
-   "value": "S51.6 notify.name"
+   "value": null
   },
   "Creditors Name_2": {
-   "value": "S8.1 priority.creditor_name"
+   "value": null
   },
   "Creditors Name_3": {
-   "value": "S8.2 priority.creditor_name"
+   "value": null
   },
   "Creditors Name_4": {
-   "value": "S8.3 priority.creditor_name"
+   "value": null
   },
   "Creditors Name_5": {
-   "value": "S8.4 priority.creditor_name"
+   "value": null
   },
   "Creditors Name_6": {
-   "value": "S32.0 nonpriority.creditor_name"
+   "value": "Meridian Bank Card Services"
   },
   "Creditors Name_7": {
-   "value": "S32.1 nonpriority.creditor_name"
+   "value": "Bayside General Hospital"
   },
   "Creditors Name_8": {
-   "value": "S32.2 nonpriority.creditor_name"
+   "value": "Great Plains Student Servicing"
   },
   "Creditors Name_9": {
-   "value": "S32.3 nonpriority.creditor_name"
+   "value": null
   },
   "Date debt was incurred": {
-   "value": "01/16/2026"
+   "value": "04/15/2025"
   },
   "Date debt was incurred_10": {
-   "value": "01/15/2026"
+   "value": null
   },
   "Date debt was incurred_11": {
-   "value": "01/16/2026"
+   "value": null
   },
   "Date debt was incurred_2": {
-   "value": "01/17/2026"
+   "value": null
   },
   "Date debt was incurred_3": {
-   "value": "01/18/2026"
+   "value": null
   },
   "Date debt was incurred_4": {
-   "value": "01/19/2026"
+   "value": null
   },
   "Date debt was incurred_5": {
-   "value": "01/20/2026"
+   "value": null
   },
   "Date debt was incurred_6": {
-   "value": "01/11/2026"
+   "value": "11/01/2020"
   },
   "Date debt was incurred_7": {
-   "value": "01/12/2026"
+   "value": "02/10/2026"
   },
   "Date debt was incurred_8": {
-   "value": "01/13/2026"
+   "value": "09/01/2012"
   },
   "Date debt was incurred_9": {
-   "value": "01/14/2026"
+   "value": null
   },
   "Debtor 1": {
-   "value": "S0.0 caption.debtor1_name"
+   "value": "Ada Quinn Lovelace"
   },
   "Debtor 2": {
-   "value": "S1.0 caption.debtor2_name"
+   "value": "Ben Lovelace Jr."
   },
   "Debts in pension plans_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Debts in pension plans_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Debts in pension plans_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Debts in pension plans_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Debts in pension plans_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Debts in pension plans_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_7": {
@@ -457,156 +457,156 @@
    ]
   },
   "Disputed_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Disputed_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Domestic support obligations": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Domestic support obligations_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Domestic support obligations_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Domestic support obligations_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Domestic support obligations_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Obligations arising out of divorce_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other unsecurecured claim 2.1": {
-   "value": "S28.0 priority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 2.2": {
-   "value": "S28.1 priority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 2.3": {
-   "value": "S28.2 priority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 2.4": {
-   "value": "S28.3 priority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 2.5": {
-   "value": "S28.4 priority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 4.1": {
-   "value": "S49.0 nonpriority.type_other_specify"
+   "value": "Credit card purchases"
   },
   "Other unsecurecured claim 4.2": {
-   "value": "S49.1 nonpriority.type_other_specify"
+   "value": "Medical services"
   },
   "Other unsecurecured claim 4.3": {
-   "value": "S49.2 nonpriority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 4.4": {
-   "value": "S49.3 nonpriority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 4.5": {
-   "value": "S49.4 nonpriority.type_other_specify"
+   "value": null
   },
   "Other unsecurecured claim 4.6": {
-   "value": "S49.5 nonpriority.type_other_specify"
+   "value": null
   },
   "Other_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_6": {
@@ -622,174 +622,174 @@
    ]
   },
   "Other_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Other_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Referenced line 5.1": {
-   "value": "S57.0 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.2": {
-   "value": "S57.1 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.3": {
-   "value": "S57.2 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.4": {
-   "value": "S57.3 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.5": {
-   "value": "S57.4 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.6": {
-   "value": "S57.5 notify.referenced_line"
+   "value": null
   },
   "Referenced line 5.7": {
-   "value": "S57.6 notify.referenced_line"
+   "value": null
   },
   "State 4.1": {
-   "value": "FL"
+   "value": "DE"
   },
   "State 4.2": {
    "value": "FL"
   },
   "State 4.3": {
-   "value": "FL"
+   "value": "NE"
   },
   "State 4.4": {
-   "value": "FL"
+   "value": null
   },
   "State 4.5": {
-   "value": "FL"
+   "value": null
   },
   "State 4.6": {
-   "value": "FL"
+   "value": null
   },
   "State 5.1": {
-   "value": "FL"
+   "value": "DE"
   },
   "State 5.2": {
-   "value": "FL"
+   "value": null
   },
   "State 5.3": {
-   "value": "FL"
+   "value": null
   },
   "State 5.4": {
-   "value": "FL"
+   "value": null
   },
   "State 5.5": {
-   "value": "FL"
+   "value": null
   },
   "State 5.6": {
-   "value": "FL"
+   "value": null
   },
   "State 5.7": {
-   "value": "FL"
+   "value": null
   },
   "Street": {
-   "value": "S9.0 priority.creditor_street"
+   "value": "PO Box 7346"
   },
   "Street2_12": {
-   "value": "S53.0 notify.street2"
+   "value": null
   },
   "Street2_13": {
-   "value": "S53.1 notify.street2"
+   "value": null
   },
   "Street2_14": {
-   "value": "S53.2 notify.street2"
+   "value": null
   },
   "Street2_15": {
-   "value": "S53.3 notify.street2"
+   "value": null
   },
   "Street2_16": {
-   "value": "S53.4 notify.street2"
+   "value": null
   },
   "Street2_17": {
-   "value": "S53.5 notify.street2"
+   "value": null
   },
   "Street2_18": {
-   "value": "S53.6 notify.street2"
+   "value": null
   },
   "Street_10": {
-   "value": "S33.4 nonpriority.creditor_street"
+   "value": null
   },
   "Street_11": {
-   "value": "S33.5 nonpriority.creditor_street"
+   "value": null
   },
   "Street_12": {
-   "value": "S52.0 notify.street"
+   "value": "9 Collection Court"
   },
   "Street_13": {
-   "value": "S52.1 notify.street"
+   "value": null
   },
   "Street_14": {
-   "value": "S52.2 notify.street"
+   "value": null
   },
   "Street_15": {
-   "value": "S52.3 notify.street"
+   "value": null
   },
   "Street_16": {
-   "value": "S52.4 notify.street"
+   "value": null
   },
   "Street_17": {
-   "value": "S52.5 notify.street"
+   "value": null
   },
   "Street_18": {
-   "value": "S52.6 notify.street"
+   "value": null
   },
   "Street_2": {
-   "value": "S9.1 priority.creditor_street"
+   "value": null
   },
   "Street_3": {
-   "value": "S9.2 priority.creditor_street"
+   "value": null
   },
   "Street_4": {
-   "value": "S9.3 priority.creditor_street"
+   "value": null
   },
   "Street_5": {
-   "value": "S9.4 priority.creditor_street"
+   "value": null
   },
   "Street_6": {
-   "value": "S33.0 nonpriority.creditor_street"
+   "value": "1 Meridian Plaza"
   },
   "Street_7": {
-   "value": "S33.1 nonpriority.creditor_street"
+   "value": "2 Care Circle"
   },
   "Street_8": {
-   "value": "S33.2 nonpriority.creditor_street"
+   "value": "500 Loan Loop"
   },
   "Street_9": {
-   "value": "S33.3 nonpriority.creditor_street"
+   "value": null
   },
   "Student loans_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Student loans_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Student loans_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Student loans_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Student loans_8": {
@@ -799,9 +799,9 @@
    ]
   },
   "Student loans_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Taxes and ceratin other debts you owe the government": {
@@ -811,282 +811,300 @@
    ]
   },
   "Taxes and ceratin other debts you owe the government_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Taxes and ceratin other debts you owe the government_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Taxes and ceratin other debts you owe the government_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Taxes and ceratin other debts you owe the government_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Total_26": {
-   "value": "1,294.56"
+   "value": "8,200.00"
   },
   "Total_27": {
-   "value": "1,204.56"
+   "value": "2,600.00"
   },
   "Total_28": {
-   "value": "1,214.56"
+   "value": "12,000.00"
   },
   "Total_29": {
-   "value": "1,224.56"
+   "value": null
   },
   "Total_30": {
-   "value": "1,234.56"
+   "value": null
   },
   "Total_31": {
-   "value": "1,244.56"
+   "value": null
   },
   "Total_6a": {
-   "value": "1,204.56"
+   "value": "0.00"
   },
   "Total_6b": {
-   "value": "1,214.56"
+   "value": "3,650.00"
   },
   "Total_6c": {
-   "value": "1,224.56"
+   "value": "0.00"
   },
   "Total_6d": {
-   "value": "1,234.56"
+   "value": "0.00"
   },
   "Total_6e": {
-   "value": "1,244.56"
+   "value": "3,650.00"
   },
   "Total_6f": {
-   "value": "1,254.56"
+   "value": "12,000.00"
   },
   "Total_6g": {
-   "value": "1,264.56"
+   "value": "0.00"
   },
   "Total_6h": {
-   "value": "1,274.56"
+   "value": "0.00"
   },
   "Total_6i": {
-   "value": "1,284.56"
+   "value": "10,800.00"
   },
   "Total_6j": {
-   "value": "1,294.56"
+   "value": "22,800.00"
   },
   "Unliquidated": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_11": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_2": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_3": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_4": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_5": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_6": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_7": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_8": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Unliquidated_9": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
-    "/On"
+    "/Off"
    ]
   },
   "Zip 4.1": {
-   "value": "S36.0 nonpriority.creditor_zip"
+   "value": "19801"
   },
   "Zip 4.2": {
-   "value": "S36.1 nonpriority.creditor_zip"
+   "value": "33606"
   },
   "Zip 4.3": {
-   "value": "S36.2 nonpriority.creditor_zip"
+   "value": "68501"
   },
   "Zip 4.4": {
-   "value": "S36.3 nonpriority.creditor_zip"
+   "value": null
   },
   "Zip 4.5": {
-   "value": "S36.4 nonpriority.creditor_zip"
+   "value": null
   },
   "Zip 4.6": {
-   "value": "S36.5 nonpriority.creditor_zip"
+   "value": null
   },
   "Zip 5.1": {
-   "value": "S56.0 notify.zip"
+   "value": "19801"
   },
   "Zip 5.2": {
-   "value": "S56.1 notify.zip"
+   "value": null
   },
   "Zip 5.3": {
-   "value": "S56.2 notify.zip"
+   "value": null
   },
   "Zip 5.4": {
-   "value": "S56.3 notify.zip"
+   "value": null
   },
   "Zip 5.5": {
-   "value": "S56.4 notify.zip"
+   "value": null
   },
   "Zip 5.6": {
-   "value": "S56.5 notify.zip"
+   "value": null
   },
   "Zip 5.7": {
-   "value": "S56.6 notify.zip"
+   "value": null
   },
   "account number": {
-   "value": "S14."
+   "value": null
   },
   "account number 10": {
-   "value": "S37."
+   "value": null
   },
   "account number 11": {
-   "value": "S37."
+   "value": null
   },
   "account number 12": {
-   "value": "S59."
+   "value": "4412"
   },
   "account number 13": {
-   "value": "S59."
+   "value": null
   },
   "account number 14": {
-   "value": "S59."
+   "value": null
   },
   "account number 15": {
-   "value": "S59."
+   "value": null
   },
   "account number 16": {
-   "value": "S59."
+   "value": null
   },
   "account number 17": {
-   "value": "S59."
+   "value": null
   },
   "account number 18": {
-   "value": "S59."
+   "value": null
   },
   "account number 2": {
-   "value": "S14."
+   "value": null
   },
   "account number 3": {
-   "value": "S14."
+   "value": null
   },
   "account number 4": {
-   "value": "S14."
+   "value": null
   },
   "account number 5": {
-   "value": "S14."
+   "value": null
   },
   "account number 6": {
-   "value": "S37."
+   "value": "4412"
   },
   "account number 7": {
-   "value": "S37."
+   "value": "0072"
   },
   "account number 8": {
-   "value": "S37."
+   "value": "5510"
   },
   "account number 9": {
-   "value": "S37."
+   "value": null
   },
   "check 1": {
-   "value": "/debtor 2",
+   "value": "/Debtor 1 and 2",
    "widget_states": [
     "/Off",
-    "/debtor 2",
     "/Off",
+    "/Debtor 1 and 2",
     "/Off"
    ]
   },
   "check 10": {
-   "value": "/On",
+   "value": null,
    "widget_states": [
     "/Off",
     "/Off",
     "/Off",
-    "/On"
+    "/Off"
    ]
   },
   "check 11": {
-   "value": "/debtor 1",
+   "value": null,
    "widget_states": [
-    "/debtor 1",
+    "/Off",
     "/Off",
     "/Off",
     "/Off"
    ]
   },
   "check 2": {
-   "value": "/One of debtors and another",
+   "value": null,
    "widget_states": [
     "/Off",
     "/Off",
     "/Off",
-    "/One of debtors and another"
+    "/Off"
    ]
   },
   "check 3": {
-   "value": "/One of debtors and another",
+   "value": null,
    "widget_states": [
     "/Off",
     "/Off",
     "/Off",
-    "/One of debtors and another"
+    "/Off"
    ]
   },
   "check 4": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 5": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 6": {
    "value": "/debtor 1 and 2",
    "widget_states": [
     "/Off",
@@ -1095,25 +1113,16 @@
     "/Off"
    ]
   },
-  "check 5": {
-   "value": "/one of debtors and another",
-   "widget_states": [
-    "/Off",
-    "/Off",
-    "/Off",
-    "/one of debtors and another"
-   ]
-  },
-  "check 6": {
-   "value": "/On",
-   "widget_states": [
-    "/Off",
-    "/Off",
-    "/Off",
-    "/On"
-   ]
-  },
   "check 7": {
+   "value": "/debtor 2",
+   "widget_states": [
+    "/Off",
+    "/debtor 2",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 8": {
    "value": "/debtor 1",
    "widget_states": [
     "/debtor 1",
@@ -1122,29 +1131,20 @@
     "/Off"
    ]
   },
-  "check 8": {
-   "value": "/debtor 2",
-   "widget_states": [
-    "/Off",
-    "/debtor 2",
-    "/Off",
-    "/Off"
-   ]
-  },
   "check 9": {
-   "value": "/debtor 2",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/debtor 2",
+    "/Off",
     "/Off",
     "/Off"
    ]
   },
   "check1": {
-   "value": "/no",
+   "value": "/yes",
    "widget_states": [
-    "/no",
-    "/Off"
+    "/Off",
+    "/yes"
    ]
   },
   "check10": {
@@ -1155,115 +1155,115 @@
    ]
   },
   "check11": {
-   "value": "/yes",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/yes"
+    "/Off"
    ]
   },
   "check12": {
-   "value": "/no",
+   "value": null,
    "widget_states": [
-    "/no",
+    "/Off",
     "/Off"
    ]
   },
   "check13": {
-   "value": "/yes",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/yes"
-   ]
-  },
-  "check14": {
-   "value": "/Part 1",
-   "widget_states": [
-    "/Part 1",
     "/Off"
    ]
   },
-  "check15": {
+  "check14": {
    "value": "/yes",
    "widget_states": [
     "/Off",
     "/yes"
    ]
   },
-  "check16": {
-   "value": "/Part 1",
+  "check15": {
+   "value": null,
    "widget_states": [
-    "/Part 1",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check16": {
+   "value": null,
+   "widget_states": [
+    "/Off",
     "/Off"
    ]
   },
   "check17": {
-   "value": "/yes",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/yes"
+    "/Off"
    ]
   },
   "check18": {
-   "value": "/Part 1",
+   "value": null,
    "widget_states": [
-    "/Part 1",
+    "/Off",
     "/Off"
    ]
   },
   "check19": {
-   "value": "/yes",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/yes"
+    "/Off"
    ]
   },
   "check2": {
-   "value": "/yes",
+   "value": "/no",
    "widget_states": [
-    "/Off",
-    "/yes"
+    "/no",
+    "/Off"
    ]
   },
   "check20": {
-   "value": "/Part 1",
+   "value": null,
    "widget_states": [
-    "/Part 1",
+    "/Off",
     "/Off"
    ]
   },
   "check3": {
-   "value": "/no",
+   "value": null,
    "widget_states": [
-    "/no",
+    "/Off",
     "/Off"
    ]
   },
   "check4": {
-   "value": "/yes",
+   "value": null,
    "widget_states": [
     "/Off",
-    "/yes"
+    "/Off"
    ]
   },
   "check5": {
-   "value": "/no",
+   "value": null,
    "widget_states": [
-    "/no",
+    "/Off",
     "/Off"
    ]
   },
   "check6": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check7": {
    "value": "/yes",
    "widget_states": [
     "/Off",
     "/yes"
-   ]
-  },
-  "check7": {
-   "value": "/no",
-   "widget_states": [
-    "/no",
-    "/Off"
    ]
   },
   "check8": {
@@ -1281,96 +1281,96 @@
    ]
   },
   "fill_27.0": {
-   "value": "6"
+   "value": null
   },
   "fill_27.1.0": {
-   "value": "7"
+   "value": null
   },
   "fill_27.1.1": {
-   "value": "8"
+   "value": null
   },
   "fill_27.1.2": {
-   "value": "1"
+   "value": null
   },
   "fill_27.1.3": {
-   "value": "9"
+   "value": null
   },
   "fill_27.1.4": {
-   "value": "2"
+   "value": null
   },
   "fill_27.1.5": {
-   "value": "3"
+   "value": null
   },
   "fill_27.1.6": {
-   "value": "4"
+   "value": null
   },
   "fill_27.1.7": {
-   "value": "5"
+   "value": null
   },
   "fill_27.1.8": {
-   "value": "6"
+   "value": null
   },
   "undefined": {
-   "value": "1,264.56"
+   "value": "3,650.00"
   },
   "undefined_10": {
-   "value": "1,284.56"
+   "value": null
   },
   "undefined_12": {
-   "value": "S7.0 priority.entry_number"
+   "value": null
   },
   "undefined_13": {
-   "value": "1,294.56"
+   "value": null
   },
   "undefined_14": {
-   "value": "1,294.56"
+   "value": null
   },
   "undefined_15": {
-   "value": "1,204.56"
+   "value": null
   },
   "undefined_17": {
-   "value": "1,204.56"
+   "value": null
   },
   "undefined_18": {
-   "value": "1,214.56"
+   "value": null
   },
   "undefined_19": {
-   "value": "S7.1 priority.entry_number"
+   "value": null
   },
   "undefined_2": {
-   "value": "1,274.56"
+   "value": "3,200.00"
   },
   "undefined_20": {
-   "value": "1,204.56"
+   "value": null
   },
   "undefined_22": {
-   "value": "1,214.56"
+   "value": null
   },
   "undefined_25": {
-   "value": "1,224.56"
+   "value": null
   },
   "undefined_3": {
-   "value": "1,284.56"
+   "value": "450.00"
   },
   "undefined_4.4": {
-   "value": "S31.0 nonpriority.entry_number"
+   "value": null
   },
   "undefined_4.5": {
-   "value": "S31.1 nonpriority.entry_number"
+   "value": null
   },
   "undefined_4.6": {
-   "value": "S31.2 nonpriority.entry_number"
+   "value": null
   },
   "undefined_5": {
-   "value": "1,274.56"
+   "value": null
   },
   "undefined_6": {
-   "value": "1,284.56"
+   "value": null
   },
   "undefined_7": {
-   "value": "1,294.56"
+   "value": null
   }
  },
  "release": "form/b106ef@2015-12-01",
- "sha256": "1e1869044909d9324ce760e6396c63e9b3be376ecb5d1ec54c5bf9bbbf886184"
+ "sha256": "17cb9d8eadefdcc9d4842f72a0621b20feeb7e56168cb85e51bf69002007498a"
 }
