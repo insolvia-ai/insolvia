@@ -48,6 +48,8 @@ import type {
   CaseEntity,
   CaseEntityRequest,
   CreditCounseling,
+  CreditorMatrix,
+  CreditorMatrixProblem,
   Debtor,
   FilingRole,
   HealthStatus,
@@ -759,6 +761,25 @@ export class InsolviaApiClient {
       { method: 'DELETE', headers },
     );
     await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/creditor-matrix` — generate the court's creditor
+   * mailing matrix from the case's creditor records (issue #94).
+   *
+   * Always a 200: the outcome is either the file (`content` present,
+   * `problems` empty) or the reasons there isn't one (`problems` non-empty,
+   * `content` absent) — never both, and never a partial file. Like
+   * {@link getCase}, a 404 means the case is unknown *or* not the caller's.
+   */
+  async getCreditorMatrix(caseId: string): Promise<CreditorMatrix> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/creditor-matrix`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return creditorMatrixFromJson(decoded);
   }
 
   /**
@@ -1822,6 +1843,34 @@ function requireCaseEntityArray<C extends CaseCollection>(
       json: item as JsonObject,
       path: `${key}[${index}]`,
     });
+  });
+}
+
+/** One matrix problem: `{"creditorId"?, "field", "message"}` (issue #94). */
+function creditorMatrixProblemFromJson(response: DecodedResponse): CreditorMatrixProblem {
+  return definedMembers<CreditorMatrixProblem>({
+    creditorId: optionalString(response, 'creditorId'),
+    field: requireString(response, 'field'),
+    message: requireString(response, 'message'),
+  });
+}
+
+/**
+ * Decodes a {@link CreditorMatrix} — `matrix_json`'s exact shape. `content`
+ * is absent, never null, when the server refused to produce the file.
+ */
+function creditorMatrixFromJson(response: DecodedResponse): CreditorMatrix {
+  return definedMembers<CreditorMatrix>({
+    fileName: requireString(response, 'fileName'),
+    creditorCount: requireNumber(response, 'creditorCount'),
+    duplicatesOmitted: requireNumber(response, 'duplicatesOmitted'),
+    problems: requireArrayOf(
+      response,
+      'problems',
+      'CreditorMatrixProblem',
+      creditorMatrixProblemFromJson,
+    ),
+    content: optionalString(response, 'content'),
   });
 }
 

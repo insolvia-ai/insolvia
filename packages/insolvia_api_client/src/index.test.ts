@@ -3630,6 +3630,117 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
   });
 });
 
+describe('getCreditorMatrix', () => {
+  // The literal 200 body routes/creditor_matrix.py answers when every
+  // creditor is mailable — content is the exact CRLF text of the .txt file.
+  const GENERATED = {
+    fileName: 'creditor-matrix.txt',
+    creditorCount: 1,
+    duplicatesOmitted: 0,
+    problems: [],
+    content: 'Example Bank\r\nPO Box 15168\r\nWilmington DE 19850\r\n',
+  };
+
+  test('GETs /v1/cases/{caseId}/creditor-matrix and maps the file outcome', async () => {
+    const stub = stubFetch(() => jsonResponse(GENERATED, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const matrix = await client.getCreditorMatrix(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/creditor-matrix`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(matrix).toEqual(GENERATED);
+  });
+
+  test('a refused matrix carries problems and NO content member at all', async () => {
+    // The server omits `content` rather than sending null; the case-level
+    // problem (no creditors) likewise omits `creditorId`.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          fileName: 'creditor-matrix.txt',
+          creditorCount: 0,
+          duplicatesOmitted: 0,
+          problems: [
+            {
+              creditorId: ENTITY_ID,
+              field: 'address.state',
+              message: 'A state is required.',
+            },
+            {
+              field: 'creditors',
+              message:
+                'The case has no creditors — a matrix must list every creditor before it can be filed.',
+            },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const matrix = await client.getCreditorMatrix(ENTITY_CASE_ID);
+
+    expect('content' in matrix).toBe(false);
+    expect(matrix.problems).toHaveLength(2);
+    expect(matrix.problems[0]).toEqual({
+      creditorId: ENTITY_ID,
+      field: 'address.state',
+      message: 'A state is required.',
+    });
+    expect(matrix.problems[1] !== undefined && 'creditorId' in matrix.problems[1]).toBe(false);
+  });
+
+  test('URL-encodes the caseId into the path', async () => {
+    const stub = stubFetch(() => jsonResponse(GENERATED, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.getCreditorMatrix('id with spaces/slash');
+
+    expect(new URL(stub.lastRequest().url).pathname).toBe(
+      '/v1/cases/id%20with%20spaces%2Fslash/creditor-matrix',
+    );
+  });
+
+  test('a foreign or unknown case surfaces the 404', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.getCreditorMatrix(ENTITY_CASE_ID)));
+    expect(error.statusCode).toBe(404);
+    expect(error.message).toContain('case not found');
+  });
+
+  test('no access token throws without calling fetch at all', async () => {
+    const stub = stubFetch(() => jsonResponse(GENERATED, 200));
+    const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.getCreditorMatrix(ENTITY_CASE_ID)),
+    );
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
 describe('the case-collection enums', () => {
   test('CASE_COLLECTIONS mirrors core/case_collections.py, in order', () => {
     expect(CASE_COLLECTIONS).toEqual([
