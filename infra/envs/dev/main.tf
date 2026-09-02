@@ -107,6 +107,29 @@ module "case_store" {
   tags                        = local.common_tags
 }
 
+# ── Job pipeline (ADR 0018), queue half only ────────────────────
+# The same module staging and prod instantiate, with the WORKER half absent:
+# ecr_repository_url is null (there is no Lambda in dev, same as everywhere
+# above), so the module creates the queue and its DLQ and nothing else. That
+# is deliberately not a stub — the local API enqueues onto this real queue
+# (JOB_QUEUE_URL in services/api/.env), and
+# `python -m insolvia_api.entrypoints.worker_poller` consumes it under the
+# developer's own credentials, so the full accept → deliver → run → status
+# loop runs on a laptop; only the managed SQS→Lambda delivery hop itself is
+# cloud-only (ADR 0018 writes that down). api_role_name is null for the
+# reason every module here passes it null; no alarms topic exists in dev, so
+# the alarms are skipped too.
+module "job_pipeline" {
+  source = "../../modules/job_pipeline"
+
+  project            = "insolvia"
+  environment        = local.environment
+  ecr_repository_url = null
+  api_role_name      = null
+  alarms_topic_arn   = null
+  tags               = local.common_tags
+}
+
 # ── Firms ───────────────────────────────────────────────────────
 # The same module staging and prod instantiate, on the same case key, so local
 # development resolves a caller through the real sparse index rather than a
@@ -245,6 +268,16 @@ resource "aws_ssm_parameter" "case_access_log_table_name" {
   name  = "/insolvia/${local.environment}/api/case-access-log-table-name"
   type  = "String"
   value = module.case_store.access_log_table_name
+  tags  = local.common_tags
+}
+
+# The job queue's URL, same namespace-parity reasoning as everything above.
+# The value a developer actually consumes is the job_queue_url output, which
+# dev-aws-setup.sh writes into services/api/.env as JOB_QUEUE_URL.
+resource "aws_ssm_parameter" "job_queue_url" {
+  name  = "/insolvia/${local.environment}/api/job-queue-url"
+  type  = "String"
+  value = module.job_pipeline.queue_url
   tags  = local.common_tags
 }
 

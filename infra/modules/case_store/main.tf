@@ -429,3 +429,58 @@ resource "aws_iam_role_policy" "api_case_access" {
     ]
   })
 }
+
+# ── The second application principal: the pipeline worker ───────
+# ADR 0018 amends "exactly one principal reads this table" the way ADR 0011
+# amended ADR 0001: the worker Lambda is the API's own long-running half — it
+# advances the job rows the API accepted, and (with 9.6/9.7) reads the case
+# it is assembling — under a role of its own so its blast radius is its own.
+#
+# Same statements as the API's grant, minus one, and the omission is the
+# design: NO access-log append. The worker records nothing in the access log
+# today — the accept was logged by the API as job.accept, and per-read
+# logging inside workers arrives with the workers that actually read case
+# data (9.6/9.7), as a grant added in a diff that says so. No Scan, same as
+# the API, for the same reason.
+resource "aws_iam_role_policy" "worker_case_access" {
+  count = var.worker_role_name == null ? 0 : 1
+
+  name = "${local.name}-worker-access"
+  role = var.worker_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CaseTableData"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:BatchGetItem",
+          "dynamodb:Query",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:ConditionCheckItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.cases.arn,
+          "${aws_dynamodb_table.cases.arn}/index/*",
+        ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        Sid      = "CaseKeyUse"
+        Effect   = "Allow"
+        Action   = local.api_key_actions
+        Resource = aws_kms_key.case.arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}

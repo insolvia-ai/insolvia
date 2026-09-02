@@ -25,6 +25,23 @@ variable "api_role_name" {
   default     = null
 }
 
+variable "worker_role_name" {
+  description = <<-EOT
+    Execution role of the pipeline worker Lambda —
+    module.job_pipeline.worker_role_name (ADR 0018). Same shape and same
+    reasoning as api_role_name above: a name, attached from this side, so
+    neither this module nor job_pipeline has to reference the other's
+    resources (job_pipeline's Lambda does not read this module's outputs
+    either — the table name reaches the worker through SSM via the deploy
+    workflow, exactly as it reaches the API).
+
+    null in infra/envs/dev, where there is no worker Lambda — jobs run
+    through entrypoints/worker_poller.py under the developer's own IAM user.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "point_in_time_recovery" {
   description = <<-EOT
     DynamoDB PITR. On everywhere that holds data worth recovering; off in dev,

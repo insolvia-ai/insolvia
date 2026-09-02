@@ -58,7 +58,8 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   firm_table="$(jq -r '.outputs.firm_table_name.value // empty' <<<"$state_json")"
   pool_id="$(jq -r '.outputs.auth_user_pool_id.value // empty' <<<"$state_json")"
   document_bucket="$(jq -r '.outputs.case_document_bucket.value // empty' <<<"$state_json")"
-  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" ]] || die "Terraform state is missing required development outputs."
+  job_queue_url="$(jq -r '.outputs.job_queue_url.value // empty' <<<"$state_json")"
+  [[ -n "$table" && -n "$case_table" && -n "$access_log_table" && -n "$firm_table" && -n "$document_bucket" && -n "$pool_id" && -n "$job_queue_url" ]] || die "Terraform state is missing required development outputs."
   aws_dev dynamodb describe-table --table-name "$table" >/dev/null ||
     die "Development DynamoDB table '$table' is unavailable."
   aws_dev dynamodb describe-table --table-name "$case_table" >/dev/null ||
@@ -71,11 +72,14 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     die "Development case document bucket '$document_bucket' is unavailable."
   aws_dev cognito-idp describe-user-pool --user-pool-id "$pool_id" >/dev/null ||
     die "Development Cognito pool '$pool_id' is unavailable."
+  aws_dev sqs get-queue-attributes --queue-url "$job_queue_url" --attribute-names QueueArn >/dev/null ||
+    die "Development job queue '$job_queue_url' is unavailable."
   if [[ ! -f "$API_DIR/.env" ]] || ! grep -q "^WAITLIST_TABLE_NAME=$table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_ACCESS_LOG_TABLE_NAME=$access_log_table\$" "$API_DIR/.env" ||
     ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$API_DIR/.env" ||
     ! grep -q "^CASE_DOCUMENT_BUCKET=$document_bucket\$" "$API_DIR/.env" ||
+    ! grep -q "^JOB_QUEUE_URL=$job_queue_url\$" "$API_DIR/.env" ||
     ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
@@ -100,6 +104,7 @@ auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
 google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
+job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
 
 # ── Wire services/api at the real table ─────────────────────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
@@ -131,6 +136,10 @@ upsert_env "$api_env" CASE_TABLE_NAME "$case_table"
 upsert_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
 upsert_env "$api_env" FIRM_TABLE_NAME "$firm_table"
 upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
+# The pipeline's local seam (ADR 0018): the local API enqueues accepted jobs
+# onto this machine's real queue, and `python -m
+# insolvia_api.entrypoints.worker_poller` (same .env) runs them.
+upsert_env "$api_env" JOB_QUEUE_URL "$job_queue_url"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"

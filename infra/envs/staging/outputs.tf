@@ -47,6 +47,21 @@ output "api_alarms_topic_arn" {
   value       = module.api_service.alarms_topic_arn
 }
 
+output "jobs_ecr_repository_url" {
+  description = "ECR repository the API deploy workflow pushes staging worker images to (ADR 0018)."
+  value       = module.job_pipeline.ecr_repository_url
+}
+
+output "jobs_worker_function_name" {
+  description = "Staging pipeline worker Lambda name (deploy target for update-function-code/-configuration)."
+  value       = module.job_pipeline.worker_function_name
+}
+
+output "jobs_queue_url" {
+  description = "Staging job queue URL — also published to SSM as job-queue-url for the API."
+  value       = module.job_pipeline.queue_url
+}
+
 output "auth_user_pool_id" {
   description = "Staging Cognito user pool ID."
   value       = module.auth.user_pool_id

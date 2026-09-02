@@ -63,6 +63,8 @@ jobs:
             echo "function=$(terraform -chdir=infra/envs/staging output -raw api_lambda_function_name)"
             echo "domain=$(terraform -chdir=infra/envs/staging output -raw api_domain)"
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw api_lambda_alias_name)"
+            echo "jobs_repo=$(terraform -chdir=infra/envs/staging output -raw jobs_ecr_repository_url)"
+            echo "worker_function=$(terraform -chdir=infra/envs/staging output -raw jobs_worker_function_name)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -92,6 +94,22 @@ jobs:
             .
           docker push "$REPO:sha-${{ github.sha }}"
           docker push "$REPO:staging"
+
+      # The pipeline worker's image (ADR 0018): same Dockerfile, same repo-root
+      # context, the `worker` target, its own shared repository. Nearly every
+      # layer is shared with the build above, so this is cheap — and it keeps
+      # the api and worker images of one commit in lockstep, which run_job's
+      # unknown-kind window depends on being short.
+      - name: Build and push worker image
+        env:
+          JOBS_REPO: ${{ steps.tf.outputs.jobs_repo }}
+        run: |
+          docker build --target worker -f services/api/Dockerfile \
+            -t "$JOBS_REPO:sha-${{ github.sha }}" \
+            -t "$JOBS_REPO:staging" \
+            .
+          docker push "$JOBS_REPO:sha-${{ github.sha }}"
+          docker push "$JOBS_REPO:staging"
 
       - name: Update Lambda code
         env:
@@ -158,3 +176,70 @@ jobs:
         run: |
           curl -sSf "https://$DOMAIN/health" | tee health.json
           jq -e '.environment == "staging"' health.json > /dev/null
+
+      # ── The pipeline worker (ADR 0018) ──────────────────────────
+      # Rolled after the API is serving, in the same run: no alias, no
+      # version dance — a queue consumer has no router to protect
+      # (modules/job_pipeline owns that argument), so this is
+      # update-code, re-derive env, and a direct smoke invocation.
+      - name: Update worker code
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+          JOBS_REPO: ${{ steps.tf.outputs.jobs_repo }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$WORKER" \
+            --image-uri "$JOBS_REPO:sha-${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$WORKER"
+
+      - name: Re-derive worker environment from SSM
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+        run: |
+          # The SAME /insolvia/staging/api namespace as the API Lambda — the
+          # worker is the API's long-running half and reads the same config
+          # (CASE_TABLE_NAME is what it actually needs; the extras are
+          # harmless and keep this step one derivation, not two).
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/staging/api \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$WORKER" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$WORKER"
+
+      # A synthetic SQS event whose job id has no record: run_job logs and
+      # drops it by design, so a clean (no FunctionError) return proves the
+      # image boots, the handler resolves, and the store is reachable —
+      # without writing anything.
+      - name: Smoke test the worker
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+        run: |
+          cat > worker-event.json <<'EOF'
+          {
+            "Records": [
+              {
+                "body": "{\"version\":1,\"jobId\":\"00000000-0000-4000-8000-00000000smoke\",\"caseId\":\"00000000-0000-4000-8000-00000000smoke\",\"kind\":\"echo\"}"
+              }
+            ]
+          }
+          EOF
+          aws lambda invoke \
+            --function-name "$WORKER" \
+            --payload fileb://worker-event.json \
+            --cli-read-timeout 120 \
+            worker-response.json > worker-invoke-meta.json
+          cat worker-invoke-meta.json
+          if jq -e '.FunctionError' worker-invoke-meta.json > /dev/null; then
+            echo "::error::Worker smoke invocation raised: $(jq -r '.FunctionError' worker-invoke-meta.json)"
+            cat worker-response.json
+            exit 1
+          fi
