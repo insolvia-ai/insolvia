@@ -72,6 +72,32 @@ def nonpriority_unsecured_total(case_file: CaseFile) -> Decimal:
     )
 
 
+def priority_type_total(case_file: CaseFile, wanted: str) -> Decimal:
+    """One Part 4 line: priority claims of one type, at their total claim.
+    Shared with 106Sum lines 9a-9c."""
+    return sum(
+        (
+            _total_claim(c)
+            for c in claims_of(case_file, "priority_unsecured")
+            if c.priority_type == wanted
+        ),
+        Decimal("0"),
+    )
+
+
+def nonpriority_type_total(case_file: CaseFile, wanted: str) -> Decimal:
+    """One Part 4 line: nonpriority claims of one type. Shared with 106Sum
+    lines 9d-9f."""
+    return sum(
+        (
+            amount(c.amount)
+            for c in claims_of(case_file, "nonpriority_unsecured")
+            if c.nonpriority_type == wanted
+        ),
+        Decimal("0"),
+    )
+
+
 def _creditor_block(
     release: FormRelease,
     values: FieldValues,
@@ -297,33 +323,33 @@ def project_b106ef_1215(release: FormRelease, case_file: CaseFile) -> FieldValue
         )
 
     # Part 4 — the statistical rollup, derived line by line.
-    def by_priority_type(wanted: str) -> Decimal:
-        return sum(
-            (_total_claim(c) for c in priority if c.priority_type == wanted),
-            Decimal("0"),
-        )
-
-    def by_nonpriority_type(wanted: str) -> Decimal:
-        return sum(
-            (amount(c.amount) for c in nonpriority if c.nonpriority_type == wanted),
-            Decimal("0"),
-        )
-
-    values["line_6a_total"] = Text(format_money(by_priority_type("domestic_support")))
-    values["line_6b_total"] = Text(format_money(by_priority_type("tax_and_government")))
-    values["line_6c_total"] = Text(
-        format_money(by_priority_type("death_or_injury_while_intoxicated"))
+    values["line_6a_total"] = Text(
+        format_money(priority_type_total(case_file, "domestic_support"))
     )
-    values["line_6d_total"] = Text(format_money(by_priority_type("other")))
+    values["line_6b_total"] = Text(
+        format_money(priority_type_total(case_file, "tax_and_government"))
+    )
+    values["line_6c_total"] = Text(
+        format_money(
+            priority_type_total(case_file, "death_or_injury_while_intoxicated")
+        )
+    )
+    values["line_6d_total"] = Text(
+        format_money(priority_type_total(case_file, "other"))
+    )
     values["line_6e_total"] = Text(format_money(priority_unsecured_total(case_file)))
-    values["line_6f_total"] = Text(format_money(by_nonpriority_type("student_loan")))
+    values["line_6f_total"] = Text(
+        format_money(nonpriority_type_total(case_file, "student_loan"))
+    )
     values["line_6g_total"] = Text(
-        format_money(by_nonpriority_type("separation_or_divorce"))
+        format_money(nonpriority_type_total(case_file, "separation_or_divorce"))
     )
     values["line_6h_total"] = Text(
-        format_money(by_nonpriority_type("pension_or_profit_sharing"))
+        format_money(nonpriority_type_total(case_file, "pension_or_profit_sharing"))
     )
-    values["line_6i_total"] = Text(format_money(by_nonpriority_type("other")))
+    values["line_6i_total"] = Text(
+        format_money(nonpriority_type_total(case_file, "other"))
+    )
     values["line_6j_total"] = Text(format_money(nonpriority_unsecured_total(case_file)))
 
     if problems:
