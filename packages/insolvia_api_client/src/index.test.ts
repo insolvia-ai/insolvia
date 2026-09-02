@@ -3901,6 +3901,9 @@ describe('the case-collection enums', () => {
       'related_cases',
       'sole_proprietorships',
       'filing_professionals',
+      'exemptions',
+      'contract_leases',
+      'community_household_members',
     ]);
   });
 

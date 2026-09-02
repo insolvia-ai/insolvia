@@ -80,6 +80,9 @@ class HouseholdBody:
     which_household: str | None = None
     # 106J line 1: does debtor 2 live in a separate household?
     separate_household: bool | None = None
+    # Line 3: do the expenses include those of people other than the debtors
+    # and their dependents?
+    expenses_include_others: bool | None = None
     # Line 24: increase or decrease expected within the year, and why.
     change_expected: bool | None = None
     change_explanation: str | None = None
@@ -93,6 +96,9 @@ def parse_household(payload: Mapping[str, object]) -> HouseholdBody:
         ),
         separate_household=boolean(
             payload.get("separate_household"), "separate_household", errors
+        ),
+        expenses_include_others=boolean(
+            payload.get("expenses_include_others"), "expenses_include_others", errors
         ),
         change_expected=boolean(
             payload.get("change_expected"), "change_expected", errors

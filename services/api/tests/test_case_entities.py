@@ -20,7 +20,9 @@ from insolvia_api.core.case_entities import (
     replace_entity,
 )
 from insolvia_api.core.claims import parse_claim
+from insolvia_api.core.codebtors import parse_community_household_member
 from insolvia_api.core.creditors import parse_creditor
+from insolvia_api.core.exemption_claims import parse_exemption
 from insolvia_api.core.expenses import parse_dependent
 from insolvia_api.core.provenance import populated_paths
 from insolvia_core.errors import FieldValidationError
@@ -134,6 +136,24 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "bar_number": "112233",
         "bar_state": "FL",
         "signature_date": "2026-09-01",
+    },
+    "exemptions": {
+        "asset_id": "as-1",
+        "statute_citation": "Fla. Stat. § 222.25(1)",
+        "amount": "5000.00",
+        "claims_full_fmv": False,
+        "acquired_within_1215_days": False,
+    },
+    "contract_leases": {
+        "counterparty_name": "Example Storage LLC",
+        "counterparty_address": {"line1": "1 Example Way", "city": "Exampleville"},
+        "description": "Month-to-month storage unit lease, unit 12",
+    },
+    "community_household_members": {
+        "name": "Example Former Spouse",
+        "address": {"city": "Exampleville", "state": "TX"},
+        "community_state": "TX",
+        "lived_with_debtor": False,
     },
 }
 
@@ -336,3 +356,17 @@ def test_an_age_of_true_is_not_a_count() -> None:
 def test_a_cleared_field_collapses_to_absent() -> None:
     body = parse_creditor({"name": "   "})
     assert body.name is None
+
+
+def test_an_exemption_accepts_amount_and_election_together() -> None:
+    # Mutually exclusive per the model, but that is the completeness gate's
+    # rule: an intake that typed the amount before answering the election
+    # must persist (storage validates shape and type only).
+    body = parse_exemption({"amount": "5000.00", "claims_full_fmv": True})
+    assert (body.amount, body.claims_full_fmv) == ("5000.00", True)
+
+
+def test_a_community_state_is_a_two_letter_code() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_community_household_member({"community_state": "Texas"})
+    assert "community_state" in failure.value.fields

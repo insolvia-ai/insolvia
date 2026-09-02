@@ -19,8 +19,10 @@ from typing import Any, Final
 from .assets import ASSET
 from .case_entities import EntityKind
 from .claims import CLAIM
-from .codebtors import CODEBTOR
+from .codebtors import CODEBTOR, COMMUNITY_HOUSEHOLD_MEMBER
+from .contract_leases import CONTRACT_LEASE
 from .creditors import CREDITOR
+from .exemption_claims import EXEMPTION
 from .expenses import DEPENDENT, EXPENSE, HOUSEHOLD
 from .income import EMPLOYMENT, INCOME_SUMMARY
 from .petitions import (
@@ -56,6 +58,12 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         RELATED_CASE,
         SOLE_PROPRIETORSHIP,
         FILING_PROFESSIONAL,
+        # The schedules' remaining entities (issue #289): 106C's claimed
+        # exemptions, 106G's contracts and leases, and 106H's
+        # community-property household member.
+        EXEMPTION,
+        CONTRACT_LEASE,
+        COMMUNITY_HOUSEHOLD_MEMBER,
     )
 }
 
