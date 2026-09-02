@@ -26,12 +26,21 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, date, datetime
 from typing import Final
 
 from insolvia_core.errors import FieldValidationError
 
 from .cases import partition_key
+
+# The scalar and structured parsers live in core/fields.py, shared with every
+# other case entity (issue #249). `Address` and `PersonName` are re-exported
+# here because a debtor's callers have always imported them from this module.
+from .fields import Address, PersonName, parse_address, parse_name, prune_body
+from .fields import choice as _choice
+from .fields import form_date as _form_date
+from .fields import mapping as _mapping
+from .fields import text as _text
+from .fields import timestamp as _timestamp
 from .provenance import (
     ADDRESSABLE_ID_RE,
     ProvenanceEntry,
@@ -39,6 +48,30 @@ from .provenance import (
     provenance_json,
     require_provenance,
 )
+
+__all__ = [
+    "COUNSELING_EXEMPTIONS",
+    "COUNSELING_STATUSES",
+    "FILING_ROLES",
+    "VENUE_BASES",
+    "Address",
+    "CreditCounseling",
+    "Debtor",
+    "DebtorDraft",
+    "OtherName",
+    "PersonName",
+    "Venue",
+    "create_debtor",
+    "debtor_body",
+    "debtor_from_item",
+    "debtor_item",
+    "debtor_json",
+    "parse_debtor",
+    "parse_filing_role",
+    "replace_debtor",
+    "role_order",
+    "sort_key",
+]
 
 # One record per role per case, which is why the role is the sort key rather
 # than a uuid: "the second debtor" is a position on the form, and a case can no
@@ -60,16 +93,6 @@ COUNSELING_STATUSES: Final = (
 # Only meaningful with status `not_required` — the form's three grounds.
 COUNSELING_EXEMPTIONS: Final = ("incapacity", "disability", "active_duty")
 
-_MAX_TEXT = 200
-
-
-@dataclass(frozen=True)
-class PersonName:
-    given: str | None = None
-    middle: str | None = None
-    surname: str | None = None
-    suffix: str | None = None
-
 
 @dataclass(frozen=True)
 class OtherName:
@@ -82,15 +105,6 @@ class OtherName:
     middle: str | None = None
     surname: str | None = None
     business_name: str | None = None
-
-
-@dataclass(frozen=True)
-class Address:
-    line1: str | None = None
-    line2: str | None = None
-    city: str | None = None
-    state: str | None = None
-    postal_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,110 +156,6 @@ class DebtorDraft:
     credit_counseling: CreditCounseling
     signed_at: str | None
     provenance: Mapping[str, ProvenanceEntry]
-
-
-def _timestamp() -> str:
-    return datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
-
-
-def _text(
-    value: object, path: str, errors: dict[str, str], *, limit: int = _MAX_TEXT
-) -> str | None:
-    """A single-line free-text field, or None when absent.
-
-    An empty or whitespace-only string collapses to None rather than being
-    stored: "the user cleared this box" and "the user never filled it in" are
-    the same state on a form, and keeping them distinct would mean provenance
-    for the act of deleting (see populated_paths in core/provenance.py).
-    """
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        errors[path] = "Must be text."
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    if len(text) > limit:
-        errors[path] = f"Must be {limit} characters or fewer."
-        return None
-    if "\n" in text or "\r" in text:
-        errors[path] = "Must be a single line."
-        return None
-    return text
-
-
-def _form_date(value: object, path: str, errors: dict[str, str]) -> str | None:
-    """A calendar date, `YYYY-MM-DD`, or None when absent.
-
-    Checked rather than taken as free text. docs/reference/case-data-model.md:
-    a form date has no time and no zone because it is a calendar fact, not an
-    instant — and a signature date that reads "yesterday" is worse than an
-    empty one, because it looks filled in. Parsed rather than pattern-matched
-    for the same reason the provenance timestamp is: `2019-02-30` matches every
-    plausible regex and is not a day.
-    """
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        errors[path] = "Must be a date."
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    try:
-        parsed = date.fromisoformat(text)
-    except ValueError:
-        errors[path] = "Must be a date in YYYY-MM-DD form."
-        return None
-    # `date.fromisoformat` also accepts "20190214"; the stored form is one shape.
-    if parsed.isoformat() != text:
-        errors[path] = "Must be a date in YYYY-MM-DD form."
-        return None
-    return text
-
-
-def _choice(
-    value: object, allowed: Sequence[str], path: str, errors: dict[str, str]
-) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str) or value not in allowed:
-        errors[path] = "Must be one of " + ", ".join(allowed) + "."
-        return None
-    return value
-
-
-def _mapping(value: object, path: str, errors: dict[str, str]) -> Mapping[str, object]:
-    if value is None:
-        return {}
-    if not isinstance(value, Mapping):
-        errors[path] = "Must be an object."
-        return {}
-    return value
-
-
-def _parse_name(value: object, path: str, errors: dict[str, str]) -> PersonName:
-    raw = _mapping(value, path, errors)
-    return PersonName(
-        given=_text(raw.get("given"), f"{path}.given", errors),
-        middle=_text(raw.get("middle"), f"{path}.middle", errors),
-        surname=_text(raw.get("surname"), f"{path}.surname", errors),
-        suffix=_text(raw.get("suffix"), f"{path}.suffix", errors, limit=20),
-    )
-
-
-def _parse_address(value: object, path: str, errors: dict[str, str]) -> Address:
-    raw = _mapping(value, path, errors)
-    return Address(
-        line1=_text(raw.get("line1"), f"{path}.line1", errors),
-        line2=_text(raw.get("line2"), f"{path}.line2", errors),
-        city=_text(raw.get("city"), f"{path}.city", errors),
-        state=_text(raw.get("state"), f"{path}.state", errors, limit=40),
-        postal_code=_text(
-            raw.get("postal_code"), f"{path}.postal_code", errors, limit=12
-        ),
-    )
 
 
 def _parse_other_names(value: object, errors: dict[str, str]) -> tuple[OtherName, ...]:
@@ -375,13 +285,13 @@ def parse_debtor(
             "encryption, which is not built. Leave this out."
         )
 
-    name = _parse_name(payload.get("name"), "name", errors)
+    name = parse_name(payload.get("name"), "name", errors)
     other_names_used = _parse_other_names(payload.get("other_names_used"), errors)
     employer_ids = _parse_employer_ids(payload.get("employer_ids"), errors)
-    residence_address = _parse_address(
+    residence_address = parse_address(
         payload.get("residence_address"), "residence_address", errors
     )
-    mailing_address = _parse_address(
+    mailing_address = parse_address(
         payload.get("mailing_address"), "mailing_address", errors
     )
     phone = _text(payload.get("phone"), "phone", errors, limit=40)
@@ -498,7 +408,7 @@ def debtor_json(debtor: Debtor) -> dict[str, object]:
     """The API representation. Absent values are omitted rather than sent as
     nulls: on a progressive intake most of the record is empty most of the
     time, and a body of nulls is mostly noise."""
-    body = _prune_body(debtor_body(debtor))
+    body = prune_body(debtor_body(debtor))
     return {
         "id": debtor.id,
         "case_id": debtor.case_id,
@@ -508,40 +418,6 @@ def debtor_json(debtor: Debtor) -> dict[str, object]:
         "provenance": provenance_json(debtor.provenance),
         **body,
     }
-
-
-def _prune_body(body: Mapping[str, object]) -> dict[str, object]:
-    """`_prune` over a record body, typed as the mapping it always is — mypy
-    cannot see through the generic recursion, and a `cast` here would be the
-    same claim with less checking."""
-    pruned = _prune(dict(body))
-    return pruned if isinstance(pruned, dict) else {}
-
-
-def _prune(value: object) -> object:
-    """Drop absent members from a record, recursively.
-
-    Absent means None, and — inside a MAP — an empty string, list, tuple or
-    map, matching populated_paths so that what is stored and what invariant 1
-    validated agree. Two limits worth stating rather than discovering: a None
-    INSIDE a list survives (lists here hold records, never holes), and an empty
-    container nested in a list is not dropped.
-
-    `False` and `0` survive everywhere. They are answers, the same rule
-    populated_paths states at length.
-    """
-    if isinstance(value, Mapping):
-        pruned = {
-            key: _prune(member) for key, member in value.items() if member is not None
-        }
-        return {
-            key: member
-            for key, member in pruned.items()
-            if not (isinstance(member, (dict, list, tuple)) and not member)
-        }
-    if isinstance(value, (list, tuple)):
-        return [_prune(member) for member in value]
-    return value
 
 
 def debtor_item(debtor: Debtor) -> dict[str, object]:
@@ -562,7 +438,7 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
         "filingRole": debtor.filing_role,
         "createdAt": debtor.created_at,
         "updatedAt": debtor.updated_at,
-        "body": _prune_body(debtor_body(debtor)),
+        "body": prune_body(debtor_body(debtor)),
         "provenance": provenance_json(debtor.provenance),
     }
 

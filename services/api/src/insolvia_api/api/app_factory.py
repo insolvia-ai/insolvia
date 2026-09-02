@@ -16,6 +16,7 @@ from insolvia_core.errors import (
 from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
+from insolvia_api.api.routes.case_entities import blueprint as case_entities_blueprint
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
@@ -43,6 +44,10 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(firm_blueprint)
     app.register_blueprint(documents_blueprint)
     app.register_blueprint(debtors_blueprint)
+    # AFTER debtors and documents in this list, though registration order does
+    # not decide matching — Werkzeug ranks static URL segments above dynamic
+    # ones, so /debtors and /documents always beat /<collection>.
+    app.register_blueprint(case_entities_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

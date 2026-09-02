@@ -9,6 +9,7 @@ from insolvia_core.ports import FirmStore, JwksProvider, UserDirectory
 from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
     AccessLog,
+    CaseEntityStore,
     CaseStore,
     DebtorStore,
     DocumentBlobStore,
@@ -60,6 +61,9 @@ class ApiDependencies:
     # lives in its case's partition (SK=DEBTOR#<role>), so there is no
     # second table, no new environment variable, and nothing to provision.
     debtor_store: DebtorStore | None = None
+    # The generic case collections (issue #249) — same table, same partition,
+    # same "nothing to provision" argument as the debtor store above.
+    case_entity_store: CaseEntityStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint
