@@ -53,6 +53,10 @@ import type {
   Debtor,
   FilingRole,
   HealthStatus,
+  Job,
+  JobFailure,
+  JobKind,
+  JobStatus,
   ListCasesOptions,
   ListCasesResult,
   OtherName,
@@ -358,6 +362,55 @@ export class InsolviaApiClient {
     });
     const decoded = await decodeExpected(response, 200);
     return caseFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/jobs` — hand minutes-long work to the async
+   * pipeline (ADR 0018). Body is `{"kind"}` and nothing else: workers read
+   * everything from the case, so there is no payload to send.
+   *
+   * Always 202 with the {@link Job} now in flight — which is a FRESH job, or
+   * the already-active one of the same kind: one active job per (case, kind)
+   * is the server's idempotency rule, so re-calling this after a timeout is
+   * safe and never starts a duplicate run. Poll {@link getCaseJob} until the
+   * status settles.
+   *
+   * Throws {@link ApiValidationException} on a 400 (message keyed `kind`);
+   * a plain {@link ApiException} with 404 when the case is unknown *or* not
+   * the caller's (see {@link getCase}), and with 503 in the brief deploy
+   * window where this environment's pipeline is not up yet — retry later.
+   */
+  async acceptCaseJob(caseId: string, kind: JobKind): Promise<Job> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#jobsUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind }),
+    });
+    const decoded = await decodeExpected(response, 202);
+    return jobFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/jobs/{jobId}` — one job's status.
+   *
+   * Like {@link getCase}, a 404 means the case is unknown *or* not the
+   * caller's — and also covers a job id from another case, which does not
+   * resolve here by construction.
+   */
+  async getCaseJob(caseId: string, jobId: string): Promise<Job> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#jobsUrl(caseId)}/${encodeURIComponent(jobId)}`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return jobFromJson(decoded);
+  }
+
+  /** `/v1/cases/{caseId}/jobs`, with the id encoded exactly once. */
+  #jobsUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/jobs`;
   }
 
   /** `/v1/cases/{caseId}/documents`, with the id encoded exactly once. */
@@ -1339,6 +1392,57 @@ function caseFromJson(response: DecodedResponse): Case {
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
   };
+}
+
+/** A required field that must be a registered job kind. */
+function requireJobKind(response: DecodedResponse, key: string): JobKind {
+  const value = response.json[key];
+  if (value === 'echo') {
+    return value;
+  }
+  throw malformedField(response, key, "one of 'echo'");
+}
+
+/** A required field that must be one of the four job statuses. */
+function requireJobStatus(response: DecodedResponse, key: string): JobStatus {
+  const value = response.json[key];
+  if (value === 'queued' || value === 'running' || value === 'succeeded' || value === 'failed') {
+    return value;
+  }
+  throw malformedField(response, key, 'one of "queued" | "running" | "succeeded" | "failed"');
+}
+
+/**
+ * Decodes a {@link Job} from a response body. Shared by both
+ * `/v1/cases/{caseId}/jobs` endpoints. `failure` and `result` are absent
+ * unless set (never `null`) — mirroring `job_json` in
+ * services/api/src/insolvia_api/core/jobs.py — so both stay optional here.
+ */
+function jobFromJson(response: DecodedResponse): Job {
+  let failure: JobFailure | undefined;
+  if (response.json.failure !== undefined) {
+    const child = childObject(response, 'failure');
+    failure = {
+      category: requireString(child, 'category'),
+      message: requireString(child, 'message'),
+    };
+  }
+  let result: Readonly<Record<string, unknown>> | undefined;
+  if (response.json.result !== undefined) {
+    result = childObject(response, 'result').json;
+  }
+  const job: Job = {
+    id: requireString(response, 'id'),
+    kind: requireJobKind(response, 'kind'),
+    status: requireJobStatus(response, 'status'),
+    createdBy: requireString(response, 'createdBy'),
+    attempts: requireNumber(response, 'attempts'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    ...(failure === undefined ? {} : { failure }),
+    ...(result === undefined ? {} : { result }),
+  };
+  return job;
 }
 
 /**

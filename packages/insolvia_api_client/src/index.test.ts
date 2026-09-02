@@ -1099,6 +1099,141 @@ describe('updateCase', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pipeline jobs. Pinned against services/api/.../routes/jobs.py and
+// core/jobs.py (ADR 0018): the 202 on accept, `job_json`'s seven base fields,
+// `failure`/`result` absent-unless-set, and the 503 that means the pipeline
+// is not deployed yet.
+// ---------------------------------------------------------------------------
+
+describe('the pipeline job endpoints', () => {
+  const JOB_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const JOB_ID = 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918';
+
+  /** A freshly accepted job — the literal `job_json` the accept route returns. */
+  const QUEUED_JOB = {
+    id: JOB_ID,
+    kind: 'echo',
+    status: 'queued',
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+    attempts: 0,
+    createdAt: '2026-09-02T09:15:00.123Z',
+    updatedAt: '2026-09-02T09:15:00.123Z',
+  };
+
+  test('POSTs /v1/cases/{caseId}/jobs with only the kind, and maps the 202 Job', async () => {
+    const stub = stubFetch(() => jsonResponse(QUEUED_JOB, 202));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const accepted = await client.acceptCaseJob(JOB_CASE_ID, 'echo');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${JOB_CASE_ID}/jobs`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({ kind: 'echo' });
+    expect(accepted).toEqual(QUEUED_JOB);
+    // Absent, not null — the wire omits them until they exist.
+    expect('failure' in accepted).toBe(false);
+    expect('result' in accepted).toBe(false);
+  });
+
+  test('GETs /v1/cases/{caseId}/jobs/{jobId} with every segment encoded, and maps a settled job', async () => {
+    const succeeded = {
+      ...QUEUED_JOB,
+      status: 'succeeded',
+      attempts: 1,
+      updatedAt: '2026-09-02T09:16:40.000Z',
+      result: { echo: JOB_ID },
+    };
+    const stub = stubFetch(() => jsonResponse(succeeded, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const job = await client.getCaseJob('id with spaces/slash', 'job/id');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/id%20with%20spaces%2Fslash/jobs/job%2Fid`);
+    expect(job).toEqual(succeeded);
+  });
+
+  test('maps a failed job with the preparer-safe failure block', async () => {
+    const failed = {
+      ...QUEUED_JOB,
+      status: 'failed',
+      attempts: 1,
+      failure: { category: 'case_incomplete', message: 'The case has no debtor yet.' },
+    };
+    const stub = stubFetch(() => jsonResponse(failed, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const job = await client.getCaseJob(JOB_CASE_ID, JOB_ID);
+
+    expect(job.status).toBe('failed');
+    expect(job.failure).toEqual({
+      category: 'case_incomplete',
+      message: 'The case has no debtor yet.',
+    });
+  });
+
+  test('a 400 on accept surfaces the per-field kind message', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { kind: 'Kind must be one of echo.' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .acceptCaseJob(JOB_CASE_ID, 'not-a-kind' as never)
+      .then(() => null)
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields).toEqual({
+      kind: 'Kind must be one of echo.',
+    });
+  });
+
+  test('the 503 pipeline-not-deployed answer stays a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'PipelineUnavailable',
+          message: 'job pipeline is not available in this deployment',
+        },
+        503,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .acceptCaseJob(JOB_CASE_ID, 'echo')
+      .then(() => null)
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(503);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Documents. Pinned against services/api/.../routes/documents.py and
 // core/documents.py: `document_json`'s eight fields, the `upload` block on the
 // 201, the 204 on delete, and the 409 that means the bytes never arrived.

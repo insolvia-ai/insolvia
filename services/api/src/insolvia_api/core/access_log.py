@@ -39,6 +39,15 @@ from datetime import UTC, datetime
 # smaller scale: reading the list learns what documents exist, and downloading
 # is the one that produces a decryptable copy outside this account. They are
 # different disclosures and should not share a row.
+#
+# job.accept (ADR 0018) EXTENDS the tuple for the same reason the document
+# verbs did: accepting a pipeline job sets machinery in motion that will read
+# the whole case file (packet assembly renders every schedule; AI review
+# reads the assembled petition), and folding that into case.update would make
+# "someone started a full-file process" indistinguishable from a district
+# edit. The worker's own reads are the accepting user's delegated access —
+# recording them per-read is 9.6/9.7's obligation when those workers arrive;
+# the skeleton's echo worker reads nothing.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -47,6 +56,7 @@ ACTIONS = (
     "document.read",
     "document.download",
     "document.delete",
+    "job.accept",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row

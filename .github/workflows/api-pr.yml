@@ -80,3 +80,12 @@ jobs:
         if: steps.filter.outputs.run == 'true'
         working-directory: ${{ github.workspace }}
         run: docker build --target lambda -f services/api/Dockerfile -t insolvia-api-pr-check .
+
+      # The pipeline worker's image (ADR 0018) ships from the same Dockerfile;
+      # every layer is shared with the lambda stage today, so this is nearly
+      # free — until the worker stage grows its own dependencies, which is
+      # exactly when it starts being able to fail on its own.
+      - name: Build worker image
+        if: steps.filter.outputs.run == 'true'
+        working-directory: ${{ github.workspace }}
+        run: docker build --target worker -f services/api/Dockerfile -t insolvia-jobs-pr-check .

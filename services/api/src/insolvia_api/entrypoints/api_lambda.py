@@ -12,6 +12,8 @@ from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_api.adapters.aws.job_queue import SqsJobQueue
+from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
@@ -19,7 +21,7 @@ from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
-from insolvia_api.core.ports import Mailer
+from insolvia_api.core.ports import JobQueue, Mailer
 
 configure_logging()
 
@@ -83,6 +85,16 @@ if config.mailer_api_url:
 else:
     mailer = InMemoryMailerClient()
 
+# NOT the mailer's fallback shape, deliberately (ADR 0018). An in-memory
+# queue in a Lambda accepts jobs nothing will ever run — the worker is a
+# separate function — so absence composes None and the accept endpoint
+# answers 503 while status reads keep working. Unset happens for real in
+# exactly one window: this image rolling out ahead of the infra that creates
+# the queue and publishes /insolvia/<env>/api/job-queue-url.
+job_queue: JobQueue | None = None
+if config.job_queue_url:
+    job_queue = SqsJobQueue(config.job_queue_url)
+
 app = create_app(
     ApiDependencies(
         config=config,
@@ -109,6 +121,10 @@ app = create_app(
         # Likewise: the generic collections (issue #249) are child items of
         # their case's partition — no new table, no new environment variable.
         case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),
+        # The pipeline pair (ADR 0018): jobs are child items of the case
+        # partition too, and the queue is Optional — see its note above.
+        job_store=DynamoDbJobStore(config.case_table_name),
+        job_queue=job_queue,
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

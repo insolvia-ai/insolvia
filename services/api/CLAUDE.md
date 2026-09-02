@@ -37,3 +37,11 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
 - **CORS is an exact-origin allowlist** (`core/config.py`), no wildcard.
 - **Local dev runs against this machine's real AWS dev table** — there is no
   local DynamoDB emulator; `infra/envs/dev` is the dev database.
+- **Minutes-long work is a pipeline job, never an endpoint**
+  ([ADR 0018](../../docs/adr/0018-sqs-queue-and-worker-lambda-over-step-functions.md)):
+  the API accepts a job (`api/routes/jobs.py`) and a separate worker Lambda
+  runs it. A new job kind is a plain callable registered in
+  `core/jobs.WORKERS` — its heavy dependencies go in the **worker** Docker
+  stage, not the API's. `core/jobs.py` owns the queue message contract; both
+  entrypoints (`worker_lambda`, the local `worker_poller`) parse with it, and
+  `tests/test_jobs.py` pins the wire shape.

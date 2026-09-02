@@ -14,6 +14,8 @@ from insolvia_api.core.ports import (
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
+    JobQueue,
+    JobStore,
     Mailer,
     WaitlistStore,
 )
@@ -64,6 +66,17 @@ class ApiDependencies:
     # The generic case collections (issue #249) — same table, same partition,
     # same "nothing to provision" argument as the debtor store above.
     case_entity_store: CaseEntityStore | None = None
+    # The pipeline pair (ADR 0018). The STORE shares the case table — same
+    # "nothing to provision" argument as the two above. The QUEUE is the one
+    # dependency here where None is a legitimate DEPLOYED state, not only a
+    # test convenience: the api image can roll out ahead of the infra that
+    # creates the queue and publishes /insolvia/<env>/api/job-queue-url, and
+    # in that window the accept endpoint answers 503 (api/routes/jobs.py)
+    # while status reads keep working. It must never silently fall back to
+    # the in-memory queue in a Lambda — that accepts work nothing will ever
+    # run.
+    job_store: JobStore | None = None
+    job_queue: JobQueue | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint
