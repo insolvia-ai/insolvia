@@ -1881,6 +1881,137 @@ export interface SofaEntryBody {
   readonly payload?: SofaPayload | undefined;
 }
 
+// ── B101's entities (issue #93) — mirrored from core/petitions.py ──
+
+/** B101 line 8 — how the filing fee will be handled (→ Forms 103A/103B). */
+export const FEE_HANDLING = ['full', 'installments', 'waiver'] as const;
+export type FeeHandling = (typeof FEE_HANDLING)[number];
+
+/** B101 line 12's business-type choice. */
+export const BUSINESS_TYPES = [
+  'health_care_business',
+  'single_asset_real_estate',
+  'stockbroker',
+  'commodity_broker',
+  'none_of_the_above',
+] as const;
+export type BusinessType = (typeof BUSINESS_TYPES)[number];
+
+/** B101 line 13, including the Subchapter V election. */
+export const SMALL_BUSINESS_STATUSES = [
+  'not_filing_under_chapter_11',
+  'chapter_11_not_small_business',
+  'chapter_11_small_business',
+  'chapter_11_subchapter_v',
+] as const;
+export type SmallBusinessStatus = (typeof SMALL_BUSINESS_STATUSES)[number];
+
+/** B101 line 16. `other` carries the explanation in `debt_character_other`. */
+export const DEBT_CHARACTERS = ['consumer', 'business', 'other'] as const;
+export type DebtCharacter = (typeof DEBT_CHARACTERS)[number];
+
+/** B101 line 18's printed brackets, self-selected by the debtor. */
+export const ESTIMATED_CREDITORS_BANDS = [
+  '1_49',
+  '50_99',
+  '100_199',
+  '200_999',
+  '1000_5000',
+  '5001_10000',
+  '10001_25000',
+  '25001_50000',
+  '50001_100000',
+  'more_than_100000',
+] as const;
+export type EstimatedCreditorsBand = (typeof ESTIMATED_CREDITORS_BANDS)[number];
+
+/** B101 lines 19 and 20 share one dollar-bracket scale. */
+export const ESTIMATED_DOLLAR_BANDS = [
+  '0_50000',
+  '50001_100000',
+  '100001_500000',
+  '500001_1000000',
+  '1000001_10000000',
+  '10000001_50000000',
+  '50000001_100000000',
+  '100000001_500000000',
+  '500000001_1000000000',
+  '1000000001_10000000000',
+  '10000000001_50000000000',
+  'more_than_50000000000',
+] as const;
+export type EstimatedDollarBand = (typeof ESTIMATED_DOLLAR_BANDS)[number];
+
+/** Part 7's two signer kinds; a preparer triggers Form 119. */
+export const FILING_PROFESSIONAL_ROLES = ['attorney', 'bankruptcy_petition_preparer'] as const;
+export type FilingProfessionalRole = (typeof FILING_PROFESSIONAL_ROLES)[number];
+
+/** B101 line 14: property needing immediate attention. */
+export interface HazardousProperty {
+  readonly description?: string | undefined;
+  readonly why_immediate?: string | undefined;
+  readonly address?: Address | undefined;
+}
+
+/**
+ * B101's Part 2–6 case-level answers. ONE per case by meaning — churned
+ * during intake, untouched afterwards — though stored as a generic
+ * collection; the pre-filing completeness gate flags a duplicate.
+ */
+export interface PetitionBody {
+  readonly fee_handling?: FeeHandling | undefined;
+  readonly rents_residence?: boolean | undefined;
+  readonly eviction_judgment_against_you?: boolean | undefined;
+  readonly small_business_status?: SmallBusinessStatus | undefined;
+  readonly hazardous_property?: HazardousProperty | undefined;
+  readonly debt_character?: DebtCharacter | undefined;
+  readonly debt_character_other?: string | undefined;
+  readonly ch7_funds_available_for_creditors?: boolean | undefined;
+  readonly estimated_creditors?: EstimatedCreditorsBand | undefined;
+  readonly estimated_assets?: EstimatedDollarBand | undefined;
+  readonly estimated_liabilities?: EstimatedDollarBand | undefined;
+}
+
+/** B101 line 9: a bankruptcy filed within the last 8 years. */
+export interface PriorCaseBody {
+  readonly district?: string | undefined;
+  readonly filed_on?: FormDate | undefined;
+  readonly case_number?: string | undefined;
+}
+
+/** B101 line 10: a pending case by a spouse, partner, or affiliate. */
+export interface RelatedCaseBody {
+  readonly debtor_name?: string | undefined;
+  readonly relationship?: string | undefined;
+  readonly district?: string | undefined;
+  readonly filed_on?: FormDate | undefined;
+  readonly case_number?: string | undefined;
+}
+
+/** B101 line 12: a business the debtor runs as a sole proprietor. */
+export interface SoleProprietorshipBody {
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly business_type?: BusinessType | undefined;
+}
+
+/**
+ * B101 Part 7: the attorney block, or a bankruptcy petition preparer.
+ * The name is four discrete parts like every person name — the form prints
+ * one line, and composing it is the forms engine's job.
+ */
+export interface FilingProfessionalBody {
+  readonly role?: FilingProfessionalRole | undefined;
+  readonly name?: PersonName | undefined;
+  readonly firm_name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+  readonly bar_number?: string | undefined;
+  readonly bar_state?: string | undefined;
+  readonly signature_date?: FormDate | undefined;
+}
+
 /**
  * The URL segment and listing key of each generic collection, and the body
  * each one carries. `debtors` and `documents` are deliberately not here —
@@ -1897,6 +2028,11 @@ export interface CaseCollections {
   readonly dependents: DependentBody;
   readonly codebtors: CodebtorBody;
   readonly sofa_entries: SofaEntryBody;
+  readonly petitions: PetitionBody;
+  readonly prior_cases: PriorCaseBody;
+  readonly related_cases: RelatedCaseBody;
+  readonly sole_proprietorships: SoleProprietorshipBody;
+  readonly filing_professionals: FilingProfessionalBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -1914,6 +2050,11 @@ export const CASE_COLLECTIONS = [
   'dependents',
   'codebtors',
   'sofa_entries',
+  'petitions',
+  'prior_cases',
+  'related_cases',
+  'sole_proprietorships',
+  'filing_professionals',
 ] as const satisfies readonly CaseCollection[];
 
 /**
