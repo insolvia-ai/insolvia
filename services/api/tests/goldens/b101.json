@@ -1,0 +1,624 @@
+{
+ "fields": {
+  "16c State the type of debts you owe that are not consumer debts or business debts": {
+   "value": "S90.0 line_16c_other_debts"
+  },
+  "Attorney.Bar State": {
+   "value": "FL"
+  },
+  "Attorney.Bar number": {
+   "value": "S111.0 attorney.bar_number"
+  },
+  "Attorney.City": {
+   "value": "S106.0 attorney.city"
+  },
+  "Attorney.Date signed": {
+   "value": "01/18/2026"
+  },
+  "Attorney.Email address": {
+   "value": "sample110.0@example.com"
+  },
+  "Attorney.Firm name": {
+   "value": "S103.0 attorney.firm_name"
+  },
+  "Attorney.Printed name": {
+   "value": "S102.0 attorney.printed_name"
+  },
+  "Attorney.Sig": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Attorney.State": {
+   "value": "FL"
+  },
+  "Attorney.Street address_2": {
+   "value": "S104.0 attorney.street"
+  },
+  "Attorney.Street address_3": {
+   "value": "S105.0 attorney.street2"
+  },
+  "Attorney.Zip": {
+   "value": "S108.0 attorney.zip"
+  },
+  "Attorney.phone": {
+   "value": "(305) 555-0109"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Business City": {
+   "value": "S71.0 line_12_business_city"
+  },
+  "Business State": {
+   "value": "FL"
+  },
+  "Business Street address": {
+   "value": "S69.0 line_12_business_street"
+  },
+  "Business Street address2": {
+   "value": "S70.0 line_12_business_street2"
+  },
+  "Case number": {
+   "value": "S58.0 line_9_prior_case_number"
+  },
+  "Case number if known_3": {
+   "value": "S64.0 line_10_related_case_number"
+  },
+  "Case number if known_4": {
+   "value": "S64.1 line_10_related_case_number"
+  },
+  "Case number1": {
+   "value": "S1.0 caption.case_number"
+  },
+  "Case number_2": {
+   "value": "S58.1 line_9_prior_case_number"
+  },
+  "Case number_3": {
+   "value": "S58.2 line_9_prior_case_number"
+  },
+  "Check Box1": {
+   "value": "/Chapter 7",
+   "widget_states": [
+    "/Chapter 7",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Chapter 7",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box10": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box11": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box12": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box13": {
+   "value": "/Stockbroker",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Stockbroker",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box14": {
+   "value": "/Yes filling under chapter",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Yes filling under chapter",
+    "/Off"
+   ]
+  },
+  "Check Box15": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box16": {
+   "value": "/1",
+   "widget_states": [
+    "/1",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box16A": {
+   "value": "/Disability",
+   "widget_states": [
+    "/Off",
+    "/Disability",
+    "/Off"
+   ]
+  },
+  "Check Box17": {
+   "value": "/4",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/4"
+   ]
+  },
+  "Check Box17A": {
+   "value": "/Active duty",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Active duty"
+   ]
+  },
+  "Check Box18": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box19": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check Box20": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box20A": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Check Box21": {
+   "value": "/10001-25000",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/10001-25000",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box22": {
+   "value": "/50001-100000",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/50001-100000",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box23": {
+   "value": "/More than 50000000000",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off",
+    "/More than 50000000000"
+   ]
+  },
+  "Check Box24": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box25": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box26": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "Check Box5": {
+   "value": "/Other",
+   "widget_states": [
+    "/Off",
+    "/Other"
+   ]
+  },
+  "Check Box6": {
+   "value": "/Other",
+   "widget_states": [
+    "/Off",
+    "/Other"
+   ]
+  },
+  "Check Box7": {
+   "value": "/Pay entirely",
+   "widget_states": [
+    "/Pay entirely",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Check Box8": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "Check Box9": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "City_2": {
+   "value": "S81.0 line_14_property_city"
+  },
+  "County_2": {
+   "value": "S43.0 line_5_debtor2_county"
+  },
+  "Debtor": {
+   "value": "S60.0 line_10_related_debtor"
+  },
+  "Debtor1 Tax Payer IDNum": {
+   "value": "1234"
+  },
+  "Debtor1.Business name": {
+   "value": "S16.0 line_2_debtor1_business_name"
+  },
+  "Debtor1.Business name_3": {
+   "value": "S16.1 line_2_debtor1_business_name"
+  },
+  "Debtor1.Cell phone": {
+   "value": "(305) 555-0122"
+  },
+  "Debtor1.City": {
+   "value": "S29.0 line_5_debtor1_city"
+  },
+  "Debtor1.City_2": {
+   "value": "S81.0 line_14_property_city"
+  },
+  "Debtor1.Contact phone_2": {
+   "value": "(305) 555-0121"
+  },
+  "Debtor1.County": {
+   "value": "S32.0 line_5_debtor1_county"
+  },
+  "Debtor1.Date signed": {
+   "value": "01/07/2026"
+  },
+  "Debtor1.Email address_2": {
+   "value": "sample123.0@example.com"
+  },
+  "Debtor1.Employer Identification Number1": {
+   "value": "123456780"
+  },
+  "Debtor1.Employer Identification Number2": {
+   "value": "123456781"
+  },
+  "Debtor1.First name": {
+   "value": "S5.0 line_1_debtor1_first_name"
+  },
+  "Debtor1.First name_3": {
+   "value": "S13.0 line_2_debtor1_other_given"
+  },
+  "Debtor1.First name_5": {
+   "value": "S13.1 line_2_debtor1_other_given"
+  },
+  "Debtor1.Last name": {
+   "value": "S7.0 line_1_debtor1_last_name"
+  },
+  "Debtor1.Last name_3": {
+   "value": "S15.0 line_2_debtor1_other_surname"
+  },
+  "Debtor1.Last name_5": {
+   "value": "S15.1 line_2_debtor1_other_surname"
+  },
+  "Debtor1.Middle name": {
+   "value": "S6.0 line_1_debtor1_middle_name"
+  },
+  "Debtor1.Middle name_3": {
+   "value": "S14.0 line_2_debtor1_other_middle"
+  },
+  "Debtor1.Middle name_5": {
+   "value": "S14.1 line_2_debtor1_other_middle"
+  },
+  "Debtor1.Name": {
+   "value": "S2.0 caption.header_debtor1_name"
+  },
+  "Debtor1.PO Box": {
+   "value": "S34.0 line_5_debtor1_mailing_pobox"
+  },
+  "Debtor1.SSNum": {
+   "value": "1234"
+  },
+  "Debtor1.See 28 USC  1408 1": {
+   "value": "S50.0 line_6_debtor1_venue_explanation"
+  },
+  "Debtor1.See 28 USC  1408 2": {
+   "value": "S50.1 line_6_debtor1_venue_explanation"
+  },
+  "Debtor1.See 28 USC  1408 3": {
+   "value": "S50.2 line_6_debtor1_venue_explanation"
+  },
+  "Debtor1.See 28 USC  1408 4": {
+   "value": "S50.3 line_6_debtor1_venue_explanation"
+  },
+  "Debtor1.Signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor1.State": {
+   "value": "FL"
+  },
+  "Debtor1.State_2": {
+   "value": "FL"
+  },
+  "Debtor1.Street": {
+   "value": "S27.0 line_5_debtor1_street"
+  },
+  "Debtor1.Street1": {
+   "value": "S28.0 line_5_debtor1_street2"
+  },
+  "Debtor1.Street_2": {
+   "value": "S33.0 line_5_debtor1_mailing_street"
+  },
+  "Debtor1.Suffix Sr Jr II III": {
+   "value": "S8.0 line_1_debtor1_suffix"
+  },
+  "Debtor1.ZIP Code": {
+   "value": "S31.0 line_5_debtor1_zip"
+  },
+  "Debtor1.ZIP Code_2": {
+   "value": "S37.0 line_5_debtor1_mailing_zip"
+  },
+  "Debtor1.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2 Employer Identification Number2": {
+   "value": "123456781"
+  },
+  "Debtor2 SSNum": {
+   "value": "1234"
+  },
+  "Debtor2.Business name": {
+   "value": "S20.0 line_2_debtor2_business_name"
+  },
+  "Debtor2.Business name_4": {
+   "value": "S20.1 line_2_debtor2_business_name"
+  },
+  "Debtor2.Cell phone": {
+   "value": "(305) 555-0125"
+  },
+  "Debtor2.City": {
+   "value": "S40.0 line_5_debtor2_city"
+  },
+  "Debtor2.City_2": {
+   "value": "S81.0 line_14_property_city"
+  },
+  "Debtor2.Contact phone": {
+   "value": "(305) 555-0124"
+  },
+  "Debtor2.Date signed": {
+   "value": "01/09/2026"
+  },
+  "Debtor2.Email address": {
+   "value": "sample126.0@example.com"
+  },
+  "Debtor2.Employer Identification Number1": {
+   "value": "123456780"
+  },
+  "Debtor2.Executed on": {
+   "value": "01/16/2026"
+  },
+  "Debtor2.First name": {
+   "value": "S9.0 line_1_debtor2_first_name"
+  },
+  "Debtor2.First name_4": {
+   "value": "S17.0 line_2_debtor2_other_given"
+  },
+  "Debtor2.First name_6": {
+   "value": "S17.1 line_2_debtor2_other_given"
+  },
+  "Debtor2.Last name": {
+   "value": "S11.0 line_1_debtor2_last_name"
+  },
+  "Debtor2.Last name_4": {
+   "value": "S19.0 line_2_debtor2_other_surname"
+  },
+  "Debtor2.Last name_6": {
+   "value": "S19.1 line_2_debtor2_other_surname"
+  },
+  "Debtor2.Middle name_2": {
+   "value": "S10.0 line_1_debtor2_middle_name"
+  },
+  "Debtor2.Middle name_4": {
+   "value": "S18.0 line_2_debtor2_other_middle"
+  },
+  "Debtor2.Middle name_6": {
+   "value": "S18.1 line_2_debtor2_other_middle"
+  },
+  "Debtor2.PO Box": {
+   "value": "S45.0 line_5_debtor2_mailing_pobox"
+  },
+  "Debtor2.See 28 USC  1408 1_2": {
+   "value": "S52.0 line_6_debtor2_venue_explanation"
+  },
+  "Debtor2.See 28 USC  1408 2_2": {
+   "value": "S52.1 line_6_debtor2_venue_explanation"
+  },
+  "Debtor2.See 28 USC  1408 3_2": {
+   "value": "S52.2 line_6_debtor2_venue_explanation"
+  },
+  "Debtor2.See 28 USC  1408 4_2": {
+   "value": "S52.3 line_6_debtor2_venue_explanation"
+  },
+  "Debtor2.Signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2.State": {
+   "value": "FL"
+  },
+  "Debtor2.State_2": {
+   "value": "FL"
+  },
+  "Debtor2.Street": {
+   "value": "S38.0 line_5_debtor2_street"
+  },
+  "Debtor2.Street2": {
+   "value": "S39.0 line_5_debtor2_street2"
+  },
+  "Debtor2.Street_2": {
+   "value": "S44.0 line_5_debtor2_mailing_street"
+  },
+  "Debtor2.Tax Payer IDNum": {
+   "value": "1234"
+  },
+  "Debtor2.ZIP": {
+   "value": "S42.0 line_5_debtor2_zip"
+  },
+  "Debtor2.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor_2": {
+   "value": "S60.1 line_10_related_debtor"
+  },
+  "District": {
+   "value": "S56.0 line_9_prior_district"
+  },
+  "District_2": {
+   "value": "S56.1 line_9_prior_district"
+  },
+  "District_3": {
+   "value": "S56.2 line_9_prior_district"
+  },
+  "District_4": {
+   "value": "S62.0 line_10_related_district"
+  },
+  "District_5": {
+   "value": "S62.1 line_10_related_district"
+  },
+  "Executed on": {
+   "value": "01/14/2026"
+  },
+  "If immediate attention is needed why is it needed1": {
+   "value": "S78.0 line_14_why_immediate"
+  },
+  "If immediate attention is needed why is it needed2": {
+   "value": "S78.1 line_14_why_immediate"
+  },
+  "Name of business if any": {
+   "value": "S68.0 line_12_business_name"
+  },
+  "Name of person payed to help file": {
+   "value": "S116.0 prose.preparer_name"
+  },
+  "Relationship to you": {
+   "value": "S61.0 line_10_related_relationship"
+  },
+  "Relationship to you_2": {
+   "value": "S61.1 line_10_related_relationship"
+  },
+  "State_6": {
+   "value": "FL"
+  },
+  "Street_6": {
+   "value": "S79.0 line_14_property_street"
+  },
+  "Street_7": {
+   "value": "S80.0 line_14_property_street2"
+  },
+  "Suffix Sr Jr II III_2": {
+   "value": "S12.0 line_1_debtor2_suffix"
+  },
+  "What is the hazard1": {
+   "value": "S77.0 line_14_hazard_description"
+  },
+  "What is the hazard2": {
+   "value": "S77.1 line_14_hazard_description"
+  },
+  "When": {
+   "value": "01/02/2026"
+  },
+  "When_2": {
+   "value": "01/03/2026"
+  },
+  "When_3": {
+   "value": "01/04/2026"
+  },
+  "When_4": {
+   "value": "01/08/2026"
+  },
+  "When_5": {
+   "value": "01/09/2026"
+  },
+  "ZIP Code_4": {
+   "value": "S48.0 line_5_debtor2_mailing_zip"
+  },
+  "ZIP Code_5": {
+   "value": "S73.0 line_12_business_zip"
+  },
+  "ZIP Code_6": {
+   "value": "S83.0 line_14_property_zip"
+  }
+ },
+ "release": "form/b101@2024-06-22",
+ "sha256": "af7017b728df409592bde538c878ba43b445970d81c75139f94e0b3936d5e4a4"
+}

@@ -11,6 +11,12 @@ boto3==1.40.66
 # Pinned exact for the same reason boto3 is: local, CI, and Lambda must resolve
 # one version of the code that decides whether a request is authenticated.
 PyJWT[crypto]==2.13.0
+# The forms fill engine (issue #93): AcroForm value + appearance writing over
+# the official form templates in core/form_fill.py. Pure Python, and pinned
+# exact for a sharper reason than the others: the golden tests pin the sha256
+# of filled output, and a drifting pypdf can change PDF serialization without
+# changing a single field value. A deliberate bump regenerates the goldens.
+pypdf==6.16.2
 # The shared domain (issue #208): firms, token verification, and their
 # adapters. A local path, and pip resolves it against the CURRENT WORKING
 # DIRECTORY — not this file's location — so every installer must run from this

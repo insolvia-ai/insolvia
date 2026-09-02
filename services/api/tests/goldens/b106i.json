@@ -1,0 +1,265 @@
+{
+ "fields": {
+  "Amount 10": {
+   "value": "1,284.56"
+  },
+  "Amount 10 Debtor 1": {
+   "value": "1,274.56"
+  },
+  "Amount 10 Debtor 2": {
+   "value": "1,284.56"
+  },
+  "Amount 11": {
+   "value": "1,294.56"
+  },
+  "Amount 12": {
+   "value": "1,204.56"
+  },
+  "Amount 2 Debtor 1": {
+   "value": "1,214.56"
+  },
+  "Amount 2 Debtor 2": {
+   "value": "1,224.56"
+  },
+  "Amount 3 Debtor 1": {
+   "value": "1,224.56"
+  },
+  "Amount 3 Debtor 2": {
+   "value": "1,234.56"
+  },
+  "Amount 4 Debtor 1": {
+   "value": "1,234.56"
+  },
+  "Amount 4 Debtor 1a": {
+   "value": "1,244.56"
+  },
+  "Amount 4 Debtor 2": {
+   "value": "1,244.56"
+  },
+  "Amount 4 Debtor 2a": {
+   "value": "1,254.56"
+  },
+  "Amount 5a Debtor 1": {
+   "value": "1,254.56"
+  },
+  "Amount 5a Debtor 2": {
+   "value": "1,264.56"
+  },
+  "Amount 5b Debtor 1": {
+   "value": "1,264.56"
+  },
+  "Amount 5b Debtor 2": {
+   "value": "1,274.56"
+  },
+  "Amount 5c Debtor 1": {
+   "value": "1,274.56"
+  },
+  "Amount 5c Debtor 2": {
+   "value": "1,284.56"
+  },
+  "Amount 5d Debtor 1": {
+   "value": "1,284.56"
+  },
+  "Amount 5d Debtor 2": {
+   "value": "1,294.56"
+  },
+  "Amount 5e Debtor 1": {
+   "value": "1,294.56"
+  },
+  "Amount 5e Debtor 2": {
+   "value": "1,204.56"
+  },
+  "Amount 5f Debtor 1": {
+   "value": "1,204.56"
+  },
+  "Amount 5f Debtor 2": {
+   "value": "1,214.56"
+  },
+  "Amount 5g Debtor 1": {
+   "value": "1,214.56"
+  },
+  "Amount 5g Debtor 2": {
+   "value": "1,224.56"
+  },
+  "Amount 5h Debtor 1": {
+   "value": "1,224.56"
+  },
+  "Amount 5h Debtor 2": {
+   "value": "1,234.56"
+  },
+  "Amount 6 Debtor 1": {
+   "value": "1,244.56"
+  },
+  "Amount 6 Debtor 2": {
+   "value": "1,254.56"
+  },
+  "Amount 7 Debtor 1": {
+   "value": "1,264.56"
+  },
+  "Amount 7 Debtor 2": {
+   "value": "1,254.56"
+  },
+  "Amount 8a Debtor 1": {
+   "value": "1,264.56"
+  },
+  "Amount 8a Debtor 2": {
+   "value": "1,274.56"
+  },
+  "Amount 8b Debtor 1": {
+   "value": "1,274.56"
+  },
+  "Amount 8b Debtor 2": {
+   "value": "1,284.56"
+  },
+  "Amount 8c Debtor 1": {
+   "value": "1,284.56"
+  },
+  "Amount 8c Debtor 2": {
+   "value": "1,294.56"
+  },
+  "Amount 8d Debtor 1": {
+   "value": "1,294.56"
+  },
+  "Amount 8d Debtor 2": {
+   "value": "1,204.56"
+  },
+  "Amount 8e Debtor 1": {
+   "value": "1,204.56"
+  },
+  "Amount 8e Debtor 2": {
+   "value": "1,214.56"
+  },
+  "Amount 8f Debtor 1": {
+   "value": "1,214.56"
+  },
+  "Amount 8f Debtor 2": {
+   "value": "1,224.56"
+  },
+  "Amount 8g Debtor 1": {
+   "value": "1,234.56"
+  },
+  "Amount 8g Debtor 2": {
+   "value": "1,244.56"
+  },
+  "Amount 8h Debtor 1": {
+   "value": "1,244.56"
+  },
+  "Amount 8h Debtor 2": {
+   "value": "1,254.56"
+  },
+  "Amount 9 Debtor 1": {
+   "value": "1,264.56"
+  },
+  "Amount 9 Debtor 2": {
+   "value": "1,274.56"
+  },
+  "Assistance 8f": {
+   "value": "S32.0 line_8f_government_assistance_specify"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check 1": {
+   "value": "/amended",
+   "widget_states": [
+    "/amended",
+    "/Off"
+   ]
+  },
+  "Check emploment status Debtor 1": {
+   "value": "/employed",
+   "widget_states": [
+    "/employed",
+    "/Off"
+   ]
+  },
+  "Check emploment status Debtor 2": {
+   "value": "/unemployed",
+   "widget_states": [
+    "/Off",
+    "/unemployed"
+   ]
+  },
+  "Check increase": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Employers City Debtor 1": {
+   "value": "S9.3 employer_address"
+  },
+  "Employers City Debtor 2": {
+   "value": "S9.9 employer_address"
+  },
+  "Employers Name Debtor 1": {
+   "value": "S8.0 employer_name"
+  },
+  "Employers Name Debtor 2": {
+   "value": "S8.1 employer_name"
+  },
+  "Employers State Debtor 1": {
+   "value": "S9.4 employer_address"
+  },
+  "Employers State Debtor 2": {
+   "value": "S9.10 employer_address"
+  },
+  "Employers Street1 Debtor 1": {
+   "value": "S9.0 employer_address"
+  },
+  "Employers Street1 Debtor 2": {
+   "value": "S9.6 employer_address"
+  },
+  "Employers Street2 Debtor 1": {
+   "value": "S9.1 employer_address"
+  },
+  "Employers Street2 Debtor 2": {
+   "value": "S9.7 employer_address"
+  },
+  "Employers Street3 Debtor 1": {
+   "value": "S9.2 employer_address"
+  },
+  "Employers Street3 Debtor 2": {
+   "value": "S9.8 employer_address"
+  },
+  "Employers Zip debtor 1": {
+   "value": "S9.5 employer_address"
+  },
+  "Employers Zip debtor 2": {
+   "value": "S9.11 employer_address"
+  },
+  "Increase/Decrease 13": {
+   "value": "S42.0 line_13_change_explanation"
+  },
+  "Occupation Debtor 1": {
+   "value": "S7.0 occupation"
+  },
+  "Occupation Debtor 2": {
+   "value": "S7.1 occupation"
+  },
+  "Other deductions 5h": {
+   "value": "S23.0 line_5h_other_deductions_specify"
+  },
+  "Other income 8h": {
+   "value": "S35.0 line_8h_other_income_specify"
+  },
+  "Supplemental income date": {
+   "value": "01/06/2026"
+  },
+  "Time employed Debtor 1": {
+   "value": "S10.0 how_long_employed"
+  }
+ },
+ "release": "form/b106i@2015-12-01",
+ "sha256": "5b6d15dc271cd36d71c56e513bdcac300428945b0a4e3138c623ebc52adb205e"
+}
