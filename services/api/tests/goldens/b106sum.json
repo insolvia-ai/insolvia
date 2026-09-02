@@ -1,0 +1,89 @@
+{
+ "fields": {
+  "1a": {
+   "value": "1,254.56"
+  },
+  "1b": {
+   "value": "1,264.56"
+  },
+  "1c": {
+   "value": "1,274.56"
+  },
+  "2": {
+   "value": "1,284.56"
+  },
+  "3a": {
+   "value": "1,294.56"
+  },
+  "3b": {
+   "value": "1,204.56"
+  },
+  "3c": {
+   "value": "1,214.56"
+  },
+  "4": {
+   "value": "1,224.56"
+  },
+  "5": {
+   "value": "1,234.56"
+  },
+  "8": {
+   "value": "1,264.56"
+  },
+  "9a": {
+   "value": "1,274.56"
+  },
+  "9b": {
+   "value": "1,284.56"
+  },
+  "9c": {
+   "value": "1,294.56"
+  },
+  "9d": {
+   "value": "1,204.56"
+  },
+  "9e": {
+   "value": "1,214.56"
+  },
+  "9f": {
+   "value": "1,224.56"
+  },
+  "9g": {
+   "value": "1,234.56"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "check6": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check7": {
+   "value": "/not consumer",
+   "widget_states": [
+    "/Off",
+    "/not consumer"
+   ]
+  }
+ },
+ "release": "form/b106sum@2015-12-01",
+ "sha256": "31bd74547b0e10a79cfc373c1be9ae3484d98e1b4f311a754c6f7e02a2f12e41"
+}

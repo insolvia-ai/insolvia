@@ -1,0 +1,558 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Codebtor City 3.1": {
+   "value": "S18.0 line_3_codebtor_city"
+  },
+  "Codebtor City 3.10": {
+   "value": "S18.9 line_3_codebtor_city"
+  },
+  "Codebtor City 3.11": {
+   "value": "S18.10 line_3_codebtor_city"
+  },
+  "Codebtor City 3.2": {
+   "value": "S18.1 line_3_codebtor_city"
+  },
+  "Codebtor City 3.3": {
+   "value": "S18.2 line_3_codebtor_city"
+  },
+  "Codebtor City 3.4": {
+   "value": "S18.3 line_3_codebtor_city"
+  },
+  "Codebtor City 3.5": {
+   "value": "S18.4 line_3_codebtor_city"
+  },
+  "Codebtor City 3.6": {
+   "value": "S18.5 line_3_codebtor_city"
+  },
+  "Codebtor City 3.7": {
+   "value": "S18.6 line_3_codebtor_city"
+  },
+  "Codebtor City 3.8": {
+   "value": "S18.7 line_3_codebtor_city"
+  },
+  "Codebtor City 3.9": {
+   "value": "S18.8 line_3_codebtor_city"
+  },
+  "Codebtor Name 3.1": {
+   "value": "S16.0 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.10": {
+   "value": "S16.9 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.11": {
+   "value": "S16.10 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.2": {
+   "value": "S16.1 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.3": {
+   "value": "S16.2 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.4": {
+   "value": "S16.3 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.5": {
+   "value": "S16.4 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.6": {
+   "value": "S16.5 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.7": {
+   "value": "S16.6 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.8": {
+   "value": "S16.7 line_3_codebtor_name"
+  },
+  "Codebtor Name 3.9": {
+   "value": "S16.8 line_3_codebtor_name"
+  },
+  "Codebtor State 3.1": {
+   "value": "FL"
+  },
+  "Codebtor State 3.10": {
+   "value": "FL"
+  },
+  "Codebtor State 3.11": {
+   "value": "FL"
+  },
+  "Codebtor State 3.2": {
+   "value": "FL"
+  },
+  "Codebtor State 3.3": {
+   "value": "FL"
+  },
+  "Codebtor State 3.4": {
+   "value": "FL"
+  },
+  "Codebtor State 3.5": {
+   "value": "FL"
+  },
+  "Codebtor State 3.6": {
+   "value": "FL"
+  },
+  "Codebtor State 3.7": {
+   "value": "FL"
+  },
+  "Codebtor State 3.8": {
+   "value": "FL"
+  },
+  "Codebtor State 3.9": {
+   "value": "FL"
+  },
+  "Codebtor Street 3.1": {
+   "value": "S17.0 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.10": {
+   "value": "S17.9 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.11": {
+   "value": "S17.10 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.2": {
+   "value": "S17.1 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.3": {
+   "value": "S17.2 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.4": {
+   "value": "S17.3 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.5": {
+   "value": "S17.4 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.6": {
+   "value": "S17.5 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.7": {
+   "value": "S17.6 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.8": {
+   "value": "S17.7 line_3_codebtor_street"
+  },
+  "Codebtor Street 3.9": {
+   "value": "S17.8 line_3_codebtor_street"
+  },
+  "Codebtor Zip 3.1": {
+   "value": "S20.0 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.10": {
+   "value": "S20.9 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.11": {
+   "value": "S20.10 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.2": {
+   "value": "S20.1 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.3": {
+   "value": "S20.2 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.4": {
+   "value": "S20.3 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.5": {
+   "value": "S20.4 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.6": {
+   "value": "S20.5 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.7": {
+   "value": "S20.6 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.8": {
+   "value": "S20.7 line_3_codebtor_zip"
+  },
+  "Codebtor Zip 3.9": {
+   "value": "S20.8 line_3_codebtor_zip"
+  },
+  "Community state": {
+   "value": "S9.0 line_2_community_state"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Schedule line D 3.1": {
+   "value": "S22.0 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.10": {
+   "value": "S22.9 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.11": {
+   "value": "S22.10 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.2": {
+   "value": "S22.1 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.3": {
+   "value": "S22.2 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.4": {
+   "value": "S22.3 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.5": {
+   "value": "S22.4 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.6": {
+   "value": "S22.5 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.7": {
+   "value": "S22.6 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.8": {
+   "value": "S22.7 line_3_schedule_d_line"
+  },
+  "Schedule line D 3.9": {
+   "value": "S22.8 line_3_schedule_d_line"
+  },
+  "Schedule line E/F 3.1": {
+   "value": "S24.0 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.10": {
+   "value": "S24.9 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.11": {
+   "value": "S24.10 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.2": {
+   "value": "S24.1 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.3": {
+   "value": "S24.2 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.4": {
+   "value": "S24.3 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.5": {
+   "value": "S24.4 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.6": {
+   "value": "S24.5 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.7": {
+   "value": "S24.6 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.8": {
+   "value": "S24.7 line_3_schedule_ef_line"
+  },
+  "Schedule line E/F 3.9": {
+   "value": "S24.8 line_3_schedule_ef_line"
+  },
+  "Schedule line G 3.1": {
+   "value": "S26.0 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.10": {
+   "value": "S26.9 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.11": {
+   "value": "S26.10 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.2": {
+   "value": "S26.1 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.3": {
+   "value": "S26.2 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.4": {
+   "value": "S26.3 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.5": {
+   "value": "S26.4 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.6": {
+   "value": "S26.5 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.7": {
+   "value": "S26.6 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.8": {
+   "value": "S26.7 line_3_schedule_g_line"
+  },
+  "Schedule line G 3.9": {
+   "value": "S26.8 line_3_schedule_g_line"
+  },
+  "Spouse City": {
+   "value": "S12.0 line_2_spouse_city"
+  },
+  "Spouse Name": {
+   "value": "S10.0 line_2_spouse_name"
+  },
+  "Spouse State": {
+   "value": "FL"
+  },
+  "Spouse Street": {
+   "value": "S11.0 line_2_spouse_street"
+  },
+  "Spouse Zip": {
+   "value": "S14.0 line_2_spouse_zip"
+  },
+  "check schedule line D 3.1": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.10": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.11": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.2": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.3": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.4": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.5": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.6": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.7": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.8": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line D 3.9": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.1": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.10": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.11": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.2": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.3": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.4": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.5": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.6": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.7": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.8": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line E/F 3.9": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.1": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.10": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.11": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.2": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.3": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.4": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.5": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.6": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.7": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.8": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check schedule line G 3.9": {
+   "value": "/yes",
+   "widget_states": [
+    "/yes"
+   ]
+  },
+  "check1": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check3": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "fill 3.10": {
+   "value": "S1"
+  },
+  "fill 3.11": {
+   "value": "S1"
+  },
+  "fill 3.4": {
+   "value": "S1"
+  },
+  "fill 3.5": {
+   "value": "S1"
+  },
+  "fill 3.6": {
+   "value": "S1"
+  },
+  "fill 3.7": {
+   "value": "S1"
+  },
+  "fill 3.8": {
+   "value": "S1"
+  },
+  "fill 3.9": {
+   "value": "S1"
+  },
+  "fill_27.0": {
+   "value": "6"
+  },
+  "fill_27.1.0": {
+   "value": "8"
+  },
+  "fill_27.1.1": {
+   "value": "7"
+  }
+ },
+ "release": "form/b106h@2015-12-01",
+ "sha256": "22716596faec6d9640dcdf1a36c50f505d0364c270691d6582e61f4795c47672"
+}

@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b106j",
+  "effective_date": "2015-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b106j.pdf",
+    "published": null,
+    "sha256": "60c728d5136442b652942aacceffe11e1b8197dc0dfd4ccdeaf0e60c05f95dff"
+  },
+  "notes": "Official Form 106J, Schedule J: Your Expenses, printed revision 12/15 (current as of ingestion). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-92 field spec and AcroForm dump for this revision, copied from forms/ at ingestion \u2014 tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision."
+}

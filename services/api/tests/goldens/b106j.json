@@ -1,0 +1,275 @@
+{
+ "fields": {
+  "10": {
+   "value": "1,274.56"
+  },
+  "11": {
+   "value": "1,284.56"
+  },
+  "12": {
+   "value": "1,294.56"
+  },
+  "13": {
+   "value": "1,204.56"
+  },
+  "14": {
+   "value": "1,214.56"
+  },
+  "15a": {
+   "value": "1,224.56"
+  },
+  "15b": {
+   "value": "1,234.56"
+  },
+  "15c": {
+   "value": "1,244.56"
+  },
+  "15d": {
+   "value": "1,254.56"
+  },
+  "16": {
+   "value": "1,274.56"
+  },
+  "17a": {
+   "value": "1,294.56"
+  },
+  "17b": {
+   "value": "1,204.56"
+  },
+  "17c": {
+   "value": "1,214.56"
+  },
+  "17d": {
+   "value": "1,234.56"
+  },
+  "18": {
+   "value": "1,254.56"
+  },
+  "19": {
+   "value": "1,264.56"
+  },
+  "20a": {
+   "value": "1,284.56"
+  },
+  "20b": {
+   "value": "1,294.56"
+  },
+  "20c": {
+   "value": "1,204.56"
+  },
+  "20d": {
+   "value": "1,214.56"
+  },
+  "20e": {
+   "value": "1,224.56"
+  },
+  "21": {
+   "value": "1,234.56"
+  },
+  "22a": {
+   "value": "1,254.56"
+  },
+  "22b": {
+   "value": "1,264.56"
+  },
+  "22c": {
+   "value": "1,274.56"
+  },
+  "23a": {
+   "value": "1,284.56"
+  },
+  "23b": {
+   "value": "1,294.56"
+  },
+  "23c": {
+   "value": "1,204.56"
+  },
+  "4": {
+   "value": "1,234.56"
+  },
+  "4a": {
+   "value": "1,244.56"
+  },
+  "4b": {
+   "value": "1,254.56"
+  },
+  "4c": {
+   "value": "1,264.56"
+  },
+  "4d": {
+   "value": "1,274.56"
+  },
+  "5": {
+   "value": "1,284.56"
+  },
+  "6a": {
+   "value": "1,294.56"
+  },
+  "6b": {
+   "value": "1,204.56"
+  },
+  "6c": {
+   "value": "1,214.56"
+  },
+  "6d": {
+   "value": "1,224.56"
+  },
+  "7": {
+   "value": "1,244.56"
+  },
+  "8": {
+   "value": "1,254.56"
+  },
+  "9": {
+   "value": "1,264.56"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check 1": {
+   "value": "/amended",
+   "widget_states": [
+    "/amended",
+    "/Off"
+   ]
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Dependant Relation 2a": {
+   "value": "S9.0 line_2_dependent_relationship"
+  },
+  "Dependant Relation 2b": {
+   "value": "S9.1 line_2_dependent_relationship"
+  },
+  "Dependant Relation 2c": {
+   "value": "S9.2 line_2_dependent_relationship"
+  },
+  "Dependant Relation 2d": {
+   "value": "S9.3 line_2_dependent_relationship"
+  },
+  "Dependant Relation 2e": {
+   "value": "S9.4 line_2_dependent_relationship"
+  },
+  "Dependant age 2a": {
+   "value": "2"
+  },
+  "Dependant age 2b": {
+   "value": "3"
+  },
+  "Dependant age 2c": {
+   "value": "4"
+  },
+  "Dependant age 2d": {
+   "value": "5"
+  },
+  "Dependant age 2e": {
+   "value": "6"
+  },
+  "Other 15d": {
+   "value": "S36.0 line_15d_other_insurance_specify"
+  },
+  "Other 16": {
+   "value": "S38.0 line_16_taxes_specify"
+  },
+  "Other 17c": {
+   "value": "S42.0 line_17c_installment_other_1_specify"
+  },
+  "Other 17d": {
+   "value": "S44.0 line_17d_installment_other_2_specify"
+  },
+  "Other 19": {
+   "value": "S47.0 line_19_support_others_specify"
+  },
+  "Other 21": {
+   "value": "S54.0 line_21_other_specify"
+  },
+  "Other 24": {
+   "value": "S62.0 line_24_change_explanation"
+  },
+  "Other 6d": {
+   "value": "S23.0 line_6d_utilities_other_specify"
+  },
+  "Supplemental income date": {
+   "value": "01/06/2026"
+  },
+  "check1": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check1a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check24": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2b": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2c": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2d": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2e": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check3": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  }
+ },
+ "release": "form/b106j@2015-12-01",
+ "sha256": "0bfef1ceb6f2addca291a9d18989f182830069cc065bcc5d4a8cf6ff889b7716"
+}

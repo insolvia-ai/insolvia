@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b106dec",
+  "effective_date": "2015-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b106dec.pdf",
+    "published": null,
+    "sha256": "02d5e9fce22e437143779e219ae836b2271a487e6af7788b4c203bab5cb70b5c"
+  },
+  "notes": "Official Form 106Dec, Declaration About an Individual Debtor's Schedules, printed revision 12/15 (current as of ingestion). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-92 field spec and AcroForm dump for this revision, copied from forms/ at ingestion \u2014 tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision."
+}

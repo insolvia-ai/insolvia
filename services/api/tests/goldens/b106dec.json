@@ -1,0 +1,46 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Debtor1.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2.Executed on": {
+   "value": "01/11/2026"
+  },
+  "Debtor2.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Executed on": {
+   "value": "01/10/2026"
+  },
+  "Name of person payed to help file": {
+   "value": "S6.0 preparer_name"
+  },
+  "check1": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  }
+ },
+ "release": "form/b106dec@2015-12-01",
+ "sha256": "f8daa5a73759e5a07a1cd7847894739a6d073a9871c8686eb27ad677dceb9dbc"
+}

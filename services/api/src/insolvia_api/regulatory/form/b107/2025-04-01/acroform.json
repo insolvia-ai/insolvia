@@ -1,0 +1,4849 @@
+{
+ "form": "b107",
+ "official_number": "107",
+ "title": "Statement of Financial Affairs for Individuals Filing for Bankruptcy",
+ "revision": "04/25",
+ "effective_date": "2025-04-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/statement-financial-affairs-individuals-filing-bankruptcy",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/2025-04/b_107_0425-form.pdf",
+  "pdf_sha256": "efdcb1446328c3cca29b3c2e424c1984a4ca185f79f0f20f43e1271cbdd9ed52",
+  "retrieved": "2026-09-01"
+ },
+ "pages": 12,
+ "field_count": 535,
+ "fields": [
+  {
+   "name": "Check if this is an",
+   "kind": "checkbox",
+   "tooltip": "Check if this is an",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "Debtor 2",
+   "kind": "text",
+   "tooltip": "Debtor 2",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "check1",
+   "kind": "checkbox",
+   "tooltip": "Current marital status",
+   "pages": [
+    1
+   ],
+   "states": [
+    "married",
+    "yes"
+   ]
+  },
+  {
+   "name": "check2",
+   "kind": "checkbox",
+   "tooltip": "Lived anywhere else in the last 3 years",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Debtor 1",
+   "kind": "text",
+   "tooltip": "Debtor 1",
+   "pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+   ]
+  },
+  {
+   "name": "Case number",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "check3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    1,
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check4",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    2
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check5",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "Street address 1b Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 1c Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "ZIP Code 1c Debtor 1",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "City 1b Debtor1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "State 1b Debtor1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 1b Debtor 1",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "City 1c Debtor1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 1b Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "City 1b Debtor2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "State 1b Debtor2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 1b Debtor 2",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 1c Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "City 1c Debtor2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "State 1c Debtor2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 1c Debtor 2",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "State 1c Debtor1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date to 1b Debtor1",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date from 1b Debtor2",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date to 1b Debtor2",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date from 1c Debtor2",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date to 1c Debtor2",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "check1b2",
+   "kind": "checkbox",
+   "tooltip": "Dates same as Debtor 1",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check1c2",
+   "kind": "checkbox",
+   "tooltip": "Dates same as Debtor 1",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check1c",
+   "kind": "checkbox",
+   "tooltip": "Address same as Debtor 1",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check1b",
+   "kind": "checkbox",
+   "tooltip": "Address same as Debtor 1",
+   "pages": [
+    1
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "Date from 1b Debtor1",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "check4a Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4b Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4c Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4d Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4e Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4f Debtor 1",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4a Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4b Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4c Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4d Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4e Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Wages, commissions, bonuses, tips",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check4f Debtor 2",
+   "kind": "checkbox",
+   "tooltip": "Operating a business",
+   "pages": [
+    2
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "Income 4a Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 4b Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 4c Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 4a Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 4c Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 4b Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Year from 4b Debtor1",
+   "kind": "text",
+   "tooltip": "Year",
+   "pages": [
+    2
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Income source 5a Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5i Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5a Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5b Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5b Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5c Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5c Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5d Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5d Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5e Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5e Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5f Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5f Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5g Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5g Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5h Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5h Debtor 1",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5i Debtor 1",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5a Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5b Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5c Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5d Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5e Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5f Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5g Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5h Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income source 5i Debtor 2",
+   "kind": "text",
+   "tooltip": "Source of income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5a Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5b Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5c Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5d Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5e Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5f Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5g Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Income 5h Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Date from 1c Debtor1",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date to 1c Debtor1",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    1
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Income 5i Debtor 2",
+   "kind": "text",
+   "tooltip": "Gross income",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "check6",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check6a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check6b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditors Name 1",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Other 1",
+   "kind": "text",
+   "tooltip": "Other",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 1a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors amount paid 1",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors amount owe 1",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors address a 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 1b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors address b 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 1c",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors City 1",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors State 1",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors ZIP Code 1",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check mortgage 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check car 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check credit card 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check loan 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check vendors 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check other 1",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditors Name 2",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors address a 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors address b 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors City 2",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors State 2",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors ZIP Code 2",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 2a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors payment Date 2b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors payment Date 2c",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors amount paid 2",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors amount owe 2",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check mortgage 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check car 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check credit card 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check loan 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check vendors 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check other 2",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Other 2",
+   "kind": "text",
+   "tooltip": "Other",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check mortgage 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "Creditors Name 3",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors ZIP Code 3",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors address a 3",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors address b 3",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors City 3",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors State 3",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors amount owe 3",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 3a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors amount paid 3",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Creditors payment Date 3b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors payment Date 3c",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    3
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "check7",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    4
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check8",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    4
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "Insider Name 7a",
+   "kind": "text",
+   "tooltip": "Insiders Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insider reason of pay 7b",
+   "kind": "text",
+   "tooltip": "Reason for this payment",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date1 7a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders amount paid 7a",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders amount owe 7a",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders address 7a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date2 7a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiderss address2 7a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date3 7a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders City 7a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders State 7a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders ZIP Code 7a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insider Name 7b",
+   "kind": "text",
+   "tooltip": "Insiders Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date1 7b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders amount paid 7b",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders amount owe 7b",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders address 7b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date2 7b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiderss address2 7b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date3 7b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders City 7b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders State 7b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders ZIP Code 7b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insider reason of pay 7a",
+   "kind": "text",
+   "tooltip": "Reason for this payment",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insider Name 8a",
+   "kind": "text",
+   "tooltip": "Insiders Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders address 8a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiderss address2 8a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders City 8a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders State 8a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders ZIP Code 8a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date1 8a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders payment Date2 8a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders payment Date3 8a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders amount paid 8a",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders amount owe 8a",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insider reason of pay 8a",
+   "kind": "text",
+   "tooltip": "Reason for this payment",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders payment Date1 8b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders payment Date2 8b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders amount paid 8b",
+   "kind": "text",
+   "tooltip": "Total amount paid",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "check9",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    5
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check11",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    6
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check10",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    5
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check12",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    6
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check13",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    6
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check14",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    7
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check15",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    7
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check16",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    7
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check17",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    8
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check18",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    8
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check19",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check20",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check21",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check21a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check22",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    10
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check22a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    10
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check23",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    10
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check24",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    10
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check25",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check26",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "concluded",
+    "no",
+    "on appeal",
+    "pending",
+    "yes"
+   ]
+  },
+  {
+   "name": "check27a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check28",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    12
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check29",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    12
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check30",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    12
+   ],
+   "states": [
+    "no",
+    "yes"
+   ]
+  },
+  {
+   "name": "check9a",
+   "kind": "checkbox",
+   "tooltip": "Status of the case",
+   "pages": [
+    5
+   ],
+   "states": [
+    "concluded",
+    "on appeal",
+    "pending"
+   ]
+  },
+  {
+   "name": "Insider reason of pay 8b",
+   "kind": "text",
+   "tooltip": "Reason for this payment",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Case title1 9b",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Case title2 9b",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Case number 9b",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court Name 9b",
+   "kind": "text",
+   "tooltip": "Court Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court address 9b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court City 9b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court State 9b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Court ZIP Code 9b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "check9b",
+   "kind": "checkbox",
+   "tooltip": "Status of the case",
+   "pages": [
+    5
+   ],
+   "states": [
+    "concluded",
+    "on appeal",
+    "pending"
+   ]
+  },
+  {
+   "name": "Insider Name 8b",
+   "kind": "text",
+   "tooltip": "Insiders Name",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders address 8b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiderss address2 8b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders City 8b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Insiders State 8b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Case nature 9b",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Insiders payment Date3 8b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    4
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Insiders amount owe 8b",
+   "kind": "text",
+   "tooltip": "Total amount you still owe",
+   "pages": [
+    4
+   ]
+  },
+  {
+   "name": "Creditors Name 10b",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors address 10b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors address2 10b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors City 10b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors State 10b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Creditors ZIP Code 10b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Describe property 10b",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "check10a1",
+   "kind": "checkbox",
+   "tooltip": "Property was repossessed",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10a2",
+   "kind": "checkbox",
+   "tooltip": "Property was foreclosed",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10a3",
+   "kind": "checkbox",
+   "tooltip": "Property was garnished",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10a4",
+   "kind": "checkbox",
+   "tooltip": "Property was attached, seized, or levied",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10b1",
+   "kind": "checkbox",
+   "tooltip": "Property was repossessed",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10b2",
+   "kind": "checkbox",
+   "tooltip": "Property was foreclosed",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10b3",
+   "kind": "checkbox",
+   "tooltip": "Property was garnished",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check10b4",
+   "kind": "checkbox",
+   "tooltip": "Property was attached, seized, or levied",
+   "pages": [
+    5
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Creditor Date3 10b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Property value 10b",
+   "kind": "text",
+   "tooltip": "Value of the property",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name 10a",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors ZIP Code 10a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors address 10a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors address2 10a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors City 10a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors State 10a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Describe property 10a",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditor Date3 10a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Property value 10a",
+   "kind": "text",
+   "tooltip": "Value of the property",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Creditors Name 11",
+   "kind": "text",
+   "tooltip": "Creditors Name",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Creditors ZIP Code 11",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Creditors address 11",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Creditors address2 11",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Creditors City 11",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Creditors State 11",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Describe action 11",
+   "kind": "text",
+   "tooltip": "Describe the action the creditor took",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Name to who you gave gift 13a",
+   "kind": "text",
+   "tooltip": "Person to whom you gave gift",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Relation 13a",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "address 13a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Address2 13a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "City 13a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "State 13a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 13a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Amount2 13a",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Amount1 13a",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Date2 13a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date1 13a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Describe 13a",
+   "kind": "text",
+   "tooltip": "Describe the gifts",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Charitys Name 14",
+   "kind": "text",
+   "tooltip": "Charitys name",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "address 14",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Address2 14",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "City 14",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "State 14",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 14",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Date2 14",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount2 14",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Describe 14",
+   "kind": "text",
+   "tooltip": "Describe what you contributed",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Date1 14",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount1 14",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Date1 15",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount1 15",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Describe1 15",
+   "kind": "text",
+   "tooltip": "Describe property lost and how loss occurred",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Describe2 15",
+   "kind": "text",
+   "tooltip": "Describe any insurance coverage for the loss",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Name to who you was paid 16a",
+   "kind": "text",
+   "tooltip": "Person who was paid",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Describe 16a",
+   "kind": "text",
+   "tooltip": "Dsecription and value of any property transferred",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "address 16a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "City 16a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Address2 16a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "State 16a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 16a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Email 16a",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Person who paid 16a",
+   "kind": "text",
+   "tooltip": "Person who made payment if not you",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Amount2 16a",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Date1 16a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount1 16a",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    7
+   ]
+  },
+  {
+   "name": "Date2 16a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    7
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Email 16b",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Person who paid 16b",
+   "kind": "text",
+   "tooltip": "Person who made payment if not you",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Name to who you was paid 16b",
+   "kind": "text",
+   "tooltip": "Person who was paid",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "ZIP Code 16b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "address 16b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Address2 16b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "City 16b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "State 16b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount2 16b",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Describe 16b",
+   "kind": "text",
+   "tooltip": "Dsecription and value of any property transferred",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date1 16b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount1 16b",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date2 16b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Name to who you was paid 17",
+   "kind": "text",
+   "tooltip": "Person who was paid",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "address 17",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Address2 17",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "City 17",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "State 17",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 17",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Describe 17",
+   "kind": "text",
+   "tooltip": "Dsecription and value of any property transferred",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date1 17",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount1 17",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date2 17",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount2 17",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Name to who you gave gift 13b",
+   "kind": "text",
+   "tooltip": "Person to whom you gave gift",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Describe 13b",
+   "kind": "text",
+   "tooltip": "Describe the gifts",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "address 13b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "City 13b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Address2 13b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "State 13b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 13b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Relation 13b",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Amount2 13b",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Amount1 13b",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "Date2 13b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date1 13b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Name to who you received transfer 18a",
+   "kind": "text",
+   "tooltip": "Person who received transfer",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Relation 18a",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "address 18a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Address2 18a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "City 18a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "State 18a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 18a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date1 18a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Describe1 18a",
+   "kind": "text",
+   "tooltip": "Description and value of property transferred",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Describe2 18a",
+   "kind": "text",
+   "tooltip": "Describe any property or payments received or debts paid in exchange",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Relation 18b",
+   "kind": "text",
+   "tooltip": "Persons relationship to you",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Describe1 18b",
+   "kind": "text",
+   "tooltip": "Description and value of property transferred",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Date1 18b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    8,
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Describe2 18b",
+   "kind": "text",
+   "tooltip": "Describe any property or payments received or debts paid in exchange",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Name of trust1 19",
+   "kind": "text",
+   "tooltip": "Name of trust",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Name of trust2 19",
+   "kind": "text",
+   "tooltip": "Name of trust",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Name to who you received transfer 18b",
+   "kind": "text",
+   "tooltip": "Person who received transfer",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "ZIP Code 18b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "address 18b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "Address2 18b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "City 18b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    8
+   ]
+  },
+  {
+   "name": "State 18b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    8
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "account number 11",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    6
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Creditor Date 11",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    6
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Amount 11",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    6
+   ]
+  },
+  {
+   "name": "check car 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Other 3",
+   "kind": "text",
+   "tooltip": "Other",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "check credit card 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check loan 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check vendors 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check other 3",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    3
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Name of financial institution 20a",
+   "kind": "text",
+   "tooltip": "Name of Financial Institution",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Balance 20a",
+   "kind": "text",
+   "tooltip": "Last balance before closing or transfer",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "account number 20a",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    9
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Date closed 20a",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "address 20a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "check Checking 20a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Other 20a",
+   "kind": "text",
+   "tooltip": "Other",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Address2 20a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "City 20a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "State 20a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 20a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "check Savings 20a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check Money market 20a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check brokerage 20a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check other 20a",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Other 20b",
+   "kind": "text",
+   "tooltip": "Other",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Name of financial institution 20b",
+   "kind": "text",
+   "tooltip": "Name of Financial Institution",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "address 20b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Address2 20b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "City 20b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "State 20b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 21a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Describe 19",
+   "kind": "text",
+   "tooltip": "Describe any property or payments received or debts paid in exchange",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Name of financial institution 21a",
+   "kind": "text",
+   "tooltip": "Name of Financial Institution",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Describe 21",
+   "kind": "text",
+   "tooltip": "Describe the contents",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Name of who else had access 21b",
+   "kind": "text",
+   "tooltip": "Name of who else had access",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "address 21a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "address 21b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Address2 21",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "City 21b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "State 21b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "City 21a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "State 21a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 22a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Name of financial institution 22a",
+   "kind": "text",
+   "tooltip": "Name of Financial Institution",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Describe 22",
+   "kind": "text",
+   "tooltip": "Describe the contents",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Name of who else had access 22b",
+   "kind": "text",
+   "tooltip": "Name of who else had access",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "address 22a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "address 22b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "City 22b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 22b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "City 22a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 22a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Address2 22a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Balance 20b",
+   "kind": "text",
+   "tooltip": "Last balance before closing or transfer",
+   "pages": [
+    9
+   ]
+  },
+  {
+   "name": "Value 23b",
+   "kind": "text",
+   "tooltip": "Last balance before closing or transfer",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Name of owner 23a",
+   "kind": "text",
+   "tooltip": "Owners name",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "address 23b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "address 23a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Address2 23b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Address2 23a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "City 23b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 23b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 23b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "City 23a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 23a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 23a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Date closed 20b",
+   "kind": "text",
+   "tooltip": "Date",
+   "pages": [
+    9
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Name of site 24a",
+   "kind": "text",
+   "tooltip": "Name of site",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "ZIP Code 24a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "address 24a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Address2 24a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "City 24a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 24a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Government unit 24b",
+   "kind": "text",
+   "tooltip": "Governmennt unit",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Address2 24b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Describe 24",
+   "kind": "text",
+   "tooltip": "Environmental law if known",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "City 24b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "State 24b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 24b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Government unit 25b",
+   "kind": "text",
+   "tooltip": "Governmennt unit",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Address2 25b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "City 25b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "State 25b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 25b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Describe 25",
+   "kind": "text",
+   "tooltip": "Environmental law if known",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Date 25",
+   "kind": "text",
+   "tooltip": "Date of notice",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Case title1 9a",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court ZIP Code 9a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court Name 9a",
+   "kind": "text",
+   "tooltip": "Court Name",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Case title2 9a",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Case nature 9a",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court address 9a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Case number 9a",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court City 9a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    5
+   ]
+  },
+  {
+   "name": "Court State 9a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    5
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Case title1 26",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Case title2 26",
+   "kind": "text",
+   "tooltip": "Case title",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Case number 26",
+   "kind": "text",
+   "tooltip": "Case number",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Court Name 26",
+   "kind": "text",
+   "tooltip": "Court Name",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Court address 26",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Court City 26",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Court State 26",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Court ZIP Code 26",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Name of site 25a",
+   "kind": "text",
+   "tooltip": "Name of site",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "ZIP Code 25a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "address 25a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Address2 25a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "City 25a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "State 25a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date 24",
+   "kind": "text",
+   "tooltip": "Date of notice",
+   "pages": [
+    10
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Case nature 26",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "account number 20b",
+   "kind": "text",
+   "tooltip": "Last 4 digits of account number",
+   "pages": [
+    9
+   ],
+   "max_len": 4
+  },
+  {
+   "name": "Business Name 27a",
+   "kind": "text",
+   "tooltip": "Name of business",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Date to 27a",
+   "kind": "text",
+   "tooltip": "Date of notice",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "address 27a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Describe nature 27a",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Address2 27a",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Date from 27a",
+   "kind": "text",
+   "tooltip": "From Date ",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "City 27a",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "State 27a",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Accountant Name 27a",
+   "kind": "text",
+   "tooltip": "Name of accountantant or bookkeeper",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "ZIP Code 27a",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Business Name 27b",
+   "kind": "text",
+   "tooltip": "Name of business",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Date to 27b",
+   "kind": "text",
+   "tooltip": "Date of notice",
+   "pages": [
+    11,
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Address2 27b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "address 27b",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Describe nature 27b",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "City 27b",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "State 27b",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 27b",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Date from 27b",
+   "kind": "text",
+   "tooltip": "From Date ",
+   "pages": [
+    11
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Accountant Name 27b",
+   "kind": "text",
+   "tooltip": "Name of accountantant or bookkeeper",
+   "pages": [
+    11
+   ]
+  },
+  {
+   "name": "Describe nature 27c",
+   "kind": "text",
+   "tooltip": "Nature of the case",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Accountant Name 27c",
+   "kind": "text",
+   "tooltip": "Name of accountantant or bookkeeper",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Business Name 27c",
+   "kind": "text",
+   "tooltip": "Name of business",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "ZIP Code 27c",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "address 27c",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Address2 27c",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "City 27c",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "State 27c",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date from 27c",
+   "kind": "text",
+   "tooltip": "From Date ",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "address 28",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Address2 28",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "City 28",
+   "kind": "text",
+   "tooltip": "City",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "State 28",
+   "kind": "text",
+   "tooltip": "State",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "ZIP Code 28",
+   "kind": "text",
+   "tooltip": "ZIP Code",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Name 28",
+   "kind": "text",
+   "tooltip": "Name",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Signature of Debtor 1",
+   "kind": "text",
+   "tooltip": "Signature of Debtor 1",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Date 28",
+   "kind": "text",
+   "tooltip": "Date issued",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date signed Debtor 1",
+   "kind": "text",
+   "tooltip": "Date signed by Debtor 1",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Date signed Debtor 2",
+   "kind": "text",
+   "tooltip": "Date signed by Debtor 2",
+   "pages": [
+    12
+   ],
+   "max_len": 10
+  },
+  {
+   "name": "Signature of Debtor 2",
+   "kind": "text",
+   "tooltip": "Signature of Debtor 2",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "Name of person agreed to pay",
+   "kind": "text",
+   "tooltip": "Name of person to help fill out forms (not an attorney)",
+   "pages": [
+    12
+   ]
+  },
+  {
+   "name": "check Checking 20b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check other 20b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check Savings 20b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check Money market 20b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check brokerage 20b",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    9
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check Sole Proprietor 27",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check LLC 27",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check Partner 27",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "check Executive 27",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "no"
+   ]
+  },
+  {
+   "name": "check CorpOwner 27",
+   "kind": "checkbox",
+   "tooltip": null,
+   "pages": [
+    11
+   ],
+   "states": [
+    "yes"
+   ]
+  },
+  {
+   "name": "Debtor1.Employer Identification Number27c",
+   "kind": "text",
+   "tooltip": "Employer Identification Number",
+   "pages": [
+    12
+   ],
+   "max_len": 9
+  },
+  {
+   "name": "Debtor1.Employer Identification Number27b",
+   "kind": "text",
+   "tooltip": "Employer Identification Number",
+   "pages": [
+    11
+   ],
+   "max_len": 9
+  },
+  {
+   "name": "Debtor1.Employer Identification Number27a",
+   "kind": "text",
+   "tooltip": "Employer Identification Number",
+   "pages": [
+    11
+   ],
+   "max_len": 9
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  },
+  {
+   "name": "Street address 2b Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 2c Debtor 1",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 2b Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Street address 2c Debtor 2",
+   "kind": "text",
+   "tooltip": "Street address",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Describe 23",
+   "kind": "text",
+   "tooltip": "Describe the contents",
+   "pages": [
+    10
+   ]
+  },
+  {
+   "name": "Year from 4c Debtor1",
+   "kind": "text",
+   "tooltip": "Year",
+   "pages": [
+    2
+   ],
+   "max_len": 10
+  }
+ ]
+}
