@@ -51,6 +51,8 @@ from typing import Final
 
 from ..form_templates import FormRelease
 from .b101 import project_b101_0624
+from .b106ab import project_b106ab_1215
+from .b106c import project_b106c_0425
 from .b106i import project_b106i_1215
 from .shared import (
     CaseFile,
@@ -79,6 +81,8 @@ Projector = Callable[[FormRelease, CaseFile], FieldValues]
 
 PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b101", "2024-06-22"): project_b101_0624,
+    ("form/b106ab", "2015-12-01"): project_b106ab_1215,
+    ("form/b106c", "2025-04-01"): project_b106c_0425,
     ("form/b106i", "2015-12-01"): project_b106i_1215,
 }
 

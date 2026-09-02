@@ -237,6 +237,11 @@ def address_fills(
     put(county, getattr(address, "county", None))
 
 
+def text_or_none(value: str | None) -> Text | None:
+    """A Text fill for a present value, a blank box for an absent one."""
+    return Text(value) if value else None
+
+
 def rows(
     release: FormRelease,
     values: FieldValues,

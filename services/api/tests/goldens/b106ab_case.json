@@ -1,0 +1,1446 @@
+{
+ "fields": {
+  "1 1": {
+   "value": "12 Byron Court, Tampa, FL 33601"
+  },
+  "1 1a": {
+   "value": null
+  },
+  "10 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "10 description": {
+   "value": null
+  },
+  "10 description amount": {
+   "value": null
+  },
+  "11 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "11 description": {
+   "value": "Everyday clothing"
+  },
+  "11 description amount": {
+   "value": "400.00"
+  },
+  "12": {
+   "value": null
+  },
+  "12 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "12 description": {
+   "value": "Wedding rings"
+  },
+  "12 description amount": {
+   "value": "1,800.00"
+  },
+  "13": {
+   "value": null
+  },
+  "13 description": {
+   "value": null
+  },
+  "13 description amount": {
+   "value": null
+  },
+  "14 description": {
+   "value": null
+  },
+  "14 description amount": {
+   "value": null
+  },
+  "15 amount": {
+   "value": "5,300.00"
+  },
+  "16 Cash amount": {
+   "value": "150.00"
+  },
+  "17.1 Checking account": {
+   "value": "Checking account, Suncoast Credit Union"
+  },
+  "17.1 Checking amount": {
+   "value": "1,250.00"
+  },
+  "17.2 Checking account": {
+   "value": "Business checking account, Wells Fargo"
+  },
+  "17.2 Checking amount": {
+   "value": "2,100.00"
+  },
+  "17.3 Checking account": {
+   "value": null
+  },
+  "17.3 Checking amount": {
+   "value": null
+  },
+  "17.4 Checking account": {
+   "value": null
+  },
+  "17.4 Checking amount": {
+   "value": null
+  },
+  "17.5 Certificates of deposit account": {
+   "value": null
+  },
+  "17.5 Certificates of deposit amount": {
+   "value": null
+  },
+  "17.6 Other financial account": {
+   "value": null
+  },
+  "17.6 Other financial amount": {
+   "value": null
+  },
+  "17.7 Other financial account": {
+   "value": null
+  },
+  "17.7 Other financial amount": {
+   "value": null
+  },
+  "17.8 Other financial account": {
+   "value": null
+  },
+  "17.8 Other financial amount": {
+   "value": null
+  },
+  "17.9 Other financial account": {
+   "value": null
+  },
+  "17.9 Other financial amount": {
+   "value": null
+  },
+  "18.1 Institution or issuer name": {
+   "value": null
+  },
+  "18.1 Institution or issuer name 1 amount": {
+   "value": null
+  },
+  "18.2 Institution or issuer name": {
+   "value": null
+  },
+  "18.2 Institution or issuer name amount": {
+   "value": null
+  },
+  "18.3 Institution or issuer name": {
+   "value": null
+  },
+  "18.3 Institution or issuer name amount": {
+   "value": null
+  },
+  "19.1 % of ownership": {
+   "value": null
+  },
+  "19.1 Name of entity": {
+   "value": null
+  },
+  "19.1 amount": {
+   "value": null
+  },
+  "19.2 % of ownership": {
+   "value": null
+  },
+  "19.2 Name of entity": {
+   "value": null
+  },
+  "19.2 amount": {
+   "value": null
+  },
+  "19.3 % of ownership": {
+   "value": null
+  },
+  "19.3 Name of entity": {
+   "value": null
+  },
+  "19.3 amount": {
+   "value": null
+  },
+  "1_2": {
+   "value": null
+  },
+  "1_3": {
+   "value": null
+  },
+  "1_4": {
+   "value": null
+  },
+  "20.1 Issuer name": {
+   "value": null
+  },
+  "20.1 Issuer name amount": {
+   "value": null
+  },
+  "20.2 Issuer name": {
+   "value": null
+  },
+  "20.2 Issuer name amount": {
+   "value": null
+  },
+  "20.3 Issuer name": {
+   "value": null
+  },
+  "20.3 Issuer name amount": {
+   "value": null
+  },
+  "21.1 401k or similar plan": {
+   "value": "401(k), Fidelity \u2014 Menabrea Machines Inc"
+  },
+  "21.1 401k or similar plan amount": {
+   "value": "48,000.00"
+  },
+  "21.2 Pension plan": {
+   "value": null
+  },
+  "21.2 Pension plan amount": {
+   "value": null
+  },
+  "21.3 IRA": {
+   "value": null
+  },
+  "21.3 IRA amount": {
+   "value": null
+  },
+  "21.4 Retirement account": {
+   "value": null
+  },
+  "21.4 Retirement account amount": {
+   "value": null
+  },
+  "21.5 Keogh": {
+   "value": null
+  },
+  "21.5 Keogh amount": {
+   "value": null
+  },
+  "21.6 Additional account": {
+   "value": null
+  },
+  "21.6 Additional account amount": {
+   "value": null
+  },
+  "21.7 Additional account": {
+   "value": null
+  },
+  "21.7 Additional account amount": {
+   "value": null
+  },
+  "22.1 Electric": {
+   "value": "Utility deposit, Tampa Electric"
+  },
+  "22.1 Electric amount": {
+   "value": "200.00"
+  },
+  "22.2 Gas": {
+   "value": null
+  },
+  "22.2 Gas amount": {
+   "value": null
+  },
+  "22.3 Heating oil": {
+   "value": null
+  },
+  "22.3 Heating oil amount": {
+   "value": null
+  },
+  "22.4 Security deposit on rental unit": {
+   "value": null
+  },
+  "22.4 Security deposit on rental unit amount": {
+   "value": null
+  },
+  "22.5 Prepaid rent": {
+   "value": null
+  },
+  "22.5 Prepaid rent amount": {
+   "value": null
+  },
+  "22.6 Telephone": {
+   "value": null
+  },
+  "22.6 Telephone amount": {
+   "value": null
+  },
+  "22.7 Water": {
+   "value": null
+  },
+  "22.7 Water amount": {
+   "value": null
+  },
+  "22.8 Rented furniture": {
+   "value": null
+  },
+  "22.8 Rented furniture amount": {
+   "value": null
+  },
+  "22.9 Other": {
+   "value": null
+  },
+  "22.9 Other amount": {
+   "value": null
+  },
+  "23.1 Annuities": {
+   "value": null
+  },
+  "23.1 Annuities amount": {
+   "value": null
+  },
+  "23.2 Annuities": {
+   "value": null
+  },
+  "23.2 Annuities amount": {
+   "value": null
+  },
+  "23.3 Annuities": {
+   "value": null
+  },
+  "23.3 Annuities amount": {
+   "value": null
+  },
+  "24.1 Interest in an education IRA": {
+   "value": null
+  },
+  "24.1 Interest in an education IRA amount": {
+   "value": null
+  },
+  "24.2 Interest in an education IRA": {
+   "value": null
+  },
+  "24.3 Interest in an education IRA": {
+   "value": null
+  },
+  "25 Trusts, equitable or future interests in property": {
+   "value": null
+  },
+  "25 Trusts, equitable or future interests in property amount": {
+   "value": null
+  },
+  "26 Patents, copyrights, trademarks, trade secrets": {
+   "value": null
+  },
+  "26 Patents, copyrights, trademarks, trade secrets amount": {
+   "value": null
+  },
+  "27 Liscenses, Franchises": {
+   "value": null
+  },
+  "27 Liscenses, Franchises amount": {
+   "value": null
+  },
+  "28 Tax refunds owed": {
+   "value": "2025 federal income tax refund, return filed; Federal"
+  },
+  "28 Tax refunds owed amout1": {
+   "value": "1,100.00"
+  },
+  "28 Tax refunds owed amout2": {
+   "value": null
+  },
+  "28 Tax refunds owed amout3": {
+   "value": null
+  },
+  "29 Family support": {
+   "value": null
+  },
+  "29 Family support amount1": {
+   "value": null
+  },
+  "29 Family support amount2": {
+   "value": null
+  },
+  "29 Family support amount3": {
+   "value": null
+  },
+  "29 Family support amount4": {
+   "value": null
+  },
+  "29 Family support amount5": {
+   "value": null
+  },
+  "2_2": {
+   "value": null
+  },
+  "2_3": {
+   "value": null
+  },
+  "2_4": {
+   "value": null
+  },
+  "3 1": {
+   "value": null
+  },
+  "3 2": {
+   "value": null
+  },
+  "3 3": {
+   "value": null
+  },
+  "3 4": {
+   "value": null
+  },
+  "32 Interest in property due you from someone who died": {
+   "value": null
+  },
+  "33": {
+   "value": null
+  },
+  "34": {
+   "value": null
+  },
+  "35": {
+   "value": null
+  },
+  "38 Accounts receivable or commissions already earned": {
+   "value": null
+  },
+  "39 Office equipment furnishings and supplies": {
+   "value": "Workbench, test rigs, and hand tools"
+  },
+  "3_2": {
+   "value": null
+  },
+  "3_3": {
+   "value": null
+  },
+  "40 Machinery fixtures equipment and tools of your trade": {
+   "value": null
+  },
+  "41 Inventory": {
+   "value": "Replacement engine parts inventory"
+  },
+  "42.1 Name of entity": {
+   "value": null
+  },
+  "42.2 Name of entity": {
+   "value": null
+  },
+  "42.3 Name of entity": {
+   "value": null
+  },
+  "43 Identifiable information": {
+   "value": null
+  },
+  "44.1": {
+   "value": null
+  },
+  "44.2": {
+   "value": null
+  },
+  "44.3": {
+   "value": null
+  },
+  "44.4": {
+   "value": null
+  },
+  "44.5": {
+   "value": null
+  },
+  "44.6": {
+   "value": null
+  },
+  "47 Farm Animals": {
+   "value": null
+  },
+  "48 Cropseither growing or harvested": {
+   "value": null
+  },
+  "49": {
+   "value": null
+  },
+  "50": {
+   "value": null
+  },
+  "51": {
+   "value": null
+  },
+  "53 Examples Season tickets country club membership": {
+   "value": null
+  },
+  "6 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "6 description": {
+   "value": "Used furniture and kitchen appliances"
+  },
+  "6 description amount": {
+   "value": "2,200.00"
+  },
+  "7 check": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "7 description": {
+   "value": "Two laptops, one television"
+  },
+  "7 description amount": {
+   "value": "900.00"
+  },
+  "8 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "8 description": {
+   "value": null
+  },
+  "8 description amount": {
+   "value": null
+  },
+  "9 check": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "9 description": {
+   "value": null
+  },
+  "9 description amount": {
+   "value": null
+  },
+  "Approximate mileage_2": {
+   "value": null
+  },
+  "Approximate mileage_3": {
+   "value": null
+  },
+  "Approximate mileage_4": {
+   "value": null
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Beneficiary 1": {
+   "value": "Beneficiary: Ben Lovelace"
+  },
+  "Beneficiary 2": {
+   "value": null
+  },
+  "Beneficiary 3": {
+   "value": null
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check 1": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check 16": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check 17": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check 18": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "Check 2": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check 3": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "Check if this is community property": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see_4": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see_5": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property see_6": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Check if this is community property_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "City": {
+   "value": null
+  },
+  "City_2": {
+   "value": null
+  },
+  "City_3": {
+   "value": null
+  },
+  "Company name 1": {
+   "value": "Term life policy, Prudential"
+  },
+  "Company name 2": {
+   "value": null
+  },
+  "Company name 3": {
+   "value": null
+  },
+  "Condominium or cooperative": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Condominium or cooperative_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Condominium or cooperative_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "County": {
+   "value": "Hillsborough"
+  },
+  "County_2": {
+   "value": null
+  },
+  "County_3": {
+   "value": null
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Duplex or multiunit building": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Duplex or multiunit building_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Duplex or multiunit building_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Examples Boats trailers motors personal watercraft fishing vessels snowmobiles motorcycle accessories": {
+   "value": "/Yes_2",
+   "widget_states": [
+    "/Off",
+    "/Yes_2"
+   ]
+  },
+  "If you own or have more than one describe here": {
+   "value": null
+  },
+  "Investment property": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Investment property_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Investment property_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Land": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Land_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Land_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Make": {
+   "value": null
+  },
+  "Make_2": {
+   "value": null
+  },
+  "Manufactured or mobile home": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Manufactured or mobile home_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Manufactured or mobile home_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Model": {
+   "value": null
+  },
+  "Model_2": {
+   "value": null
+  },
+  "Other": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Other information": {
+   "value": "2016 Honda Civic LX; Approx. 92,000 miles"
+  },
+  "Other information_2": {
+   "value": null
+  },
+  "Other information_3": {
+   "value": null
+  },
+  "Other information_4": {
+   "value": null
+  },
+  "Other information_5": {
+   "value": "2005 Sun Tracker pontoon boat; Trailer included; engine needs work"
+  },
+  "Other information_6": {
+   "value": null
+  },
+  "Other_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Other_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Singlefamily home": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Singlefamily home_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Singlefamily home_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "State": {
+   "value": null
+  },
+  "State_2": {
+   "value": null
+  },
+  "State_3": {
+   "value": null
+  },
+  "Timeshare": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Timeshare_2": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Timeshare_3": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Who has an interest in the property Check one": {
+   "value": null
+  },
+  "Who has an interest in the property Check one_2": {
+   "value": null
+  },
+  "Who has interest in property": {
+   "value": "/Debtor 1 and 2",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Debtor 1 and 2",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 2": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 3": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 4": {
+   "value": "/Debtor 1",
+   "widget_states": [
+    "/Debtor 1",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 5": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 6": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 7": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 8": {
+   "value": "/Debtor 1 and 2",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Debtor 1 and 2",
+    "/Off"
+   ]
+  },
+  "Who has interest in property 9": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "Year": {
+   "value": null
+  },
+  "Year_2": {
+   "value": null
+  },
+  "ZIP Code": {
+   "value": null
+  },
+  "ZIP Code_2": {
+   "value": null
+  },
+  "ZIP Code_3": {
+   "value": null
+  },
+  "check 13": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 14": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 19": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 20": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 21": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 22": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 23": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 24": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 25": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 26": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 27": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 28": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "check 29": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 30": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 31": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 32": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 33": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 34": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 35": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 37": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 38": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 39": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 40": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 41": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check 42": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 43": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 43_1": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check 44": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 46": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 47": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 48": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 49": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 50": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 51": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check 53": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "property identification number": {
+   "value": "Two-bedroom bungalow; the family homestead"
+  },
+  "property identification number_2": {
+   "value": null
+  },
+  "property identification number_3": {
+   "value": null
+  },
+  "the entireties or a life estate if known": {
+   "value": "Fee simple, tenancy by the entireties"
+  },
+  "undefined_10": {
+   "value": null
+  },
+  "undefined_107": {
+   "value": null
+  },
+  "undefined_108": {
+   "value": null
+  },
+  "undefined_109": {
+   "value": "0.00"
+  },
+  "undefined_11": {
+   "value": null
+  },
+  "undefined_110": {
+   "value": null
+  },
+  "undefined_111": {
+   "value": null
+  },
+  "undefined_114": {
+   "value": null
+  },
+  "undefined_117": {
+   "value": null
+  },
+  "undefined_12": {
+   "value": null
+  },
+  "undefined_120": {
+   "value": null
+  },
+  "undefined_123": {
+   "value": null
+  },
+  "undefined_124": {
+   "value": "52,800.00"
+  },
+  "undefined_125": {
+   "value": null
+  },
+  "undefined_126": {
+   "value": "750.00"
+  },
+  "undefined_127": {
+   "value": null
+  },
+  "undefined_128": {
+   "value": "1,200.00"
+  },
+  "undefined_129": {
+   "value": null
+  },
+  "undefined_13": {
+   "value": "240,000.00"
+  },
+  "undefined_130": {
+   "value": null
+  },
+  "undefined_131": {
+   "value": null
+  },
+  "undefined_132": {
+   "value": null
+  },
+  "undefined_133": {
+   "value": null
+  },
+  "undefined_134": {
+   "value": null
+  },
+  "undefined_135": {
+   "value": null
+  },
+  "undefined_137": {
+   "value": null
+  },
+  "undefined_138": {
+   "value": null
+  },
+  "undefined_139": {
+   "value": null
+  },
+  "undefined_14": {
+   "value": "9,000.00"
+  },
+  "undefined_140": {
+   "value": null
+  },
+  "undefined_141": {
+   "value": null
+  },
+  "undefined_142": {
+   "value": null
+  },
+  "undefined_143": {
+   "value": "1,950.00"
+  },
+  "undefined_144": {
+   "value": null
+  },
+  "undefined_145": {
+   "value": null
+  },
+  "undefined_148": {
+   "value": null
+  },
+  "undefined_15": {
+   "value": "9,000.00"
+  },
+  "undefined_151": {
+   "value": null
+  },
+  "undefined_153": {
+   "value": null
+  },
+  "undefined_154": {
+   "value": "0.00"
+  },
+  "undefined_155": {
+   "value": null
+  },
+  "undefined_156": {
+   "value": null
+  },
+  "undefined_157": {
+   "value": null
+  },
+  "undefined_158": {
+   "value": "0.00"
+  },
+  "undefined_159": {
+   "value": "240,000.00"
+  },
+  "undefined_16": {
+   "value": null
+  },
+  "undefined_160": {
+   "value": "12,500.00"
+  },
+  "undefined_161": {
+   "value": "5,300.00"
+  },
+  "undefined_162": {
+   "value": "52,800.00"
+  },
+  "undefined_163": {
+   "value": "1,950.00"
+  },
+  "undefined_164": {
+   "value": "0.00"
+  },
+  "undefined_165": {
+   "value": "0.00"
+  },
+  "undefined_166": {
+   "value": "72,550.00"
+  },
+  "undefined_167": {
+   "value": "312,550.00"
+  },
+  "undefined_17": {
+   "value": null
+  },
+  "undefined_18": {
+   "value": null
+  },
+  "undefined_19": {
+   "value": null
+  },
+  "undefined_2": {
+   "value": "265,000.00"
+  },
+  "undefined_20": {
+   "value": null
+  },
+  "undefined_21": {
+   "value": null
+  },
+  "undefined_22": {
+   "value": "3,500.00"
+  },
+  "undefined_23": {
+   "value": "3,500.00"
+  },
+  "undefined_24": {
+   "value": null
+  },
+  "undefined_25": {
+   "value": null
+  },
+  "undefined_26": {
+   "value": "12,500.00"
+  },
+  "undefined_3": {
+   "value": "240,000.00"
+  },
+  "undefined_4": {
+   "value": null
+  },
+  "undefined_5": {
+   "value": null
+  },
+  "undefined_6": {
+   "value": null
+  },
+  "undefined_7": {
+   "value": null
+  },
+  "undefined_8": {
+   "value": null
+  },
+  "undefined_9": {
+   "value": null
+  }
+ },
+ "release": "form/b106ab@2015-12-01",
+ "sha256": "4f58e8860192e17559d88464f0312551304cf071782620906d8b3b958853589b"
+}
