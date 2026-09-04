@@ -95,6 +95,7 @@ from insolvia_core.petitions import (
 )
 from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
 
+from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import (
     MATRIX_FILE_NAME,
     generate_creditor_matrix,
@@ -480,10 +481,15 @@ class AssembledPacket:
     the PDFs are the deliverable — but the AI review worker (issue #97,
     core/petition_review.py) reads the SAME projected content the forms
     printed, which is what lets its findings cite the form's own line keys
-    without parsing a PDF back apart."""
+    without parsing a PDF back apart.
+
+    `constants_set_id` is the `code/dollar-amounts` release resolved as of
+    the same assembly date as the forms — the second pin effective-dating.md
+    names, recorded on the case (and this packet) in the same write."""
 
     parts: tuple[tuple[str, bytes], ...]
     form_revisions: Mapping[str, str]
+    constants_set_id: str
     creditor_count: int
     projections: Mapping[str, FieldValues]
 
@@ -527,6 +533,22 @@ def assemble(
                 )
             )
 
+    # The dollar-amounts pin resolves alongside the forms: the same as_of,
+    # the same gate on failure — a packet must never record form pins while
+    # leaving "which constant set applied" unanswerable.
+    constants_release: dollar_amounts.Release | None = None
+    try:
+        constants_release = dollar_amounts.resolve(as_of)
+    except LookupError as error:
+        problems.append(
+            PacketProblem(
+                source=dollar_amounts.DOLLAR_AMOUNTS_SERIES,
+                item_id=None,
+                field="",
+                message=str(error),
+            )
+        )
+
     projected: dict[str, FieldValues] = {}
     for series_id, release in releases.items():
         try:
@@ -556,10 +578,12 @@ def assemble(
         return tuple(problems)
 
     assert matrix.content is not None  # its problems gated above
+    assert constants_release is not None  # its resolution failure gated above
     parts.append((MATRIX_FILE_NAME, matrix.content.encode("ascii")))
 
     return AssembledPacket(
         parts=tuple(parts),
+        constants_set_id=constants_release.release_id,
         # The WHOLE set pins, including a J-2 this case does not file: the
         # pin map records which revisions were in force for this assembly,
         # and a household added before re-assembly must not find a hole.
@@ -657,6 +681,7 @@ def run_packet_assembly(
         byte_size=len(content),
         sha256=hashlib.sha256(content).hexdigest(),
         form_revisions=outcome.form_revisions,
+        constants_set_id=outcome.constants_set_id,
         creditor_count=outcome.creditor_count,
         created_by=job.created_by,
     )
@@ -668,7 +693,11 @@ def run_packet_assembly(
         packet.storage_ref, content=content, content_type=PACKET_CONTENT_TYPE
     )
 
-    pinned = pin_case(case, form_revisions=outcome.form_revisions)
+    pinned = pin_case(
+        case,
+        form_revisions=outcome.form_revisions,
+        constants_set_id=outcome.constants_set_id,
+    )
     stored = deps.packet_store.create(
         packet, pinned_case=pinned, expected_updated_at=case.updated_at
     )

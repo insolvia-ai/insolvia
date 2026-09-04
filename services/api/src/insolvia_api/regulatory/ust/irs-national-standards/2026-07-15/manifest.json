@@ -1,0 +1,11 @@
+{
+  "series_id": "ust/irs-national-standards",
+  "effective_date": "2026-07-15",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.justice.gov/ust/eo/bapcpa/20260715/bci_data/docs/national_expense_standards.xlsx",
+    "published": null,
+    "sha256": "c2b235b26f6971908b5e01ba51c91df4964ce3573d5407013c145d5affd65c31"
+  },
+  "notes": "IRS National Standards as republished by the UST for cases filed on or after 2026-07-15; includes the out-of-pocket health care table (https://www.justice.gov/ust/eo/bapcpa/20260715/bci_data/docs/national_oop_healthcare.xlsx, sha256 7c3ca9a57661ed9d430015edd5e917cadb213e835d392998c25a8f3b5e6dbc47). Converted mechanically; spot-check the diff against the UST's HTML tables before merging."
+}

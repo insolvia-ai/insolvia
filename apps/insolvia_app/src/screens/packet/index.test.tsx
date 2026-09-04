@@ -36,6 +36,7 @@ function packet(overrides: Record<string, unknown> = {}) {
     byteSize: 1843200,
     sha256: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2',
     formRevisions: { 'form/b101': '2024-06-22' },
+    constantsSetId: 'code/dollar-amounts@2025-04-01',
     creditorCount: 6,
     createdBy: '00000000-0000-4000-8000-0000000000a1',
     createdAt: '2026-09-03T10:00:00.123Z',

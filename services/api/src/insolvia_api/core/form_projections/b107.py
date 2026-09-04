@@ -14,9 +14,10 @@ Readings this revision forces, each argued where it happens:
   the case's creation year (the filing-date stand-in, as 106C uses);
   `other` entries take Q5's flat source rows.
 - **Q6's gates** answer from petition.debt_character (the same fact B101
-  line 16 prints) and from whether creditor_payment entries exist — the
-  dollar floors themselves live with the effective constant sets, and only
-  the branch the consumer answer selects is answered.
+  line 16 prints) and from the creditor_payment entries, checked against
+  the branch's dollar floor from code/dollar-amounts (§ 547(c)(8)/(9)) —
+  only the branch the consumer answer selects is answered, and a recorded
+  payment below the floor is an error, not a silent row.
 - **Q26** is the PDF's merged gate+status group: a No is a plain option,
   a Yes must set the yes box AND the status box by appearance state.
 - **Shared-widget defects** (Q18/Q19's date, Q20's row-two ZIP, Q21's
@@ -32,6 +33,7 @@ Q27's accountant column (nothing structured records it).
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from datetime import date
 from decimal import Decimal
 from typing import Final, TypeVar
 
@@ -58,6 +60,7 @@ from insolvia_core.sofa import (
     StorageUnit,
 )
 
+from .. import dollar_amounts
 from ..form_fill import Check, FieldFill, Option, Text, WidgetStates
 from ..form_templates import FormRelease
 from .shared import (
@@ -348,13 +351,38 @@ def _q6(
     if petition is not None and petition.debt_character is not None:
         consumer = petition.debt_character == "consumer"
         values["q6_consumer_debts"] = yes_no(release, "q6_consumer_debts", consumer)
-    # Only the branch the consumer answer selects is answered; the dollar
-    # floors are the constant set's, and intake records only reportable
-    # payments, so the entries' existence IS the answer.
-    if consumer is True:
-        values["q6_paid_600"] = yes_no(release, "q6_paid_600", bool(payments))
-    elif consumer is False:
-        values["q6_paid_8575"] = yes_no(release, "q6_paid_8575", bool(payments))
+    # Only the branch the consumer answer selects is answered, against the
+    # branch's own dollar floor from code/dollar-amounts (§ 547(c)(8)/(9)),
+    # resolved as of the case's creation date — the filing-date stand-in the
+    # other registry reads use. A recorded payment whose known total falls
+    # below the floor is a fact that cannot land: printing its rows under a
+    # No answer (or flipping the answer to Yes for it) would each misstate
+    # the form, so it is an error naming the creditor and the floor. A
+    # payment with no total yet answers by its presence, as before.
+    if consumer is not None:
+        constants = dollar_amounts.resolve(
+            date.fromisoformat(case_file.case.created_at[:10])
+        )
+        floor = constants.amount(
+            "sofa-payment-floor-consumer" if consumer else "sofa-payment-floor-business"
+        )
+        for payment in payments:
+            if (
+                payment.total_paid is not None
+                and Decimal(payment.total_paid) < floor.value
+            ):
+                problems.append(
+                    f"q6: the payments to {payment.creditor.name or 'a creditor'} "
+                    f"total {payment.total_paid}, below the {floor.amount} "
+                    f"reporting floor ({floor.citation}) — question 6 lists "
+                    "only creditors paid at least the floor; remove the entry "
+                    "or correct the total"
+                )
+        answer = bool(payments)
+        if consumer:
+            values["q6_paid_600"] = yes_no(release, "q6_paid_600", answer)
+        else:
+            values["q6_paid_8575"] = yes_no(release, "q6_paid_8575", answer)
 
     for index, payment in enumerate(payments):
         _put_row(

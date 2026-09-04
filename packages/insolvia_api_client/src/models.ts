@@ -691,6 +691,11 @@ export interface Packet {
    * re-assembly while this record describes this packet forever.
    */
   readonly formRevisions: Readonly<Record<string, string>>;
+  /**
+   * The `code/dollar-amounts` release this packet was rendered under — the
+   * second pin, kept here for `formRevisions`' reason.
+   */
+  readonly constantsSetId: string;
   /** How many creditors the enclosed matrix lists (after deduplication). */
   readonly creditorCount: number;
   /**

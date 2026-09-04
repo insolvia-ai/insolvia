@@ -1,0 +1,58 @@
+name: Regulatory data · refresh check
+
+# The scheduled tripwire for the UST means-testing datasets and the § 104
+# dollar-amount horizon (issue #99; effective-dating.md "The refresh
+# process"). scripts/check-ust-data.py compares the UST's current period
+# against the committed registry; a difference means the product would
+# compute means tests on stale data, so the failure must reach a HUMAN —
+# this workflow opens (or comments on) a tracking issue rather than dying in
+# a log. The checker is stdlib-only Python and runs identically on a
+# developer machine: `python3 scripts/check-ust-data.py`.
+#
+# Weekly is deliberate: the UST posts 2-4 updates a year with effective
+# dates weeks out, so a week's detection latency still leaves time to ingest
+# before the data takes effect.
+
+on:
+  schedule:
+    # Mondays 12:07 UTC — an off-minute, per GitHub's guidance to avoid the
+    # top-of-hour thundering herd on scheduled workflows.
+    - cron: "7 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: UST datasets current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the UST means-testing data against the registry
+        id: check
+        run: |
+          set +e
+          python3 scripts/check-ust-data.py 2>&1 | tee check.log
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Alert a human
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Regulatory data staleness: UST means-testing datasets"
+          body="$(printf 'scripts/check-ust-data.py failed on %s (run %s).\n\n```\n%s\n```\n\nIngest with scripts/ingest-ust-data.py and open a release PR — see docs/reference/effective-dating.md, "The refresh process".' \
+            "$(date -u +%Y-%m-%d)" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "$(cat check.log)")"
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

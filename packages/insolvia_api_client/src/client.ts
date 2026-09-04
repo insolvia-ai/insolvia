@@ -1870,6 +1870,7 @@ function packetFromJson(response: DecodedResponse): Packet {
     byteSize: requireNumber(response, 'byteSize'),
     sha256: requireString(response, 'sha256'),
     formRevisions: requireStringRecord(response, 'formRevisions'),
+    constantsSetId: requireString(response, 'constantsSetId'),
     creditorCount: requireNumber(response, 'creditorCount'),
     createdBy: requireString(response, 'createdBy'),
     createdAt: requireString(response, 'createdAt'),
