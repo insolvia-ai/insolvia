@@ -154,7 +154,12 @@ class CmiLine:
     """One income line of one column, with its six-month total, the monthly
     average, and every entry behind them. `note` explains any line-level
     arithmetic (the business/rental expense subtraction and its zero
-    floor)."""
+    floor).
+
+    Business and rental lines also carry the monthly averages of their gross
+    receipts and operating expenses — B122A-1 lines 5-6 print all three
+    boxes, and the projection must not re-derive what the derivation already
+    computed."""
 
     category: str
     label: str
@@ -163,6 +168,8 @@ class CmiLine:
     entries: tuple[CmiEntry, ...]
     citation: str = ""
     note: str = ""
+    gross_monthly_average: str | None = None
+    expenses_monthly_average: str | None = None
 
 
 @dataclass(frozen=True)
@@ -411,7 +418,19 @@ def current_monthly_income(
                 if net < 0:
                     note += "; a net loss enters as zero (B122A-1 lines 5-6)"
                     net = Decimal("0")
-                lines.append(_line(category, entries, net, note=note))
+                base = _line(category, entries, net, note=note)
+                lines.append(
+                    CmiLine(
+                        category=base.category,
+                        label=base.label,
+                        total_received=base.total_received,
+                        monthly_average=base.monthly_average,
+                        entries=base.entries,
+                        note=base.note,
+                        gross_monthly_average=_monthly_average(gross),
+                        expenses_monthly_average=_monthly_average(expenses),
+                    )
+                )
                 total += net
             else:
                 lines.append(_line(category, entries, gross))

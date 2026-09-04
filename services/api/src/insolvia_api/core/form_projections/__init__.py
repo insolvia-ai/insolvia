@@ -63,6 +63,8 @@ from .b106j import project_b106j_1215
 from .b106j2 import project_b106j2_1215
 from .b106sum import project_b106sum_1215
 from .b107 import project_b107_0425
+from .b122a1 import project_b122a1_1219
+from .b122a2 import project_b122a2_0425
 from .shared import (
     CaseFile,
     FieldValues,
@@ -102,6 +104,8 @@ PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b106j2", "2015-12-01"): project_b106j2_1215,
     ("form/b106sum", "2015-12-01"): project_b106sum_1215,
     ("form/b107", "2025-04-01"): project_b107_0425,
+    ("form/b122a1", "2019-12-01"): project_b122a1_1219,
+    ("form/b122a2", "2025-04-01"): project_b122a2_0425,
 }
 
 

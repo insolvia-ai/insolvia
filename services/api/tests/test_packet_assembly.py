@@ -48,7 +48,14 @@ from insolvia_core.contract_leases import CONTRACT_LEASE
 from insolvia_core.creditors import CREDITOR
 from insolvia_core.exemption_claims import EXEMPTION, ExemptionBody
 from insolvia_core.expenses import DEPENDENT, EXPENSE, HOUSEHOLD, HouseholdBody
-from insolvia_core.income import EMPLOYMENT, INCOME_SUMMARY, IncomeSummaryBody
+from insolvia_core.income import (
+    EMPLOYMENT,
+    INCOME_SUMMARY,
+    OTHER_INCOME_RECORD,
+    PAY_PERIOD_RECORD,
+    IncomeSummaryBody,
+)
+from insolvia_core.means_test_inputs import MEANS_TEST_INPUT
 from insolvia_core.petitions import (
     FILING_PROFESSIONAL,
     PETITION,
@@ -109,9 +116,18 @@ def reference_case_data() -> CaseData:
         filing_professionals=wrap_bodies(
             FILING_PROFESSIONAL, case_file.filing_professionals, "prof"
         ),
-        employments=wrap_bodies(EMPLOYMENT, case_file.employments, "employment"),
+        employments=wrap_pairs(EMPLOYMENT, case_file.employments),
         income_summaries=wrap_bodies(
             INCOME_SUMMARY, case_file.income_summaries, "income"
+        ),
+        pay_period_records=wrap_bodies(
+            PAY_PERIOD_RECORD, case_file.pay_period_records, "payperiod"
+        ),
+        other_income_records=wrap_bodies(
+            OTHER_INCOME_RECORD, case_file.other_income_records, "otherincome"
+        ),
+        means_test_inputs=wrap_bodies(
+            MEANS_TEST_INPUT, case_file.means_test_inputs, "meanstest"
         ),
         assets=wrap_pairs(ASSET, case_file.assets),
         exemptions=wrap_bodies(EXEMPTION, case_file.exemptions, "exemption"),
@@ -360,6 +376,9 @@ def build_deps(data: CaseData):
         "filing_professionals",
         "employments",
         "income_summaries",
+        "pay_period_records",
+        "other_income_records",
+        "means_test_inputs",
         "assets",
         "exemptions",
         "creditors",
@@ -498,3 +517,66 @@ def test_packet_assembly_is_an_acceptable_job_kind():
     register under PACKET_ASSEMBLY_KIND. This is the pin that keeps the two
     naming the same kind."""
     assert PACKET_ASSEMBLY_KIND in KINDS
+
+
+def test_b122a2_stays_out_of_the_packet_below_the_median():
+    # B122A-1 line 14a: below the median the calculation form is not filed
+    # — but its series still PINS, the J-2 rule for the same reason.
+    data = reference_case_data()
+    shrunk = replace(
+        data,
+        pay_period_records=tuple(
+            replace(entity, body=replace(entity.body, gross="4500.00"))
+            for entity in data.pay_period_records
+        ),
+    )
+    series = packet_form_series(shrunk)
+    assert "form/b122a1" in series
+    assert "form/b122a2" not in series
+    outcome = assemble(shrunk, as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    assert "form/b122a2" in outcome.form_revisions
+    names = [name for name, _ in outcome.parts]
+    assert any(name.endswith("b122a1.pdf") for name in names)
+    assert not any(name.endswith("b122a2.pdf") for name in names)
+
+
+def test_the_reference_case_files_the_means_test_pair():
+    data = reference_case_data()
+    series = packet_form_series(data)
+    assert series[-2:] == ("form/b122a1", "form/b122a2")
+
+
+def test_a_duplicate_means_test_input_is_refused():
+    data = reference_case_data()
+    extra = data.means_test_inputs[0]
+    doubled = replace(
+        data,
+        means_test_inputs=(
+            data.means_test_inputs[0],
+            replace(extra, id="meanstest-extra"),
+        ),
+    )
+    problems = completeness_problems(doubled)
+    assert any(p.source == "means_test_inputs" for p in problems)
+
+
+def test_a_dangling_pay_period_employment_is_reported():
+    data = reference_case_data()
+    broken = replace(
+        data,
+        pay_period_records=(
+            *data.pay_period_records[1:],
+            replace(
+                data.pay_period_records[0],
+                body=replace(
+                    data.pay_period_records[0].body, employment_id="employment-gone"
+                ),
+            ),
+        ),
+    )
+    problems = completeness_problems(broken)
+    assert any(
+        p.source == "pay_period_records" and p.field == "employment_id"
+        for p in problems
+    )

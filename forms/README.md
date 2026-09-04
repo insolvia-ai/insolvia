@@ -40,6 +40,8 @@ missing fields" an executable property, not a one-time review.
 | B106J | Schedule J: Your Expenses | 12/15 | 2015-12-01 |
 | B106J-2 | Schedule J-2: Expenses for Separate Household of Debtor 2 | 12/15 | 2015-12-01 |
 | B107 | Statement of Financial Affairs | **04/25** | 2025-04-01 |
+| B122A-1 | Chapter 7 Statement of Your Current Monthly Income | 12/19 | 2019-12-01 |
+| B122A-2 | Chapter 7 Means Test Calculation | **04/25** | 2025-04-01 |
 
 B106C and B107 carry the April 2025 dollar-amount adjustments (§ 104 three-year
 cycle: the $214,000 homestead question, B107's $8,575 payment floor — next
@@ -109,6 +111,12 @@ one in a `notes` where it bites. The recurring kinds:
 - **Inconsistent export values** — the same choice exports `Debtor 1 and 2`,
   `debtor 1 and 2`, `Dentor 2` (sic), or `On` depending on the row. Radios list
   the exact per-PDF values, with `maps_to_value` giving the canonical enum.
+- **Boxes with no widget at all** — a printed box the PDF simply cannot fill.
+  B122A-1's line 12a copy box; B122A-2's line 39b and most of its right-margin
+  "copy here" boxes (lines 3, 25, 33e, 34, 36, 38, 39c, 39d, 41b). The shared
+  widgets that DO exist there (line 4 = 39a, 9b's total = 33a, 13b/13e's
+  totals = 33b/33c) are the same defect kind as B107's, used constructively:
+  one value, two printed boxes, always agreeing.
 
 ## Updating for a new revision
 

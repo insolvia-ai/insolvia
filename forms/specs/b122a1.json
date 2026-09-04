@@ -1,0 +1,651 @@
+{
+ "form": "b122a1",
+ "official_number": "122A-1",
+ "title": "Chapter 7 Statement of Your Current Monthly Income",
+ "revision": "12/19",
+ "effective_date": "2019-12-01",
+ "notes": "The CMI statement (issue #102): every income line is a projection of the § 101(10A) derivation (core/cmi.py) over the case's dated income history — the one place the model deliberately refuses to mirror the form (case-data-model.md). Known defects of the official PDF, verified by widget geometry: Debtor 2's line-4 box is named Debto2.Quest2.2; line 12a's copy box has no widget; line 10's two source boxes are ordinary distinct fields (suffixes 1/2) despite their prose-length names.",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Calculate Your Current Monthly Income"
+  },
+  {
+   "number": 2,
+   "title": "Determine Whether the Means Test Applies to You"
+  },
+  {
+   "number": 3,
+   "title": "Sign Below"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Name"
+    ]
+   }
+  },
+  {
+   "id": "caption.debtor2_name",
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Name"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number1"
+    ]
+   }
+  },
+  {
+   "id": "caption.amended",
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "CheckBox2"
+    ]
+   }
+  },
+  {
+   "id": "caption.presumption_box",
+   "label": "Check one box only as directed in this form and in Form 122A-1Supp",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the line 14 comparison decides the box: 14a checks box 1 (no presumption), 14b checks box 2 (determined by Form 122A-2); box 3 is the 122A-1Supp military-service exemption, which this product does not prepare"
+   },
+   "pdf": {
+    "names": [
+     "CheckBox1"
+    ]
+   },
+   "options": [
+    {
+     "value": "No Abuse",
+     "label": "1. There is no presumption of abuse",
+     "maps_to_value": "no_presumption"
+    },
+    {
+     "value": "Presumption of abuse applies",
+     "label": "2. The calculation will be made under Form 122A-2",
+     "maps_to_value": "determined_by_122a2"
+    },
+    {
+     "value": "Does not apply",
+     "label": "3. The Means Test does not apply now because of qualified military service"
+    }
+   ]
+  },
+  {
+   "id": "marital_filing_status",
+   "label": "What is your marital and filing status? Check one only.",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the case's debtor records answer it: a debtor_2 record is 'married and filing', a non_filing_spouse record is 'married but not filing', neither is 'not married'"
+   },
+   "pdf": {
+    "names": [
+     "CheckBox3"
+    ]
+   },
+   "part": 1,
+   "line": "1",
+   "options": [
+    {
+     "value": "Not married",
+     "label": "Not married. Fill out Column A, lines 2-11.",
+     "maps_to_value": "not_married"
+    },
+    {
+     "value": "Maried and filing",
+     "label": "Married and your spouse is filing with you (the PDF's own misspelling)",
+     "maps_to_value": "married_filing_jointly"
+    },
+    {
+     "value": "Married but not filing",
+     "label": "Married and your spouse is NOT filing with you",
+     "maps_to_value": "married_not_filing"
+    }
+   ]
+  },
+  {
+   "id": "married_not_filing_household",
+   "label": "You and your spouse are: living in the same household / living separately or legally separated",
+   "type": "radio",
+   "maps_to": {
+    "derived": "answered only when marital_filing_status is 'married but not filing': a non_filing_spouse debtor record means the same household (Column B is filled in); the separated declaration is not modelled, so 'separately' never fills"
+   },
+   "pdf": {
+    "names": [
+     "CheckBox3A"
+    ]
+   },
+   "part": 1,
+   "line": "1",
+   "options": [
+    {
+     "value": "together",
+     "label": "Living in the same household and are not legally separated",
+     "maps_to_value": "same_household"
+    },
+    {
+     "value": "separately",
+     "label": "Living separately or are legally separated (declaration under § 707(b)(7)(B))"
+    }
+   ]
+  },
+  {
+   "id": "wages",
+   "label": "Your gross wages, salary, tips, bonuses, overtime, and commissions (before all payroll deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest2.0",
+     "Debto2.Quest2.0"
+    ]
+   },
+   "part": 1,
+   "line": "2"
+  },
+  {
+   "id": "alimony",
+   "label": "Alimony and maintenance payments",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest3",
+     "Debto2.Quest3"
+    ]
+   },
+   "part": 1,
+   "line": "3"
+  },
+  {
+   "id": "household_contributions",
+   "label": "All amounts from any source which are regularly paid for household expenses of you or your dependents",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest4",
+     "Debto2.Quest2.2"
+    ]
+   },
+   "part": 1,
+   "line": "4",
+   "notes": "Column B's box is misnamed Debto2.Quest2.2 in the PDF; its position (the line-4 row, y=192, beside Debto1.Quest4) is the identity."
+  },
+  {
+   "id": "business_gross",
+   "label": "Business, profession, or farm — gross receipts (before all deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest5A",
+     "Debto2.Quest5A"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "business_expenses",
+   "label": "Business, profession, or farm — ordinary and necessary operating expenses",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest5B",
+     "Debto2.Quest5B"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "business_net",
+   "label": "Net monthly income from a business, profession, or farm (copied into the column)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest5C",
+     "Debto2.Quest5C"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "rental_gross",
+   "label": "Rental and other real property — gross receipts (before all deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest6A",
+     "Debto2.Quest6A"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "rental_expenses",
+   "label": "Rental and other real property — ordinary and necessary operating expenses",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest6B",
+     "Debto2.Quest6B"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "rental_net",
+   "label": "Net monthly income from rental or other real property (copied into the column)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest6C",
+     "Debto2.Quest6C"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "interest_dividends",
+   "label": "Interest, dividends, and royalties",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest7",
+     "Debto2.Quest7"
+    ]
+   },
+   "part": 1,
+   "line": "7"
+  },
+  {
+   "id": "unemployment",
+   "label": "Unemployment compensation",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest8.0",
+     "Debto2.Quest8.0"
+    ]
+   },
+   "part": 1,
+   "line": "8"
+  },
+  {
+   "id": "ssa_contention",
+   "label": "Amounts contended to be benefits under the Social Security Act — for you / for your spouse",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest8A",
+     "Debto2.Quest8A"
+    ]
+   },
+   "part": 1,
+   "line": "8",
+   "notes": "not part of any column total: the § 101(10A)(B)(ii) exclusion, shown rather than counted (other_income_record category social_security_act_benefit)"
+  },
+  {
+   "id": "pension",
+   "label": "Pension or retirement income",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest9",
+     "Debto2.Quest9"
+    ]
+   },
+   "part": 1,
+   "line": "9"
+  },
+  {
+   "id": "other_income_1",
+   "label": "Income from all other sources not listed above — first row",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest10A",
+     "Debto2.Quest10A"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_2",
+   "label": "Income from all other sources not listed above — second row",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest10B",
+     "Debto2.Quest10B"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_separate_pages",
+   "label": "Total amounts from separate pages, if any",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest10C",
+     "Debto2.Quest10C"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_source_1",
+   "label": "Line 10, first row — specify the source",
+   "type": "text",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "terrorism If necessary list other sources on a separate page and put the total below 1"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_source_2",
+   "label": "Line 10, second row — specify the source",
+   "type": "text",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "terrorism If necessary list other sources on a separate page and put the total below 2"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "column_total",
+   "label": "Total current monthly income for the column (add lines 2 through 10)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Debto1.Quest11",
+     "Debto2.Quest11"
+    ]
+   },
+   "part": 1,
+   "line": "11"
+  },
+  {
+   "id": "total_cmi",
+   "label": "Total current monthly income (Column A plus Column B)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "Quest11"
+    ]
+   },
+   "part": 1,
+   "line": "11"
+  },
+  {
+   "id": "annualized_cmi",
+   "label": "12b. Your annual income for this part of the form (line 11 x 12)",
+   "type": "money",
+   "maps_to": {
+    "derived": "line 11 multiplied by 12 — § 707(b)(7)'s comparison figure"
+   },
+   "pdf": {
+    "names": [
+     "12B"
+    ]
+   },
+   "part": 2,
+   "line": "12",
+   "notes": "line 12a's 'Copy line 11 here' box carries no widget in the official PDF — the printed box cannot be filled; 12b is the one that lands."
+  },
+  {
+   "id": "median_state",
+   "label": "13. The state in which you live",
+   "type": "state",
+   "maps_to": {
+    "derived": "debtor 1's residence address state — the same fact 106C's scheme election reads"
+   },
+   "pdf": {
+    "names": [
+     "13A"
+    ]
+   },
+   "part": 2,
+   "line": "13"
+  },
+  {
+   "id": "median_household_size",
+   "label": "13. The number of people in your household",
+   "type": "integer",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "people_under_65",
+    "notes": "the sum of people_under_65 and people_65_or_older — one entered household composition feeds line 13 here and line 5 of Form 122A-2"
+   },
+   "pdf": {
+    "names": [
+     "13B"
+    ]
+   },
+   "part": 2,
+   "line": "13"
+  },
+  {
+   "id": "median_income",
+   "label": "13. The median family income for your state and size of household",
+   "type": "money",
+   "maps_to": {
+    "derived": "the ust/census-median-family-income release effective on the filing date (core/ust_data.py)"
+   },
+   "pdf": {
+    "names": [
+     "13C"
+    ]
+   },
+   "part": 2,
+   "line": "13"
+  },
+  {
+   "id": "median_comparison",
+   "label": "14. How do the lines compare?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the § 707(b)(7) comparison (core/means_test.py): 12b <= 13 checks 14a (no presumption; do not file 122A-2), 12b > 13 checks 14b (fill out Form 122A-2)"
+   },
+   "pdf": {
+    "names": [
+     "14a"
+    ]
+   },
+   "part": 2,
+   "line": "14",
+   "options": [
+    {
+     "value": "12b less or equal to 13",
+     "label": "14a. Line 12b is less than or equal to line 13",
+     "maps_to_value": "below_or_equal_median"
+    },
+    {
+     "value": "12b more than 13",
+     "label": "14b. Line 12b is more than line 13",
+     "maps_to_value": "above_median"
+    }
+   ]
+  },
+  {
+   "id": "debtor1_signature",
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.sig"
+    ]
+   },
+   "part": 3
+  },
+  {
+   "id": "debtor2_signature",
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.sig"
+    ]
+   },
+   "part": 3
+  },
+  {
+   "id": "debtor1_signature_date",
+   "label": "Date (Debtor 1, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor1.Date signed"
+    ]
+   },
+   "part": 3
+  },
+  {
+   "id": "debtor2_signature_date",
+   "label": "Date (Debtor 2, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor2.Date signed"
+    ]
+   },
+   "part": 3
+  }
+ ]
+}
