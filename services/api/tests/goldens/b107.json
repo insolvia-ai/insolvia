@@ -85,7 +85,7 @@
    "value": "1,204.56"
   },
   "Amount1 14": {
-   "value": "1,284.56"
+   "value": "1,274.56"
   },
   "Amount1 15": {
    "value": "1,224.56"
@@ -106,7 +106,7 @@
    "value": "1,294.56"
   },
   "Amount2 14": {
-   "value": "1,274.56"
+   "value": "1,284.56"
   },
   "Amount2 16a": {
    "value": "1,244.56"
@@ -541,7 +541,7 @@
    "value": "01/28/2026"
   },
   "Date1 14": {
-   "value": "01/08/2026"
+   "value": "01/07/2026"
   },
   "Date1 15": {
    "value": "01/12/2026"
@@ -568,7 +568,7 @@
    "value": "01/27/2026"
   },
   "Date2 14": {
-   "value": "01/07/2026"
+   "value": "01/08/2026"
   },
   "Date2 16a": {
    "value": "01/25/2026"
@@ -697,55 +697,55 @@
    "value": "1,224.56"
   },
   "Income 5a Debtor 1": {
-   "value": "1,284.56"
+   "value": "1,274.56"
   },
   "Income 5a Debtor 2": {
    "value": "1,294.56"
   },
   "Income 5b Debtor 1": {
-   "value": "1,294.56"
+   "value": "1,284.56"
   },
   "Income 5b Debtor 2": {
    "value": "1,204.56"
   },
   "Income 5c Debtor 1": {
-   "value": "1,204.56"
+   "value": "1,294.56"
   },
   "Income 5c Debtor 2": {
    "value": "1,214.56"
   },
   "Income 5d Debtor 1": {
-   "value": "1,214.56"
+   "value": "1,204.56"
   },
   "Income 5d Debtor 2": {
    "value": "1,224.56"
   },
   "Income 5e Debtor 1": {
-   "value": "1,224.56"
+   "value": "1,214.56"
   },
   "Income 5e Debtor 2": {
    "value": "1,234.56"
   },
   "Income 5f Debtor 1": {
-   "value": "1,234.56"
+   "value": "1,224.56"
   },
   "Income 5f Debtor 2": {
    "value": "1,244.56"
   },
   "Income 5g Debtor 1": {
-   "value": "1,244.56"
+   "value": "1,234.56"
   },
   "Income 5g Debtor 2": {
    "value": "1,254.56"
   },
   "Income 5h Debtor 1": {
-   "value": "1,254.56"
+   "value": "1,244.56"
   },
   "Income 5h Debtor 2": {
    "value": "1,264.56"
   },
   "Income 5i Debtor 1": {
-   "value": "1,274.56"
+   "value": "1,254.56"
   },
   "Income 5i Debtor 2": {
    "value": "1,274.56"
@@ -1192,13 +1192,13 @@
    "value": "S181.1 q18_recipient_zip"
   },
   "ZIP Code 1b Debtor 1": {
-   "value": "S11.1 q2_debtor1_zip"
+   "value": "S11.0 q2_debtor1_zip"
   },
   "ZIP Code 1b Debtor 2": {
    "value": "S18.0 q2_debtor2_zip"
   },
   "ZIP Code 1c Debtor 1": {
-   "value": "S11.0 q2_debtor1_zip"
+   "value": "S11.1 q2_debtor1_zip"
   },
   "ZIP Code 1c Debtor 2": {
    "value": "S18.1 q2_debtor2_zip"
@@ -1918,5 +1918,5 @@
   }
  },
  "release": "form/b107@2025-04-01",
- "sha256": "b3540712884d228fccd9089c92276b7fa46c3efd7b4e87c287ab828591ff1e1b"
+ "sha256": "5e67822cafece98597d0ac5c3211c24f9115a5bf920fd2cea983924aad8d4b60"
 }

@@ -89,16 +89,16 @@
    ]
   },
   "Check Box10": {
-   "value": "/Yes",
-   "widget_states": [
-    "/Off",
-    "/Yes"
-   ]
-  },
-  "Check Box11": {
    "value": "/No",
    "widget_states": [
     "/No",
+    "/Off"
+   ]
+  },
+  "Check Box11": {
+   "value": null,
+   "widget_states": [
+    "/Off",
     "/Off"
    ]
   },
@@ -451,7 +451,7 @@
    "value": "Tampa"
   },
   "Debtor2.City_2": {
-   "value": "Tampa"
+   "value": null
   },
   "Debtor2.Contact phone": {
    "value": null
@@ -620,5 +620,5 @@
   }
  },
  "release": "form/b101@2024-06-22",
- "sha256": "c04df22f6694123b794c31e9c7dfa3b4162148e57712ef150ee01e5ab63eb28f"
+ "sha256": "72b2c2a24a7f3e9a3b7854964f45924bd6b2ec18f2a4302186b734c159339ec1"
 }
