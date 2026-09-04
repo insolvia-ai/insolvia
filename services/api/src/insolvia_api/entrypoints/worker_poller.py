@@ -31,6 +31,7 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 
+from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.config import load_config
@@ -40,6 +41,11 @@ from insolvia_api.core.packet_assembly import (
     PACKET_ASSEMBLY_KIND,
     PacketAssemblyDeps,
     packet_assembly_worker,
+)
+from insolvia_api.core.petition_review import (
+    PETITION_REVIEW_KIND,
+    PetitionReviewDeps,
+    petition_review_worker,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,17 +70,41 @@ def main() -> None:
 
     store = DynamoDbJobStore(config.case_table_name)
     # The same composition the worker Lambda does — a laptop runs the exact
-    # worker the cloud runs, against this machine's real dev resources.
+    # worker the cloud runs, against this machine's real dev resources. The
+    # AI review's model rides ANTHROPIC_API_KEY from services/api/.env
+    # (gitignored; add your own key by hand — dev-aws-setup does not write
+    # it); without one, `petition_review` jobs fail honestly with
+    # `not_configured` and everything else runs as before.
+    case_store = DynamoDbCaseStore(config.case_table_name)
+    debtor_store = DynamoDbDebtorStore(config.case_table_name)
+    entity_store = DynamoDbCaseEntityStore(config.case_table_name)
+    packet_store = DynamoDbPacketStore(config.case_table_name)
+    access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+    review_model = (
+        AnthropicReviewModel(config.anthropic_api_key)
+        if config.anthropic_api_key
+        else None
+    )
     workers = {
         **WORKERS,
         PACKET_ASSEMBLY_KIND: packet_assembly_worker(
             PacketAssemblyDeps(
-                case_store=DynamoDbCaseStore(config.case_table_name),
-                debtor_store=DynamoDbDebtorStore(config.case_table_name),
-                entity_store=DynamoDbCaseEntityStore(config.case_table_name),
-                packet_store=DynamoDbPacketStore(config.case_table_name),
+                case_store=case_store,
+                debtor_store=debtor_store,
+                entity_store=entity_store,
+                packet_store=packet_store,
                 blobs=S3DocumentBlobStore(config.case_document_bucket),
-                access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+                access_log=access_log,
+            )
+        ),
+        PETITION_REVIEW_KIND: petition_review_worker(
+            PetitionReviewDeps(
+                case_store=case_store,
+                debtor_store=debtor_store,
+                entity_store=entity_store,
+                packet_store=packet_store,
+                access_log=access_log,
+                model=review_model,
             )
         ),
     }

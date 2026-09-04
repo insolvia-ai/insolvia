@@ -16,6 +16,7 @@ from insolvia_core.cases import Case
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.packets import Packet
+from insolvia_api.core.petition_review import ReviewModelResult
 from insolvia_api.core.waitlist import WaitlistRecord
 
 
@@ -109,6 +110,26 @@ class PacketStore(Protocol):
         reversed — the SK is a random uuid, so neither implementation gets
         the ordering for free). All of them: a caller cannot page."""
         ...
+
+
+class ReviewModel(Protocol):
+    """Runs the AI petition review's model call (issue #97, ADR 0019).
+
+    The one seam between the review worker and the Anthropic API. `document`
+    is core/petition_review.review_document's output — already scrubbed,
+    already deterministic — and the answer is the raw structured output plus
+    the model that produced it; parse_findings validates it on the way back.
+    Implemented by adapters/anthropic (the real call — worker image only, per
+    ADR 0015's heavy-dependency rule) and adapters/memory (tests, and any
+    laptop without a key).
+
+    Failure contract, mirroring core/jobs.py's split: an implementation
+    raises JobError for a failure a retry cannot change (a rejected key, the
+    model declining the request) and lets anything transient (rate limits,
+    5xx, network) propagate so SQS redelivery retries the job.
+    """
+
+    def review(self, document: str) -> ReviewModelResult: ...
 
 
 class JobQueue(Protocol):

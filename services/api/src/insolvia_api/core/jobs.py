@@ -141,14 +141,15 @@ WORKERS: dict[str, Callable[[Job], dict[str, Any]]] = {
 }
 
 # What the accept endpoint admits. WORKERS above holds only the DEPENDENCY-
-# FREE workers; a worker that reads stores (packet assembly — issue #96,
-# core/packet_assembly.py) is composed by the worker entrypoints, which build
-# the full mapping around WORKERS with the adapters in hand. Its KIND still
-# lives here, because the accept endpoint must admit it without importing the
-# worker's dependencies — and `run_job`'s unknown-kind branch already covers
-# a registry that lacks a kind this tuple admits (the same deploy-window
-# shape its comment describes).
-KINDS = (*WORKERS, "packet_assembly")
+# FREE workers; workers that read stores (packet assembly — issue #96,
+# core/packet_assembly.py — and the AI petition review — issue #97,
+# core/petition_review.py) are composed by the worker entrypoints, which
+# build the full mapping around WORKERS with the adapters in hand. Their
+# KINDS still live here, because the accept endpoint must admit them without
+# importing the workers' dependencies — and `run_job`'s unknown-kind branch
+# already covers a registry that lacks a kind this tuple admits (the same
+# deploy-window shape its comment describes).
+KINDS = (*WORKERS, "packet_assembly", "petition_review")
 
 
 # ── Validation and identity ─────────────────────────────────────

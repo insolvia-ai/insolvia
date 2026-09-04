@@ -473,11 +473,19 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
 @dataclass(frozen=True)
 class AssembledPacket:
     """A clean assembly: the parts in filing order, and the facts the record
-    and the pins store. `parts` maps zip entry name -> exact bytes."""
+    and the pins store. `parts` maps zip entry name -> exact bytes.
+
+    `projections` keeps the per-form field values the fills were rendered
+    from, keyed by series id in filing order. The packet worker ignores it —
+    the PDFs are the deliverable — but the AI review worker (issue #97,
+    core/petition_review.py) reads the SAME projected content the forms
+    printed, which is what lets its findings cite the form's own line keys
+    without parsing a PDF back apart."""
 
     parts: tuple[tuple[str, bytes], ...]
     form_revisions: Mapping[str, str]
     creditor_count: int
+    projections: Mapping[str, FieldValues]
 
 
 def assemble(
@@ -560,6 +568,7 @@ def assemble(
             for series_id in PACKET_FORM_SERIES
         },
         creditor_count=matrix.creditor_count,
+        projections={series_id: projected[series_id] for series_id in series_ids},
     )
 
 

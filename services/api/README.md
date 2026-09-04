@@ -84,6 +84,7 @@ directory; ruff config is the repo-root `ruff.toml`).
 | `AUTH_ISSUER_URL` | Cognito OIDC issuer — `https://cognito-idp.<region>.amazonaws.com/<pool-id>`. Its `/.well-known/jwks.json` supplies the signing keys. Required by the Lambda entrypoint |
 | `AUTH_USER_POOL_ID` | The pool this environment **calls** (`AdminCreateUser`, when a firm admin adds a colleague) — as against `AUTH_ISSUER_URL`, which it **verifies against**. Both end in the same id and neither is derived from the other: parsing an id out of a URL would make that URL's format load-bearing in a way Cognito never promised. Required by the Lambda entrypoint |
 | `AUTH_CLIENT_ID` | The web app client id every access token must name (`client_id` claim). Required by the Lambda entrypoint |
+| `ANTHROPIC_API_KEY` | The Anthropic API key the **worker's** AI petition review calls Claude with (issue #97, [ADR 0019](../../docs/adr/0019-ai-review-calls-anthropic-from-the-worker.md)). Deployed environments read SSM SecureString `/insolvia/<env>/api/anthropic-api-key` (human-created — see the ADR's rollout note); locally, add your own key to `services/api/.env` by hand. Unset → `petition_review` jobs fail deterministically with `not_configured`; nothing else is affected |
 
 Both auth variables are published to SSM as `/insolvia/<env>/api/auth-issuer-url`
 and `.../auth-client-id` and re-derived into the Lambda's environment by the

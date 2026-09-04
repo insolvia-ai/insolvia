@@ -44,9 +44,14 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
   the API accepts a job (`api/routes/jobs.py`) and a separate worker Lambda
   runs it. A new job kind is a plain callable: dependency-free workers
   register in `core/jobs.WORKERS`; store-reading ones (packet assembly,
-  `core/packet_assembly.py`) are composed by the worker entrypoints, with
-  their kind named in `core/jobs.KINDS` so the accept endpoint admits it —
-  heavy dependencies go in the **worker** Docker stage, not the API's.
+  `core/packet_assembly.py`; AI review, `core/petition_review.py`) are
+  composed by the worker entrypoints, with their kind named in
+  `core/jobs.KINDS` so the accept endpoint admits it — heavy dependencies
+  go in the **worker** Docker stage (`requirements-worker.txt`), not the
+  API's. The AI review is the repo's Claude seam: model, retention posture
+  and where the call runs are
+  [ADR 0019](../../docs/adr/0019-ai-review-calls-anthropic-from-the-worker.md),
+  which extraction (8.7) inherits.
   `core/jobs.py` owns the queue message contract; both entrypoints
   (`worker_lambda`, the local `worker_poller`) parse with it, and
   `tests/test_jobs.py` pins the wire shape.

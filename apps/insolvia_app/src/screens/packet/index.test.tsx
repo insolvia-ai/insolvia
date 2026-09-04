@@ -23,6 +23,7 @@ jest.mock('@/config/environment', () => ({
 const CASE_ID = '00000000-0000-4000-8000-0000000000c1';
 const PACKET_ID = '00000000-0000-4000-8000-0000000000p1';
 const JOB_ID = '00000000-0000-4000-8000-0000000000j1';
+const REVIEW_JOB_ID = '00000000-0000-4000-8000-0000000000j2';
 
 /** A packet as `packet_json` renders it. `storageRef` is not among the keys. */
 function packet(overrides: Record<string, unknown> = {}) {
@@ -236,6 +237,165 @@ describe('the filing packet screen', () => {
     expect(screen.getByText(/prior cases but the form prints/)).toBeTruthy();
     // Nothing was produced, and the screen keeps saying so.
     expect(screen.getByText(/No packet has been assembled yet/)).toBeTruthy();
+  });
+
+  it('runs the AI review and lists advisory findings with their form and line', async () => {
+    const fetchMock = signedIn({
+      list: () => jsonResponse(200, { packets: [packet()] }),
+      accept: () => jsonResponse(202, job({ id: REVIEW_JOB_ID, kind: 'petition_review' })),
+      status: () =>
+        jsonResponse(
+          200,
+          job({
+            id: REVIEW_JOB_ID,
+            kind: 'petition_review',
+            status: 'succeeded',
+            attempts: 1,
+            result: {
+              outcome: 'reviewed',
+              report: {
+                packetId: PACKET_ID,
+                packetSha256: packet().sha256,
+                model: 'claude-opus-5',
+                findings: [
+                  {
+                    severity: 'high',
+                    category: 'consistency',
+                    form: 'form/b106i',
+                    line: '4_combined_monthly_income',
+                    message: 'Schedule I income disagrees with the SOFA income answers.',
+                  },
+                  {
+                    severity: 'low',
+                    category: 'transfer',
+                    form: 'form/b107',
+                    line: '',
+                    message: 'A closed account in the last year has no matching SOFA entry.',
+                  },
+                ],
+              },
+            },
+          }),
+        ),
+    });
+    await screen.findByText('chapter7-packet.zip');
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Run the AI review of the assembled packet' }),
+    );
+
+    expect(
+      await screen.findByText('Schedule I income disagrees with the SOFA income answers.'),
+    ).toBeTruthy();
+    // Severity badge, and the form + line citation the preparer navigates by.
+    expect(screen.getByText('High')).toBeTruthy();
+    expect(screen.getByText('Form B106I · 4_combined_monthly_income')).toBeTruthy();
+    // A finding without a single line cites the form alone.
+    expect(screen.getByText('Form B107')).toBeTruthy();
+    const accepts = fetchMock.mock.calls.filter(
+      ([url, init]) => init?.method === 'POST' && String(url).endsWith('/jobs'),
+    );
+    expect(accepts).toHaveLength(1);
+    expect(JSON.parse(String(accepts[0]?.[1]?.body))).toEqual({ kind: 'petition_review' });
+  });
+
+  it('says plainly when the review found nothing to flag', async () => {
+    signedIn({
+      list: () => jsonResponse(200, { packets: [packet()] }),
+      accept: () => jsonResponse(202, job({ id: REVIEW_JOB_ID, kind: 'petition_review' })),
+      status: () =>
+        jsonResponse(
+          200,
+          job({
+            id: REVIEW_JOB_ID,
+            kind: 'petition_review',
+            status: 'succeeded',
+            attempts: 1,
+            result: {
+              outcome: 'reviewed',
+              report: { packetId: PACKET_ID, model: 'claude-opus-5', findings: [] },
+            },
+          }),
+        ),
+    });
+    await screen.findByText('chapter7-packet.zip');
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Run the AI review of the assembled packet' }),
+    );
+
+    expect(await screen.findByText(/The review found nothing to flag/)).toBeTruthy();
+  });
+
+  it('says why the packet cannot be reviewed yet, in the worker’s own words', async () => {
+    signedIn({
+      accept: () => jsonResponse(202, job({ id: REVIEW_JOB_ID, kind: 'petition_review' })),
+      status: () =>
+        jsonResponse(
+          200,
+          job({
+            id: REVIEW_JOB_ID,
+            kind: 'petition_review',
+            status: 'succeeded',
+            attempts: 1,
+            result: {
+              outcome: 'blocked',
+              problems: [
+                {
+                  source: 'packets',
+                  message:
+                    'No packet has been assembled yet — assemble the filing packet, then run the review.',
+                },
+              ],
+            },
+          }),
+        ),
+    });
+    await screen.findByText(/No packet has been assembled yet. When one is/);
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Run the AI review of the assembled packet' }),
+    );
+
+    expect(await screen.findByText('The packet cannot be reviewed yet')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No packet has been assembled yet — assemble the filing packet, then run the review.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows the review job record’s own words when it fails', async () => {
+    signedIn({
+      accept: () => jsonResponse(202, job({ id: REVIEW_JOB_ID, kind: 'petition_review' })),
+      status: () =>
+        jsonResponse(
+          200,
+          job({
+            id: REVIEW_JOB_ID,
+            kind: 'petition_review',
+            status: 'failed',
+            attempts: 1,
+            failure: {
+              category: 'not_configured',
+              message: 'AI review is not configured in this environment yet.',
+            },
+          }),
+        ),
+    });
+    await screen.findByText(/No packet has been assembled yet/);
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Run the AI review of the assembled packet' }),
+    );
+
+    expect(
+      await screen.findByText('AI review is not configured in this environment yet.'),
+    ).toBeTruthy();
+    // The button re-enables for when the environment gains its key.
+    expect(
+      screen.getByRole('button', { name: 'Run the AI review of the assembled packet' }),
+    ).toBeEnabled();
   });
 
   it('shows the job record’s own words when the pipeline fails', async () => {

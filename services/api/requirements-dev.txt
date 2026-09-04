@@ -1,4 +1,6 @@
--r requirements.txt
+# The WORKER set, not the API's: tests and mypy cover the worker's adapters
+# (adapters/anthropic) too, so the dev environment needs their dependencies.
+-r requirements-worker.txt
 mypy==2.3.0
 pytest==8.4.2
 ruff==0.14.4
