@@ -17,7 +17,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Final
 
-from ..claims import ClaimBody
+from insolvia_core.claims import ClaimBody
+
 from ..form_fill import Check, Option, Text
 from ..form_templates import FormRelease
 from .shared import (

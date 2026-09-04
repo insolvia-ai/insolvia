@@ -122,6 +122,7 @@ jobs:
       app: ${{ steps.f.outputs.app }}
       mailer: ${{ steps.f.outputs.mailer }}
       marketing: ${{ steps.f.outputs.marketing }}
+      mcp: ${{ steps.f.outputs.mcp }}
       shared: ${{ steps.f.outputs.shared }}
     steps:
       - uses: actions/checkout@v5
@@ -144,14 +145,14 @@ jobs:
           # property staging exists to have.
           if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             echo "No usable diff base — deploying every service."
-            for s in api app mailer marketing shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
             exit 0
           fi
 
           files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
           if [ -z "$files" ]; then
             echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
-            for s in api app mailer marketing shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
             exit 0
           fi
           printf '%s\n' "$files" | sed 's/^/  /'
@@ -176,6 +177,9 @@ jobs:
           emit admin     '^(apps/insolvia_admin/|services/admin/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/(admin-staging|release)\.yml)'
           emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
+          # packages/insolvia_core is baked into the mcp image too (ADR 0016's
+          # "a core change redeploys three services" consequence).
+          emit mcp       '^(services/mcp/|packages/insolvia_core/|infra/envs/staging/|infra/modules/mcp_service/|\.github/workflows/(mcp-staging|release)\.yml)'
           # apps/ and packages/ are named app-by-app rather than as whole
           # directories: marketing has its own line above, and the Python
           # packages/insolvia_core belongs to the api leg — a broad ^apps/ or
@@ -234,6 +238,15 @@ jobs:
     uses: ./.github/workflows/admin-staging.yml
     secrets: inherit
 
+  # After the API for ordering only (shared tables mean a core change lands on
+  # both, and the API is the primary surface) — nothing at runtime couples the
+  # two deploys.
+  mcp:
+    needs: [changes, infra, api]
+    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mcp == 'true' }}
+    uses: ./.github/workflows/mcp-staging.yml
+    secrets: inherit
+
   marketing:
     needs: [changes, infra, api]
     if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
@@ -273,7 +286,7 @@ jobs:
   # that deploys staging, so no deploy can move a `staging` marker tag between
   # the read and the copy.
   record:
-    needs: [changes, infra, mailer, api, admin, marketing, app]
+    needs: [changes, infra, mailer, api, admin, mcp, marketing, app]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     concurrency:
@@ -314,6 +327,7 @@ jobs:
             echo "jobs=$(basename "$(tf jobs_ecr_repository_url)")"
             echo "mailer=$(basename "$(tf mailer_ecr_repository_url)")"
             echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
+            echo "mcp=$(basename "$(tf mcp_ecr_repository_url)")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Ensure every service has a sha-tagged image for this commit
@@ -325,6 +339,7 @@ jobs:
             ${{ steps.tf.outputs.jobs }}
             ${{ steps.tf.outputs.mailer }}
             ${{ steps.tf.outputs.marketing }}
+            ${{ steps.tf.outputs.mcp }}
         run: |
           set -euo pipefail
           for repo in $REPOS; do
@@ -483,6 +498,15 @@ jobs:
     needs: [prod-infra, prod-api]
     if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
     uses: ./.github/workflows/admin-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  prod-mcp:
+    needs: [prod-infra, prod-api]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
+    uses: ./.github/workflows/mcp-prod.yml
     with:
       sha: ${{ github.sha }}
       gated: true

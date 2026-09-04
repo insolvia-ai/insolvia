@@ -16,24 +16,9 @@ from dataclasses import replace
 from datetime import date
 
 import pytest
-from insolvia_api.adapters.memory.access_log import MemoryAccessLog
-from insolvia_api.adapters.memory.case_entity_store import MemoryCaseEntityStore
-from insolvia_api.adapters.memory.case_store import MemoryCaseStore
-from insolvia_api.adapters.memory.debtor_store import MemoryDebtorStore
-from insolvia_api.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
-from insolvia_api.core.assets import ASSET
-from insolvia_api.core.case_entities import CaseEntity
-from insolvia_api.core.cases import assign_case
-from insolvia_api.core.claims import CLAIM, ClaimBody
-from insolvia_api.core.codebtors import CODEBTOR, COMMUNITY_HOUSEHOLD_MEMBER
-from insolvia_api.core.contract_leases import CONTRACT_LEASE
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
-from insolvia_api.core.creditors import CREDITOR
-from insolvia_api.core.exemption_claims import EXEMPTION, ExemptionBody
-from insolvia_api.core.expenses import DEPENDENT, EXPENSE, HOUSEHOLD, HouseholdBody
 from insolvia_api.core.form_templates import form_revisions_as_of
-from insolvia_api.core.income import EMPLOYMENT, INCOME_SUMMARY, IncomeSummaryBody
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
     PACKET_ASSEMBLY_KIND,
@@ -48,14 +33,29 @@ from insolvia_api.core.packet_assembly import (
     problem_json,
     run_packet_assembly,
 )
-from insolvia_api.core.petitions import (
+from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
+from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
+from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_core.assets import ASSET
+from insolvia_core.case_entities import CaseEntity
+from insolvia_core.cases import assign_case
+from insolvia_core.claims import CLAIM, ClaimBody
+from insolvia_core.codebtors import CODEBTOR, COMMUNITY_HOUSEHOLD_MEMBER
+from insolvia_core.contract_leases import CONTRACT_LEASE
+from insolvia_core.creditors import CREDITOR
+from insolvia_core.exemption_claims import EXEMPTION, ExemptionBody
+from insolvia_core.expenses import DEPENDENT, EXPENSE, HOUSEHOLD, HouseholdBody
+from insolvia_core.income import EMPLOYMENT, INCOME_SUMMARY, IncomeSummaryBody
+from insolvia_core.petitions import (
     FILING_PROFESSIONAL,
     PETITION,
     PRIOR_CASE,
     RELATED_CASE,
     SOLE_PROPRIETORSHIP,
 )
-from insolvia_api.core.sofa import SOFA_ENTRY
+from insolvia_core.sofa import SOFA_ENTRY
 
 from tests.test_form_projections import REFERENCE_CASE, reference_case_file
 

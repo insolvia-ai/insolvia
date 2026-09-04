@@ -329,8 +329,11 @@ per request, metadata only, never payloads.
   entity-sized payloads).
 - 1–25 proposals per `propose_case_records` call.
 - `limit` ≤ 100 on every listing.
-- Rate limiting is a spec MUST for tool invocations; the mechanism (API
-  Gateway throttling vs in-service) belongs to 12.3.
+- Rate limiting is a spec MUST for tool invocations; the mechanism belonged
+  to 12.3, which chose API Gateway stage throttling (10 req/s sustained,
+  bursts to 20 — half the API's numbers, ahead of the Lambda so a
+  retry-happy harness gets 429s before consuming concurrency;
+  `infra/modules/mcp_service`).
 
 ## Constraints from harnesses
 

@@ -17,11 +17,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_api.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
-from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
+from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
+from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.config import load_config

@@ -25,15 +25,15 @@ import logging
 
 from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
+from insolvia_core.access_log import record_access
+from insolvia_core.creditors import CREDITOR
 from insolvia_core.errors import NotFoundError
 from insolvia_core.firms import INTAKE, VIEW_ONLY
+from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access_log import record_access
 from insolvia_api.core.creditor_matrix import generate_creditor_matrix, matrix_json
-from insolvia_api.core.creditors import CREDITOR
-from insolvia_api.core.ports import AccessLog, CaseEntityStore, CaseStore
 
 logger = logging.getLogger(__name__)
 

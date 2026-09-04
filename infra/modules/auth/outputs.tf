@@ -45,3 +45,18 @@ output "issuer_url" {
   description = "OIDC issuer URL the API will validate access/ID tokens against."
   value       = "https://cognito-idp.${data.aws_region.current.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
 }
+
+# The MCP service's client-id allowlist (#261), derived from the registered
+# harness clients so registering a harness IS adding it to the allowlist —
+# the env publishes this as /insolvia/<env>/mcp/auth-client-ids and the
+# deploy workflow derives AUTH_CLIENT_IDS from it. A map too, for anything
+# that needs to name one harness's client (the E2E, a directory listing).
+output "mcp_client_ids" {
+  description = "Comma-joinable list of MCP harness app client IDs — the MCP service's token allowlist."
+  value       = [for client in aws_cognito_user_pool_client.mcp : client.id]
+}
+
+output "mcp_client_ids_by_harness" {
+  description = "MCP harness app client IDs, keyed by harness (claude, inspector...)."
+  value       = { for harness, client in aws_cognito_user_pool_client.mcp : harness => client.id }
+}

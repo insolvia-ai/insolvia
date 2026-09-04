@@ -366,18 +366,35 @@ output therefore lives outside the case entirely:
 
 ```
 extraction_candidate {
-  id, case_id, document_id, kind, payload,     // payload mirrors its target entity
+  id, case_id, kind, payload,                  // payload mirrors its target entity
+  document_id,                                 // optional — an MCP proposal has no source document
+  origin: { channel: mcp | extraction,         // which surface wrote this row, and as whom —
+            client_id, subject },              // from the verified token, never an argument
   confidence, locator,
-  status: pending | accepted | corrected | rejected,
+  status: pending | accepted | corrected | rejected | withdrawn,
   confirmed_by, confirmed_at,                  // the same act as the provenance fields
   corrected_payload,                           // what the human changed it to
   resulting_record_id
 }
 ```
 
-Corrections and rejections are retained after review. They are the only
-measurement of extraction quality we will ever get, and deleting them on accept
-throws that away.
+The MCP surface generalised this shape when it became the second writer
+([mcp-surface.md](mcp-surface.md), issue
+[#262](https://github.com/insolvia-ai/insolvia/issues/262)): `document_id`
+became optional (an agent proposal has no source document), `origin` records
+which OAuth client and which subject proposed the row — attribution the way
+`uploaded_by` attributes a document — and `withdrawn` joined the status
+vocabulary as a second terminal state: the proposer's own retraction of a
+still-`pending` row, so a wrong batch does not sit in a paralegal's review
+queue. One review queue, one status vocabulary, one confirmation act; the
+review UI (8.9) reads both streams without knowing which is which beyond the
+origin it displays. The store implementation currently lives in
+`services/mcp` (`core/candidates.py` owns the item shape) and graduates to
+`insolvia_core` when the review flow becomes its second importer.
+
+Corrections and rejections are retained after review — and so are
+withdrawals. They are the only measurement of extraction (and agent) quality
+we will ever get, and deleting them on accept throws that away.
 
 ## Documents and locators
 

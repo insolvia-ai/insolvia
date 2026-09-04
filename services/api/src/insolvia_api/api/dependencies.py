@@ -4,16 +4,20 @@ from dataclasses import dataclass
 from typing import cast
 
 from flask import current_app
-from insolvia_core.ports import FirmStore, JwksProvider, UserDirectory
-
-from insolvia_api.core.config import AppConfig
-from insolvia_api.core.ports import (
+from insolvia_core.ports import (
     AccessLog,
     CaseEntityStore,
     CaseStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
+    FirmStore,
+    JwksProvider,
+    UserDirectory,
+)
+
+from insolvia_api.core.config import AppConfig
+from insolvia_api.core.ports import (
     JobQueue,
     JobStore,
     Mailer,

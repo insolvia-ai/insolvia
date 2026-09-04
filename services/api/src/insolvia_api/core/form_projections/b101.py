@@ -12,14 +12,15 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from ..form_fill import Option, Text
-from ..form_templates import FormRelease
-from ..petitions import (
+from insolvia_core.petitions import (
     BUSINESS_TYPES,
     ESTIMATED_CREDITORS_BANDS,
     ESTIMATED_DOLLAR_BANDS,
     SMALL_BUSINESS_STATUSES,
 )
+
+from ..form_fill import Option, Text
+from ..form_templates import FormRelease
 from .shared import (
     CaseFile,
     FieldValues,

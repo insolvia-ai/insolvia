@@ -61,8 +61,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from .case_entities import CaseEntity
-from .creditors import CreditorBody
+from insolvia_core.case_entities import CaseEntity
+from insolvia_core.creditors import CreditorBody
 
 # The upload name CM/ECF's "Upload List of Creditors" step expects a .txt for.
 # (S.D. Fla. CI-3 walks filers through saving "creditor.txt"; the name itself

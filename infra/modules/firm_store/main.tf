@@ -174,6 +174,60 @@ resource "aws_iam_role_policy" "api_firm_access" {
   })
 }
 
+# ── The third application principal: the MCP service (ADR 0016) ─
+# READ-ONLY, and the omissions are the point: every MCP tool call resolves
+# the caller's firm user and firm (never cached — mcp-surface.md's staleness
+# rule), so this role needs exactly the two keyed reads plus the by-subject
+# index. No PutItem/UpdateItem/DeleteItem — an agent surface administers
+# nobody — and no Scan, which stays the admin service's alone. The
+# "reads are table-wide" argument on the API's grant applies unchanged:
+# resolving which firm a subject belongs to IS the read, so there is nothing
+# to scope by until it has happened.
+resource "aws_iam_role_policy" "mcp_firm_access" {
+  count = var.mcp_role_name == null ? 0 : 1
+
+  name = "${local.name}-mcp-access"
+  role = var.mcp_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "FirmResolution"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:BatchGetItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.firms.arn,
+          "${aws_dynamodb_table.firms.arn}/index/*",
+        ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # Same DynamoDB-only fence as the other two principals' key statements.
+        Sid    = "FirmKeyUse"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+        ]
+        Resource = var.kms_key_arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "dynamodb.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}
+
 # ── The second application principal (#213, ADR 0011) ───────────
 # The admin service — the exception to "one application principal" that
 # ADR 0011 records. Same shape as the API's grant above with ONE deliberate

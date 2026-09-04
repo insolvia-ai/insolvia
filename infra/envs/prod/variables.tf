@@ -28,6 +28,15 @@ variable "mailer_subdomain" {
   default     = "mailer-api.insolvia.ai"
 }
 
+# The MCP server's host (ADR 0016 gives it a hostname of its own: this string
+# is the canonical resource URI's authority). Must agree with services/mcp's
+# core/config.py _RESOURCE_URLS.
+variable "mcp_subdomain" {
+  description = "Hostname the MCP server serves in this environment."
+  type        = string
+  default     = "mcp.insolvia.ai"
+}
+
 variable "marketing_image_tag" {
   description = "ECR image tag the marketing SSR Lambda is seeded from (creation-time only; CI owns the running image afterwards). Defaults to this environment's moving marker tag — NOT `latest`, which under the shared insolvia-marketing repository would mean whatever any environment pushed last."
   type        = string

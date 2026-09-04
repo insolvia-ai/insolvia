@@ -5,8 +5,9 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
 
 - **Layered `core / api / adapters / entrypoints`** with the dependency
   direction enforced by `tests/test_architecture.py`: `core` depends on nothing
-  else; `api` depends only on `core`. The firm domain, token verification, and
-  their adapters live in the shared
+  else; `api` depends only on `core`. The firm domain, token verification, the
+  case domain (cases, debtors, documents, case collections, provenance —
+  ADR 0016), and their adapters live in the shared
   [`packages/insolvia_core`](../../packages/insolvia_core/CLAUDE.md)
   ([ADR 0012](../../docs/adr/0012-shared-python-domain-package.md)) — its
   domain modules count as core-direction imports, its `adapters` as adapters.
@@ -24,11 +25,12 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
   `POST /v1/unsubscribe` are deliberately public.
 - **There is a third state: authenticated *and permitted*.** A case belongs to
   a **firm**, not to whoever opened it. `current_accessor()` resolves the
-  caller's firm user (`core/firms.py`) and answers **403** when there is none —
-  a different failure from 401, and not hidden behind a 404 because it is a
-  fact about the caller's own account. `@requires(FEATURE, LEVEL)` goes below
-  `@require_auth`, same "or it never runs" rule. Everything about who may see
-  which case is `core/access.may_see_case`, in one place on purpose.
+  caller's firm user (`insolvia_core.firms`) and answers **403** when there is
+  none — a different failure from 401, and not hidden behind a 404 because it
+  is a fact about the caller's own account. `@requires(FEATURE, LEVEL)` goes
+  below `@require_auth`, same "or it never runs" rule. Everything about who may
+  see which case is `insolvia_core.access.may_see_case`, in one place on
+  purpose.
   `/v1/me` is the ONE route that resolves without requiring — it reports the
   firm, or reports its absence, so a new user has something to render.
 - **Logs are one JSON line per request, metadata only** — never bodies or PII

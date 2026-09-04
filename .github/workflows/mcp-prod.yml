@@ -1,0 +1,258 @@
+name: MCP · Deploy · Production
+
+# PROMOTES the image staging validated — it does not build one. Same
+# promotion contract as api-prod.yml: resolve the `sha-<commit>` tag to an
+# immutable digest, point the prod Lambda at it, publish a candidate version,
+# smoke-test THAT version while nothing routes to it, and only then shift the
+# `live` alias. The normal way in is release.yml (`gated: true`); a direct
+# dispatch brings its own verified-commit check and insolvia-production
+# approval.
+#
+# This workflow applies no Terraform — prod infra applies as the first leg of
+# an approved release (release.yml → infra-prod.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  # Reading the insolvia/staging-release commit status.
+  statuses: read
+
+jobs:
+  # Resolve + verify once, with no credentials and no environment — a commit
+  # that never passed staging is rejected BEFORE anyone is asked to approve.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
+  # The human gate, and ONLY for a direct dispatch — api-prod.yml's comment
+  # owns the null-comparison subtlety.
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  # `!cancelled() && !failure()` rather than `success()`: when the release
+  # pipeline calls this, `approve` is SKIPPED, and the default would silently
+  # skip the deploy behind it.
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Read prod infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "repo=$(tf mcp_ecr_repository_url)"
+            echo "function=$(tf mcp_lambda_function_name)"
+            echo "domain=$(tf mcp_domain)"
+            echo "alias=$(tf mcp_lambda_alias_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
+        run: |
+          # No --publish: the next step rewrites the environment from SSM.
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive Lambda environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          # /insolvia/prod/mcp/<kebab-key> — the same derivation
+          # mcp-staging.yml documents, against prod's namespace.
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/prod/mcp \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          echo "$environment" | jq -e '.Variables.AUTH_CLIENT_IDS | length > 0' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # Publishing does NOT move traffic: the alias still points at the
+      # previous version until the smoke test below passes.
+      - name: Publish candidate version
+        id: candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          version="$(aws lambda publish-version \
+            --function-name "$FUNCTION" \
+            --query Version --output text)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo ":hourglass: Published version \`$version\` — not yet serving." >> "$GITHUB_STEP_SUMMARY"
+
+      # Invoke the candidate DIRECTLY by version qualifier, against the one
+      # unauthenticated route the spec makes this server publish — the
+      # protected-resource metadata. Production traffic is still on the old
+      # version throughout.
+      - name: Smoke test the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          # Payload format 2.0 — the shape API Gateway sends and Mangum
+          # parses. The Host header matters doubly here: the service's
+          # transport security validates it against the canonical hostname.
+          cat > event.json <<EOF
+          {
+            "version": "2.0",
+            "routeKey": "\$default",
+            "rawPath": "/.well-known/oauth-protected-resource/mcp",
+            "rawQueryString": "",
+            "headers": { "host": "$DOMAIN", "accept": "application/json" },
+            "requestContext": {
+              "http": {
+                "method": "GET", "path": "/.well-known/oauth-protected-resource/mcp",
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1", "userAgent": "insolvia-deploy-smoke"
+              }
+            },
+            "isBase64Encoded": false
+          }
+          EOF
+
+          aws lambda invoke \
+            --function-name "$FUNCTION:$VERSION" \
+            --payload fileb://event.json \
+            --cli-read-timeout 60 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json
+
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::Candidate version $VERSION raised: $(jq -r '.FunctionError' invoke-meta.json)"
+            cat response.json
+            exit 1
+          fi
+
+          jq -e '.statusCode == 200' response.json > /dev/null
+          jq -r '.body' response.json | jq -e --arg url "https://$DOMAIN/mcp" '.resource == $url' > /dev/null
+
+      - name: Shift live traffic to the candidate
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          previous="$(aws lambda get-alias \
+            --function-name "$FUNCTION" --name "$ALIAS" \
+            --query FunctionVersion --output text)"
+
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$VERSION"
+
+          # Move the `prod` marker tag onto the promoted digest — the
+          # from-scratch-apply seed, api-prod.yml's comment owns it.
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."
+
+          {
+            echo ":rocket: **Live.** Alias \`$ALIAS\` moved \`$previous\` → \`$VERSION\`."
+            echo
+            echo "Roll back without a rebuild:"
+            echo '```bash'
+            echo "aws lambda update-alias --function-name $FUNCTION --name $ALIAS --function-version $previous"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Belt-and-braces: the alias shift and the API Gateway integration
+      # actually took effect, through the public hostname.
+      - name: Verify through the public endpoint
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          curl -sSf --retry 5 --retry-delay 3 --retry-all-errors \
+            "https://$DOMAIN/.well-known/oauth-protected-resource/mcp" | tee metadata.json
+          jq -e --arg url "https://$DOMAIN/mcp" '.resource == $url' metadata.json > /dev/null

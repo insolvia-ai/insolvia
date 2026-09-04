@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from asgiref.wsgi import WsgiToAsgi
+from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
+from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
+from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from mangum import Mangum
 
-from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
-from insolvia_api.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
-from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
-from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
-from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
-from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
