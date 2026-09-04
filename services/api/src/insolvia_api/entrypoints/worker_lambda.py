@@ -23,6 +23,7 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 
+from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.config import load_config
@@ -32,6 +33,11 @@ from insolvia_api.core.packet_assembly import (
     PACKET_ASSEMBLY_KIND,
     PacketAssemblyDeps,
     packet_assembly_worker,
+)
+from insolvia_api.core.petition_review import (
+    PETITION_REVIEW_KIND,
+    PetitionReviewDeps,
+    petition_review_worker,
 )
 
 configure_logging()
@@ -60,16 +66,38 @@ _store = DynamoDbJobStore(config.case_table_name)
 # core/jobs.KINDS is what keeps the accept endpoint and this mapping naming
 # the same kinds (tests/test_jobs.py pins that).
 _case_store = DynamoDbCaseStore(config.case_table_name)
+_debtor_store = DynamoDbDebtorStore(config.case_table_name)
+_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
+_packet_store = DynamoDbPacketStore(config.case_table_name)
+_access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+# The AI review's model seam (issue #97, ADR 0019). Deliberately NOT
+# hard-required like the stores above: an environment without the key still
+# runs every other job kind, and a `petition_review` job fails
+# deterministically with `not_configured` — an honest status, not a boot
+# refusal that would take packet assembly down with it.
+_review_model = (
+    AnthropicReviewModel(config.anthropic_api_key) if config.anthropic_api_key else None
+)
 _workers = {
     **WORKERS,
     PACKET_ASSEMBLY_KIND: packet_assembly_worker(
         PacketAssemblyDeps(
             case_store=_case_store,
-            debtor_store=DynamoDbDebtorStore(config.case_table_name),
-            entity_store=DynamoDbCaseEntityStore(config.case_table_name),
-            packet_store=DynamoDbPacketStore(config.case_table_name),
+            debtor_store=_debtor_store,
+            entity_store=_entity_store,
+            packet_store=_packet_store,
             blobs=S3DocumentBlobStore(config.case_document_bucket),
-            access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+            access_log=_access_log,
+        )
+    ),
+    PETITION_REVIEW_KIND: petition_review_worker(
+        PetitionReviewDeps(
+            case_store=_case_store,
+            debtor_store=_debtor_store,
+            entity_store=_entity_store,
+            packet_store=_packet_store,
+            access_log=_access_log,
+            model=_review_model,
         )
     ),
 }

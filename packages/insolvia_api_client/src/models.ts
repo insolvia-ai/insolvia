@@ -627,10 +627,11 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
 
 /**
  * The job kinds the API accepts today. The exact `KINDS` tuple from
- * `core/jobs.py`: `echo` (the walking skeleton) and `packet_assembly` (the
- * Chapter 7 packet, issue #96). 9.7 adds the AI review.
+ * `core/jobs.py`: `echo` (the walking skeleton), `packet_assembly` (the
+ * Chapter 7 packet, issue #96) and `petition_review` (the AI review's
+ * advisory findings, issue #97).
  */
-export type JobKind = 'echo' | 'packet_assembly';
+export type JobKind = 'echo' | 'packet_assembly' | 'petition_review';
 
 /**
  * Where a job sits. `queued` and `running` mean poll again; `succeeded` and

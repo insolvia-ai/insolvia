@@ -1,5 +1,6 @@
 import type { Job, Packet } from '@insolvia-ai/api-client';
-import { Button } from '@insolvia-ai/design-system';
+import { Badge, Button } from '@insolvia-ai/design-system';
+import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -44,6 +45,112 @@ type ListState =
   | { readonly kind: 'error'; readonly message: string };
 
 /**
+ * One advisory finding, as the review worker's `reviewed` report lists them —
+ * `finding_json` in services/api core/petition_review.py: every key always
+ * present.
+ */
+interface ReviewFinding {
+  readonly severity: 'high' | 'medium' | 'low';
+  readonly form: string;
+  readonly line: string;
+  readonly message: string;
+}
+
+interface ReviewReport {
+  readonly findings: readonly ReviewFinding[];
+}
+
+/**
+ * Where the AI review stands. Mirrors {@link Assembly}: `blocked` and
+ * `reviewed` are both SETTLED, successful outcomes — a review that answers
+ * "assemble first" did its job, and so did one that answers with an empty
+ * findings list.
+ */
+type Review =
+  | { readonly phase: 'idle' }
+  | { readonly phase: 'running'; readonly jobId: string }
+  | { readonly phase: 'blocked'; readonly problems: readonly PacketProblem[] }
+  | { readonly phase: 'reviewed'; readonly report: ReviewReport }
+  | { readonly phase: 'failed'; readonly message: string };
+
+const SEVERITY_INTENT: Record<ReviewFinding['severity'], BadgeIntent> = {
+  high: 'danger',
+  medium: 'warning',
+  low: 'neutral',
+};
+
+const SEVERITY_LABEL: Record<ReviewFinding['severity'], string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+
+/** The shared problems decoding, reused by {@link decodeReviewOutcome}. */
+function decodeProblems(raw: unknown): readonly PacketProblem[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const problems: PacketProblem[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) {
+      continue;
+    }
+    const problem = entry as Record<string, unknown>;
+    if (typeof problem.source === 'string' && typeof problem.message === 'string') {
+      problems.push({
+        source: problem.source,
+        message: problem.message,
+        ...(typeof problem.itemId === 'string' ? { itemId: problem.itemId } : {}),
+        ...(typeof problem.field === 'string' ? { field: problem.field } : {}),
+      });
+    }
+  }
+  return problems;
+}
+
+/**
+ * The review worker's result, narrowed field by field for the same reason
+ * {@link decodeOutcome} is: `Job.result` is per-kind, and a malformed report
+ * should degrade to an empty findings list, never to a crash.
+ */
+function decodeReviewOutcome(
+  result: Readonly<Record<string, unknown>> | undefined,
+):
+  | { readonly outcome: 'blocked'; readonly problems: readonly PacketProblem[] }
+  | { readonly outcome: 'reviewed'; readonly report: ReviewReport } {
+  if (result !== undefined && result.outcome === 'blocked') {
+    return { outcome: 'blocked', problems: decodeProblems(result.problems) };
+  }
+  const report =
+    result !== undefined && typeof result.report === 'object' && result.report !== null
+      ? (result.report as Record<string, unknown>)
+      : {};
+  const findings: ReviewFinding[] = [];
+  if (Array.isArray(report.findings)) {
+    for (const raw of report.findings) {
+      if (typeof raw !== 'object' || raw === null) {
+        continue;
+      }
+      const entry = raw as Record<string, unknown>;
+      if (
+        (entry.severity === 'high' || entry.severity === 'medium' || entry.severity === 'low') &&
+        typeof entry.form === 'string' &&
+        typeof entry.line === 'string' &&
+        typeof entry.message === 'string'
+      ) {
+        findings.push({
+          severity: entry.severity,
+          form: entry.form,
+          line: entry.line,
+          message: entry.message,
+        });
+      }
+    }
+  }
+  return { outcome: 'reviewed', report: { findings } };
+}
+
+/**
  * The worker's result, narrowed field by field rather than cast: `Job.result`
  * is `Record<string, unknown>` on purpose (its shape is per-kind), and a
  * malformed one should degrade to "assembled, reload the list" — the list is
@@ -54,23 +161,8 @@ function decodeOutcome(
 ):
   | { readonly outcome: 'assembled' }
   | { readonly outcome: 'blocked'; readonly problems: readonly PacketProblem[] } {
-  if (result !== undefined && result.outcome === 'blocked' && Array.isArray(result.problems)) {
-    const problems: PacketProblem[] = [];
-    for (const raw of result.problems) {
-      if (typeof raw !== 'object' || raw === null) {
-        continue;
-      }
-      const entry = raw as Record<string, unknown>;
-      if (typeof entry.source === 'string' && typeof entry.message === 'string') {
-        problems.push({
-          source: entry.source,
-          message: entry.message,
-          ...(typeof entry.itemId === 'string' ? { itemId: entry.itemId } : {}),
-          ...(typeof entry.field === 'string' ? { field: entry.field } : {}),
-        });
-      }
-    }
-    return { outcome: 'blocked', problems };
+  if (result !== undefined && result.outcome === 'blocked') {
+    return { outcome: 'blocked', problems: decodeProblems(result.problems) };
   }
   return { outcome: 'assembled' };
 }
@@ -87,7 +179,10 @@ function describeSource(source: string): string {
   const labels: Record<string, string> = {
     case: 'Case',
     debtors: 'Debtors',
+    packet: 'Packet',
+    packets: 'Packet',
     petitions: 'Petition',
+    sofa_entries: 'Financial affairs',
     creditors: 'Creditors',
     claims: 'Claims',
     exemptions: 'Exemptions',
@@ -128,6 +223,13 @@ function formatSize(bytes: number): string {
  *
  * Old packets stay listed after re-assembly — the server keeps every one, so
  * the packet an attorney reviewed last week is still openable.
+ *
+ * The AI review (issue #97) rides the same pipeline as its own
+ * `petition_review` job: "Run AI review" accepts, the same-shaped poll loop
+ * watches, and a settled job renders advisory findings (severity, form,
+ * line, message) or the blocked list saying why nothing was reviewable.
+ * Findings never change anything — the copy says so, because "advisory
+ * only" is the feature's defining rule.
  */
 export function FilingPacket({ caseId }: { readonly caseId: string }) {
   const theme = useTheme();
@@ -135,6 +237,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
   const [assembly, setAssembly] = useState<Assembly>({ phase: 'idle' });
+  const [review, setReview] = useState<Review>({ phase: 'idle' });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [activity, setActivity] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -234,6 +337,70 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     }
   };
 
+  /**
+   * The review's poll loop — the assembly loop's shape, for the assembly
+   * loop's reasons, settling into {@link Review}'s own states. Kept separate
+   * rather than generalised: the two jobs can run at once, and each effect's
+   * lifetime is exactly its own phase.
+   */
+  useEffect(() => {
+    if (review.phase !== 'running') {
+      return;
+    }
+    const jobId = review.jobId;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const result = await call((client) => client.getCaseJob(caseId, jobId));
+        if (cancelled || !result.ok) {
+          return;
+        }
+        const job = result.value;
+        if (job.status === 'succeeded') {
+          const outcome = decodeReviewOutcome(job.result);
+          setReview(
+            outcome.outcome === 'blocked'
+              ? { phase: 'blocked', problems: outcome.problems }
+              : { phase: 'reviewed', report: outcome.report },
+          );
+        } else if (job.status === 'failed') {
+          setReview({
+            phase: 'failed',
+            message: job.failure?.message ?? 'The review did not finish. Try again in a moment.',
+          });
+        }
+      } catch {
+        // A dropped poll is not a failed job; the next tick asks again.
+      }
+    };
+    void check();
+    const timer = setInterval(() => {
+      void check();
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [review, call, caseId]);
+
+  const runReview = async () => {
+    if (review.phase === 'running') {
+      return;
+    }
+    setActionError(null);
+    try {
+      const result = await call((client) => client.acceptCaseJob(caseId, 'petition_review'));
+      if (result.ok) {
+        // Same 202-either-way idempotency as assembly: one active review per
+        // case, and re-pressing the button re-attaches to it.
+        setReview({ phase: 'running', jobId: result.value.id });
+      }
+    } catch {
+      setActionError('Could not start the review. Please try again.');
+      setReview({ phase: 'idle' });
+    }
+  };
+
   const download = async (entry: Packet) => {
     setActionError(null);
     setBusyId(entry.id);
@@ -263,10 +430,17 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     activity !== '' ? activity : list.kind === 'loading' ? 'Loading this case’s packets…' : '';
 
   // One assertive region, whatever went wrong most recently wins: an action
-  // error, a failed job's own words, or the list failing to load.
+  // error, a failed job's own words (either job's), or the list failing to
+  // load.
   const assertiveText =
     actionError ??
-    (assembly.phase === 'failed' ? assembly.message : list.kind === 'error' ? list.message : '');
+    (assembly.phase === 'failed'
+      ? assembly.message
+      : review.phase === 'failed'
+        ? review.message
+        : list.kind === 'error'
+          ? list.message
+          : '');
 
   return (
     <AppShell>
@@ -353,6 +527,74 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           {list.kind === 'loading' ? 'Loading…' : `${list.message} Reload the page to try again.`}
         </Text>
       )}
+
+      <Heading level={2}>AI review</Heading>
+      <Text style={[styles.body, muted]}>
+        A second set of eyes on the assembled packet: Claude reads the filled forms and flags
+        inconsistencies, missing-looking answers and arithmetic that does not hold. Findings are
+        advisory — nothing is changed and nothing is blocked; you dispose of each one.
+      </Text>
+      <View style={styles.actions}>
+        <Button
+          size="lg"
+          intent="secondary"
+          onPress={() => {
+            void runReview();
+          }}
+          disabled={review.phase === 'running'}
+          aria-label="Run the AI review of the assembled packet"
+        >
+          {review.phase === 'running' ? 'Reviewing…' : 'Run AI review'}
+        </Button>
+      </View>
+      {/* The polite region the poll narrates into, always present. */}
+      <Text aria-live="polite" style={[styles.status, muted]}>
+        {review.phase === 'running' ? 'Reviewing the packet — this can take a minute or two.' : ''}
+      </Text>
+
+      {review.phase === 'blocked' ? (
+        <View>
+          <Heading level={3}>The packet cannot be reviewed yet</Heading>
+          <View role="list" style={styles.list}>
+            {review.problems.map((problem, index) => (
+              <View role="listitem" key={`${problem.source}-${index}`} style={styles.problem}>
+                <Text style={[styles.problemSource, ink]}>{describeSource(problem.source)}</Text>
+                <Text style={[styles.body, muted]}>{problem.message}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {review.phase === 'reviewed' ? (
+        review.report.findings.length === 0 ? (
+          <Text style={[styles.body, muted]}>
+            The review found nothing to flag. A clean result is the expected outcome for a
+            consistent case — it is not a guarantee.
+          </Text>
+        ) : (
+          <View role="list" style={styles.list}>
+            {review.report.findings.map((finding, index) => (
+              <View
+                role="listitem"
+                key={`${finding.form}-${finding.line}-${index}`}
+                style={styles.problem}
+              >
+                <View style={styles.findingHeader}>
+                  <Badge intent={SEVERITY_INTENT[finding.severity]} size="sm">
+                    {SEVERITY_LABEL[finding.severity]}
+                  </Badge>
+                  <Text style={[styles.problemSource, ink]}>
+                    {describeSource(finding.form)}
+                    {finding.line !== '' ? ` · ${finding.line}` : ''}
+                  </Text>
+                </View>
+                <Text style={[styles.body, muted]}>{finding.message}</Text>
+              </View>
+            ))}
+          </View>
+        )
+      ) : null}
     </AppShell>
   );
 }
@@ -365,6 +607,11 @@ const styles = StyleSheet.create({
   body: {
     fontSize: fontSizes.body,
     lineHeight: fontSizes.body * 1.5,
+  },
+  findingHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
   list: {
     gap: spacing.md,
