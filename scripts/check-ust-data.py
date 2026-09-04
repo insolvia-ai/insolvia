@@ -51,6 +51,7 @@ PERIOD_FILES = {
     "national_oop_healthcare": "ust/irs-national-standards",
     "housing_util_standards_FIPS": "ust/irs-local-standards",
     "transportation_standards": "ust/irs-local-standards",
+    "ch13_exp_mult": "ust/ch13-admin-multipliers",
 }
 
 # How far ahead of a recorded § 104 next_adjustment the alarm trips. Two

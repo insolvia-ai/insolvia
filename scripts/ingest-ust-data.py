@@ -54,6 +54,7 @@ import sys
 import urllib.request
 import zipfile
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -592,6 +593,76 @@ def ingest_local(args: argparse.Namespace) -> None:
     )
 
 
+def ingest_ch13_multipliers(args: argparse.Namespace) -> None:
+    url = BASE.format(period=args.period, name="ch13_exp_mult")
+    data, sha = fetch(url)
+    rows = read_sheet_rows(data)
+
+    multipliers: dict[str, str] = {}
+    source_note = ""
+    for row in rows:
+        cells = [c for c in row if c]
+        if len(cells) == 1 and cells[0].startswith("Effective as of"):
+            source_note = cells[0]
+        if len(cells) != 2 or cells[0] in ("JUDICIAL DISTRICT",):
+            continue
+        district, raw = cells
+        try:
+            fraction = Decimal(raw)
+        except InvalidOperation:
+            continue
+        if not Decimal("0") <= fraction < Decimal("1"):
+            raise SystemExit(f"ch13 multiplier {district}: {raw!r} is not a fraction")
+        # The XLSX stores binary-float noise (9.2999...E-2); the published
+        # figures are tenths of a percent, so quantize to 4 places and strip.
+        multipliers[district] = str(fraction.quantize(Decimal("0.0001")).normalize())
+    if len(multipliers) < 50:
+        raise SystemExit(
+            f"ch13 multipliers: only {len(multipliers)} districts parsed — "
+            "the table shape changed; review the XLSX"
+        )
+
+    dataset = {
+        "kind": "ch13-admin-multipliers",
+        "verification": "primary",
+        "sources": [
+            source_entry(
+                "UST Chapter 13 administrative expense multipliers (XLSX)",
+                url,
+                args.accessed,
+            )
+        ],
+        "multipliers": {name: multipliers[name] for name in sorted(multipliers)},
+        "notes": (
+            "Schedule of actual administrative expenses of administering a "
+            "Chapter 13 plan, per judicial district, as fractions "
+            "(§ 707(b)(2)(A)(ii)(III); B122A-2 line 36 multiplies the "
+            "projected plan payment by this figure). District names are the "
+            f"UST's own ('Middle Florida'). {source_note}. Converted "
+            "mechanically by scripts/ingest-ust-data.py."
+        ),
+    }
+    manifest = manifest_for(
+        "ust/ch13-admin-multipliers",
+        args.effective,
+        args.sequence,
+        url,
+        sha,
+        f"Chapter 13 administrative expense multipliers as published by the "
+        f"UST for cases filed on or after {args.effective}. Converted "
+        "mechanically; spot-check the diff against the UST's HTML table "
+        "before merging.",
+    )
+    write_release(
+        args.out_root,
+        "ust/ch13-admin-multipliers",
+        args.effective,
+        args.sequence,
+        manifest,
+        dataset,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -599,6 +670,7 @@ def main() -> None:
         ("medians", ingest_medians),
         ("national", ingest_national),
         ("local", ingest_local),
+        ("ch13-multipliers", ingest_ch13_multipliers),
     ):
         p = sub.add_parser(name)
         p.add_argument("--period", required=True, help="UST period, YYYYMMDD")

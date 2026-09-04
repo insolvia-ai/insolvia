@@ -30,6 +30,7 @@ from .income import (
     OTHER_INCOME_RECORD,
     PAY_PERIOD_RECORD,
 )
+from .means_test_inputs import MEANS_TEST_INPUT
 from .petitions import (
     FILING_PROFESSIONAL,
     PETITION,
@@ -75,6 +76,9 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         EXEMPTION,
         CONTRACT_LEASE,
         COMMUNITY_HOUSEHOLD_MEMBER,
+        # B122A-2's entered figures (issue #101), one per case like the
+        # petition — the gate owns the cardinality.
+        MEANS_TEST_INPUT,
     )
 }
 
