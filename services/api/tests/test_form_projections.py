@@ -24,10 +24,14 @@ from pathlib import Path
 import pytest
 from insolvia_api.core.assets import AssetBody
 from insolvia_api.core.cases import Case
+from insolvia_api.core.claims import ClaimBody, NoticeParty
+from insolvia_api.core.codebtors import CodebtorBody, CommunityHouseholdMemberBody
+from insolvia_api.core.contract_leases import ContractLeaseBody
+from insolvia_api.core.creditors import CreditorBody
 from insolvia_api.core.debtors import CreditCounseling, Debtor, OtherName, Venue
 from insolvia_api.core.exemption_claims import ExemptionBody
 from insolvia_api.core.fields import Address, PersonName
-from insolvia_api.core.form_fill import Option, Text, fill_form
+from insolvia_api.core.form_fill import Check, Option, Text, WidgetStates, fill_form
 from insolvia_api.core.form_projections import (
     CaseFile,
     FormProjectionError,
@@ -329,6 +333,244 @@ def _exemptions() -> tuple[ExemptionBody, ...]:
     )
 
 
+def _creditors() -> tuple[tuple[str, CreditorBody], ...]:
+    def creditor(id_: str, name: str, line1: str, city: str, state: str, postal: str):
+        return (
+            id_,
+            CreditorBody(
+                name=name,
+                address=Address(
+                    line1=line1, city=city, state=state, postal_code=postal
+                ),
+            ),
+        )
+
+    return (
+        creditor(
+            "cred-mortgage",
+            "Gulf Coast Home Loans",
+            "100 Lender Way",
+            "Tampa",
+            "FL",
+            "33602",
+        ),
+        creditor(
+            "cred-auto",
+            "Drive Away Financial LLC",
+            "88 Motor Row",
+            "Orlando",
+            "FL",
+            "32801",
+        ),
+        creditor(
+            "cred-irs",
+            "Internal Revenue Service",
+            "PO Box 7346",
+            "Philadelphia",
+            "PA",
+            "19101",
+        ),
+        creditor(
+            "cred-visa",
+            "Meridian Bank Card Services",
+            "1 Meridian Plaza",
+            "Wilmington",
+            "DE",
+            "19801",
+        ),
+        creditor(
+            "cred-hospital",
+            "Bayside General Hospital",
+            "2 Care Circle",
+            "Tampa",
+            "FL",
+            "33606",
+        ),
+        creditor(
+            "cred-student",
+            "Great Plains Student Servicing",
+            "500 Loan Loop",
+            "Lincoln",
+            "NE",
+            "68501",
+        ),
+    )
+
+
+def _claims() -> tuple[tuple[str, ClaimBody], ...]:
+    """Two secured, one priority, three nonpriority — every class, every
+    printed flag column somewhere, and one notice party per notify part."""
+    return (
+        (
+            "claim-mortgage",
+            ClaimBody(
+                creditor_id="cred-mortgage",
+                claim_class="secured",
+                account_last4="3321",
+                date_incurred="2019-06-01",
+                amount="195000.00",
+                contingent=False,
+                unliquidated=False,
+                disputed=False,
+                who_incurred="both",
+                collateral_description="12 Byron Court, Tampa, FL 33601",
+                collateral_value="240000.00",
+                lien_nature=("agreement",),
+                notice_parties=(
+                    NoticeParty(
+                        id="np-mortgage-servicer",
+                        name="Gulf Coast Loan Servicing",
+                        address=Address(
+                            line1="101 Lender Way",
+                            line2="Suite 4",
+                            city="Tampa",
+                            state="FL",
+                            postal_code="33602",
+                        ),
+                        account_last4="3321",
+                    ),
+                ),
+            ),
+        ),
+        (
+            "claim-auto",
+            ClaimBody(
+                creditor_id="cred-auto",
+                claim_class="secured",
+                account_last4="8890",
+                date_incurred="2023-04-15",
+                amount="7400.00",
+                who_incurred="debtor_1",
+                collateral_description="2016 Honda Civic LX",
+                collateral_value="9000.00",
+                lien_nature=("agreement",),
+            ),
+        ),
+        (
+            "claim-irs",
+            ClaimBody(
+                creditor_id="cred-irs",
+                claim_class="priority_unsecured",
+                date_incurred="2025-04-15",
+                priority_amount="3200.00",
+                nonpriority_amount="450.00",
+                priority_type="tax_and_government",
+                who_incurred="both",
+                subject_to_offset=False,
+            ),
+        ),
+        (
+            "claim-visa",
+            ClaimBody(
+                creditor_id="cred-visa",
+                claim_class="nonpriority_unsecured",
+                account_last4="4412",
+                date_incurred="2020-11-01",
+                amount="8200.00",
+                nonpriority_type="other",
+                nonpriority_type_other="Credit card purchases",
+                who_incurred="both",
+                subject_to_offset=False,
+                notice_parties=(
+                    NoticeParty(
+                        id="np-visa-collector",
+                        name="Meridian Recovery Services",
+                        address=Address(
+                            line1="9 Collection Court",
+                            city="Wilmington",
+                            state="DE",
+                            postal_code="19801",
+                        ),
+                        account_last4="4412",
+                    ),
+                ),
+            ),
+        ),
+        (
+            "claim-hospital",
+            ClaimBody(
+                creditor_id="cred-hospital",
+                claim_class="nonpriority_unsecured",
+                account_last4="0072",
+                date_incurred="2026-02-10",
+                amount="2600.00",
+                nonpriority_type="other",
+                nonpriority_type_other="Medical services",
+                who_incurred="debtor_2",
+                disputed=True,
+                subject_to_offset=True,
+            ),
+        ),
+        (
+            "claim-student",
+            ClaimBody(
+                creditor_id="cred-student",
+                claim_class="nonpriority_unsecured",
+                account_last4="5510",
+                date_incurred="2012-09-01",
+                amount="12000.00",
+                nonpriority_type="student_loan",
+                who_incurred="debtor_1",
+                subject_to_offset=False,
+            ),
+        ),
+    )
+
+
+def _contract_leases() -> tuple[tuple[str, ContractLeaseBody], ...]:
+    return (
+        (
+            "cl-storage",
+            ContractLeaseBody(
+                counterparty_name="StorSafe Tampa LLC",
+                counterparty_address=Address(
+                    line1="77 Keeper Street",
+                    city="Tampa",
+                    state="FL",
+                    postal_code="33605",
+                ),
+                description=(
+                    "Month-to-month storage unit lease, unit 214; debtor's "
+                    "interest: lessee"
+                ),
+            ),
+        ),
+        (
+            "cl-wireless",
+            ContractLeaseBody(
+                counterparty_name="Gulf Wireless LLC",
+                counterparty_address=Address(
+                    line1="300 Signal Drive",
+                    city="Tampa",
+                    state="FL",
+                    postal_code="33607",
+                ),
+                description="Two-year wireless service agreement, 14 months remaining",
+            ),
+        ),
+    )
+
+
+def _codebtors() -> tuple[CodebtorBody, ...]:
+    return (
+        CodebtorBody(
+            name="Margaret Lovelace",
+            address=Address(
+                line1="9 Garden Lane", city="Tampa", state="FL", postal_code="33603"
+            ),
+            claim_ids=("claim-auto",),
+        ),
+        CodebtorBody(
+            name="Charles Menabrea",
+            address=Address(
+                line1="41 Engine Row", city="Tampa", state="FL", postal_code="33605"
+            ),
+            claim_ids=("claim-visa",),
+            contract_lease_ids=("cl-storage",),
+        ),
+    )
+
+
 def reference_case_file() -> CaseFile:
     return CaseFile(
         case=REFERENCE_CASE,
@@ -425,6 +667,10 @@ def reference_case_file() -> CaseFile:
         ),
         assets=_assets(),
         exemptions=_exemptions(),
+        creditors=_creditors(),
+        claims=_claims(),
+        contract_leases=_contract_leases(),
+        codebtors=_codebtors(),
         income_summaries=(
             IncomeSummaryBody(
                 debtor_id="debtor-0001",
@@ -450,7 +696,17 @@ def reference_case_file() -> CaseFile:
 
 
 @pytest.mark.parametrize(
-    "series", ["form/b101", "form/b106ab", "form/b106c", "form/b106i"]
+    "series",
+    [
+        "form/b101",
+        "form/b106ab",
+        "form/b106c",
+        "form/b106d",
+        "form/b106ef",
+        "form/b106g",
+        "form/b106h",
+        "form/b106i",
+    ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
     release = latest_form(series)
@@ -822,6 +1078,192 @@ def test_b106c_overflow_past_fifteen_rows_is_an_error() -> None:
         project(
             latest_form("form/b106c"),
             CaseFile(**{**case_file.__dict__, "exemptions": crowded}),
+        )
+
+
+# --- B106D --------------------------------------------------------------------
+
+
+def test_b106d_rows_resolve_their_creditor_and_derive_the_unsecured_portion() -> None:
+    release = latest_form("form/b106d")
+    values = dict(project(release, reference_case_file()))
+    assert row(values, release, "claim.creditor_name", 0) == Text(
+        "Gulf Coast Home Loans"
+    )
+    assert row(values, release, "claim.amount", 0) == Text("195,000.00")
+    assert row(values, release, "claim.collateral_value", 0) == Text("240,000.00")
+    # 195,000 owed against 240,000 of collateral: nothing unsecured.
+    assert row(values, release, "claim.unsecured_portion", 0) == Text("0.00")
+    assert row(values, release, "claim.who_owes", 0) == Option("Debtor 1 and 2")
+    # Column A: both rows print on page one; no page-two subtotal.
+    assert row(values, release, "part1_page_subtotal", 0) == Text("202,400.00")
+    entry = values["part1_page_subtotal"]
+    assert isinstance(entry, dict)
+    assert len(entry) == 1
+    assert values["part1_total"] == Text("202,400.00")
+
+
+def test_b106d_underwater_collateral_leaves_an_unsecured_portion() -> None:
+    case_file = reference_case_file()
+    resized = tuple(
+        (id_, ClaimBody(**{**body.__dict__, "collateral_value": "180000.00"}))
+        if id_ == "claim-mortgage"
+        else (id_, body)
+        for id_, body in case_file.claims
+    )
+    release = latest_form("form/b106d")
+    values = dict(
+        project(release, CaseFile(**{**case_file.__dict__, "claims": resized}))
+    )
+    assert row(values, release, "claim.unsecured_portion", 0) == Text("15,000.00")
+
+
+def test_b106d_broken_who_owes_rows_use_the_widget_escape_hatches() -> None:
+    # Rows 2.4 and 2.5 carry the official PDF's broken groups: 2.4 selects
+    # by widget position, 2.5 by the option's own named checkbox.
+    case_file = reference_case_file()
+    filler = tuple(
+        (
+            f"claim-extra-{n}",
+            ClaimBody(
+                creditor_id="cred-auto",
+                claim_class="secured",
+                amount="100.00",
+                who_incurred="at_least_one_plus_another" if n == 1 else "debtor_2",
+            ),
+        )
+        for n in range(3)
+    )
+    release = latest_form("form/b106d")
+    values = project(
+        release,
+        CaseFile(**{**case_file.__dict__, "claims": case_file.claims + filler}),
+    )
+    assert values["claim.who_owes_row_2_4"] == WidgetStates(indexes=(3,))
+    row_5 = values["claim.who_owes_row_2_5"]
+    assert isinstance(row_5, dict)
+    assert set(row_5) == {"Debtor 2 only_5"}
+
+
+def test_b106d_notice_row_four_can_only_mirror_claim_one() -> None:
+    # The fourth notice row's account box is the PDF's second widget of
+    # claim row 2.1's account field — a different last-four cannot land.
+    case_file = reference_case_file()
+    parties = tuple(
+        NoticeParty(id=f"np-{n}", name=f"Notice Party {n}", account_last4=f"000{n}")
+        for n in range(4)
+    )
+    crowded = tuple(
+        (id_, ClaimBody(**{**body.__dict__, "notice_parties": parties}))
+        if id_ == "claim-mortgage"
+        else (id_, body)
+        for id_, body in case_file.claims
+    )
+    with pytest.raises(FormProjectionError, match="second widget"):
+        project(
+            latest_form("form/b106d"),
+            CaseFile(**{**case_file.__dict__, "claims": crowded}),
+        )
+
+
+# --- B106E/F ------------------------------------------------------------------
+
+
+def test_b106ef_derives_each_priority_total_and_the_part_4_rollup() -> None:
+    release = latest_form("form/b106ef")
+    values = dict(project(release, reference_case_file()))
+    # The IRS row: 3,200 priority + 450 nonpriority = 3,650 total claim.
+    assert row(values, release, "priority.total_claim", 0) == Text("3,650.00")
+    assert row(values, release, "priority.priority_amount", 0) == Text("3,200.00")
+    assert row(values, release, "priority.nonpriority_amount", 0) == Text("450.00")
+    # Part 4: 6b/6e carry the tax claim; 6f the student loan; 6i the two
+    # 'other' rows (8,200 + 2,600); 6j all nonpriority claims.
+    assert values["line_6b_total"] == Text("3,650.00")
+    assert values["line_6e_total"] == Text("3,650.00")
+    assert values["line_6f_total"] == Text("12,000.00")
+    assert values["line_6i_total"] == Text("10,800.00")
+    assert values["line_6j_total"] == Text("22,800.00")
+    assert values["line_6a_total"] == Text("0.00")
+
+
+def test_b106ef_types_and_offsets_land_per_row() -> None:
+    release = latest_form("form/b106ef")
+    values = dict(project(release, reference_case_file()))
+    assert row(values, release, "priority.type_taxes", 0) == Check()
+    # Nonpriority rows print in creation order: visa, hospital, student.
+    assert row(values, release, "nonpriority.type_other_specify", 0) == Text(
+        "Credit card purchases"
+    )
+    assert row(values, release, "nonpriority.subject_to_offset", 1) == Option("yes")
+    assert row(values, release, "nonpriority.type_student_loans", 2) == Check()
+    assert row(values, release, "nonpriority.amount", 2) == Text("12,000.00")
+
+
+def test_b106ef_notice_rows_answer_which_part_from_the_claims_class() -> None:
+    release = latest_form("form/b106ef")
+    values = dict(project(release, reference_case_file()))
+    # The one notice party rides the visa claim — Part 2's box ('yes').
+    assert row(values, release, "notify.name", 0) == Text("Meridian Recovery Services")
+    assert row(values, release, "notify.referenced_part", 0) == Option("yes")
+
+
+# --- B106G and B106H ----------------------------------------------------------
+
+
+def test_b106g_contracts_take_one_printed_row_each() -> None:
+    release = latest_form("form/b106g")
+    values = dict(project(release, reference_case_file()))
+    assert values["line_1_any_contracts"] == Option("yes")
+    assert row(values, release, "line_2_counterparty_name", 0) == Text(
+        "StorSafe Tampa LLC"
+    )
+    assert row(values, release, "line_2_contract_description", 1) == Text(
+        "Two-year wireless service agreement, 14 months remaining"
+    )
+
+
+def test_b106h_schedule_boxes_derive_from_what_the_links_resolve_to() -> None:
+    release = latest_form("form/b106h")
+    values = dict(project(release, reference_case_file()))
+    assert values["line_1_any_codebtors"] == Option("yes")
+    # Margaret co-signed the (secured) car loan: Schedule D only.
+    assert row(values, release, "line_3_schedule_d_applies", 0) == Check()
+    with pytest.raises(KeyError):
+        row(values, release, "line_3_schedule_ef_applies", 0)
+    # Charles is on the visa claim and the storage lease: E/F and G.
+    assert row(values, release, "line_3_schedule_ef_applies", 1) == Check()
+    assert row(values, release, "line_3_schedule_g_applies", 1) == Check()
+    # Florida is not a community property state: line 2 answers No and the
+    # spouse block stays empty.
+    assert values["line_2_lived_in_community_state"] == Option("no")
+    assert "line_2_spouse_name" not in values
+
+
+def test_b106h_prints_one_community_property_block() -> None:
+    case_file = reference_case_file()
+    member = CommunityHouseholdMemberBody(
+        name="Dana Lovelace",
+        address=Address(
+            line1="4 Alamo Way", city="San Antonio", state="TX", postal_code="78205"
+        ),
+        community_state="TX",
+        lived_with_debtor=True,
+    )
+    release = latest_form("form/b106h")
+    values = project(
+        release,
+        CaseFile(**{**case_file.__dict__, "community_household_members": (member,)}),
+    )
+    assert values["line_2_lived_in_community_state"] == Option("yes")
+    assert values["line_2_community_state"] == Text("TX")
+    assert values["line_2_spouse_lived_with_you"] == Option("yes")
+
+    with pytest.raises(FormProjectionError, match="one community-property block"):
+        project(
+            release,
+            CaseFile(
+                **{**case_file.__dict__, "community_household_members": (member,) * 2}
+            ),
         )
 
 

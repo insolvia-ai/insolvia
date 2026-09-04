@@ -238,16 +238,39 @@ def _widgets(dump: Mapping[str, object], where: str) -> dict[str, Widget]:
 
 
 _ROW_MARKER_RE = re.compile(r"^(\d+)\.(\d+)\b")
+_ROW_SUFFIX_RE = re.compile(r"^(.*?)_(\d+)$")
+
+
+def _suffix_order(hits: list[str]) -> list[str] | None:
+    """Row order for the `Stem`/`Stem_2`/…/`Stem_N` naming run the official
+    PDFs use for repeated boxes (the bare stem is row 1). None unless every
+    hit belongs to one such run with distinct numbers — the dump's field
+    array interleaves these (B106D lists Contingent_4 before Contingent_3),
+    so the suffix, not the dump position, is the row identity."""
+    parsed: list[tuple[int, str]] = []
+    stems: set[str] = set()
+    for name in hits:
+        match = _ROW_SUFFIX_RE.match(name)
+        if match:
+            stems.add(match.group(1))
+            parsed.append((int(match.group(2)), name))
+        else:
+            stems.add(name)
+            parsed.append((1, name))
+    numbers = [number for number, _ in parsed]
+    if len(stems) == 1 and len(set(numbers)) == len(numbers):
+        return [name for _, name in sorted(parsed)]
+    return None
 
 
 def _pattern_order(hits: list[str], dump_order: Mapping[str, int]) -> list[str]:
     """Order a pattern's hits for `pdf_names`.
 
     A pattern cannot say which hit is which printed row, so the loader
-    derives it: when every hit starts with the official forms' `NN.M` row
-    marker ("17.1 Checking account"), the marker is the row identity —
-    reliable where the dump's field order is not. Otherwise the dump order
-    stands, which is the best remaining approximation.
+    derives it from the names: the official forms' `NN.M` row marker
+    ("17.1 Checking account") when every hit carries one, else the
+    `Stem_N` suffix run, else the dump order — the best remaining
+    approximation, though not reading order (see `_suffix_order`).
     """
     markers = [_ROW_MARKER_RE.match(name) for name in hits]
     if all(markers):
@@ -258,6 +281,9 @@ def _pattern_order(hits: list[str], dump_order: Mapping[str, int]) -> list[str]:
                 for part in _ROW_MARKER_RE.match(name).groups()  # type: ignore[union-attr]
             ),
         )
+    by_suffix = _suffix_order(hits)
+    if by_suffix is not None:
+        return by_suffix
     return sorted(hits, key=lambda name: dump_order[name])
 
 

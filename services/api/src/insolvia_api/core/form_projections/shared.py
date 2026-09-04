@@ -237,6 +237,13 @@ def address_fills(
     put(county, getattr(address, "county", None))
 
 
+def claims_of(case_file: CaseFile, *classes: str) -> list[ClaimBody]:
+    """The case's claims of the given classes, in creation (= printed row)
+    order — the filter 106D and both parts of 106E/F row their tables by."""
+    wanted = set(classes)
+    return [body for _, body in case_file.claims if body.claim_class in wanted]
+
+
 def text_or_none(value: str | None) -> Text | None:
     """A Text fill for a present value, a blank box for an absent one."""
     return Text(value) if value else None
