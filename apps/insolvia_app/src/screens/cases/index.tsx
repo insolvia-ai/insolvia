@@ -278,6 +278,16 @@ function CaseList({
           >
             Documents
           </Link>
+          <Link
+            href={`/cases/${item.id}/packet`}
+            aria-label={`Filing packet for case ${item.id}`}
+            style={[
+              styles.caseLink,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            Filing packet
+          </Link>
         </View>
       ))}
     </View>
