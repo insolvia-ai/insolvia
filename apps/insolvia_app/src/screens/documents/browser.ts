@@ -257,3 +257,37 @@ export function openDownload(url: string, fileName: string): boolean {
     anchor.remove();
   }
 }
+
+/**
+ * Saves text the CLIENT already holds as a named file — the creditor matrix
+ * (issue #282), whose bytes arrive in the API response rather than behind a
+ * presigned URL.
+ *
+ * A `data:` URL, deliberately, over `URL.createObjectURL`: the matrix is a few
+ * kilobytes of plain ASCII, the data URL needs no second global to guard and
+ * nothing to revoke afterwards, and an anchor click with `download` set is a
+ * download, not a navigation — so the browser's block on top-level `data:`
+ * navigation does not apply. No `target="_blank"` here, unlike
+ * {@link openDownload}: there is no cross-origin response for the browser to
+ * decide to render inline, so there is no tab to protect the SPA from.
+ */
+export function saveTextFile(content: string, fileName: string): boolean {
+  const doc = browserDocument();
+  if (doc === null) {
+    return false;
+  }
+  const anchor = transientElement<AnchorLike>(doc, 'a');
+  if (anchor === null) {
+    return false;
+  }
+  try {
+    anchor.href = `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`;
+    anchor.download = fileName;
+    anchor.click();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    anchor.remove();
+  }
+}

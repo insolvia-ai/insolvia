@@ -19,6 +19,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 import type { ChoiceOption, CollectionSpec, FieldSpec } from './collections';
 import { COLLECTION_SPECS, labelize } from './collections';
+import { newRowId } from './row-id';
 
 /**
  * List, add, edit and remove for one generic case collection (issue #249) —
@@ -556,6 +557,102 @@ function FieldControl({
           />
         </View>
       );
+    case 'party-list': {
+      // The id-keyed object list (issue #280). Each row is a Body of its own,
+      // so TextAt/AddressGroup work on the ROW with row-relative paths; the
+      // API requires a client-minted `id` per row (core/claims.py), minted on
+      // Add so provenance can address `<key>[<id>].name` before the save.
+      const rows = Array.isArray(value)
+        ? value.filter(
+            (row): row is Body => typeof row === 'object' && row !== null && !Array.isArray(row),
+          )
+        : [];
+      const setRows = (next: readonly Body[]) => set(next.length === 0 ? undefined : [...next]);
+      // Server messages are keyed by POSITION (`notice_parties[0].name`);
+      // rescope each row's slice to row-relative paths so the row's own
+      // controls can find them.
+      const rowErrors = (index: number): Readonly<Record<string, string>> => {
+        const prefix = `${field.key}[${index}].`;
+        return Object.fromEntries(
+          Object.entries(errors)
+            .filter(([path]) => path.startsWith(prefix))
+            .map(([path, text]) => [path.slice(prefix.length), text]),
+        );
+      };
+      const listMessage = message;
+      return (
+        <View style={styles.group}>
+          {rows.map((row, index) => {
+            const scoped = rowErrors(index);
+            const rowLabel = `${labelize(field.itemLabel)} ${index + 1}`;
+            const wholeRowMessage = errors[`${field.key}[${index}]`];
+            return (
+              <View key={typeof row.id === 'string' ? row.id : index} style={styles.group}>
+                <TextAt
+                  label={`${rowLabel} — name`}
+                  path="name"
+                  body={row}
+                  errors={scoped}
+                  onChange={(next) =>
+                    setRows(rows.map((current, at) => (at === index ? next : current)))
+                  }
+                />
+                <AddressGroup
+                  label={`${rowLabel} — address`}
+                  basePath="address"
+                  body={row}
+                  errors={scoped}
+                  onChange={(next) =>
+                    setRows(rows.map((current, at) => (at === index ? next : current)))
+                  }
+                />
+                <Field.Root invalid={Boolean(scoped.account_last4)}>
+                  <Field.Label>{`${rowLabel} — account number, last four digits`}</Field.Label>
+                  <Input
+                    value={typeof row.account_last4 === 'string' ? row.account_last4 : ''}
+                    onValueChange={(next) =>
+                      setRows(
+                        rows.map((current, at) =>
+                          at === index
+                            ? setAt(current, 'account_last4', next === '' ? undefined : next)
+                            : current,
+                        ),
+                      )
+                    }
+                    autoCorrect={false}
+                  />
+                  {scoped.account_last4 ? (
+                    <Field.Error match>{scoped.account_last4}</Field.Error>
+                  ) : null}
+                </Field.Root>
+                {wholeRowMessage ? (
+                  <Text style={[styles.help, { color: theme.colors.danger }]}>
+                    {wholeRowMessage}
+                  </Text>
+                ) : null}
+                <Button
+                  size="lg"
+                  intent="secondary"
+                  onPress={() => setRows(rows.filter((_, at) => at !== index))}
+                >
+                  {`Remove ${field.itemLabel} ${index + 1}`}
+                </Button>
+              </View>
+            );
+          })}
+          {listMessage ? (
+            <Text style={[styles.help, { color: theme.colors.danger }]}>{listMessage}</Text>
+          ) : null}
+          <Button
+            size="lg"
+            intent="secondary"
+            onPress={() => setRows([...rows, { id: newRowId() }])}
+          >
+            {`Add ${field.itemLabel}`}
+          </Button>
+        </View>
+      );
+    }
     case 'strings':
     case 'dates': {
       const items = Array.isArray(value)

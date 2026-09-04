@@ -288,6 +288,16 @@ function CaseList({
           >
             Filing packet
           </Link>
+          <Link
+            href={`/cases/${item.id}/creditor-matrix`}
+            aria-label={`Creditor matrix for case ${item.id}`}
+            style={[
+              styles.caseLink,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            Creditor matrix
+          </Link>
         </View>
       ))}
     </View>

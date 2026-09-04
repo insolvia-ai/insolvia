@@ -261,6 +261,146 @@ describe('the intake collection sections', () => {
     ).toBe(true);
   });
 
+  it('saves a claim’s notice parties with client-minted ids, and provenance addressed by them', async () => {
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () => jsonResponse(200, { claims: [] }),
+      },
+      // The claims spec references creditors, so opening the section also
+      // loads them for the picker.
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () =>
+          jsonResponse(201, {
+            id: '00000000-0000-4000-8000-0000000000f2',
+            case_id: CASE_ID,
+            created_at: '2026-09-01T10:00:00.000000Z',
+            updated_at: '2026-09-01T10:00:00.000000Z',
+            provenance: {},
+            notice_parties: [],
+          }),
+      },
+    ]);
+
+    const user = await openSection('Claims');
+    await user.press(await screen.findByRole('button', { name: 'Add claim' }));
+    await user.press(await screen.findByRole('button', { name: 'Add notice party' }));
+    await user.type(await screen.findByLabelText('Notice party 1 — name'), 'Midland Credit');
+    await user.type(
+      screen.getByLabelText('Notice party 1 — account number, last four digits'),
+      '4471',
+    );
+    await user.press(screen.getByRole('button', { name: 'Save claim' }));
+
+    await waitFor(() => {
+      const body = lastBody(fetchMock, 'POST', '/claims');
+      // The row's id is minted by the client (the API requires one so
+      // provenance can address the row), so assert its shape and then use it.
+      const parties = body.notice_parties as readonly Record<string, unknown>[];
+      expect(parties).toHaveLength(1);
+      const party = parties[0];
+      if (party === undefined) throw new Error('expected one notice party');
+      expect(typeof party.id).toBe('string');
+      expect(party.name).toBe('Midland Credit');
+      expect(party.account_last4).toBe('4471');
+      expect(body.provenance).toEqual({
+        [`notice_parties[${String(party.id)}].name`]: { source: 'staff_typed' },
+        [`notice_parties[${String(party.id)}].account_last4`]: { source: 'staff_typed' },
+      });
+    });
+  });
+
+  it('puts a notice-party server message on the row field it names', async () => {
+    signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () => jsonResponse(200, { claims: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () =>
+          jsonResponse(400, {
+            error: 'validation failed',
+            // Positional, exactly as core/claims.py keys them.
+            fields: { 'notice_parties[0].account_last4': 'Must be up to four digits.' },
+          }),
+      },
+    ]);
+
+    const user = await openSection('Claims');
+    await user.press(await screen.findByRole('button', { name: 'Add claim' }));
+    await user.press(await screen.findByRole('button', { name: 'Add notice party' }));
+    await user.type(
+      await screen.findByLabelText('Notice party 1 — account number, last four digits'),
+      'ABCDE',
+    );
+    await user.press(screen.getByRole('button', { name: 'Save claim' }));
+
+    expect(await screen.findByText('Must be up to four digits.')).toBeTruthy();
+  });
+
+  it('removes a notice-party row, and an emptied list leaves the body', async () => {
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () => jsonResponse(200, { claims: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () =>
+          jsonResponse(201, {
+            id: '00000000-0000-4000-8000-0000000000f3',
+            case_id: CASE_ID,
+            created_at: '2026-09-01T10:00:00.000000Z',
+            updated_at: '2026-09-01T10:00:00.000000Z',
+            provenance: { account_last4: { source: 'staff_typed' } },
+            account_last4: '4471',
+          }),
+      },
+    ]);
+
+    const user = await openSection('Claims');
+    await user.press(await screen.findByRole('button', { name: 'Add claim' }));
+    await user.press(await screen.findByRole('button', { name: 'Add notice party' }));
+    await user.type(await screen.findByLabelText('Notice party 1 — name'), 'Midland Credit');
+    await user.press(screen.getByRole('button', { name: 'Remove notice party 1' }));
+    // Something else populated, so the save has a body to send.
+    await user.type(screen.getByLabelText('Account number — last four digits'), '4471');
+    await user.press(screen.getByRole('button', { name: 'Save claim' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/claims')).toEqual({
+        account_last4: '4471',
+        provenance: { account_last4: { source: 'staff_typed' } },
+      }),
+    );
+  });
+
   it('types a SOFA entry by its question, and nests its answers under payload', async () => {
     const fetchMock = signedIn([
       noDebtors,
