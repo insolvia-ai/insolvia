@@ -189,7 +189,7 @@ def test_a_record_written_by_one_firm_is_invisible_to_another(client):
 
 def test_an_unknown_collection_is_a_plain_404(client):
     case_id = open_case(client)
-    response = client.get(f"/v1/cases/{case_id}/exemptions", headers=auth(ALICE))
+    response = client.get(f"/v1/cases/{case_id}/pay_stubs", headers=auth(ALICE))
     assert response.status_code == 404
 
 

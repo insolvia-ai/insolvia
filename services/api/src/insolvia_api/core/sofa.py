@@ -81,9 +81,13 @@ ACCOUNT_TYPES: Final = ("checking", "savings", "money_market", "brokerage", "oth
 # Q24/Q25 fold into one entry type: who told whom.
 ENVIRONMENTAL_NOTICE_KINDS: Final = ("liability_notice_received", "release_reported")
 
-# Q27's "connection to the business" checkboxes.
+# Q27's "connection to the business" checkboxes, in the printed order. The
+# 04/25 revision prints five: `llc_member` is the "member of a limited
+# liability company (LLC) or limited liability partnership (LLP)" box the
+# original four-member vocabulary missed.
 BUSINESS_CONNECTIONS: Final = (
     "sole_proprietor",
+    "llc_member",
     "partner",
     "officer_or_director",
     "owner_of_5_percent",

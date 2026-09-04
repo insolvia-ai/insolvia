@@ -1898,6 +1898,8 @@ export interface IncomeSummaryBody {
 export interface HouseholdBody {
   readonly which_household?: WhichHousehold | undefined;
   readonly separate_household?: boolean | undefined;
+  /** Line 3 — expenses include people other than the debtors + dependents. */
+  readonly expenses_include_others?: boolean | undefined;
   readonly change_expected?: boolean | undefined;
   readonly change_explanation?: string | undefined;
 }
@@ -1928,6 +1930,43 @@ export interface CodebtorBody {
   readonly address?: Address | undefined;
   /** Claim record ids — the fact behind the form's "Schedule D, line __". */
   readonly claim_ids?: readonly string[] | undefined;
+  /** Contract/lease record ids — the "Schedule G, line __" column. */
+  readonly contract_lease_ids?: readonly string[] | undefined;
+}
+
+/**
+ * 106C, one row: an exemption claimed on an asset. The amount is EITHER a
+ * dollar figure OR the 100%-of-fair-market-value election — the API accepts
+ * both while intake is in progress; the completeness gate flags a conflict.
+ * The printed description and value are the referenced ASSET's, copied at
+ * projection time and never stored here.
+ */
+export interface ExemptionBody {
+  /** The asset record this exemption protects. Not checked server-side. */
+  readonly asset_id?: string | undefined;
+  readonly statute_citation?: string | undefined;
+  readonly amount?: Money | undefined;
+  readonly claims_full_fmv?: boolean | undefined;
+  /** 106C line 3's follow-up — a fact the debtor supplies. */
+  readonly acquired_within_1215_days?: boolean | undefined;
+}
+
+/** 106G, one row: an executory contract or unexpired lease. */
+export interface ContractLeaseBody {
+  /** One free-text line — counterparties are predominantly entities. */
+  readonly counterparty_name?: string | undefined;
+  readonly counterparty_address?: Address | undefined;
+  /** What the contract or lease is for, term remaining, contract number. */
+  readonly description?: string | undefined;
+}
+
+/** 106H line 2 / B107 Q3: the community-property spouse or former spouse. */
+export interface CommunityHouseholdMemberBody {
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  /** The community property state lived in — a two-letter code. */
+  readonly community_state?: string | undefined;
+  readonly lived_with_debtor?: boolean | undefined;
 }
 
 /**
@@ -2098,6 +2137,9 @@ export interface CaseCollections {
   readonly related_cases: RelatedCaseBody;
   readonly sole_proprietorships: SoleProprietorshipBody;
   readonly filing_professionals: FilingProfessionalBody;
+  readonly exemptions: ExemptionBody;
+  readonly contract_leases: ContractLeaseBody;
+  readonly community_household_members: CommunityHouseholdMemberBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -2120,6 +2162,9 @@ export const CASE_COLLECTIONS = [
   'related_cases',
   'sole_proprietorships',
   'filing_professionals',
+  'exemptions',
+  'contract_leases',
+  'community_household_members',
 ] as const satisfies readonly CaseCollection[];
 
 /**
