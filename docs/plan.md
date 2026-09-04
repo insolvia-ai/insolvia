@@ -5,8 +5,15 @@ in force, and the work ahead. Completed milestones are summarized in one table
 — their full histories live in git, the PRs, and the ADRs, not here. Desktop
 was dropped entirely (D9); this document no longer plans for it.
 
-Status: **foundation shipped; intake shipped; forms & petition engine is the
-current milestone** · Last pruned 2026-09-01
+Status: **foundation, intake, forms & petition engine, and the MCP server
+(12.1–12.3) all built; forms and MCP await their staging validations (#96,
+#97, 12.4–12.5); means test and AI extraction are the current milestones** ·
+Last pruned 2026-09-04
+
+The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
+pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
+service, SQS+worker over Step Functions, launch states FL/TX/GA, and the
+Anthropic call posture that extraction inherits.
 
 **Pivot 2026-09-01 (D11 /
 [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md)):** no
@@ -108,10 +115,10 @@ the same seam extraction review (8.9) needs
 
 | # | Issue | Notes |
 |---|---|---|
-| 12.1 | [#260](https://github.com/insolvia-ai/insolvia/issues/260) — Design the MCP surface: tools + candidate-write flow | Do first; also decides `services/mcp` vs. inside `services/api`. |
-| 12.2 | [#261](https://github.com/insolvia-ai/insolvia/issues/261) — MCP auth: OAuth against the existing Cognito pool | A session is a `sub` with firm permissions (D10); nothing authorization-bearing in tokens. |
-| 12.3 | [#262](https://github.com/insolvia-ai/insolvia/issues/262) — The service itself, all three environments | Lambda, `insolvia_core`, normal CI/deploy pattern. |
-| 12.4 | [#263](https://github.com/insolvia-ai/insolvia/issues/263) — First end-to-end: harness reads a case, writes a candidate creditor, human confirms | The round-trip that proves the pivot. |
+| 12.1 | [#260](https://github.com/insolvia-ai/insolvia/issues/260) — Design the MCP surface ✅ | [`mcp-surface.md`](reference/mcp-surface.md) + [ADR 0016](adr/0016-mcp-server-is-its-own-service.md) (own `services/mcp`). |
+| 12.2 | [#261](https://github.com/insolvia-ai/insolvia/issues/261) — MCP auth ✅ | Cognito OAuth; one pre-registered client per harness; permissions from the store per call (D10). |
+| 12.3 | [#262](https://github.com/insolvia-ai/insolvia/issues/262) — The service itself ✅ | Shipped 2026-09-04; case domain moved to `insolvia_core` with it. |
+| 12.4 | [#263](https://github.com/insolvia-ai/insolvia/issues/263) — First end-to-end: harness reads a case, writes a candidate creditor, human confirms | **Next** — needs the per-env image bootstrap, then a harness against staging. |
 | 12.5 | [#264](https://github.com/insolvia-ai/insolvia/issues/264) — Verify against Claude Desktop + ChatGPT + an inspector | "Any MCP client" meets reality; per-harness gaps feed back into 12.1. |
 | 12.6 | [#265](https://github.com/insolvia-ai/insolvia/issues/265) — Distribution: MCP/connector directories | The discovery channel that replaces the App Bar (old 0.6). |
 | 12.7 | [#266](https://github.com/insolvia-ai/insolvia/issues/266) — Marketing repositioning off "MyCase-native" | Public story; founder signs off the copy. |
@@ -147,8 +154,8 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 |---|---|---|---|
 | [`Product · Auth`](https://github.com/insolvia-ai/insolvia/milestone/4) | — | 7.1–7.6 | Wire the app to the existing Cognito seam: sign-in, session, the first authenticated API endpoint (JWT verification lands server-side with it). |
 | [`Product · Intake`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.6, 8.10 | Standalone intake behind auth: case data model, encrypted store, case CRUD, the intake form widgets (risk 4), the questionnaire, document upload. Only the design-partner web-first test (risk 3) is still open. |
-| **[`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6)** — *current* | M3 / P2 | 9.1–9.9 | Deterministic, versioned forms; Chapter 7 packet; AI review agent. Opens with the effective-date model the register demands from day one. |
-| [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register. |
+| [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) — **built 2026-09-04** | M3 / P2 | 9.1–9.10 | Deterministic, versioned forms; Chapter 7 packet; AI review agent — all merged. #96/#97 stay open for their staging validations (walkthrough with the design partner; seeded-defect review with a provisioned API key). |
+| [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — *current* | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register — now on the shipped registry/forms-engine foundations. |
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) | M2 / P1 | 8.7–8.9 | Claude reading credit reports and pay stubs into candidate records, human-confirmed before case entry. **Deferred 2026-08-11** — see below. |
 
