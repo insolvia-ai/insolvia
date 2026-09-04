@@ -53,7 +53,7 @@ def make_job(**overrides) -> Job:
 
 
 def test_a_registered_kind_is_accepted() -> None:
-    assert parse_job_acceptance({"kind": "echo"}) == "echo"
+    assert parse_job_acceptance({"kind": "echo"}) == ("echo", None)
 
 
 @pytest.mark.parametrize(
@@ -63,11 +63,23 @@ def test_a_registered_kind_is_accepted() -> None:
         {"kind": "assemble_packet_from_the_future"},
         {"kind": 7},
         {"kind": None},
+        # A document-scoped kind without its document, and with a blank one.
+        {"kind": "document_extraction"},
+        {"kind": "document_extraction", "documentId": "  "},
+        {"kind": "document_extraction", "documentId": 7},
+        # And the inverse: a documentId decorating a kind nothing reads it on.
+        {"kind": "echo", "documentId": "doc-1"},
     ],
 )
 def test_anything_but_a_registered_kind_is_rejected(payload) -> None:
     with pytest.raises(FieldValidationError):
         parse_job_acceptance(payload)
+
+
+def test_a_document_scoped_kind_requires_and_returns_its_document() -> None:
+    assert parse_job_acceptance(
+        {"kind": "document_extraction", "documentId": "doc-1"}
+    ) == ("document_extraction", "doc-1")
 
 
 def test_every_pure_worker_is_an_acceptable_kind() -> None:
@@ -79,6 +91,7 @@ def test_every_pure_worker_is_an_acceptable_kind() -> None:
     assert set(WORKERS) <= set(KINDS)
     assert "packet_assembly" in KINDS
     assert "petition_review" in KINDS
+    assert "document_extraction" in KINDS
 
 
 # ── Identity and transitions ────────────────────────────────────
@@ -127,6 +140,20 @@ def test_find_active_matches_kind_and_liveness() -> None:
     assert find_active((make_job(status="failed"),), "echo") is None
     assert find_active((make_job(status="succeeded"),), "echo") is None
     assert find_active((queued,), "another-kind") is None
+
+
+def test_find_active_scopes_document_kinds_per_document() -> None:
+    # Extracting two different uploads concurrently is two jobs, not a
+    # duplicate — the idempotency key is (case, kind, document).
+    extraction = make_job(kind="document_extraction", document_id="doc-1")
+    assert (
+        find_active((extraction,), "document_extraction", document_id="doc-1")
+        is extraction
+    )
+    assert (
+        find_active((extraction,), "document_extraction", document_id="doc-2") is None
+    )
+    assert find_active((extraction,), "document_extraction") is None
 
 
 # ── Stored item shape ───────────────────────────────────────────
@@ -190,10 +217,34 @@ def test_the_wire_message_is_exactly_ids_and_a_version() -> None:
     assert MESSAGE_VERSION == 1
 
 
+def test_the_wire_message_carries_a_document_id_only_when_the_job_does() -> None:
+    # Still identifiers only — the documentId names a stored record the
+    # worker re-reads, never case data; and its absence on every other kind
+    # keeps the version-1 shape byte-identical to what it always was.
+    job = make_job(kind="document_extraction", document_id="doc-1")
+    assert job_message(job) == {
+        "version": 1,
+        "jobId": job.id,
+        "caseId": CASE,
+        "kind": "document_extraction",
+        "documentId": "doc-1",
+    }
+
+
 def test_the_message_round_trips() -> None:
     job = make_job()
     message = parse_job_message(job_message(job))
     assert message == JobMessage(job_id=job.id, case_id=CASE, kind="echo")
+
+
+def test_the_message_round_trips_a_document_id() -> None:
+    job = make_job(kind="document_extraction", document_id="doc-1")
+    assert parse_job_message(job_message(job)) == JobMessage(
+        job_id=job.id,
+        case_id=CASE,
+        kind="document_extraction",
+        document_id="doc-1",
+    )
 
 
 @pytest.mark.parametrize(

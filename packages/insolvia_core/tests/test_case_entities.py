@@ -67,6 +67,24 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "deduction_tax": "830.00",
         "change_expected": False,
     },
+    "pay_period_records": {
+        "employment_id": "emp-1",
+        "period_start": "2026-08-01",
+        "period_end": "2026-08-14",
+        "pay_date": "2026-08-19",
+        "gross": "2400.00",
+        "net": "1890.50",
+        "frequency": "biweekly",
+        "deductions": [
+            {"id": "ded1", "category": "tax", "amount": "410.00"},
+            {
+                "id": "ded2",
+                "category": "insurance",
+                "amount": "99.50",
+                "description": "Medical premium",
+            },
+        ],
+    },
     "households": {"which_household": "main", "separate_household": False},
     "expenses": {
         "household_id": "h-1",

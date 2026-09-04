@@ -18,7 +18,9 @@ from insolvia_core.ports import AccessLog, CaseStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
+from insolvia_api.core.extraction import EXTRACTABLE_DOCUMENT_KINDS
 from insolvia_api.core.jobs import (
+    DOCUMENT_SCOPED_KINDS,
     JobFailure,
     fail,
     find_active,
@@ -93,21 +95,42 @@ def accept_job_route(case_id: str) -> ResponseReturnValue:
     queue: JobQueue = deps.job_queue
 
     case_store, job_store, access_log = _stores()
-    kind = parse_job_acceptance(_json_body())
+    kind, document_id = parse_job_acceptance(_json_body())
     accessor = current_accessor()
 
     case = case_store.get(case_id, accessor=accessor)
     if case is None:
         raise NotFoundError("case not found")
 
-    existing = find_active(job_store.list_for_case(case.id), kind)
+    if kind in DOCUMENT_SCOPED_KINDS:
+        # Resolve the named document against the ALREADY-AUTHORISED case —
+        # `case_id` is half the document store's key, so another case's
+        # document id answers the same 404 a missing one does. Refusing an
+        # unextractable kind here (rather than letting the worker fail the
+        # job) turns a doomed accept into an immediate, fixable 400.
+        document_store = dependencies().document_store
+        if document_store is None:
+            raise RuntimeError("document store is not composed")
+        document = document_store.get(case.id, document_id or "")
+        if document is None:
+            raise NotFoundError("document not found")
+        if document.kind not in EXTRACTABLE_DOCUMENT_KINDS:
+            raise ValidationError(
+                "extraction reads: " + ", ".join(EXTRACTABLE_DOCUMENT_KINDS)
+            )
+
+    existing = find_active(
+        job_store.list_for_case(case.id), kind, document_id=document_id
+    )
     if existing is not None:
         # The no-op repeat is not access-logged: the first accept was, and a
         # row per retry would record the client's network conditions, not a
         # new decision by a person.
         return jsonify(job_json(existing)), 202
 
-    job = new_job(kind, case_id=case.id, created_by=accessor.subject)
+    job = new_job(
+        kind, case_id=case.id, created_by=accessor.subject, document_id=document_id
+    )
     job_store.create(job)
     try:
         queue.enqueue(job)

@@ -26,15 +26,23 @@ import logging
 
 import boto3
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 
+from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.config import load_config
+from insolvia_api.core.extraction import (
+    DOCUMENT_EXTRACTION_KIND,
+    DocumentExtractionDeps,
+    document_extraction_worker,
+)
 from insolvia_api.core.jobs import WORKERS, handle_sqs_event
 from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.packet_assembly import (
@@ -85,6 +93,12 @@ def main() -> None:
         if config.anthropic_api_key
         else None
     )
+    extraction_model = (
+        AnthropicExtractionModel(config.anthropic_api_key)
+        if config.anthropic_api_key
+        else None
+    )
+    blobs = S3DocumentBlobStore(config.case_document_bucket)
     workers = {
         **WORKERS,
         PACKET_ASSEMBLY_KIND: packet_assembly_worker(
@@ -93,7 +107,7 @@ def main() -> None:
                 debtor_store=debtor_store,
                 entity_store=entity_store,
                 packet_store=packet_store,
-                blobs=S3DocumentBlobStore(config.case_document_bucket),
+                blobs=blobs,
                 access_log=access_log,
             )
         ),
@@ -105,6 +119,16 @@ def main() -> None:
                 packet_store=packet_store,
                 access_log=access_log,
                 model=review_model,
+            )
+        ),
+        DOCUMENT_EXTRACTION_KIND: document_extraction_worker(
+            DocumentExtractionDeps(
+                case_store=case_store,
+                document_store=DynamoDbDocumentStore(config.case_table_name),
+                blobs=blobs,
+                candidate_store=DynamoDbCandidateStore(config.case_table_name),
+                access_log=access_log,
+                model=extraction_model,
             )
         ),
     }

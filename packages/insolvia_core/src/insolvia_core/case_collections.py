@@ -24,7 +24,7 @@ from .contract_leases import CONTRACT_LEASE
 from .creditors import CREDITOR
 from .exemption_claims import EXEMPTION
 from .expenses import DEPENDENT, EXPENSE, HOUSEHOLD
-from .income import EMPLOYMENT, INCOME_SUMMARY
+from .income import EMPLOYMENT, INCOME_SUMMARY, PAY_PERIOD_RECORD
 from .petitions import (
     FILING_PROFESSIONAL,
     PETITION,
@@ -45,6 +45,10 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         CLAIM,
         ASSET,
         EMPLOYMENT,
+        # The dated paycheck history behind the means test (§101(10A)),
+        # written by pay-stub extraction (8.8) through the review flow —
+        # docs/reference/case-data-model.md, "106I is not the income model".
+        PAY_PERIOD_RECORD,
         INCOME_SUMMARY,
         HOUSEHOLD,
         EXPENSE,

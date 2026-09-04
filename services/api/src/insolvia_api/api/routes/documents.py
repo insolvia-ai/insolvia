@@ -94,6 +94,11 @@ from insolvia_core.ports import (
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
+from insolvia_api.core.extraction import (
+    DOCUMENT_EXTRACTION_KIND,
+    EXTRACTABLE_DOCUMENT_KINDS,
+)
+from insolvia_api.core.jobs import JobFailure, fail, find_active, new_job
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +384,76 @@ def complete_document_route(case_id: str, document_id: str) -> ResponseReturnVal
             "byte_size": confirmed.byte_size,
         },
     )
+    _trigger_extraction(confirmed, accepted_by=accessor.subject)
     return jsonify({"document": document_json(confirmed)}), 200
+
+
+def _trigger_extraction(document: Document, *, accepted_by: str) -> None:
+    """A confirmed upload of an extractable kind starts extraction on its own
+    (issue 8.7: "a document upload triggers … extraction of a document").
+
+    BEST-EFFORT, deliberately: the upload has already succeeded, and failing
+    the confirm because the pipeline hiccuped would tell the user their
+    document did not arrive — a lie. Whatever goes wrong here is logged and
+    swallowed; the preparer can always request extraction explicitly through
+    the jobs endpoint, which is also the retry path. A deployment without
+    the pipeline (no queue composed) simply skips the trigger. The same
+    one-active-job-per-(case, kind, document) idempotency rule the accept
+    endpoint applies holds here, so a re-confirmed upload does not queue a
+    second run.
+    """
+    if document.kind not in EXTRACTABLE_DOCUMENT_KINDS:
+        return
+    deps = dependencies()
+    if deps.job_store is None or deps.job_queue is None:
+        return
+    try:
+        active = find_active(
+            deps.job_store.list_for_case(document.case_id),
+            DOCUMENT_EXTRACTION_KIND,
+            document_id=document.id,
+        )
+        if active is not None:
+            return
+        job = new_job(
+            DOCUMENT_EXTRACTION_KIND,
+            case_id=document.case_id,
+            created_by=accepted_by,
+            document_id=document.id,
+        )
+        deps.job_store.create(job)
+        try:
+            deps.job_queue.enqueue(job)
+        except Exception:
+            # The jobs route's own rule: a row nothing will deliver must not
+            # stay `queued`, or the idempotency check blocks every later
+            # accept of this document. Mark it failed (best-effort) so a
+            # manual request starts clean.
+            deps.job_store.update(
+                fail(
+                    job,
+                    JobFailure(
+                        category="enqueue_failed",
+                        message="The job could not be handed to the pipeline.",
+                    ),
+                ),
+                expected_status="queued",
+            )
+            raise
+    except Exception:
+        logger.exception(
+            "extraction auto-trigger failed; the upload itself succeeded",
+            extra={"case_id": document.case_id, "document_id": document.id},
+        )
+        return
+    logger.info(
+        "extraction triggered by upload",
+        extra={
+            "case_id": document.case_id,
+            "document_id": document.id,
+            "job_id": job.id,
+        },
+    )
 
 
 @blueprint.get("/v1/cases/<case_id>/documents")

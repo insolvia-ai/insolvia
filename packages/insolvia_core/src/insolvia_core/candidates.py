@@ -117,6 +117,12 @@ class Candidate:
     document_id: str | None = None
     external_ref: ExternalRef | None = None
     note: str | None = None
+    # The extraction stream's fields (data model: `extraction_candidate`'s
+    # `confidence, locator`): how sure the model was of this record, and
+    # where on the source document it read it. Absent on MCP proposals — an
+    # agent's say-so has no confidence score and no page to point at.
+    confidence: float | None = None
+    locator: Mapping[str, object] | None = None
     # Review outcome — written by 8.9's review flow, only read here.
     confirmed_by: str | None = None
     confirmed_at: str | None = None
@@ -256,8 +262,18 @@ def parse_proposals(value: object) -> tuple[ProposalDraft, ...]:
 
 
 def create_candidate(
-    draft: ProposalDraft, *, case_id: str, origin: CandidateOrigin
+    draft: ProposalDraft,
+    *,
+    case_id: str,
+    origin: CandidateOrigin,
+    document_id: str | None = None,
+    confidence: float | None = None,
+    locator: Mapping[str, object] | None = None,
 ) -> Candidate:
+    """A fresh pending candidate. The three keyword extras are the extraction
+    stream's (8.7/8.8): the source document, the model's confidence, and the
+    page anchor. MCP callers pass none of them — an agent proposal has no
+    source document (mcp-surface.md)."""
     now = timestamp()
     return Candidate(
         id=str(uuid.uuid4()),
@@ -268,8 +284,11 @@ def create_candidate(
         origin=origin,
         created_at=now,
         updated_at=now,
+        document_id=document_id,
         external_ref=draft.external_ref,
         note=draft.note,
+        confidence=confidence,
+        locator=locator,
     )
 
 
@@ -342,6 +361,10 @@ def candidate_item(candidate: Candidate) -> dict[str, object]:
         item["externalRef"] = ref
     if candidate.note is not None:
         item["note"] = candidate.note
+    if candidate.confidence is not None:
+        item["confidence"] = candidate.confidence
+    if candidate.locator is not None:
+        item["locator"] = dict(candidate.locator)
     if candidate.confirmed_by is not None:
         item["confirmedBy"] = candidate.confirmed_by
     if candidate.confirmed_at is not None:
@@ -371,6 +394,8 @@ def candidate_from_item(item: Mapping[str, object]) -> Candidate:
         )
     payload = item.get("payload")
     corrected = item.get("correctedPayload")
+    raw_confidence = item.get("confidence")
+    raw_locator = item.get("locator")
     try:
         return Candidate(
             id=str(item["id"]),
@@ -388,6 +413,11 @@ def candidate_from_item(item: Mapping[str, object]) -> Candidate:
             document_id=_optional_str(item.get("documentId")),
             external_ref=external_ref,
             note=_optional_str(item.get("note")),
+            confidence=float(raw_confidence)
+            if not isinstance(raw_confidence, bool)
+            and isinstance(raw_confidence, (int, float))
+            else None,
+            locator=raw_locator if isinstance(raw_locator, Mapping) else None,
             confirmed_by=_optional_str(item.get("confirmedBy")),
             confirmed_at=_optional_str(item.get("confirmedAt")),
             corrected_payload=corrected if isinstance(corrected, Mapping) else None,
