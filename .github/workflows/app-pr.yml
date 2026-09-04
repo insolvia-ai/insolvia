@@ -148,6 +148,10 @@ jobs:
             package-lock.json
             # The shared toolchain configs the app's lint/typecheck re-export.
             tsconfig.base.json
+            # This workflow itself: an edit to the audit steps must run them,
+            # or a broken step change rides in green and fails the next
+            # unrelated PR instead.
+            .github/workflows/app-pr.yml
             eslint.base.js
             .prettierrc
             .prettierignore
@@ -273,10 +277,43 @@ jobs:
           npm install --prefix "$tools" --no-audit --no-fund --silent \
             puppeteer@24 axe-core@4
 
-          # `serve -s` rewrites unknown paths to index.html, which is exactly
-          # what the CloudFront 403/404 handler does in front of the real
-          # bucket — so the audit sees the app the way a user does.
-          npx --yes serve@14 -s "$DIST" -l 4173 >"$RUNNER_TEMP/serve.log" 2>&1 &
+          # Node-builtins static server, written inline: unknown paths rewrite
+          # to index.html, which is exactly what the CloudFront 403/404 handler
+          # does in front of the real bucket — so the audit sees the app the
+          # way a user does. It used to be `npx serve@14`, a cold registry
+          # download at run time — the one uncached fetch left in this job, and
+          # a registry brownout failed the audit on PRs that touched no app
+          # code at all (2026-09-04). The puppeteer/axe install above shares
+          # that exposure but cannot be inlined; this could, so it is.
+          cat >"$RUNNER_TEMP/static-server.cjs" <<'NODE'
+          const http = require('http');
+          const fs = require('fs');
+          const path = require('path');
+          const root = path.resolve(process.env.DIST);
+          const mime = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'text/javascript; charset=utf-8',
+            '.mjs': 'text/javascript; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.json': 'application/json',
+            '.map': 'application/json',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.ico': 'image/x-icon',
+            '.woff2': 'font/woff2',
+            '.txt': 'text/plain; charset=utf-8',
+          };
+          http.createServer((req, res) => {
+            const clean = path.normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
+            let file = path.join(root, clean);
+            if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+              file = path.join(root, 'index.html');
+            }
+            res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
+            fs.createReadStream(file).pipe(res);
+          }).listen(4173, '127.0.0.1');
+          NODE
+          node "$RUNNER_TEMP/static-server.cjs" >"$RUNNER_TEMP/serve.log" 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true' EXIT
 
