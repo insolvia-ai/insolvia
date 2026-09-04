@@ -25,6 +25,7 @@ from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
+from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
@@ -52,6 +53,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # not decide matching — Werkzeug ranks static URL segments above dynamic
     # ones, so /debtors and /documents always beat /<collection>.
     app.register_blueprint(case_entities_blueprint)
+    # /v1/cases/<id>/jobs — a static segment, so it always beats
+    # /<collection> for the same Werkzeug-ranking reason debtors does.
+    app.register_blueprint(jobs_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

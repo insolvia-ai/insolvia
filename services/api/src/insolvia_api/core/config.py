@@ -65,6 +65,7 @@ class AppConfig:
     firm_table_name: str | None = None
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
+    job_queue_url: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -116,6 +117,16 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     case key, S3 resolves it from the bucket's default encryption, and nothing
     in this service ever names it — which is what keeps this service's only
     KMS reach fenced to `kms:ViaService = s3` (modules/case_documents).
+    JOB_QUEUE_URL is the SQS queue the accept endpoint hands pipeline jobs to
+    (ADR 0018; published to SSM as /insolvia/<env>/api/job-queue-url and
+    re-derived into this env var by the deploy workflow). In local dev it is
+    this machine's real per-developer queue (scripts/dev-aws-setup.sh writes
+    it into services/api/.env), consumed by entrypoints/worker_poller.py —
+    the same no-emulator rule as every store above. Unset does NOT fall back
+    to a working in-memory pipeline: the composed MemoryJobQueue only records
+    the enqueue, and POST /v1/cases/<id>/jobs answers 503 when no queue is
+    composed at all — accepting work that can never run would be a lie the
+    status read repeats forever.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -151,6 +162,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         firm_table_name=source.get("FIRM_TABLE_NAME") or None,
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
+        job_queue_url=source.get("JOB_QUEUE_URL") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,

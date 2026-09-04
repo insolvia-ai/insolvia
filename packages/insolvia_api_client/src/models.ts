@@ -608,6 +608,66 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
 }
 
 // ---------------------------------------------------------------------------
+// Pipeline jobs — mirrors services/api/src/insolvia_api/core/jobs.py
+// (`job_json`, `KINDS`, `STATUSES`) and api/routes/jobs.py (ADR 0018).
+// ---------------------------------------------------------------------------
+
+/**
+ * The job kinds the API accepts today. The exact `KINDS` tuple from
+ * `core/jobs.py` — which is itself derived from the worker registry, so this
+ * union is "what the pipeline can actually run". 9.6 adds packet assembly
+ * here, 9.7 the AI review.
+ */
+export type JobKind = 'echo';
+
+/**
+ * Where a job sits. `queued` and `running` mean poll again; `succeeded` and
+ * `failed` are settled — except that a `failed` job whose failure was
+ * infrastructure (category `internal`) is still being retried by the
+ * pipeline and may yet flip to `succeeded`. Only `succeeded` never changes.
+ */
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+/**
+ * Why a job failed, in words safe to show the preparer. `category` is a
+ * machine key (`case_incomplete`, `internal`, …); `message` is the sentence
+ * to render.
+ */
+export interface JobFailure {
+  readonly category: string;
+  readonly message: string;
+}
+
+/**
+ * A pipeline job, as returned by both `/v1/cases/{caseId}/jobs` endpoints:
+ * `{"id", "kind", "status", "createdBy", "attempts", "createdAt",
+ * "updatedAt"}` plus `failure` only when failed and `result` only when
+ * succeeded — both **absent** otherwise, never `null`.
+ *
+ * There is no `caseId`: the caller named the case in the URL.
+ */
+export interface Job {
+  /** The server-generated job id — the handle {@link InsolviaApiClient.getCaseJob} polls. */
+  readonly id: string;
+  readonly kind: JobKind;
+  readonly status: JobStatus;
+  /**
+   * The subject of the firm user who accepted the job. Keyed the same way
+   * {@link FirmColleague.subject} is — resolve it through
+   * `listFirmDirectory`, never render it raw.
+   */
+  readonly createdBy: string;
+  /** How many times a worker has started this job. 0 until the first run. */
+  readonly attempts: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** Present only when `status` is `'failed'`. */
+  readonly failure?: JobFailure;
+  /** Present only when `status` is `'succeeded'`. Shape is per-kind. */
+  readonly result?: Readonly<Record<string, unknown>>;
+}
+
+// ---------------------------------------------------------------------------
 // Case documents — mirrors services/api/src/insolvia_api/core/documents.py
 // (`document_json`, `KINDS`, `CONTENT_TYPES`, `STATUSES`, `MAX_BYTE_SIZE`) and
 // api/routes/documents.py.

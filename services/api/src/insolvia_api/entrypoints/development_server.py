@@ -13,6 +13,8 @@ from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_api.adapters.aws.job_queue import SqsJobQueue
+from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.access_log import MemoryAccessLog
 from insolvia_api.adapters.memory.case_entity_store import MemoryCaseEntityStore
@@ -20,6 +22,8 @@ from insolvia_api.adapters.memory.case_store import MemoryCaseStore
 from insolvia_api.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_api.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_api.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
+from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
@@ -33,6 +37,8 @@ from insolvia_api.core.ports import (
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
+    JobQueue,
+    JobStore,
     WaitlistStore,
 )
 
@@ -127,6 +133,26 @@ else:
     debtor_store = MemoryDebtorStore()
     case_entity_store = MemoryCaseEntityStore()
 
+# The pipeline pair (ADR 0018). The store rides the case-table condition
+# above — a job is a child item of the case partition, so whichever table the
+# case store got, the job store shares. The QUEUE follows the user-directory
+# shape: with JOB_QUEUE_URL set (dev-aws-setup.sh writes this machine's real
+# dev queue into services/api/.env) an accepted job lands on real SQS, and
+# `python -m insolvia_api.entrypoints.worker_poller` in another terminal runs
+# it — the full accept → deliver → run → status loop on a laptop. Unset, the
+# memory queue records the enqueue and nothing runs, which is honest: there
+# is no worker in this process.
+job_store: JobStore
+if config.case_table_name and config.case_access_log_table_name:
+    job_store = DynamoDbJobStore(config.case_table_name)
+else:
+    job_store = MemoryJobStore()
+job_queue: JobQueue
+if config.job_queue_url:
+    job_queue = SqsJobQueue(config.job_queue_url)
+else:
+    job_queue = MemoryJobQueue()
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -157,5 +183,7 @@ app = create_app(
         document_blobs=document_blobs,
         debtor_store=debtor_store,
         case_entity_store=case_entity_store,
+        job_store=job_store,
+        job_queue=job_queue,
     )
 )

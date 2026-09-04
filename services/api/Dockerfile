@@ -15,6 +15,18 @@ COPY services/api/src/ ${LAMBDA_TASK_ROOT}/
 
 CMD ["insolvia_api.entrypoints.api_lambda.handler"]
 
+# The pipeline worker's image (ADR 0018) — same source tree, different
+# handler, its OWN image and ECR repository (insolvia-shared-jobs) rather
+# than a CMD override on the API's. The split looks redundant while the two
+# stages are byte-identical, and it is the point of ADR 0015's rule: when
+# 9.6/9.7 bring PDF assembly and model SDKs, their weight lands HERE (as
+# worker-only pip installs in this stage), and the API image never grows
+# them. Built and pushed by the same workflows that build the lambda stage;
+# seeded for a fresh environment by scripts/bootstrap-ecr-images.sh jobs.
+FROM lambda AS worker
+
+CMD ["insolvia_api.entrypoints.worker_lambda.handler"]
+
 FROM python:3.12-slim AS development
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

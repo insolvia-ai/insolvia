@@ -15,6 +15,7 @@ from insolvia_api.core.case_entities import CaseEntity, EntityKind
 from insolvia_api.core.cases import Case, CaseAssignment, CasePage
 from insolvia_api.core.debtors import Debtor
 from insolvia_api.core.documents import Document, StoredBlob
+from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.waitlist import WaitlistRecord
 
@@ -326,6 +327,64 @@ class CaseEntityStore(Protocol):
         neither implementation gets this ordering for free). All of them: a
         caller cannot page, so an implementation that can truncate must not."""
         ...
+
+
+class JobStore(Protocol):
+    """Persists pipeline job records (ADR 0018, issue #271).
+
+    Same table, same partition as every other case child item — a job is
+    SK=JOB#<id> under its case — and the same authorisation rule DebtorStore
+    and DocumentStore state: a job is reached only through its case, the
+    route resolves the case through `CaseStore` first on every path, and a
+    second ownership check here would eventually disagree with the first.
+    `case_id` is half the key, so a job id from another case does not resolve.
+
+    Written from BOTH sides of the pipeline: the API creates rows and reads
+    them back for status; the worker Lambda advances them. The conditional
+    `update` is what keeps those two writers — and SQS's at-least-once
+    redelivery — from trampling each other.
+    """
+
+    def create(self, job: Job) -> None:
+        """Store a new record. Ids are server-minted uuid4s, so an existing
+        (case, id) means the minting is broken — implementations MUST raise
+        rather than silently replace, exactly as CaseEntityStore.create
+        does."""
+        ...
+
+    def get(self, case_id: str, job_id: str) -> Job | None: ...
+
+    def list_for_case(self, case_id: str) -> tuple[Job, ...]:
+        """Every job of one case, in creation order (core/jobs.list_order —
+        the sort key embeds a random uuid, so neither implementation gets
+        the ordering for free). All of them: the accept endpoint's
+        one-active-job-per-kind check reads this, and a truncated answer
+        would let a duplicate pipeline run through."""
+        ...
+
+    def update(self, job: Job, *, expected_status: str) -> Job | None:
+        """Write `job` back, but only if the stored status is still
+        `expected_status` — the compare-and-swap every transition in
+        core/jobs.py rides on. None means the condition failed (or the row
+        is gone): the caller lost a race with a concurrent delivery and must
+        not pretend otherwise. See run_job for why that is the entire
+        at-least-once story."""
+        ...
+
+
+class JobQueue(Protocol):
+    """Hands an accepted job to the pipeline (ADR 0018).
+
+    The orchestration seam. One method on purpose: the message body is not a
+    parameter — implementations serialize with core/jobs.job_message, the one
+    owner of the wire shape, which is what the contract test pins. Implemented
+    by adapters/aws (SQS) and adapters/memory (tests and the plain
+    development server, which record the enqueue rather than running the job
+    — locally, jobs run through entrypoints/worker_poller.py against this
+    machine's real dev queue).
+    """
+
+    def enqueue(self, job: Job) -> None: ...
 
 
 class AccessLog(Protocol):
