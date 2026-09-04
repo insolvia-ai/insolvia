@@ -30,6 +30,7 @@ from insolvia_api.core.contract_leases import ContractLeaseBody
 from insolvia_api.core.creditors import CreditorBody
 from insolvia_api.core.debtors import CreditCounseling, Debtor, OtherName, Venue
 from insolvia_api.core.exemption_claims import ExemptionBody
+from insolvia_api.core.expenses import DependentBody, ExpenseBody, HouseholdBody
 from insolvia_api.core.fields import Address, PersonName
 from insolvia_api.core.form_fill import Check, Option, Text, WidgetStates, fill_form
 from insolvia_api.core.form_projections import (
@@ -571,6 +572,68 @@ def _codebtors() -> tuple[CodebtorBody, ...]:
     )
 
 
+def _households() -> tuple[tuple[str, HouseholdBody], ...]:
+    return (
+        (
+            "hh-main",
+            HouseholdBody(
+                which_household="main",
+                separate_household=False,
+                expenses_include_others=True,
+                change_expected=True,
+                change_explanation="Health insurance premiums increase in January.",
+            ),
+        ),
+    )
+
+
+def _expenses() -> tuple[ExpenseBody, ...]:
+    """The main household's monthly expense rows — one per 106J line the
+    family actually has, totalling 5,060.00."""
+
+    def expense(category: str, monthly: str, specify: str | None = None) -> ExpenseBody:
+        return ExpenseBody(
+            household_id="hh-main",
+            category=category,
+            amount=monthly,
+            specify_text=specify,
+        )
+
+    return (
+        expense("rent_or_home_ownership", "1480.00"),
+        expense("home_maintenance", "120.00"),
+        expense("electricity_heat_gas", "210.00"),
+        expense("water_sewer_garbage", "95.00"),
+        expense("telephone_and_internet", "140.00"),
+        expense("food_and_housekeeping", "850.00"),
+        expense("childcare_and_education", "300.00"),
+        expense("clothing_and_laundry", "120.00"),
+        expense("personal_care", "60.00"),
+        expense("medical_and_dental", "180.00"),
+        expense("transportation", "240.00"),
+        expense("entertainment_and_recreation", "90.00"),
+        expense("charitable_contributions", "50.00"),
+        expense("life_insurance", "45.00"),
+        expense("health_insurance", "380.00"),
+        expense("vehicle_insurance", "165.00"),
+        expense("taxes", "150.00", "Self-employment tax estimate"),
+        expense("vehicle_installment_payments", "260.00"),
+        expense("other_installment_payments", "55.00", "Financed laptop"),
+        expense("other", "70.00", "Dog food and veterinary care"),
+    )
+
+
+def _dependents() -> tuple[DependentBody, ...]:
+    return (
+        DependentBody(
+            household_id="hh-main",
+            relationship="Daughter",
+            age=9,
+            lives_with_debtor=True,
+        ),
+    )
+
+
 def reference_case_file() -> CaseFile:
     return CaseFile(
         case=REFERENCE_CASE,
@@ -671,6 +734,9 @@ def reference_case_file() -> CaseFile:
         claims=_claims(),
         contract_leases=_contract_leases(),
         codebtors=_codebtors(),
+        households=_households(),
+        expenses=_expenses(),
+        dependents=_dependents(),
         income_summaries=(
             IncomeSummaryBody(
                 debtor_id="debtor-0001",
@@ -703,9 +769,13 @@ def reference_case_file() -> CaseFile:
         "form/b106c",
         "form/b106d",
         "form/b106ef",
+        "form/b106dec",
         "form/b106g",
         "form/b106h",
         "form/b106i",
+        "form/b106j",
+        "form/b106j2",
+        "form/b106sum",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
@@ -1265,6 +1335,111 @@ def test_b106h_prints_one_community_property_block() -> None:
                 **{**case_file.__dict__, "community_household_members": (member,) * 2}
             ),
         )
+
+
+# --- B106J / B106J-2 ----------------------------------------------------------
+
+
+def test_b106j_expense_rows_land_on_their_lines_and_lines_22_23_derive() -> None:
+    release = latest_form("form/b106j")
+    values = dict(project(release, reference_case_file()))
+    assert values["line_1_joint_case"] == Option("yes")
+    assert values["line_1_debtor2_separate_household"] == Option("no")
+    assert values["line_4_rent_or_home_ownership"] == Text("1,480.00")
+    assert values["line_16_taxes"] == Text("150.00")
+    assert values["line_16_taxes_specify"] == Text("Self-employment tax estimate")
+    assert values["line_17a_car_payment_vehicle1"] == Text("260.00")
+    assert values["line_17c_installment_other_1"] == Text("55.00")
+    assert values["line_21_other_specify"] == Text("Dog food and veterinary care")
+    assert row(values, release, "line_2_dependent_relationship", 0) == Text("Daughter")
+    assert row(values, release, "line_2_dependent_age", 0) == Text("9")
+    assert row(values, release, "line_2_dependent_lives_with_you", 0) == Option("yes")
+    # 22a sums lines 4-21; no second household, so 22b stays blank and
+    # 22c = 22a; 23c = Schedule I line 12 less 22c.
+    assert values["line_22a_total_expenses"] == Text("5,060.00")
+    assert "line_22b_debtor2_expenses" not in values
+    assert values["line_22c_monthly_expenses"] == Text("5,060.00")
+    assert values["line_23a_combined_monthly_income"] == Text("8,149.50")
+    assert values["line_23c_net_income"] == Text("3,089.50")
+
+
+def test_b106j2_projects_only_its_gate_without_a_second_household() -> None:
+    release = latest_form("form/b106j2")
+    values = dict(project(release, reference_case_file()))
+    assert values["line_1_separate_households"] == Option("no")
+    assert "line_22_monthly_expenses" not in values
+
+
+def _with_second_household(case_file: CaseFile) -> CaseFile:
+    second = (
+        "hh-2",
+        HouseholdBody(which_household="debtor_2_separate", separate_household=True),
+    )
+    extra = (
+        ExpenseBody(
+            household_id="hh-2", category="rent_or_home_ownership", amount="900.00"
+        ),
+        ExpenseBody(
+            household_id="hh-2", category="food_and_housekeeping", amount="400.00"
+        ),
+    )
+    return CaseFile(
+        **{
+            **case_file.__dict__,
+            "households": (*case_file.households, second),
+            "expenses": case_file.expenses + extra,
+        }
+    )
+
+
+def test_b106j2_prints_the_second_household_and_carries_to_106j() -> None:
+    case_file = _with_second_household(reference_case_file())
+    values = dict(project(latest_form("form/b106j2"), case_file))
+    assert values["line_1_separate_households"] == Option("yes")
+    assert values["line_4_rent_or_home_ownership"] == Text("900.00")
+    assert values["line_22_monthly_expenses"] == Text("1,300.00")
+
+    j_values = dict(project(latest_form("form/b106j"), case_file))
+    assert j_values["line_22b_debtor2_expenses"] == Text("1,300.00")
+    assert j_values["line_22c_monthly_expenses"] == Text("6,360.00")
+
+
+# --- B106Sum and B106Dec ------------------------------------------------------
+
+
+def test_b106sum_copies_every_line_from_the_schedules() -> None:
+    release = latest_form("form/b106sum")
+    values = dict(project(release, reference_case_file()))
+    # Line 1: Schedule A/B's part totals.
+    assert values["line_1a_total_real_estate"] == Text("240,000.00")
+    assert values["line_1b_total_personal_property"] == Text("72,550.00")
+    assert values["line_1c_total_property"] == Text("312,550.00")
+    # Lines 2-3: D's Column A and E/F's 6e/6j.
+    assert values["line_2_secured_claims_total"] == Text("202,400.00")
+    assert values["line_3a_priority_unsecured_total"] == Text("3,650.00")
+    assert values["line_3b_nonpriority_unsecured_total"] == Text("22,800.00")
+    assert values["line_3_total_liabilities"] == Text("228,850.00")
+    # Lines 4-5: I's line 12 and J's line 22c.
+    assert values["line_4_combined_monthly_income"] == Text("8,149.50")
+    assert values["line_5_monthly_expenses"] == Text("5,060.00")
+    # Part 3: a chapter-7 consumer filing; line 8 stays blank for the
+    # means-test milestone.
+    assert values["line_6_filing_under_7_11_13"] == Option("yes")
+    assert values["line_7_kind_of_debt"] == Option("consumer")
+    assert "line_8_current_monthly_income" not in values
+    assert values["line_9b_taxes_government"] == Text("3,650.00")
+    assert values["line_9d_student_loans"] == Text("12,000.00")
+    assert values["line_9g_total"] == Text("15,650.00")
+
+
+def test_b106dec_answers_the_preparer_question_and_dates_the_signatures() -> None:
+    release = latest_form("form/b106dec")
+    values = dict(project(release, reference_case_file()))
+    assert values["paid_nonattorney_preparer"] == Option("no")
+    assert "preparer_name" not in values
+    assert values["debtor1_signature_date"] == Text("08/30/2026")
+    assert values["debtor2_signature_date"] == Text("08/30/2026")
+    assert "debtor1_signature" not in values
 
 
 @pytest.mark.parametrize(

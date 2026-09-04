@@ -54,10 +54,14 @@ from .b101 import project_b101_0624
 from .b106ab import project_b106ab_1215
 from .b106c import project_b106c_0425
 from .b106d import project_b106d_1215
+from .b106dec import project_b106dec_1215
 from .b106ef import project_b106ef_1215
 from .b106g import project_b106g_1215
 from .b106h import project_b106h_1215
 from .b106i import project_b106i_1215
+from .b106j import project_b106j_1215
+from .b106j2 import project_b106j2_1215
+from .b106sum import project_b106sum_1215
 from .shared import (
     CaseFile,
     FieldValues,
@@ -88,10 +92,14 @@ PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b106ab", "2015-12-01"): project_b106ab_1215,
     ("form/b106c", "2025-04-01"): project_b106c_0425,
     ("form/b106d", "2015-12-01"): project_b106d_1215,
+    ("form/b106dec", "2015-12-01"): project_b106dec_1215,
     ("form/b106ef", "2015-12-01"): project_b106ef_1215,
     ("form/b106g", "2015-12-01"): project_b106g_1215,
     ("form/b106h", "2015-12-01"): project_b106h_1215,
     ("form/b106i", "2015-12-01"): project_b106i_1215,
+    ("form/b106j", "2015-12-01"): project_b106j_1215,
+    ("form/b106j2", "2015-12-01"): project_b106j2_1215,
+    ("form/b106sum", "2015-12-01"): project_b106sum_1215,
 }
 
 

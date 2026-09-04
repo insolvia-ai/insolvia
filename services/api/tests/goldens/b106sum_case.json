@@ -1,0 +1,89 @@
+{
+ "fields": {
+  "1a": {
+   "value": "240,000.00"
+  },
+  "1b": {
+   "value": "72,550.00"
+  },
+  "1c": {
+   "value": "312,550.00"
+  },
+  "2": {
+   "value": "202,400.00"
+  },
+  "3a": {
+   "value": "3,650.00"
+  },
+  "3b": {
+   "value": "22,800.00"
+  },
+  "3c": {
+   "value": "228,850.00"
+  },
+  "4": {
+   "value": "8,149.50"
+  },
+  "5": {
+   "value": "5,060.00"
+  },
+  "8": {
+   "value": null
+  },
+  "9a": {
+   "value": "0.00"
+  },
+  "9b": {
+   "value": "3,650.00"
+  },
+  "9c": {
+   "value": "0.00"
+  },
+  "9d": {
+   "value": "12,000.00"
+  },
+  "9e": {
+   "value": "0.00"
+  },
+  "9f": {
+   "value": "0.00"
+  },
+  "9g": {
+   "value": "15,650.00"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check if this is an": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "check6": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check7": {
+   "value": "/consumer",
+   "widget_states": [
+    "/consumer",
+    "/Off"
+   ]
+  }
+ },
+ "release": "form/b106sum@2015-12-01",
+ "sha256": "7c597a64fce7ad5079197be329cea914b5868fb4e9c27dd47eeeaa254c38485d"
+}
