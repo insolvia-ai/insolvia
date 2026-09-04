@@ -53,10 +53,15 @@ import type {
   Debtor,
   FilingRole,
   HealthStatus,
+  CandidateOrigin,
+  CandidateStatus,
+  ExtractionCandidate,
   Job,
   JobFailure,
   JobKind,
   JobStatus,
+  ReviewCandidateRequest,
+  ReviewedCandidate,
   ListCasesOptions,
   ListCasesResult,
   OtherName,
@@ -382,12 +387,19 @@ export class InsolviaApiClient {
    * the caller's (see {@link getCase}), and with 503 in the brief deploy
    * window where this environment's pipeline is not up yet — retry later.
    */
-  async acceptCaseJob(caseId: string, kind: JobKind): Promise<Job> {
+  async acceptCaseJob(
+    caseId: string,
+    kind: JobKind,
+    options?: { readonly documentId?: string },
+  ): Promise<Job> {
     const headers = await this.#protectedHeaders();
+    const documentId = options?.documentId;
     const response = await this.#fetch(this.#jobsUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind }),
+      // `documentId` exactly when given: the document-scoped kinds
+      // (document_extraction) require it, every other kind refuses it.
+      body: JSON.stringify(documentId === undefined ? { kind } : { kind, documentId }),
     });
     const decoded = await decodeExpected(response, 202);
     return jobFromJson(decoded);
@@ -408,6 +420,74 @@ export class InsolviaApiClient {
     });
     const decoded = await decodeExpected(response, 200);
     return jobFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/extraction/candidates` — the case's review
+   * queue (issue 8.9): machine-proposed records awaiting, or past, human
+   * confirmation. Both streams — document extraction and MCP agent
+   * proposals — distinguishable only by each row's `origin`.
+   *
+   * Gated on the `extraction_review` feature: `hidden` answers 403 (check
+   * `me.permissions` before routing here), `view_only` and up may read.
+   * `status` narrows server-side; the review screen reads `'pending'`.
+   */
+  async listExtractionCandidates(
+    caseId: string,
+    status?: CandidateStatus,
+  ): Promise<readonly ExtractionCandidate[]> {
+    const headers = await this.#protectedHeaders();
+    const query = status === undefined ? '' : `?status=${encodeURIComponent(status)}`;
+    const response = await this.#fetch(`${this.#extractionCandidatesUrl(caseId)}${query}`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireCandidateArray(decoded, 'candidates');
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/extraction/candidates/{candidateId}/review` —
+   * the one confirmation act (issue 8.9): accept a pending candidate into
+   * the case (optionally with the record as the human corrected it), or
+   * reject it. Requires `extraction_review: add_edit`; `view_only` gets a
+   * 403 here while the listing above still answers.
+   *
+   * Throws {@link ApiValidationException} on a 400 — including the
+   * "confirm the referenced creditor/employment candidate first" refusal,
+   * keyed by the reference field — and a plain {@link ApiException} with
+   * 409 when the candidate was already reviewed (by this reviewer's own
+   * earlier call, or by a colleague who won the race).
+   */
+  async reviewExtractionCandidate(
+    caseId: string,
+    candidateId: string,
+    review: ReviewCandidateRequest,
+  ): Promise<ReviewedCandidate> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#extractionCandidatesUrl(caseId)}/${encodeURIComponent(candidateId)}/review`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          review.correctedPayload === undefined
+            ? { action: review.action }
+            : { action: review.action, correctedPayload: review.correctedPayload },
+        ),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    const candidate = candidateFromJson(childObject(decoded, 'candidate'));
+    if (decoded.json.record === undefined) {
+      return { candidate };
+    }
+    return { candidate, record: childObject(decoded, 'record').json };
+  }
+
+  /** `/v1/cases/{caseId}/extraction/candidates`, with the id encoded once. */
+  #extractionCandidatesUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/extraction/candidates`;
   }
 
   /** `/v1/cases/{caseId}/jobs`, with the id encoded exactly once. */
@@ -1476,10 +1556,19 @@ function caseFromJson(response: DecodedResponse): Case {
 /** A required field that must be a registered job kind. */
 function requireJobKind(response: DecodedResponse, key: string): JobKind {
   const value = response.json[key];
-  if (value === 'echo' || value === 'packet_assembly' || value === 'petition_review') {
+  if (
+    value === 'echo' ||
+    value === 'packet_assembly' ||
+    value === 'petition_review' ||
+    value === 'document_extraction'
+  ) {
     return value;
   }
-  throw malformedField(response, key, "one of 'echo' | 'packet_assembly' | 'petition_review'");
+  throw malformedField(
+    response,
+    key,
+    "one of 'echo' | 'packet_assembly' | 'petition_review' | 'document_extraction'",
+  );
 }
 
 /** A required field that must be one of the four job statuses. */
@@ -1510,6 +1599,7 @@ function jobFromJson(response: DecodedResponse): Job {
   if (response.json.result !== undefined) {
     result = childObject(response, 'result').json;
   }
+  const documentId = optionalString(response, 'documentId');
   const job: Job = {
     id: requireString(response, 'id'),
     kind: requireJobKind(response, 'kind'),
@@ -1518,10 +1608,110 @@ function jobFromJson(response: DecodedResponse): Job {
     attempts: requireNumber(response, 'attempts'),
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    ...(documentId === undefined ? {} : { documentId }),
     ...(failure === undefined ? {} : { failure }),
     ...(result === undefined ? {} : { result }),
   };
   return job;
+}
+
+const CANDIDATE_STATUSES: readonly CandidateStatus[] = [
+  'pending',
+  'accepted',
+  'corrected',
+  'rejected',
+  'withdrawn',
+];
+
+function requireCandidateStatus(response: DecodedResponse, key: string): CandidateStatus {
+  const value = response.json[key];
+  if (typeof value !== 'string' || !(CANDIDATE_STATUSES as readonly string[]).includes(value)) {
+    throw malformedField(response, key, 'CandidateStatus');
+  }
+  return value as CandidateStatus;
+}
+
+function candidateOriginFromJson(response: DecodedResponse): CandidateOrigin {
+  const channel = requireString(response, 'channel');
+  if (channel !== 'extraction' && channel !== 'mcp') {
+    throw malformedField(response, 'channel', "'extraction' | 'mcp'");
+  }
+  return {
+    channel,
+    clientId: requireString(response, 'clientId'),
+    subject: requireString(response, 'subject'),
+  };
+}
+
+/** Decodes one {@link ExtractionCandidate} from `candidate_json`'s shape. */
+function candidateFromJson(response: DecodedResponse): ExtractionCandidate {
+  const documentId = optionalString(response, 'documentId');
+  const note = optionalString(response, 'note');
+  const confirmedBy = optionalString(response, 'confirmedBy');
+  const confirmedAt = optionalString(response, 'confirmedAt');
+  const resultingRecordId = optionalString(response, 'resultingRecordId');
+  let confidence: number | undefined;
+  if (response.json.confidence !== undefined) {
+    const value = response.json.confidence;
+    if (typeof value !== 'number') {
+      throw malformedField(response, 'confidence', 'number');
+    }
+    confidence = value;
+  }
+  // The locator is the provenance vocabulary's shape ({document_id, page});
+  // only the page is surfaced — the document id already rides `documentId`.
+  let locatorPage: number | undefined;
+  if (response.json.locator !== undefined) {
+    const page = childObject(response, 'locator').json.page;
+    if (page !== undefined) {
+      if (typeof page !== 'number') {
+        throw malformedField(response, 'locator', '{ page?: number }');
+      }
+      locatorPage = page;
+    }
+  }
+  let correctedPayload: Readonly<Record<string, unknown>> | undefined;
+  if (response.json.correctedPayload !== undefined) {
+    correctedPayload = childObject(response, 'correctedPayload').json;
+  }
+  return {
+    id: requireString(response, 'id'),
+    entityType: requireString(response, 'entityType'),
+    status: requireCandidateStatus(response, 'status'),
+    payload: childObject(response, 'payload').json,
+    origin: candidateOriginFromJson(childObject(response, 'origin')),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    ...(documentId === undefined ? {} : { documentId }),
+    ...(confidence === undefined ? {} : { confidence }),
+    ...(locatorPage === undefined ? {} : { locatorPage }),
+    ...(note === undefined ? {} : { note }),
+    ...(confirmedBy === undefined ? {} : { confirmedBy }),
+    ...(confirmedAt === undefined ? {} : { confirmedAt }),
+    ...(correctedPayload === undefined ? {} : { correctedPayload }),
+    ...(resultingRecordId === undefined ? {} : { resultingRecordId }),
+  };
+}
+
+/** {@link requireCaseArray} for candidates — per-element, checked, not cast. */
+function requireCandidateArray(
+  response: DecodedResponse,
+  key: string,
+): readonly ExtractionCandidate[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'ExtractionCandidate[]');
+  }
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, `${key}[${index}]`, 'object');
+    }
+    return candidateFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+    });
+  });
 }
 
 /**

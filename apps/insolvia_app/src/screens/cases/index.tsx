@@ -1,10 +1,11 @@
-import { ApiValidationException } from '@insolvia-ai/api-client';
+import { ApiValidationException, permits } from '@insolvia-ai/api-client';
 import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
 import { Button, Field, Input, RadioGroup } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
@@ -206,6 +207,13 @@ function CaseList({
   colleagues: readonly FirmColleague[];
 }) {
   const theme = useTheme();
+  const membership = useMembership();
+  // The extraction-review link is the ONE gated link here: the feature
+  // defaults to hidden across the firm (issue 8.9 — it stays invisible until
+  // granted), so an ungated link would 403 for most users. `permits` is a
+  // courtesy, never a control — the screen and the API both re-check.
+  const mayReviewExtraction =
+    membership != null && permits(membership.permissions.extraction_review, 'view_only');
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   // A subject the directory does not carry still renders — as the subject. A
   // case opened by somebody since removed from the firm is history, and hiding
@@ -298,6 +306,18 @@ function CaseList({
           >
             Creditor matrix
           </Link>
+          {mayReviewExtraction ? (
+            <Link
+              href={`/cases/${item.id}/extraction-review`}
+              aria-label={`Review extracted records for case ${item.id}`}
+              style={[
+                styles.caseLink,
+                { color: theme.colors.primary, fontFamily: theme.typography.body },
+              ]}
+            >
+              Review extracted
+            </Link>
+          ) : null}
         </View>
       ))}
     </View>

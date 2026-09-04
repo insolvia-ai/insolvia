@@ -431,6 +431,53 @@ def _optional_str(value: object) -> str | None:
     return str(value) if value is not None else None
 
 
+def candidate_json(candidate: Candidate) -> dict[str, object]:
+    """The review queue's wire shape (8.9): everything a reviewing human
+    needs to verify a record — the proposed payload, where it came from
+    (origin, source document, page anchor, confidence), and the outcome once
+    there is one. Distinct from `candidate_review_json`, which is the
+    HARNESS-facing answer and deliberately omits the payload the harness
+    already holds. Absent values are omitted rather than sent as nulls."""
+    result: dict[str, object] = {
+        "id": candidate.id,
+        "entityType": candidate.entity_type,
+        "status": candidate.status,
+        "payload": prune_body(candidate.payload),
+        "origin": {
+            "channel": candidate.origin.channel,
+            "clientId": candidate.origin.client_id,
+            "subject": candidate.origin.subject,
+        },
+        "createdAt": candidate.created_at,
+        "updatedAt": candidate.updated_at,
+    }
+    if candidate.document_id is not None:
+        result["documentId"] = candidate.document_id
+    if candidate.confidence is not None:
+        result["confidence"] = candidate.confidence
+    if candidate.locator is not None:
+        result["locator"] = dict(candidate.locator)
+    if candidate.note is not None:
+        result["note"] = candidate.note
+    if candidate.external_ref is not None:
+        ref: dict[str, object] = {
+            "system": candidate.external_ref.system,
+            "externalId": candidate.external_ref.external_id,
+        }
+        if candidate.external_ref.external_url is not None:
+            ref["externalUrl"] = candidate.external_ref.external_url
+        result["externalRef"] = ref
+    if candidate.confirmed_by is not None:
+        result["confirmedBy"] = candidate.confirmed_by
+    if candidate.confirmed_at is not None:
+        result["confirmedAt"] = candidate.confirmed_at
+    if candidate.corrected_payload is not None:
+        result["correctedPayload"] = prune_body(candidate.corrected_payload)
+    if candidate.resulting_record_id is not None:
+        result["resultingRecordId"] = candidate.resulting_record_id
+    return result
+
+
 def candidate_review_json(candidate: Candidate) -> dict[str, object]:
     """The `check_proposals` wire shape: the review status, the human's
     corrections, and the resulting record id — the feedback signal. Absent

@@ -6,6 +6,7 @@ from typing import cast
 from flask import current_app
 from insolvia_core.ports import (
     AccessLog,
+    CandidateStore,
     CaseEntityStore,
     CaseStore,
     DebtorStore,
@@ -87,6 +88,11 @@ class ApiDependencies:
     # bucket, reached through document_blobs above. The API only reads this
     # store — the pipeline worker is the writer.
     packet_store: PacketStore | None = None
+    # The review queue (8.9): candidate rows are child items of the case
+    # partition (the "nothing to provision" argument once more), written by
+    # the extraction worker and the MCP service, read and resolved by the
+    # extraction-review routes.
+    candidate_store: CandidateStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

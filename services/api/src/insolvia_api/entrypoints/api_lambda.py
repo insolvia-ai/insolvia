@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asgiref.wsgi import WsgiToAsgi
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
@@ -129,6 +130,10 @@ app = create_app(
         # Assembled packets (issue #96): records in the case table, written
         # by the worker Lambda — the API composes this store to read them.
         packet_store=DynamoDbPacketStore(config.case_table_name),
+        # The review queue (8.9): candidate rows in the case table, written
+        # by the extraction worker and the MCP service — the API composes
+        # this store to list and resolve them.
+        candidate_store=DynamoDbCandidateStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

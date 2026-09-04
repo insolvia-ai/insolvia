@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
@@ -10,6 +11,7 @@ from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
@@ -19,6 +21,7 @@ from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
 from insolvia_core.ports import (
     AccessLog,
+    CandidateStore,
     CaseEntityStore,
     CaseStore,
     DebtorStore,
@@ -172,6 +175,15 @@ else:
         raise RuntimeError("memory packet store needs the memory case store")
     packet_store = MemoryPacketStore(case_store)
 
+# The review queue (8.9): candidate rows ride the case table like the job
+# store — this machine's real dev table, or the in-memory group with the
+# rest of the memory stores.
+candidate_store: CandidateStore
+if config.case_table_name and config.case_access_log_table_name:
+    candidate_store = DynamoDbCandidateStore(config.case_table_name)
+else:
+    candidate_store = MemoryCandidateStore()
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -205,5 +217,6 @@ app = create_app(
         job_store=job_store,
         job_queue=job_queue,
         packet_store=packet_store,
+        candidate_store=candidate_store,
     )
 )
