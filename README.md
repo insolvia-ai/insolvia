@@ -22,7 +22,7 @@ Runnable apps in `apps/`, shared libraries in `packages/`, backend services in
 | [`apps/insolvia_admin/`](apps/insolvia_admin/) | Internal staff portal — firm provisioning, Vite SPA, Google Workspace sign-in. |
 | [`apps/insolvia_marketing/`](apps/insolvia_marketing/) | Marketing site for `www.insolvia.ai` — React Router v7, SSR. |
 | [`packages/`](packages/) | Shared libraries: the API client (TypeScript) and `insolvia_core`, the Python services' shared domain. |
-| [`services/`](services/) | Backend services (Python on Lambda): `api`, `admin`, `mailer`. |
+| [`services/`](services/) | Backend services (Python on Lambda): `api`, `admin`, `mailer`, `mcp` (the remote MCP server). |
 | [`infra/`](infra/) | AWS infrastructure (Terraform): `ci-trust`, `shared`, `staging`, `prod`. |
 | [`docs/`](docs/) | [Business plan](docs/business/business-plan.html) + engineering runbooks. |
 

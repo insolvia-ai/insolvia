@@ -71,6 +71,12 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
 # the invariant tests/test_case_entities.py checks: a new prefix that collides
 # with (or is a prefix of) an existing one would hand one collection's items
 # to another's begins_with query.
+#
+# CANDIDATE is the MCP service's proposal rows (services/mcp, issue #262):
+# agent-written records awaiting human review, stored in the case's partition
+# but outside the case data proper — accepting one is what writes a real case
+# record. Registered here because this tuple is the one cross-service ledger
+# of who owns which SK prefix in that partition.
 RESERVED_SK_NAMESPACES: Final = (
     "META",
     "ASSIGNEE",
@@ -78,4 +84,5 @@ RESERVED_SK_NAMESPACES: Final = (
     "DOCUMENT",
     "JOB",
     "PACKET",
+    "CANDIDATE",
 )

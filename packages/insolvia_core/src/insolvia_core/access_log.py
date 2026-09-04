@@ -48,6 +48,11 @@ from datetime import UTC, datetime
 # edit. The worker's own reads are the accepting user's delegated access —
 # recording them per-read is 9.6/9.7's obligation when those workers arrive;
 # the skeleton's echo worker reads nothing.
+# candidate.propose / candidate.withdraw (issue #262) EXTEND the tuple the
+# way job.accept did: an agent proposing records through the MCP surface is
+# not a case write — candidates live outside the case — but it is machinery
+# aimed at one, and folding it into case.read would make "an agent queued
+# twenty records for review" indistinguishable from opening the case.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -57,6 +62,8 @@ ACTIONS = (
     "document.download",
     "document.delete",
     "job.accept",
+    "candidate.propose",
+    "candidate.withdraw",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
