@@ -39,7 +39,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer"])
+  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -125,6 +125,26 @@ module "admin_service" {
   audit_deletion_protection = true
 
   tags = local.common_tags
+}
+
+# MCP service (#262, ADR 0016): the remote MCP server (services/mcp) — a
+# second protocol surface over the same case and firm stores, deployed the
+# way the API is: same cert-lookup reuse, same image-before-apply bootstrap
+# on the first apply (scripts/bootstrap-ecr-images.sh prod mcp). Its data
+# grants attach from modules/case_store and modules/firm_store
+# (mcp_role_name), so this module owns only the service stack itself.
+module "mcp_service" {
+  source = "../../modules/mcp_service"
+
+  project             = "insolvia"
+  environment         = local.environment
+  insolvia_env        = "production"
+  domain_name         = var.mcp_subdomain
+  hosted_zone_id      = data.aws_route53_zone.main.zone_id
+  acm_certificate_arn = data.aws_acm_certificate.wildcard.arn
+  ecr_repository_url  = data.aws_ecr_repository.service["mcp"].repository_url
+  image_tag           = local.environment
+  tags                = local.common_tags
 }
 
 # Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
@@ -374,6 +394,7 @@ module "case_store" {
   environment                 = local.environment
   api_role_name               = module.api_service.lambda_role_name
   worker_role_name            = module.job_pipeline.worker_role_name
+  mcp_role_name               = module.mcp_service.lambda_role_name
   deletion_protection         = true
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
@@ -395,6 +416,7 @@ module "firm_store" {
   kms_key_arn            = module.case_store.kms_key_arn
   api_role_name          = module.api_service.lambda_role_name
   admin_role_name        = module.admin_service.lambda_role_name
+  mcp_role_name          = module.mcp_service.lambda_role_name
   point_in_time_recovery = true
   deletion_protection    = true
   tags                   = local.common_tags
@@ -461,6 +483,51 @@ resource "aws_ssm_parameter" "firm_table_name" {
   name  = "/insolvia/${local.environment}/api/firm-table-name"
   type  = "String"
   value = module.firm_store.table_name
+  tags  = local.common_tags
+}
+
+# ── MCP configuration namespace (#261/#262) ─────────────────────
+# The /insolvia/<env>/mcp siblings of the api namespace above — env-level for
+# the same cycle-avoidance reason (module.case_store and module.firm_store
+# depend on module.mcp_service to attach its grants), re-published under /mcp
+# because each service's namespace is its complete configuration contract.
+# See infra/envs/staging/main.tf for the longer form of both arguments.
+resource "aws_ssm_parameter" "mcp_case_table_name" {
+  name  = "/insolvia/${local.environment}/mcp/case-table-name"
+  type  = "String"
+  value = module.case_store.table_name
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "mcp_case_access_log_table_name" {
+  name  = "/insolvia/${local.environment}/mcp/case-access-log-table-name"
+  type  = "String"
+  value = module.case_store.access_log_table_name
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "mcp_firm_table_name" {
+  name  = "/insolvia/${local.environment}/mcp/firm-table-name"
+  type  = "String"
+  value = module.firm_store.table_name
+  tags  = local.common_tags
+}
+
+resource "aws_ssm_parameter" "mcp_auth_issuer_url" {
+  name  = "/insolvia/${local.environment}/mcp/auth-issuer-url"
+  type  = "String"
+  value = module.auth.issuer_url
+  tags  = local.common_tags
+}
+
+# The client-id allowlist (#261): derived from the registered harness clients
+# so registering a harness IS adding it to the allowlist. On prod this is the
+# claude client alone — the inspector client is deliberately absent
+# (modules/auth's mcp_inspector_client, default false).
+resource "aws_ssm_parameter" "mcp_auth_client_ids" {
+  name  = "/insolvia/${local.environment}/mcp/auth-client-ids"
+  type  = "String"
+  value = join(",", module.auth.mcp_client_ids)
   tags  = local.common_tags
 }
 # The document bucket's name, same namespace and same reasoning as the two

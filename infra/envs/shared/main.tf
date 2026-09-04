@@ -141,8 +141,12 @@ module "email" {
 # (arn:aws:ecr:...:repository/insolvia-*, infra/envs/ci-trust/main.tf) covers
 # them without an IAM change — that grant is human-applied, so a rename OUT of
 # that prefix would strand the pipeline.
+# `mcp` is the remote MCP server (services/mcp, ADR 0016) — its own image
+# and its own repository, per the ADR's release-cadence argument: the MCP
+# surface churns while harnesses are verified, and each of those deploys
+# must not redeploy the API the app depends on.
 locals {
-  container_repositories = toset(["api", "admin-api", "jobs", "marketing", "mailer"])
+  container_repositories = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp"])
 }
 
 resource "aws_ecr_repository" "service" {

@@ -35,6 +35,17 @@ variable "mailer_subdomain" {
   default     = "staging-mailer-api.insolvia.ai"
 }
 
+# The MCP server's host (ADR 0016 gives it a hostname of its own: this string
+# is the canonical resource URI's authority, and it must stay stable however
+# the API's routing evolves). Must agree with services/mcp's
+# core/config.py _RESOURCE_URLS — the service pins its Host-header validation
+# and its published metadata to that constant.
+variable "mcp_subdomain" {
+  description = "Hostname the MCP server serves in this environment."
+  type        = string
+  default     = "staging-mcp.insolvia.ai"
+}
+
 # Same flat-label reasoning once more: `*.insolvia.ai` covers
 # `staging-www.insolvia.ai`, not a nested `www.staging.…`. Prod serves the
 # real `www.insolvia.ai` plus the apex; staging serves this host only.

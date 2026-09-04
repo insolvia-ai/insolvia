@@ -83,6 +83,12 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     ! grep -q "^AUTH_USER_POOL_ID=$pool_id\$" "$API_DIR/.env"; then
     die "services/api/.env is missing or stale. Run setup without --check."
   fi
+  if [[ ! -f "$REPO_ROOT/services/mcp/.env" ]] ||
+    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/mcp/.env" ||
+    ! grep -q "^FIRM_TABLE_NAME=$firm_table\$" "$REPO_ROOT/services/mcp/.env" ||
+    ! grep -q "^AUTH_CLIENT_IDS=" "$REPO_ROOT/services/mcp/.env"; then
+    die "services/mcp/.env is missing or stale. Run setup without --check."
+  fi
   ok "Per-machine AWS resources and services/api/.env are ready."
   exit 0
 fi
@@ -105,6 +111,7 @@ issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
 google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
+mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
 
 # ── Wire services/api at the real table ─────────────────────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
@@ -166,6 +173,22 @@ upsert_env "$admin_env" INSOLVIA_ENV "local"
 upsert_env "$admin_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$admin_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 
+# ── Wire services/mcp at the same resources (#261/#262) ─────────
+# The MCP server is a second surface over the SAME tables and the SAME pool
+# (ADR 0016); locally it runs under the developer's own IAM user like the API
+# and admin dev servers. AUTH_CLIENT_IDS is the harness allowlist — this
+# machine's claude + inspector app clients, comma-joined exactly as the
+# deployed SSM parameter is. None of these values is a secret.
+mcp_env="$REPO_ROOT/services/mcp/.env"
+upsert_env "$mcp_env" CASE_TABLE_NAME "$case_table"
+upsert_env "$mcp_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
+upsert_env "$mcp_env" FIRM_TABLE_NAME "$firm_table"
+upsert_env "$mcp_env" AUTH_ISSUER_URL "$issuer_url"
+upsert_env "$mcp_env" AUTH_CLIENT_IDS "$mcp_auth_client_ids"
+upsert_env "$mcp_env" INSOLVIA_ENV "local"
+upsert_env "$mcp_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
+upsert_env "$mcp_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only
 # `EXPO_PUBLIC_*`-prefixed variables into the bundle, and it loads them from
@@ -185,7 +208,7 @@ upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
 
-ok "AWS development resources are ready; services/api/.env, services/admin/.env and apps/insolvia_app/.env were updated."
+ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env and apps/insolvia_app/.env were updated."
 
 # If setup is reapplied while the API container is already running, replace it
 # so it picks up the new table name and the freshly exported credentials —
@@ -206,3 +229,4 @@ printf '  Web client id:     %s\n' "$web_client_id"
 printf '  Hosted domain:     %s\n' "$auth_domain"
 printf '  Issuer:            %s\n' "$issuer_url"
 printf '\nStart the API against your per-machine table with:\n  ./services/api/scripts/dev-up.sh\n'
+printf 'Start the MCP server (then connect an inspector — services/mcp/README.md):\n  ./services/mcp/scripts/dev-up.sh\n'

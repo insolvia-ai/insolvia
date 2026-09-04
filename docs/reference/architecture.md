@@ -17,7 +17,7 @@ insolvia/
 │   └── insolvia_marketing/            React Router v7 + Vite, SSR
 ├── packages/
 │   └── insolvia_api_client/           @insolvia-ai/api-client
-├── services/                          api · mailer (Python on Lambda)
+├── services/                          api · admin · mailer · mcp (Python on Lambda)
 ├── infra/                             Terraform — ci-trust / shared / staging / prod
 ├── tool/                              reconcile-cognito-branding.ts
 └── docs/                              business plan + runbooks

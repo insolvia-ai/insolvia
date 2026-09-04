@@ -235,3 +235,35 @@ output "admin_portal_url" {
   description = "Where the admin portal serves."
   value       = module.admin_web_hosting.url
 }
+
+# ── MCP service (#262) ──────────────────────────────────────────
+
+output "mcp_ecr_repository_url" {
+  description = "ECR repository the MCP deploy workflow pushes images to (shared across environments)."
+  value       = module.mcp_service.ecr_repository_url
+}
+
+output "mcp_lambda_function_name" {
+  description = "MCP Lambda function name (deploy target)."
+  value       = module.mcp_service.lambda_function_name
+}
+
+output "mcp_lambda_alias_name" {
+  description = "Alias serving MCP traffic — shifted only after the smoke test."
+  value       = module.mcp_service.lambda_alias_name
+}
+
+output "mcp_domain" {
+  description = "Hostname the MCP server serves; the endpoint is https://<this>/mcp."
+  value       = module.mcp_service.domain_name
+}
+
+output "mcp_alarms_topic_arn" {
+  description = "SNS topic the MCP alarms publish to (subscribe by hand)."
+  value       = module.mcp_service.alarms_topic_arn
+}
+
+output "mcp_client_ids" {
+  description = "MCP harness app client ids — the service's token allowlist (#261)."
+  value       = module.auth.mcp_client_ids
+}

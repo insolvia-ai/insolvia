@@ -1,0 +1,169 @@
+name: MCP · Deploy · Staging
+
+# Steady-state deploy for the MCP service (services/mcp, ADR 0016): push a
+# fresh image, point the Lambda at it, re-derive its environment from the
+# /insolvia/staging/mcp SSM namespace, smoke-test the endpoint. Same shape as
+# api-staging.yml minus the worker half.
+#
+# The FIRST deploy in a fresh environment cannot run through this workflow: an
+# Image-package Lambda refuses to be created before its image exists, so the
+# infra apply deadlocks. Bootstrap once by hand, per
+# infra/modules/mcp_service/main.tf:
+#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-shared-mcp)
+#   2. scripts/bootstrap-ecr-images.sh staging mcp
+#   3. terraform apply   (full)
+# After that, every deploy is this workflow.
+
+on:
+  # Reusable: release.yml calls this as one leg of a staging release, and it
+  # stays dispatchable by hand for a single-service deploy.
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# Held while this workflow deploys, shared with infra-staging.yml — same
+# rationale as api-staging.yml's group.
+concurrency:
+  group: insolvia-terraform-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Read staging infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          {
+            echo "repo=$(terraform -chdir=infra/envs/staging output -raw mcp_ecr_repository_url)"
+            echo "function=$(terraform -chdir=infra/envs/staging output -raw mcp_lambda_function_name)"
+            echo "domain=$(terraform -chdir=infra/envs/staging output -raw mcp_domain)"
+            echo "alias=$(terraform -chdir=infra/envs/staging output -raw mcp_lambda_alias_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      - name: Build and push image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # `sha-<sha>` is the immutable build identity a production promotion
+          # resolves to a digest; `staging` is the moving marker tag a
+          # from-scratch apply seeds the Lambda from — api-staging.yml's
+          # comment owns the full argument. Context is the repo root: the
+          # image installs packages/insolvia_core by relative path.
+          docker build --target lambda -f services/mcp/Dockerfile \
+            -t "$REPO:sha-${{ github.sha }}" \
+            -t "$REPO:staging" \
+            .
+          docker push "$REPO:sha-${{ github.sha }}"
+          docker push "$REPO:staging"
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # No --publish: the next step rewrites the environment from SSM, and
+          # a version published now would snapshot the OLD configuration.
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$REPO:sha-${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      - name: Re-derive Lambda environment from SSM
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          # /insolvia/staging/mcp/<kebab-key> -> KEBAB_KEY:
+          #   insolvia-env               -> INSOLVIA_ENV
+          #   case-table-name            -> CASE_TABLE_NAME
+          #   case-access-log-table-name -> CASE_ACCESS_LOG_TABLE_NAME
+          #   firm-table-name            -> FIRM_TABLE_NAME
+          #   auth-issuer-url            -> AUTH_ISSUER_URL
+          #   auth-client-ids            -> AUTH_CLIENT_IDS
+          # Terraform ignores `environment` drift on the Lambda — this step
+          # owns it.
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/staging/mcp \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          # Refuse to ship nonsense: an empty or half-applied namespace would
+          # otherwise silently wipe every variable the service reads.
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "staging"' > /dev/null
+          echo "$environment" | jq -e '.Variables.AUTH_CLIENT_IDS | length > 0' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # Staging publishes and shifts in one go — it is the proving ground.
+      # Production does the opposite (smoke-test first, shift after).
+      - name: Publish version and shift the live alias
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          ALIAS: ${{ steps.tf.outputs.alias }}
+        run: |
+          version="$(aws lambda publish-version \
+            --function-name "$FUNCTION" \
+            --query Version --output text)"
+          aws lambda update-alias \
+            --function-name "$FUNCTION" \
+            --name "$ALIAS" \
+            --function-version "$version"
+          echo "Staging now serving version $version via alias $ALIAS." >> "$GITHUB_STEP_SUMMARY"
+
+      # The MCP surface has no public /health — every tool is authenticated —
+      # so the smoke test is the two unauthenticated facts the spec REQUIRES
+      # this server to publish: the RFC 9728 protected-resource metadata, and
+      # a 401 + WWW-Authenticate challenge from the MCP endpoint itself.
+      # Together they prove the image boots, the SDK's routes mounted, the
+      # custom domain resolves, and auth fails closed.
+      - name: Smoke test
+        env:
+          DOMAIN: ${{ steps.tf.outputs.domain }}
+        run: |
+          curl -sSf "https://$DOMAIN/.well-known/oauth-protected-resource/mcp" | tee metadata.json
+          jq -e --arg url "https://$DOMAIN/mcp" '.resource == $url' metadata.json > /dev/null
+          jq -e '.authorization_servers | length == 1' metadata.json > /dev/null
+
+          status="$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST "https://$DOMAIN/mcp" \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: tools/list' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}')"
+          if [ "$status" != "401" ]; then
+            echo "::error::Expected an unauthenticated tools/list to answer 401, got $status."
+            exit 1
+          fi

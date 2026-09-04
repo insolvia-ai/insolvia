@@ -77,3 +77,16 @@ output "google_admin_client_id" {
   description = "The dev Google OAuth client id (public), for services/admin/.env and the portal dev server."
   value       = var.google_admin_client_id
 }
+
+# The MCP service's token allowlist (#261): every harness app client on this
+# machine's pool, comma-joined the way the deployed SSM parameter is —
+# dev-aws-setup.sh writes it into services/mcp/.env as AUTH_CLIENT_IDS.
+output "mcp_auth_client_ids" {
+  description = "Comma-joined MCP harness app client ids (AUTH_CLIENT_IDS for the local MCP server)."
+  value       = join(",", module.auth.mcp_client_ids)
+}
+
+output "mcp_client_ids_by_harness" {
+  description = "MCP harness app client ids by harness — printed so a developer can point the inspector's client id field at the right one."
+  value       = module.auth.mcp_client_ids_by_harness
+}

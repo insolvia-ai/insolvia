@@ -41,8 +41,9 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin jobs mailer marketing   (default: all five;
-#                `jobs` is the pipeline worker image — ADR 0018)
+#   service ...  any of: api admin jobs mailer marketing mcp   (default: all
+#                six; `jobs` is the pipeline worker image — ADR 0018, `mcp`
+#                the remote MCP server — ADR 0016)
 #   --dispatch   after pushing, re-run the matching deploy workflows
 #                (<service>-<env>.yml; jobs rides api-<env>.yml)
 #   --yes        skip the confirmation prompt
@@ -103,6 +104,7 @@ ecr_component() {
     jobs)      printf 'jobs' ;;
     mailer)    printf 'mailer' ;;
     marketing) printf 'marketing' ;;
+    mcp)       printf 'mcp' ;;
     *)         die "no ECR component mapping for service '$1'" ;;
   esac
 }
@@ -123,7 +125,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|jobs|mailer|marketing) SERVICES+=("$arg") ;;
+    api|admin|jobs|mailer|marketing|mcp) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -132,7 +134,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing mcp)
 
 require_command aws
 require_command docker
@@ -218,6 +220,14 @@ build_jobs() {
 build_mailer() {
   docker build --platform "$PLATFORM" --target lambda \
     -t "$1:$ENV" "$REPO_ROOT/services/mailer"
+}
+
+build_mcp() {
+  # Same repo-root-context rule as build_api — the image installs the shared
+  # packages/insolvia_core by relative path (ADR 0016).
+  docker build --platform "$PLATFORM" --target lambda \
+    -f "$REPO_ROOT/services/mcp/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
 }
 
 build_marketing() {

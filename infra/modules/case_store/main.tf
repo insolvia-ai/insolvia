@@ -430,6 +430,79 @@ resource "aws_iam_role_policy" "api_case_access" {
   })
 }
 
+# ── The third application principal: the MCP service ────────────
+# ADR 0016 amends "exactly one principal reads this table" the way ADR 0011
+# did for the admin service: the MCP server is a second protocol surface
+# over the same case domain, under a role of its own so a misbehaving
+# harness's blast radius is its own.
+#
+# Same statements as the API's grant with the write set NARROWED, and the
+# narrowing is the design: no UpdateItem, no DeleteItem, no BatchWriteItem,
+# no TransactWriteItems. The only rows this service writes are CANDIDATE#
+# items — agent proposals awaiting human review — and both candidate writes
+# are conditional PutItems (create refuses to overwrite; withdrawal is a
+# compare-and-swap on status). Honest about the limit: IAM cannot fence a
+# PutItem to one SORT-KEY namespace (dynamodb:LeadingKeys is partition keys
+# only), so "candidates only" remains an application property enforced by
+# services/mcp having no case-record write path (ADR 0013's structural
+# invariant) — what the omissions DO buy is that a compromised MCP service
+# cannot delete rows, and cannot make the transactional case+assignment
+# write that creating a case requires.
+#
+# The access-log append rides along, same append-only shape as the API's:
+# every case read through this surface is recorded, and the service can
+# never read, amend or delete an entry. No Scan, same as every principal.
+resource "aws_iam_role_policy" "mcp_case_access" {
+  count = var.mcp_role_name == null ? 0 : 1
+
+  name = "${local.name}-mcp-access"
+  role = var.mcp_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CaseTableData"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:BatchGetItem",
+          "dynamodb:Query",
+          "dynamodb:PutItem",
+          "dynamodb:ConditionCheckItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.cases.arn,
+          "${aws_dynamodb_table.cases.arn}/index/*",
+        ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        Sid      = "CaseAccessLogAppend"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = aws_dynamodb_table.access_log.arn
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        Sid      = "CaseKeyUse"
+        Effect   = "Allow"
+        Action   = local.api_key_actions
+        Resource = aws_kms_key.case.arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}
+
 # ── The second application principal: the pipeline worker ───────
 # ADR 0018 amends "exactly one principal reads this table" the way ADR 0011
 # amended ADR 0001: the worker Lambda is the API's own long-running half — it
