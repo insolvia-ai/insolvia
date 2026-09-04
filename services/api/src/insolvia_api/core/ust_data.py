@@ -13,6 +13,9 @@ source register rates this row high-risk — "everything downstream"):
     ust/irs-local-standards           Local Standards: housing/utilities by
                                       county and the transportation tables
                                       (B122A-2 lines 8-14)
+    ust/ch13-admin-multipliers        Chapter 13 administrative expense
+                                      multipliers by judicial district
+                                      (B122A-2 line 36)
 
 Each release is a committed directory under `src/insolvia_api/regulatory/`
 per the regulatory release registry model (docs/reference/effective-dating.md;
@@ -56,11 +59,13 @@ from .exemptions import Source, Verification
 MEDIAN_INCOME_SERIES = "ust/census-median-family-income"
 NATIONAL_STANDARDS_SERIES = "ust/irs-national-standards"
 LOCAL_STANDARDS_SERIES = "ust/irs-local-standards"
+CH13_MULTIPLIERS_SERIES = "ust/ch13-admin-multipliers"
 
 _SERIES_PAYLOADS = {
     MEDIAN_INCOME_SERIES: "census-median-family-income",
     NATIONAL_STANDARDS_SERIES: "irs-national-standards",
     LOCAL_STANDARDS_SERIES: "irs-local-standards",
+    CH13_MULTIPLIERS_SERIES: "ch13-admin-multipliers",
 }
 
 _MONEY_RE = re.compile(r"^[1-9]\d*\.\d{2}$")
@@ -260,7 +265,41 @@ class LocalStandards:
         return found
 
 
-PayloadT = TypeVar("PayloadT", MedianIncomeTable, NationalStandards, LocalStandards)
+@dataclass(frozen=True)
+class Ch13AdminMultipliers:
+    """The UST's schedule of actual Chapter 13 administrative expenses per
+    judicial district, as fractions (§ 707(b)(2)(A)(ii)(III); B122A-2 line
+    36 multiplies the projected plan payment by this). Keyed by the UST's
+    own district names ('Middle Florida', 'District of Columbia')."""
+
+    multipliers: Mapping[str, str]
+
+    def multiplier_for(self, district: str) -> Decimal:
+        """The fraction for a case's district. Accepts either the UST's own
+        spelling or the courts' ('Middle District of Florida'); raises
+        KeyError when neither matches — a wrong-district multiplier is a
+        wrong means test, so no fallback."""
+        cleaned = " ".join(district.split())
+        found = self.multipliers.get(cleaned)
+        if found is None and cleaned != "District of Columbia":
+            # 'Middle District of Florida' -> 'Middle Florida';
+            # 'District of Alaska' -> 'Alaska'.
+            stripped = " ".join(cleaned.replace("District of", "").split())
+            found = self.multipliers.get(stripped)
+        if found is None:
+            raise KeyError(
+                f"the Chapter 13 multiplier table has no district {district!r}"
+            )
+        return Decimal(found)
+
+
+PayloadT = TypeVar(
+    "PayloadT",
+    MedianIncomeTable,
+    NationalStandards,
+    LocalStandards,
+    Ch13AdminMultipliers,
+)
 
 
 @dataclass(frozen=True)
@@ -276,7 +315,9 @@ class Release:
     notes: str
     verification: Verification
     sources: tuple[Source, ...]
-    payload: MedianIncomeTable | NationalStandards | LocalStandards
+    payload: (
+        MedianIncomeTable | NationalStandards | LocalStandards | Ch13AdminMultipliers
+    )
 
     @property
     def release_id(self) -> str:
@@ -453,6 +494,26 @@ def _national_payload(payload: Mapping[str, object], where: str) -> NationalStan
     )
 
 
+def _ch13_payload(payload: Mapping[str, object], where: str) -> Ch13AdminMultipliers:
+    raw = payload.get("multipliers")
+    if not isinstance(raw, dict) or not raw:
+        raise _fail(where, "multipliers missing or empty")
+    multipliers: dict[str, str] = {}
+    for district, value in raw.items():
+        if not isinstance(district, str) or not district.strip():
+            raise _fail(where, "multiplier district name missing")
+        if not isinstance(value, str):
+            raise _fail(where, f"{district}: multiplier must be a string")
+        try:
+            fraction = Decimal(value)
+        except ArithmeticError as exc:
+            raise _fail(where, f"{district}: multiplier {value!r}: {exc}") from exc
+        if not Decimal("0") <= fraction < Decimal("1"):
+            raise _fail(where, f"{district}: multiplier {value!r} is not a fraction")
+        multipliers[district] = value
+    return Ch13AdminMultipliers(multipliers=multipliers)
+
+
 def _local_payload(payload: Mapping[str, object], where: str) -> LocalStandards:
     raw_states = payload.get("states")
     if (
@@ -616,11 +677,15 @@ def _load_release(release_dir: Traversable, series_id: str) -> Release:
     if verification is Verification.UNVERIFIED:
         raise _fail(where, "a means-testing dataset may never be unverified")
 
-    payload: MedianIncomeTable | NationalStandards | LocalStandards
+    payload: (
+        MedianIncomeTable | NationalStandards | LocalStandards | Ch13AdminMultipliers
+    )
     if series_id == MEDIAN_INCOME_SERIES:
         payload = _medians_payload(payload_raw, where)
     elif series_id == NATIONAL_STANDARDS_SERIES:
         payload = _national_payload(payload_raw, where)
+    elif series_id == CH13_MULTIPLIERS_SERIES:
+        payload = _ch13_payload(payload_raw, where)
     else:
         payload = _local_payload(payload_raw, where)
 
@@ -748,3 +813,8 @@ def national_standards(as_of: date) -> tuple[Release, NationalStandards]:
 def local_standards(as_of: date) -> tuple[Release, LocalStandards]:
     """The Local Standards in force on `as_of`, with their release."""
     return _payload(resolve(LOCAL_STANDARDS_SERIES, as_of), LocalStandards)
+
+
+def ch13_admin_multipliers(as_of: date) -> tuple[Release, Ch13AdminMultipliers]:
+    """The Chapter 13 multipliers in force on `as_of`, with their release."""
+    return _payload(resolve(CH13_MULTIPLIERS_SERIES, as_of), Ch13AdminMultipliers)

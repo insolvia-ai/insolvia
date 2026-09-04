@@ -4091,6 +4091,7 @@ describe('the case-collection enums', () => {
       'contract_leases',
       'community_household_members',
       'other_income_records',
+      'means_test_inputs',
     ]);
   });
 

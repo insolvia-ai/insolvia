@@ -180,6 +180,34 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "amount": "275.00",
         "payer": "Example State Agency",
     },
+    "means_test_inputs": {
+        "people_under_65": 3,
+        "people_65_or_older": 0,
+        "marital_adjustments": [
+            {
+                "id": "ma1",
+                "description": "Spouse's own student loan",
+                "amount": "220.00",
+            }
+        ],
+        "home_secured_monthly_total": "1450.00",
+        "vehicle_count": 1,
+        "vehicle_1_loan_monthly": "310.00",
+        "taxes": "780.00",
+        "involuntary_deductions": "95.00",
+        "health_insurance": "410.00",
+        "other_secured_payments": [
+            {
+                "id": "os1",
+                "creditor_name": "Example Finance",
+                "property_description": "Boat",
+                "monthly_payment": "120.00",
+            }
+        ],
+        "priority_cure_total": "2400.00",
+        "ch13_eligible": True,
+        "ch13_projected_plan_payment": "500.00",
+    },
 }
 
 

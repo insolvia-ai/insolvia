@@ -16,14 +16,17 @@ from pathlib import Path
 import pytest
 from insolvia_api.core.dollar_amounts import latest as latest_dollar_amounts
 from insolvia_api.core.ust_data import (
+    CH13_MULTIPLIERS_SERIES,
     LOCAL_STANDARDS_SERIES,
     MEDIAN_INCOME_SERIES,
     NATIONAL_STANDARDS_SERIES,
+    Ch13AdminMultipliers,
     LocalStandards,
     MedianIncomeTable,
     NationalStandards,
     Release,
     Verification,
+    ch13_admin_multipliers,
     get,
     latest,
     load_registry,
@@ -43,9 +46,10 @@ AS_OF = date(2026, 9, 4)
 # --- the committed registry loads, whole -------------------------------------
 
 
-def test_the_registry_holds_the_three_series() -> None:
+def test_the_registry_holds_the_four_series() -> None:
     assert series_ids() == (
         MEDIAN_INCOME_SERIES,
+        CH13_MULTIPLIERS_SERIES,
         LOCAL_STANDARDS_SERIES,
         NATIONAL_STANDARDS_SERIES,
     )
@@ -212,6 +216,27 @@ def test_the_national_transportation_figures_match_the_ust_table() -> None:
         transportation.ownership_costs.for_vehicles(3)
 
 
+# --- the Chapter 13 multipliers (B122A-2 line 36) -----------------------------
+
+
+def test_the_launch_district_multipliers_match_the_ust_table() -> None:
+    _, table = ch13_admin_multipliers(AS_OF)
+    assert table.multiplier_for("Middle Florida") == Decimal("0.1")
+    assert table.multiplier_for("Northern Georgia") == Decimal("0.077")
+    assert table.multiplier_for("Southern Texas") == Decimal("0.098")
+
+
+def test_district_lookup_accepts_the_courts_spelling() -> None:
+    _, table = ch13_admin_multipliers(AS_OF)
+    assert table.multiplier_for("Middle District of Florida") == table.multiplier_for(
+        "Middle Florida"
+    )
+    # DC is a name, not a pattern — the normalisation must not strip it away.
+    assert table.multiplier_for("District of Columbia") == Decimal("0.091")
+    with pytest.raises(KeyError, match="no district"):
+        table.multiplier_for("Outer District of Nowhere")
+
+
 # --- resolution semantics -----------------------------------------------------
 
 
@@ -236,6 +261,7 @@ def test_the_typed_accessors_carry_their_payload_types() -> None:
     assert isinstance(median_income_table(AS_OF)[1], MedianIncomeTable)
     assert isinstance(national_standards(AS_OF)[1], NationalStandards)
     assert isinstance(local_standards(AS_OF)[1], LocalStandards)
+    assert isinstance(ch13_admin_multipliers(AS_OF)[1], Ch13AdminMultipliers)
 
 
 def _release_stub(effective: date, sequence: int) -> Release:
@@ -327,10 +353,22 @@ def _local_payload() -> dict[str, object]:
     }
 
 
+def _ch13_payload() -> dict[str, object]:
+    return {
+        "kind": "ch13-admin-multipliers",
+        "verification": "primary",
+        "sources": [
+            {"title": "stub", "url": "https://example.gov/", "accessed": "2026-09-04"}
+        ],
+        "multipliers": {"Middle Florida": "0.1"},
+    }
+
+
 _PAYLOADS = {
     "census-median-family-income": _medians_payload,
     "irs-national-standards": _national_payload,
     "irs-local-standards": _local_payload,
+    "ch13-admin-multipliers": _ch13_payload,
 }
 
 
@@ -341,6 +379,7 @@ def _write_registry(
         MEDIAN_INCOME_SERIES,
         NATIONAL_STANDARDS_SERIES,
         LOCAL_STANDARDS_SERIES,
+        CH13_MULTIPLIERS_SERIES,
     ):
         name = series_id.removeprefix("ust/")
         release_dir = root / "ust" / name / "2026-04-01"
