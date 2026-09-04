@@ -51,6 +51,7 @@ ENTITIES = {
     "community_household_member",
     "employment",
     "pay_period_record",
+    "other_income_record",
     "income_summary",
     "household",
     "expense",

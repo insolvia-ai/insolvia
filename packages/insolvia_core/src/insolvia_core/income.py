@@ -6,9 +6,14 @@ the model stores dated pay-period history for the means test and treats 106I
 as a projection. `pay_period_record` is that history — one row per paycheck,
 all three dates required by shape (`pay_date` drives the §101(10A) six-month
 lookback window), written by pay-stub extraction (8.8) through the review
-flow and read by the means-test milestone's CMI calculation. The other two
-record types are what 106I itself prints — where the debtor works (Part 1)
-and the monthly estimate lines (Part 2).
+flow and read by the CMI calculation (issue #100). `other_income_record` is
+the history's non-wage half — dated receipts whose categories deliberately
+include § 101(10A)(B)(ii)'s EXCLUDED kinds (Social Security Act benefits,
+the HAVEN Act's veterans' compensation, war-crime and terrorism victim
+payments), recorded like any receipt so the CMI derivation can SHOW the
+exclusion instead of silently dropping money a reviewer can see on a bank
+statement. The other two record types are what 106I itself prints — where
+the debtor works (Part 1) and the monthly estimate lines (Part 2).
 
 `income_summary` is ENTERED AND CONFIRMED, NOT COMPUTED. Pay-period records
 inform it — the UI should offer the arithmetic — but 106I's question is an
@@ -211,6 +216,86 @@ PAY_PERIOD_RECORD: EntityKind[PayPeriodRecordBody] = EntityKind(
     collection="pay_period_records",
     sk_prefix="PAY_PERIOD",
     parse_body=parse_pay_period_record,
+)
+
+
+# Non-wage income a household receives, dated per receipt. The included set
+# follows B122A-1's own line taxonomy (§ 101(10A)(A)-(B)(i)); the excluded
+# set is § 101(10A)(B)(ii)'s list, stored so the CMI derivation can show the
+# exclusion rather than silently dropping it. Unemployment compensation the
+# debtor contends is a Social Security Act benefit is recorded under
+# `social_security_act_benefit` — that contention is the attorney's call, and
+# the category IS the recording of it.
+OTHER_INCOME_CATEGORIES: Final = (
+    "alimony_maintenance",
+    "household_contributions",
+    "business",
+    "rental",
+    "interest_dividends_royalties",
+    "unemployment",
+    "pension_retirement",
+    "other",
+)
+EXCLUDED_INCOME_CATEGORIES: Final = (
+    "social_security_act_benefit",
+    "veterans_disability_compensation",
+    "war_crime_victim_payment",
+    "terrorism_victim_payment",
+)
+
+
+@dataclass(frozen=True)
+class OtherIncomeRecordBody:
+    """One dated non-wage receipt — the CMI inputs a pay stub cannot supply
+    (issue #100). `amount` is the gross amount received; `expenses` is the
+    ordinary and necessary operating expenses attributable to the same
+    receipt, meaningful only for the `business` and `rental` categories,
+    where B122A-1 lines 5-6 subtract them (never below zero) before the
+    average. An excluded category (§ 101(10A)(B)(ii)) is still a record —
+    the derivation shows it excluded, with the citation."""
+
+    debtor_id: str | None = None
+    category: str | None = None
+    received_on: str | None = None
+    amount: str | None = None
+    expenses: str | None = None
+    payer: str | None = None
+    description: str | None = None
+
+
+def parse_other_income_record(payload: Mapping[str, object]) -> OtherIncomeRecordBody:
+    errors: dict[str, str] = {}
+    category = choice(
+        payload.get("category"),
+        OTHER_INCOME_CATEGORIES + EXCLUDED_INCOME_CATEGORIES,
+        "category",
+        errors,
+    )
+    expenses = money(payload.get("expenses"), "expenses", errors)
+    if expenses is not None and category not in (None, "business", "rental"):
+        errors["expenses"] = (
+            "Only business and rental receipts carry operating expenses "
+            "(B122A-1 lines 5-6)."
+        )
+    body = OtherIncomeRecordBody(
+        debtor_id=text(payload.get("debtor_id"), "debtor_id", errors, limit=64),
+        category=category,
+        received_on=form_date(payload.get("received_on"), "received_on", errors),
+        amount=money(payload.get("amount"), "amount", errors),
+        expenses=expenses,
+        payer=text(payload.get("payer"), "payer", errors),
+        description=text(payload.get("description"), "description", errors),
+    )
+    if errors:
+        raise FieldValidationError(errors)
+    return body
+
+
+OTHER_INCOME_RECORD: EntityKind[OtherIncomeRecordBody] = EntityKind(
+    name="other_income_record",
+    collection="other_income_records",
+    sk_prefix="OTHER_INCOME",
+    parse_body=parse_other_income_record,
 )
 
 

@@ -1837,6 +1837,30 @@ export type PropertyType = (typeof PROPERTY_TYPES)[number];
 export const EMPLOYMENT_STATUSES = ['employed', 'not_employed'] as const;
 export type EmploymentStatus = (typeof EMPLOYMENT_STATUSES)[number];
 
+/**
+ * Dated non-wage receipts — B122A-1's line taxonomy plus the
+ * § 101(10A)(B)(ii) EXCLUDED kinds, mirrored from core/income.py. Excluded
+ * kinds are stored like any receipt; the CMI derivation shows the exclusion.
+ */
+export const OTHER_INCOME_CATEGORIES = [
+  'alimony_maintenance',
+  'household_contributions',
+  'business',
+  'rental',
+  'interest_dividends_royalties',
+  'unemployment',
+  'pension_retirement',
+  'other',
+] as const;
+export const EXCLUDED_INCOME_CATEGORIES = [
+  'social_security_act_benefit',
+  'veterans_disability_compensation',
+  'war_crime_victim_payment',
+  'terrorism_victim_payment',
+] as const;
+export type OtherIncomeCategory =
+  (typeof OTHER_INCOME_CATEGORIES)[number] | (typeof EXCLUDED_INCOME_CATEGORIES)[number];
+
 /** Which of 106J's two schedules a household row is: 106J or 106J-2. */
 export const WHICH_HOUSEHOLDS = ['main', 'debtor_2_separate'] as const;
 export type WhichHousehold = (typeof WHICH_HOUSEHOLDS)[number];
@@ -2086,6 +2110,21 @@ export interface IncomeSummaryBody {
   readonly change_explanation?: string | undefined;
 }
 
+/**
+ * One dated non-wage receipt — CMI's other half (issue #100). `expenses`
+ * belongs only to `business` and `rental` receipts (B122A-1 lines 5-6
+ * subtract them, never below zero); the server refuses it elsewhere.
+ */
+export interface OtherIncomeRecordBody {
+  readonly debtor_id?: string | undefined;
+  readonly category?: OtherIncomeCategory | undefined;
+  readonly received_on?: FormDate | undefined;
+  readonly amount?: Money | undefined;
+  readonly expenses?: Money | undefined;
+  readonly payer?: string | undefined;
+  readonly description?: string | undefined;
+}
+
 /** 106J Part 1's frame: which schedule, and the change narrative. */
 export interface HouseholdBody {
   readonly which_household?: WhichHousehold | undefined;
@@ -2333,6 +2372,7 @@ export interface CaseCollections {
   readonly exemptions: ExemptionBody;
   readonly contract_leases: ContractLeaseBody;
   readonly community_household_members: CommunityHouseholdMemberBody;
+  readonly other_income_records: OtherIncomeRecordBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -2359,6 +2399,7 @@ export const CASE_COLLECTIONS = [
   'exemptions',
   'contract_leases',
   'community_household_members',
+  'other_income_records',
 ] as const satisfies readonly CaseCollection[];
 
 /**

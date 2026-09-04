@@ -173,6 +173,13 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "community_state": "TX",
         "lived_with_debtor": False,
     },
+    "other_income_records": {
+        "debtor_id": "d-1",
+        "category": "unemployment",
+        "received_on": "2026-04-07",
+        "amount": "275.00",
+        "payer": "Example State Agency",
+    },
 }
 
 
