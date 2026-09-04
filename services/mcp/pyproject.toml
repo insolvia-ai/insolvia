@@ -1,0 +1,30 @@
+[project]
+name = "insolvia-mcp"
+version = "0.1.0"
+description = "The Insolvia MCP service — the official MCP SDK + Mangum on Lambda (ADR 0016)"
+requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt, mailer-style; the
+# Docker image and CI install from there rather than from this metadata.
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+# --strict-markers / --strict-config: same guards as services/api's
+# pyproject, for the same reasons — a typo'd mark or ini key is an error,
+# not a warning.
+addopts = "-q --strict-markers --strict-config"
+markers = []
+
+# Strict static type checking (mirrors the CI `mypy` step). Scoped to `src`;
+# tests exercise fakes/monkeypatching where --strict is noise, not signal.
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["boto3.*", "botocore.*", "mangum.*"]
+ignore_missing_imports = true

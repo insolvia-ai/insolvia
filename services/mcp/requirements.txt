@@ -1,0 +1,24 @@
+# The official MCP Python SDK (v2) — the protocol stack this service is built
+# on rather than hand-rolled JSON-RPC (ADR 0016): version negotiation,
+# Streamable HTTP, the RFC 9728 protected-resource metadata endpoints, and
+# era compatibility for older harnesses. Pinned exact for the same reason
+# every other pin here is: local, CI, and Lambda must resolve one version of
+# the code that speaks the protocol. It pulls starlette, pydantic, uvicorn
+# and PyJWT of its own accord; PyJWT is additionally pinned below because it
+# is the code that decides whether a request is authenticated.
+mcp==2.1.1
+# ASGI-on-Lambda adapter — the streamable-HTTP app is ASGI (Starlette), so no
+# WsgiToAsgi bridge, unlike the Flask API. 0.22 is the current line; the API
+# pins the older 0.17 it launched with, and the two services deliberately pin
+# independently (each image resolves its own requirements).
+mangum==0.22.0
+# Same explicit pin as services/api, same reason: the Lambda runtime bundles
+# a boto3 whose version drifts under us.
+boto3==1.40.66
+# JWT verification for Cognito access tokens, via insolvia_core.auth.
+PyJWT[crypto]==2.13.0
+# The shared domain (ADR 0012/0016): firms, token verification, the case
+# domain, and their adapters. A local path resolved against the CURRENT
+# WORKING DIRECTORY — every installer must run from this directory (CI's
+# working-directory does; the Dockerfile cd's here first).
+../../packages/insolvia_core

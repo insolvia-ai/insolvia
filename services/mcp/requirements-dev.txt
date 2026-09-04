@@ -1,0 +1,7 @@
+-r requirements.txt
+# Same tool pins as services/api (one toolchain across the Python services);
+# bump them together. Nothing extra for the protocol-seam tests: Starlette's
+# TestClient rides the httpx2 the MCP SDK already pulls in.
+mypy==2.3.0
+pytest==8.4.2
+ruff==0.14.4

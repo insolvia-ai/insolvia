@@ -61,6 +61,7 @@ infra/modules/*/.build/
 # `./scripts/dev-aws-setup.sh` and it writes both files.
 /services/api/.env
 /services/admin/.env
+/services/mcp/.env
 /apps/insolvia_app/.env
 
 # ── Python ──────────────────────────────────────────────────────
