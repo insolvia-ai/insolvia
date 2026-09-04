@@ -1,0 +1,603 @@
+{
+ "form": "b122a1",
+ "official_number": "122A-1",
+ "title": "Chapter 7 Statement of Your Current Monthly Income",
+ "revision": "12/19",
+ "effective_date": "2019-12-01",
+ "source": {
+  "page_url": "https://www.uscourts.gov/forms-rules/forms/chapter-7-statement-your-current-monthly-income-0",
+  "pdf_url": "https://www.uscourts.gov/sites/default/files/b_122a-1.pdf",
+  "pdf_sha256": "555618ee62800998658dbc9ec8c19da24308b8296b6782e4cabc12e9560a11ea",
+  "retrieved": "2026-09-04"
+ },
+ "pages": 3,
+ "field_count": 58,
+ "fields": [
+  {
+   "name": "Debtor1.Name",
+   "kind": "text",
+   "tooltip": "Debtor;s name (first, middle, last)",
+   "pages": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "name": "Debtor1.sig",
+   "kind": "text",
+   "tooltip": "Signature of Debtor",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Debtor1.Date signed",
+   "kind": "text",
+   "tooltip": "Date signed (format mm/dd/yyyy)",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Debtor2.Name",
+   "kind": "text",
+   "tooltip": "Debtor's name (first, middle, last)",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debtor2.sig",
+   "kind": "text",
+   "tooltip": "Signature of Debtor",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Debtor2.Date signed",
+   "kind": "text",
+   "tooltip": "Date signed (format mm/dd/yyyy)",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Bankruptcy District Information",
+   "kind": "choice",
+   "tooltip": "District Information",
+   "pages": [
+    1
+   ],
+   "options": [
+    " ",
+    "__________ District of __________",
+    "Middle District of Alabama",
+    "Northern District of Alabama",
+    "Southern District of Alabama",
+    "District of Alaska",
+    "District of Arizona",
+    "Eastern and Western District of Arkansas",
+    "Central District of California",
+    "Eastern District of California",
+    "Northern District of California",
+    "Southern District of California",
+    "District of Colorado",
+    "District of Connecticut",
+    "District of Columbia",
+    "District of Delaware",
+    "Middle District of Florida",
+    "Northern District of Florida",
+    "Southern District of Florida",
+    "Middle District of Georgia",
+    "Northern District of Georgia ",
+    "Southern District of Georgia ",
+    "District of Guam",
+    "District of Hawaii",
+    "District of Idaho",
+    "Central District of Illinois",
+    "Northern District of Illinois",
+    "Southern District of Illinois",
+    "Northern District of Indiana",
+    "Southern District of Indiana",
+    "Northern District of Iowa",
+    "Southern District of Iowa",
+    "District of Kansas",
+    "Eastern District of Kentucky",
+    "Western District of Kentucky",
+    "Eastern District of Louisiana",
+    "Middle District of Louisiana",
+    "Western District of Louisiana",
+    "District of Maine",
+    "District of Maryland",
+    "District of Massachusetts",
+    "District of Montana",
+    "Eastern District of Michigan",
+    "Western District of Michigan",
+    "District of Minnesota",
+    "Northern District of Mississippi",
+    "Southern District of Mississippi",
+    "Eastern District of Missouri",
+    "Western District of Missouri",
+    "District of Nebraska",
+    "District of Nevada",
+    "District of New Hampshire",
+    "District of New Jersey",
+    "District of New Mexico",
+    "Eastern District of New York",
+    "Northern District of New York",
+    "Southern District of New York",
+    "Western District of New York",
+    "Eastern District of North Carolina",
+    "Middle District of North Carolina",
+    "Western District of North Carolina",
+    "District of North Dakota",
+    "District of Northern Mariana Islands",
+    "Northern District of Ohio",
+    "Southern District of Ohio",
+    "Eastern District of Oklahoma",
+    "Northern District of Oklahoma",
+    "Western District of Oklahoma",
+    "District of Oregon",
+    "Eastern District of Pennsylvania",
+    "Middle District of Pennsylvania",
+    "Western District of Pennsylvania",
+    "District of Puerto Rico",
+    "District of Rhode Island",
+    "District of South Carolina",
+    "District of South Dakota",
+    "Eastern District of Tennessee",
+    "Middle District of Tennessee",
+    "Western District of Tennessee",
+    "Eastern District of Texas",
+    "Northern District of Texas",
+    "Southern District of Texas",
+    "Western District of Texas",
+    "District of Utah",
+    "District of Vermont",
+    "District of Virgin Islands",
+    "Eastern District of Virginia",
+    "Western District of Virginia",
+    "Eastern District of Washington",
+    "Western District of Washington",
+    "Northern District of West Virginia",
+    "Southern District of West Virginia",
+    "Eastern District of Wisconsin",
+    "Western District of Wisconsin",
+    "District of Wyoming"
+   ]
+  },
+  {
+   "name": "CheckBox3",
+   "kind": "checkbox",
+   "tooltip": "Marital status",
+   "pages": [
+    1
+   ],
+   "states": [
+    "Married but not filing",
+    "Not married",
+    "Maried and filing"
+   ]
+  },
+  {
+   "name": "Debto2.Quest7",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest2.0",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest2.2",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest3",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest5A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest5B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest5C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest6A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest6B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest6C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto2.Quest8.0",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest8A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest9",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest10A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest10B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest10C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto2.Quest11",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "CheckBox1",
+   "kind": "checkbox",
+   "tooltip": "check",
+   "pages": [
+    1
+   ],
+   "states": [
+    "No Abuse",
+    "Presumption of abuse applies",
+    "Does not apply"
+   ]
+  },
+  {
+   "name": "CheckBox2",
+   "kind": "checkbox",
+   "tooltip": "Check if this is an amended filing",
+   "pages": [
+    1
+   ],
+   "states": [
+    "On"
+   ]
+  },
+  {
+   "name": "CheckBox3A",
+   "kind": "checkbox",
+   "tooltip": "Married but not filing",
+   "pages": [
+    1
+   ],
+   "states": [
+    "together",
+    "separately"
+   ]
+  },
+  {
+   "name": "Debto1.Quest2.0",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest3",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest4",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest5A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest5B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest5C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest6A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest6B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest6C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest7",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    1
+   ]
+  },
+  {
+   "name": "Debto1.Quest8.0",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest8A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest9",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest10A",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest10B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest10C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Debto1.Quest11",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Case number1",
+   "kind": "text",
+   "tooltip": "Case number (if known)",
+   "pages": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "name": "terrorism If necessary list other sources on a separate page and put the total below 1",
+   "kind": "text",
+   "tooltip": "terrorism. If necessary, list other sources on a separate page and put the total below [1]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "terrorism If necessary list other sources on a separate page and put the total below 2",
+   "kind": "text",
+   "tooltip": "terrorism. If necessary, list other sources on a separate page and put the total below [2]",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Quest11",
+   "kind": "text",
+   "tooltip": "Total Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "12B",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "13A",
+   "kind": "text",
+   "tooltip": "State in which you live",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "13B",
+   "kind": "text",
+   "tooltip": "Number of people in your household",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "13C",
+   "kind": "text",
+   "tooltip": "Amount",
+   "pages": [
+    2
+   ]
+  },
+  {
+   "name": "Button.Reset",
+   "kind": "pushbutton",
+   "tooltip": "Resets the entire form",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Button.Print1",
+   "kind": "pushbutton",
+   "tooltip": "Opens Print Menu",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "Button.SaveAs",
+   "kind": "pushbutton",
+   "tooltip": "Allows you to give the file a new name when saving",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "attach",
+   "kind": "pushbutton",
+   "tooltip": "Attach a file",
+   "pages": [
+    3
+   ]
+  },
+  {
+   "name": "14a",
+   "kind": "checkbox",
+   "tooltip": "14a",
+   "pages": [
+    2
+   ],
+   "states": [
+    "12b less or equal to 13",
+    "12b more than 13"
+   ]
+  }
+ ]
+}

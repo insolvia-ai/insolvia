@@ -74,10 +74,9 @@ class Case:
     # re-pins; a filed case never re-resolves.
     #
     # `form_revisions` maps form series id -> `effective_date[+sequence]`
-    # (FormRelease.pin). `constants_set_id` is reserved for the pinned
-    # release id of the `code/dollar-amounts` series — that series has no
-    # registry yet (it lands with the means-test milestone), so today
-    # assembly leaves it None rather than inventing a value.
+    # (FormRelease.pin). `constants_set_id` is the pinned release id of the
+    # `code/dollar-amounts` series (issue #99) — assembly resolves it as of
+    # the same date as the forms and records both in one write.
     form_revisions: Mapping[str, str] | None = None
     constants_set_id: str | None = None
 
@@ -297,17 +296,25 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
-def pin_case(case: Case, *, form_revisions: Mapping[str, str]) -> Case:
+def pin_case(
+    case: Case, *, form_revisions: Mapping[str, str], constants_set_id: str
+) -> Case:
     """The pinned case packet assembly writes (effective-dating.md).
 
-    A new Case with `form_revisions` recorded and updated_at refreshed.
-    Re-pinning an already-pinned case is the re-assembly rule working as
-    designed: the new pins replace the old ones outright, because the new
-    packet is now the one the pins describe. `constants_set_id` stays as it
-    was — its series has no registry yet, and this helper must not blank a
-    value a future writer records.
+    A new Case with `form_revisions` and `constants_set_id` recorded and
+    updated_at refreshed. Re-pinning an already-pinned case is the
+    re-assembly rule working as designed: the new pins replace the old ones
+    outright, because the new packet is now the one the pins describe. Both
+    pins are required — a packet that resolved its forms also resolved its
+    dollar amounts, and recording one without the other would make "what did
+    this filing use" half-answerable.
     """
-    return replace(case, form_revisions=dict(form_revisions), updated_at=_timestamp())
+    return replace(
+        case,
+        form_revisions=dict(form_revisions),
+        constants_set_id=constants_set_id,
+        updated_at=_timestamp(),
+    )
 
 
 def partition_key(case_id: str) -> str:

@@ -78,9 +78,14 @@ from insolvia_core.expenses import (
 from insolvia_core.income import (
     EMPLOYMENT,
     INCOME_SUMMARY,
+    OTHER_INCOME_RECORD,
+    PAY_PERIOD_RECORD,
     EmploymentBody,
     IncomeSummaryBody,
+    OtherIncomeRecordBody,
+    PayPeriodRecordBody,
 )
+from insolvia_core.means_test_inputs import MEANS_TEST_INPUT, MeansTestInputBody
 from insolvia_core.petitions import (
     FILING_PROFESSIONAL,
     PETITION,
@@ -95,6 +100,7 @@ from insolvia_core.petitions import (
 )
 from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
 
+from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import (
     MATRIX_FILE_NAME,
     generate_creditor_matrix,
@@ -106,6 +112,7 @@ from insolvia_api.core.form_projections import (
     FormProjectionError,
     project,
 )
+from insolvia_api.core.form_projections.b122a2 import files_b122a2
 from insolvia_api.core.form_templates import FormRelease, resolve_form
 from insolvia_api.core.jobs import Job, JobError
 from insolvia_api.core.packets import PACKET_CONTENT_TYPE, new_packet, packet_json
@@ -129,8 +136,9 @@ logger = logging.getLogger(__name__)
 PACKET_ASSEMBLY_KIND: Final = "packet_assembly"
 
 # The individual Chapter 7 set, in filing order — the order the clerk's
-# checklist reads and the order the zip lists. B122A slots in here when the
-# means-test milestone lands it (the issue says so in as many words).
+# checklist reads and the order the zip lists. The B122A pair closes the
+# set (issue #102): the CMI statement always files; the calculation only
+# for an above-median debtor (packet_form_series makes that call).
 PACKET_FORM_SERIES: Final = (
     "form/b101",
     "form/b106sum",
@@ -145,6 +153,8 @@ PACKET_FORM_SERIES: Final = (
     "form/b106j2",
     "form/b106dec",
     "form/b107",
+    "form/b122a1",
+    "form/b122a2",
 )
 
 # The one fixed zip timestamp (1980-01-01, DOS epoch): determinism demands a
@@ -198,6 +208,9 @@ class CaseData:
     filing_professionals: tuple[CaseEntity[FilingProfessionalBody], ...] = ()
     employments: tuple[CaseEntity[EmploymentBody], ...] = ()
     income_summaries: tuple[CaseEntity[IncomeSummaryBody], ...] = ()
+    pay_period_records: tuple[CaseEntity[PayPeriodRecordBody], ...] = ()
+    other_income_records: tuple[CaseEntity[OtherIncomeRecordBody], ...] = ()
+    means_test_inputs: tuple[CaseEntity[MeansTestInputBody], ...] = ()
     assets: tuple[CaseEntity[AssetBody], ...] = ()
     exemptions: tuple[CaseEntity[ExemptionBody], ...] = ()
     creditors: tuple[CaseEntity[CreditorBody], ...] = ()
@@ -228,6 +241,9 @@ def read_case_data(
         filing_professionals=entity_store.list_for_case(case.id, FILING_PROFESSIONAL),
         employments=entity_store.list_for_case(case.id, EMPLOYMENT),
         income_summaries=entity_store.list_for_case(case.id, INCOME_SUMMARY),
+        pay_period_records=entity_store.list_for_case(case.id, PAY_PERIOD_RECORD),
+        other_income_records=entity_store.list_for_case(case.id, OTHER_INCOME_RECORD),
+        means_test_inputs=entity_store.list_for_case(case.id, MEANS_TEST_INPUT),
         assets=entity_store.list_for_case(case.id, ASSET),
         exemptions=entity_store.list_for_case(case.id, EXEMPTION),
         creditors=entity_store.list_for_case(case.id, CREDITOR),
@@ -259,8 +275,11 @@ def to_case_file(data: CaseData) -> CaseFile:
         related_cases=tuple(e.body for e in data.related_cases),
         sole_proprietorships=tuple(e.body for e in data.sole_proprietorships),
         filing_professionals=tuple(e.body for e in data.filing_professionals),
-        employments=tuple(e.body for e in data.employments),
+        employments=tuple((e.id, e.body) for e in data.employments),
         income_summaries=tuple(e.body for e in data.income_summaries),
+        pay_period_records=tuple(e.body for e in data.pay_period_records),
+        other_income_records=tuple(e.body for e in data.other_income_records),
+        means_test_inputs=tuple(e.body for e in data.means_test_inputs),
         assets=tuple((e.id, e.body) for e in data.assets),
         exemptions=tuple(e.body for e in data.exemptions),
         creditors=tuple((e.id, e.body) for e in data.creditors),
@@ -314,6 +333,15 @@ def _reference_problems(data: CaseData) -> list[PacketProblem]:
         ref = employment.body.debtor_id
         if ref is not None and ref not in debtor_ids:
             dangle("employments", employment.id, "debtor_id", "debtor")
+    employment_ids = {e.id for e in data.employments}
+    for record in data.pay_period_records:
+        ref = record.body.employment_id
+        if ref is not None and ref not in employment_ids:
+            dangle("pay_period_records", record.id, "employment_id", "employment")
+    for receipt in data.other_income_records:
+        ref = receipt.body.debtor_id
+        if ref is not None and ref not in debtor_ids:
+            dangle("other_income_records", receipt.id, "debtor_id", "debtor")
     for summary in data.income_summaries:
         ref = summary.body.debtor_id
         if ref is not None and ref not in debtor_ids:
@@ -360,6 +388,17 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
                 field="",
                 message="A case has exactly one petition record — delete the"
                 " duplicates before assembling.",
+            )
+        )
+
+    for extra_input in data.means_test_inputs[1:]:
+        problems.append(
+            PacketProblem(
+                source="means_test_inputs",
+                item_id=extra_input.id,
+                field="",
+                message="A case has exactly one means-test input record —"
+                " delete the duplicates before assembling.",
             )
         )
 
@@ -457,17 +496,20 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     B106J-2 prints only when Debtor 2 keeps a separate household — its own
     projection module says "packet assembly decides whether a schedule with
     nothing to say is filed at all", and an all-blank J-2 in front of a clerk
-    is a question, not a filing. Everything else is unconditional for an
+    is a question, not a filing. B122A-2 files only when the debtor is not
+    determinately below the median (B122A-1 line 14; `files_b122a2` argues
+    the indeterminate case). Everything else is unconditional for an
     individual Chapter 7.
     """
     has_separate = any(
         e.body.which_household == "debtor_2_separate" for e in data.households
     )
-    return tuple(
-        series
-        for series in PACKET_FORM_SERIES
-        if series != "form/b106j2" or has_separate
-    )
+    skipped = set()
+    if not has_separate:
+        skipped.add("form/b106j2")
+    if not files_b122a2(to_case_file(data)):
+        skipped.add("form/b122a2")
+    return tuple(series for series in PACKET_FORM_SERIES if series not in skipped)
 
 
 @dataclass(frozen=True)
@@ -480,10 +522,15 @@ class AssembledPacket:
     the PDFs are the deliverable — but the AI review worker (issue #97,
     core/petition_review.py) reads the SAME projected content the forms
     printed, which is what lets its findings cite the form's own line keys
-    without parsing a PDF back apart."""
+    without parsing a PDF back apart.
+
+    `constants_set_id` is the `code/dollar-amounts` release resolved as of
+    the same assembly date as the forms — the second pin effective-dating.md
+    names, recorded on the case (and this packet) in the same write."""
 
     parts: tuple[tuple[str, bytes], ...]
     form_revisions: Mapping[str, str]
+    constants_set_id: str
     creditor_count: int
     projections: Mapping[str, FieldValues]
 
@@ -527,6 +574,22 @@ def assemble(
                 )
             )
 
+    # The dollar-amounts pin resolves alongside the forms: the same as_of,
+    # the same gate on failure — a packet must never record form pins while
+    # leaving "which constant set applied" unanswerable.
+    constants_release: dollar_amounts.Release | None = None
+    try:
+        constants_release = dollar_amounts.resolve(as_of)
+    except LookupError as error:
+        problems.append(
+            PacketProblem(
+                source=dollar_amounts.DOLLAR_AMOUNTS_SERIES,
+                item_id=None,
+                field="",
+                message=str(error),
+            )
+        )
+
     projected: dict[str, FieldValues] = {}
     for series_id, release in releases.items():
         try:
@@ -556,10 +619,12 @@ def assemble(
         return tuple(problems)
 
     assert matrix.content is not None  # its problems gated above
+    assert constants_release is not None  # its resolution failure gated above
     parts.append((MATRIX_FILE_NAME, matrix.content.encode("ascii")))
 
     return AssembledPacket(
         parts=tuple(parts),
+        constants_set_id=constants_release.release_id,
         # The WHOLE set pins, including a J-2 this case does not file: the
         # pin map records which revisions were in force for this assembly,
         # and a household added before re-assembly must not find a hole.
@@ -657,6 +722,7 @@ def run_packet_assembly(
         byte_size=len(content),
         sha256=hashlib.sha256(content).hexdigest(),
         form_revisions=outcome.form_revisions,
+        constants_set_id=outcome.constants_set_id,
         creditor_count=outcome.creditor_count,
         created_by=job.created_by,
     )
@@ -668,7 +734,11 @@ def run_packet_assembly(
         packet.storage_ref, content=content, content_type=PACKET_CONTENT_TYPE
     )
 
-    pinned = pin_case(case, form_revisions=outcome.form_revisions)
+    pinned = pin_case(
+        case,
+        form_revisions=outcome.form_revisions,
+        constants_set_id=outcome.constants_set_id,
+    )
     stored = deps.packet_store.create(
         packet, pinned_case=pinned, expected_updated_at=case.updated_at
     )

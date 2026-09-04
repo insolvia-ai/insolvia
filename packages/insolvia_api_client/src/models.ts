@@ -691,6 +691,11 @@ export interface Packet {
    * re-assembly while this record describes this packet forever.
    */
   readonly formRevisions: Readonly<Record<string, string>>;
+  /**
+   * The `code/dollar-amounts` release this packet was rendered under — the
+   * second pin, kept here for `formRevisions`' reason.
+   */
+  readonly constantsSetId: string;
   /** How many creditors the enclosed matrix lists (after deduplication). */
   readonly creditorCount: number;
   /**
@@ -1832,6 +1837,30 @@ export type PropertyType = (typeof PROPERTY_TYPES)[number];
 export const EMPLOYMENT_STATUSES = ['employed', 'not_employed'] as const;
 export type EmploymentStatus = (typeof EMPLOYMENT_STATUSES)[number];
 
+/**
+ * Dated non-wage receipts — B122A-1's line taxonomy plus the
+ * § 101(10A)(B)(ii) EXCLUDED kinds, mirrored from core/income.py. Excluded
+ * kinds are stored like any receipt; the CMI derivation shows the exclusion.
+ */
+export const OTHER_INCOME_CATEGORIES = [
+  'alimony_maintenance',
+  'household_contributions',
+  'business',
+  'rental',
+  'interest_dividends_royalties',
+  'unemployment',
+  'pension_retirement',
+  'other',
+] as const;
+export const EXCLUDED_INCOME_CATEGORIES = [
+  'social_security_act_benefit',
+  'veterans_disability_compensation',
+  'war_crime_victim_payment',
+  'terrorism_victim_payment',
+] as const;
+export type OtherIncomeCategory =
+  (typeof OTHER_INCOME_CATEGORIES)[number] | (typeof EXCLUDED_INCOME_CATEGORIES)[number];
+
 /** Which of 106J's two schedules a household row is: 106J or 106J-2. */
 export const WHICH_HOUSEHOLDS = ['main', 'debtor_2_separate'] as const;
 export type WhichHousehold = (typeof WHICH_HOUSEHOLDS)[number];
@@ -2081,6 +2110,77 @@ export interface IncomeSummaryBody {
   readonly change_explanation?: string | undefined;
 }
 
+/**
+ * One dated non-wage receipt — CMI's other half (issue #100). `expenses`
+ * belongs only to `business` and `rental` receipts (B122A-1 lines 5-6
+ * subtract them, never below zero); the server refuses it elsewhere.
+ */
+export interface OtherIncomeRecordBody {
+  readonly debtor_id?: string | undefined;
+  readonly category?: OtherIncomeCategory | undefined;
+  readonly received_on?: FormDate | undefined;
+  readonly amount?: Money | undefined;
+  readonly expenses?: Money | undefined;
+  readonly payer?: string | undefined;
+  readonly description?: string | undefined;
+}
+
+/** One B122A-2 line-3 row; `id` is client-chosen and required (provenance). */
+export interface MaritalAdjustmentItem {
+  readonly id: string;
+  readonly description?: string | undefined;
+  readonly amount?: Money | undefined;
+}
+
+/** One B122A-2 line-33d row; `id` is client-chosen and required (provenance). */
+export interface OtherSecuredPayment {
+  readonly id: string;
+  readonly creditor_name?: string | undefined;
+  readonly property_description?: string | undefined;
+  readonly monthly_payment?: Money | undefined;
+}
+
+/**
+ * B122A-2's entered figures (issue #101), one record per case — entered and
+ * confirmed like the income summary. Fields are named for the line's
+ * SUBJECT, not its number; every money member is a monthly amount unless
+ * the name says otherwise. `vehicle_count` is at most 2 (the form's own
+ * "2 or more"; the Local Standards publish no third column).
+ */
+export interface MeansTestInputBody {
+  readonly people_under_65?: number | undefined;
+  readonly people_65_or_older?: number | undefined;
+  readonly marital_adjustments?: readonly MaritalAdjustmentItem[] | undefined;
+  readonly home_secured_monthly_total?: Money | undefined;
+  readonly housing_adjustment_amount?: Money | undefined;
+  readonly housing_adjustment_explanation?: string | undefined;
+  readonly vehicle_count?: number | undefined;
+  readonly vehicle_1_loan_monthly?: Money | undefined;
+  readonly vehicle_2_loan_monthly?: Money | undefined;
+  readonly additional_public_transportation?: Money | undefined;
+  readonly taxes?: Money | undefined;
+  readonly involuntary_deductions?: Money | undefined;
+  readonly term_life_insurance?: Money | undefined;
+  readonly court_ordered_payments?: Money | undefined;
+  readonly education_for_employment_or_disability?: Money | undefined;
+  readonly childcare?: Money | undefined;
+  readonly healthcare_above_allowance?: Money | undefined;
+  readonly optional_telecom?: Money | undefined;
+  readonly health_insurance?: Money | undefined;
+  readonly disability_insurance?: Money | undefined;
+  readonly health_savings_account?: Money | undefined;
+  readonly family_care_contributions?: Money | undefined;
+  readonly family_violence_protection?: Money | undefined;
+  readonly home_energy_excess?: Money | undefined;
+  readonly education_under_18?: Money | undefined;
+  readonly additional_food_clothing?: Money | undefined;
+  readonly charitable_contributions?: Money | undefined;
+  readonly other_secured_payments?: readonly OtherSecuredPayment[] | undefined;
+  readonly priority_cure_total?: Money | undefined;
+  readonly ch13_eligible?: boolean | undefined;
+  readonly ch13_projected_plan_payment?: Money | undefined;
+}
+
 /** 106J Part 1's frame: which schedule, and the change narrative. */
 export interface HouseholdBody {
   readonly which_household?: WhichHousehold | undefined;
@@ -2328,6 +2428,8 @@ export interface CaseCollections {
   readonly exemptions: ExemptionBody;
   readonly contract_leases: ContractLeaseBody;
   readonly community_household_members: CommunityHouseholdMemberBody;
+  readonly other_income_records: OtherIncomeRecordBody;
+  readonly means_test_inputs: MeansTestInputBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -2354,6 +2456,8 @@ export const CASE_COLLECTIONS = [
   'exemptions',
   'contract_leases',
   'community_household_members',
+  'other_income_records',
+  'means_test_inputs',
 ] as const satisfies readonly CaseCollection[];
 
 /**

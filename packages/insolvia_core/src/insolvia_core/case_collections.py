@@ -24,7 +24,13 @@ from .contract_leases import CONTRACT_LEASE
 from .creditors import CREDITOR
 from .exemption_claims import EXEMPTION
 from .expenses import DEPENDENT, EXPENSE, HOUSEHOLD
-from .income import EMPLOYMENT, INCOME_SUMMARY, PAY_PERIOD_RECORD
+from .income import (
+    EMPLOYMENT,
+    INCOME_SUMMARY,
+    OTHER_INCOME_RECORD,
+    PAY_PERIOD_RECORD,
+)
+from .means_test_inputs import MEANS_TEST_INPUT
 from .petitions import (
     FILING_PROFESSIONAL,
     PETITION,
@@ -45,10 +51,12 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         CLAIM,
         ASSET,
         EMPLOYMENT,
-        # The dated paycheck history behind the means test (§101(10A)),
-        # written by pay-stub extraction (8.8) through the review flow —
+        # The dated income history behind the means test (§101(10A)) —
+        # per-paycheck records written by pay-stub extraction (8.8) through
+        # the review flow, and dated non-wage receipts (issue #100) —
         # docs/reference/case-data-model.md, "106I is not the income model".
         PAY_PERIOD_RECORD,
+        OTHER_INCOME_RECORD,
         INCOME_SUMMARY,
         HOUSEHOLD,
         EXPENSE,
@@ -68,6 +76,9 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         EXEMPTION,
         CONTRACT_LEASE,
         COMMUNITY_HOUSEHOLD_MEMBER,
+        # B122A-2's entered figures (issue #101), one per case like the
+        # petition — the gate owns the cardinality.
+        MEANS_TEST_INPUT,
     )
 }
 

@@ -35,7 +35,7 @@ asked.
 
 ## Core entities
 
-Twenty-three case-scoped types. Two more — the tax-identifier access log and
+Twenty-five case-scoped types. Two more — the tax-identifier access log and
 the effective-dated statutory constant sets — are referenced here but live
 outside the case store; see below.
 
@@ -57,6 +57,8 @@ outside the case store; see below.
 | `community_household_member` | many | 106H line 2, B107 Q3 |
 | `employment` | many | 106I Pt.1 |
 | `pay_period_record` | many, references an `employment` | Means test |
+| `other_income_record` | many, references a `debtor` | Means test |
+| `means_test_input` | one | B122A-2 |
 | `income_summary` | one per debtor column | 106I Pt.2 |
 | `household` | 1–2 (106J-2 adds a second) | 106J Pt.1 |
 | `expense` | many, references a `household` | 106J Pt.2 |
@@ -263,6 +265,24 @@ pay_period_record {
   deductions: [ { id, category, amount, description } ]
   frequency: weekly | biweekly | semimonthly | monthly | other
 }
+
+other_income_record {                    // dated non-wage receipts — CMI's other half
+  id, case_id, debtor_id
+  category                               // B122A-1's line taxonomy, plus the
+                                         // § 101(10A)(B)(ii) EXCLUDED kinds, which are
+                                         // stored like any receipt so the CMI derivation
+                                         // shows the exclusion instead of dropping it
+  received_on                            // drives the lookback window, like pay_date
+  amount, expenses                       // expenses only on business/rental receipts
+  payer, description
+}
+
+means_test_input {                       // B122A-2's entered figures, one per case
+  id, case_id
+  ...the actual-expense and adjustment answers only the debtor can supply
+  (insolvia_core.means_test_inputs owns the field list, named by subject)...
+}                                        // entered and confirmed, like income_summary;
+                                         // one-per-case is the packet gate's check
 
 income_summary  {
   id, case_id, debtor_id
@@ -525,7 +545,7 @@ Handing these constraints, not a decision, to the encrypted-case-store work:
   listings, and which one a caller uses depends on their permissions.
 - The dominant access patterns are *fetch a whole case* and *list one entity
   type within a case*. Cross-case queries are administrative and rare.
-- Twenty-three entity types, all small, most of them lists — no single record
+- Twenty-five entity types, all small, most of them lists — no single record
   is large, but a fully-populated case is many records read together.
 - Tax identifiers need protection distinct from the surrounding record, and
   reads of them need to be individually auditable, into a log that is not case

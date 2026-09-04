@@ -27,6 +27,7 @@ def make_packet(**overrides):
         "byte_size": 1234,
         "sha256": "ab" * 32,
         "form_revisions": {"form/b101": "2024-06-22"},
+        "constants_set_id": "code/dollar-amounts@2025-04-01",
         "creditor_count": 4,
         "created_by": "subject-1",
     }

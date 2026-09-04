@@ -58,9 +58,10 @@ class Packet:
     """One assembled packet of a case — metadata only. The bytes are in the
     bucket.
 
-    `form_revisions` is the same pin map written onto the case, kept here too
-    because the CASE's copy moves on re-assembly while this record describes
-    THIS packet forever. `sha256` is the digest of the stored zip — assembly
+    `form_revisions` and `constants_set_id` are the same pins written onto
+    the case, kept here too because the CASE's copies move on re-assembly
+    while this record describes THIS packet forever.
+    `sha256` is the digest of the stored zip — assembly
     is deterministic to the byte (core/form_fill.py), so the digest is what
     lets anyone prove a downloaded packet is the one this record describes.
     `created_by` is the firm user whose job accept produced it.
@@ -75,6 +76,7 @@ class Packet:
     sha256: str
     storage_ref: str
     form_revisions: Mapping[str, str]
+    constants_set_id: str
     creditor_count: int
     created_by: str
     created_at: str
@@ -107,6 +109,7 @@ def new_packet(
     byte_size: int,
     sha256: str,
     form_revisions: Mapping[str, str],
+    constants_set_id: str,
     creditor_count: int,
     created_by: str,
 ) -> Packet:
@@ -126,6 +129,7 @@ def new_packet(
         # record's argument: the scheme can change without stranding objects.
         storage_ref=packet_object_key(case_id, packet_id),
         form_revisions=dict(form_revisions),
+        constants_set_id=constants_set_id,
         creditor_count=creditor_count,
         created_by=created_by,
         created_at=_timestamp(),
@@ -163,6 +167,7 @@ def packet_item(packet: Packet) -> dict[str, object]:
         "sha256": packet.sha256,
         "storageRef": packet.storage_ref,
         "formRevisions": dict(packet.form_revisions),
+        "constantsSetId": packet.constants_set_id,
         "creditorCount": packet.creditor_count,
         "createdBy": packet.created_by,
         "createdAt": packet.created_at,
@@ -194,6 +199,7 @@ def packet_from_item(item: Mapping[str, object]) -> Packet:
             form_revisions={
                 str(series): str(pin) for series, pin in raw_revisions.items()
             },
+            constants_set_id=str(item["constantsSetId"]),
             creditor_count=int(creditor_count),
             created_by=str(item["createdBy"]),
             created_at=str(item["createdAt"]),
@@ -220,6 +226,7 @@ def packet_json(packet: Packet) -> dict[str, object]:
         "byteSize": packet.byte_size,
         "sha256": packet.sha256,
         "formRevisions": dict(packet.form_revisions),
+        "constantsSetId": packet.constants_set_id,
         "creditorCount": packet.creditor_count,
         "createdBy": packet.created_by,
         "createdAt": packet.created_at,

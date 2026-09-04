@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b122a1",
+  "effective_date": "2019-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/b_122a-1.pdf",
+    "published": null,
+    "sha256": "555618ee62800998658dbc9ec8c19da24308b8296b6782e4cabc12e9560a11ea"
+  },
+  "notes": "Official Form 122A-1, Chapter 7 Statement of Your Current Monthly Income, printed revision 12/19 (current as of ingestion; the form page notes a temporary CARES Act variant applied 2020-04-03 to 2022-03-27 and then reverted to this text). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-102 field spec and AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. Known defects carried from the spec: Debtor 2's line-4 box is misnamed Debto2.Quest2.2, and line 12a's 'Copy line 11 here' box carries no widget."
+}

@@ -80,6 +80,8 @@ FORM_SERIES = (
     "form/b106j2",
     "form/b106sum",
     "form/b107",
+    "form/b122a1",
+    "form/b122a2",
 )
 
 

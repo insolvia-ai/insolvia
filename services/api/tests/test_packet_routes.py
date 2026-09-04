@@ -143,6 +143,7 @@ def store_packet(stores, case_id):
         byte_size=3,
         sha256="cd" * 32,
         form_revisions={"form/b101": "2024-06-22"},
+        constants_set_id="code/dollar-amounts@2025-04-01",
         creditor_count=2,
         created_by=ALICE,
     )
@@ -152,7 +153,11 @@ def store_packet(stores, case_id):
     case = stores["case_store"].cases[case_id]
     created = stores["packet_store"].create(
         packet,
-        pinned_case=pin_case(case, form_revisions=packet.form_revisions),
+        pinned_case=pin_case(
+            case,
+            form_revisions=packet.form_revisions,
+            constants_set_id=packet.constants_set_id,
+        ),
         expected_updated_at=case.updated_at,
     )
     assert created
