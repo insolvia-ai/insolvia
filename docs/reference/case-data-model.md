@@ -388,9 +388,10 @@ vocabulary as a second terminal state: the proposer's own retraction of a
 still-`pending` row, so a wrong batch does not sit in a paralegal's review
 queue. One review queue, one status vocabulary, one confirmation act; the
 review UI (8.9) reads both streams without knowing which is which beyond the
-origin it displays. The store implementation currently lives in
-`services/mcp` (`core/candidates.py` owns the item shape) and graduates to
-`insolvia_core` when the review flow becomes its second importer.
+origin it displays. The store implementation lives in
+`insolvia_core.candidates` (it owns the item shape), where it graduated from
+`services/mcp` when the review flow became its second importer (ADR 0012's
+admission rule; issues 8.7-8.9).
 
 Corrections and rejections are retained after review — and so are
 withdrawals. They are the only measurement of extraction (and agent) quality

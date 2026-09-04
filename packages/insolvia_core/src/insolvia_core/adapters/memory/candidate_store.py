@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_mcp.core.candidates import Candidate, list_order
+from insolvia_core.candidates import Candidate, list_order
 
 
 class MemoryCandidateStore:

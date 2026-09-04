@@ -15,6 +15,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from insolvia_core.access import Accessor
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
@@ -22,7 +23,6 @@ from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.firms import Firm, FirmUser
-from insolvia_mcp.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_mcp.api.dependencies import McpDependencies
 from insolvia_mcp.core.config import load_config
 from insolvia_mcp.core.tools import CaseTools

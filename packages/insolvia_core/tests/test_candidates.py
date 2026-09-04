@@ -1,13 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from insolvia_core.errors import (
-    ConflictError,
-    FieldValidationError,
-    ForbiddenError,
-    ValidationError,
-)
-from insolvia_mcp.core.candidates import (
+from insolvia_core.candidates import (
     MAX_PROPOSALS_PER_CALL,
     PENDING,
     PROPOSABLE_ENTITY_TYPES,
@@ -19,6 +13,12 @@ from insolvia_mcp.core.candidates import (
     create_candidate,
     parse_proposals,
     withdraw,
+)
+from insolvia_core.errors import (
+    ConflictError,
+    FieldValidationError,
+    ForbiddenError,
+    ValidationError,
 )
 
 ORIGIN = CandidateOrigin(channel="mcp", client_id="client-1", subject="subject-1")

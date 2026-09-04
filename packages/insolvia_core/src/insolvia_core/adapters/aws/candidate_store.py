@@ -4,16 +4,16 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_core.cases import partition_key
 
-from insolvia_mcp.core.candidates import (
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.candidates import (
     Candidate,
     candidate_from_item,
     candidate_item,
     list_order,
     sort_key,
 )
+from insolvia_core.cases import partition_key
 
 
 class DynamoDbCandidateStore:

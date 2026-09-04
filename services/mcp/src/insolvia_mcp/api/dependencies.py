@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from insolvia_core.ports import (
     AccessLog,
+    CandidateStore,
     CaseEntityStore,
     CaseStore,
     DebtorStore,
@@ -13,7 +14,6 @@ from insolvia_core.ports import (
 )
 
 from insolvia_mcp.core.config import AppConfig
-from insolvia_mcp.core.ports import CandidateStore
 
 
 @dataclass(frozen=True)
