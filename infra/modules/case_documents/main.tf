@@ -478,3 +478,51 @@ resource "aws_iam_role_policy" "api_document_access" {
     ]
   })
 }
+
+# ── The second application principal: the pipeline worker ───────
+# Issue #96: packet assembly runs in the worker Lambda and WRITES its
+# assembled packet into this bucket (cases/<case_id>/packets/<packet_id>) —
+# a direct PutObject under the worker's own role, not a presigned capability,
+# because the worker holds the bytes itself. Same amendment shape as
+# modules/case_store's worker grant: a second, narrower principal with a
+# grant of its own, attached from this module's side via the role NAME.
+#
+# Narrower than the API's on purpose: PutObject alone, on the packets prefix
+# alone. No GetObject — the worker never reads objects (downloads are the
+# API's brokered URLs); no PutObjectTagging — a worker write and its record
+# land in the same operation (core/ports.PacketStore), so nothing it stores
+# is ever "unconfirmed"; no ListBucket, the API grant's own argument.
+resource "aws_iam_role_policy" "worker_document_access" {
+  count = var.worker_role_name == null ? 0 : 1
+
+  name = "${local.name}-worker-write"
+  role = var.worker_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CasePacketObjectsWrite"
+        Effect = "Allow"
+        Action = ["s3:PutObject"]
+        # The packets prefix only — the worker cannot touch uploaded source
+        # documents, whose keys sit directly under cases/<case_id>/.
+        Resource = "${aws_s3_bucket.documents.arn}/cases/*/packets/*"
+      },
+      {
+        # GenerateDataKey is what an SSE-KMS PutObject needs; fenced to S3 as
+        # the calling service exactly as the API's grant is, so this can
+        # never become a direct Decrypt of a case row.
+        Sid      = "CasePacketKeyUse"
+        Effect   = "Allow"
+        Action   = ["kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = var.kms_key_arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "s3.${var.aws_region}.amazonaws.com"
+          }
+        }
+      },
+    ]
+  })
+}

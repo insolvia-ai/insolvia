@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 
@@ -59,6 +60,10 @@ class MemoryDocumentBlobStore:
         # Every clear_upload_tag, in order, including repeats — the route is
         # idempotent and a test should be able to see that it stayed so.
         self.cleared: list[str] = []
+        # Bytes written server-side through put_bytes (the packet worker's
+        # path), kept whole so a test can read back what was stored.
+        self.contents: dict[str, bytes] = {}
+        self.content_types: dict[str, str] = {}
 
     def accept_upload(
         self, storage_ref: str, *, byte_size: int, etag: str = "0" * 32
@@ -132,3 +137,19 @@ class MemoryDocumentBlobStore:
         self.deleted.append(storage_ref)
         self.objects.pop(storage_ref, None)
         self.tagged.discard(storage_ref)
+        self.contents.pop(storage_ref, None)
+
+    def put_bytes(self, storage_ref: str, *, content: bytes, content_type: str) -> None:
+        # The one server-side write (the packet worker's — see the port). The
+        # bytes are kept so a test can open the zip it just assembled; no
+        # unconfirmed tag, because no capability was minted.
+        if not storage_ref:
+            raise ValueError("a blob write needs a storage ref")
+        self.objects[storage_ref] = StoredBlob(
+            byte_size=len(content),
+            # md5 because that IS S3's etag for a single-part put — identity,
+            # not security.
+            etag=hashlib.md5(content, usedforsecurity=False).hexdigest(),
+        )
+        self.contents[storage_ref] = content
+        self.content_types[storage_ref] = content_type

@@ -26,10 +26,21 @@ import logging
 
 import boto3
 
+from insolvia_api.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_api.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
+from insolvia_api.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_api.adapters.aws.debtor_store import DynamoDbDebtorStore
+from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
+from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.config import load_config
 from insolvia_api.core.jobs import WORKERS, handle_sqs_event
 from insolvia_api.core.logging import configure_logging
+from insolvia_api.core.packet_assembly import (
+    PACKET_ASSEMBLY_KIND,
+    PacketAssemblyDeps,
+    packet_assembly_worker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +53,31 @@ def main() -> None:
             "CASE_TABLE_NAME and JOB_QUEUE_URL must be set for the worker poller "
             "(scripts/dev-aws-setup.sh writes both into services/api/.env)"
         )
+    # The packet worker's extra reach (issue #96) — same dev-aws provisioning,
+    # same .env, and the worker Lambda entrypoint states the same pair.
+    if not config.case_access_log_table_name or not config.case_document_bucket:
+        raise RuntimeError(
+            "CASE_ACCESS_LOG_TABLE_NAME and CASE_DOCUMENT_BUCKET must be set "
+            "for the worker poller (scripts/dev-aws-setup.sh writes both into "
+            "services/api/.env)"
+        )
 
     store = DynamoDbJobStore(config.case_table_name)
+    # The same composition the worker Lambda does — a laptop runs the exact
+    # worker the cloud runs, against this machine's real dev resources.
+    workers = {
+        **WORKERS,
+        PACKET_ASSEMBLY_KIND: packet_assembly_worker(
+            PacketAssemblyDeps(
+                case_store=DynamoDbCaseStore(config.case_table_name),
+                debtor_store=DynamoDbDebtorStore(config.case_table_name),
+                entity_store=DynamoDbCaseEntityStore(config.case_table_name),
+                packet_store=DynamoDbPacketStore(config.case_table_name),
+                blobs=S3DocumentBlobStore(config.case_document_bucket),
+                access_log=DynamoDbAccessLog(config.case_access_log_table_name),
+            )
+        ),
+    }
     sqs = boto3.client("sqs")
     logger.info("worker poller listening", extra={"queue": config.job_queue_url})
 
@@ -60,7 +94,7 @@ def main() -> None:
                 handle_sqs_event(
                     {"Records": [{"body": message["Body"]}]},
                     store=store,
-                    workers=WORKERS,
+                    workers=workers,
                 )
             except Exception:
                 # Mirror Lambda semantics: no delete, so the visibility

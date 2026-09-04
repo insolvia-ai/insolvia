@@ -65,6 +65,21 @@ class Case:
     status: str
     created_at: str
     updated_at: str
+    # THE PINS (docs/reference/effective-dating.md, "Float, then pin").
+    # None until packet assembly runs: a floating case resolves every
+    # regulatory series as of today, and nothing is recorded. Packet assembly
+    # (issue #96) is the ONE writer: it resolves once and records what it
+    # used, in the same operation that stores the packet, so "what forms did
+    # this filing use" is answerable forever. RE-assembly before filing
+    # re-pins; a filed case never re-resolves.
+    #
+    # `form_revisions` maps form series id -> `effective_date[+sequence]`
+    # (FormRelease.pin). `constants_set_id` is reserved for the pinned
+    # release id of the `code/dollar-amounts` series — that series has no
+    # registry yet (it lands with the means-test milestone), so today
+    # assembly leaves it None rather than inventing a value.
+    form_revisions: Mapping[str, str] | None = None
+    constants_set_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -282,6 +297,19 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
+def pin_case(case: Case, *, form_revisions: Mapping[str, str]) -> Case:
+    """The pinned case packet assembly writes (effective-dating.md).
+
+    A new Case with `form_revisions` recorded and updated_at refreshed.
+    Re-pinning an already-pinned case is the re-assembly rule working as
+    designed: the new pins replace the old ones outright, because the new
+    packet is now the one the pins describe. `constants_set_id` stays as it
+    was — its series has no registry yet, and this helper must not blank a
+    value a future writer records.
+    """
+    return replace(case, form_revisions=dict(form_revisions), updated_at=_timestamp())
+
+
 def partition_key(case_id: str) -> str:
     return f"CASE#{case_id}"
 
@@ -305,7 +333,7 @@ def listing_sort_key(created_at: str, case_id: str) -> str:
     return f"{created_at}#{case_id}"
 
 
-def case_item(case: Case) -> dict[str, str | int]:
+def case_item(case: Case) -> dict[str, object]:
     """The exact stored item shape, shared by both CaseStore implementations.
 
     PK      CASE#<id>
@@ -317,8 +345,12 @@ def case_item(case: Case) -> dict[str, str | int]:
     NO GSI2 KEYS. The by-assignee index is fed by the assignment items below,
     which is what makes it sparse in the opposite direction — a case with no
     assignees simply is not in it.
+
+    The pins are stored only when present — the same absent-means-absent rule
+    the job record's `failure`/`result` follow, so an unpinned (floating) case
+    row looks exactly as it did before assembly existed.
     """
-    return {
+    item: dict[str, object] = {
         "PK": partition_key(case.id),
         "SK": "META",
         "GSI1PK": firm_key(case.firm_id),
@@ -332,9 +364,14 @@ def case_item(case: Case) -> dict[str, str | int]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    if case.form_revisions is not None:
+        item["formRevisions"] = dict(case.form_revisions)
+    if case.constants_set_id is not None:
+        item["constantsSetId"] = case.constants_set_id
+    return item
 
 
-def case_from_item(item: Mapping[str, str | int]) -> Case:
+def case_from_item(item: Mapping[str, object]) -> Case:
     """Inverse of case_item. Raises ValidationError on an item this service
     did not write — a corrupt row should fail loudly here rather than become
     a half-populated Case that reaches a caller.
@@ -347,15 +384,27 @@ def case_from_item(item: Mapping[str, str | int]) -> Case:
     scripts/dev-aws-reset.sh is the answer.
     """
     try:
+        raw_revisions = item.get("formRevisions")
+        form_revisions = (
+            {str(series): str(pin) for series, pin in raw_revisions.items()}
+            if isinstance(raw_revisions, Mapping)
+            else None
+        )
+        raw_constants = item.get("constantsSetId")
+        chapter = item["chapter"]
+        if not isinstance(chapter, (int, str)):
+            raise ValueError(f"chapter is {chapter!r}")
         return Case(
             id=str(item["id"]),
             firm_id=str(item["firmId"]),
             created_by=str(item["createdBy"]),
-            chapter=int(item["chapter"]),
+            chapter=int(chapter),
             district=str(item["district"]),
             status=str(item["status"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            form_revisions=form_revisions,
+            constants_set_id=str(raw_constants) if raw_constants is not None else None,
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored case item is malformed: {error}") from error
@@ -420,7 +469,7 @@ def case_json(case: Case) -> dict[str, object]:
     the firm's own staff list is keyed by (core/firms.firm_user_json), so the
     client can resolve it to a name without a second endpoint.
     """
-    return {
+    body: dict[str, object] = {
         "id": case.id,
         "createdBy": case.created_by,
         "chapter": case.chapter,
@@ -429,6 +478,15 @@ def case_json(case: Case) -> dict[str, object]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    # Present only once packet assembly has pinned the case — absent, not
+    # null, before that (the failure/result rule in core/jobs.job_json). The
+    # client renders which printed revisions the packet used; it never sends
+    # these back (parse_case_update does not accept them).
+    if case.form_revisions is not None:
+        body["formRevisions"] = dict(case.form_revisions)
+    if case.constants_set_id is not None:
+        body["constantsSetId"] = case.constants_set_id
+    return body
 
 
 def parse_list_limit(raw: str | None) -> int:

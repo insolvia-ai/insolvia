@@ -175,6 +175,8 @@ export type {
   ListCasesOptions,
   ListCasesResult,
   OtherName,
+  Packet,
+  PacketDownload,
   PersonName,
   Principal,
   ProvenanceEntry,

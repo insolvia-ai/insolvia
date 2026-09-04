@@ -70,10 +70,14 @@ def test_anything_but_a_registered_kind_is_rejected(payload) -> None:
         parse_job_acceptance(payload)
 
 
-def test_kinds_are_derived_from_the_worker_registry() -> None:
+def test_every_pure_worker_is_an_acceptable_kind() -> None:
     # The accept endpoint's validation and the worker's dispatch must not be
-    # able to disagree about what exists.
-    assert tuple(WORKERS) == KINDS
+    # able to disagree about what exists. KINDS may name MORE than core
+    # WORKERS carries — the store-reading workers (packet assembly) are
+    # composed by the worker entrypoints — and run_job's unknown-kind branch
+    # covers a registry missing a kind KINDS admits.
+    assert set(WORKERS) <= set(KINDS)
+    assert "packet_assembly" in KINDS
 
 
 # ── Identity and transitions ────────────────────────────────────

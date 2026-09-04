@@ -17,6 +17,7 @@ from insolvia_api.core.ports import (
     JobQueue,
     JobStore,
     Mailer,
+    PacketStore,
     WaitlistStore,
 )
 
@@ -77,6 +78,11 @@ class ApiDependencies:
     # run.
     job_store: JobStore | None = None
     job_queue: JobQueue | None = None
+    # Assembled packets (issue #96): the records share the case table (the
+    # "nothing to provision" argument again); the bytes share the document
+    # bucket, reached through document_blobs above. The API only reads this
+    # store — the pipeline worker is the writer.
+    packet_store: PacketStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

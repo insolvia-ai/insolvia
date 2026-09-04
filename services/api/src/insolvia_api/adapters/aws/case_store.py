@@ -113,6 +113,22 @@ class DynamoDbCaseStore:
         # The whole rule, in core, applied here rather than in the route.
         return case if may_see_case(accessor, case, assigned=assigned) else None
 
+    def read_for_worker(self, case_id: str) -> Case | None:
+        # No access rule and no assignment read, exactly as the port says:
+        # the pipeline worker's authority is the accepted job, and only the
+        # worker entrypoints compose this path — never a route. Strongly
+        # consistent for the job store's reason: the worker may run within
+        # milliseconds of the accept that read this case.
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={"PK": {"S": partition_key(case_id)}, "SK": {"S": "META"}},
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        if not item:
+            return None
+        return case_from_item(from_attributes(item))
+
     def list_for_accessor(
         self, accessor: Accessor, *, limit: int, cursor: str | None
     ) -> CasePage:

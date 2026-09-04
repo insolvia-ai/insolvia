@@ -436,12 +436,14 @@ resource "aws_iam_role_policy" "api_case_access" {
 # advances the job rows the API accepted, and (with 9.6/9.7) reads the case
 # it is assembling — under a role of its own so its blast radius is its own.
 #
-# Same statements as the API's grant, minus one, and the omission is the
-# design: NO access-log append. The worker records nothing in the access log
-# today — the accept was logged by the API as job.accept, and per-read
-# logging inside workers arrives with the workers that actually read case
-# data (9.6/9.7), as a grant added in a diff that says so. No Scan, same as
-# the API, for the same reason.
+# Same statements as the API's grant. The access-log append arrived exactly
+# the way the original omission promised it would — in a diff that says so:
+# packet assembly (issue #96) is the first worker that reads case DATA (the
+# whole file, to project the forms), and a case-data read that the access
+# log cannot see is the failure the api-and-log pairing rule exists to
+# prevent. Recorded against the preparer whose accept caused the run
+# (core/packet_assembly.py). Write-only, PutItem alone, exactly as the API's
+# grant is; no Scan, same as the API, for the same reason.
 resource "aws_iam_role_policy" "worker_case_access" {
   count = var.worker_role_name == null ? 0 : 1
 
@@ -466,6 +468,18 @@ resource "aws_iam_role_policy" "worker_case_access" {
           aws_dynamodb_table.cases.arn,
           "${aws_dynamodb_table.cases.arn}/index/*",
         ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "true" }
+        }
+      },
+      {
+        # Append-only, like the API's CaseAccessLogAppend and for its
+        # reasons: the packet worker reads whole case files (issue #96) and
+        # must record that it did; nothing grants it a read of the log.
+        Sid      = "CaseAccessLogAppend"
+        Effect   = "Allow"
+        Action   = ["dynamodb:PutItem"]
+        Resource = aws_dynamodb_table.access_log.arn
         Condition = {
           Bool = { "aws:SecureTransport" = "true" }
         }

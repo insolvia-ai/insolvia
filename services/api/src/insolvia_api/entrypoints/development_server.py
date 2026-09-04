@@ -15,6 +15,7 @@ from insolvia_api.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
+from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.access_log import MemoryAccessLog
 from insolvia_api.adapters.memory.case_entity_store import MemoryCaseEntityStore
@@ -25,6 +26,7 @@ from insolvia_api.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
+from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
@@ -39,6 +41,7 @@ from insolvia_api.core.ports import (
     DocumentStore,
     JobQueue,
     JobStore,
+    PacketStore,
     WaitlistStore,
 )
 
@@ -153,6 +156,18 @@ if config.job_queue_url:
 else:
     job_queue = MemoryJobQueue()
 
+# Assembled packets (issue #96): the record rides the case table like the job
+# store; the API side only reads it. The memory fallback shares the memory
+# case store because its `create` is a transaction over both — and in that
+# branch the case store above IS the memory one (the group moves together).
+packet_store: PacketStore
+if config.case_table_name and config.case_access_log_table_name:
+    packet_store = DynamoDbPacketStore(config.case_table_name)
+else:
+    if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
+        raise RuntimeError("memory packet store needs the memory case store")
+    packet_store = MemoryPacketStore(case_store)
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -185,5 +200,6 @@ app = create_app(
         case_entity_store=case_entity_store,
         job_store=job_store,
         job_queue=job_queue,
+        packet_store=packet_store,
     )
 )

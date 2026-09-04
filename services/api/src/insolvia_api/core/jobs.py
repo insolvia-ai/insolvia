@@ -140,9 +140,15 @@ WORKERS: dict[str, Callable[[Job], dict[str, Any]]] = {
     "echo": run_echo,
 }
 
-# Derived from the registry so the accept endpoint's validation and the
-# worker's dispatch cannot disagree about what exists.
-KINDS = tuple(WORKERS)
+# What the accept endpoint admits. WORKERS above holds only the DEPENDENCY-
+# FREE workers; a worker that reads stores (packet assembly — issue #96,
+# core/packet_assembly.py) is composed by the worker entrypoints, which build
+# the full mapping around WORKERS with the adapters in hand. Its KIND still
+# lives here, because the accept endpoint must admit it without importing the
+# worker's dependencies — and `run_job`'s unknown-kind branch already covers
+# a registry that lacks a kind this tuple admits (the same deploy-window
+# shape its comment describes).
+KINDS = (*WORKERS, "packet_assembly")
 
 
 # ── Validation and identity ─────────────────────────────────────

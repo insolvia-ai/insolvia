@@ -193,6 +193,26 @@ class S3DocumentBlobStore:
             Bucket=self.bucket_name, Key=storage_ref, Tagging={"TagSet": []}
         )
 
+    def put_bytes(self, storage_ref: str, *, content: bytes, content_type: str) -> None:
+        """A direct PutObject — the packet worker's write (issue #96), under
+        the WORKER role's grant (infra/modules/case_documents,
+        worker_role_name), not a presigned capability.
+
+        `ServerSideEncryption` is stated for the same reason the presigned
+        PUT states it: the bucket policy's DenyEncryptionDowngrade statement
+        matches on the header, so an unencrypted-looking request is refused
+        rather than quietly falling back. No Tagging — this write and its
+        record land together (PacketStore.create), so the unconfirmed-upload
+        reaper has no business with these bytes.
+        """
+        self.client.put_object(
+            Bucket=self.bucket_name,
+            Key=storage_ref,
+            Body=content,
+            ContentType=content_type,
+            ServerSideEncryption="aws:kms",
+        )
+
     def delete(self, storage_ref: str) -> None:
         # Deleting an object that is not there succeeds — S3's own behaviour,
         # and the one the port asks for, because this runs after the row is

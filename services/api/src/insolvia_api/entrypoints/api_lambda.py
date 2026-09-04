@@ -15,6 +15,7 @@ from insolvia_api.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
+from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.api.app_factory import create_app
@@ -125,6 +126,9 @@ app = create_app(
         # partition too, and the queue is Optional — see its note above.
         job_store=DynamoDbJobStore(config.case_table_name),
         job_queue=job_queue,
+        # Assembled packets (issue #96): records in the case table, written
+        # by the worker Lambda — the API composes this store to read them.
+        packet_store=DynamoDbPacketStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

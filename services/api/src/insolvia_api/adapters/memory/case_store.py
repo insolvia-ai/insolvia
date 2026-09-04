@@ -49,6 +49,12 @@ class MemoryCaseStore:
         assigned = (case_id, accessor.subject) in self.assignments
         return case if may_see_case(accessor, case, assigned=assigned) else None
 
+    def read_for_worker(self, case_id: str) -> Case | None:
+        # No access rule, exactly as the port says: the pipeline worker's
+        # authority is the accepted job, and only entrypoints compose this
+        # path — never a route.
+        return self.cases.get(case_id)
+
     def list_for_accessor(
         self, accessor: Accessor, *, limit: int, cursor: str | None
     ) -> CasePage:
