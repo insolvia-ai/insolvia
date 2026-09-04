@@ -56,6 +56,18 @@ export type FieldSpec =
   | { readonly kind: 'address'; readonly key: string; readonly label: string }
   /** A name-and-address block — B107's recurring column. */
   | { readonly kind: 'party'; readonly key: string; readonly label: string }
+  /**
+   * A REPEATING list of notice-party rows (issue #280) — the id-keyed object
+   * list. Each row carries a client-minted `id` (the API requires one, so
+   * provenance can address `<key>[<id>].name`), a name, an address and an
+   * account-last-four; the editor mints the id on Add, never the spec.
+   */
+  | {
+      readonly kind: 'party-list';
+      readonly key: string;
+      readonly label: string;
+      readonly itemLabel: string;
+    }
   /** A plain string list, attributed whole by provenance. */
   | {
       readonly kind: 'strings';
@@ -339,11 +351,6 @@ const isSofaType = (value: unknown): value is SofaEntryType =>
  * Every generic collection, in the order the schedules run. The intake screen
  * renders THIS list, so a collection the API grows reaches the UI by adding
  * its spec here — and only here.
- *
- * `notice_parties` on a claim is the one API field with no spec yet: it is an
- * id-keyed object list (the alias machinery), and the descriptor language
- * stops short of it on purpose until a second such field exists. The API
- * accepts it today; the form will grow it.
  */
 export const COLLECTION_SPECS: readonly CollectionSpec[] = [
   {
@@ -378,6 +385,15 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       yesNo('subject_to_offset', 'Subject to offset'),
       choice('who_incurred', 'Who incurred the debt', DEBTOR_ATTRIBUTION),
       yesNo('community_debt', 'Community debt'),
+      {
+        // 106D Part 2 / 106E/F Part 3 — collection agencies, attorneys, and
+        // anyone else to be notified about this debt (issue #280). Keyed as
+        // core/claims.py's parser reads it, ids minted by the editor.
+        kind: 'party-list',
+        key: 'notice_parties',
+        label: 'Others to be notified about this debt',
+        itemLabel: 'notice party',
+      },
       narrative('collateral_description', 'Collateral — describe the property (secured)'),
       money('collateral_value', 'Value of the collateral (secured)'),
       multichoice('lien_nature', 'Nature of the lien (secured)', LIEN_NATURES),

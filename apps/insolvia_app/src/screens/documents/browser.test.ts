@@ -1,4 +1,4 @@
-import { openDownload, pickFile } from '@/screens/documents/browser';
+import { openDownload, pickFile, saveTextFile } from '@/screens/documents/browser';
 import { installFakeFileBrowser } from '@/screens/documents/testing';
 import type { FakeFileBrowser } from '@/screens/documents/testing';
 
@@ -21,6 +21,10 @@ describe('the documents web seam', () => {
 
     it('reports that a download could not be opened', () => {
       expect(openDownload('https://example.test/blob', 'statement.pdf')).toBe(false);
+    });
+
+    it('reports that a text file could not be saved', () => {
+      expect(saveTextFile('Example Bank\r\n', 'creditor-matrix.txt')).toBe(false);
     });
   });
 
@@ -62,6 +66,23 @@ describe('the documents web seam', () => {
       expect(browser.downloads).toEqual([
         { url: 'https://example.test/presigned', fileName: 'june-statement.pdf' },
       ]);
+    });
+
+    it('saves in-memory text as a data: download, bytes intact', () => {
+      // CRLF and a trailing newline, exactly as the matrix ships — the round
+      // trip through the data URL must not touch either.
+      const content = 'Example Bank\r\nPO Box 15168\r\nWilmington DE 19850\r\n';
+
+      expect(saveTextFile(content, 'creditor-matrix.txt')).toBe(true);
+
+      expect(browser.downloads).toHaveLength(1);
+      const saved = browser.downloads[0];
+      if (saved === undefined) throw new Error('expected a recorded download');
+      expect(saved.fileName).toBe('creditor-matrix.txt');
+      expect(saved.url.startsWith('data:text/plain;charset=utf-8,')).toBe(true);
+      expect(decodeURIComponent(saved.url.slice('data:text/plain;charset=utf-8,'.length))).toBe(
+        content,
+      );
     });
   });
 });
