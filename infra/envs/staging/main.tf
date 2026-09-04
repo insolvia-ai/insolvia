@@ -447,6 +447,9 @@ module "case_documents" {
   aws_region    = var.aws_region
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = module.api_service.lambda_role_name
+  # The packet worker writes its assembled zips here (issue #96) — the same
+  # role case_store's worker grant names.
+  worker_role_name = module.job_pipeline.worker_role_name
 
   # Both origins staging already admits elsewhere: the deployed app, and the
   # localhost dev server module.auth registers above and the API's own CORS

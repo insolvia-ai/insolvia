@@ -17,6 +17,7 @@ from insolvia_api.core.debtors import Debtor
 from insolvia_api.core.documents import Document, StoredBlob
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
+from insolvia_api.core.packets import Packet
 from insolvia_api.core.waitlist import WaitlistRecord
 
 BodyT = TypeVar("BodyT")
@@ -114,6 +115,23 @@ class CaseStore(Protocol):
         through `get` first, on every path. Same rule DocumentStore states —
         two authorisation checks that must agree are two checks that will
         eventually disagree.
+        """
+        ...
+
+    def read_for_worker(self, case_id: str) -> Case | None:
+        """The case record with NO accessor and NO access rule — the pipeline
+        worker's read (ADR 0018), and ONLY the pipeline worker's.
+
+        A worker holds no firm identity: its authority derives from the job
+        record it is executing, whose accept already resolved the case
+        through `get` under the preparer's accessor and logged the decision.
+        Re-deriving that decision here would need an accessor the worker does
+        not have, and inventing one would be a second authorisation path.
+
+        MUST NOT be called from a route. A route always has a caller, a
+        caller always has an accessor, and `get` is the only read a request
+        path may use — this method existing does not change that rule, it is
+        the one deliberate exception for the process that has no caller.
         """
         ...
 
@@ -235,6 +253,20 @@ class DocumentBlobStore(Protocol):
         """Delete the object. Idempotent — deleting an object that is not there
         succeeds, because the route reaches here only after removing the row
         that was the record of it."""
+        ...
+
+    def put_bytes(self, storage_ref: str, *, content: bytes, content_type: str) -> None:
+        """Write an object this SERVICE produced — the packet worker's write
+        (issue #96), and the one write path that is not a presigned PUT.
+
+        Everything about the upload flow above exists because a CLIENT moves
+        the bytes; here the worker holds them, so there is no capability to
+        mint, no declared size to bind, and no `upload=unconfirmed` tag —
+        the record is written in the same breath (PacketStore.create), so the
+        reaper the tag feeds has nothing to reap. Implementations MUST write
+        with the bucket's required encryption mode, exactly as a presigned
+        PUT is forced to.
+        """
         ...
 
 
@@ -369,6 +401,48 @@ class JobStore(Protocol):
         is gone): the caller lost a race with a concurrent delivery and must
         not pretend otherwise. See run_job for why that is the entire
         at-least-once story."""
+        ...
+
+
+class PacketStore(Protocol):
+    """Persists assembled-packet records (issue #96) — and writes the case's
+    effective-dating pins in the same operation, which is the reason this is
+    its own port rather than three calls on the others.
+
+    Same table, same partition, same reached-only-through-its-case rule as
+    every sibling: a packet is SK=PACKET#<id> under its case, `case_id` is
+    half the key, and the routes resolve the case through `CaseStore` first.
+
+    Written by the pipeline WORKER (create), read by the API (get/list).
+    """
+
+    def create(
+        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+    ) -> bool:
+        """Store the packet record AND the pinned case, atomically — both or
+        neither, exactly as CaseStore.create pairs the case with its
+        assignment. A packet without its pins (or pins without their packet)
+        makes "what data did this filing use" unanswerable, which is the
+        provenance failure effective-dating.md exists to prevent.
+
+        The case write is conditional on the stored `updatedAt` still being
+        `expected_updated_at` (the value the worker READ before assembling)
+        and on the status not being `filed`. False means the condition failed
+        — the case was edited, filed, or deleted mid-assembly — and the
+        caller must treat the packet as describing a case that no longer
+        exists; nothing was written.
+
+        The packet put itself refuses to overwrite an existing (case, id),
+        the id-minting rule every sibling create states.
+        """
+        ...
+
+    def get(self, case_id: str, packet_id: str) -> Packet | None: ...
+
+    def list_for_case(self, case_id: str) -> tuple[Packet, ...]:
+        """Every packet of one case, newest first (core/packets.list_order
+        reversed — the SK is a random uuid, so neither implementation gets
+        the ordering for free). All of them: a caller cannot page."""
         ...
 
 

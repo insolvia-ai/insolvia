@@ -60,6 +60,8 @@ import type {
   ListCasesOptions,
   ListCasesResult,
   OtherName,
+  Packet,
+  PacketDownload,
   PersonName,
   Principal,
   ProvenanceEntry,
@@ -836,6 +838,52 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/cases/{caseId}/packets` — every assembled Chapter 7 packet of
+   * this case, newest first (issue #96).
+   *
+   * Packets are produced by the `packet_assembly` pipeline job: trigger one
+   * with {@link acceptCaseJob}, poll {@link getCaseJob} until it settles, and
+   * the succeeded job's `result` names the packet this listing also shows.
+   * Old packets stay listed — re-assembly creates rather than replaces.
+   */
+  async listCasePackets(caseId: string): Promise<readonly Packet[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#packetsUrl(caseId), {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requirePacketArray(decoded, 'packets');
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/packets/{packetId}/url` — a short-lived URL that
+   * serves one packet's bytes: the issue's "one download of the packet as
+   * filed-ready PDFs", a zip of the full form set plus the creditor matrix.
+   *
+   * The same ask-at-the-moment-of-use rule as {@link getDocumentUrl}: it
+   * expires in minutes and is a bearer capability, so never cache or log it.
+   */
+  async getPacketUrl(caseId: string, packetId: string): Promise<PacketDownload> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#packetsUrl(caseId)}/${encodeURIComponent(packetId)}/url`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return {
+      url: requireString(decoded, 'url'),
+      method: requireString(decoded, 'method'),
+      expiresAt: requireString(decoded, 'expiresAt'),
+    };
+  }
+
+  /** `/v1/cases/{caseId}/packets`, with the id encoded exactly once. */
+  #packetsUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/packets`;
+  }
+
+  /**
    * The base URL of one collection. `collection` is a union of URL-safe
    * literals, encoded anyway — the same rule {@link putDebtor} states about
    * its role segment.
@@ -1358,6 +1406,31 @@ function optionalString(response: DecodedResponse, key: string): string | undefi
   return value;
 }
 
+/**
+ * An optional flat string-to-string map (the pin maps: `formRevisions`) —
+ * `undefined` when absent, checked per entry rather than cast when present.
+ */
+function optionalStringRecord(
+  response: DecodedResponse,
+  key: string,
+): Readonly<Record<string, string>> | undefined {
+  const value = response.json[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw malformedField(response, key, 'Record<string, string>');
+  }
+  const record: Record<string, string> = {};
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (typeof entryValue !== 'string') {
+      throw malformedField(response, `${key}.${entryKey}`, 'string');
+    }
+    record[entryKey] = entryValue;
+  }
+  return record;
+}
+
 /** A required field that must be one of the four valid case chapters. */
 function requireCaseChapter(response: DecodedResponse, key: string): CaseChapter {
   const value = response.json[key];
@@ -1383,6 +1456,10 @@ function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
  * endpoint's page of cases.
  */
 function caseFromJson(response: DecodedResponse): Case {
+  // The pins are absent (never null) until packet assembly writes them —
+  // mirroring `case_json` in core/cases.py — so both stay optional here.
+  const formRevisions = optionalStringRecord(response, 'formRevisions');
+  const constantsSetId = optionalString(response, 'constantsSetId');
   return {
     id: requireString(response, 'id'),
     createdBy: requireString(response, 'createdBy'),
@@ -1391,16 +1468,18 @@ function caseFromJson(response: DecodedResponse): Case {
     status: requireCaseStatus(response, 'status'),
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    ...(formRevisions === undefined ? {} : { formRevisions }),
+    ...(constantsSetId === undefined ? {} : { constantsSetId }),
   };
 }
 
 /** A required field that must be a registered job kind. */
 function requireJobKind(response: DecodedResponse, key: string): JobKind {
   const value = response.json[key];
-  if (value === 'echo') {
+  if (value === 'echo' || value === 'packet_assembly') {
     return value;
   }
-  throw malformedField(response, key, "one of 'echo'");
+  throw malformedField(response, key, "one of 'echo' | 'packet_assembly'");
 }
 
 /** A required field that must be one of the four job statuses. */
@@ -1580,6 +1659,44 @@ function requireDocumentArray(response: DecodedResponse, key: string): readonly 
       throw malformedField(response, `${key}[${index}]`, 'object');
     }
     return documentFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+    });
+  });
+}
+
+/**
+ * Decodes a {@link Packet} from a response body — `packet_json` in
+ * services/api/src/insolvia_api/core/packets.py, every field required.
+ */
+function packetFromJson(response: DecodedResponse): Packet {
+  return {
+    id: requireString(response, 'id'),
+    caseId: requireString(response, 'caseId'),
+    jobId: requireString(response, 'jobId'),
+    fileName: requireString(response, 'fileName'),
+    contentType: requireString(response, 'contentType'),
+    byteSize: requireNumber(response, 'byteSize'),
+    sha256: requireString(response, 'sha256'),
+    formRevisions: requireStringRecord(response, 'formRevisions'),
+    creditorCount: requireNumber(response, 'creditorCount'),
+    createdBy: requireString(response, 'createdBy'),
+    createdAt: requireString(response, 'createdAt'),
+  };
+}
+
+/** An array field whose every element must decode as a {@link Packet}. */
+function requirePacketArray(response: DecodedResponse, key: string): readonly Packet[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'Packet[]');
+  }
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, `${key}[${index}]`, 'object');
+    }
+    return packetFromJson({
       statusCode: response.statusCode,
       body: response.body,
       json: item as JsonObject,

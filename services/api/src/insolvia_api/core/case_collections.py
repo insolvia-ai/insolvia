@@ -71,4 +71,11 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
 # the invariant tests/test_case_entities.py checks: a new prefix that collides
 # with (or is a prefix of) an existing one would hand one collection's items
 # to another's begins_with query.
-RESERVED_SK_NAMESPACES: Final = ("META", "ASSIGNEE", "DEBTOR", "DOCUMENT")
+RESERVED_SK_NAMESPACES: Final = (
+    "META",
+    "ASSIGNEE",
+    "DEBTOR",
+    "DOCUMENT",
+    "JOB",
+    "PACKET",
+)

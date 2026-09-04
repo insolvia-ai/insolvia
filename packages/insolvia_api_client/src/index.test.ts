@@ -1234,6 +1234,143 @@ describe('the pipeline job endpoints', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Assembled packets (issue #96). Pinned against services/api/.../routes/
+// packets.py and core/packets.py: `packet_json`'s eleven fields, the listing
+// wrapper, the download-URL triple, and the case's pin fields that packet
+// assembly writes (`case_json`'s formRevisions).
+// ---------------------------------------------------------------------------
+
+describe('the packet endpoints', () => {
+  const PACKET_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const PACKET_ID = 'b8c7d6e5-4f3a-4291-8a7b-6c5d4e3f2a1b';
+
+  /** The literal `packet_json` the routes return. */
+  const PACKET = {
+    id: PACKET_ID,
+    caseId: PACKET_CASE_ID,
+    jobId: 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918',
+    fileName: 'chapter7-packet.zip',
+    contentType: 'application/zip',
+    byteSize: 1843200,
+    sha256: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2',
+    formRevisions: { 'form/b101': '2024-06-22', 'form/b107': '2025-04-01' },
+    creditorCount: 6,
+    createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+    createdAt: '2026-09-02T09:20:00.123Z',
+  };
+
+  test('accepts a packet_assembly job — the trigger is the jobs endpoint', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          id: 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918',
+          kind: 'packet_assembly',
+          status: 'queued',
+          createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+          attempts: 0,
+          createdAt: '2026-09-02T09:15:00.123Z',
+          updatedAt: '2026-09-02T09:15:00.123Z',
+        },
+        202,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const accepted = await client.acceptCaseJob(PACKET_CASE_ID, 'packet_assembly');
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ kind: 'packet_assembly' });
+    expect(accepted.kind).toBe('packet_assembly');
+  });
+
+  test('GETs /v1/cases/{caseId}/packets and maps the listing', async () => {
+    const stub = stubFetch(() => jsonResponse({ packets: [PACKET] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const packets = await client.listCasePackets(PACKET_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${PACKET_CASE_ID}/packets`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(packets).toEqual([PACKET]);
+  });
+
+  test('GETs /v1/cases/{caseId}/packets/{packetId}/url with every segment encoded', async () => {
+    const download = {
+      url: 'https://bucket.s3.amazonaws.com/cases/x/packets/y?signature=abc',
+      method: 'GET',
+      expiresAt: '2026-09-02T09:25:00.123Z',
+    };
+    const stub = stubFetch(() => jsonResponse(download, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const minted = await client.getPacketUrl('id with spaces/slash', 'packet/id');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/id%20with%20spaces%2Fslash/packets/packet%2Fid/url`,
+    );
+    expect(minted).toEqual(download);
+  });
+
+  test('a case pinned by assembly carries its formRevisions', async () => {
+    // The pins are `case_json`'s two optional fields (core/cases.py): absent
+    // until packet assembly writes them, present verbatim afterwards.
+    const pinned = {
+      id: PACKET_CASE_ID,
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      chapter: 7,
+      district: 'M.D. Fla.',
+      status: 'intake',
+      createdAt: '2026-07-23T09:15:00.123Z',
+      updatedAt: '2026-09-02T09:20:00.456Z',
+      formRevisions: { 'form/b101': '2024-06-22' },
+    };
+    const stub = stubFetch(() => jsonResponse(pinned, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const found = await client.getCase(PACKET_CASE_ID);
+
+    expect(found.formRevisions).toEqual({ 'form/b101': '2024-06-22' });
+    expect('constantsSetId' in found).toBe(false);
+  });
+
+  test('an unpinned case leaves the pin fields absent, not null', async () => {
+    const unpinned = {
+      id: PACKET_CASE_ID,
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      chapter: 7,
+      district: 'M.D. Fla.',
+      status: 'intake',
+      createdAt: '2026-07-23T09:15:00.123Z',
+      updatedAt: '2026-07-23T09:15:00.123Z',
+    };
+    const stub = stubFetch(() => jsonResponse(unpinned, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const found = await client.getCase(PACKET_CASE_ID);
+
+    expect('formRevisions' in found).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Documents. Pinned against services/api/.../routes/documents.py and
 // core/documents.py: `document_json`'s eight fields, the `upload` block on the
 // 201, the 204 on delete, and the 409 that means the bytes never arrived.

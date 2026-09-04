@@ -510,6 +510,19 @@ export interface Case {
   readonly createdAt: string;
   /** The server's UTC last-update timestamp, kept verbatim as the wire string. */
   readonly updatedAt: string;
+  /**
+   * The effective-dating pins packet assembly wrote (issue #96): form series
+   * id -> the pinned revision (`effective_date[+sequence]`). **Absent until
+   * the first packet assembles** — a floating case records nothing — and
+   * replaced whole on re-assembly. Read-only: no request ever sends it.
+   */
+  readonly formRevisions?: Readonly<Record<string, string>>;
+  /**
+   * The pinned `code/dollar-amounts` release id. Reserved — the series has no
+   * registry yet (it lands with the means-test milestone), so today this is
+   * always absent.
+   */
+  readonly constantsSetId?: string;
 }
 
 /** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
@@ -614,11 +627,10 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
 
 /**
  * The job kinds the API accepts today. The exact `KINDS` tuple from
- * `core/jobs.py` — which is itself derived from the worker registry, so this
- * union is "what the pipeline can actually run". 9.6 adds packet assembly
- * here, 9.7 the AI review.
+ * `core/jobs.py`: `echo` (the walking skeleton) and `packet_assembly` (the
+ * Chapter 7 packet, issue #96). 9.7 adds the AI review.
  */
-export type JobKind = 'echo';
+export type JobKind = 'echo' | 'packet_assembly';
 
 /**
  * Where a job sits. `queued` and `running` mean poll again; `succeeded` and
@@ -637,6 +649,63 @@ export interface JobFailure {
   readonly category: string;
   readonly message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Assembled packets — mirrors services/api/src/insolvia_api/core/packets.py
+// (`packet_json`) and api/routes/packets.py (issue #96).
+// ---------------------------------------------------------------------------
+
+/**
+ * One assembled Chapter 7 packet, as returned by `GET
+ * /v1/cases/{caseId}/packets`. Produced by the `packet_assembly` pipeline job
+ * — trigger with {@link InsolviaApiClient.acceptCaseJob}, poll with
+ * {@link InsolviaApiClient.getCaseJob}, then download through
+ * {@link InsolviaApiClient.getPacketUrl}.
+ *
+ * A packet is immutable: re-assembly creates a NEW record rather than
+ * replacing this one, so the packet an attorney reviewed stays the packet
+ * they reviewed.
+ */
+export interface Packet {
+  /** The server-generated packet id. */
+  readonly id: string;
+  /** The case it belongs to (also named in the URL; echoed for convenience). */
+  readonly caseId: string;
+  /** The pipeline job whose run produced it. */
+  readonly jobId: string;
+  /** The download name — always `chapter7-packet.zip`. */
+  readonly fileName: string;
+  /** Always `application/zip`. */
+  readonly contentType: string;
+  /** The stored zip's exact size in bytes. */
+  readonly byteSize: number;
+  /**
+   * The sha256 of the stored zip. Assembly is deterministic to the byte, so
+   * this digest is how a reviewer proves a downloaded file is THIS packet.
+   */
+  readonly sha256: string;
+  /**
+   * The effective-dating pins this packet was rendered under — the same map
+   * written onto the case, kept here because the case's copy moves on
+   * re-assembly while this record describes this packet forever.
+   */
+  readonly formRevisions: Readonly<Record<string, string>>;
+  /** How many creditors the enclosed matrix lists (after deduplication). */
+  readonly creditorCount: number;
+  /**
+   * The subject of the firm user whose job accept produced it — resolve
+   * through `listFirmDirectory`, never render raw.
+   */
+  readonly createdBy: string;
+  readonly createdAt: string;
+}
+
+/**
+ * The `GET /v1/cases/{caseId}/packets/{packetId}/url` 200 response — the same
+ * `{"url", "method", "expiresAt"}` short-lived capability shape the document
+ * download uses ({@link DocumentDownload}), minted by the same route pattern.
+ */
+export type PacketDownload = DocumentDownload;
 
 /**
  * A pipeline job, as returned by both `/v1/cases/{caseId}/jobs` endpoints:

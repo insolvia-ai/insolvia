@@ -56,6 +56,12 @@ variable "api_role_name" {
   default     = null
 }
 
+variable "worker_role_name" {
+  description = "Pipeline worker Lambda execution role (module.job_pipeline.worker_role_name) — packet assembly writes its zips under cases/*/packets/* (issue #96). Null in infra/envs/dev, where there is no Lambda and the developer's own IAM user is the principal."
+  type        = string
+  default     = null
+}
+
 variable "force_destroy" {
   description = "Whether `terraform destroy` may empty the bucket first. True in staging and dev (synthetic documents, disposable), false in prod."
   type        = bool

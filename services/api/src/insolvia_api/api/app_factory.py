@@ -27,6 +27,7 @@ from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
+from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
 from insolvia_api.core.cors import origin_allowed
@@ -56,6 +57,8 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/cases/<id>/jobs — a static segment, so it always beats
     # /<collection> for the same Werkzeug-ranking reason debtors does.
     app.register_blueprint(jobs_blueprint)
+    # /v1/cases/<id>/packets — same static-segment argument.
+    app.register_blueprint(packets_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)
