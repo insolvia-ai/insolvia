@@ -33,8 +33,10 @@ import {
   DEBT_CHARACTERS,
   ESTIMATED_CREDITORS_BANDS,
   ESTIMATED_DOLLAR_BANDS,
+  EXCLUDED_INCOME_CATEGORIES,
   FEE_HANDLING,
   FILING_PROFESSIONAL_ROLES,
+  OTHER_INCOME_CATEGORIES,
   SMALL_BUSINESS_STATUSES,
   SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
@@ -4088,6 +4090,26 @@ describe('the case-collection enums', () => {
       'exemptions',
       'contract_leases',
       'community_household_members',
+      'other_income_records',
+    ]);
+  });
+
+  test('the income-history enums mirror core/income.py', () => {
+    expect(OTHER_INCOME_CATEGORIES).toEqual([
+      'alimony_maintenance',
+      'household_contributions',
+      'business',
+      'rental',
+      'interest_dividends_royalties',
+      'unemployment',
+      'pension_retirement',
+      'other',
+    ]);
+    expect(EXCLUDED_INCOME_CATEGORIES).toEqual([
+      'social_security_act_benefit',
+      'veterans_disability_compensation',
+      'war_crime_victim_payment',
+      'terrorism_victim_payment',
     ]);
   });
 
