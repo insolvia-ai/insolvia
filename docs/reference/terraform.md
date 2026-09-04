@@ -17,6 +17,9 @@ infra/
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
 │   │                         #   insolvia-<env>-audit under its own key
+│   ├── job_pipeline/         # async jobs (ADR 0018): SQS queue + DLQ + the
+│   │                         #   image-packaged worker Lambda + alarms; the
+│   │                         #   worker half is optional (absent in dev)
 │   ├── mailer/               # transactional email: Lambda + S3 + DynamoDB + SES
 │   └── marketing_site/       # SSR marketing site: Lambda + alias + HTTP API + S3 +
 │                             # CloudFront (www + apex)
@@ -44,7 +47,7 @@ infra/
 |---|---|---|
 | ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy — **human-applied only**, never by CI (see below) |
 | account-access | `insolvia/account-access/terraform.tfstate` | The human IAM users, the groups they belong to, and the policies attached to them — **human-applied only**, and CI *cannot* apply it at all (see below) |
-| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer` — one per service, shared by every env) |
+| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer`, `insolvia-shared-jobs` — one per image, shared by every env) |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-staging-waitlist`, alarms); staging auth (`insolvia-staging-users`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-prod-waitlist`, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
 | dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-waitlist` and `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
@@ -182,6 +185,47 @@ terraform apply
 Steady state is workflow-driven: push image → `aws lambda
 update-function-code` → resolve `/insolvia/<env>/api/*` →
 `update-function-configuration`. Terraform never notices.
+
+## Async job pipeline (`infra/modules/job_pipeline/`)
+
+The orchestration half of
+[ADR 0018](../adr/0018-sqs-queue-and-worker-lambda-over-step-functions.md):
+per environment, one SQS queue (`insolvia-<env>-jobs`) the API enqueues
+accepted jobs onto, a DLQ, and one image-packaged worker Lambda
+(`insolvia-<env>-jobs-worker`) consuming it at batch size 1. The job *record*
+lives in the case table — this module owns no store.
+
+- **The worker image** is `insolvia-shared-jobs` — services/api's Dockerfile,
+  `worker` target: the API's source tree, a different handler, its own image
+  so worker-only dependencies (9.6's PDF assembly, 9.7's model SDK) never
+  land in the request path's image (ADR 0015's rule). It deploys inside
+  `api-<env>.yml` — build/promote alongside the api image, then
+  `update-function-code` on the worker — and the `record` job stamps its
+  `sha-<commit>` tag like every other repo. No alias, no version dance:
+  a queue consumer has no router to protect (the module header owns the
+  argument).
+- **Grant seams, both by role NAME** (the mailer/case_store pattern, so no
+  module references another's resources): this module attaches
+  `sqs:SendMessage` onto the API role it is passed, and `modules/case_store`
+  attaches the worker's case-table + key grant onto the worker role it is
+  passed (`worker_role_name`). The queue URL reaches the API as
+  `/insolvia/<env>/api/job-queue-url` → `JOB_QUEUE_URL`; the worker reads the
+  same namespace (it needs `CASE_TABLE_NAME`).
+- **The queue carries identifiers only** — job id, case id, kind; never case
+  data — which is why SSE-SQS suffices and the case CMK is deliberately not
+  used (a queue under that key would also trip `DenyCaseDataDecryption` for
+  the deploy role). Retry is `maxReceiveCount = 3` into the DLQ; the DLQ
+  depth alarm is the pipeline's real pager, publishing to the API's existing
+  alarms topic.
+- **In `infra/envs/dev` the worker half is absent** (`ecr_repository_url =
+  null` — there is no Lambda in dev): the module creates the queue + DLQ
+  only. The local API enqueues onto that real queue and
+  `python -m insolvia_api.entrypoints.worker_poller` consumes it under the
+  developer's own credentials, so the whole loop runs on a laptop; the one
+  cloud-only piece is the managed SQS→Lambda event source mapping itself.
+- **First apply in a fresh environment** hits the usual image-before-apply
+  deadlock: `scripts/bootstrap-ecr-images.sh <env> jobs` seeds
+  `insolvia-shared-jobs:<env>` after `shared` applies, then apply the env.
 
 ## Auth (`infra/modules/auth/`)
 
@@ -441,6 +485,11 @@ What it owns is deliberately only what local dev consumes today:
   across AWS; the short id is what makes a per-developer pool creatable at
   all), localhost-only web origin, deletion protection off. Outputs only —
   preps local auth work, nothing consumes it yet.
+- **Job queue** via the same `modules/job_pipeline` as staging/prod, worker
+  half absent (`ecr_repository_url = null` — dev has no Lambda). The local
+  API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in
+  `services/api/.env`) and the worker poller consumes it — the pipeline's
+  local story, ADR 0018.
 
 No ECR/Lambda/API Gateway/S3 (local dev runs the API via compose, not
 Lambda), and no IAM — the developer's own credentials are the principal.

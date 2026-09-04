@@ -39,7 +39,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "marketing", "mailer"])
+  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -328,6 +328,36 @@ module "marketing_site" {
   tags         = local.common_tags
 }
 
+# Async job pipeline (ADR 0018, issue #271). Staging's block owns the shared
+# commentary; prod differs only in insolvia_env and the marker tag. The
+# worker image is never built here — api-prod.yml promotes the digest staging
+# validated, exactly as it does for the api image.
+#
+# First apply in a fresh account needs the image-before-apply bootstrap
+# documented at the top of modules/job_pipeline/main.tf
+# (scripts/bootstrap-ecr-images.sh prod jobs).
+module "job_pipeline" {
+  source = "../../modules/job_pipeline"
+
+  project            = "insolvia"
+  environment        = local.environment
+  insolvia_env       = "production"
+  ecr_repository_url = data.aws_ecr_repository.service["jobs"].repository_url
+  image_tag          = local.environment
+  api_role_name      = module.api_service.lambda_role_name
+  alarms_topic_arn   = module.api_service.alarms_topic_arn
+  tags               = local.common_tags
+}
+
+# The queue URL, into the API's SSM config namespace — same env-level
+# cycle-avoidance and same kebab-key derivation as staging's block.
+resource "aws_ssm_parameter" "job_queue_url" {
+  name  = "/insolvia/${local.environment}/api/job-queue-url"
+  type  = "String"
+  value = module.job_pipeline.queue_url
+  tags  = local.common_tags
+}
+
 # Case data store (issue 8.2): the first GLBA-scope persistent store — a
 # customer-managed key and the case table behind it. Declared after
 # module.api_service because it takes that module's execution role name and
@@ -343,6 +373,7 @@ module "case_store" {
   project                     = "insolvia"
   environment                 = local.environment
   api_role_name               = module.api_service.lambda_role_name
+  worker_role_name            = module.job_pipeline.worker_role_name
   deletion_protection         = true
   key_deletion_window_in_days = 30
   tags                        = local.common_tags

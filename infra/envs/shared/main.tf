@@ -130,14 +130,19 @@ module "email" {
 #
 # The component names match the services they hold images for, including
 # `admin-api` rather than `admin` — `admin` is the staff PORTAL, which has no
-# container at all (it is a static SPA in an S3 bucket).
+# container at all (it is a static SPA in an S3 bucket). `jobs` is the one
+# repo that is not a service directory of its own: it holds the pipeline
+# WORKER image (ADR 0018), built from services/api's Dockerfile `worker`
+# target — same source tree as the api image, its own image so 9.6/9.7's
+# heavy dependencies land in the worker and never in the request path
+# (ADR 0015's rule).
 #
 # Named `insolvia-*` so the deploy role's ECR grant
 # (arn:aws:ecr:...:repository/insolvia-*, infra/envs/ci-trust/main.tf) covers
 # them without an IAM change — that grant is human-applied, so a rename OUT of
 # that prefix would strand the pipeline.
 locals {
-  container_repositories = toset(["api", "admin-api", "marketing", "mailer"])
+  container_repositories = toset(["api", "admin-api", "jobs", "marketing", "mailer"])
 }
 
 resource "aws_ecr_repository" "service" {

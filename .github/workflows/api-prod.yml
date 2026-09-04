@@ -137,12 +137,24 @@ jobs:
             echo "function=$(tf api_lambda_function_name)"
             echo "domain=$(tf api_domain)"
             echo "alias=$(tf api_lambda_alias_name)"
+            echo "jobs_repo=$(tf jobs_ecr_repository_url)"
+            echo "worker_function=$(tf jobs_worker_function_name)"
           } >> "$GITHUB_OUTPUT"
 
       - id: image
         uses: ./.github/actions/promote-image
         with:
           repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      # The worker image is promoted by the same rule as the api's — the
+      # digest staging validated, never a rebuild. The `record` job stamps
+      # sha-<commit> on insolvia-shared-jobs like every other repo, so an
+      # unchanged pipeline still resolves.
+      - id: worker-image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.jobs_repo }}
           sha: ${{ needs.resolve.outputs.sha }}
 
       - name: Update Lambda code
@@ -293,3 +305,83 @@ jobs:
           curl -sSf --retry 5 --retry-delay 3 --retry-all-errors \
             "https://$DOMAIN/health" | tee health.json
           jq -e '.environment == "production"' health.json > /dev/null
+
+      # ── The pipeline worker (ADR 0018) ──────────────────────────
+      # After the API is live, same as staging: no alias to shift (the module
+      # owns that argument), so promote the digest, re-derive the environment,
+      # smoke-invoke directly, then move the `prod` marker tag.
+      - name: Update worker code
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+          IMAGE_URI: ${{ steps.worker-image.outputs.image-uri }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$WORKER" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$WORKER"
+
+      - name: Re-derive worker environment from SSM
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+        run: |
+          # The SAME /insolvia/prod/api namespace as the API Lambda — the
+          # worker is the API's long-running half and reads the same config.
+          environment="$(
+            aws ssm get-parameters-by-path \
+              --path /insolvia/prod/api \
+              --with-decryption \
+              --query 'Parameters[].{Name:Name,Value:Value}' \
+              --output json \
+            | jq -c 'map({key: (.Name | split("/") | last | ascii_upcase | gsub("-"; "_")), value: .Value})
+                     | {Variables: from_entries}'
+          )"
+          echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          aws lambda update-function-configuration \
+            --function-name "$WORKER" \
+            --environment "$environment"
+          aws lambda wait function-updated --function-name "$WORKER"
+
+      # A synthetic SQS event whose job id has no record: run_job drops it by
+      # design, so a clean return proves boot + handler + store reachability
+      # without writing anything to the prod table.
+      - name: Smoke test the worker
+        env:
+          WORKER: ${{ steps.tf.outputs.worker_function }}
+        run: |
+          cat > worker-event.json <<'EOF'
+          {
+            "Records": [
+              {
+                "body": "{\"version\":1,\"jobId\":\"00000000-0000-4000-8000-00000000smoke\",\"caseId\":\"00000000-0000-4000-8000-00000000smoke\",\"kind\":\"echo\"}"
+              }
+            ]
+          }
+          EOF
+          aws lambda invoke \
+            --function-name "$WORKER" \
+            --payload fileb://worker-event.json \
+            --cli-read-timeout 120 \
+            worker-response.json > worker-invoke-meta.json
+          cat worker-invoke-meta.json
+          if jq -e '.FunctionError' worker-invoke-meta.json > /dev/null; then
+            echo "::error::Worker smoke invocation raised: $(jq -r '.FunctionError' worker-invoke-meta.json)"
+            cat worker-response.json
+            exit 1
+          fi
+
+      - name: Move the jobs prod marker tag
+        env:
+          JOBS_REPO: ${{ steps.tf.outputs.jobs_repo }}
+          DIGEST: ${{ steps.worker-image.outputs.digest }}
+        run: |
+          # Same seed-tag maintenance as the api repo's step above: a
+          # from-scratch apply seeds the worker Lambda from `prod`.
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${JOBS_REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${JOBS_REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::jobs \`prod\` tag already points at this digest."

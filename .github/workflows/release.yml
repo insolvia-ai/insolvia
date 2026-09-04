@@ -169,7 +169,10 @@ jobs:
 
           # packages/insolvia_core is baked into the api image (issue #208), so
           # a core change must rebuild and redeploy the service that ships it.
-          emit api       '^(services/api/|packages/insolvia_core/|infra/envs/staging/|infra/modules/api_service/|\.github/workflows/(api-staging|release)\.yml)'
+          # modules/job_pipeline rides the api leg: the pipeline worker's image
+          # is built from services/api and deployed by api-staging.yml
+          # (ADR 0018).
+          emit api       '^(services/api/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(api_service|job_pipeline)/|\.github/workflows/(api-staging|release)\.yml)'
           emit admin     '^(apps/insolvia_admin/|services/admin/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(admin_service|web_hosting)/|\.github/workflows/(admin-staging|release)\.yml)'
           emit mailer    '^(services/mailer/|infra/envs/staging/|infra/modules/(mailer|api_service)/|\.github/workflows/(mailer-staging|release)\.yml)'
           emit marketing '^(apps/insolvia_marketing/|infra/envs/staging/|infra/modules/marketing_site/|\.github/workflows/(marketing-staging|release)\.yml)'
@@ -308,6 +311,7 @@ jobs:
           {
             echo "api=$(basename "$(tf api_ecr_repository_url)")"
             echo "admin=$(basename "$(tf admin_ecr_repository_url)")"
+            echo "jobs=$(basename "$(tf jobs_ecr_repository_url)")"
             echo "mailer=$(basename "$(tf mailer_ecr_repository_url)")"
             echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
           } >> "$GITHUB_OUTPUT"
@@ -318,6 +322,7 @@ jobs:
           REPOS: >-
             ${{ steps.tf.outputs.api }}
             ${{ steps.tf.outputs.admin }}
+            ${{ steps.tf.outputs.jobs }}
             ${{ steps.tf.outputs.mailer }}
             ${{ steps.tf.outputs.marketing }}
         run: |

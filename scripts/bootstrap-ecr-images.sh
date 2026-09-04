@@ -15,9 +15,9 @@
 #     <acct>.dkr.ecr.<region>.amazonaws.com/insolvia-shared-<component>:<env>
 #     does not exist. Provide a valid source image.
 #
-# The same note lives at the top of infra/modules/{api_service,admin_service,mailer,
-# marketing_site}/main.tf and in each workflow header. This script is that
-# manual step, done once, for whatever services you name.
+# The same note lives at the top of infra/modules/{api_service,admin_service,
+# job_pipeline,mailer,marketing_site}/main.tf and in each workflow header. This
+# script is that manual step, done once, for whatever services you name.
 #
 # It is safe to run when the ECR *repositories* already exist (e.g. a failed
 # apply created them before it reached the Lambdas): it only pushes images.
@@ -41,8 +41,10 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin mailer marketing   (default: all four)
-#   --dispatch   after pushing, re-run the matching <service>-<env>.yml workflows
+#   service ...  any of: api admin jobs mailer marketing   (default: all five;
+#                `jobs` is the pipeline worker image — ADR 0018)
+#   --dispatch   after pushing, re-run the matching deploy workflows
+#                (<service>-<env>.yml; jobs rides api-<env>.yml)
 #   --yes        skip the confirmation prompt
 #
 # Examples:
@@ -98,9 +100,21 @@ ecr_component() {
   case "$1" in
     api)       printf 'api' ;;
     admin)     printf 'admin-api' ;;
+    jobs)      printf 'jobs' ;;
     mailer)    printf 'mailer' ;;
     marketing) printf 'marketing' ;;
     *)         die "no ECR component mapping for service '$1'" ;;
+  esac
+}
+
+# Which deploy workflow rolls a service forward. Almost always
+# <service>-<env>.yml; `jobs` is the exception — the pipeline worker image is
+# built from services/api and deployed by the api workflow (ADR 0018), so
+# there is no jobs-<env>.yml to dispatch.
+deploy_workflow() {
+  case "$1" in
+    jobs) printf 'api-%s.yml' "$ENV" ;;
+    *)    printf '%s-%s.yml' "$1" "$ENV" ;;
   esac
 }
 
@@ -109,7 +123,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|mailer|marketing) SERVICES+=("$arg") ;;
+    api|admin|jobs|mailer|marketing) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -118,7 +132,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin mailer marketing)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing)
 
 require_command aws
 require_command docker
@@ -192,6 +206,15 @@ build_admin() {
     -t "$1:$ENV" "$REPO_ROOT"
 }
 
+build_jobs() {
+  # The pipeline worker (ADR 0018): services/api's Dockerfile, `worker`
+  # target — same source tree as the api image, its own image and repo so
+  # worker-only dependencies never land in the request path's image.
+  docker build --platform "$PLATFORM" --target worker \
+    -f "$REPO_ROOT/services/api/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
+}
+
 build_mailer() {
   docker build --platform "$PLATFORM" --target lambda \
     -t "$1:$ENV" "$REPO_ROOT/services/mailer"
@@ -237,7 +260,7 @@ done
 if $DISPATCH; then
   log "Re-dispatching deploy workflows on main"
   for svc in "${SERVICES[@]}"; do
-    wf="$svc-$ENV.yml"
+    wf="$(deploy_workflow "$svc")"
     if gh workflow run "$wf" --ref main >/dev/null 2>&1; then
       ok "dispatched $wf"
     else

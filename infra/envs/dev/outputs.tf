@@ -63,6 +63,11 @@ output "case_document_bucket" {
   value       = module.case_documents.bucket_name
 }
 
+output "job_queue_url" {
+  description = "This machine's job queue (JOB_QUEUE_URL for the local API and the worker poller — ADR 0018)."
+  value       = module.job_pipeline.queue_url
+}
+
 output "admin_audit_table_name" {
   description = "This machine's append-only admin audit table (#213)."
   value       = aws_dynamodb_table.admin_audit.name

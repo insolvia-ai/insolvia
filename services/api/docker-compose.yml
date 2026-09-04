@@ -49,6 +49,11 @@ services:
       # The pool POST /v1/firm/users CALLS (AUTH_ISSUER_URL is what tokens are
       # verified against); unset means the in-memory directory.
       AUTH_USER_POOL_ID: ${AUTH_USER_POOL_ID:-}
+      # Job pipeline (ADR 0018): this machine's real queue. Accepted jobs land
+      # there and run when the worker poller is running
+      # (`python -m insolvia_api.entrypoints.worker_poller`, same .env);
+      # unset composes the in-memory queue, which records and runs nothing.
+      JOB_QUEUE_URL: ${JOB_QUEUE_URL:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
