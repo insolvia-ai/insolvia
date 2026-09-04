@@ -1235,7 +1235,7 @@ describe('the pipeline job endpoints', () => {
 
 // ---------------------------------------------------------------------------
 // Assembled packets (issue #96). Pinned against services/api/.../routes/
-// packets.py and core/packets.py: `packet_json`'s eleven fields, the listing
+// packets.py and core/packets.py: `packet_json`'s twelve fields, the listing
 // wrapper, the download-URL triple, and the case's pin fields that packet
 // assembly writes (`case_json`'s formRevisions).
 // ---------------------------------------------------------------------------
@@ -1254,6 +1254,7 @@ describe('the packet endpoints', () => {
     byteSize: 1843200,
     sha256: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2',
     formRevisions: { 'form/b101': '2024-06-22', 'form/b107': '2025-04-01' },
+    constantsSetId: 'code/dollar-amounts@2025-04-01',
     creditorCount: 6,
     createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     createdAt: '2026-09-02T09:20:00.123Z',
@@ -1365,9 +1366,10 @@ describe('the packet endpoints', () => {
     expect(minted).toEqual(download);
   });
 
-  test('a case pinned by assembly carries its formRevisions', async () => {
+  test('a case pinned by assembly carries both pin fields', async () => {
     // The pins are `case_json`'s two optional fields (core/cases.py): absent
-    // until packet assembly writes them, present verbatim afterwards.
+    // until packet assembly writes them, present verbatim afterwards —
+    // assembly writes both in one operation (issue #99).
     const pinned = {
       id: PACKET_CASE_ID,
       createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
@@ -1377,6 +1379,7 @@ describe('the packet endpoints', () => {
       createdAt: '2026-07-23T09:15:00.123Z',
       updatedAt: '2026-09-02T09:20:00.456Z',
       formRevisions: { 'form/b101': '2024-06-22' },
+      constantsSetId: 'code/dollar-amounts@2025-04-01',
     };
     const stub = stubFetch(() => jsonResponse(pinned, 200));
     const client = new InsolviaApiClient(BASE_URL, {
@@ -1387,7 +1390,7 @@ describe('the packet endpoints', () => {
     const found = await client.getCase(PACKET_CASE_ID);
 
     expect(found.formRevisions).toEqual({ 'form/b101': '2024-06-22' });
-    expect('constantsSetId' in found).toBe(false);
+    expect(found.constantsSetId).toBe('code/dollar-amounts@2025-04-01');
   });
 
   test('an unpinned case leaves the pin fields absent, not null', async () => {
@@ -1409,6 +1412,7 @@ describe('the packet endpoints', () => {
     const found = await client.getCase(PACKET_CASE_ID);
 
     expect('formRevisions' in found).toBe(false);
+    expect('constantsSetId' in found).toBe(false);
   });
 });
 

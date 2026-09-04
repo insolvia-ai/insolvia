@@ -17,6 +17,7 @@ from datetime import date
 
 import pytest
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
+from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
 from insolvia_api.core.form_templates import form_revisions_as_of
 from insolvia_api.core.jobs import KINDS, JobError, new_job
@@ -293,7 +294,18 @@ def test_the_reference_case_assembles_the_full_set():
     # added before re-assembly must not find a hole.
     assert outcome.form_revisions == form_revisions_as_of(TODAY)
     assert "form/b106j2" in outcome.form_revisions
+    # The second pin: the dollar-amounts release resolved as of the same
+    # assembly date (issue #99).
+    assert outcome.constants_set_id == dollar_amounts.resolve(TODAY).release_id
     assert outcome.creditor_count > 0
+
+
+def test_assembly_gates_when_no_dollar_amounts_release_is_effective():
+    # A date before the series' earliest release must refuse to assemble —
+    # the effective-dating rule: wrong data is worse than no answer.
+    outcome = assemble(reference_case_data(), as_of=date(2024, 1, 1))
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(p.source == "code/dollar-amounts" for p in outcome)
 
 
 def test_j2_files_when_debtor_2_keeps_a_separate_household():
@@ -395,6 +407,10 @@ def test_the_worker_stores_the_packet_and_pins_the_case_together():
     pinned = deps.case_store.cases[CASE_ID]
     assert pinned.form_revisions == form_revisions_as_of(TODAY)
     assert dict(stored.form_revisions) == pinned.form_revisions
+    # `constants_set_id` lands in the same write — the standing IOU from
+    # core/cases.py, paid by the code/dollar-amounts series (issue #99).
+    assert pinned.constants_set_id == dollar_amounts.resolve(TODAY).release_id
+    assert stored.constants_set_id == pinned.constants_set_id
     # The zip is a readable archive holding the full set plus the matrix.
     names = zipfile.ZipFile(io.BytesIO(content)).namelist()
     assert names[-1] == MATRIX_FILE_NAME

@@ -1,0 +1,11 @@
+{
+  "series_id": "code/dollar-amounts",
+  "effective_date": "2025-04-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.govinfo.gov/content/pkg/FR-2025-02-04/html/2025-02207.htm",
+    "published": "2025-02-04",
+    "sha256": "dcda0796a2ce1f6e90e2e7385b9ac30c56c8ac05394e4c3d46f25948df8cedbe"
+  },
+  "notes": "The statutory dollar amounts the means test and the SOFA read: the Apr. 1, 2025 triennial adjustment under 11 U.S.C. § 104(b) (90 Fed. Reg. 8941, a 13.2004% increase rounded to the nearest $25) for the § 707(b) and § 547(c)(9) figures, plus the § 547(c)(8) consumer floor the same forms print but § 104 never adjusts. Every figure verified against the Federal Register notice and independently corroborated against Cornell LII's amendment notes and/or the printed 04/25 Official Forms (which carry the same figures). The § 522 exemption amounts from the same notice live in exemptions/federal, not here — one owner per figure. Next adjustment takes effect 2028-04-01 — ingest it as the next release of this series before that date. Verified current as of 2026-09-04."
+}

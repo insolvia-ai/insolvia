@@ -19,6 +19,7 @@ arithmetic the model refuses to store.
 import hashlib
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -1860,6 +1861,63 @@ def test_b107_q6_answers_the_consumer_branch_from_the_entries() -> None:
     release = latest_form("form/b107")
     assert row(values, release, "q6_payment_dates", 0) == Text("05/01/2026")
     assert row(values, release, "q6_payment_dates", 2) == Text("07/01/2026")
+
+
+def _with_payment(case_file: CaseFile, payment: CreditorPayment) -> CaseFile:
+    entry = SofaEntryBody(entry_type="creditor_payment", payload=payment)
+    without = tuple(
+        e for e in case_file.sofa_entries if not isinstance(e.payload, CreditorPayment)
+    )
+    return CaseFile(**{**case_file.__dict__, "sofa_entries": (*without, entry)})
+
+
+def test_b107_q6_refuses_a_payment_below_the_reporting_floor() -> None:
+    # The floor comparison is code/dollar-amounts' (§ 547(c)(8): $600 on the
+    # consumer branch) — the numeric check the projection deferred until the
+    # series existed (issue #99). A recorded total below it cannot land.
+    case_file = _with_payment(
+        reference_case_file(),
+        CreditorPayment(creditor=Party(name="Corner Store"), total_paid="599.99"),
+    )
+    with pytest.raises(FormProjectionError, match=r"below the 600\.00"):
+        project(latest_form("form/b107"), case_file)
+
+
+def test_b107_q6_business_branch_compares_against_the_8575_floor() -> None:
+    # § 547(c)(9)'s adjusted figure governs where debts are not primarily
+    # consumer debts — the same entries flip branches with the petition fact.
+    case_file = _with_payment(
+        reference_case_file(),
+        CreditorPayment(creditor=Party(name="Supplier Co"), total_paid="8574.99"),
+    )
+    petition = case_file.petition
+    assert petition is not None
+    business = CaseFile(
+        **{
+            **case_file.__dict__,
+            "petition": replace(petition, debt_character="business"),
+        }
+    )
+    with pytest.raises(FormProjectionError, match=r"below the 8575\.00"):
+        project(latest_form("form/b107"), business)
+    at_floor = _with_payment(
+        business,
+        CreditorPayment(creditor=Party(name="Supplier Co"), total_paid="8575.00"),
+    )
+    values = project(latest_form("form/b107"), at_floor)
+    assert values["q6_paid_8575"] == Option("yes")
+    assert "q6_paid_600" not in values
+
+
+def test_b107_q6_a_payment_without_a_total_answers_by_presence() -> None:
+    # An entry whose total is not yet typed was still recorded as reportable;
+    # the gate answers yes and the completeness question stays intake's.
+    case_file = _with_payment(
+        reference_case_file(),
+        CreditorPayment(creditor=Party(name="Gulf Coast Home Loans")),
+    )
+    values = project(latest_form("form/b107"), case_file)
+    assert values["q6_paid_600"] == Option("yes")
 
 
 def test_b107_q2_both_debtors_share_a_row_via_the_same_as_boxes() -> None:

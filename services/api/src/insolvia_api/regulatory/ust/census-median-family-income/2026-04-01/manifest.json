@@ -1,0 +1,11 @@
+{
+  "series_id": "ust/census-median-family-income",
+  "effective_date": "2026-04-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.justice.gov/ust/eo/bapcpa/20260401/bci_data/docs/median_income.xlsx",
+    "published": null,
+    "sha256": "3f65734004831f54a4d7841bbe475628834dee3880db1f636058f81c9b923669"
+  },
+  "notes": "Census Bureau median family income as republished by the UST for cases filed on or after 2026-04-01 (period page https://www.justice.gov/ust/means-testing/20260401). Converted mechanically; spot-check the diff against the UST's HTML table before merging."
+}
