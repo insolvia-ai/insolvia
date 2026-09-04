@@ -23,6 +23,9 @@ from insolvia_api.api.routes.creditor_matrix import (
 )
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
+from insolvia_api.api.routes.extraction_review import (
+    blueprint as extraction_review_blueprint,
+)
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
@@ -59,6 +62,8 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(jobs_blueprint)
     # /v1/cases/<id>/packets — same static-segment argument.
     app.register_blueprint(packets_blueprint)
+    # /v1/cases/<id>/extraction/... — same static-segment argument (8.9).
+    app.register_blueprint(extraction_review_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

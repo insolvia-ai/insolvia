@@ -631,7 +631,7 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
  * Chapter 7 packet, issue #96) and `petition_review` (the AI review's
  * advisory findings, issue #97).
  */
-export type JobKind = 'echo' | 'packet_assembly' | 'petition_review';
+export type JobKind = 'echo' | 'packet_assembly' | 'petition_review' | 'document_extraction';
 
 /**
  * Where a job sits. `queued` and `running` mean poll again; `succeeded` and
@@ -731,10 +731,84 @@ export interface Job {
   readonly attempts: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** Present only on the document-scoped kinds (`document_extraction`). */
+  readonly documentId?: string;
   /** Present only when `status` is `'failed'`. */
   readonly failure?: JobFailure;
   /** Present only when `status` is `'succeeded'`. Shape is per-kind. */
   readonly result?: Readonly<Record<string, unknown>>;
+}
+
+// ---------------------------------------------------------------------------
+// Extraction review — mirrors insolvia_core/candidates.py (`candidate_json`,
+// `STATUSES`, `ORIGIN_CHANNELS`) and api/routes/extraction_review.py (8.9).
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a candidate sits. `pending` awaits a human; `accepted`, `corrected`
+ * and `rejected` are review outcomes (retained — they are the extraction
+ * quality feedback loop); `withdrawn` is the proposer's own retraction, an
+ * MCP-surface act.
+ */
+export type CandidateStatus = 'pending' | 'accepted' | 'corrected' | 'rejected' | 'withdrawn';
+
+/** Which surface wrote a candidate, and as whom — never client-claimed. */
+export interface CandidateOrigin {
+  readonly channel: 'extraction' | 'mcp';
+  /** The model that extracted it, or the harness's OAuth client id. */
+  readonly clientId: string;
+  /** The subject it is attributed to — resolve through the firm directory. */
+  readonly subject: string;
+}
+
+/**
+ * One row of a case's review queue: a machine-proposed record awaiting (or
+ * past) human confirmation. `payload` is the proposed record in the target
+ * collection's own body shape; the server re-validates whatever comes back,
+ * so the loose typing here never becomes a write.
+ */
+export interface ExtractionCandidate {
+  readonly id: string;
+  /** The target collection (`creditors`, `claims`, `pay_period_records`, …). */
+  readonly entityType: string;
+  readonly status: CandidateStatus;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly origin: CandidateOrigin;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** The source document, when the extraction stream wrote this row. */
+  readonly documentId?: string;
+  /** The model's certainty, 0-1, extraction rows only. */
+  readonly confidence?: number;
+  /** 1-based page of the source document the record was read from. */
+  readonly locatorPage?: number;
+  readonly note?: string;
+  readonly confirmedBy?: string;
+  readonly confirmedAt?: string;
+  readonly correctedPayload?: Readonly<Record<string, unknown>>;
+  /** The case record acceptance created. */
+  readonly resultingRecordId?: string;
+}
+
+/** What a reviewer may do with one pending candidate. */
+export type ReviewAction = 'accept' | 'reject';
+
+/**
+ * The review request: `accept` (optionally with the record as the human
+ * corrected it — full body, same shape as the collection's own PUT) or
+ * `reject`. One candidate per call, deliberately: bulk-accept must not
+ * become blind-accept.
+ */
+export interface ReviewCandidateRequest {
+  readonly action: ReviewAction;
+  readonly correctedPayload?: Readonly<Record<string, unknown>> | undefined;
+}
+
+/** A review's answer: the resolved candidate, plus the record an accept wrote. */
+export interface ReviewedCandidate {
+  readonly candidate: ExtractionCandidate;
+  /** Present exactly when the action was an accept. */
+  readonly record?: Readonly<Record<string, unknown>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1929,6 +2003,49 @@ export interface EmploymentBody {
   readonly employed_since?: FormDate | undefined;
 }
 
+/** How often a stub says the debtor is paid — `PAY_FREQUENCIES` in core. */
+export type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly' | 'other';
+
+/** 106I line 5's eight named lines — `DEDUCTION_CATEGORIES` in core. */
+export type DeductionCategory =
+  | 'tax'
+  | 'mandatory_retirement'
+  | 'voluntary_retirement'
+  | 'retirement_loan_repayment'
+  | 'insurance'
+  | 'domestic_support'
+  | 'union_dues'
+  | 'other';
+
+/**
+ * One itemised deduction line on a stub. `id` is caller-chosen and required
+ * — the same contract as a claim's notice parties, so provenance can address
+ * `deductions[<id>].amount` across reorders.
+ */
+export interface PayPeriodDeduction {
+  readonly id: string;
+  readonly category?: DeductionCategory | undefined;
+  readonly amount?: Money | undefined;
+  /** The stub's own wording for the line. */
+  readonly description?: string | undefined;
+}
+
+/**
+ * One paycheck — the dated history behind the means test's six-month
+ * lookback (`pay_date` drives the window), written by pay-stub extraction
+ * through the review flow. All three dates are distinct facts.
+ */
+export interface PayPeriodRecordBody {
+  readonly employment_id?: string | undefined;
+  readonly period_start?: FormDate | undefined;
+  readonly period_end?: FormDate | undefined;
+  readonly pay_date?: FormDate | undefined;
+  readonly gross?: Money | undefined;
+  readonly net?: Money | undefined;
+  readonly frequency?: PayFrequency | undefined;
+  readonly deductions?: readonly PayPeriodDeduction[] | undefined;
+}
+
 /**
  * 106I Part 2, one column per debtor. ENTERED AND CONFIRMED, NOT COMPUTED —
  * the form asks for an estimate of what income will be, and the derived lines
@@ -2196,6 +2313,7 @@ export interface CaseCollections {
   readonly claims: ClaimBody;
   readonly assets: AssetBody;
   readonly employments: EmploymentBody;
+  readonly pay_period_records: PayPeriodRecordBody;
   readonly income_summaries: IncomeSummaryBody;
   readonly households: HouseholdBody;
   readonly expenses: ExpenseBody;
@@ -2221,6 +2339,7 @@ export const CASE_COLLECTIONS = [
   'claims',
   'assets',
   'employments',
+  'pay_period_records',
   'income_summaries',
   'households',
   'expenses',

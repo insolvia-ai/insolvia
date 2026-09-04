@@ -4069,6 +4069,7 @@ describe('the case-collection enums', () => {
       'claims',
       'assets',
       'employments',
+      'pay_period_records',
       'income_summaries',
       'households',
       'expenses',
@@ -4149,5 +4150,246 @@ describe('the case-collection enums', () => {
 
   test('CLAIM_CLASSES mirrors core/claims.py', () => {
     expect(CLAIM_CLASSES).toEqual(['secured', 'priority_unsecured', 'nonpriority_unsecured']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extraction review (issue 8.9). Pinned against services/api/.../routes/
+// extraction_review.py and insolvia_core/candidates.py (`candidate_json`):
+// the queue listing with its source context, the status filter, the review
+// POST's exact body, the accepted/corrected/rejected answers, and the 403
+// that means the `extraction_review` permission — not linkage — refused.
+// ---------------------------------------------------------------------------
+
+describe('the extraction review endpoints', () => {
+  const REVIEW_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const CANDIDATE_ID = 'c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
+  const RECORD_ID = 'd2e3f4a5-6b7c-4d8e-9f0a-1b2c3d4e5f6a';
+
+  /** One pending row — the literal `candidate_json` the listing returns. */
+  const PENDING_CANDIDATE = {
+    id: CANDIDATE_ID,
+    entityType: 'creditors',
+    status: 'pending',
+    payload: { name: 'First Example Bank', address: { city: 'Exampleville' } },
+    origin: {
+      channel: 'extraction',
+      clientId: 'claude-opus-5',
+      subject: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+    },
+    createdAt: '2026-09-04T10:00:00.000000Z',
+    updatedAt: '2026-09-04T10:00:00.000000Z',
+    documentId: 'e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    confidence: 0.95,
+    locator: { document_id: 'e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b', page: 2 },
+  };
+
+  test('GETs the queue with the status filter, and maps the source context', async () => {
+    const stub = stubFetch(() => jsonResponse({ candidates: [PENDING_CANDIDATE] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const candidates = await client.listExtractionCandidates(REVIEW_CASE_ID, 'pending');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/${REVIEW_CASE_ID}/extraction/candidates?status=pending`,
+    );
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(candidates).toHaveLength(1);
+    const row = candidates[0]!;
+    expect(row.id).toBe(CANDIDATE_ID);
+    expect(row.entityType).toBe('creditors');
+    expect(row.status).toBe('pending');
+    expect(row.payload).toEqual(PENDING_CANDIDATE.payload);
+    expect(row.origin).toEqual({
+      channel: 'extraction',
+      clientId: 'claude-opus-5',
+      subject: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+    });
+    expect(row.documentId).toBe(PENDING_CANDIDATE.documentId);
+    expect(row.confidence).toBe(0.95);
+    // The locator's page is surfaced; the document id already rides
+    // `documentId`.
+    expect(row.locatorPage).toBe(2);
+    // Absent stays absent, never null.
+    expect('confirmedBy' in row).toBe(false);
+    expect('resultingRecordId' in row).toBe(false);
+  });
+
+  test('an unfiltered listing sends no query string', async () => {
+    const stub = stubFetch(() => jsonResponse({ candidates: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    await client.listExtractionCandidates(REVIEW_CASE_ID);
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${REVIEW_CASE_ID}/extraction/candidates`,
+    );
+  });
+
+  test('POSTs an accept with only the action, and maps candidate plus record', async () => {
+    const accepted = {
+      ...PENDING_CANDIDATE,
+      status: 'accepted',
+      confirmedBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      confirmedAt: '2026-09-04T11:00:00.000000Z',
+      resultingRecordId: RECORD_ID,
+    };
+    const record = {
+      id: RECORD_ID,
+      case_id: REVIEW_CASE_ID,
+      created_at: '2026-09-04T11:00:00.000000Z',
+      updated_at: '2026-09-04T11:00:00.000000Z',
+      provenance: { name: { source: 'ai_extracted' } },
+      name: 'First Example Bank',
+    };
+    const stub = stubFetch(() => jsonResponse({ candidate: accepted, record }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const reviewed = await client.reviewExtractionCandidate(REVIEW_CASE_ID, CANDIDATE_ID, {
+      action: 'accept',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/${REVIEW_CASE_ID}/extraction/candidates/${CANDIDATE_ID}/review`,
+    );
+    expect(JSON.parse(seen.body)).toEqual({ action: 'accept' });
+    expect(reviewed.candidate.status).toBe('accepted');
+    expect(reviewed.candidate.resultingRecordId).toBe(RECORD_ID);
+    expect(reviewed.record).toEqual(record);
+  });
+
+  test('a correction rides the accept, and the corrected answer carries it back', async () => {
+    const corrected = {
+      ...PENDING_CANDIDATE,
+      status: 'corrected',
+      confirmedBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      confirmedAt: '2026-09-04T11:00:00.000000Z',
+      correctedPayload: { name: 'First Example Bank NA' },
+      resultingRecordId: RECORD_ID,
+    };
+    const stub = stubFetch(() => jsonResponse({ candidate: corrected, record: {} }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const reviewed = await client.reviewExtractionCandidate(REVIEW_CASE_ID, CANDIDATE_ID, {
+      action: 'accept',
+      correctedPayload: { name: 'First Example Bank NA' },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      action: 'accept',
+      correctedPayload: { name: 'First Example Bank NA' },
+    });
+    expect(reviewed.candidate.status).toBe('corrected');
+    expect(reviewed.candidate.correctedPayload).toEqual({ name: 'First Example Bank NA' });
+  });
+
+  test('a reject answers the candidate alone, with no record', async () => {
+    const rejected = {
+      ...PENDING_CANDIDATE,
+      status: 'rejected',
+      confirmedBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      confirmedAt: '2026-09-04T11:00:00.000000Z',
+    };
+    const stub = stubFetch(() => jsonResponse({ candidate: rejected }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const reviewed = await client.reviewExtractionCandidate(REVIEW_CASE_ID, CANDIDATE_ID, {
+      action: 'reject',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ action: 'reject' });
+    expect(reviewed.candidate.status).toBe('rejected');
+    expect('record' in reviewed).toBe(false);
+  });
+
+  test('the confirm-the-creditor-first refusal surfaces per field', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: {
+            creditor_id:
+              'This record references another extracted candidate (creditors) that has not been accepted yet — review that one first.',
+          },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .reviewExtractionCandidate(REVIEW_CASE_ID, CANDIDATE_ID, { action: 'accept' })
+      .then(() => null)
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect(Object.keys((error as ApiValidationException).fields)).toEqual(['creditor_id']);
+  });
+
+  test('an already-reviewed candidate answers 409, a hidden feature 403', async () => {
+    for (const [status, body] of [
+      [409, { error: 'ConflictError', message: 'candidate has already been reviewed' }],
+      [403, { error: 'ForbiddenError', message: 'your firm has not granted you access' }],
+    ] as const) {
+      const stub = stubFetch(() => jsonResponse(body, status));
+      const client = new InsolviaApiClient(BASE_URL, {
+        fetch: stub.fetch,
+        accessToken: () => ACCESS_TOKEN,
+      });
+      const error = await client
+        .reviewExtractionCandidate(REVIEW_CASE_ID, CANDIDATE_ID, { action: 'accept' })
+        .then(() => null)
+        .catch((thrown: unknown) => thrown);
+      expect(error).toBeInstanceOf(ApiException);
+      expect((error as ApiException).statusCode).toBe(status);
+    }
+  });
+
+  test('accepting an extraction job names its document, and the Job carries it back', async () => {
+    const job = {
+      id: 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918',
+      kind: 'document_extraction',
+      status: 'queued',
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      attempts: 0,
+      createdAt: '2026-09-04T09:15:00.123Z',
+      updatedAt: '2026-09-04T09:15:00.123Z',
+      documentId: 'e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    };
+    const stub = stubFetch(() => jsonResponse(job, 202));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const accepted = await client.acceptCaseJob(REVIEW_CASE_ID, 'document_extraction', {
+      documentId: 'e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      kind: 'document_extraction',
+      documentId: 'e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+    });
+    expect(accepted).toEqual(job);
   });
 });
