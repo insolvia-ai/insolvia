@@ -20,10 +20,10 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_api.adapters.memory.debtor_store import MemoryDebtorStore
-from insolvia_api.core.cases import Case, case_from_item, case_item
-from insolvia_api.core.debtors import (
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
+from insolvia_core.cases import Case, case_from_item, case_item
+from insolvia_core.debtors import (
     FILING_ROLES,
     Address,
     CreditCounseling,
@@ -34,7 +34,7 @@ from insolvia_api.core.debtors import (
     debtor_from_item,
     debtor_item,
 )
-from insolvia_api.core.provenance import ProvenanceEntry
+from insolvia_core.provenance import ProvenanceEntry
 
 CASE = "case-0001"
 WHEN = "2026-01-01T00:00:00.000000Z"

@@ -14,26 +14,27 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ..assets import AssetBody
-from ..cases import Case
-from ..claims import ClaimBody
-from ..codebtors import CodebtorBody, CommunityHouseholdMemberBody
-from ..contract_leases import ContractLeaseBody
-from ..creditors import CreditorBody
-from ..debtors import Debtor
-from ..exemption_claims import ExemptionBody
-from ..expenses import DependentBody, ExpenseBody, HouseholdBody
-from ..form_fill import FieldFill, Option, Text
-from ..form_templates import FormRelease
-from ..income import EmploymentBody, IncomeSummaryBody
-from ..petitions import (
+from insolvia_core.assets import AssetBody
+from insolvia_core.cases import Case
+from insolvia_core.claims import ClaimBody
+from insolvia_core.codebtors import CodebtorBody, CommunityHouseholdMemberBody
+from insolvia_core.contract_leases import ContractLeaseBody
+from insolvia_core.creditors import CreditorBody
+from insolvia_core.debtors import Debtor
+from insolvia_core.exemption_claims import ExemptionBody
+from insolvia_core.expenses import DependentBody, ExpenseBody, HouseholdBody
+from insolvia_core.income import EmploymentBody, IncomeSummaryBody
+from insolvia_core.petitions import (
     FilingProfessionalBody,
     PetitionBody,
     PriorCaseBody,
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
-from ..sofa import SofaEntryBody
+from insolvia_core.sofa import SofaEntryBody
+
+from ..form_fill import FieldFill, Option, Text
+from ..form_templates import FormRelease
 
 FieldValues = dict[str, "FieldFill | dict[str, FieldFill]"]
 

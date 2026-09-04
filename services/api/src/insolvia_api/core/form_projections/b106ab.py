@@ -28,7 +28,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Final
 
-from ..assets import AssetBody
+from insolvia_core.assets import AssetBody
+
 from ..form_fill import Check, Text
 from ..form_templates import FormRelease
 from .shared import (

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_api.core.documents import Document, list_order
+from insolvia_core.documents import Document, list_order
 
 
 class MemoryDocumentStore:

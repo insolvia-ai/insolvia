@@ -4,9 +4,9 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.cases import partition_key
 
-from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_api.core.cases import partition_key
 from insolvia_api.core.jobs import Job, job_from_item, job_item, list_order, sort_key
 
 

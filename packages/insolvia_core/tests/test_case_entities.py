@@ -9,8 +9,8 @@ going untested.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.case_collections import COLLECTIONS, RESERVED_SK_NAMESPACES
-from insolvia_api.core.case_entities import (
+from insolvia_core.case_collections import COLLECTIONS, RESERVED_SK_NAMESPACES
+from insolvia_core.case_entities import (
     create_entity,
     entity_body,
     entity_from_item,
@@ -19,13 +19,13 @@ from insolvia_api.core.case_entities import (
     parse_entity,
     replace_entity,
 )
-from insolvia_api.core.claims import parse_claim
-from insolvia_api.core.codebtors import parse_community_household_member
-from insolvia_api.core.creditors import parse_creditor
-from insolvia_api.core.exemption_claims import parse_exemption
-from insolvia_api.core.expenses import parse_dependent
-from insolvia_api.core.provenance import populated_paths
+from insolvia_core.claims import parse_claim
+from insolvia_core.codebtors import parse_community_household_member
+from insolvia_core.creditors import parse_creditor
 from insolvia_core.errors import FieldValidationError
+from insolvia_core.exemption_claims import parse_exemption
+from insolvia_core.expenses import parse_dependent
+from insolvia_core.provenance import populated_paths
 
 CASE = "case-0001"
 TYPED = {"source": "staff_typed"}

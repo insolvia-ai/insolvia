@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 
-from insolvia_api.core.documents import UPLOAD_TAG, StoredBlob
+from insolvia_core.documents import UPLOAD_TAG, StoredBlob
 
 
 @dataclass(frozen=True)

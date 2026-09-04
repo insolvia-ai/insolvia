@@ -70,6 +70,7 @@ from typing import Any, TypeVar, cast
 
 from flask import g, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.access import Accessor
 from insolvia_core.auth import (
     AuthenticationError,
     AuthFailureReason,
@@ -82,7 +83,6 @@ from insolvia_core.auth import Principal as Principal
 from insolvia_core.errors import ForbiddenError
 
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access import Accessor
 
 logger = logging.getLogger(__name__)
 

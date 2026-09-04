@@ -7,13 +7,13 @@ there, parametrised over the registry."""
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.petitions import (
+from insolvia_core.errors import FieldValidationError
+from insolvia_core.petitions import (
     parse_filing_professional,
     parse_petition,
     parse_prior_case,
     parse_sole_proprietorship,
 )
-from insolvia_core.errors import FieldValidationError
 
 
 def test_a_full_petition_parses() -> None:

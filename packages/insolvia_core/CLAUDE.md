@@ -1,18 +1,21 @@
 # packages/insolvia_core — agent rules
 
-The shared Python domain (firms, token verification, their adapters), consumed
-by `services/api` and the admin service as a local-path install. Human docs:
-[`README.md`](README.md).
+The shared Python domain (firms, token verification, the case domain —
+cases/debtors/documents/case collections/provenance — and their adapters),
+consumed by `services/api`, the admin service, and the MCP service as a
+local-path install. Human docs: [`README.md`](README.md).
 
 - **Admission rule: code moves here only when a second service actually
   imports it — never speculatively.** A generically-named shared package is one
   lazy refactor away from becoming the junk drawer every `common/` directory
   turns into; the test for admission is a concrete second importer, not "might
   be useful". One owner per fact still applies — the owner just lives here.
-- **The item shapes are the point.** `firms.firm_item` / `firm_user_item` exist
-  in one place so the DynamoDB and in-memory stores cannot drift, and so two
-  services cannot disagree about what a stored firm looks like. Never copy a
-  shape into a service; import it.
+- **The item shapes are the point.** `firms.firm_item` / `firm_user_item` —
+  and the case-domain item shapes (`cases.case_item`, the per-entity parse
+  functions, `provenance.py`'s invariants) that moved here under ADR 0016's
+  admission — exist in one place so the DynamoDB and in-memory stores cannot
+  drift, and so two services cannot disagree about what a stored record looks
+  like. Never copy a shape into a service; import it.
 - **Layering, enforced by `tests/test_architecture.py`:** the domain modules in
   the package root import nothing but each other and the stdlib (PyJWT is the
   one deliberate exception — the signature check *is* the domain rule, see

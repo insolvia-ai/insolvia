@@ -5,8 +5,8 @@ from typing import Any, Final
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_api.core.cases import partition_key
-from insolvia_api.core.documents import (
+from insolvia_core.cases import partition_key
+from insolvia_core.documents import (
     Document,
     document_from_item,
     document_item,

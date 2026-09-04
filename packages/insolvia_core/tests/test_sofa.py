@@ -11,9 +11,9 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from insolvia_api.core.fields import prune_body
-from insolvia_api.core.sofa import PAYLOAD_PARSERS, parse_sofa_entry
 from insolvia_core.errors import FieldValidationError
+from insolvia_core.fields import prune_body
+from insolvia_core.sofa import PAYLOAD_PARSERS, parse_sofa_entry
 
 # One representative payload per entry type: every value below survives the
 # parse unchanged (amounts are already canonical), so the assertion can be an

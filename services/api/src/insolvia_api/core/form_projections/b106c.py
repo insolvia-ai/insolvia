@@ -29,7 +29,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from ..exemption_claims import ExemptionBody
+from insolvia_core.exemption_claims import ExemptionBody
+
 from ..exemptions import federal_limits, schemes_for_state
 from ..form_fill import Option, Text
 from ..form_templates import FormRelease

@@ -35,10 +35,8 @@ from collections.abc import Iterable, Sequence
 from decimal import Decimal
 from typing import Final, TypeVar
 
-from ..fields import Address
-from ..form_fill import Check, FieldFill, Option, Text, WidgetStates
-from ..form_templates import FormRelease
-from ..sofa import (
+from insolvia_core.fields import Address
+from insolvia_core.sofa import (
     BusinessConnection,
     CharitableContribution,
     ClosedAccount,
@@ -59,6 +57,9 @@ from ..sofa import (
     Setoff,
     StorageUnit,
 )
+
+from ..form_fill import Check, FieldFill, Option, Text, WidgetStates
+from ..form_templates import FormRelease
 from .shared import (
     CaseFile,
     FieldValues,
@@ -256,7 +257,7 @@ def _q4_q5(
     case_file: CaseFile,
     problems: list[str],
 ) -> None:
-    from ..sofa import IncomeByPeriod
+    from insolvia_core.sofa import IncomeByPeriod
 
     entries = _entries(case_file, IncomeByPeriod)
     employment = [
@@ -468,7 +469,7 @@ def _q9_q12(
     case_file: CaseFile,
     problems: list[str],
 ) -> None:
-    from ..sofa import Receivership
+    from insolvia_core.sofa import Receivership
 
     lawsuits = _entries(case_file, Lawsuit)
     values["q9_gate"] = yes_no(release, "q9_gate", bool(lawsuits))
@@ -772,7 +773,7 @@ def _q18_q23(
     case_file: CaseFile,
     problems: list[str],
 ) -> None:
-    from ..sofa import SafeDepositBox
+    from insolvia_core.sofa import SafeDepositBox
 
     transfers = _entries(case_file, PropertyTransfer)
     values["q18_gate"] = yes_no(release, "q18_gate", bool(transfers))
@@ -971,7 +972,7 @@ def _q24_q28(
     case_file: CaseFile,
     problems: list[str],
 ) -> None:
-    from ..sofa import (
+    from insolvia_core.sofa import (
         EnvironmentalNotice,
         EnvironmentalProceeding,
         FinancialStatementIssued,

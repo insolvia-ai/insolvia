@@ -4,6 +4,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.access import Accessor
 from insolvia_core.errors import NotFoundError, ValidationError
 from insolvia_core.firms import (
     FEATURES,
@@ -21,7 +22,6 @@ from insolvia_api.api.auth import (
     resolve_accessor,
 )
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access import Accessor
 
 logger = logging.getLogger(__name__)
 

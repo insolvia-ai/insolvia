@@ -5,9 +5,9 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_api.core.access import Accessor, may_see_case
-from insolvia_api.core.cases import (
+from insolvia_core.access import Accessor, may_see_case
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
     Case,

@@ -16,20 +16,16 @@ import logging
 
 from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
+from insolvia_core.access_log import record_access
+from insolvia_core.documents import expiry_timestamp
 from insolvia_core.errors import NotFoundError
 from insolvia_core.firms import CASES, VIEW_ONLY
+from insolvia_core.ports import AccessLog, CaseStore, DocumentBlobStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access_log import record_access
-from insolvia_api.core.documents import expiry_timestamp
 from insolvia_api.core.packets import packet_json
-from insolvia_api.core.ports import (
-    AccessLog,
-    CaseStore,
-    DocumentBlobStore,
-    PacketStore,
-)
+from insolvia_api.core.ports import PacketStore
 
 logger = logging.getLogger(__name__)
 

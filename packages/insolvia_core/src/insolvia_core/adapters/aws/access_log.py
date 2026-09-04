@@ -4,7 +4,7 @@ from typing import Any
 
 import boto3
 
-from insolvia_api.core.access_log import AccessEvent, access_item
+from insolvia_core.access_log import AccessEvent, access_item
 
 
 class DynamoDbAccessLog:

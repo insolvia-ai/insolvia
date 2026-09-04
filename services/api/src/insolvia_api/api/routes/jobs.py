@@ -11,12 +11,13 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.access_log import record_access
 from insolvia_core.errors import NotFoundError, ValidationError
 from insolvia_core.firms import ADD_EDIT, CASES, VIEW_ONLY
+from insolvia_core.ports import AccessLog, CaseStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access_log import record_access
 from insolvia_api.core.jobs import (
     JobFailure,
     fail,
@@ -25,7 +26,7 @@ from insolvia_api.core.jobs import (
     new_job,
     parse_job_acceptance,
 )
-from insolvia_api.core.ports import AccessLog, CaseStore, JobQueue, JobStore
+from insolvia_api.core.ports import JobQueue, JobStore
 
 logger = logging.getLogger(__name__)
 
