@@ -1285,6 +1285,48 @@ describe('the packet endpoints', () => {
     expect(accepted.kind).toBe('packet_assembly');
   });
 
+  test('accepts a petition_review job and maps its reviewed result verbatim', async () => {
+    // The literal shape core/petition_review.py's worker returns — the AI
+    // review's advisory report rides the generic Job.result, so the pin
+    // lives here rather than in a dedicated decoder.
+    const reviewed = {
+      id: 'a1b2c3d4-5e6f-4a8b-9c0d-1e2f3a4b5c6d',
+      kind: 'petition_review',
+      status: 'succeeded',
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      attempts: 1,
+      createdAt: '2026-09-04T10:00:00.123Z',
+      updatedAt: '2026-09-04T10:01:30.456Z',
+      result: {
+        outcome: 'reviewed',
+        report: {
+          packetId: '0f9e8d7c-6b5a-4432-8110-fedcba987654',
+          packetSha256: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2',
+          model: 'claude-opus-5',
+          findings: [
+            {
+              severity: 'high',
+              category: 'consistency',
+              form: 'form/b106i',
+              line: '4_combined_monthly_income',
+              message: 'Schedule I income disagrees with the SOFA income answers.',
+            },
+          ],
+        },
+      },
+    };
+    const stub = stubFetch(() => jsonResponse(reviewed, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const job = await client.getCaseJob(PACKET_CASE_ID, reviewed.id);
+
+    expect(job.kind).toBe('petition_review');
+    expect(job.result).toEqual(reviewed.result);
+  });
+
   test('GETs /v1/cases/{caseId}/packets and maps the listing', async () => {
     const stub = stubFetch(() => jsonResponse({ packets: [PACKET] }, 200));
     const client = new InsolviaApiClient(BASE_URL, {

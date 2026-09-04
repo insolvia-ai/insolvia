@@ -33,6 +33,7 @@ jobs:
             # Tool pins come from the API's requirements files (see the
             # install step) — a pin bump must re-run this suite too.
             services/api/requirements.txt
+            services/api/requirements-worker.txt
             services/api/requirements-dev.txt
             # Shared root lint config — a rule change must re-lint this package.
             ruff.toml

@@ -66,6 +66,7 @@ class AppConfig:
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
     job_queue_url: str | None = None
+    anthropic_api_key: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
     auth_issuer_url: str | None = None
@@ -127,6 +128,19 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     the enqueue, and POST /v1/cases/<id>/jobs answers 503 when no queue is
     composed at all — accepting work that can never run would be a lie the
     status read repeats forever.
+    ANTHROPIC_API_KEY is the Anthropic API key the AI petition-review worker
+    calls Claude with (issue #97, ADR 0019 — extraction 8.7 will share it).
+    The SDK's own variable name, so a maintainer's exported key and the
+    deployed value spell identically. Deployed environments read it from SSM
+    SecureString /insolvia/<env>/api/anthropic-api-key — a parameter a HUMAN
+    creates (the value cannot be generated; see ADR 0019's rollout note),
+    picked up by the deploy workflow's namespace derivation like every
+    sibling. Unset is NOT a degraded mode that skips the model: the worker
+    entrypoints compose no ReviewModel without it, and a `petition_review`
+    job then fails deterministically with category `not_configured` — honest
+    now, and it starts working on the first deploy after the key exists.
+    Only the worker composes it; the API Lambda carries the variable (one
+    namespace, one derivation) but no code path reads it there.
     MAILER_API_URL is the mailer service's public HTTPS base URL (published
     to SSM as /insolvia/<env>/api/mailer-api-url and re-derived into this env
     var by the deploy workflow); unset means the in-memory mailer, same
@@ -163,6 +177,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         job_queue_url=source.get("JOB_QUEUE_URL") or None,
+        anthropic_api_key=source.get("ANTHROPIC_API_KEY") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,

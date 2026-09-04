@@ -25,6 +25,12 @@ CMD ["insolvia_api.entrypoints.api_lambda.handler"]
 # seeded for a fresh environment by scripts/bootstrap-ecr-images.sh jobs.
 FROM lambda AS worker
 
+# The worker-only weight (ADR 0015): the Anthropic SDK behind the AI review
+# (issue #97). Same cd-then-install rule as the lambda stage; the -r chain
+# re-resolves requirements.txt, which pip finds already satisfied.
+COPY services/api/requirements-worker.txt /build/services/api/requirements-worker.txt
+RUN cd /build/services/api && pip install --no-cache-dir -r requirements-worker.txt
+
 CMD ["insolvia_api.entrypoints.worker_lambda.handler"]
 
 FROM python:3.12-slim AS development

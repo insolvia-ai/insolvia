@@ -1,0 +1,10 @@
+# The pipeline WORKER's dependencies — everything the API image needs, plus
+# the weight ADR 0015 keeps out of the request path. Installed by the
+# Dockerfile's `worker` stage and by requirements-dev.txt (tests and the
+# local worker poller import these adapters), never by the lambda stage.
+-r requirements.txt
+# The Anthropic SDK behind the AI petition review's ReviewModel port
+# (issue #97, ADR 0019; extraction 8.7 will share it). Pinned exact for the
+# same reason boto3 is: local, CI, and the worker Lambda must resolve one
+# version of the code that talks to the model API.
+anthropic==1.3.0

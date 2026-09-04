@@ -78,6 +78,7 @@ def test_every_pure_worker_is_an_acceptable_kind() -> None:
     # covers a registry missing a kind KINDS admits.
     assert set(WORKERS) <= set(KINDS)
     assert "packet_assembly" in KINDS
+    assert "petition_review" in KINDS
 
 
 # ── Identity and transitions ────────────────────────────────────

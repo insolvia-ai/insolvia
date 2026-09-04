@@ -1476,10 +1476,10 @@ function caseFromJson(response: DecodedResponse): Case {
 /** A required field that must be a registered job kind. */
 function requireJobKind(response: DecodedResponse, key: string): JobKind {
   const value = response.json[key];
-  if (value === 'echo' || value === 'packet_assembly') {
+  if (value === 'echo' || value === 'packet_assembly' || value === 'petition_review') {
     return value;
   }
-  throw malformedField(response, key, "one of 'echo' | 'packet_assembly'");
+  throw malformedField(response, key, "one of 'echo' | 'packet_assembly' | 'petition_review'");
 }
 
 /** A required field that must be one of the four job statuses. */
