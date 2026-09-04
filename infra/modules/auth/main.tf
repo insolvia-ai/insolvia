@@ -412,6 +412,122 @@ resource "aws_cognito_user_pool_client" "web" {
   }
 }
 
+# ── MCP harness clients (#261) ──────────────────────────────────
+# The MCP service (services/mcp, ADR 0016) is an OAuth 2.1 resource server
+# over THIS pool: the pool is the authorization server harnesses discover
+# through the server's RFC 9728 protected-resource metadata, and an MCP
+# session is a `sub` with firm permissions like any other caller (ADR 0009).
+#
+# ONE PRE-REGISTERED APP CLIENT PER HARNESS — the design's stated v1
+# constraint (docs/reference/mcp-surface.md § Identity): Cognito supports
+# neither dynamic client registration nor Client ID Metadata Documents, and
+# the MCP spec explicitly allows pre-registered client ids. Whether every
+# harness we care about can actually complete the flow against a
+# pre-registered client is 12.5's measurement; if one demands DCR, the answer
+# is a registration facade in front of this pool, not a loosening here.
+#
+# The client set is DISJOINT from the web SPA's client, and that disjointness
+# is load-bearing: Cognito access tokens carry no `aud`, so "this token was
+# issued for the MCP server" is verified as "this token names one of these
+# client ids" (insolvia_core.auth.verify_access_token_for_clients). The MCP
+# service's allowlist is derived from these resources — never hand-listed —
+# via the env's SSM parameter, so registering a harness here IS adding it to
+# the allowlist.
+#
+# Callback URLs are each harness's PUBLISHED redirect endpoints, matched
+# exactly by Cognito (no wildcards):
+#   • Claude (claude.ai / Claude Desktop / Claude Code's --callback-port
+#     flow lands on the same hosted endpoints): the documented
+#     /api/mcp/auth_callback on both claude.ai and claude.com.
+#   • The MCP inspector: its web UI's loopback callback (port 6274, plus the
+#     /debug variant it also registers) and the CLI/TUI variant on 6276.
+#     RFC 8252 §7.3 blesses loopback redirects for native tools; the client
+#     is gated off prod by var.mcp_inspector_client because a debugging tool
+#     has no business holding production-capable tokens.
+#   • ChatGPT is deliberately ABSENT for now: OpenAI has moved to minting a
+#     per-connector unique callback URL at connector-creation time, so its
+#     registration cannot be written down before the connector exists —
+#     recorded as a 12.5 measurement (mcp-surface.md § Constraints from
+#     harnesses), not forgotten.
+#
+# Token posture, answering #261's lifetime question: the SAME as the SPA —
+# 1 h access tokens, 30-day rotating refresh tokens, revocation on. The
+# tempting "tighter for agents" buys nothing real: authorization is resolved
+# from the firm store on EVERY tool call (never cached), so a disabled user
+# or a stripped permission cuts an agent off within the hour-long access
+# token exactly as it cuts off the app — and a shorter refresh token would
+# only force attorneys through re-auth ceremonies without shortening that
+# window. Rotation is the control that matters for a long-lived harness
+# credential: a stolen refresh token dies the next time the harness
+# refreshes.
+
+locals {
+  mcp_harness_clients = merge(
+    {
+      claude = {
+        callback_urls = [
+          "https://claude.ai/api/mcp/auth_callback",
+          "https://claude.com/api/mcp/auth_callback",
+        ]
+      }
+    },
+    var.mcp_inspector_client ? {
+      inspector = {
+        callback_urls = [
+          "http://localhost:6274/oauth/callback",
+          "http://localhost:6274/oauth/callback/debug",
+          "http://127.0.0.1:6276/oauth/callback",
+        ]
+      }
+    } : {}
+  )
+}
+
+resource "aws_cognito_user_pool_client" "mcp" {
+  for_each = local.mcp_harness_clients
+
+  # insolvia-<env>-mcp-<harness>: component `mcp`, matching the surface these
+  # clients sign agents in to (mcp.insolvia.ai), harness as the identifier.
+  name         = "${var.project}-${var.environment}-mcp-${each.key}"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret = false # public clients, PKCE — same header argument as web
+
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+
+  callback_urls = each.value.callback_urls
+  # Harnesses have no sign-out surface to land on; Cognito requires nothing
+  # here, and registering none keeps /logout unusable through these clients.
+
+  # SRP only, exactly as the web client: sign-in happens on the hosted
+  # domain, and nothing should ever ship a raw password through an MCP
+  # client. (The dev-pool manual-token fallback in services/mcp/README.md
+  # uses the DEV environment's own seeded client, not these.)
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+  ]
+
+  prevent_user_existence_errors = "ENABLED"
+  enable_token_revocation       = true
+
+  access_token_validity  = 1
+  id_token_validity      = 1
+  refresh_token_validity = 30
+  token_validity_units {
+    access_token  = "hours"
+    id_token      = "hours"
+    refresh_token = "days"
+  }
+
+  refresh_token_rotation {
+    feature                    = "ENABLED"
+    retry_grace_period_seconds = 30
+  }
+}
+
 # ── The API's invite grant ──────────────────────────────────────
 # Self-signup is off (`allow_admin_create_user_only` above), so when a firm
 # admin adds a colleague through POST /v1/firm/users the API has to mint the

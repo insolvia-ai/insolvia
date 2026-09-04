@@ -28,7 +28,10 @@ from insolvia_mcp.core.config import load_config
 from insolvia_mcp.core.tools import CaseTools
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
-CLIENT_ID = "examplemcpclientid000000"
+# Two allowlisted MCP clients — the surface's shape is one pre-registered
+# client per harness — plus the app's, which must never verify here.
+CLIENT_ID = "examplemcpclaudeclient00"
+SECOND_CLIENT_ID = "examplemcpinspector00000"
 OTHER_CLIENT_ID = "exampleappclientid000000"
 SUBJECT = "00000000-0000-4000-8000-000000000001"
 COLLEAGUE = "00000000-0000-4000-8000-000000000002"
@@ -154,7 +157,12 @@ def firm_store() -> MemoryFirmStore:
 @pytest.fixture
 def deps(stores, firm_store) -> McpDependencies:
     return McpDependencies(
-        config=load_config({"AUTH_ISSUER_URL": ISSUER, "AUTH_CLIENT_ID": CLIENT_ID}),
+        config=load_config(
+            {
+                "AUTH_ISSUER_URL": ISSUER,
+                "AUTH_CLIENT_IDS": f"{CLIENT_ID},{SECOND_CLIENT_ID}",
+            }
+        ),
         firm_store=firm_store,
         jwks_provider=StaticJwksProvider({KID: PUBLIC_KEY}),
         **stores,

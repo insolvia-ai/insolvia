@@ -37,7 +37,7 @@ class AppConfig:
     case_access_log_table_name: str | None = None
     firm_table_name: str | None = None
     auth_issuer_url: str | None = None
-    auth_client_id: str | None = None
+    auth_client_ids: tuple[str, ...] = ()
     resource_url: str = _RESOURCE_URLS["local"]
 
 
@@ -53,14 +53,17 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     server use; local dev names this machine's real per-developer tables
     (scripts/dev-aws-setup.sh), exactly as services/api does — no emulator.
 
-    AUTH_ISSUER_URL and AUTH_CLIENT_ID are the Cognito pool's OIDC issuer and
-    the MCP app client id every access token must name. The client id is
-    DELIBERATELY NOT the app's (ADR 0016): each service verifies exactly its
-    own client id(s), which is the audience check Cognito's aud-less access
-    tokens can't carry — an app token presented here fails closed. Unset
-    follows the API's rule: there is no degraded mode where a protected tool
-    stops checking; the entrypoint refuses to boot without both, and the bare
-    development server answers 401 on everything.
+    AUTH_ISSUER_URL and AUTH_CLIENT_IDS are the Cognito pool's OIDC issuer
+    and the comma-separated allowlist of MCP app client ids an access token
+    may name — one pre-registered client per harness (issue #261; Cognito
+    has no dynamic client registration), each a Terraform resource in
+    infra/modules/auth. The set is DELIBERATELY DISJOINT from the app's
+    client id (ADR 0016): each service verifies exactly its own clients,
+    which is the audience check Cognito's aud-less access tokens can't carry
+    — an app token presented here fails closed. Unset follows the API's
+    rule: there is no degraded mode where a protected tool stops checking;
+    the entrypoint refuses to boot without both, and the bare development
+    server answers 401 on everything.
 
     MCP_RESOURCE_URL overrides the canonical resource URI, which only local
     dev needs (a non-default port); staging and prod take the constant for
@@ -79,6 +82,16 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         case_access_log_table_name=source.get("CASE_ACCESS_LOG_TABLE_NAME") or None,
         firm_table_name=source.get("FIRM_TABLE_NAME") or None,
         auth_issuer_url=source.get("AUTH_ISSUER_URL") or None,
-        auth_client_id=source.get("AUTH_CLIENT_ID") or None,
+        auth_client_ids=_client_ids(source.get("AUTH_CLIENT_IDS")),
         resource_url=source.get("MCP_RESOURCE_URL") or _RESOURCE_URLS[environment],
     )
+
+
+def _client_ids(raw: str | None) -> tuple[str, ...]:
+    """A comma-separated allowlist, whitespace-tolerant, empties dropped —
+    so a trailing comma in an SSM parameter cannot smuggle an empty string
+    into the allowlist (the verifier would refuse it anyway, but a malformed
+    allowlist should read as "not configured", not "configured oddly")."""
+    if not raw:
+        return ()
+    return tuple(value.strip() for value in raw.split(",") if value.strip())

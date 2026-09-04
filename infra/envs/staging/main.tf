@@ -234,6 +234,11 @@ module "auth" {
   # Staging pool holds only test accounts; keep it destroyable.
   deletion_protection = false
 
+  # The MCP inspector's loopback-callback client (#261): 12.5 verifies the
+  # OAuth dance against STAGING with an inspector, so its client must exist
+  # here. Deliberately absent from prod — the flag's default.
+  mcp_inspector_client = true
+
   # Lets POST /v1/firm/users mint a colleague's Cognito account. ONE action on
   # ONE pool — the module's own comment has the argument for why that is the
   # whole grant, and what it deliberately excludes.

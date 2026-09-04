@@ -101,6 +101,18 @@ variable "from_email_address" {
   default     = "Insolvia <no-reply@insolvia.ai>"
 }
 
+# ── MCP harness clients (#261) ──────────────────────────────────
+# Whether to register the MCP inspector's loopback-callback client on this
+# pool. True on dev and staging (where connecting an inspector is how the
+# service is exercised), false on prod: a debugging tool's client has no
+# business minting production-capable tokens, and the harness clients that DO
+# belong on prod are registered unconditionally in main.tf.
+variable "mcp_inspector_client" {
+  description = "Register the MCP inspector's app client (loopback callbacks) on this pool."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

@@ -220,6 +220,12 @@ module "auth" {
 
   web_origins = ["http://localhost:3000"]
 
+  # The MCP inspector's loopback-callback client (#261): connecting
+  # `npx @modelcontextprotocol/inspector` to the locally running
+  # services/mcp server against THIS machine's pool is the local check the
+  # MCP milestone's issues require.
+  mcp_inspector_client = true
+
   # Throwaway test accounts on a throwaway pool.
   deletion_protection = false
 

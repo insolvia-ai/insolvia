@@ -191,16 +191,30 @@ def verify_access_token(
     adapter's job; this function only decides whether the result is
     trustworthy.
     """
+    claims = _decode_verified_claims(
+        token, signing_key=signing_key, issuer_url=settings.issuer_url
+    )
+    return principal_from_claims(claims, settings=settings)
+
+
+def _decode_verified_claims(
+    token: str, *, signing_key: Any, issuer_url: str
+) -> Mapping[str, Any]:
+    """The PyJWT half of verification: signature, issuer, lifetime, and the
+    required-claim set — everything that does not depend on WHICH app clients
+    a service accepts. Shared by the single-client and allowlist paths so the
+    cryptographic checks cannot drift between them."""
     try:
         claims: Mapping[str, Any] = jwt.decode(
             token,
             key=signing_key,
             algorithms=list(ALGORITHMS),
-            issuer=settings.issuer_url,
+            issuer=issuer_url,
             options={
                 # Cognito ACCESS tokens carry client_id, never aud. Verifying
                 # aud here would reject every valid token; the app-client
-                # check happens below against client_id instead.
+                # check happens in principal_from_claims against client_id
+                # instead.
                 "verify_aud": False,
                 "require": ["exp", "iss", "sub", "token_use", "client_id"],
                 "verify_exp": True,
@@ -221,8 +235,75 @@ def verify_access_token(
         # DecodeError, ImmatureSignatureError, InvalidAlgorithmError, and
         # anything PyJWT adds later. Everything unrecognised is a rejection.
         raise AuthenticationError(AuthFailureReason.INVALID_SIGNATURE) from exc
+    return claims
 
-    return principal_from_claims(claims, settings=settings)
+
+# ── Client allowlists (issue #261) ──────────────────────────────────
+#
+# The MCP service verifies a SET of app clients — one pre-registered Cognito
+# client per harness (Cognito has no dynamic client registration), all
+# minting tokens this one resource server accepts. The set is the audience
+# check: Cognito access tokens carry no RFC 8707 `aud`, so "issued for this
+# server" is approximated by "issued to one of this server's own clients" —
+# a set DISJOINT from the app's client id, so an app token presented to the
+# MCP endpoint fails closed and vice versa (ADR 0016). The tenant API keeps
+# the single-client profile above: exactly one surface, exactly one client.
+
+
+@dataclass(frozen=True)
+class MultiClientAuthSettings:
+    """The issuer plus the client allowlist that decide whether a token is
+    one of ours. Built from config at composition time; both required — see
+    `multi_client_settings_or_raise`, there is no "unset means allow"."""
+
+    issuer_url: str
+    client_ids: tuple[str, ...]
+
+
+def multi_client_settings_or_raise(
+    issuer_url: str | None, client_ids: tuple[str, ...] | None
+) -> MultiClientAuthSettings:
+    """Require the issuer and a non-empty allowlist, or refuse to verify
+    anything — `settings_or_raise`'s fail-closed rule, for the set shape."""
+    if not issuer_url or not client_ids or not all(client_ids):
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    return MultiClientAuthSettings(
+        issuer_url=issuer_url.rstrip("/"), client_ids=tuple(client_ids)
+    )
+
+
+def verify_access_token_for_clients(
+    token: str, *, signing_key: Any, settings: MultiClientAuthSettings
+) -> Principal:
+    """`verify_access_token`, with the client check against an allowlist.
+
+    Same composition contract: the key arrives from a JwksProvider, this
+    function only decides whether the result is trustworthy.
+    """
+    claims = _decode_verified_claims(
+        token, signing_key=signing_key, issuer_url=settings.issuer_url
+    )
+    if claims.get("token_use") != TOKEN_USE_ACCESS:
+        raise AuthenticationError(AuthFailureReason.WRONG_TOKEN_USE)
+
+    client_id = claims.get("client_id")
+    if not isinstance(client_id, str) or client_id not in settings.client_ids:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLIENT)
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject:
+        raise AuthenticationError(AuthFailureReason.INVALID_CLAIMS)
+
+    username = claims.get("username")
+    expires_at = claims.get("exp")
+
+    return Principal(
+        subject=subject,
+        username=username if isinstance(username, str) and username else None,
+        client_id=client_id,
+        scopes=_scopes(claims.get("scope")),
+        expires_at=expires_at if isinstance(expires_at, int) else None,
+    )
 
 
 def principal_from_claims(
