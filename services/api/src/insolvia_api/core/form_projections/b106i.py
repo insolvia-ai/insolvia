@@ -140,7 +140,12 @@ def project_b106i_1215(release: FormRelease, case_file: CaseFile) -> FieldValues
         return _Column(
             digit=digit,
             employment=next(
-                (e for e in case_file.employments if e.debtor_id == debtor.id), None
+                (
+                    body
+                    for _, body in case_file.employments
+                    if body.debtor_id == debtor.id
+                ),
+                None,
             ),
             summary=next(
                 (s for s in case_file.income_summaries if s.debtor_id == debtor.id),

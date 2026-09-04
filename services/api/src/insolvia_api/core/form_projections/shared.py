@@ -23,7 +23,13 @@ from insolvia_core.creditors import CreditorBody
 from insolvia_core.debtors import Debtor
 from insolvia_core.exemption_claims import ExemptionBody
 from insolvia_core.expenses import DependentBody, ExpenseBody, HouseholdBody
-from insolvia_core.income import EmploymentBody, IncomeSummaryBody
+from insolvia_core.income import (
+    EmploymentBody,
+    IncomeSummaryBody,
+    OtherIncomeRecordBody,
+    PayPeriodRecordBody,
+)
+from insolvia_core.means_test_inputs import MeansTestInputBody
 from insolvia_core.petitions import (
     FilingProfessionalBody,
     PetitionBody,
@@ -61,8 +67,9 @@ class CaseFile:
 
     Collections whose records are referenced BY ID from other records
     (creditors from claims, assets from exemptions, claims and contracts
-    from codebtors, households from expenses) carry `(id, body)` pairs so a
-    reference resolves without a store; the rest are bare bodies.
+    from codebtors, households from expenses, employments from pay-period
+    records) carry `(id, body)` pairs so a reference resolves without a
+    store; the rest are bare bodies.
     """
 
     case: Case
@@ -72,8 +79,12 @@ class CaseFile:
     related_cases: tuple[RelatedCaseBody, ...] = ()
     sole_proprietorships: tuple[SoleProprietorshipBody, ...] = ()
     filing_professionals: tuple[FilingProfessionalBody, ...] = ()
-    employments: tuple[EmploymentBody, ...] = ()
+    employments: tuple[tuple[str, EmploymentBody], ...] = ()
     income_summaries: tuple[IncomeSummaryBody, ...] = ()
+    # The means test (B122A-1 / B122A-2).
+    pay_period_records: tuple[PayPeriodRecordBody, ...] = ()
+    other_income_records: tuple[OtherIncomeRecordBody, ...] = ()
+    means_test_inputs: tuple[MeansTestInputBody, ...] = ()
     # 106A/B and 106C.
     assets: tuple[tuple[str, AssetBody], ...] = ()
     exemptions: tuple[ExemptionBody, ...] = ()

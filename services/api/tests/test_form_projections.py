@@ -42,7 +42,17 @@ from insolvia_core.debtors import CreditCounseling, Debtor, OtherName, Venue
 from insolvia_core.exemption_claims import ExemptionBody
 from insolvia_core.expenses import DependentBody, ExpenseBody, HouseholdBody
 from insolvia_core.fields import Address, PersonName
-from insolvia_core.income import EmploymentBody, IncomeSummaryBody
+from insolvia_core.income import (
+    EmploymentBody,
+    IncomeSummaryBody,
+    OtherIncomeRecordBody,
+    PayPeriodDeduction,
+    PayPeriodRecordBody,
+)
+from insolvia_core.means_test_inputs import (
+    MeansTestInputBody,
+    OtherSecuredPayment,
+)
 from insolvia_core.petitions import (
     FilingProfessionalBody,
     HazardousProperty,
@@ -645,6 +655,90 @@ def _expenses() -> tuple[ExpenseBody, ...]:
     )
 
 
+def _pay_period_records() -> tuple[PayPeriodRecordBody, ...]:
+    """Ada's six monthly paychecks across the Feb-Jul 2026 lookback (the
+    case's 2026-08-01 creation date stands in for the filing date)."""
+    return tuple(
+        PayPeriodRecordBody(
+            employment_id="employment-0001",
+            period_start=f"2026-{month:02d}-01",
+            period_end=f"2026-{month:02d}-28",
+            pay_date=f"2026-{month:02d}-27",
+            gross="7400.00",
+            net="5610.00",
+            deductions=(
+                PayPeriodDeduction(
+                    id=f"ded-{month:02d}-1", category="tax", amount="1620.00"
+                ),
+                PayPeriodDeduction(
+                    id=f"ded-{month:02d}-2", category="insurance", amount="170.00"
+                ),
+            ),
+            frequency="monthly",
+        )
+        for month in range(2, 8)
+    )
+
+
+def _other_income_records() -> tuple[OtherIncomeRecordBody, ...]:
+    """Ben's window income: unemployment compensation (counted, Column B)
+    and one Social Security Act benefit (recorded and excluded)."""
+    return (
+        *(
+            OtherIncomeRecordBody(
+                debtor_id="debtor-0002",
+                category="unemployment",
+                received_on=f"2026-{month:02d}-10",
+                amount="1300.00",
+                payer="Florida Reemployment Assistance",
+            )
+            for month in range(2, 8)
+        ),
+        OtherIncomeRecordBody(
+            debtor_id="debtor-0002",
+            category="social_security_act_benefit",
+            received_on="2026-05-20",
+            amount="900.00",
+            payer="Social Security Administration",
+        ),
+    )
+
+
+def _means_test_input() -> MeansTestInputBody:
+    """The entered B122A-2 answers, coherent with the rest of the file: the
+    home payment is the Gulf Coast mortgage the SOFA reports, the vehicle
+    loan is the car claim the insider cosigned, and the household is Ada,
+    Ben and their daughter."""
+    return MeansTestInputBody(
+        people_under_65=3,
+        people_65_or_older=0,
+        home_secured_monthly_total="1480.00",
+        vehicle_count=1,
+        vehicle_1_loan_monthly="415.00",
+        taxes="1620.00",
+        involuntary_deductions="85.00",
+        term_life_insurance="35.00",
+        childcare="450.00",
+        optional_telecom="45.00",
+        health_insurance="520.00",
+        health_savings_account="60.00",
+        education_under_18="150.00",
+        additional_food_clothing="60.00",
+        charitable_contributions="100.00",
+        other_secured_payments=(
+            OtherSecuredPayment(
+                id="os-1",
+                creditor_name="Suncoast Equipment Finance",
+                property_description="Utility trailer",
+                monthly_payment="95.00",
+            ),
+        ),
+        priority_cure_total="2100.00",
+        ch13_eligible=True,
+        ch13_projected_plan_payment="650.00",
+    )
+
+
 def _dependents() -> tuple[DependentBody, ...]:
     return (
         DependentBody(
@@ -1066,22 +1160,28 @@ def reference_case_file() -> CaseFile:
             ),
         ),
         employments=(
-            EmploymentBody(
-                debtor_id="debtor-0001",
-                status="employed",
-                occupation="Systems analyst",
-                employer_name="Menabrea Machines Inc",
-                employer_address=Address(
-                    line1="200 Engine Row",
-                    city="Tampa",
-                    state="FL",
-                    postal_code="33605",
+            (
+                "employment-0001",
+                EmploymentBody(
+                    debtor_id="debtor-0001",
+                    status="employed",
+                    occupation="Systems analyst",
+                    employer_name="Menabrea Machines Inc",
+                    employer_address=Address(
+                        line1="200 Engine Row",
+                        city="Tampa",
+                        state="FL",
+                        postal_code="33605",
+                    ),
+                    employed_since="2019-02-14",
                 ),
-                employed_since="2019-02-14",
             ),
-            EmploymentBody(
-                debtor_id="debtor-0002",
-                status="not_employed",
+            (
+                "employment-0002",
+                EmploymentBody(
+                    debtor_id="debtor-0002",
+                    status="not_employed",
+                ),
             ),
         ),
         assets=_assets(),
@@ -1094,6 +1194,9 @@ def reference_case_file() -> CaseFile:
         expenses=_expenses(),
         dependents=_dependents(),
         sofa_entries=_sofa_entries(),
+        pay_period_records=_pay_period_records(),
+        other_income_records=_other_income_records(),
+        means_test_inputs=(_means_test_input(),),
         income_summaries=(
             IncomeSummaryBody(
                 debtor_id="debtor-0001",
@@ -1134,6 +1237,8 @@ def reference_case_file() -> CaseFile:
         "form/b106j2",
         "form/b106sum",
         "form/b107",
+        "form/b122a1",
+        "form/b122a2",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
@@ -2031,3 +2136,86 @@ def test_money_prints_grouped_with_two_decimals(stored: str, printed: str) -> No
 
 def test_dates_print_as_the_forms_spell_them() -> None:
     assert format_date("2019-03-04") == "03/04/2019"
+
+
+# --- B122A-1 / B122A-2 (issue #102) -------------------------------------------
+
+
+def _below_median_file() -> CaseFile:
+    """The reference case with Ada's paychecks shrunk: 4,500 + Ben's 1,300
+    annualizes to 69,600, under the FL household-of-3 median (97,540)."""
+    case_file = reference_case_file()
+    shrunk = tuple(
+        replace(record, gross="4500.00") for record in case_file.pay_period_records
+    )
+    return CaseFile(**{**case_file.__dict__, "pay_period_records": shrunk})
+
+
+def test_b122a1_columns_are_the_cmi_derivation_verbatim() -> None:
+    release = latest_form("form/b122a1")
+    values = project(release, reference_case_file())
+    wages = values["wages"]
+    assert isinstance(wages, dict)
+    # Ada's six 7,400 checks average to themselves; Ben's column is $0 wages
+    # (the form's own instruction for a filled-out column's silent lines).
+    assert wages["Debto1.Quest2.0"] == Text("7,400.00")
+    assert wages["Debto2.Quest2.0"] == Text("0.00")
+    unemployment = values["unemployment"]
+    assert isinstance(unemployment, dict)
+    assert unemployment["Debto2.Quest8.0"] == Text("1,300.00")
+    # The § 101(10A)(B)(ii) exclusion is SHOWN in line 8's contention box
+    # (900 received once in the window, averaged), never counted.
+    ssa = values["ssa_contention"]
+    assert isinstance(ssa, dict)
+    assert ssa == {"Debto2.Quest8A": Text("150.00")}
+    assert values["total_cmi"] == Text("8,700.00")
+    assert values["annualized_cmi"] == Text("104,400.00")
+    assert values["median_income"] == Text("97,540.00")
+    assert values["median_comparison"] == Option("12b more than 13")
+    assert values["caption.presumption_box"] == Option("Presumption of abuse applies")
+
+
+def test_b122a1_lands_debtor2s_misnamed_line_4_box() -> None:
+    # The PDF names Column B's line-4 box Debto2.Quest2.2; geometry, not the
+    # name, is the identity (the spec's note).
+    release = latest_form("form/b122a1")
+    values = project(release, reference_case_file())
+    contributions = values["household_contributions"]
+    assert isinstance(contributions, dict)
+    assert set(contributions) == {"Debto1.Quest4", "Debto2.Quest2.2"}
+
+
+def test_b122a1_below_the_median_checks_box_1() -> None:
+    release = latest_form("form/b122a1")
+    values = project(release, _below_median_file())
+    assert values["median_comparison"] == Option("12b less or equal to 13")
+    assert values["caption.presumption_box"] == Option("No Abuse")
+
+
+def test_b122a2_refuses_a_below_median_case() -> None:
+    with pytest.raises(FormProjectionError, match="below the applicable median"):
+        project(latest_form("form/b122a2"), _below_median_file())
+
+
+def test_b122a2_determination_follows_the_engine() -> None:
+    values = project(latest_form("form/b122a2"), reference_case_file())
+    # The reference household's deductions exceed its income: 39d lands at
+    # -23,359.80, under the § 707(b)(2)(A)(i)(I) floor — box 1, no abuse.
+    assert values["disposable_income_60_months"] == Text("-23,359.80")
+    assert values["presumption_thresholds"] == Option("1")
+    assert values["caption.presumption_box"] == Option("No Abuse")
+    assert "unsecured_ratio_determination" not in values
+    # Line 36's multiplication prints the district's dated multiplier.
+    assert values["ch13_multiplier"] == Text("0.1")
+    assert values["ch13_admin_expense"] == Text("65.00")
+    # The entered 33d row prints with its creditor and property.
+    creditor = values["other_secured_creditor"]
+    assert isinstance(creditor, dict)
+    assert creditor == {"undefined_71": Text("Suncoast Equipment Finance")}
+
+
+def test_b122a2_surfaces_the_engines_refusals_through_the_gate() -> None:
+    case_file = reference_case_file()
+    without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
+    with pytest.raises(FormProjectionError, match="household composition"):
+        project(latest_form("form/b122a2"), without_inputs)

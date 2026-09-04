@@ -69,6 +69,8 @@ def test_the_registry_holds_the_expected_series() -> None:
         "form/b106j2",
         "form/b106sum",
         "form/b107",
+        "form/b122a1",
+        "form/b122a2",
     )
 
 
@@ -193,6 +195,8 @@ def test_form_revisions_as_of_is_the_case_pin_map() -> None:
         "form/b106j2": "2015-12-01",
         "form/b106sum": "2015-12-01",
         "form/b107": "2025-04-01",
+        "form/b122a1": "2019-12-01",
+        "form/b122a2": "2025-04-01",
     }
     # And every pin round-trips through get_form, which is what makes a
     # filed case reproducible forever.

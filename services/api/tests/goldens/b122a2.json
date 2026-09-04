@@ -1,0 +1,497 @@
+{
+ "fields": {
+  "1_2": {
+   "value": "1,284.56"
+  },
+  "2_2": {
+   "value": "1,294.56"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number1": {
+   "value": "S3.0 caption.case_number"
+  },
+  "CheckBox1": {
+   "value": "/Presumption of abuse applies",
+   "widget_states": [
+    "/Off",
+    "/Presumption of abuse applies"
+   ]
+  },
+  "CheckBox10": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "CheckBox11": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "CheckBox12": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "CheckBox13": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox14": {
+   "value": "/1",
+   "widget_states": [
+    "/1",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "CheckBox15": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox16": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "CheckBox2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "CheckBox3": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox4": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "CheckBox5": {
+   "value": "/On",
+   "widget_states": [
+    "/Off",
+    "/On"
+   ]
+  },
+  "CheckBox6": {
+   "value": "/1",
+   "widget_states": [
+    "/Off",
+    "/1",
+    "/Off"
+   ]
+  },
+  "CheckBox7": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "CheckBox8": {
+   "value": "/Yes",
+   "widget_states": [
+    "/Off",
+    "/Yes"
+   ]
+  },
+  "CheckBox9": {
+   "value": "/No",
+   "widget_states": [
+    "/No",
+    "/Off"
+   ]
+  },
+  "Debtor1.Date signed": {
+   "value": "01/22/2026"
+  },
+  "Debtor1.Name": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor1.sig": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2.Date signed": {
+   "value": "01/23/2026"
+  },
+  "Debtor2.Name": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Debtor2.sig": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Describe Vehicle 1 1": {
+   "value": "S33.0 vehicle_1_description"
+  },
+  "Describe Vehicle 1 2": {
+   "value": "S33.1 vehicle_1_description"
+  },
+  "Describe Vehicle 2 1": {
+   "value": "S39.0 vehicle_2_description"
+  },
+  "Describe Vehicle 2 2": {
+   "value": "S39.1 vehicle_2_description"
+  },
+  "Explain 1": {
+   "value": "S30.0 housing_adjustment_explanation"
+  },
+  "Explain 2": {
+   "value": "S30.1 housing_adjustment_explanation"
+  },
+  "Quest1": {
+   "value": "1,264.56"
+  },
+  "Quest10": {
+   "value": "1,294.56"
+  },
+  "Quest12": {
+   "value": "1,224.56"
+  },
+  "Quest13A": {
+   "value": "1,244.56"
+  },
+  "Quest13B Creditor for vehicle 1-1": {
+   "value": "S35.0 vehicle_1_creditor_name"
+  },
+  "Quest13B Creditor for vehicle 1-2": {
+   "value": "S35.1 vehicle_1_creditor_name"
+  },
+  "Quest13B Total amount for vehicle 1": {
+   "value": "1,274.56"
+  },
+  "Quest13B amount for vehicle 1-1": {
+   "value": "1,264.56"
+  },
+  "Quest13B amount for vehicle 1-2": {
+   "value": "1,274.56"
+  },
+  "Quest13C": {
+   "value": "1,284.56"
+  },
+  "Quest13D": {
+   "value": "1,204.56"
+  },
+  "Quest13E.Creditor1": {
+   "value": "S41.0 vehicle_2_creditor_name"
+  },
+  "Quest13E.Creditor2": {
+   "value": "S41.1 vehicle_2_creditor_name"
+  },
+  "Quest13E.Monthly1": {
+   "value": "1,224.56"
+  },
+  "Quest13E.Monthly2": {
+   "value": "1,234.56"
+  },
+  "Quest13E.TotalMonthly": {
+   "value": "1,234.56"
+  },
+  "Quest13F": {
+   "value": "1,244.56"
+  },
+  "Quest14": {
+   "value": "1,254.56"
+  },
+  "Quest15": {
+   "value": "1,264.56"
+  },
+  "Quest3": {
+   "value": "1,224.56"
+  },
+  "Quest3A": {
+   "value": "S10.0 marital_adjustment_purpose"
+  },
+  "Quest3A1": {
+   "value": "1,214.56"
+  },
+  "Quest3B": {
+   "value": "S10.1 marital_adjustment_purpose"
+  },
+  "Quest3B1": {
+   "value": "1,224.56"
+  },
+  "Quest3C": {
+   "value": "S10.2 marital_adjustment_purpose"
+  },
+  "Quest3C1": {
+   "value": "1,234.56"
+  },
+  "Quest4": {
+   "value": "1,234.56"
+  },
+  "Quest5": {
+   "value": "6"
+  },
+  "Quest6": {
+   "value": "1,254.56"
+  },
+  "Quest7A": {
+   "value": "1,264.56"
+  },
+  "Quest7B": {
+   "value": "9"
+  },
+  "Quest7C": {
+   "value": "1,284.56"
+  },
+  "Quest7D": {
+   "value": "1,294.56"
+  },
+  "Quest7E": {
+   "value": "3"
+  },
+  "Quest7F": {
+   "value": "1,214.56"
+  },
+  "Quest7G": {
+   "value": "1,224.56"
+  },
+  "Quest8": {
+   "value": "1,234.56"
+  },
+  "Quest9": {
+   "value": "1,244.56"
+  },
+  "Quest9B creditor amount1": {
+   "value": "1,264.56"
+  },
+  "Quest9B creditor amount2": {
+   "value": "1,274.56"
+  },
+  "Quest9B creditor amount3": {
+   "value": "1,284.56"
+  },
+  "Quest9B creditor name1": {
+   "value": "S25.0 home_debt_creditor_name"
+  },
+  "Quest9B creditor name2": {
+   "value": "S25.1 home_debt_creditor_name"
+  },
+  "Quest9B creditor name3": {
+   "value": "S25.2 home_debt_creditor_name"
+  },
+  "Quest9B total amount": {
+   "value": "1,274.56"
+  },
+  "Quest9C": {
+   "value": "1,284.56"
+  },
+  "secures the debt": {
+   "value": "S78.0 cure_property"
+  },
+  "undefined_100": {
+   "value": "1,294.56"
+  },
+  "undefined_101": {
+   "value": "1,204.56"
+  },
+  "undefined_102": {
+   "value": "1,214.56"
+  },
+  "undefined_103": {
+   "value": "1,224.56"
+  },
+  "undefined_104": {
+   "value": "1,234.56"
+  },
+  "undefined_107": {
+   "value": "1,244.56"
+  },
+  "undefined_108": {
+   "value": "1,254.56"
+  },
+  "undefined_110": {
+   "value": "1,274.56"
+  },
+  "undefined_111": {
+   "value": "1,284.56"
+  },
+  "undefined_113": {
+   "value": "S101.0 special_circumstances_explanation"
+  },
+  "undefined_114": {
+   "value": "1,224.56"
+  },
+  "undefined_115": {
+   "value": "S101.1 special_circumstances_explanation"
+  },
+  "undefined_116": {
+   "value": "1,234.56"
+  },
+  "undefined_117": {
+   "value": "S101.2 special_circumstances_explanation"
+  },
+  "undefined_118": {
+   "value": "1,244.56"
+  },
+  "undefined_119": {
+   "value": "S101.3 special_circumstances_explanation"
+  },
+  "undefined_120": {
+   "value": "1,254.56"
+  },
+  "undefined_48": {
+   "value": "1,274.56"
+  },
+  "undefined_49": {
+   "value": "1,284.56"
+  },
+  "undefined_50": {
+   "value": "1,294.56"
+  },
+  "undefined_51": {
+   "value": "1,204.56"
+  },
+  "undefined_52": {
+   "value": "1,214.56"
+  },
+  "undefined_53": {
+   "value": "1,224.56"
+  },
+  "undefined_54": {
+   "value": "1,234.56"
+  },
+  "undefined_55": {
+   "value": "1,244.56"
+  },
+  "undefined_56": {
+   "value": "1,254.56"
+  },
+  "undefined_57": {
+   "value": "1,264.56"
+  },
+  "undefined_58": {
+   "value": "1,274.56"
+  },
+  "undefined_59": {
+   "value": "1,214.56"
+  },
+  "undefined_61": {
+   "value": "1,224.56"
+  },
+  "undefined_62": {
+   "value": "1,234.56"
+  },
+  "undefined_63": {
+   "value": "1,244.56"
+  },
+  "undefined_64": {
+   "value": "1,254.56"
+  },
+  "undefined_65": {
+   "value": "1,264.56"
+  },
+  "undefined_66": {
+   "value": "1,274.56"
+  },
+  "undefined_67": {
+   "value": "1,284.56"
+  },
+  "undefined_71": {
+   "value": "S69.0 other_secured_creditor"
+  },
+  "undefined_72": {
+   "value": "S70.0 other_secured_property"
+  },
+  "undefined_73": {
+   "value": "1,244.56"
+  },
+  "undefined_74": {
+   "value": "S69.1 other_secured_creditor"
+  },
+  "undefined_75": {
+   "value": "S70.1 other_secured_property"
+  },
+  "undefined_76": {
+   "value": "1,254.56"
+  },
+  "undefined_77": {
+   "value": "S69.2 other_secured_creditor"
+  },
+  "undefined_78": {
+   "value": "S70.2 other_secured_property"
+  },
+  "undefined_79": {
+   "value": "1,264.56"
+  },
+  "undefined_80": {
+   "value": "1,254.56"
+  },
+  "undefined_81": {
+   "value": "S77.0 cure_creditor"
+  },
+  "undefined_82": {
+   "value": "1,294.56"
+  },
+  "undefined_83": {
+   "value": "1,204.56"
+  },
+  "undefined_84": {
+   "value": "S77.1 cure_creditor"
+  },
+  "undefined_85": {
+   "value": "S78.1 cure_property"
+  },
+  "undefined_86": {
+   "value": "1,204.56"
+  },
+  "undefined_87": {
+   "value": "1,214.56"
+  },
+  "undefined_88": {
+   "value": "S77.2 cure_creditor"
+  },
+  "undefined_89": {
+   "value": "S78.2 cure_property"
+  },
+  "undefined_90": {
+   "value": "1,214.56"
+  },
+  "undefined_91": {
+   "value": "1,224.56"
+  },
+  "undefined_92": {
+   "value": "1,214.56"
+  },
+  "undefined_93": {
+   "value": "1,234.56"
+  },
+  "undefined_93-1": {
+   "value": "1,244.56"
+  },
+  "undefined_97": {
+   "value": "1,264.56"
+  },
+  "undefined_98": {
+   "value": "1,284.56"
+  },
+  "x": {
+   "value": "S87.0 ch13_multiplier"
+  }
+ },
+ "release": "form/b122a2@2025-04-01",
+ "sha256": "1aed252fc946ec4e5f0893c3e4e0f51ed404d5edff64930165ce7b8e6f21b3a5"
+}
