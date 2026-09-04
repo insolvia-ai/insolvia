@@ -11,17 +11,19 @@ One review queue, one status vocabulary, one confirmation act: extraction
 (8.7/8.8) writes the same rows with a `document_id` and an extraction origin,
 and the review UI (8.9) accepts, corrects or rejects both streams without
 knowing which is which beyond the origin it displays. Acceptance — which
-writes the real case record with `source: imported` provenance — belongs to
-that review work, not to this service; there is deliberately no code path
-here that turns a candidate into case data.
+writes the real case record with machine-source provenance and the
+confirmation pair — belongs to the review flow in services/api; there is
+deliberately no code path in the MCP service that turns a candidate into
+case data.
 
-WHERE THIS LIVES, AND WHY NOT insolvia_core: this module is the case
-partition's `CANDIDATE#` namespace (registered in
-insolvia_core.case_collections.RESERVED_SK_NAMESPACES), but today exactly one
-service composes it. The core package's admission rule is a concrete second
-importer, not "will be shared" — when 8.9's review routes land in
-services/api, this module and its adapters graduate to insolvia_core the way
-the case domain itself did (ADR 0016).
+WHERE THIS LIVES: this module began in services/mcp (issue #262) with a note
+that it would graduate here the day the review flow became its second
+importer — the core package's admission rule (ADR 0012) is a concrete second
+importer, never "will be shared". 8.7-8.9 are that importer: the extraction
+workers write these rows and the review routes read them, so the module and
+its adapters moved verbatim, exactly as the case domain did (ADR 0016). It
+owns the case partition's `CANDIDATE#` namespace, registered in
+insolvia_core.case_collections.RESERVED_SK_NAMESPACES.
 
 Pure: no boto3, no framework, no clock beyond datetime.now via fields.timestamp.
 """

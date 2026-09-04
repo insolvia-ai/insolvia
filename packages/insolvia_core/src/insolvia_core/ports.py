@@ -14,6 +14,7 @@ from typing import Any, Protocol, TypeVar
 
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import AccessEvent
+from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage
 from insolvia_core.debtors import Debtor
@@ -552,3 +553,47 @@ class AccessLog(Protocol):
     """
 
     def record(self, event: AccessEvent) -> None: ...
+
+
+class CandidateStore(Protocol):
+    """Persists candidate records (mcp-surface.md § Candidate writes;
+    docs/reference/case-data-model.md's `extraction_candidate`).
+
+    Moved here from services/mcp with the candidate domain when the review
+    flow became its second composer (ADR 0012's admission rule; issues
+    8.7-8.9): the MCP service writes proposals, the extraction workers write
+    extracted candidates, and the review routes read and resolve both.
+
+    Ownership is NOT a parameter here, the same rule every case-child store
+    states: a candidate is reached only through its case, the caller resolves
+    the case through `CaseStore` first on every path, and a second
+    authorisation path here would eventually disagree with the first. What
+    every method DOES enforce is the case scope: `case_id` is half the key,
+    so a candidate id from another case does not resolve here.
+    """
+
+    def create(self, candidate: Candidate) -> None:
+        """Store a new row. Ids are server-minted uuid4s, so an existing
+        (case, id) means the minting is broken — implementations MUST raise
+        rather than silently replace, exactly as CaseEntityStore.create
+        does."""
+        ...
+
+    def get(self, case_id: str, candidate_id: str) -> Candidate | None: ...
+
+    def list_for_case(self, case_id: str) -> tuple[Candidate, ...]:
+        """Every candidate of one case, in creation order
+        (core/candidates.list_order — the sort key is a random uuid, so
+        neither implementation gets the ordering for free). All of them; the
+        callers paginate, and status filtering happens above this port so
+        implementations cannot drift on what a filter means."""
+        ...
+
+    def update(self, candidate: Candidate, *, expected_status: str) -> Candidate | None:
+        """Write `candidate` back, but only if the stored status is still
+        `expected_status` — the compare-and-swap withdrawal and review both
+        ride on. None means the condition failed (or the row is gone): the
+        caller lost a race and must not pretend otherwise — a withdrawal that
+        overwrote an acceptance would silently un-review a record the human
+        just confirmed, and two reviewers racing must get one winner."""
+        ...

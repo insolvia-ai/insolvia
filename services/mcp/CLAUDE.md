@@ -10,20 +10,20 @@ The official MCP Python SDK + Mangum on Lambda (ADR 0016). Human docs:
   the reverse. The protocol facts it cites are spec revision 2026-07-28.
 - **Layered `core / api / adapters / entrypoints`**, enforced by
   `tests/test_architecture.py`: `core` is the surface's meaning (tool logic,
-  candidates, config) and never imports the MCP SDK; `api` owns the SDK the
+  config) and never imports the MCP SDK; `api` owns the SDK the
   way the tenant API's api layer owns Flask; adapters own boto3. The case
   domain itself lives in [`packages/insolvia_core`](../../packages/insolvia_core/CLAUDE.md)
   — this service composes its stores and parse functions, and MUST NOT copy a
   shape or re-derive an access rule locally.
 - **There is no code path that writes a case record.** Agent writes land as
-  candidates (`core/candidates.py`, `CANDIDATE#` rows) and become case data
-  only in the review flow (8.9, in the app) — confirm-before-entry holds
+  candidates (`insolvia_core.candidates`, `CANDIDATE#` rows) and become case
+  data only in the review flow (8.9) — confirm-before-entry holds
   structurally, not as a check. Do not add a case-record write "just for
   tests"; the absence is the invariant.
-- **The candidate module graduates, later.** It lives here (not
-  insolvia_core) because exactly one service composes it — the core package's
-  admission rule. When the API grows review routes, move it there the way the
-  case domain moved, and take `candidate_item` with it verbatim.
+- **The candidate module graduated.** It began here under the core package's
+  admission rule (one composer) and moved to `insolvia_core` verbatim when
+  the extraction/review flow (8.7-8.9) became its second importer — the same
+  path the case domain took. Change candidate shapes there, never locally.
 - **Every call resolves the accessor from the store — never cached** (two
   reads, ADR 0009). The firm is never an argument; the origin of a proposal
   comes from the VERIFIED token. Tools the caller may not use are listed but

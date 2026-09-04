@@ -27,6 +27,7 @@ from typing import Annotated, Any
 from urllib.parse import urlparse
 
 from insolvia_core.access import Accessor
+from insolvia_core.candidates import PROPOSABLE_ENTITY_TYPES
 from insolvia_core.errors import ForbiddenError
 from mcp.server import MCPServer
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -39,7 +40,6 @@ from starlette.applications import Starlette
 from insolvia_mcp.api.auth import CognitoTokenVerifier, resolve_accessor
 from insolvia_mcp.api.dependencies import McpDependencies
 from insolvia_mcp.api.results import guarded, success
-from insolvia_mcp.core.candidates import PROPOSABLE_ENTITY_TYPES
 from insolvia_mcp.core.tools import (
     ENTITY_TYPES,
     CaseTools,

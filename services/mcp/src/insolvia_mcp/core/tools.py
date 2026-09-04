@@ -16,7 +16,7 @@ Three inherited rules shape every method (mcp-surface.md § inherited):
   listed but refuses (`permission_denied`); another firm's caseId answers
   `not_found`, indistinguishable from a case that does not exist.
 - There is no method that writes a case record. The write half of the surface
-  is candidates (core/candidates.py), and confirm-before-entry holds
+  is candidates (insolvia_core.candidates), and confirm-before-entry holds
   structurally because the code path does not exist.
 """
 
@@ -27,6 +27,16 @@ from typing import Any, Final, NotRequired, TypedDict
 
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import record_access
+from insolvia_core.candidates import (
+    STATUSES as CANDIDATE_STATUSES,
+)
+from insolvia_core.candidates import (
+    CandidateOrigin,
+    candidate_review_json,
+    create_candidate,
+    parse_proposals,
+    withdraw,
+)
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import entity_json
 from insolvia_core.cases import (
@@ -58,23 +68,12 @@ from insolvia_core.firms import (
 )
 from insolvia_core.ports import (
     AccessLog,
+    CandidateStore,
     CaseEntityStore,
     CaseStore,
     DebtorStore,
     DocumentStore,
 )
-
-from insolvia_mcp.core.candidates import (
-    STATUSES as CANDIDATE_STATUSES,
-)
-from insolvia_mcp.core.candidates import (
-    CandidateOrigin,
-    candidate_review_json,
-    create_candidate,
-    parse_proposals,
-    withdraw,
-)
-from insolvia_mcp.core.ports import CandidateStore
 
 # mcp-surface.md § Pagination: identical numbers to the API's contract, but
 # the surface's stated default is 25 — an agent's context window is the
@@ -427,7 +426,7 @@ class CaseTools:
         origin = CandidateOrigin(
             channel="mcp",
             # Both halves from the VERIFIED TOKEN, never an argument — the
-            # attribution rule core/candidates.py states.
+            # attribution rule insolvia_core.candidates states.
             client_id=client_id,
             subject=accessor.subject,
         )

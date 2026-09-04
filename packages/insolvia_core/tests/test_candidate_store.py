@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from insolvia_mcp.adapters.memory.candidate_store import MemoryCandidateStore
-from insolvia_mcp.core.candidates import (
+from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
+from insolvia_core.candidates import (
     CandidateOrigin,
     create_candidate,
     parse_proposals,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
+from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
@@ -9,7 +10,6 @@ from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from mangum import Mangum
 
-from insolvia_mcp.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_mcp.api.dependencies import McpDependencies
 from insolvia_mcp.api.server import create_asgi_app
 from insolvia_mcp.core.config import load_config
