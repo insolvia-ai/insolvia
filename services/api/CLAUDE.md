@@ -40,8 +40,11 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
 - **Minutes-long work is a pipeline job, never an endpoint**
   ([ADR 0018](../../docs/adr/0018-sqs-queue-and-worker-lambda-over-step-functions.md)):
   the API accepts a job (`api/routes/jobs.py`) and a separate worker Lambda
-  runs it. A new job kind is a plain callable registered in
-  `core/jobs.WORKERS` — its heavy dependencies go in the **worker** Docker
-  stage, not the API's. `core/jobs.py` owns the queue message contract; both
-  entrypoints (`worker_lambda`, the local `worker_poller`) parse with it, and
+  runs it. A new job kind is a plain callable: dependency-free workers
+  register in `core/jobs.WORKERS`; store-reading ones (packet assembly,
+  `core/packet_assembly.py`) are composed by the worker entrypoints, with
+  their kind named in `core/jobs.KINDS` so the accept endpoint admits it —
+  heavy dependencies go in the **worker** Docker stage, not the API's.
+  `core/jobs.py` owns the queue message contract; both entrypoints
+  (`worker_lambda`, the local `worker_poller`) parse with it, and
   `tests/test_jobs.py` pins the wire shape.
