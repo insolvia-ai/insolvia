@@ -7,8 +7,11 @@ was dropped entirely (D9); this document no longer plans for it.
 
 Status: **foundation, intake, forms & petition engine, and the MCP server
 (12.1–12.3) all built; forms and MCP await their staging validations (#96,
-#97, 12.4–12.5); means test and AI extraction are the current milestones** ·
-Last pruned 2026-09-04
+#97, 12.4–12.5); means test and AI extraction built 2026-09-04 — every
+product milestone's build work is done. What remains is validation and
+go-to-market: the staging walkthroughs, the MCP harness round-trip
+(12.4–12.5), SES production access, the design partner, and the
+positioning rewrites (12.7/12.8)** · Last pruned 2026-09-04
 
 The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
 pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
@@ -155,9 +158,9 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · Auth`](https://github.com/insolvia-ai/insolvia/milestone/4) | — | 7.1–7.6 | Wire the app to the existing Cognito seam: sign-in, session, the first authenticated API endpoint (JWT verification lands server-side with it). |
 | [`Product · Intake`](https://github.com/insolvia-ai/insolvia/milestone/5) | M2 / P1 | 8.1–8.6, 8.10 | Standalone intake behind auth: case data model, encrypted store, case CRUD, the intake form widgets (risk 4), the questionnaire, document upload. Only the design-partner web-first test (risk 3) is still open. |
 | [`Product · Forms & petition engine`](https://github.com/insolvia-ai/insolvia/milestone/6) — **built 2026-09-04** | M3 / P2 | 9.1–9.10 | Deterministic, versioned forms; Chapter 7 packet; AI review agent — all merged. #96/#97 stay open for their staging validations (walkthrough with the design partner; seeded-defect review with a provisioned API key). |
-| [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — *current* | P3 | 10.1–10.4 | Rule-based §707(b), with the effective-dated IRS/Census refresh pipeline from the regulatory register — now on the shipped registry/forms-engine foundations. |
+| [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — **built 2026-09-04** | P3 | 10.1–10.4 | §707(b) engine, CMI, UST/IRS/Census registry series with a weekly staleness tripwire (`regulatory-refresh.yml`), B122A-1/A-2 in the packet. `code/dollar-amounts` now written at pin time. |
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
-| [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) | M2 / P1 | 8.7–8.9 | Claude reading credit reports and pay stubs into candidate records, human-confirmed before case entry. **Deferred 2026-08-11** — see below. |
+| [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
 
 ### Why extraction is its own milestone now (2026-08-11)
 
