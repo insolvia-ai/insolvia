@@ -20,6 +20,7 @@ from .conftest import (
     KID,
     OTHER_CLIENT_ID,
     PUBLIC_KEY,
+    SECOND_CLIENT_ID,
     SUBJECT,
     make_firm,
     make_token,
@@ -30,12 +31,12 @@ from .conftest import (
 def _verifier(
     *,
     issuer: str | None = ISSUER,
-    client_id: str | None = CLIENT_ID,
+    client_ids: tuple[str, ...] = (CLIENT_ID, SECOND_CLIENT_ID),
     provider: StaticJwksProvider | None = None,
 ) -> CognitoTokenVerifier:
     return CognitoTokenVerifier(
         issuer_url=issuer,
-        client_id=client_id,
+        client_ids=client_ids,
         jwks_provider=provider
         if provider is not None
         else StaticJwksProvider({KID: PUBLIC_KEY}),
@@ -54,9 +55,18 @@ def test_a_valid_token_yields_the_principal() -> None:
     assert access.scopes == ["insolvia/mcp"]
 
 
+def test_every_harness_client_on_the_allowlist_verifies() -> None:
+    # One pre-registered app client per harness (#261) — the allowlist is
+    # what lets a Claude token and an inspector token both reach the same
+    # resource server.
+    access = _verify(_verifier(), make_token(client_id=SECOND_CLIENT_ID))
+    assert access is not None
+    assert access.client_id == SECOND_CLIENT_ID
+
+
 def test_the_app_clients_token_is_not_an_mcp_token() -> None:
     # The audience separation ADR 0016 makes structural: this service
-    # verifies exactly its own client id, so a token minted for the app's
+    # verifies exactly its own client set, so a token minted for the app's
     # client fails closed with no code asked to distinguish the cases.
     assert _verify(_verifier(), make_token(client_id=OTHER_CLIENT_ID)) is None
 
@@ -71,12 +81,12 @@ def test_refusals_answer_none() -> None:
 
 
 def test_missing_configuration_fails_closed() -> None:
-    # No issuer, no client id, or no provider composed: every one is a
+    # No issuer, an empty allowlist, or no provider composed: every one is a
     # rejection, never a bypass.
     assert _verify(_verifier(issuer=None), make_token()) is None
-    assert _verify(_verifier(client_id=None), make_token()) is None
+    assert _verify(_verifier(client_ids=()), make_token()) is None
     verifier = CognitoTokenVerifier(
-        issuer_url=ISSUER, client_id=CLIENT_ID, jwks_provider=None
+        issuer_url=ISSUER, client_ids=(CLIENT_ID,), jwks_provider=None
     )
     assert _verify(verifier, make_token()) is None
 

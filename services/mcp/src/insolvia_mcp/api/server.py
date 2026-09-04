@@ -114,7 +114,7 @@ def create_mcp_server(deps: McpDependencies) -> MCPServer:
         ),
         token_verifier=CognitoTokenVerifier(
             issuer_url=config.auth_issuer_url,
-            client_id=config.auth_client_id,
+            client_ids=config.auth_client_ids,
             jwks_provider=deps.jwks_provider,
         ),
         auth=AuthSettings(

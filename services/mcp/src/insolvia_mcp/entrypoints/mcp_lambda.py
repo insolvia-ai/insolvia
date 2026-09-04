@@ -27,9 +27,9 @@ config = load_config()
 # infra/envs/<env>/main.tf as /insolvia/<env>/mcp/*, which the deploy
 # workflow derives into these environment variables — the same shape as the
 # API's namespace.
-if not config.auth_issuer_url or not config.auth_client_id:
+if not config.auth_issuer_url or not config.auth_client_ids:
     raise RuntimeError(
-        "AUTH_ISSUER_URL and AUTH_CLIENT_ID must be set for the Lambda entrypoint"
+        "AUTH_ISSUER_URL and AUTH_CLIENT_IDS must be set for the Lambda entrypoint"
     )
 
 # The pair rule services/api states: serving case data while recording nobody

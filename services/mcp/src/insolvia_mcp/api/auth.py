@@ -11,13 +11,15 @@ wrong token_use, unknown kid, and no auth config on this deployment at all —
 is a None from `verify_token`, which the SDK turns into the same 401. A
 rejection logs the coarse `AuthFailureReason` category and nothing else (GLBA).
 
-THE CLIENT-ID CHECK IS THE AUDIENCE CHECK. Cognito access tokens carry
+THE CLIENT-ID ALLOWLIST IS THE AUDIENCE CHECK. Cognito access tokens carry
 `client_id` and `scope`, never an RFC 8707 `aud`, so audience binding is
-approximated the way `services/api` already does it: this service verifies
-its own client id — DISJOINT from the app's — so an app token presented here
-fails closed with no code asked to distinguish the cases (ADR 0016). That gap
-against the spec's aud-validation MUST is real and stated, not papered over;
-docs/reference/mcp-surface.md § Identity records it.
+approximated the way `services/api` already does it, widened to a set: this
+service verifies its own pre-registered clients — one per harness
+(infra/modules/auth), DISJOINT from the app's client id — so an app token
+presented here fails closed with no code asked to distinguish the cases
+(ADR 0016). That gap against the spec's aud-validation MUST is real and
+stated, not papered over; docs/reference/mcp-surface.md § Identity records
+it.
 """
 
 from __future__ import annotations
@@ -29,8 +31,8 @@ from insolvia_core.auth import (
     AuthenticationError,
     AuthFailureReason,
     key_id,
-    settings_or_raise,
-    verify_access_token,
+    multi_client_settings_or_raise,
+    verify_access_token_for_clients,
 )
 from insolvia_core.ports import FirmStore, JwksProvider
 from mcp.server.auth.provider import AccessToken, TokenVerifier
@@ -45,23 +47,25 @@ class CognitoTokenVerifier(TokenVerifier):
         self,
         *,
         issuer_url: str | None,
-        client_id: str | None,
+        client_ids: tuple[str, ...],
         jwks_provider: JwksProvider | None,
     ) -> None:
         self._issuer_url = issuer_url
-        self._client_id = client_id
+        self._client_ids = client_ids
         self._jwks_provider = jwks_provider
 
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
-            settings = settings_or_raise(self._issuer_url, self._client_id)
+            settings = multi_client_settings_or_raise(
+                self._issuer_url, self._client_ids
+            )
             if self._jwks_provider is None:
-                # Configured issuer/client but no provider composed: a broken
+                # Configured issuer/clients but no provider composed: a broken
                 # deployment, not a caller error. Still a rejection — never
                 # "allow".
                 raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
             signing_key = self._jwks_provider.signing_key(key_id(token))
-            principal = verify_access_token(
+            principal = verify_access_token_for_clients(
                 token, signing_key=signing_key, settings=settings
             )
         except AuthenticationError as error:

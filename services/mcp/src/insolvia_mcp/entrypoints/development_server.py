@@ -76,13 +76,13 @@ else:
     firm_store = MemoryFirmStore()
 
 # Auth against this machine's own Cognito pool when AUTH_ISSUER_URL and
-# AUTH_CLIENT_ID are set. Unset, the provider is simply absent and every
+# AUTH_CLIENT_IDS are set. Unset, the provider is simply absent and every
 # call answers 401 — the bare dev server still serves the protected-resource
 # metadata, and auth fails CLOSED rather than waving requests through. This
 # is the ONE entrypoint that tolerates missing auth config; mcp_lambda.py
 # refuses to boot without it.
 jwks_provider: JwksProvider | None = None
-if config.auth_issuer_url and config.auth_client_id:
+if config.auth_issuer_url and config.auth_client_ids:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
 
 app = create_asgi_app(

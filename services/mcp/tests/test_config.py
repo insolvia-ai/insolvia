@@ -10,7 +10,7 @@ def test_defaults_are_local_and_unconfigured() -> None:
     assert config.environment == "local"
     assert config.case_table_name is None
     assert config.auth_issuer_url is None
-    assert config.auth_client_id is None
+    assert config.auth_client_ids == ()
     assert config.resource_url == "http://127.0.0.1:8788/mcp"
 
 
