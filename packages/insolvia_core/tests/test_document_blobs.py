@@ -193,3 +193,42 @@ def test_no_response_override_puts_a_file_name_in_the_query_string(blobs):
     it would carry the client's own file name — routinely a person's name — in
     a query string that lands in history and proxy logs."""
     assert "response-content-disposition" not in blobs.download_url(KEY, expires_in=300)
+
+
+def test_get_bytes_reads_the_denied_answer_as_absent(blobs, monkeypatch):
+    # Same rule as stat, same reason: no ListBucket means a missing key
+    # answers 403, so the worker's read must treat denied as absent.
+    from botocore.exceptions import ClientError
+
+    def deny(**kwargs):
+        raise ClientError(
+            {"Error": {"Code": "403", "Message": "Forbidden"}}, "GetObject"
+        )
+
+    monkeypatch.setattr(blobs.client, "get_object", deny)
+    assert blobs.get_bytes(KEY) is None
+
+
+def test_get_bytes_returns_the_object_whole(blobs, monkeypatch):
+    import io
+
+    monkeypatch.setattr(
+        blobs.client,
+        "get_object",
+        lambda **kwargs: {"Body": io.BytesIO(b"%PDF-1.7 bytes")},
+    )
+    assert blobs.get_bytes(KEY) == b"%PDF-1.7 bytes"
+
+
+def test_get_bytes_does_not_swallow_a_real_failure(blobs, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    def throttle(**kwargs):
+        raise ClientError(
+            {"Error": {"Code": "SlowDown", "Message": "Reduce request rate"}},
+            "GetObject",
+        )
+
+    monkeypatch.setattr(blobs.client, "get_object", throttle)
+    with pytest.raises(ClientError):
+        blobs.get_bytes(KEY)

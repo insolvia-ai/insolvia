@@ -141,3 +141,26 @@ A workload that cannot fit one worker attempt (reopens ADR 0018's
 primitive, which drags the call's location with it); an organisational move
 to Bedrock; ZDR terms that exclude the chosen model tier; or extraction
 needing a capability the direct API cannot offer.
+
+---
+
+> **Amended 2026-09-04 (extraction, 8.7/8.8).** Extraction lands on every
+> decision above — same worker Lambda, same direct API, same model id (one
+> owner, `adapters/anthropic/review_model.py`), same key, same no-training
+> standing — with one input-posture divergence this amendment records rather
+> than letting it happen quietly: **extraction's model input is the uploaded
+> document itself** (PDF/image, base64), and a credit report carries the
+> debtor's tax identifiers on its face. No scrub can remove them from bytes
+> that must be sent whole — that is what reading the document means. What
+> holds instead: the layer that made "no tax identifiers" structural for the
+> review still governs everything extraction *constructs* — the prompts
+> carry no case data, and every extracted payload passes through the same
+> `scrub` (plus a structural last-four coercion for account numbers) before
+> storage, so a tax id never lands in a candidate row. The document bytes
+> themselves are covered by the no-training standing and by the ZDR
+> follow-up above, whose launch-checklist condition now reads on extraction
+> with extra force: it is the surface where full identifiers actually flow.
+> One more deliberate divergence: a `max_tokens` stop is **deterministic**
+> for extraction (the same document overflows the same ceiling every time)
+> and fails the job honestly instead of retrying — the review's transient
+> treatment stays as it was.

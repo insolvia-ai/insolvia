@@ -213,6 +213,31 @@ class S3DocumentBlobStore:
             ServerSideEncryption="aws:kms",
         )
 
+    def get_bytes(self, storage_ref: str) -> bytes | None:
+        """A direct GetObject — the extraction worker's read (8.7/8.8), under
+        the WORKER role's grant (infra/modules/case_documents,
+        worker_role_name), not a presigned capability.
+
+        The 403-means-absent rule is `stat`'s, inherited whole: this service
+        holds no s3:ListBucket, so S3 answers 403 for a key that is not
+        there, and a genuine permission failure is indistinguishable from an
+        absent object at this boundary. The warning log is the tell — a burst
+        of them is a misconfigured grant, not a run of vanished uploads.
+        """
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=storage_ref)
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code in ("403", "AccessDenied"):
+                logger.warning(
+                    "get_object was denied; treating the object as absent",
+                    extra={"bucket": self.bucket_name},
+                )
+            if code in ("403", "AccessDenied", "404", "NoSuchKey"):
+                return None
+            raise
+        return bytes(response["Body"].read())
+
     def delete(self, storage_ref: str) -> None:
         # Deleting an object that is not there succeeds — S3's own behaviour,
         # and the one the port asks for, because this runs after the row is

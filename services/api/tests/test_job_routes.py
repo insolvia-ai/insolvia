@@ -108,7 +108,9 @@ def job_queue():
     return MemoryJobQueue()
 
 
-def build_client(access_log, job_store, job_queue, case_store=None):
+def build_client(
+    access_log, job_store, job_queue, case_store=None, document_store=None
+):
     firms = MemoryFirmStore()
     firms.create_firm(firm(FIRM_A, "Example & Partners"))
     firms.create_firm(firm(FIRM_B, "Other Firm LLP"))
@@ -134,6 +136,7 @@ def build_client(access_log, job_store, job_queue, case_store=None):
             access_log=access_log,
             job_store=job_store,
             job_queue=job_queue,
+            document_store=document_store,
         )
     )
     return app.test_client()
@@ -237,6 +240,106 @@ def test_an_unknown_kind_is_rejected_per_field(client):
     )
     assert response.status_code == 400
     assert "kind" in response.get_json()["fields"]
+
+
+# ── Document-scoped accepts (extraction, 8.7/8.8) ──────────────
+
+
+def extraction_setup(access_log, job_store, job_queue):
+    """A client whose dependencies carry a document store, plus a helper
+    that plants a stored document row directly — the upload flow itself is
+    test_document_routes.py's subject, not this file's."""
+    from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+    from insolvia_core.documents import (
+        StoredBlob,
+        confirm_document,
+        create_document,
+        parse_document_upload,
+    )
+
+    document_store = MemoryDocumentStore()
+    client = build_client(
+        access_log, job_store, job_queue, document_store=document_store
+    )
+
+    def plant(case_id, kind="credit_report"):
+        document = create_document(
+            parse_document_upload(
+                {
+                    "kind": kind,
+                    "fileName": "synthetic.pdf",
+                    "contentType": "application/pdf",
+                    "byteSize": 100,
+                }
+            ),
+            case_id=case_id,
+            uploaded_by=ALICE,
+        )
+        document_store.create(
+            confirm_document(document, StoredBlob(byte_size=100, etag="e" * 32))
+        )
+        return document.id
+
+    return client, plant
+
+
+def accept_extraction(client, case_id, document_id, subject=ALICE):
+    return client.post(
+        f"/v1/cases/{case_id}/jobs",
+        json={"kind": "document_extraction", "documentId": document_id},
+        headers=auth(subject),
+    )
+
+
+def test_accepting_an_extraction_names_its_document(access_log, job_store, job_queue):
+    client, plant = extraction_setup(access_log, job_store, job_queue)
+    case_id = open_case(client)
+    document_id = plant(case_id)
+
+    response = accept_extraction(client, case_id, document_id)
+
+    assert response.status_code == 202
+    body = response.get_json()
+    assert body["kind"] == "document_extraction"
+    assert body["documentId"] == document_id
+    # The wire message carries the identifier too — the worker re-reads
+    # everything else from the store.
+    (message,) = job_queue.messages
+    assert message["documentId"] == document_id
+
+
+def test_an_unknown_document_is_not_found_on_accept(access_log, job_store, job_queue):
+    client, _ = extraction_setup(access_log, job_store, job_queue)
+    case_id = open_case(client)
+    response = accept_extraction(client, case_id, "not-a-document")
+    assert response.status_code == 404
+
+
+def test_an_unextractable_document_kind_is_refused_at_accept(
+    access_log, job_store, job_queue
+):
+    client, plant = extraction_setup(access_log, job_store, job_queue)
+    case_id = open_case(client)
+    document_id = plant(case_id, kind="bank_statement")
+    response = accept_extraction(client, case_id, document_id)
+    assert response.status_code == 400
+
+
+def test_extraction_idempotency_is_per_document(access_log, job_store, job_queue):
+    client, plant = extraction_setup(access_log, job_store, job_queue)
+    case_id = open_case(client)
+    first_doc = plant(case_id)
+    second_doc = plant(case_id)
+
+    first = accept_extraction(client, case_id, first_doc).get_json()
+    repeat = accept_extraction(client, case_id, first_doc).get_json()
+    other = accept_extraction(client, case_id, second_doc).get_json()
+
+    # Re-requesting the same document returns the active job; a DIFFERENT
+    # document is new work, not a duplicate.
+    assert repeat["id"] == first["id"]
+    assert other["id"] != first["id"]
+    assert len(job_store.list_for_case(case_id)) == 2
 
 
 def test_a_repeat_accept_returns_the_active_job_not_a_duplicate(

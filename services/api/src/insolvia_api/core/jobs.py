@@ -98,6 +98,11 @@ class Job:
     created_by: str
     created_at: str
     updated_at: str
+    # Which document a document-scoped kind works on (extraction, 8.7/8.8).
+    # An identifier, not a payload: the worker still reads the record and the
+    # bytes from the store, so nothing case-shaped arrives by request body —
+    # the rule parse_job_acceptance states survives intact.
+    document_id: str | None = None
     attempts: int = 0
     failure: JobFailure | None = None
     result: dict[str, Any] | None = None
@@ -110,6 +115,7 @@ class JobMessage:
     job_id: str
     case_id: str
     kind: str
+    document_id: str | None = None
 
 
 def _timestamp() -> str:
@@ -149,30 +155,54 @@ WORKERS: dict[str, Callable[[Job], dict[str, Any]]] = {
 # importing the workers' dependencies — and `run_job`'s unknown-kind branch
 # already covers a registry that lacks a kind this tuple admits (the same
 # deploy-window shape its comment describes).
-KINDS = (*WORKERS, "packet_assembly", "petition_review")
+KINDS = (*WORKERS, "packet_assembly", "petition_review", "document_extraction")
+
+# The kinds that work on ONE DOCUMENT of the case rather than the case whole
+# (extraction — issues 8.7/8.8, core/extraction.py). For these, `documentId`
+# is required at accept and scopes the idempotency rule below; for every
+# other kind it is refused, so a client cannot decorate a job with an
+# identifier nothing will read.
+DOCUMENT_SCOPED_KINDS = frozenset({"document_extraction"})
 
 
 # ── Validation and identity ─────────────────────────────────────
 
 
-def parse_job_acceptance(payload: Mapping[str, object]) -> str:
+def parse_job_acceptance(payload: Mapping[str, object]) -> tuple[str, str | None]:
     """Validate POST /v1/cases/<id>/jobs. Unknown keys are ignored.
 
-    Only `kind` is accepted. There is deliberately no client-supplied payload
-    in v1: workers read everything from the store, so a payload would be a
-    second, unvalidated path for case data to arrive by.
+    `kind` always; `documentId` exactly when the kind is document-scoped.
+    There is still no client-supplied payload: `documentId` is an identifier
+    naming which stored record to work on — the worker reads the record and
+    the bytes from the store, so no case data arrives by request body. The
+    route must resolve it against the case before enqueueing, exactly as it
+    resolves the case itself.
     """
     kind = payload.get("kind")
     if not isinstance(kind, str) or kind not in KINDS:
         raise FieldValidationError(
             {"kind": "Kind must be one of " + ", ".join(KINDS) + "."}
         )
-    return kind
+    document_id = payload.get("documentId")
+    if kind in DOCUMENT_SCOPED_KINDS:
+        if not isinstance(document_id, str) or not document_id.strip():
+            raise FieldValidationError(
+                {"documentId": "This kind works on one document; name it."}
+            )
+        return kind, document_id.strip()
+    if document_id is not None:
+        raise FieldValidationError(
+            {"documentId": "This kind does not take a documentId."}
+        )
+    return kind, None
 
 
-def new_job(kind: str, *, case_id: str, created_by: str) -> Job:
+def new_job(
+    kind: str, *, case_id: str, created_by: str, document_id: str | None = None
+) -> Job:
     """A freshly accepted job. Both scoping fields come from the caller's
-    resolved accessor and the route's case lookup, never the request body."""
+    resolved accessor and the route's case lookup, never the request body —
+    and `document_id` only after the route resolved it against the case."""
     now = _timestamp()
     return Job(
         id=str(uuid.uuid4()),
@@ -182,16 +212,25 @@ def new_job(kind: str, *, case_id: str, created_by: str) -> Job:
         created_by=created_by,
         created_at=now,
         updated_at=now,
+        document_id=document_id,
     )
 
 
-def find_active(jobs: tuple[Job, ...], kind: str) -> Job | None:
+def find_active(
+    jobs: tuple[Job, ...], kind: str, *, document_id: str | None = None
+) -> Job | None:
     """The queued-or-running job of this kind, if any — the accept endpoint's
-    idempotency rule. One active job per (case, kind): a client that cannot
+    idempotency rule. One active job per (case, kind) — per (case, kind,
+    document) for the document-scoped kinds, because extracting two different
+    uploads concurrently is two jobs, not a duplicate. A client that cannot
     tell whether its first request landed re-POSTs and gets the same job back
     rather than a duplicate pipeline run."""
     for job in jobs:
-        if job.kind == kind and job.status in ACTIVE_STATUSES:
+        if (
+            job.kind == kind
+            and job.status in ACTIVE_STATUSES
+            and job.document_id == document_id
+        ):
             return job
     return None
 
@@ -258,6 +297,8 @@ def job_item(job: Job) -> dict[str, Any]:
         "createdAt": job.created_at,
         "updatedAt": job.updated_at,
     }
+    if job.document_id is not None:
+        item["documentId"] = job.document_id
     if job.failure is not None:
         item["failure"] = {
             "category": job.failure.category,
@@ -283,6 +324,7 @@ def job_from_item(item: Mapping[str, Any]) -> Job:
         )
         raw_result = item.get("result")
         result = dict(raw_result) if isinstance(raw_result, Mapping) else None
+        raw_document_id = item.get("documentId")
         return Job(
             id=str(item["id"]),
             case_id=str(item["caseId"]),
@@ -291,6 +333,7 @@ def job_from_item(item: Mapping[str, Any]) -> Job:
             created_by=str(item["createdBy"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            document_id=str(raw_document_id) if raw_document_id is not None else None,
             attempts=int(item["attempts"]),
             failure=failure,
             result=result,
@@ -314,6 +357,8 @@ def job_json(job: Job) -> dict[str, object]:
         "createdAt": job.created_at,
         "updatedAt": job.updated_at,
     }
+    if job.document_id is not None:
+        body["documentId"] = job.document_id
     if job.failure is not None:
         body["failure"] = {
             "category": job.failure.category,
@@ -333,13 +378,19 @@ def job_json(job: Job) -> dict[str, object]:
 
 
 def job_message(job: Job) -> dict[str, object]:
-    """The exact message body. Identifiers only — see the module docstring."""
-    return {
+    """The exact message body. Identifiers only — see the module docstring.
+    `documentId` appears exactly when the job carries one (the
+    document-scoped kinds), so the version-1 shape for every earlier kind is
+    byte-identical to what it always was."""
+    body: dict[str, object] = {
         "version": MESSAGE_VERSION,
         "jobId": job.id,
         "caseId": job.case_id,
         "kind": job.kind,
     }
+    if job.document_id is not None:
+        body["documentId"] = job.document_id
+    return body
 
 
 def parse_job_message(payload: object) -> JobMessage:
@@ -354,13 +405,17 @@ def parse_job_message(payload: object) -> JobMessage:
     job_id = payload.get("jobId")
     case_id = payload.get("caseId")
     kind = payload.get("kind")
+    document_id = payload.get("documentId")
     if (
         not isinstance(job_id, str)
         or not isinstance(case_id, str)
         or not isinstance(kind, str)
+        or not (document_id is None or isinstance(document_id, str))
     ):
         raise ValidationError("job message is not valid")
-    return JobMessage(job_id=job_id, case_id=case_id, kind=kind)
+    return JobMessage(
+        job_id=job_id, case_id=case_id, kind=kind, document_id=document_id
+    )
 
 
 # ── The dispatch loop ───────────────────────────────────────────

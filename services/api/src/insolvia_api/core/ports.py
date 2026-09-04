@@ -13,6 +13,7 @@ from typing import Protocol
 
 from insolvia_core.cases import Case
 
+from insolvia_api.core.extraction import ExtractionModelResult, ExtractionRequest
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.packets import Packet
@@ -130,6 +131,27 @@ class ReviewModel(Protocol):
     """
 
     def review(self, document: str) -> ReviewModelResult: ...
+
+
+class ExtractionModel(Protocol):
+    """Runs one document-extraction model call (issues 8.7/8.8, under
+    ADR 0019's posture — the same worker, key, and model seam as ReviewModel).
+
+    The request is core/extraction.ExtractionRequest — the document's own
+    bytes plus the fixed per-kind instruction and schema; the answer is the
+    raw structured output plus the model that produced it, coerced and
+    re-validated by core/extraction's per-kind parser on the way back.
+    Implemented by adapters/anthropic (the real call — worker image only,
+    per ADR 0015's heavy-dependency rule) and adapters/memory (tests, and
+    any laptop without a key).
+
+    Failure contract, mirroring ReviewModel's: an implementation raises
+    JobError for a failure a retry cannot change (a rejected key, the model
+    declining, an answer the schema cannot hold) and lets anything transient
+    (rate limits, 5xx, network) propagate so SQS redelivery retries the job.
+    """
+
+    def extract(self, request: ExtractionRequest) -> ExtractionModelResult: ...
 
 
 class JobQueue(Protocol):

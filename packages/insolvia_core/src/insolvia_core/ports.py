@@ -452,6 +452,24 @@ class DocumentBlobStore(Protocol):
         """
         ...
 
+    def get_bytes(self, storage_ref: str) -> bytes | None:
+        """Read one object whole — the extraction worker's read (8.7/8.8),
+        and the one read path that is not a presigned GET.
+
+        Everything about the download flow above exists because a CLIENT
+        fetches the bytes; here the WORKER must hold them, because the model
+        call reads the document itself. Only the pipeline worker's role holds
+        s3:GetObject on source documents (infra/modules/case_documents) — the
+        API's read path stays the brokered presigned URL, so this method must
+        never be reached from a request handler.
+
+        None means absent, under `stat`'s own rule: without s3:ListBucket a
+        missing key answers 403, so "not there" and "not allowed" are not
+        separable at this boundary and an implementation MUST NOT raise for
+        one and return None for the other.
+        """
+        ...
+
 
 class DebtorStore(Protocol):
     """Persists the debtor records of a case (issue 8.5).

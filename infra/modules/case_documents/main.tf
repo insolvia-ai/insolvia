@@ -487,11 +487,20 @@ resource "aws_iam_role_policy" "api_document_access" {
 # modules/case_store's worker grant: a second, narrower principal with a
 # grant of its own, attached from this module's side via the role NAME.
 #
-# Narrower than the API's on purpose: PutObject alone, on the packets prefix
-# alone. No GetObject — the worker never reads objects (downloads are the
-# API's brokered URLs); no PutObjectTagging — a worker write and its record
-# land in the same operation (core/ports.PacketStore), so nothing it stores
-# is ever "unconfirmed"; no ListBucket, the API grant's own argument.
+# Issues 8.7/8.8 widened it with READ: the extraction worker sends a source
+# document's own bytes to the model API (insolvia_core.ports.
+# DocumentBlobStore.get_bytes), so GetObject covers cases/* — which includes
+# the packets the worker itself wrote, harmless because it wrote them. The
+# API's read path stays the brokered presigned URL; this grant never reaches
+# the request-path Lambda.
+#
+# Still narrower than the API's on purpose: PutObject stays on the packets
+# prefix alone (the worker never writes a source document); no
+# PutObjectTagging — a worker write and its record land in the same
+# operation (core/ports.PacketStore), so nothing it stores is ever
+# "unconfirmed"; no ListBucket, the API grant's own argument — which is also
+# why a missing key answers the worker 403, the absent-vs-denied fold
+# get_bytes documents.
 resource "aws_iam_role_policy" "worker_document_access" {
   count = var.worker_role_name == null ? 0 : 1
 
@@ -505,17 +514,26 @@ resource "aws_iam_role_policy" "worker_document_access" {
         Sid    = "CasePacketObjectsWrite"
         Effect = "Allow"
         Action = ["s3:PutObject"]
-        # The packets prefix only — the worker cannot touch uploaded source
+        # The packets prefix only — the worker cannot WRITE uploaded source
         # documents, whose keys sit directly under cases/<case_id>/.
         Resource = "${aws_s3_bucket.documents.arn}/cases/*/packets/*"
       },
       {
-        # GenerateDataKey is what an SSE-KMS PutObject needs; fenced to S3 as
-        # the calling service exactly as the API's grant is, so this can
-        # never become a direct Decrypt of a case row.
+        Sid    = "CaseDocumentObjectsRead"
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        # Source documents AND packets — see the header for why the wider
+        # read is acceptable where the wider write is not.
+        Resource = "${aws_s3_bucket.documents.arn}/cases/*"
+      },
+      {
+        # GenerateDataKey is what an SSE-KMS PutObject needs, Decrypt what
+        # an SSE-KMS GetObject needs; both fenced to S3 as the calling
+        # service exactly as the API's grant is, so this can never become a
+        # direct Decrypt of a case row.
         Sid      = "CasePacketKeyUse"
         Effect   = "Allow"
-        Action   = ["kms:GenerateDataKey", "kms:DescribeKey"]
+        Action   = ["kms:GenerateDataKey", "kms:Decrypt", "kms:DescribeKey"]
         Resource = var.kms_key_arn
         Condition = {
           StringEquals = {

@@ -66,17 +66,27 @@ class MemoryDocumentBlobStore:
         self.content_types: dict[str, str] = {}
 
     def accept_upload(
-        self, storage_ref: str, *, byte_size: int, etag: str = "0" * 32
+        self,
+        storage_ref: str,
+        *,
+        byte_size: int,
+        etag: str = "0" * 32,
+        content: bytes | None = None,
     ) -> None:
         """Stand in for the client's PUT through a minted capability.
 
         NOT part of DocumentBlobStore, and deliberately not: nothing in the
         service ever writes an object — the client does, straight to S3. This
         is the seam a test uses to say "the bytes arrived", and it tags what it
-        writes because every real PUT through one of our URLs does.
+        writes because every real PUT through one of our URLs does. `content`
+        is optional because most tests only care THAT bytes arrived; a test
+        driving the extraction worker passes the bytes it wants get_bytes to
+        answer with.
         """
         self.objects[storage_ref] = StoredBlob(byte_size=byte_size, etag=etag)
         self.tagged.add(storage_ref)
+        if content is not None:
+            self.contents[storage_ref] = content
 
     def _url(self, storage_ref: str, **terms: object) -> str:
         if not storage_ref:
@@ -138,6 +148,12 @@ class MemoryDocumentBlobStore:
         self.objects.pop(storage_ref, None)
         self.tagged.discard(storage_ref)
         self.contents.pop(storage_ref, None)
+
+    def get_bytes(self, storage_ref: str) -> bytes | None:
+        # None both for an object nobody uploaded and for one accepted
+        # without content — the same "absent" the real store answers, which
+        # cannot distinguish missing from denied either (see the port).
+        return self.contents.get(storage_ref)
 
     def put_bytes(self, storage_ref: str, *, content: bytes, content_type: str) -> None:
         # The one server-side write (the packet worker's — see the port). The

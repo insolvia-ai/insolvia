@@ -859,3 +859,112 @@ def test_view_only_can_read_documents_but_not_upload_or_delete(client, firms):
         ).status_code
         == 403
     )
+
+
+# ── Extraction auto-trigger (issue 8.7) ─────────────────────────
+# "A document upload triggers … extraction": completing an upload of an
+# extractable kind queues a `document_extraction` job on its own — and does
+# so BEST-EFFORT, because the upload has already succeeded and must never be
+# reported failed over a pipeline hiccup.
+
+
+def trigger_client(access_log, documents, blobs, firms, job_store, job_queue):
+    app = create_app(
+        ApiDependencies(
+            config=load_config(
+                {
+                    "INSOLVIA_ENV": "local",
+                    "AUTH_ISSUER_URL": ISSUER,
+                    "AUTH_CLIENT_ID": CLIENT_ID,
+                }
+            ),
+            waitlist_store=MemoryWaitlistStore(),
+            mailer=InMemoryMailerClient(),
+            jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
+            case_store=MemoryCaseStore(),
+            firm_store=firms,
+            access_log=access_log,
+            document_store=documents,
+            document_blobs=blobs,
+            job_store=job_store,
+            job_queue=job_queue,
+        )
+    )
+    return app.test_client()
+
+
+def test_completing_an_extractable_upload_triggers_extraction(
+    access_log, documents, blobs, firms
+):
+    from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
+    from insolvia_api.adapters.memory.job_store import MemoryJobStore
+
+    job_store, job_queue = MemoryJobStore(), MemoryJobQueue()
+    client = trigger_client(access_log, documents, blobs, firms, job_store, job_queue)
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id, kind="credit_report")
+
+    assert complete(client, case_id, document["id"]).status_code == 200
+
+    (job,) = job_store.list_for_case(case_id)
+    assert job.kind == "document_extraction"
+    assert job.document_id == document["id"]
+    assert job.created_by == ALICE
+    (message,) = job_queue.messages
+    assert message["documentId"] == document["id"]
+
+    # Idempotent alongside the complete route itself: a retried complete
+    # finds the active job and does not queue a second run.
+    assert complete(client, case_id, document["id"]).status_code == 200
+    assert len(job_store.list_for_case(case_id)) == 1
+    assert len(job_queue.messages) == 1
+
+
+def test_completing_an_unextractable_kind_triggers_nothing(
+    access_log, documents, blobs, firms
+):
+    from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
+    from insolvia_api.adapters.memory.job_store import MemoryJobStore
+
+    job_store, job_queue = MemoryJobStore(), MemoryJobQueue()
+    client = trigger_client(access_log, documents, blobs, firms, job_store, job_queue)
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id, kind="bank_statement")
+    assert complete(client, case_id, document["id"]).status_code == 200
+    assert job_store.list_for_case(case_id) == ()
+    assert job_queue.messages == []
+
+
+def test_a_pipeline_failure_does_not_fail_the_upload(
+    access_log, documents, blobs, firms
+):
+    from insolvia_api.adapters.memory.job_store import MemoryJobStore
+
+    class ExplodingQueue:
+        def enqueue(self, job):
+            raise RuntimeError("sqs is down")
+
+    job_store = MemoryJobStore()
+    client = trigger_client(
+        access_log, documents, blobs, firms, job_store, ExplodingQueue()
+    )
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id, kind="credit_report")
+
+    # The upload's own outcome is untouched…
+    assert complete(client, case_id, document["id"]).status_code == 200
+    # …and the wedged row is marked failed so a later manual accept (or a
+    # re-completed upload) starts clean instead of hitting the idempotency
+    # rule forever.
+    (job,) = job_store.list_for_case(case_id)
+    assert job.status == "failed"
+    assert job.failure.category == "enqueue_failed"
+
+
+def test_without_a_pipeline_the_upload_still_completes(client, blobs, documents):
+    # The default `client` fixture composes no job store or queue at all —
+    # the deployment window jobs.py's 503 describes. Completing must not
+    # even notice.
+    case_id = open_case(client)
+    document = uploaded(client, blobs, case_id, kind="credit_report")
+    assert complete(client, case_id, document["id"]).status_code == 200

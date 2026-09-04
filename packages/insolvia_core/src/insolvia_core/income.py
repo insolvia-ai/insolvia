@@ -1,11 +1,14 @@
-"""Employment and the 106I income summary.
+"""Employment, the dated pay-period history, and the 106I income summary.
 
 This is the one place the data model deliberately refuses to mirror the form
 (docs/reference/case-data-model.md, "Income: 106I is not the income model"):
 the model stores dated pay-period history for the means test and treats 106I
-as a projection. The `pay_period_record` half belongs to the means-test
-milestone; what THIS module owns is the two record types 106I itself prints —
-where the debtor works (Part 1) and the monthly estimate lines (Part 2).
+as a projection. `pay_period_record` is that history — one row per paycheck,
+all three dates required by shape (`pay_date` drives the §101(10A) six-month
+lookback window), written by pay-stub extraction (8.8) through the review
+flow and read by the means-test milestone's CMI calculation. The other two
+record types are what 106I itself prints — where the debtor works (Part 1)
+and the monthly estimate lines (Part 2).
 
 `income_summary` is ENTERED AND CONFIRMED, NOT COMPUTED. Pay-period records
 inform it — the UI should offer the arithmetic — but 106I's question is an
@@ -27,7 +30,7 @@ forms engine renders it in its single box.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
@@ -39,11 +42,13 @@ from .fields import (
     boolean,
     choice,
     form_date,
+    mapping,
     money,
     narrative,
     parse_address,
     text,
 )
+from .provenance import ADDRESSABLE_ID_RE
 
 # 106I Part 1's employment box.
 EMPLOYMENT_STATUSES: Final = ("employed", "not_employed")
@@ -83,6 +88,129 @@ EMPLOYMENT: EntityKind[EmploymentBody] = EntityKind(
     collection="employments",
     sk_prefix="EMPLOYMENT",
     parse_body=parse_employment,
+)
+
+
+# 106I line 5's eight deduction lines, the same vocabulary IncomeSummaryBody's
+# per-line members spell — one enum so a pay stub's itemisation maps onto the
+# form's categories without a lossy translation, exactly as the data model
+# demands. `other` carries the stub's own wording in `description`.
+DEDUCTION_CATEGORIES: Final = (
+    "tax",
+    "mandatory_retirement",
+    "voluntary_retirement",
+    "retirement_loan_repayment",
+    "insurance",
+    "domestic_support",
+    "union_dues",
+    "other",
+)
+
+# How often the stub says the debtor is paid. `other` exists because pay
+# cycles in the wild include daily and irregular piece-work.
+PAY_FREQUENCIES: Final = ("weekly", "biweekly", "semimonthly", "monthly", "other")
+
+
+@dataclass(frozen=True)
+class PayPeriodDeduction:
+    """One itemised deduction line on a stub. Carries its own `id` so
+    provenance addresses it as `deductions[<id>].amount` — position would
+    reattach on reorder, the notice-party rule."""
+
+    id: str
+    category: str | None = None
+    amount: str | None = None
+    description: str | None = None
+
+
+@dataclass(frozen=True)
+class PayPeriodRecordBody:
+    """One paycheck. All three dates are distinct facts: the period earned
+    and the day paid differ, and the means test's lookback window keys on
+    `pay_date` — which is why extraction (8.8) must capture it precisely
+    rather than deriving one date from another."""
+
+    employment_id: str | None = None
+    period_start: str | None = None
+    period_end: str | None = None
+    pay_date: str | None = None
+    gross: str | None = None
+    net: str | None = None
+    frequency: str | None = None
+    deductions: tuple[PayPeriodDeduction, ...] = ()
+
+
+def _parse_deductions(
+    value: object, errors: dict[str, str]
+) -> tuple[PayPeriodDeduction, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        errors["deductions"] = "Must be a list."
+        return ()
+    deductions: list[PayPeriodDeduction] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(value):
+        path = f"deductions[{index}]"
+        entry = mapping(raw, path, errors)
+        # Client-chosen, REQUIRED — the same contract as a claim's
+        # notice_parties, for the same reason: provenance for this row's
+        # fields must name an id the writer already knows.
+        given_id = entry.get("id")
+        if not isinstance(given_id, str) or not ADDRESSABLE_ID_RE.match(given_id):
+            errors[f"{path}.id"] = (
+                "Required, and must be letters, digits, hyphen or underscore — "
+                "generate one per row so provenance can name it."
+            )
+            continue
+        if given_id in seen:
+            errors[f"{path}.id"] = "Duplicate id."
+            continue
+        seen.add(given_id)
+        deductions.append(
+            PayPeriodDeduction(
+                id=given_id,
+                category=choice(
+                    entry.get("category"),
+                    DEDUCTION_CATEGORIES,
+                    f"{path}.category",
+                    errors,
+                ),
+                amount=money(entry.get("amount"), f"{path}.amount", errors),
+                description=text(
+                    entry.get("description"), f"{path}.description", errors
+                ),
+            )
+        )
+    return tuple(deductions)
+
+
+def parse_pay_period_record(payload: Mapping[str, object]) -> PayPeriodRecordBody:
+    errors: dict[str, str] = {}
+    body = PayPeriodRecordBody(
+        employment_id=text(
+            payload.get("employment_id"), "employment_id", errors, limit=64
+        ),
+        period_start=form_date(payload.get("period_start"), "period_start", errors),
+        period_end=form_date(payload.get("period_end"), "period_end", errors),
+        pay_date=form_date(payload.get("pay_date"), "pay_date", errors),
+        gross=money(payload.get("gross"), "gross", errors),
+        net=money(payload.get("net"), "net", errors),
+        frequency=choice(
+            payload.get("frequency"), PAY_FREQUENCIES, "frequency", errors
+        ),
+        deductions=_parse_deductions(payload.get("deductions"), errors),
+    )
+    if errors:
+        raise FieldValidationError(errors)
+    return body
+
+
+PAY_PERIOD_RECORD: EntityKind[PayPeriodRecordBody] = EntityKind(
+    name="pay_period_record",
+    collection="pay_period_records",
+    sk_prefix="PAY_PERIOD",
+    parse_body=parse_pay_period_record,
 )
 
 

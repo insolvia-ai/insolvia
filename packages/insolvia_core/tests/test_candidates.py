@@ -167,6 +167,34 @@ def test_candidate_round_trips_through_its_item() -> None:
     assert candidate_from_item(item) == candidate
 
 
+def test_an_extraction_candidate_round_trips_its_extras() -> None:
+    # The extraction stream's fields (8.7/8.8): source document, confidence,
+    # page anchor. Absent on MCP proposals, carried whole when present.
+    (draft,) = parse_proposals([CREDITOR_PROPOSAL])
+    candidate = create_candidate(
+        draft,
+        case_id="case-1",
+        origin=CandidateOrigin(
+            channel="extraction", client_id="scripted-model", subject="subject-1"
+        ),
+        document_id="doc-1",
+        confidence=0.85,
+        locator={"document_id": "doc-1", "page": 3},
+    )
+    item = candidate_item(candidate)
+    assert item["documentId"] == "doc-1"
+    assert item["confidence"] == 0.85
+    assert item["locator"] == {"document_id": "doc-1", "page": 3}
+    assert candidate_from_item(item) == candidate
+
+
+def test_a_proposal_without_extras_stores_none_of_them() -> None:
+    item = candidate_item(_candidate())
+    assert "documentId" not in item
+    assert "confidence" not in item
+    assert "locator" not in item
+
+
 def test_new_candidates_are_pending_with_the_verified_origin() -> None:
     candidate = _candidate()
     assert candidate.status == PENDING
