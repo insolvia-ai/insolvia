@@ -52,3 +52,12 @@ variable "admin_role_name" {
   type        = string
   default     = null
 }
+
+# The MCP service's Lambda execution role (ADR 0016), or null where there is
+# no MCP Lambda (dev — the local MCP server runs under the developer's own
+# IAM user). Same name-not-ARN shape as the two above.
+variable "mcp_role_name" {
+  description = "MCP Lambda execution role name to grant read-only firm resolution, or null."
+  type        = string
+  default     = null
+}

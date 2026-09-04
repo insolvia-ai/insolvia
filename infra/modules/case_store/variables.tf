@@ -42,6 +42,20 @@ variable "worker_role_name" {
   default     = null
 }
 
+variable "mcp_role_name" {
+  description = <<-EOT
+    Execution role of the MCP service Lambda —
+    module.mcp_service.lambda_role_name (ADR 0016). Same name-not-ARN shape
+    and same reasoning as api_role_name above: the grant attaches from this
+    side, so neither module references the other's resources.
+
+    null in infra/envs/dev, where there is no Lambda — the local MCP server
+    runs under the developer's own IAM user, like the API's dev server.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "point_in_time_recovery" {
   description = <<-EOT
     DynamoDB PITR. On everywhere that holds data worth recovering; off in dev,
