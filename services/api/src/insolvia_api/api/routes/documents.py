@@ -72,14 +72,9 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
-from insolvia_core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
-
-from insolvia_api.api.auth import current_accessor, require_auth, requires
-from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access import Accessor
-from insolvia_api.core.access_log import record_access
-from insolvia_api.core.documents import (
+from insolvia_core.access import Accessor
+from insolvia_core.access_log import record_access
+from insolvia_core.documents import (
     UPLOAD_TAG,
     Document,
     confirm_document,
@@ -88,12 +83,17 @@ from insolvia_api.core.documents import (
     expiry_timestamp,
     parse_document_upload,
 )
-from insolvia_api.core.ports import (
+from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
+from insolvia_core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
+from insolvia_core.ports import (
     AccessLog,
     CaseStore,
     DocumentBlobStore,
     DocumentStore,
 )
+
+from insolvia_api.api.auth import current_accessor, require_auth, requires
+from insolvia_api.api.dependencies import dependencies
 
 logger = logging.getLogger(__name__)
 

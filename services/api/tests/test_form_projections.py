@@ -22,16 +22,6 @@ import os
 from pathlib import Path
 
 import pytest
-from insolvia_api.core.assets import AssetBody
-from insolvia_api.core.cases import Case
-from insolvia_api.core.claims import ClaimBody, NoticeParty
-from insolvia_api.core.codebtors import CodebtorBody, CommunityHouseholdMemberBody
-from insolvia_api.core.contract_leases import ContractLeaseBody
-from insolvia_api.core.creditors import CreditorBody
-from insolvia_api.core.debtors import CreditCounseling, Debtor, OtherName, Venue
-from insolvia_api.core.exemption_claims import ExemptionBody
-from insolvia_api.core.expenses import DependentBody, ExpenseBody, HouseholdBody
-from insolvia_api.core.fields import Address, PersonName
 from insolvia_api.core.form_fill import Check, Option, Text, WidgetStates, fill_form
 from insolvia_api.core.form_projections import (
     CaseFile,
@@ -41,8 +31,18 @@ from insolvia_api.core.form_projections import (
     project,
 )
 from insolvia_api.core.form_templates import get_form, latest_form
-from insolvia_api.core.income import EmploymentBody, IncomeSummaryBody
-from insolvia_api.core.petitions import (
+from insolvia_core.assets import AssetBody
+from insolvia_core.cases import Case
+from insolvia_core.claims import ClaimBody, NoticeParty
+from insolvia_core.codebtors import CodebtorBody, CommunityHouseholdMemberBody
+from insolvia_core.contract_leases import ContractLeaseBody
+from insolvia_core.creditors import CreditorBody
+from insolvia_core.debtors import CreditCounseling, Debtor, OtherName, Venue
+from insolvia_core.exemption_claims import ExemptionBody
+from insolvia_core.expenses import DependentBody, ExpenseBody, HouseholdBody
+from insolvia_core.fields import Address, PersonName
+from insolvia_core.income import EmploymentBody, IncomeSummaryBody
+from insolvia_core.petitions import (
     FilingProfessionalBody,
     HazardousProperty,
     PetitionBody,
@@ -50,7 +50,7 @@ from insolvia_api.core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
-from insolvia_api.core.sofa import (
+from insolvia_core.sofa import (
     BusinessConnection,
     CharitableContribution,
     ClosedAccount,

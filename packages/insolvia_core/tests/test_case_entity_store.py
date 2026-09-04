@@ -6,15 +6,15 @@ and the key construction is shared with entity_item."""
 from __future__ import annotations
 
 import pytest
-from insolvia_api.adapters.memory.case_entity_store import MemoryCaseEntityStore
-from insolvia_api.core.case_entities import (
+from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
+from insolvia_core.case_entities import (
     CaseEntity,
     create_entity,
     parse_entity,
     replace_entity,
 )
-from insolvia_api.core.creditors import CREDITOR
-from insolvia_api.core.expenses import EXPENSE
+from insolvia_core.creditors import CREDITOR
+from insolvia_core.expenses import EXPENSE
 
 CASE = "case-0001"
 OTHER_CASE = "case-0002"

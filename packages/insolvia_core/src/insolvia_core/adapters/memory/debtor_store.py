@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_api.core.debtors import Debtor, role_order
+from insolvia_core.debtors import Debtor, role_order
 
 
 def _order(debtor: Debtor) -> tuple[int, str]:

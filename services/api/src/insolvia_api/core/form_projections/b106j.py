@@ -19,7 +19,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Final
 
-from ..expenses import DependentBody, ExpenseBody, HouseholdBody
+from insolvia_core.expenses import DependentBody, ExpenseBody, HouseholdBody
+
 from ..form_fill import Option, Text
 from ..form_templates import FormRelease
 from .b106i import monthly_income_line_12

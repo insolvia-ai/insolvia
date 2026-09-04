@@ -5,8 +5,8 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_api.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_api.core.case_entities import (
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.case_entities import (
     CaseEntity,
     EntityKind,
     entity_from_item,
@@ -14,7 +14,7 @@ from insolvia_api.core.case_entities import (
     list_order,
     sort_key,
 )
-from insolvia_api.core.cases import partition_key
+from insolvia_core.cases import partition_key
 
 
 class DynamoDbCaseEntityStore:

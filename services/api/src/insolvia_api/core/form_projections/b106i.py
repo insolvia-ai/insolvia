@@ -13,10 +13,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Final
 
-from ..debtors import Debtor
+from insolvia_core.debtors import Debtor
+from insolvia_core.income import EmploymentBody, IncomeSummaryBody
+
 from ..form_fill import FieldFill, Option, Text
 from ..form_templates import FormRelease
-from ..income import EmploymentBody, IncomeSummaryBody
 from .shared import (
     CaseFile,
     FieldValues,

@@ -11,7 +11,7 @@ Every identifier below is obviously fake. This repo is public.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.documents import (
+from insolvia_core.documents import (
     CONTENT_TYPES,
     KINDS,
     MAX_BYTE_SIZE,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_api.core.access_log import AccessEvent
+from insolvia_core.access_log import AccessEvent
 
 
 class MemoryAccessLog:

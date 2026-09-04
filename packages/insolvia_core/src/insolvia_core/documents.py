@@ -42,9 +42,8 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
+from insolvia_core.cases import partition_key
 from insolvia_core.errors import FieldValidationError, ValidationError
-
-from insolvia_api.core.cases import partition_key
 
 # What the uploader says this is. Required rather than defaulted, because
 # extraction dispatches on it: a record whose kind is unknown is one somebody

@@ -6,7 +6,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from insolvia_api.core.documents import UPLOAD_TAG, StoredBlob
+from insolvia_core.documents import UPLOAD_TAG, StoredBlob
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from insolvia_api.core.access import Accessor, may_see_case
-from insolvia_api.core.cases import (
+from insolvia_core.access import Accessor, may_see_case
+from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
     Case,

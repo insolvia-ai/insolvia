@@ -34,9 +34,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
+from insolvia_core.cases import partition_key
 from insolvia_core.errors import ValidationError
-
-from insolvia_api.core.cases import partition_key
 
 # The download name a browser saves the packet under. One name for every
 # packet on purpose: the object key carries the identity (two server-minted

@@ -10,7 +10,7 @@ provenance invariants, and tax_id.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.debtors import (
+from insolvia_core.debtors import (
     FILING_ROLES,
     Debtor,
     create_debtor,
@@ -23,8 +23,8 @@ from insolvia_api.core.debtors import (
     role_order,
     sort_key,
 )
-from insolvia_api.core.provenance import ADDRESSABLE_ID_RE
 from insolvia_core.errors import FieldValidationError
+from insolvia_core.provenance import ADDRESSABLE_ID_RE
 
 TYPED = {"source": "staff_typed"}
 

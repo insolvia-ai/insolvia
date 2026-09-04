@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from insolvia_api.core.case_entities import CaseEntity, EntityKind, list_order
+from insolvia_core.case_entities import CaseEntity, EntityKind, list_order
 
 
 class MemoryCaseEntityStore:

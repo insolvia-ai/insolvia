@@ -19,9 +19,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from insolvia_core.cases import Case
 from insolvia_core.firms import Firm, FirmUser, permits
-
-from insolvia_api.core.cases import Case
 
 
 @dataclass(frozen=True)

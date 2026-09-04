@@ -25,14 +25,17 @@ import time
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
-from insolvia_api.adapters.memory.access_log import MemoryAccessLog
-from insolvia_api.adapters.memory.case_store import MemoryCaseStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
-from insolvia_api.core.access import Accessor, may_see_case
-from insolvia_api.core.cases import (
+from insolvia_api.core.config import load_config
+from insolvia_core.access import Accessor, may_see_case
+from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
     Case,
@@ -43,9 +46,6 @@ from insolvia_api.core.cases import (
     decode_cursor,
     encode_cursor,
 )
-from insolvia_api.core.config import load_config
-from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
-from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.errors import ValidationError
 from insolvia_core.firms import (
     CASES,
@@ -805,7 +805,7 @@ def test_case_item_carries_the_by_firm_keys(client, store):
 
 
 def test_an_assignment_carries_the_by_assignee_keys(client, store):
-    from insolvia_api.core.cases import assignment_from_item, assignment_item
+    from insolvia_core.cases import assignment_from_item, assignment_item
 
     case_id = open_case(client)["id"]
     assignment = store.assignments[(case_id, ALICE)]

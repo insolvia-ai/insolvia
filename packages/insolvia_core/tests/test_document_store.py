@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from insolvia_api.adapters.memory.document_store import MemoryDocumentStore
-from insolvia_api.core.documents import Document
+from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_core.documents import Document
 
 CASE_ID = "00000000-0000-4000-8000-0000000000ca"
 OTHER_CASE_ID = "00000000-0000-4000-8000-0000000000cb"

@@ -9,7 +9,6 @@ a truncated or mis-cased line here is a bankruptcy notice that never arrives.
 from __future__ import annotations
 
 import pytest
-from insolvia_api.core.case_entities import CaseEntity
 from insolvia_api.core.creditor_matrix import (
     COMMON_FORMAT,
     DISTRICT_VARIANCES,
@@ -18,8 +17,9 @@ from insolvia_api.core.creditor_matrix import (
     generate_creditor_matrix,
     matrix_json,
 )
-from insolvia_api.core.creditors import CREDITOR, CreditorBody
-from insolvia_api.core.fields import Address
+from insolvia_core.case_entities import CaseEntity
+from insolvia_core.creditors import CREDITOR, CreditorBody
+from insolvia_core.fields import Address
 
 CASE_ID = "00000000-0000-4000-8000-00000000ca5e"
 

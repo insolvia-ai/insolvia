@@ -4,21 +4,21 @@ import logging
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
-from insolvia_core.errors import NotFoundError, ValidationError
-from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
-
-from insolvia_api.api.auth import current_accessor, require_auth, requires
-from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.access import Accessor
-from insolvia_api.core.access_log import record_access
-from insolvia_api.core.debtors import (
+from insolvia_core.access import Accessor
+from insolvia_core.access_log import record_access
+from insolvia_core.debtors import (
     create_debtor,
     debtor_json,
     parse_debtor,
     parse_filing_role,
     replace_debtor,
 )
-from insolvia_api.core.ports import AccessLog, CaseStore, DebtorStore
+from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
+from insolvia_core.ports import AccessLog, CaseStore, DebtorStore
+
+from insolvia_api.api.auth import current_accessor, require_auth, requires
+from insolvia_api.api.dependencies import dependencies
 
 logger = logging.getLogger(__name__)
 

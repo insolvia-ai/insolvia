@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from insolvia_api.adapters.memory.case_store import MemoryCaseStore
-from insolvia_api.core.cases import Case
+from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.cases import Case
+
 from insolvia_api.core.packets import Packet, list_order
 
 
