@@ -189,22 +189,34 @@ describe('the cases screen', () => {
     const levelOnes = headings.filter((node) => node.props['aria-level'] === 1);
     expect(levelOnes).toHaveLength(1);
   });
-  it("offers a way into each case's intake, named by the case", async () => {
-    // A list of identical "Open intake" links is the classic screen-reader
-    // failure here: WCAG 2.4.4 asks that a link make sense out of context.
+  it('gives each case ONE link, to the case itself', async () => {
+    // A row used to carry six — intake, team, documents, packet, matrix,
+    // review — because `/cases/<id>` did not exist for it to point at. They now
+    // live in the case's own rail, so the list is a list again.
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
+    // Waits on the row's own link rather than on the table: `Table`'s native
+    // leaf asserts `table`/`row`/`cell` through a web-only prop that the native
+    // testing renderer does not surface as a role, and the claim here is about
+    // links anyway.
+    await screen.findByText('Chapter 7 · NDCA');
 
-    const link = await screen.findByLabelText('Open intake for the chapter 7 case in NDCA');
-    expect(link).toBeTruthy();
+    const links = screen.getAllByRole('link').filter((node) => {
+      const href: unknown = node.props.href;
+      return typeof href === 'string' && href.startsWith('/cases/');
+    });
+    expect(links).toHaveLength(1);
+    expect(links[0]?.props.href).toBe(`/cases/${CASE.id}`);
   });
 
-  it("offers a way into each case's documents, named distinctly", async () => {
-    // A row now carries TWO links. Both need names that stand alone AND
-    // differ from each other — two rows of "Open intake"/"Documents" read to a
-    // screen reader as four links with two names between them.
+  it("names that link by the case, not by the word 'open'", async () => {
+    // WCAG 2.4.4: a link has to make sense read out of its row. Nine rows of
+    // "Open case" are nine links with one name between them.
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
-    expect(await screen.findByLabelText(`Documents for case ${CASE.id}`)).toBeTruthy();
-    expect(screen.getByLabelText('Open intake for the chapter 7 case in NDCA')).toBeTruthy();
+    const link = await screen.findByLabelText(
+      `Chapter 7 case in NDCA, opened 2026-08-04 by ${CASE.createdBy}`,
+    );
+    // WCAG 2.5.3: the visible text is where the accessible name starts.
+    expect(link.props.href).toBe(`/cases/${CASE.id}`);
   });
 });

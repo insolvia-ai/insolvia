@@ -108,6 +108,13 @@ export function AppShell({ children, maxContentWidth = contentMaxWidth }: AppShe
           <Link href="/" style={navLink}>
             Home
           </Link>
+          {/* Cases belongs in the primary nav because a case is what this
+              product is about. It was reachable only through two buttons on
+              the home screen, which put the app's central object one hop
+              further away than the firm's settings. */}
+          <Link href="/cases" style={navLink}>
+            Cases
+          </Link>
           {showFirmLink ? (
             <Link href="/firm" style={navLink}>
               Firm

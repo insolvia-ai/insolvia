@@ -1,25 +1,20 @@
-import { useLocalSearchParams } from 'expo-router';
-
 import { RequireFirm } from '@/components/require-firm';
-import { RequireSession } from '@/components/require-session';
+import { useCase } from '@/components/case-shell';
 import { Team } from '@/screens/team';
 
 /**
  * `/cases/<id>/team` — who is linked to a case.
  *
- * Same shape as the sibling routes: the guards live here, the parameter is
- * narrowed here, and the screen stays a screen. `RequireFirm` is the second
- * guard because assignment is entirely about the caller's firm — see that
- * component for why "signed in" and "in a firm" are separate states.
+ * The session guard and the `caseId` narrowing moved up to `_layout.tsx`.
+ * `RequireFirm` stays here, and only here: assignment is entirely about the
+ * caller's firm, and "signed in" and "in a firm" are separate states — see that
+ * component. Hoisting it to the layout would make every case screen demand a
+ * firm to render, which is a stronger claim than any of the others needs.
  */
 export default function CaseTeamRoute() {
-  const params = useLocalSearchParams();
-  const raw = params.caseId;
-  const caseId = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '');
+  const { caseId } = useCase();
 
   return (
-    <RequireSession>
-      <RequireFirm>{(membership) => <Team caseId={caseId} membership={membership} />}</RequireFirm>
-    </RequireSession>
+    <RequireFirm>{(membership) => <Team caseId={caseId} membership={membership} />}</RequireFirm>
   );
 }

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
-import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -443,7 +442,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           : '');
 
   return (
-    <AppShell>
+    <>
       <Heading level={1}>Filing packet</Heading>
       <Text style={[styles.body, muted]}>
         Assembles the full individual Chapter 7 set — the petition, every schedule, the
@@ -595,7 +594,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           </View>
         )
       ) : null}
-    </AppShell>
+    </>
   );
 }
 

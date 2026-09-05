@@ -4,6 +4,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import type { AuthConfig } from '@/config/environment';
 import { writeRefreshToken } from '@/session';
 import {
+  caseBody,
   installFakeBrowser,
   jsonResponse,
   TEST_AUTH_CONFIG,
@@ -57,6 +58,13 @@ describe('the intake collection sections', () => {
       const method = init?.method ?? 'GET';
       const match = routes.find((route) => route.method === method && url.includes(route.fragment));
       if (match === undefined) {
+        // The case LAYOUT reads the case itself before any screen under it
+        // renders. It is checked after the suite's own routes so a test can
+        // still answer either URL its own way, and only for GET — the methods
+        // this suite cares about are all declared above.
+        if (method === 'GET' && url.endsWith(`/v1/cases/${CASE_ID}`)) {
+          return Promise.resolve(jsonResponse(200, caseBody(CASE_ID)));
+        }
         return Promise.reject(new Error(`unexpected ${method} ${url}`));
       }
       return Promise.resolve(match.respond());

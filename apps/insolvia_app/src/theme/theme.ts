@@ -67,6 +67,32 @@ export const fontSizes = {
 export const contentMaxWidth = 720;
 
 /**
+ * The cap for a screen that is a WORKSPACE rather than a document: a case's
+ * navigation rail beside its content, and the wide tables that live in there —
+ * the creditor matrix, the document list, the extraction queue.
+ *
+ * It exists because {@link contentMaxWidth} is a *reading* measure, chosen so a
+ * line of prose stays short enough to track. Applying it to a creditor matrix
+ * is the same number answering a different question: that table carries a name,
+ * an address, an account number and an amount, and 720 cannot hold them without
+ * wrapping every row into a paragraph. Both screens were capped at 720 because
+ * only one number existed.
+ *
+ * 1180 is a cap, not a width — `AppShell` still centers, so nothing stretches
+ * on a very wide display, and {@link CaseShell} stacks the rail above the
+ * content below `railBreakpoint` rather than squeezing both.
+ */
+export const workspaceMaxWidth = 1180;
+
+/**
+ * Below this viewport width a case's rail stops sitting beside the content and
+ * stacks above it. Measured, not guessed: the rail is 232 and the content needs
+ * ~560 before its tables start wrapping, which with the shell's own padding is
+ * a little over 880.
+ */
+export const railBreakpoint = 900;
+
+/**
  * The scheme-independent tokens, re-exported for `StyleSheet.create` blocks.
  *
  * A `StyleSheet.create` block runs once at module load, outside any component,

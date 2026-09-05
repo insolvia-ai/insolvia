@@ -15,10 +15,12 @@ export {
   contentMaxWidth,
   fontSizes,
   radii,
+  railBreakpoint,
   spacing,
   themeFor,
   typography,
   useTheme,
+  workspaceMaxWidth,
 } from './theme';
 export type { Theme } from './theme';
 

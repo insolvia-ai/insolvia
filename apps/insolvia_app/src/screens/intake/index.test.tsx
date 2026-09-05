@@ -4,6 +4,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import type { AuthConfig } from '@/config/environment';
 import { writeRefreshToken } from '@/session';
 import {
+  withCaseShell,
   installFakeBrowser,
   jsonResponse,
   routeFetch,
@@ -53,7 +54,9 @@ describe('the intake screen', () => {
   /** Signs in and renders the intake, returning the fetch mock so a test can
    * read the request bodies — which is what most of these need. */
   function signedIn(handlers: Readonly<Record<string, () => Response>>) {
-    const route = routeFetch({ '/oauth2/token': tokenEndpointResponse, ...handlers });
+    const route = routeFetch(
+      withCaseShell(CASE_ID, { '/oauth2/token': tokenEndpointResponse, ...handlers }),
+    );
     const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     renderRouter('src/app', { initialUrl: `/cases/${CASE_ID}/intake` });

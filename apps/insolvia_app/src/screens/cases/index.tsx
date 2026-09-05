@@ -1,11 +1,11 @@
-import { ApiValidationException, permits } from '@insolvia-ai/api-client';
+import { ApiValidationException } from '@insolvia-ai/api-client';
 import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
-import { Button, Field, Input, RadioGroup } from '@insolvia-ai/design-system';
+import { Badge, Button, Field, Input, RadioGroup, Table } from '@insolvia-ai/design-system';
+import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
@@ -17,6 +17,19 @@ const CHAPTERS: readonly { readonly value: CaseChapter; readonly label: string }
   { value: 11, label: 'Chapter 11' },
   { value: 12, label: 'Chapter 12' },
 ];
+
+/** How a case's own status reads, rather than the wire's snake_case. */
+const STATUS_LABEL: Record<Case['status'], string> = {
+  intake: 'In intake',
+  ready_to_file: 'Ready to file',
+  filed: 'Filed',
+};
+
+const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
+  intake: 'neutral',
+  ready_to_file: 'success',
+  filed: 'primary',
+};
 
 type ListState =
   | { readonly kind: 'loading' }
@@ -207,13 +220,6 @@ function CaseList({
   colleagues: readonly FirmColleague[];
 }) {
   const theme = useTheme();
-  const membership = useMembership();
-  // The extraction-review link is the ONE gated link here: the feature
-  // defaults to hidden across the firm (issue 8.9 — it stays invisible until
-  // granted), so an ungated link would 403 for most users. `permits` is a
-  // courtesy, never a control — the screen and the API both re-check.
-  const mayReviewExtraction =
-    membership != null && permits(membership.permissions.extraction_review, 'view_only');
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   // A subject the directory does not carry still renders — as the subject. A
   // case opened by somebody since removed from the firm is history, and hiding
@@ -226,101 +232,74 @@ function CaseList({
   }
 
   return (
-    // `role`, not `accessibilityRole`: RN's AccessibilityRole union has no
-    // list/listitem, but the ARIA `role` prop passes straight through
-    // react-native-web to a real <ul>/<li> pair.
-    <View role="list" style={styles.list}>
-      {cases.map((item) => (
-        <View role="listitem" key={item.id} style={styles.listItem}>
-          <Text style={[styles.caseTitle, { color: theme.colors.ink }]}>
-            Chapter {item.chapter} · {item.district}
-          </Text>
-          {/*
-            The case id is shown because it is the only handle a user has on a
-            case until 8.5 gives them a debtor name to recognise it by. It is a
-            server-generated uuid and identifies nothing about a person.
-          */}
-          <Text style={[styles.caseMeta, muted]}>
-            {item.status.replace(/_/g, ' ')} · opened {item.createdAt.slice(0, 10)} by{' '}
-            {openedBy(item.createdBy)} · {item.id}
-          </Text>
-          {/*
-            `Link`s, not `Text` with `onPress`: react-native-web gives a
-            tabIndex only to elements that ask for a role it recognises, and a
-            link is one of them — these render real <a href>s the keyboard can
-            reach and the browser can open in a new tab.
+    /*
+      A TABLE, and one link per row.
 
-            EACH ACCESSIBLE NAME CARRIES THE CASE. Two rows of "Open intake"
-            and "Documents" is the classic screen-reader failure, and WCAG
-            2.4.4 is about a link making sense out of context. The visible
-            word stays the start of each name, which is what WCAG 2.5.3 asks
-            for.
-          */}
-          <Link
-            href={`/cases/${item.id}/intake`}
-            aria-label={`Open intake for the chapter ${item.chapter} case in ${item.district}`}
-            style={[
-              styles.caseLink,
-              { color: theme.colors.primary, fontFamily: theme.typography.body },
-            ]}
-          >
-            Open intake
-          </Link>
-          <Link
-            href={`/cases/${item.id}/team`}
-            aria-label={`Who is on case ${item.id}`}
-            style={[
-              styles.caseLink,
-              { color: theme.colors.primary, fontFamily: theme.typography.body },
-            ]}
-          >
-            Who is on it
-          </Link>
-          <Link
-            href={`/cases/${item.id}/documents`}
-            aria-label={`Documents for case ${item.id}`}
-            style={[
-              styles.caseLink,
-              { color: theme.colors.primary, fontFamily: theme.typography.body },
-            ]}
-          >
-            Documents
-          </Link>
-          <Link
-            href={`/cases/${item.id}/packet`}
-            aria-label={`Filing packet for case ${item.id}`}
-            style={[
-              styles.caseLink,
-              { color: theme.colors.primary, fontFamily: theme.typography.body },
-            ]}
-          >
-            Filing packet
-          </Link>
-          <Link
-            href={`/cases/${item.id}/creditor-matrix`}
-            aria-label={`Creditor matrix for case ${item.id}`}
-            style={[
-              styles.caseLink,
-              { color: theme.colors.primary, fontFamily: theme.typography.body },
-            ]}
-          >
-            Creditor matrix
-          </Link>
-          {mayReviewExtraction ? (
-            <Link
-              href={`/cases/${item.id}/extraction-review`}
-              aria-label={`Review extracted records for case ${item.id}`}
-              style={[
-                styles.caseLink,
-                { color: theme.colors.primary, fontFamily: theme.typography.body },
-              ]}
-            >
-              Review extracted
-            </Link>
-          ) : null}
-        </View>
-      ))}
-    </View>
+      Each row used to carry six links — intake, team, documents, packet,
+      creditor matrix, review — because `/cases/<id>` did not exist and there
+      was nothing else for a row to point at. At 44dp apiece that made a list of
+      nine cases some 2,400px of stacked navigation, and it made this screen the
+      only route into any case screen: moving from intake to documents meant
+      coming back here and finding the row again. The six now live in the case's
+      own rail (`CaseShell`), which leaves a row free to be a row.
+
+      `Table` from the design system rather than Views: its native leaf asserts
+      `table`/`row`/`columnheader`/`cell` by hand, which is exactly the wiring
+      that is easy to get wrong and impossible to see.
+    */
+    <Table.Root dense>
+      <Table.Head>
+        <Table.Row>
+          <Table.HeaderCell>Case</Table.HeaderCell>
+          <Table.HeaderCell width={90}>Chapter</Table.HeaderCell>
+          <Table.HeaderCell width={90}>District</Table.HeaderCell>
+          <Table.HeaderCell width={140}>Status</Table.HeaderCell>
+          <Table.HeaderCell width={150}>Opened</Table.HeaderCell>
+        </Table.Row>
+      </Table.Head>
+      <Table.Body>
+        {cases.map((item) => (
+          <Table.Row key={item.id}>
+            <Table.Cell>
+              {/*
+                The row's ONE link, and the accessible name carries the case
+                rather than repeating "Open case" nine times — WCAG 2.4.4 is
+                about a link making sense out of context. The visible text is
+                the start of that name, which is what 2.5.3 asks for.
+
+                It is a `Link` and not a pressable row because these render real
+                `<a href>`s: middle-click and open-in-new-tab are how anyone
+                works two cases at once.
+              */}
+              <Link
+                href={`/cases/${item.id}`}
+                aria-label={`Chapter ${item.chapter} case in ${item.district}, opened ${item.createdAt.slice(0, 10)} by ${openedBy(item.createdBy)}`}
+                style={[
+                  styles.caseLink,
+                  { color: theme.colors.primary, fontFamily: theme.typography.body },
+                ]}
+              >
+                Chapter {item.chapter} · {item.district}
+              </Link>
+            </Table.Cell>
+            <Table.Cell width={90}>{String(item.chapter)}</Table.Cell>
+            <Table.Cell width={90}>{item.district}</Table.Cell>
+            <Table.Cell width={140}>
+              <Badge intent={STATUS_INTENT[item.status]} size="sm">
+                {STATUS_LABEL[item.status]}
+              </Badge>
+            </Table.Cell>
+            <Table.Cell width={150}>
+              <Text style={[styles.caseMeta, muted]}>
+                {item.createdAt.slice(0, 10)}
+                {'\n'}
+                {openedBy(item.createdBy)}
+              </Text>
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
   );
 }
 
@@ -342,10 +321,6 @@ const styles = StyleSheet.create({
   },
   caseMeta: {
     fontSize: fontSizes.caption,
-  },
-  caseTitle: {
-    fontSize: fontSizes.label,
-    fontWeight: '600',
   },
   chapterLabel: {
     fontSize: fontSizes.label,
@@ -369,11 +344,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg,
     marginTop: spacing.sm,
-  },
-  list: {
-    gap: spacing.md,
-  },
-  listItem: {
-    gap: spacing.xs,
   },
 });
