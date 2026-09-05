@@ -4,6 +4,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import type { AuthConfig } from '@/config/environment';
 import { writeRefreshToken } from '@/session';
 import {
+  caseBody,
   installFakeBrowser,
   jsonResponse,
   TEST_AUTH_CONFIG,
@@ -120,6 +121,16 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response {
           ],
         }))
     )();
+  }
+  // The case LAYOUT's two reads, which every screen under /cases/[caseId] now
+  // mounts above it. They come before the throw and after the branches above,
+  // so a test that wants a named debtor or a filed case still overrides them by
+  // matching earlier. See `caseShellRoutes` in @/session/testing.
+  if (url.endsWith('/debtors')) {
+    return jsonResponse(200, { debtors: [] });
+  }
+  if (url.endsWith(CASE_ID)) {
+    return jsonResponse(200, caseBody(CASE_ID));
   }
   throw new Error(`unexpected ${method} ${url}`);
 }

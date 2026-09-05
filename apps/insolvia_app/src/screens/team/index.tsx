@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
-import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -90,7 +89,7 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
     state.kind === 'ready' ? new Set(state.assignees.map((a) => a.subject)) : new Set<string>();
 
   return (
-    <AppShell>
+    <>
       <Heading level={1}>Who is on this case</Heading>
 
       {notice === null ? null : (
@@ -182,7 +181,7 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
           {state.kind === 'loading' ? 'Loading who is on this case…' : state.message}
         </Text>
       )}
-    </AppShell>
+    </>
   );
 }
 

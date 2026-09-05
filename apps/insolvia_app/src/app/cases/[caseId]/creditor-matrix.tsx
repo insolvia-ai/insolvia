@@ -1,25 +1,16 @@
-import { useLocalSearchParams } from 'expo-router';
-
-import { RequireSession } from '@/components/require-session';
+import { useCase } from '@/components/case-shell';
 import { CreditorMatrixScreen } from '@/screens/creditor-matrix';
 
 /**
  * `/cases/<id>/creditor-matrix` — generate and save the court's creditor
  * mailing matrix (issue #282).
  *
- * The same shape as its siblings: the session guard lives here in `src/app/`
- * where the routes are, and the parameter is narrowed to a plain `string` so
- * the screen stays renderable from a test — see `documents.tsx` for the full
- * argument.
+ * The session guard and the `caseId` narrowing both moved up to `_layout.tsx`,
+ * which wraps this whole subtree — so the route reads the case the shell
+ * already loaded instead of re-deriving it from the URL.
  */
 export default function CaseCreditorMatrixRoute() {
-  const params = useLocalSearchParams();
-  const raw = params.caseId;
-  const caseId = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '');
+  const { caseId } = useCase();
 
-  return (
-    <RequireSession>
-      <CreditorMatrixScreen caseId={caseId} />
-    </RequireSession>
-  );
+  return <CreditorMatrixScreen caseId={caseId} />;
 }

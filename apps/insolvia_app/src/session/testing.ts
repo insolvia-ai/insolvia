@@ -221,3 +221,85 @@ export function jsonResponse(status: number, body: unknown): Response {
     json: () => Promise.resolve(body),
   } as unknown as Response;
 }
+
+/**
+ * The reads {@link CaseShell} makes for every screen under `/cases/[caseId]`.
+ *
+ * A case screen's test renders through the real router, so it now mounts the
+ * case layout too — and that layout will not render its children until
+ * `GET /v1/cases/{id}` answers. Without these a screen test hangs on "Opening
+ * case…" and fails on an assertion that has nothing to do with what broke,
+ * which is exactly the confusing failure this helper exists to prevent.
+ *
+ * **Spread these LAST.** `routeFetch` takes the FIRST fragment that matches and
+ * `/v1/cases/<id>` is a prefix of every URL beneath it, so a test's own
+ * `/v1/cases/<id>/documents` handler has to be declared before this one or it
+ * will never be reached:
+ *
+ * ```ts
+ * signedIn({ [`/v1/cases/${CASE_ID}/documents`]: docs, ...caseShellRoutes(CASE_ID) });
+ * ```
+ *
+ * Both answers are overridable by declaring the same fragment earlier — a test
+ * about a named debtor supplies its own `/debtors`, and one about a filed case
+ * supplies its own case.
+ */
+export interface CaseOverrides {
+  readonly status?: string;
+  readonly chapter?: number;
+  readonly district?: string;
+}
+
+/**
+ * A `GET /v1/cases/{id}` success body, in the API's wire shape.
+ *
+ * Exported separately from {@link caseShellRoutes} because the case screens
+ * test the API two different ways — some with `routeFetch`'s fragment map, some
+ * with a hand-written `respond()` that dispatches on the URL's shape — and both
+ * need the same case to come back. One fixture, so the two cannot drift.
+ */
+export function caseBody(caseId: string, overrides: CaseOverrides = {}): Record<string, unknown> {
+  return {
+    id: caseId,
+    createdBy: '00000000-0000-4000-8000-000000000001',
+    chapter: overrides.chapter ?? 7,
+    district: overrides.district ?? 'NDCA',
+    status: overrides.status ?? 'intake',
+    createdAt: '2026-08-04T10:00:00.000000Z',
+    updatedAt: '2026-08-04T10:00:00.000000Z',
+  };
+}
+
+/**
+ * A test's own handlers, plus whatever {@link CaseShell} still needs.
+ *
+ * Merging these by hand rather than with a spread, because a spread gets it
+ * wrong in both directions and silently. `routeFetch` takes the FIRST fragment
+ * that matches, so `/v1/cases/<id>` — a prefix of every URL beneath it — has to
+ * come last or it swallows the screen's own reads. But spreading it last also
+ * *overwrites* a same-named key, so a test that supplies its own `/debtors`
+ * would quietly get the empty default instead. This adds only the fragments the
+ * caller has not already claimed, and appends them at the end.
+ */
+export function withCaseShell(
+  caseId: string,
+  handlers: Readonly<Record<string, () => Response>>,
+  overrides: CaseOverrides = {},
+): Readonly<Record<string, () => Response>> {
+  const merged: Record<string, () => Response> = { ...handlers };
+  for (const [fragment, respond] of Object.entries(caseShellRoutes(caseId, overrides))) {
+    if (!(fragment in merged)) merged[fragment] = respond;
+  }
+  return merged;
+}
+
+export function caseShellRoutes(
+  caseId: string,
+  overrides: CaseOverrides = {},
+): Readonly<Record<string, () => Response>> {
+  return {
+    // Before the case itself: the id is a prefix of this URL.
+    [`/v1/cases/${caseId}/debtors`]: () => jsonResponse(200, { debtors: [] }),
+    [`/v1/cases/${caseId}`]: () => jsonResponse(200, caseBody(caseId, overrides)),
+  };
+}

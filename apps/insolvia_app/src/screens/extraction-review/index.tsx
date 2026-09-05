@@ -6,7 +6,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
-import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -290,22 +289,22 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
 
   if (membership === undefined) {
     return (
-      <AppShell>
+      <>
         <Heading level={1}>Extraction review</Heading>
         <Text style={[styles.body, muted]}>Loading…</Text>
-      </AppShell>
+      </>
     );
   }
 
   if (!mayView) {
     return (
-      <AppShell>
+      <>
         <Heading level={1}>Extraction review</Heading>
         <Text style={[styles.body, muted]}>
           Extraction review is not enabled for your account. A firm administrator can grant it from
           the firm screen.
         </Text>
-      </AppShell>
+      </>
     );
   }
 
@@ -327,7 +326,7 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
   };
 
   return (
-    <AppShell>
+    <>
       <Heading level={1}>Extraction review</Heading>
       <Text style={[styles.body, muted]}>
         Nothing extracted enters the case until a person confirms it. Each record below was read
@@ -495,7 +494,7 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
           })}
         </View>
       ) : null}
-    </AppShell>
+    </>
   );
 }
 

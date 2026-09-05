@@ -29,13 +29,14 @@
 
 [data-theme='dark'] {
   --color-accent: #d2a857;
-  --color-bg: #071b31;
-  --color-brand: #ffffff;
-  --color-card: #141a1f;
-  --color-ink: #faf9f6;
-  --color-line: #ffffff33;
-  --color-muted: #c9d0d8;
+  --color-bg: #0b1622;
+  --color-brand: #e9eef4;
+  --color-card: #122032;
+  --color-ink: #e9eef4;
+  --color-line: #2e4459;
+  --color-muted: #889cb1;
   --color-primary: #d2a857;
-  --color-primary-text: #071b31;
-  --color-surface-alt: #0b2a4a;
+  --color-primary-text: #0b1622;
+  --color-surface-alt: #1b2d42;
+  --color-warning: #e0913c;
 }

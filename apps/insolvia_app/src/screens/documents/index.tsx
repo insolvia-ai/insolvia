@@ -14,7 +14,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
-import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { openDownload, pickFile } from '@/screens/documents/browser';
 import type { PickedFile } from '@/screens/documents/browser';
@@ -263,7 +262,7 @@ export function Documents({ caseId }: { readonly caseId: string }) {
   const danger = { color: theme.colors.danger, fontFamily: theme.typography.body };
 
   return (
-    <AppShell>
+    <>
       <Heading level={1}>Case documents</Heading>
 
       {/*
@@ -412,7 +411,7 @@ export function Documents({ caseId }: { readonly caseId: string }) {
           </View>
         </AlertDialog.Popup>
       </AlertDialog.Root>
-    </AppShell>
+    </>
   );
 }
 
