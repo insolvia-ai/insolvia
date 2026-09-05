@@ -43,3 +43,20 @@ export const brandColors = {
     warning: '#E0913C',
   },
 } as const;
+
+/**
+ * The brand type families, from brand/fonts.json.
+ *
+ * Two consumers, for the same reason `brandColors` has two: the app's own
+ * `useTheme()` reads them as `typography`, and `ThemeProvider` takes them as
+ * `fonts` so the design system's native leaves follow. A family stated in
+ * only one of the two renders branded headings over system body text.
+ *
+ * Naming a family does not load it. The faces are self-hosted .woff2 under
+ * `public/fonts`, declared @font-face in `public/index.html`.
+ */
+export const brandFonts = {
+  heading: 'Archivo, ui-sans-serif, system-ui, sans-serif',
+  body: '"Public Sans", ui-sans-serif, system-ui, sans-serif',
+  mono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+} as const;

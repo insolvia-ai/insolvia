@@ -31,6 +31,9 @@ import { join, resolve } from 'node:path';
 /** The brand overrides, relative to the repo root. */
 export const BRAND = 'brand/colors.json';
 
+/** The brand's typefaces, relative to the repo root. Companion to {@link BRAND}. */
+export const BRAND_FONTS = 'brand/fonts.json';
+
 const TOKENS_PACKAGE = '@insolvia-ai/tokens';
 
 /**
@@ -49,6 +52,10 @@ const COLORS_SPECIFIER = `${TOKENS_PACKAGE}/colors.json`;
 /** The brightnesses every surface here carries a mapping for. */
 export const MODES = ['light', 'dark'] as const;
 export type Mode = (typeof MODES)[number];
+
+/** The type roles `@insolvia-ai/tokens` declares, and this file must state. */
+export const FONT_ROLES = ['heading', 'body', 'mono'] as const;
+export type FontRole = (typeof FONT_ROLES)[number];
 
 export type Scheme = Readonly<Record<string, string>>;
 export type Palette = Readonly<Record<Mode, Scheme>>;
@@ -161,6 +168,43 @@ function asObject(value: JsonValue | undefined, where: string): JsonObject {
 }
 
 /** Resolved from the module's own location, so behaviour does not vary by cwd. */
+/**
+ * The brand's type families: `{ heading, body, mono }`.
+ *
+ * A flat object rather than the per-scheme shape the colours use, because a
+ * typeface does not change between light and dark — the one thing every
+ * consumer here agrees on regardless of scheme.
+ *
+ * Every role the design system declares must be present. Unlike the colours,
+ * where naming only what Insolvia moves is the point, a partially-stated set of
+ * families is the failure this file exists to prevent: `heading` overridden and
+ * `body` left to fall through renders a branded title over system body text and
+ * looks like a loading state that never finished.
+ */
+export function fonts(root: string): Readonly<Record<FontRole, string>> {
+  const path = join(root, BRAND_FONTS);
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    throw new Error(`Cannot read ${BRAND_FONTS}. It is the source of every generated theme here.`);
+  }
+
+  const document = asObject(JSON.parse(raw) as JsonValue, BRAND_FONTS);
+  const result: Record<string, string> = {};
+  for (const role of FONT_ROLES) {
+    const value = document[role];
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new Error(
+        `${BRAND_FONTS}: ${role} is missing or not a string. All of ` +
+          `${FONT_ROLES.join(', ')} must be stated — see the file's own header.`,
+      );
+    }
+    result[role] = value;
+  }
+  return result as Readonly<Record<FontRole, string>>;
+}
+
 export function repoRoot(): string {
   return resolve(import.meta.dirname, '..');
 }
