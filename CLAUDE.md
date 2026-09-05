@@ -122,6 +122,19 @@ of them until dev-setup runs** — if a skill you expect is missing, that is why
 ./scripts/dev-setup.sh
 ```
 
+**A git worktree is a fresh clone for this purpose**, and this is the common
+case: a worktree checks out *tracked* files, and both halves of an install are
+ignored, so it starts with the `insolvia-*` skills and none of the rest. Nothing
+errors — the skills are just absent from the list, which is a quiet way to lose
+`design-system-catalogue` on exactly the branch where a screen is being written.
+The `SessionStart` hook now repairs this automatically by symlinking them from
+the primary checkout; if you are ever in a worktree missing them, that repair is
+one offline command, and it does **not** rewrite `skills-lock.json`:
+
+```bash
+./scripts/dev-skills.sh --link
+```
+
 They were vendored once, and 131 files of other people's documentation sat in
 the tree being reviewed as though we owned it and updated by hand. One
 consequence is worth keeping in mind: the installer takes each source at its

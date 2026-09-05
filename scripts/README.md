@@ -10,6 +10,7 @@ Two layers — a shared base plus thin per-package scripts:
 | Script | Scope | Does |
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check), **and the agent skills in `.agents/skills/`** — installed from `skills-lock.json`, not committed (see below) |
+| `scripts/dev-skills.sh` | Agent skills (all checkouts, **worktrees included**) | Makes the skills in `skills-lock.json` present in THIS checkout — both halves: the files under `.agents/skills/` and the `.claude/skills/<name>` symlinks that are what actually make an agent see them. In a **git worktree** it symlinks them from the primary checkout (offline, instant, and it leaves `skills-lock.json` alone); elsewhere, or when the primary has nothing to link, it installs from the network. `--link` never touches the network, `--install` forces a fresh install, `--check` reports. Called by `dev-setup.sh` and by the `SessionStart` hook, so a new worktree repairs itself |
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
@@ -56,7 +57,21 @@ and the installer is [`skills`](https://github.com/vercel-labs/skills), run via
 They were committed once: 131 files of third-party documentation in the tree,
 carried through reviews as if we owned it. The lock is the part worth tracking.
 
-Two things to know:
+**A git worktree is a fresh clone for this purpose.** It checks out tracked
+files, and both halves of an install are ignored — so a worktree gets the four
+tracked `insolvia-*` skills and none of the rest. Nothing errors; the skills are
+simply not in the agent's list, which is a quiet way to lose
+`design-system-catalogue`, the skill whose whole job is stopping a screen from
+hand-rolling a component the design system already ships. `dev-skills.sh` is
+what closes that: it symlinks each skill from the primary checkout rather than
+re-fetching 27 of them, and the `SessionStart` hook runs it, so a worktree
+repairs itself at the start of the first session in it. To do it by hand:
+
+```bash
+./scripts/dev-skills.sh --link
+```
+
+Three things to know:
 
 - **The layout matters.** dev-setup installs with
   `--agent universal --agent claude-code`, which puts the real directory at
@@ -68,6 +83,10 @@ Two things to know:
   lock records. So the step is reproducible in *which* skills you get, not in
   their content, and a changed lock means an upstream skill moved. Read that
   diff rather than discarding it.
+- **Both halves count as "installed".** `.agents/skills/<name>` holds the files;
+  `.claude/skills/<name>` is the symlink an agent actually reads. Checking only
+  the first is how a worktree reports itself set up while loading not one skill,
+  so `dev-skills.sh --check` tests both.
 
 To add one, install it and commit the resulting lock change:
 
