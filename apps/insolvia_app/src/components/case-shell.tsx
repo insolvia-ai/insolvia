@@ -106,6 +106,11 @@ export function caseTitle(matter: Case, debtors: readonly Debtor[]): string {
     .map((debtor) => personName(debtor.name))
     .filter((name): name is string => name !== null);
   if (names.length > 0) return names.join(' & ');
+  return chapterAndDistrict(matter);
+}
+
+/** The case's chapter and district, as one line. Also `caseTitle`'s fallback. */
+export function chapterAndDistrict(matter: Case): string {
   return `Chapter ${matter.chapter} · ${matter.district}`;
 }
 
@@ -202,6 +207,11 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   const current = pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : '';
   const stacked = width < railBreakpoint;
   const title = caseTitle(matter, debtors);
+  // `caseTitle` falls back to "Chapter 7 · NDCA" when intake has not named a
+  // debtor yet, which is exactly what the line below says — so on a fresh case
+  // the rail printed it twice, one above the other. Only worth showing when
+  // the title is a person.
+  const titleIsDebtors = title !== chapterAndDistrict(matter);
 
   return (
     <CaseContext.Provider value={{ caseId, matter, debtors, reload: load }}>
@@ -214,14 +224,16 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
               </Sidebar.Head>
 
               <View style={styles.identity}>
-                <Text
-                  style={[
-                    styles.identityLine,
-                    { color: theme.colors.muted, fontFamily: theme.typography.body },
-                  ]}
-                >
-                  Chapter {matter.chapter} · {matter.district}
-                </Text>
+                {titleIsDebtors ? (
+                  <Text
+                    style={[
+                      styles.identityLine,
+                      { color: theme.colors.muted, fontFamily: theme.typography.body },
+                    ]}
+                  >
+                    {chapterAndDistrict(matter)}
+                  </Text>
+                ) : null}
                 <View style={styles.status}>
                   <Badge intent={STATUS_INTENT[matter.status]} size="sm">
                     {STATUS_LABEL[matter.status]}

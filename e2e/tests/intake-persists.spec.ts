@@ -48,22 +48,36 @@ test.describe('staging intake', () => {
     await signIn(page);
 
     // ── 1. A case to work in ──────────────────────────────────────────────
+    //
+    // TWO HOPS, not one. A case-list row used to carry six links — one of them
+    // straight to intake — because `/cases/<id>` did not exist for it to point
+    // at. It does now, so the row has a single link to the case and the six
+    // live in the case's own rail. Reaching intake is: open the case, then
+    // choose the section.
     await page.goto('/cases');
-    const intakeLink = page.getByRole('link', { name: /^Open intake for the chapter/ }).first();
+    const caseLink = page.getByRole('link', { name: /^Chapter \d+ case in/ }).first();
 
-    if ((await intakeLink.count()) === 0) {
+    if ((await caseLink.count()) === 0) {
       // First run against a fresh environment: open one. The chapter radio
       // defaults to 7, so only the district needs an answer.
       await page.getByRole('textbox', { name: 'Filing district' }).fill('NDCA');
       await page.getByRole('button', { name: 'Open case' }).click();
     }
     await expect(
-      intakeLink,
-      "the case list should offer a way into a case's intake — its absence means " +
-        'either the list did not load or the link lost its accessible name',
+      caseLink,
+      'the case list should offer a way into a case — its absence means either ' +
+        'the list did not load or the row link lost its accessible name',
     ).toBeVisible();
 
-    // ── 2. Type into the intake ───────────────────────────────────────────
+    // ── 2. Into the case, then into its intake ────────────────────────────
+    await caseLink.click();
+    const intakeLink = page.getByRole('link', { name: 'Intake' }).first();
+    await expect(
+      intakeLink,
+      "the case shell's rail should offer every section of the case — its " +
+        'absence means the layout did not render, which would leave the six ' +
+        'case screens reachable from nowhere',
+    ).toBeVisible({ timeout: 15_000 });
     await intakeLink.click();
     const firstName = page.getByRole('textbox', { name: 'First name' }).first();
     await expect(

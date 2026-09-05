@@ -220,6 +220,33 @@ describe('the case overview', () => {
     expect(levelOnes).toHaveLength(1);
   });
 
+  it('does not print the chapter and district twice on an unnamed case', async () => {
+    // `caseTitle` falls back to "Chapter 7 · NDCA" before intake names a
+    // debtor, and the rail's identity line said the same thing directly
+    // beneath it — so a fresh case stacked the string on itself. Caught by
+    // opening a real one, not by this suite.
+    //
+    // TWO is correct, not one: the rail's title and the page's own <h1> are
+    // the same name by design (that is what tells you which case you are in on
+    // the other six screens). THREE was the defect.
+    ready();
+    await screen.findByText('Where this case stands');
+
+    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(2);
+  });
+
+  it('keeps the chapter and district once a debtor DOES name the case', async () => {
+    // The line earns its place again as soon as the title is a person: once,
+    // in the rail, under "Marisol Reyes".
+    ready({
+      [`/v1/cases/${CASE_ID}/debtors`]: () =>
+        jsonResponse(200, { debtors: [debtor('Marisol', 'Reyes')] }),
+    });
+    await screen.findByText('Where this case stands');
+
+    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(1);
+  });
+
   it('reports what each section actually holds', async () => {
     ready({
       [`/v1/cases/${CASE_ID}/assignees`]: () =>
