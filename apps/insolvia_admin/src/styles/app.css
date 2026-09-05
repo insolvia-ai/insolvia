@@ -1,6 +1,12 @@
 @import 'tailwindcss';
 @import '@insolvia-ai/design-system/theme.css';
 
+/* Insolvia's brand, layered over the design system's deliberately unbranded
+   base theme. MUST come after the import above — an override that lands first
+   is simply overwritten. Generated from brand/colors.json by `npm run tokens`;
+   do not edit brand.css by hand. */
+@import './brand.css';
+
 /* Required: let Tailwind v4 scan the design system's SOURCE for the utility
    classes its components use — node_modules is excluded from scanning by
    default, and omitting this silently drops every component's styles.

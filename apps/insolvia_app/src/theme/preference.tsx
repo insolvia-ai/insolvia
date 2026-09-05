@@ -1,4 +1,3 @@
-import { colors } from '@insolvia-ai/tokens';
 import type { ColorSchemeName } from '@insolvia-ai/tokens';
 import { ThemeProvider } from '@insolvia-ai/design-system';
 import type { ReactNode } from 'react';
@@ -6,6 +5,8 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { useColorScheme } from 'react-native';
 
 import { persistentStore, readFrom, writeTo } from '@/platform/browser';
+
+import { brandColors } from './brand-colors';
 
 /**
  * What the user chose, which is not the same as what they get: `system` means
@@ -69,9 +70,22 @@ function storedPreference(): ThemePreference {
  * used to its limit: overrides are per-scheme, so making the two schemes
  * identical is what makes the OS scheme stop mattering.
  *
- * `colors[scheme]` is a COMPLETE `ColorScheme`, which matters: on native the
- * derived states (`primaryHover`, …) are pre-computed rather than blended at
- * use, so a partial override would move `primary` and leave its hover behind.
+ * `brandColors[scheme]` carries the derived states (`primaryHover`, …)
+ * alongside their base roles, which matters: on native those are pre-computed
+ * rather than blended at use, so an override that moved `primary` without them
+ * would leave its hover behind. It is otherwise PARTIAL on purpose — every
+ * role Insolvia does not claim falls through to the package's own default,
+ * which is what keeps a tokens release able to improve them.
+ *
+ * ## Why there is no longer a no-override case
+ *
+ * There used to be one: `system` passed a frozen `{}`, letting the package's
+ * leaves use their own defaults. That was correct while those defaults WERE
+ * Insolvia's — the app and the package shipped the same palette. From tokens
+ * 0.5.0 they do not: the base theme is deliberately unbranded, so passing
+ * nothing now renders the design system's monochrome chrome next to this app's
+ * navy. The brand is therefore supplied in every case, and `system` differs
+ * only in letting the two slots hold DIFFERENT schemes so the OS still decides.
  *
  * ## Placement
  *
@@ -101,13 +115,20 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
     [preference, scheme, setPreference],
   );
 
-  // `system` passes the shared frozen empty object rather than a fresh one, so
-  // the package keeps its identity fast-path — `nativeColorsWith` returns the
-  // token object itself when there are no overrides, and a new `{}` on every
-  // render would defeat every `React.memo` below it.
+  // `system` hands each slot its own scheme and lets the package's leaves ask
+  // the OS, exactly as they would unthemed. An explicit preference puts the
+  // CHOSEN scheme in BOTH slots — the leaves still ask the OS, and now both
+  // answers are the same one, which is what makes the OS scheme stop mattering.
+  //
+  // Both arms are memoised on the two inputs that decide them, so the object
+  // identity is stable across renders. That still matters for the package's
+  // `React.memo` boundaries even though neither arm can be the old frozen-empty
+  // fast path any more.
   const overrides = useMemo(
     () =>
-      preference === 'system' ? NO_OVERRIDES : { light: colors[scheme], dark: colors[scheme] },
+      preference === 'system'
+        ? BRAND_BY_OS_SCHEME
+        : { light: brandColors[scheme], dark: brandColors[scheme] },
     [preference, scheme],
   );
 
@@ -118,7 +139,17 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const NO_OVERRIDES = Object.freeze({});
+/**
+ * The brand with each slot holding its own scheme — the `system` preference,
+ * where the package's leaves consult the OS and get the right half either way.
+ *
+ * Hoisted and frozen so the `system` arm is one stable object for the life of
+ * the module rather than a fresh literal per render.
+ */
+const BRAND_BY_OS_SCHEME = Object.freeze({
+  light: brandColors.light,
+  dark: brandColors.dark,
+});
 
 /**
  * The preference and the control over it. For the toggle; components that just

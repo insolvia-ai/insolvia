@@ -1,4 +1,3 @@
-import { colors } from '@insolvia-ai/tokens';
 import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
@@ -12,6 +11,7 @@ import {
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
+import { brandColors } from '@/theme/brand-colors';
 
 let mockAuthConfig: AuthConfig | null = null;
 
@@ -98,11 +98,18 @@ describe('the theme toggle', () => {
     // OS which palette to use; the app answers by making both palettes the
     // same one. Remove the `ThemeProvider` from `ThemePreferenceProvider` and
     // this is the test that fails while everything else still passes.
+    //
+    // It asserts the BRAND value, not the tokens default, which makes it the
+    // one test that also proves Insolvia's palette reaches the design system's
+    // own components. Those two used to be the same assertion; from tokens
+    // 0.5.0 the package's base theme is deliberately unbranded, so a
+    // `ThemeProvider` that passed nothing would render the package's monochrome
+    // primary here and this expectation would catch it.
     signedIn();
     const user = userEvent.setup();
 
     const cta = await screen.findByRole('button', { name: 'Start a case' });
-    expect(flattenedBackground(cta)).toBe(colors.light.primary);
+    expect(flattenedBackground(cta)).toBe(brandColors.light.primary);
 
     await user.press(
       screen.getByRole('button', { name: 'Theme: following your device. Switch to light.' }),
@@ -110,7 +117,7 @@ describe('the theme toggle', () => {
     await user.press(screen.getByRole('button', { name: 'Theme: light. Switch to dark.' }));
 
     expect(flattenedBackground(screen.getByRole('button', { name: 'Start a case' }))).toBe(
-      colors.dark.primary,
+      brandColors.dark.primary,
     );
   });
 

@@ -1,12 +1,19 @@
-// Rewrites the colour slots of Cognito's managed-login branding from the
-// installed `@insolvia-ai/tokens`.
+// Rewrites the colour slots of Cognito's managed-login branding from
+// Insolvia's brand palette — the installed `@insolvia-ai/tokens` with
+// `brand/colors.json` layered on top (see `brand-palette.ts`).
 //
 //   npm run tokens
 //   npm run tokens:check
 //
 // `--check` reconciles in memory and exits non-zero if the committed document
-// has drifted, so CI gates both a hand-edit and a tokens bump that forgot to
-// regenerate.
+// has drifted, so CI gates a hand-edit, a tokens bump, and a brand change that
+// forgot to regenerate.
+//
+// It reads the MERGED palette rather than the tokens package directly because
+// the sign-in page is one of four surfaces wearing the same brand, and it is
+// the only one a user meets before the app has loaded. Reading the unbranded
+// base here is what would make Cognito the odd one out — grey where the app is
+// navy — with nothing in the tree to say so.
 //
 // ── Why this is here and not in the design-system repo ──────────────────────
 //
@@ -21,29 +28,22 @@
 // and renders them; this file owns the mapping of those values onto AWS's
 // document, which is infrastructure nobody else can see.
 //
-// ── Why it reads colors.json rather than the package's TypeScript ───────────
+// ── Why it does not re-derive anything ──────────────────────────────────────
 //
-// `@insolvia-ai/tokens` also exports `src/tokens.ts`, which is the nicer
-// import and is what the app uses. It is unavailable here: Node refuses to
-// strip TypeScript types for any file under `node_modules`
-// (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING), and this script runs as plain
-// `node` with no loader. Metro and Vite have no such limit, which is why the
-// app and the marketing site are unaffected and this is the only consumer that
-// needs the JSON.
-//
-// The alternative was to re-derive the colours here from the palette — the
-// blend maths for the hover/active states in particular. That is the version
-// worth refusing: the sign-in page's colours would be computed by a second
-// implementation, in a second repo, and would drift the first time either
-// changed, with nothing to say so.
+// The alternative was to compute the colours here from a palette — the blend
+// maths for the hover/active states in particular. That is the version worth
+// refusing: the sign-in page's colours would be produced by a second
+// implementation and would drift the first time either changed, with nothing
+// to say so. `brand-palette.ts` resolves every role once, for every surface.
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+
+import { MODES, palette, repoRoot, BRAND } from './brand-palette.ts';
+import type { Palette } from './brand-palette.ts';
 
 const OUT = 'infra/modules/auth/managed-login-settings.json';
-const TOKENS_PACKAGE = '@insolvia-ai/tokens';
-const COLORS_SPECIFIER = `${TOKENS_PACKAGE}/colors.json`;
+const SOURCE = `the installed @insolvia-ai/tokens and ${BRAND}`;
 const REGEN_COMMAND = 'npm run tokens';
 
 /**
@@ -140,10 +140,6 @@ const COGNITO_COLORS: ReadonlyArray<readonly [string, string]> = [
   ['components.alert.{mode}.error.borderColor', 'danger'],
 ];
 
-/** The brightnesses the managed-login document carries a mapping for. */
-const MODES = ['light', 'dark'] as const;
-type Mode = (typeof MODES)[number];
-
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type JsonObject = { [key: string]: JsonValue };
 
@@ -152,20 +148,20 @@ function main(args: string[]): void {
   const root = repoRoot();
   const file = join(root, OUT);
 
-  const colors = loadColors();
+  const colors = palette(root);
   const current = readFileSync(file, 'utf8');
   const reconciled = reconcile(colors, current);
 
   if (current === reconciled) {
-    process.stdout.write(`${OUT} is in sync with ${TOKENS_PACKAGE}.\n`);
+    process.stdout.write(`${OUT} is in sync with ${SOURCE}.\n`);
     return;
   }
 
   if (check) {
-    process.stderr.write(`${OUT} has drifted from the installed ${TOKENS_PACKAGE}.\n\n`);
+    process.stderr.write(`${OUT} has drifted from ${SOURCE}.\n\n`);
     process.stderr.write(
-      'Either the file was hand-edited, or the tokens dependency was bumped\n' +
-        'without regenerating. Run:\n\n',
+      'Either the file was hand-edited, the tokens dependency was bumped, or\n' +
+        `${BRAND} changed — in each case without regenerating. Run:\n\n`,
     );
     process.stderr.write(`  ${REGEN_COMMAND}\n`);
     process.exitCode = 1;
@@ -174,43 +170,6 @@ function main(args: string[]): void {
 
   writeFileSync(file, reconciled);
   process.stdout.write(`wrote ${OUT}\n`);
-}
-
-/**
- * The colour tables the design system published, as data.
- *
- * Resolved through the package's `exports` rather than by a hand-built
- * `node_modules/...` path, so a hoisting change cannot silently point this at
- * nothing — and an absent dependency fails here, loudly, naming the package.
- */
-function loadColors(): Record<Mode, Record<string, string>> {
-  let path: string;
-  try {
-    path = fileURLToPath(import.meta.resolve(COLORS_SPECIFIER));
-  } catch {
-    throw new Error(
-      `Cannot resolve ${COLORS_SPECIFIER}. Is ${TOKENS_PACKAGE} installed? ` +
-        'It comes from github.com/insolvia-ai/design-system via GitHub Packages; ' +
-        'see scripts/github-packages-auth.sh if the install 401s.',
-    );
-  }
-
-  const parsed = JSON.parse(readFileSync(path, 'utf8')) as JsonValue;
-  const document = asObject(parsed, COLORS_SPECIFIER);
-
-  const colors = {} as Record<Mode, Record<string, string>>;
-  for (const mode of MODES) {
-    const scheme = asObject(document[mode], `${COLORS_SPECIFIER}:${mode}`);
-    const values: Record<string, string> = {};
-    for (const [role, value] of Object.entries(scheme)) {
-      if (typeof value !== 'string') {
-        throw new Error(`${COLORS_SPECIFIER}: ${mode}.${role} is not a string.`);
-      }
-      values[role] = value;
-    }
-    colors[mode] = values;
-  }
-  return colors;
 }
 
 /**
@@ -230,7 +189,7 @@ function loadColors(): Record<Mode, Record<string, string>> {
  * prevent — the sign-in page would quietly regain a patch of AWS blue and
  * nothing would say so.
  */
-function reconcile(colors: Record<Mode, Record<string, string>>, current: string): string {
+function reconcile(colors: Palette, current: string): string {
   const root = asObject(JSON.parse(current) as JsonValue, OUT);
 
   for (const mode of MODES) {
@@ -240,8 +199,9 @@ function reconcile(colors: Record<Mode, Record<string, string>>, current: string
       const hex = values[role];
       if (hex === undefined) {
         throw new Error(
-          `${COLORS_SPECIFIER}: no such semantic role "${role}" in ${mode}. ` +
-            'The tokens package dropped or renamed it — update COGNITO_COLORS.',
+          `No such semantic role "${role}" in ${mode}. Neither the installed ` +
+            `@insolvia-ai/tokens nor ${BRAND} defines it — the tokens package ` +
+            'dropped or renamed it, so update COGNITO_COLORS.',
         );
       }
       setColor(root, template.replace('{mode}', key).split('.'), cognitoColor(hex));
@@ -283,11 +243,6 @@ function asObject(value: JsonValue | undefined, where: string): JsonObject {
     throw new Error(`${where}: expected an object.`);
   }
   return value;
-}
-
-/** Resolved from the module's own location, so behaviour does not vary by cwd. */
-function repoRoot(): string {
-  return resolve(import.meta.dirname, '..');
 }
 
 main(process.argv.slice(2));

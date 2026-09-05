@@ -1,7 +1,14 @@
 name: Cognito branding · PR
 
-# The drift gate for infra/modules/auth/managed-login-settings.json — the
-# colours of Cognito's hosted sign-in page.
+# The drift gate for every surface generated from Insolvia's brand palette:
+# the colours of Cognito's hosted sign-in page
+# (infra/modules/auth/managed-login-settings.json), the app's ThemeProvider
+# overrides, and the marketing site's and admin portal's brand.css.
+#
+# The job KEEPS the name `Cognito branding` even though it now gates more than
+# Cognito. `protect-main` matches a required check by exact name (see the
+# insolvia-branch-protection skill), so renaming it here silently orphans the
+# gate on `main` — a rename has to be made in the ruleset first.
 #
 # It used to be a step inside design-system-pr.yml, because the token generator
 # that wrote this file lived in packages/insolvia_tokens next door. Both left
@@ -16,6 +23,12 @@ name: Cognito branding · PR
 # hand-edit, as before — and it also fails when @insolvia-ai/tokens is bumped
 # in package.json without regenerating, which is the new way for the sign-in
 # page to silently fall out of step with the app.
+#
+# Since the design system's base theme became deliberately unbranded (tokens
+# 0.5.0), it gates a second input too: brand/colors.json, which is where
+# Insolvia's navy and brass now live. Four surfaces are generated from it and
+# none of them share an import, so this check is the only thing that can notice
+# one falling behind the other three.
 #
 # No `on.pull_request.paths:` filter, deliberately — see
 # `.github/actions/changed-paths/action.yml`. This job is a required status
@@ -51,9 +64,16 @@ jobs:
         uses: ./.github/actions/changed-paths
         with:
           paths: |
-            # The document under gate, and the tool that writes it.
+            # The documents under gate, and the tools that write them.
             infra/modules/auth/managed-login-settings.json
+            apps/insolvia_app/src/theme/brand-colors.ts
+            apps/insolvia_marketing/app/styles/brand.css
+            apps/insolvia_admin/src/styles/brand.css
             tool/**
+            # The palette every one of them is generated FROM. A change here
+            # with no regeneration is the exact drift this gate exists to
+            # catch, and it touches nothing else in the tree.
+            brand/colors.json
             # The root manifest and lockfile ARE the input now: they pin which
             # @insolvia-ai/tokens version the colours are checked against. A
             # tokens bump with no regeneration changes nothing else in the
