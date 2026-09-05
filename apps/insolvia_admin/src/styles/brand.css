@@ -25,6 +25,12 @@
   --color-primary: #0b2a4a;
   --color-primary-text: #ffffff;
   --color-surface-alt: #efede6;
+
+  --font-heading: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 }
 
 [data-theme='dark'] {

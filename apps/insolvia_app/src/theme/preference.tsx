@@ -6,7 +6,7 @@ import { useColorScheme } from 'react-native';
 
 import { persistentStore, readFrom, writeTo } from '@/platform/browser';
 
-import { brandColors } from './brand-colors';
+import { brandColors, brandFonts } from './brand-colors';
 
 /**
  * What the user chose, which is not the same as what they get: `system` means
@@ -124,11 +124,19 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
   // identity is stable across renders. That still matters for the package's
   // `React.memo` boundaries even though neither arm can be the old frozen-empty
   // fast path any more.
+  //
+  // `fonts` rides along in BOTH arms. The package's native leaves read the type
+  // families through this context rather than out of `@insolvia-ai/tokens`
+  // (their `StyleSheet.create` runs once at module load, where no context can
+  // reach), so a brand stated only in `themeFor` would give the app's own
+  // components Insolvia's faces and every package Button, Badge and Table the
+  // system sans. Families do not vary by scheme, so it is the same object in
+  // both arms.
   const overrides = useMemo(
     () =>
       preference === 'system'
         ? BRAND_BY_OS_SCHEME
-        : { light: brandColors[scheme], dark: brandColors[scheme] },
+        : { light: brandColors[scheme], dark: brandColors[scheme], fonts: brandFonts },
     [preference, scheme],
   );
 
@@ -149,6 +157,7 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
 const BRAND_BY_OS_SCHEME = Object.freeze({
   light: brandColors.light,
   dark: brandColors.dark,
+  fonts: brandFonts,
 });
 
 /**

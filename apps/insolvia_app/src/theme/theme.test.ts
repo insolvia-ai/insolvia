@@ -1,7 +1,7 @@
-import { colors, radii, spacing } from '@insolvia-ai/tokens';
+import { colors, radii, spacing, typography as baseTypography } from '@insolvia-ai/tokens';
 
 import { contentMaxWidth, fontSizes, themeFor } from '@/theme';
-import { brandColors } from '@/theme/brand-colors';
+import { brandColors, brandFonts } from '@/theme/brand-colors';
 
 /**
  * Theme wiring.
@@ -79,5 +79,49 @@ describe('the content column', () => {
     // The cap itself is the property that matters — asserting the rendered
     // width at a desktop resolution would only re-measure it.
     expect(contentMaxWidth).toBeLessThan(1200);
+  });
+});
+
+/**
+ * The type families.
+ *
+ * They have their own describe because they reach the screen through TWO seams
+ * that nothing else connects: this app's `themeFor`, which its own components
+ * read, and `ThemeProvider`'s `fonts`, which the design system's native leaves
+ * read. Stating a family in only one renders Insolvia's headings over the
+ * package's system-sans buttons and badges, which looks like a half-finished
+ * load rather than a bug — see `preference.tsx`.
+ */
+describe('the brand type families', () => {
+  it.each(['light', 'dark'] as const)('states all three families in %s', (scheme) => {
+    expect(themeFor(scheme).typography).toEqual(brandFonts);
+  });
+
+  it('does not vary the families by scheme', () => {
+    // Colours flip; typefaces do not. A brand that shipped two would be a bug
+    // nothing else here would catch.
+    expect(themeFor('light').typography).toEqual(themeFor('dark').typography);
+  });
+
+  it.each(['heading', 'body', 'mono'] as const)(
+    'ends the %s stack in the generic the base theme used',
+    (role) => {
+      // A face that fails to load must fall back to what shipped before it, not
+      // to the browser's default serif. Each stack keeps the package's own
+      // last-resort generic as its final entry.
+      const base = baseTypography[role];
+      const generic = base.slice(base.lastIndexOf(',') + 1).trim();
+      expect(brandFonts[role].endsWith(generic)).toBe(true);
+    },
+  );
+
+  it('names a real family before the fallbacks', () => {
+    // Guards the case where a stack is edited down to only generics, which
+    // would typecheck, pass every other assertion here, and quietly un-brand
+    // the app.
+    for (const role of ['heading', 'body', 'mono'] as const) {
+      expect(brandFonts[role]).not.toBe(baseTypography[role]);
+      expect(brandFonts[role].split(',')[0]?.trim()).not.toMatch(/^(ui-|system-)/);
+    }
   });
 });

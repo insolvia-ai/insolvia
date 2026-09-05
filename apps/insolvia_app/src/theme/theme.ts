@@ -1,7 +1,7 @@
-import { colors, radii, spacing, typography } from '@insolvia-ai/tokens';
-import type { ColorScheme, ColorSchemeName } from '@insolvia-ai/tokens';
+import { colors, radii, spacing, typography as baseTypography } from '@insolvia-ai/tokens';
+import type { ColorScheme, ColorSchemeName, Typography } from '@insolvia-ai/tokens';
 
-import { brandColors } from './brand-colors';
+import { brandColors, brandFonts } from './brand-colors';
 import { useColorSchemeName } from './preference';
 
 /**
@@ -28,7 +28,12 @@ export interface Theme {
   readonly colors: ColorScheme;
   readonly spacing: typeof spacing;
   readonly radii: typeof radii;
-  readonly typography: typeof typography;
+  /**
+   * The type families. `Typography` and not `typeof baseTypography`: the
+   * package declares its own `as const`, so that would be the LITERAL system
+   * stacks and would reject any brand replacing them — which is the seam.
+   */
+  readonly typography: Typography;
   readonly fontSizes: typeof fontSizes;
 }
 
@@ -102,7 +107,21 @@ export const railBreakpoint = 900;
  * from `@insolvia-ai/tokens` keeps `@/theme` the single import a component
  * needs.
  */
-export { radii, spacing, typography } from '@insolvia-ai/tokens';
+export { radii, spacing } from '@insolvia-ai/tokens';
+
+/**
+ * The type families, branded.
+ *
+ * Re-exported from here rather than from `@insolvia-ai/tokens` for the reason
+ * the whole barrel exists: importing the package's `typography` directly would
+ * be a second, UNBRANDED answer to "what font is this", available to any
+ * `StyleSheet.create` block that reached for it. There is one answer, and it
+ * has Insolvia's faces in it.
+ *
+ * Safe in a static `StyleSheet.create` block: families do not vary by colour
+ * scheme, so unlike colours they need no hook.
+ */
+export const typography = brandFonts;
 
 /**
  * Builds the theme for a scheme. **Anything but `'dark'` resolves to light** —
@@ -123,7 +142,14 @@ export function themeFor(scheme: string | null | undefined): Theme {
     colors: { ...colors[resolved], ...brandColors[resolved] },
     spacing,
     radii,
-    typography,
+    // Brand over base again, and the same layering argument. The package's
+    // base theme sets `heading` and `body` to the same system sans and says
+    // why — a display face is a brand decision it declines to make — so all
+    // three roles here are Insolvia's, from brand/fonts.json. The faces
+    // themselves are @font-face'd in public/index.html; this only asks for
+    // them, and every stack ends in the generic the base used, so a face that
+    // fails to load renders what shipped before it.
+    typography: { ...baseTypography, ...brandFonts },
     fontSizes,
   };
 }

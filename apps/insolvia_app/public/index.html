@@ -14,6 +14,70 @@
     -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/Icon-192.png" />
+    <!--
+      THE BRAND FACES, self-hosted.
+
+      Self-hosted and not linked from a font CDN, deliberately: this app is
+      behind a sign-in and the person using it is looking at a named client's
+      bankruptcy file, so it should not be announcing page views to a third
+      party to fetch a typeface. The .woff2 files are latin-subset and total
+      about 76KB for all five; `scripts/fetch-brand-fonts.sh` regenerates them
+      and `public/fonts/OFL.txt` carries the licence they ship under.
+
+      The families themselves are declared once in `brand/fonts.json` and reach
+      the components through `src/theme` — this block only makes the bytes
+      available under those names. Change a family there, not here, then run
+      `npm run tokens` and re-run the fetch script.
+
+      `font-display: swap` on every face, and only the 400 body weight is
+      preloaded. ADR 0004 chose this stack on Lighthouse numbers, so the rule is
+      that text paints immediately in the fallback and reflows when the face
+      lands — never that first paint waits on a font.
+    -->
+    <link
+      rel="preload"
+      href="/fonts/public-sans-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
+    <style id="insolvia-fonts">
+      @font-face {
+        font-family: 'Archivo';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/archivo-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Archivo';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/archivo-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/public-sans-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/public-sans-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/ibm-plex-mono-400.woff2') format('woff2');
+      }
+    </style>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
