@@ -135,7 +135,8 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     GitHub environment secret ANTHROPIC_API_KEY — a secret a HUMAN creates
     (the value cannot be generated; see ADR 0019's rollout note, amended
     2026-09-05) — which the deploy workflow overlays onto the SSM-derived
-    environment of both Lambdas. Unset is NOT a degraded mode that skips the model: the worker
+    environment of both Lambdas. Unset is NOT a degraded mode that skips
+    the model: the worker
     entrypoints compose no ReviewModel without it, and a `petition_review`
     job then fails deterministically with category `not_configured` — honest
     now, and it starts working on the first deploy after the key exists.
