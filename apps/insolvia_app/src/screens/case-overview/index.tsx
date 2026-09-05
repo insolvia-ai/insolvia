@@ -1,5 +1,5 @@
 import { permits } from '@insolvia-ai/api-client';
-import type { FirmColleague, InsolviaApiClient } from '@insolvia-ai/api-client';
+import type { CaseSummary, FirmColleague, InsolviaApiClient } from '@insolvia-ai/api-client';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -45,6 +45,21 @@ interface Standing {
   readonly waiting?: boolean;
 }
 
+/** How many blockers the overview lists before deferring to the packet screen. */
+const PROBLEMS_SHOWN = 4;
+
+/**
+ * A problem's `source` as a human reads it.
+ *
+ * `source` is a collection name, `case`/`debtors`, or a form series id like
+ * `form/b106d`. The form ids are the ones worth translating — `B106D` is what
+ * the schedule is actually called, and what a paralegal would search for.
+ */
+function sourceLabel(source: string): string {
+  if (source.startsWith('form/')) return source.slice('form/'.length).toUpperCase();
+  return source.replace(/_/g, ' ');
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -80,6 +95,10 @@ export function CaseOverview() {
 
   const [counts, setCounts] = useState<Counts>(NOTHING);
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
+  // `null` while unread or unreadable — the same "we do not know" the counts
+  // use, and for the same reason: a case that looks ready because its summary
+  // failed to load is worse than one that says nothing.
+  const [summary, setSummary] = useState<CaseSummary | null>(null);
 
   // The extraction queue is the one gated read: the feature defaults to hidden
   // across the firm, so asking for it unconditionally would 403 for most users
@@ -124,6 +143,14 @@ export function CaseOverview() {
       ]);
       if (!live) return;
       setCounts({ documents, creditors, packets, people, pendingReview });
+
+      try {
+        const read = await call((client) => client.getCaseSummary(caseId));
+        if (live && read.ok) setSummary(read.value);
+      } catch {
+        // Same trade as the counts. The sections below still render, and the
+        // readiness block simply does not claim anything.
+      }
 
       try {
         const directory = await call((client) => client.listFirmDirectory());
@@ -192,6 +219,7 @@ export function CaseOverview() {
   ];
 
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  const mono = { color: theme.colors.ink, fontFamily: theme.typography.mono };
 
   return (
     <>
@@ -200,6 +228,78 @@ export function CaseOverview() {
         Chapter {matter.chapter} · {matter.district} · opened {matter.createdAt.slice(0, 10)} by{' '}
         {openedBy}
       </Text>
+
+      <Heading level={2}>Filing readiness</Heading>
+      {summary === null ? (
+        <Text aria-live="polite" style={[styles.body, muted]}>
+          Checking what this case still needs…
+        </Text>
+      ) : summary.readyToFile ? (
+        <Text
+          style={[styles.body, { color: theme.colors.success, fontFamily: theme.typography.body }]}
+        >
+          Every schedule has what it needs. This case can assemble its packet.
+        </Text>
+      ) : (
+        <>
+          <Text style={[styles.body, muted]}>
+            {plural(summary.problems.length, 'thing', 'things')} still to resolve before this case
+            can be filed.
+          </Text>
+          {/*
+            The SAME list the packet screen shows, because it is the same gate —
+            `readyToFile` is `completeness_problems`, not an approximation of it.
+            Each row leads with where the fix belongs, which is the only part of
+            a problem that tells somebody what to do next.
+          */}
+          <View role="list" style={styles.problems}>
+            {summary.problems.slice(0, PROBLEMS_SHOWN).map((problem, index) => (
+              <View role="listitem" key={`${problem.source}-${problem.field ?? index}`}>
+                <Text style={[styles.problemSource, mono]}>{sourceLabel(problem.source)}</Text>
+                <Text style={[styles.problemMessage, muted]}>{problem.message}</Text>
+              </View>
+            ))}
+          </View>
+          {summary.problems.length > PROBLEMS_SHOWN ? (
+            <Text style={[styles.body, muted]}>
+              …and {summary.problems.length - PROBLEMS_SHOWN} more, listed in full on the filing
+              packet screen.
+            </Text>
+          ) : null}
+        </>
+      )}
+
+      <Heading level={2}>Assets and liabilities</Heading>
+      {summary === null ? (
+        <Text style={[styles.body, muted]}>—</Text>
+      ) : (
+        <View role="list" style={styles.list}>
+          {(
+            [
+              ['Assets', summary.totals.assets],
+              ['Secured claims', summary.totals.secured],
+              ['Priority unsecured', summary.totals.priorityUnsecured],
+              ['Nonpriority unsecured', summary.totals.nonpriorityUnsecured],
+              ['Total liabilities', summary.totals.liabilities],
+            ] as const
+          ).map(([label, value]) => (
+            <View role="listitem" key={label} style={styles.row}>
+              <Text
+                style={[
+                  styles.rowValue,
+                  { color: theme.colors.ink, fontFamily: theme.typography.body },
+                ]}
+              >
+                {label}
+              </Text>
+              {/* Rendered exactly as the server sent it. These are the
+                  schedules' own totals and the client does no arithmetic on
+                  them — see `CaseTotals`. */}
+              <Text style={[styles.money, mono]}>{value}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Heading level={2}>Where this case stands</Heading>
       <View role="list" style={styles.list}>
@@ -264,5 +364,21 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     fontSize: fontSizes.label,
+  },
+  money: {
+    fontSize: fontSizes.label,
+    // Digits line up in a column, which is the whole reason these are mono.
+    fontVariant: ['tabular-nums'],
+  },
+  problems: {
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  problemSource: {
+    fontSize: fontSizes.caption,
+  },
+  problemMessage: {
+    fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.45,
   },
 });
