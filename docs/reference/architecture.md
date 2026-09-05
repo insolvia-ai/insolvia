@@ -153,9 +153,9 @@ real (prod ships when the release run's gate is approved).
 
 | Stage | Jobs | Gate |
 |---|---|---|
-| Staging | `shared-infra-deploy.yml` (if shared paths changed) → `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs` | none — staging *is* `main` |
+| Staging | `shared-infra-deploy.yml` (if shared paths changed) → `infra-staging.yml` (`mode: apply`) → changed services, ordered by `needs`; the api leg ends in the **integration tier** and the app leg in the **e2e suite** (both projects), each after seeding staging | none — staging *is* `main` |
 | Evidence | `record` (sha image tags + commit status), `supersede` | none |
-| Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order | `promote` carries the `insolvia-production` environment |
+| Production | `promote` → `infra-prod.yml` (`mode: apply`) → every service, same order; the app leg ends in the **smoke** project against production, a detector | `promote` carries the `insolvia-production` environment |
 
 Shared infra rides in the pipeline too, as the staging stage's very first leg:
 both env roots resolve shared's resources (the wildcard cert, the container
@@ -202,6 +202,21 @@ Both environments can also be planned before they are applied: `infra-staging.ym
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
 summary. `shared-infra-plan.yml` validates every env offline on a PR, which
 catches syntax and type errors but can never show what a change would *do*.
+
+### What each stage asserts
+
+Four test tiers, each aimed at the environments that can answer it —
+[ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md) owns the table and the
+`insolvia-testing` skill owns how to write one. In pipeline terms: the **unit**
+tier is every `*-pr.yml` check and the pre-push hook; the **integration** tier
+(`services/api/tests/integration`, the live API over HTTP signed in as a seeded
+person) and the **e2e** suite (`e2e/`, both projects) run inside the staging
+stage after the deploys they test, seeded by `.github/actions/seed-staging`,
+and their failure withholds the `insolvia/staging-release` status; the e2e
+**smoke** project alone runs against production, last, with no credentials.
+Seed data converges on every staging deploy from `seeds/staging.json` plus the
+versioned fixtures in `seeds/fixtures/`, whose bytes live in the shared bucket
+`envs/shared` owns.
 
 ### Production promotes; it does not rebuild
 

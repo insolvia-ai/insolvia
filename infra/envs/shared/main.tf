@@ -235,3 +235,18 @@ resource "aws_ecr_lifecycle_policy" "service" {
 # only one apex MX set can exist: reinstating SES receiving means taking inbound
 # mail away from Workspace. Outbound is untouched — SES still sends as
 # no-reply@insolvia.ai.
+
+# ── Seed fixtures (shared by every dev stack and by staging) ────
+# The bytes behind seeds/fixtures/<version>/ — sample documents a seeded
+# case carries. Account-level rather than per environment because every
+# developer's stack and every staging deploy copies from the same objects,
+# and neither is allowed to own something the other depends on. The module
+# header has the posture; services/admin's seed loader is the reader and
+# `seed publish` the writer.
+module "dev_fixtures" {
+  source = "../../modules/dev_fixtures"
+
+  project    = "insolvia"
+  aws_region = var.aws_region
+  tags       = local.common_tags
+}

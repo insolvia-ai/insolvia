@@ -27,7 +27,15 @@
     "accounts instead of locking the suite out.",
     "",
     "`handle` is how e2e/support/env.ts names a user; it is ignored by the API's",
-    "own parser. Keep handles stable — a spec refers to them."
+    "own parser. Keep handles stable — a spec refers to them.",
+    "",
+    "`cases` names which cases from a committed fixture version",
+    "(seeds/fixtures/<version>/cases.json) are loaded into which firm, and",
+    "who opened them. The rows AND the sample documents converge on every",
+    "load — staging gets the same synthetic Chapter 7 matter every other",
+    "environment gets, with the same two documents copied server-side from",
+    "the shared fixture bucket. Rows that already exist are left alone; a",
+    "changed fixture is a new version, not an edit to one that has loaded."
   ],
   "firms": [
     {
@@ -80,6 +88,14 @@
           "accessAllCases": true
         }
       ]
+    }
+  ],
+  "cases": [
+    {
+      "fixture": "v1",
+      "case": "chapter-7-sample",
+      "firm": "Insolvia E2E",
+      "openedBy": "admin"
     }
   ]
 }

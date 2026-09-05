@@ -616,3 +616,13 @@ module "audit_trail" {
   retention_days = 90
   tags           = local.common_tags
 }
+
+# ── The shared seed-fixture bucket ──────────────────────────────
+# Owned by envs/shared (module.dev_fixtures); resolved here the way every
+# shared resource is — a hard-failing data lookup, never shared's state — so
+# the seed step can read its name from this env's outputs alongside the
+# tables it loads into. Named deterministically by the module, which is why a
+# lookup by name is honest here.
+data "aws_s3_bucket" "dev_fixtures" {
+  bucket = "insolvia-shared-dev-fixtures-${var.aws_region}"
+}

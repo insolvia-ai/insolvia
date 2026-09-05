@@ -122,6 +122,14 @@ jobs:
     needs: [resolve, approve]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
+    # Frozen for the smoke job below — every origin it probes and the two
+    # public auth values the sign-in hand-off must name.
+    outputs:
+      url: ${{ steps.tf.outputs.url }}
+      api_domain: ${{ steps.tf.outputs.api_domain }}
+      marketing_url: ${{ steps.tf.outputs.marketing_url }}
+      auth_domain: ${{ steps.tf.outputs.auth_domain }}
+      auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
     # This job applies no Terraform, but the group still serializes it
     # against infra-prod.yml, so a deploy cannot land mid-apply while the bucket
     # or distribution is being reconciled underneath it. Job-level, not
@@ -197,6 +205,9 @@ jobs:
             echo "url=$(tf url)"
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
+            # For the smoke job: the API and marketing origins it probes.
+            echo "api_domain=$(tf api_domain)"
+            echo "marketing_url=$(tf marketing_url)"
           } >> "$GITHUB_OUTPUT"
 
       # ── The Metro cache trap — this is why `--clear` is here ──────────────
@@ -311,3 +322,67 @@ jobs:
           curl -sSf -o /dev/null --retry 5 --retry-delay 3 --retry-all-errors "$URL/"
           echo ":white_check_mark: \`$URL\` is serving commit \`${SHA:0:7}\`." \
             >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Smoke: the deployed product, from the outside, with no credentials ───
+  #
+  # A DETECTOR, NOT A GATE, and the position says so: the bundle is already
+  # live by the time this runs. What it buys is a broken production deploy
+  # announcing itself in minutes with a named cause — the wrong environment
+  # baked into the bundle, a stale bundle still at the edge, a sign-in
+  # hand-off to a client the pool no longer registers, an API that lost its
+  # auth configuration, a CORS allowlist that dropped the app's origin —
+  # instead of a customer finding it. It is the same `smoke` project
+  # app-staging.yml ran against staging minutes earlier, so its assertions
+  # have already been proven against a live environment this release.
+  #
+  # NEVER THE `flows` PROJECT HERE. Production holds real case data and has no
+  # test identity, by design; the config offers no authenticated project when
+  # E2E_TARGET is production, and this job passes no password because there
+  # is none to pass. No AWS credentials either: everything is HTTP.
+  #
+  # Runs as the app's leg because the app is the LAST leg of a release
+  # (release.yml orders mailer → api → marketing → app), so by now every
+  # service is at this commit. A hand-dispatched single-service prod deploy
+  # of another workflow does not run it; that path keeps its own smoke step.
+  smoke:
+    needs: [resolve, deploy]
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      # `e2e/` is NOT an npm workspace member (see the `//` note in its
+      # package.json), so it installs from its OWN lockfile.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: e2e
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      # No artifact upload and no trace, for the reason app-staging.yml gives
+      # (playwright.config.ts turns both off under CI). Nothing here types a
+      # credential anywhere, but the rule is the suite's, not the project's.
+      - name: Smoke against production
+        working-directory: e2e
+        env:
+          E2E_TARGET: production
+          E2E_BASE_URL: ${{ needs.deploy.outputs.url }}
+          E2E_API_URL: https://${{ needs.deploy.outputs.api_domain }}
+          E2E_MARKETING_URL: ${{ needs.deploy.outputs.marketing_url }}
+          E2E_COGNITO_DOMAIN: ${{ needs.deploy.outputs.auth_domain }}
+          E2E_COGNITO_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
+          # The footer must carry the verified commit's stamp — the bundle
+          # this run built and synced, not the previous one CloudFront held.
+          E2E_EXPECTED_BUILD_SHA: ${{ needs.resolve.outputs.sha }}
+        run: npx playwright test --project smoke

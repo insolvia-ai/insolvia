@@ -2,20 +2,24 @@
 #
 # Run the E2E suite against THIS MACHINE's local stack instead of staging.
 #
-# CI runs these against deployed staging, post-deploy, in app-staging.yml. That
-# remains the authoritative run and this script does not change it.
+# CI runs these against deployed staging, post-deploy, in app-staging.yml,
+# and the `smoke` project against production in app-prod.yml. Those remain
+# the authoritative runs and this script does not change them.
 #
 # What it changes is the feedback loop. Staging only refreshes on a merge to
-# main, so until now the only way to exercise a change to these specs — or to
-# the sign-in path they cover — was to merge and wait for a deploy. The repo's
-# own rule (root CLAUDE.md) is that everything must be testable locally unless
-# there is a reason good enough to write down; there was no such reason here,
-# only missing wiring.
+# main, so until this existed the only way to exercise a change to these
+# specs — or to the sign-in path they cover — was to merge and wait for a
+# deploy. The repo's own rule (root CLAUDE.md) is that everything must be
+# testable locally unless there is a reason good enough to write down; there
+# was no such reason here, only missing wiring.
 #
 # WHAT THIS POINTS AT
-#   E2E_BASE_URL       http://localhost:3000   the app from scripts/dev-up.sh
-#   E2E_COGNITO_DOMAIN this machine's dev pool, read from the .env that
-#                      scripts/dev-aws-setup.sh writes
+#   E2E_TARGET            dev — picks seeds/dev.json as who exists, "Local"
+#                         as the footer label the smoke project expects
+#   E2E_BASE_URL          http://localhost:3000   the app from scripts/dev-up.sh
+#   E2E_API_URL           http://localhost:8080   the API from the same script
+#   E2E_COGNITO_DOMAIN    this machine's dev pool, read from the .env that
+#   E2E_COGNITO_CLIENT_ID scripts/dev-aws-setup.sh writes for the app
 #
 # `infra/envs/dev` registers `http://localhost:3000` as an exact-match Cognito
 # web origin (infra/envs/dev/main.tf) — which is what makes a real sign-in
@@ -41,9 +45,11 @@
 # reasoning that keeps E2E out of the required PR checks (e2e/CLAUDE.md).
 #
 # Usage:
-#   ./e2e/scripts/dev-test.sh                 # headless
+#   ./e2e/scripts/dev-test.sh                 # both projects, headless
 #   ./e2e/scripts/dev-test.sh --headed        # watch it drive the browser
+#   ./e2e/scripts/dev-test.sh --project smoke # only the unauthenticated half
 #
+# Anything after the script's own flag passes through to `playwright test`.
 # The password comes from E2E_TEST_USER_PASSWORD if exported, else from
 # ~/.config/insolvia/dev.env (the file dev-aws-seed.sh offers to write).
 # The address comes from seeds/dev.json.
@@ -56,12 +62,19 @@ REPO_ROOT="$(cd "$E2E_DIR/.." && pwd)"
 
 APP_ENV="$REPO_ROOT/apps/insolvia_app/.env"
 BASE_URL="${E2E_BASE_URL:-http://localhost:3000}"
+API_URL="${E2E_API_URL:-http://localhost:8080}"
 
 die()  { printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
 log()  { printf '\033[1;34m[e2e]\033[0m %s\n' "$*"; }
 
 HEADED=0
-[[ "${1:-}" == "--headed" ]] && HEADED=1
+PASSTHROUGH=()
+for arg in "$@"; do
+  case "$arg" in
+    --headed) HEADED=1 ;;
+    *) PASSTHROUGH+=("$arg") ;;
+  esac
+done
 
 # ── Credentials: named, never echoed ────────────────────────────────────────
 # Only the password. The ADDRESS comes from seeds/dev.json below — the same
@@ -82,40 +95,47 @@ export E2E_TEST_USER_PASSWORD
        gave ./scripts/dev-aws-seed.sh for the account in seeds/dev.json (it offers
        to write that file), and make sure that script has run."
 
-# Which fixture describes THIS target. Staging is the suite's default, so a run
-# against a laptop has to say so or it would look for people who only exist in
-# staging and fail naming a handle rather than the environment.
-export E2E_SEED_FIXTURE="seeds/dev.json"
+# Which target this run is aimed at. The suite derives the fixture
+# (seeds/dev.json) and the expected footer label from it.
+export E2E_TARGET=dev
 
-# ── The dev pool's hosted domain ────────────────────────────────────────────
+# ── The dev pool's hosted domain and client ─────────────────────────────────
 # Read from the .env that dev-aws-setup.sh writes rather than calling
 # `terraform output`, which would need AWS credentials and the remote state for
-# a value already sitting on disk.
+# values already sitting on disk.
+[[ -f "$APP_ENV" ]] || die "No $APP_ENV — run ./scripts/dev-aws-setup.sh first (it provisions this machine's dev pool and writes the app's env)."
+read_env() { sed -n "s/^$1=//p" "$APP_ENV" | tail -1; }
 if [[ -z "${E2E_COGNITO_DOMAIN:-}" ]]; then
-  [[ -f "$APP_ENV" ]] || die "No $APP_ENV — run ./scripts/dev-aws-setup.sh first (it provisions this machine's dev pool and writes the app's env)."
-  E2E_COGNITO_DOMAIN="$(sed -n 's/^EXPO_PUBLIC_COGNITO_DOMAIN=//p' "$APP_ENV" | tail -1)"
+  E2E_COGNITO_DOMAIN="$(read_env EXPO_PUBLIC_COGNITO_DOMAIN)"
   [[ -n "$E2E_COGNITO_DOMAIN" ]] || die "EXPO_PUBLIC_COGNITO_DOMAIN is not in $APP_ENV — re-run ./scripts/dev-aws-setup.sh."
 fi
-export E2E_COGNITO_DOMAIN
+if [[ -z "${E2E_COGNITO_CLIENT_ID:-}" ]]; then
+  E2E_COGNITO_CLIENT_ID="$(read_env EXPO_PUBLIC_COGNITO_CLIENT_ID)"
+  [[ -n "$E2E_COGNITO_CLIENT_ID" ]] || die "EXPO_PUBLIC_COGNITO_CLIENT_ID is not in $APP_ENV — re-run ./scripts/dev-aws-setup.sh."
+fi
+export E2E_COGNITO_DOMAIN E2E_COGNITO_CLIENT_ID
 export E2E_BASE_URL="$BASE_URL"
+export E2E_API_URL="$API_URL"
 
-# ── The app has to actually be serving ──────────────────────────────────────
+# ── The app and the API have to actually be serving ─────────────────────────
 # Without this the first symptom is a Playwright navigation timeout, which
 # reads as a broken test rather than a stack that was never started.
 curl -sf -o /dev/null --max-time 5 "$BASE_URL" \
   || die "Nothing is serving at $BASE_URL — start the stack with ./scripts/dev-up.sh (it runs the app on port 3000)."
+curl -sf -o /dev/null --max-time 5 "$API_URL/health" \
+  || die "Nothing is serving at $API_URL — start the stack with ./scripts/dev-up.sh (it runs the API on port 8080)."
 
 if [[ ! -d "$E2E_DIR/node_modules" ]]; then
   log "installing e2e dependencies (own lockfile — not a workspace member)"
   (cd "$E2E_DIR" && npm ci)
 fi
 
-log "target      $BASE_URL"
+log "target      dev — $BASE_URL (app), $API_URL (api)"
 log "sign-in via $E2E_COGNITO_DOMAIN"
 
 cd "$E2E_DIR"
 if [[ "$HEADED" -eq 1 ]]; then
-  npm run test:headed
+  npx playwright test --headed "${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"}"
 else
-  npm test
+  npx playwright test "${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"}"
 fi

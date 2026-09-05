@@ -17,17 +17,29 @@ description: >-
 
 # Testing in Insolvia
 
-Four runners, six units, ~355 tests. **The shape differs by area on purpose** —
+Four runners, six units, ~400 tests. **The shape differs by area on purpose** —
 [ADR 0008](../../docs/adr/0008-testing-shape-follows-the-code-it-tests.md) owns
-that decision and the reasoning. This file owns *how* to write one.
+that decision and the reasoning. **Every test belongs to one of four tiers,
+and the tier is a directory** —
+[ADR 0021](../../docs/adr/0021-test-tiers-and-seed-fixtures.md) owns which tier
+runs against which environment. This file owns *how* to write one.
 
-| Area | Runner | Command |
-|---|---|---|
-| `services/api`, `services/mailer` | pytest | `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI) |
-| `apps/insolvia_app` | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` |
-| `packages/insolvia_api_client` | Vitest | `npm run test --workspace <pkg>` |
-| `tool/` | none — it is gated by `npm run tokens:check`, which compares its output against the installed tokens | `npm run tokens:check` |
-| `e2e/` | Playwright | staging only — see `docs/runbooks/staging-e2e-setup.md` |
+| Tier | Where | Runner | Command | Runs against |
+|---|---|---|---|---|
+| **unit** | `services/*/tests/unit/`, `packages/insolvia_core/tests/unit/` | pytest | each unit's `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI); a bare `pytest` is unit-only | nothing — memory adapters |
+| **unit** | `apps/insolvia_app` (colocated) | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` | nothing — mocks |
+| **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin` (colocated) | Vitest | `npm run test --workspace <pkg>` / `npm test` | nothing — stubbed `fetch` |
+| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
+| **integration** | `services/api/tests/integration/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `services/api/scripts/dev-test-integration.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
+| **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
+| **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
+| `tool/` | none — gated by `npm run tokens:check` | — | `npm run tokens:check` | — |
+
+**Pick the tier by what the test needs to touch.** If it needs AWS, a running
+server or a secret, it is not a unit test, whatever it asserts — and the unit
+conftests give it nothing that reaches a network. If it needs to sign in, it is
+integration (HTTP) or `flows` (browser). If it must run against production, it
+is `smoke`, and it gets no credentials at all.
 
 ## Before you write it
 
@@ -39,8 +51,10 @@ that decision and the reasoning. This file owns *how* to write one.
    noise. Static analysis is the base layer here, not a separate concern.
 3. **Colocation is not uniform.** TypeScript tests sit **beside** the file they
    test (`heading.tsx` ↔ `heading.test.tsx`) — never a `__tests__/` directory.
-   Python tests live in a **flat `tests/`** directory, `test_<module>.py`, never
-   beside the source.
+   Python tests live in a **flat `tests/unit/`** directory, `test_<module>.py`,
+   never beside the source; shared fixtures stay in `tests/conftest.py` (the
+   parent — every tier inherits it) and `tests/paths.py` is the one place that
+   counts its way to `src/`. `tests/__init__.py` is each unit's map.
 4. **Name the behaviour, not the function.** `test_malformed_email_is_rejected`,
    not `test_parse`. The existing suites are consistent about this; match them.
 
@@ -117,18 +131,57 @@ found online.
   export map.
 - A server field rename is *supposed* to break these tests. That is the feature.
 
+## The integration tier (`services/api/tests/integration/`)
+
+- **It drives the API over HTTP and nothing in-process.** The `Api` helper in
+  its conftest is the whole client; `as_user("paralegal")` is a real token from
+  the real pool. Do not import the Flask app or a memory adapter here — that is
+  a unit test wearing the wrong directory.
+- **Who exists comes from `seeds/<target>.json`, by handle.** A spec that needs
+  a person the fixture lacks adds them to the fixture (and the next seed
+  creates them); it never invents an address or a subject.
+- **Scratch discipline.** Cases cannot be deleted through the API, so work
+  inside the one scratch case the conftest finds-or-opens; delete every
+  document you create in teardown; leave a debtor as you found it. A spec that
+  opens a case per run fills a table nobody prunes.
+- **A test that passes only on one target is a bug in the test.** Both `dev`
+  and `staging` run the same files; branch on the fixture's contents (a
+  one-firm fixture cannot express cross-tenant isolation — return early and
+  say so), never on the target name.
+- **Never a required PR check, never a unit-tier dependency.** It runs after
+  the staging alias shift and on a developer's dev stack, and its failure
+  fails the staging stage.
+
 ## End-to-end (`e2e/`)
 
-- **Adding a test here needs a reason the other layers cannot satisfy.** Slow,
-  environment-dependent, and a flake blocks production promotion through
-  `verified-commit`.
-- **Never make it a required PR check** — that puts staging's availability on
-  every PR's critical path. Post-deploy only.
+- **Two projects, by what they may hold.** `flows` signs in and is offered
+  against dev and staging; `smoke` holds no credentials and is the only thing
+  that runs against production. A smoke spec that needs a token is a `flows`
+  spec; a `flows` spec that needs nothing signed-in is a `smoke` spec.
+- **Adding a `flows` test needs a reason the other layers cannot satisfy.**
+  Slow, environment-dependent, and a flake blocks production promotion through
+  `verified-commit`. A `smoke` test needs a reason a `curl` cannot satisfy.
+- **Never make either a required PR check** — that puts staging's availability
+  on every PR's critical path. Post-deploy only.
 - **Role-based selectors only**, matching the app's accessibility contract.
 - **Never let a credential reach a file, a default, a log line, or an uploaded
   artifact.** Traces record typed values verbatim and the repo is public.
 - If a spec starts passing only on retry, **quarantine it** — do not raise the
   retry count.
+
+## Seed data
+
+- **`seeds/<env>.json` says who exists and which fixture cases they hold;
+  `seeds/fixtures/<version>/` says what a case contains**, in the API's own
+  body shapes. The loader parses both with the route's own parsers, so a
+  malformed row fails with the API's field errors — write a fixture the way
+  you would write a request.
+- **A loaded fixture is never edited; a changed fixture is a new version.**
+  Rows that exist are left alone on every load, so editing `v1` after it has
+  loaded changes nothing anywhere. `scripts/dev-fixture.sh capture v2 …`
+  writes a new version out of your dev stack.
+- **Nothing real, ever.** Every value describes nobody; every address ends in
+  `.test`; capture refuses any source that is not a dev stack.
 
 ## Things this repo has decided against
 
@@ -156,3 +209,7 @@ ADR:
 | an API endpoint | `services/api` tests **and** the api-client contract pin |
 | a design-system component | beside it — and remember the `.web`/`.native` leaves are separate files with separate tests |
 | an infra invariant | prefer an executable check (`test_architecture.py`, a workflow guard) over prose |
+| something only a real table, bucket, pool or the deployed role can answer | `services/api/tests/integration/test_<subject>.py`, through the `Api` helper, inside the scratch case |
+| something only a real browser and a real sign-in can answer | `e2e/tests/flows/<subject>.spec.ts` |
+| something a production deploy must announce when broken | `e2e/tests/smoke/<subject>.spec.ts` — no credentials, and it runs on staging first |
+| a person or a case a suite needs to exist | `seeds/<env>.json` (who) and `seeds/fixtures/<version>/` (what) — never a script, never a secret |

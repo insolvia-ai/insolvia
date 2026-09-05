@@ -1,0 +1,134 @@
+name: Seed staging
+description: >-
+  Converge staging's test accounts, firms and fixture cases on seeds/staging.json,
+  idempotently, before a suite that depends on them runs.
+
+# WHY A SHARED STEP
+#
+# Two post-deploy suites sign in as the people seeds/staging.json names: the
+# API's integration tier (api-staging.yml, after the alias shift) and the
+# browser suite (app-staging.yml, after the CloudFront invalidation). Both need
+# the same accounts, the same firms and the same fixture case to exist, and
+# the loader converges rather than creates, so running it twice per release is
+# two fast no-ops rather than a problem. One action keeps the two callers from
+# drifting into two slightly different seed steps — which is exactly how the
+# API leg would end up testing against a fixture the app leg had moved on from.
+#
+# WHAT IT NEEDS, AND WHY IT FAILS BY NAME
+#
+# A SECOND, NARROWER ROLE than the deploy one. The deploy role is deliberately
+# control-plane only — "manages tables, never their contents" — and a firm-user
+# row IS an access grant. The seed role (infra/envs/ci-trust) can write staging's
+# firm and case tables, copy fixture objects into staging's document bucket,
+# and create the pool's test accounts, and nothing else. Its trust policy only
+# accepts tokens minted for the `insolvia-staging` environment, so THE CALLING
+# JOB MUST DECLARE `environment: insolvia-staging` — that is also what makes the
+# environment-scoped secrets below visible at all. A missing `environment:` key
+# does not error; it resolves every secret to "" and the role assumption fails
+# with "Could not load credentials from any providers", which names neither the
+# secret nor the environment. The first step here checks the inputs by NAME so
+# the failure says which one, the same discipline the suites apply to their own
+# inputs.
+#
+# The fixture's CASES carry sample documents. Those are copied server-side out
+# of the shared fixture bucket (infra/modules/dev_fixtures) into staging's own
+# case-documents bucket; the bytes never touch the runner. If that copy is
+# refused, either ci-trust has not been re-applied with the seed role's case
+# grants (a human apply — the insolvia-deploy-role-permissions skill) or the
+# fixture version has not been published (scripts/dev-fixture.sh publish).
+
+inputs:
+  seed-role-arn:
+    description: "secrets.AWS_SEED_ROLE_ARN from the insolvia-staging environment"
+    required: true
+  test-user-password:
+    description: "secrets.E2E_TEST_USER_PASSWORD from the insolvia-staging environment — the one shared test-user password"
+    required: true
+  firm-table:
+    description: "Terraform output firm_table_name"
+    required: true
+  case-table:
+    description: "Terraform output case_table_name"
+    required: true
+  document-bucket:
+    description: "Terraform output case_document_bucket"
+    required: true
+  fixture-bucket:
+    description: "Terraform output dev_fixtures_bucket"
+    required: true
+  user-pool-id:
+    description: "Terraform output auth_user_pool_id"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # NAME THE MISSING INPUT BEFORE AWS SWALLOWS IT. See the header.
+    - name: Check the seed step has its inputs
+      shell: bash
+      env:
+        SEED_ROLE_ARN: ${{ inputs.seed-role-arn }}
+        SEED_PASSWORD: ${{ inputs.test-user-password }}
+        FIRM_TABLE: ${{ inputs.firm-table }}
+        CASE_TABLE: ${{ inputs.case-table }}
+        DOCUMENT_BUCKET: ${{ inputs.document-bucket }}
+        FIXTURE_BUCKET: ${{ inputs.fixture-bucket }}
+        POOL_ID: ${{ inputs.user-pool-id }}
+      run: |
+        missing=()
+        [ -n "$SEED_ROLE_ARN" ] || missing+=(AWS_SEED_ROLE_ARN)
+        [ -n "$SEED_PASSWORD" ] || missing+=(E2E_TEST_USER_PASSWORD)
+        [ -n "$FIRM_TABLE" ] || missing+=(firm_table_name)
+        [ -n "$CASE_TABLE" ] || missing+=(case_table_name)
+        [ -n "$DOCUMENT_BUCKET" ] || missing+=(case_document_bucket)
+        [ -n "$FIXTURE_BUCKET" ] || missing+=(dev_fixtures_bucket)
+        [ -n "$POOL_ID" ] || missing+=(auth_user_pool_id)
+        if [ ${#missing[@]} -ne 0 ]; then
+          echo "::error::Seed inputs missing: ${missing[*]}"
+          echo "A secret name means it is unset on the insolvia-staging environment, or"
+          echo "the calling job lost its 'environment: insolvia-staging' key — an"
+          echo "environment-scoped secret resolves to an empty string in silence."
+          echo "An output name means the terraform job did not read it."
+          echo "docs/runbooks/staging-e2e-setup.md has both."
+          exit 1
+        fi
+
+    - uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.seed-role-arn }}
+        aws-region: us-east-1
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    # From the admin service's requirements rather than a bare `pip install
+    # boto3`, so the seeder resolves the same pinned boto3 the service that
+    # owns it does — and from that service's OWN directory, because its
+    # requirements.txt names ../../packages/insolvia_core and pip resolves
+    # that path against the current working directory, not the file.
+    - name: Install the admin service's runtime dependencies
+      shell: bash
+      run: pip install -r requirements.txt
+      working-directory: services/admin
+
+    # Accounts, firms AND cases, from one fixture. Adding a test user or a
+    # fixture case is an edit to seeds/ — no secret per person, no script run,
+    # nothing here to change. The addresses are committed (they are unroutable
+    # `.test` ones); the shared password is the only secret involved.
+    - name: Seed the staging accounts, firms and fixture cases
+      shell: bash
+      env:
+        # The seeder lives in the ADMIN service (#212 — provisioning tooling
+        # has one home); the requirements installed above are that service's
+        # own, so the pins match what the seeder runs against in Lambda.
+        PYTHONPATH: services/admin/src
+        E2E_TEST_USER_PASSWORD: ${{ inputs.test-user-password }}
+      run: |
+        python -m insolvia_admin.entrypoints.seed load \
+          --fixture seeds/staging.json \
+          --firm-table "${{ inputs.firm-table }}" \
+          --case-table "${{ inputs.case-table }}" \
+          --document-bucket "${{ inputs.document-bucket }}" \
+          --fixture-bucket "${{ inputs.fixture-bucket }}" \
+          --user-pool-id "${{ inputs.user-pool-id }}"

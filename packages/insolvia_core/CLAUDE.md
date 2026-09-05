@@ -16,7 +16,7 @@ local-path install. Human docs: [`README.md`](README.md).
   admission — exist in one place so the DynamoDB and in-memory stores cannot
   drift, and so two services cannot disagree about what a stored record looks
   like. Never copy a shape into a service; import it.
-- **Layering, enforced by `tests/test_architecture.py`:** the domain modules in
+- **Layering, enforced by `tests/unit/test_architecture.py`:** the domain modules in
   the package root import nothing but each other and the stdlib (PyJWT is the
   one deliberate exception — the signature check *is* the domain rule, see
   `auth.py`); `adapters/` owns boto3; nothing here ever imports a web framework
@@ -32,5 +32,5 @@ local-path install. Human docs: [`README.md`](README.md).
   `release.yml`'s `api` regex both name this directory; when a new service
   consumes the package, add this path to its PR filter and release regex in the
   same PR that adds the dependency.
-- Tests: pytest, colocated in `tests/`, same conventions as the services
-  (`insolvia-testing` skill). Strict mypy is on for `src`.
+- Tests: pytest, in `tests/unit/` (the only tier here — `tests/__init__.py`
+  says why), same conventions as the services (`insolvia-testing` skill). Strict mypy is on for `src`.

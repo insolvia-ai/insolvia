@@ -1,0 +1,100 @@
+{
+  "//": [
+    "The case rows a seeded environment carries, one version of the",
+    "shared fixture. `seeds/dev.json` and `seeds/staging.json` name which",
+    "of these cases to load, into which firm, opened by which person;",
+    "this file says what each case contains.",
+    "",
+    "SHAPE. Every body below is the JSON the API's own routes accept \u2014",
+    "a debtor is the PUT /v1/cases/<id>/debtors/<role> body, a collection",
+    "item is the POST /v1/cases/<id>/<collection> body \u2014 and the loader",
+    "parses them with the same core/ functions those routes use, so a",
+    "malformed row fails with the API's own field errors and a rule that",
+    "tightens (provenance, say) breaks seeding loudly rather than writing",
+    "rows the service has stopped agreeing with.",
+    "",
+    "NO IDS ARE PUBLISHED, AND THAT IS THE DESIGN. A case's id in an",
+    "environment is derived by the loader from the target table, the",
+    "firm and this file's `handle`, so two environments seed different",
+    "ids from the same fixture and a re-run finds the rows it wrote last",
+    "time instead of writing them again. An id written here would be an",
+    "id from someone else's environment.",
+    "",
+    "EVERY VALUE IS SYNTHETIC. Nothing here describes a real person, a",
+    "real employer or a real account. `seed capture` refuses a source",
+    "that is not a dev stack for exactly this reason, and a review of a",
+    "diff to this file should ask the same question."
+  ],
+  "version": "v1",
+  "cases": [
+    {
+      "handle": "chapter-7-sample",
+      "chapter": 7,
+      "district": "NDCA",
+      "debtors": {
+        "debtor_1": {
+          "name": {
+            "given": "Sample",
+            "surname": "Debtor"
+          },
+          "residence_address": {
+            "line1": "123 Fixture Street"
+          },
+          "provenance": {
+            "name.given": {
+              "source": "staff_typed"
+            },
+            "name.surname": {
+              "source": "staff_typed"
+            },
+            "residence_address.line1": {
+              "source": "staff_typed"
+            }
+          }
+        }
+      },
+      "collections": {
+        "creditors": [
+          {
+            "name": "Example Community Bank (fictitious)",
+            "address": {
+              "line1": "1 Example Plaza"
+            },
+            "provenance": {
+              "name": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "name": "Example Card Services (fictitious)",
+            "provenance": {
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ]
+      },
+      "documents": [
+        {
+          "handle": "pay-stub",
+          "kind": "pay_stub",
+          "fileName": "sample-pay-stub.pdf",
+          "contentType": "application/pdf",
+          "object": "objects/sample-pay-stub.pdf"
+        },
+        {
+          "handle": "bank-statement",
+          "kind": "bank_statement",
+          "fileName": "sample-bank-statement.pdf",
+          "contentType": "application/pdf",
+          "object": "objects/sample-bank-statement.pdf"
+        }
+      ]
+    }
+  ]
+}

@@ -45,3 +45,8 @@ output "apex_mx_records" {
   description = "Who receives mail for @insolvia.ai. Google Workspace — the SES inbound forwarder was removed."
   value       = module.email.apex_mx_records
 }
+
+output "dev_fixtures_bucket" {
+  description = "The shared seed-fixture bucket (module.dev_fixtures). Read by scripts/dev-aws-seed.sh and the staging seed step; written by `seed publish`."
+  value       = module.dev_fixtures.bucket_name
+}

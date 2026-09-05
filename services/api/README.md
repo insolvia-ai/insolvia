@@ -71,8 +71,17 @@ INSOLVIA_ENV=local PYTHONPATH=src .venv/bin/gunicorn --bind 127.0.0.1:8080 \
   insolvia_api.entrypoints.development_server:app
 ```
 
-Checks: `ruff check .`, `ruff format --check .`, `pytest` (from this
-directory; ruff config is the repo-root `ruff.toml`).
+Checks: `ruff check .`, `ruff format --check .`, `mypy`, `pytest` (from this
+directory; ruff config is the repo-root `ruff.toml`). A bare `pytest` is the
+UNIT tier (`tests/unit/`). The INTEGRATION tier (`tests/integration/`) drives
+the running API over HTTP, signed in as the person `seeds/dev.json` names:
+
+```sh
+./scripts/dev-test-integration.sh              # needs dev-up.sh and dev-aws-seed.sh done
+```
+
+The same tier runs against staging from `api-staging.yml` after every
+deploy. `tests/__init__.py` is the map of the tiers.
 
 ## Environment variables
 

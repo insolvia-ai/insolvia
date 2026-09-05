@@ -1,20 +1,41 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { baseUrl, testUser } from './support/env';
+import { baseUrl, target, testUser } from './support/env';
 
 /**
- * Playwright configuration for the staging E2E suite.
+ * Playwright configuration for the deployed-environment suite.
  *
- * This suite runs against a REAL deployed environment (see README.md). It is
- * not a unit test runner and it is deliberately not a required PR check —
- * `app-staging.yml` runs it after the deploy, which is what makes it gate
- * `verified-commit` without making it gate merges.
+ * This suite runs against a REAL environment (see README.md). It is not a
+ * unit test runner and it is deliberately not a required PR check —
+ * `app-staging.yml` runs it after the staging deploy, which is what makes it
+ * gate `verified-commit` without making it gate merges, and `app-prod.yml`
+ * runs its `smoke` half after the production deploy as a detector.
+ *
+ * TWO PROJECTS, BY WHAT THEY MAY HOLD:
+ *
+ *   flows   tests/flows — signs in as a seeded person and drives the app.
+ *           Needs a fixture (seeds/<target>.json) and the shared password.
+ *           Offered against dev and staging, NEVER production: production
+ *           holds real case data and has no test identity, by design.
+ *   smoke   tests/smoke — no credentials at all. Proves the deployed shell,
+ *           the sign-in hand-off, the API's environment and its refusals,
+ *           and the marketing site, from the outside. Runs everywhere, and
+ *           is the only thing that runs against production.
+ *
+ * A run selects by `E2E_TARGET`; a project can also be named on the command
+ * line (`npx playwright test --project smoke`).
  */
+
+const which = target();
 
 // Fail fast, at config load: an unset credential must stop the run before a
 // browser launches, not halfway through a sign-in. `testUser()` throws naming
-// the missing variable and never its value.
-testUser();
+// the missing variable and never its value. Production offers no `flows`
+// project, so it asks for no credential — a production run holding the
+// staging password would be a bug, not a convenience.
+if (which !== 'production') testUser();
+
+const chromium = { ...devices['Desktop Chrome'] };
 
 export default defineConfig({
   testDir: './tests',
@@ -33,8 +54,10 @@ export default defineConfig({
   // fix it — do not raise this number.
   retries: process.env.CI ? 2 : 0,
 
-  // One worker, no parallelism: there is a single test user, and two browsers
-  // signing it in concurrently would race on its Cognito session.
+  // One worker, no parallelism: there is a single test user per handle, and
+  // two browsers signing it in concurrently would race on its Cognito session.
+  // The smoke project could parallelise, but one worker is seconds and one
+  // config is one thing to reason about.
   fullyParallel: false,
   workers: 1,
 
@@ -71,7 +94,7 @@ export default defineConfig({
     //
     // So: no trace is recorded in CI at all (not "recorded but not uploaded" —
     // a file that does not exist cannot be uploaded by a future well-meaning
-    // edit to the workflow), and `app-staging.yml` has no upload step. Locally
+    // edit to the workflow), and the workflows have no upload step. Locally
     // a trace is retained on failure, because it never leaves the machine and
     // it is the only practical way to debug this flow.
     trace: process.env.CI ? 'off' : 'retain-on-failure',
@@ -90,5 +113,10 @@ export default defineConfig({
   // Chromium only. The auth loop is a redirect round trip, not a rendering
   // concern, so a second engine would triple the runtime of a job that sits on
   // the production-promotion path for no extra signal.
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'smoke', testDir: './tests/smoke', use: chromium },
+    ...(which === 'production'
+      ? []
+      : [{ name: 'flows', testDir: './tests/flows', use: chromium }]),
+  ],
 });

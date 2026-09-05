@@ -176,6 +176,28 @@ else
   "$SCRIPT_DIR/dev-skills.sh"
 fi
 
+# --- git hooks -------------------------------------------------------------
+#
+# The pre-commit framework runs the local gate (.pre-commit-config.yaml):
+# format + lint at COMMIT time, the unit tier at PUSH time. Both hook types
+# have to be installed or the push-time half simply never fires — which is
+# the quiet failure this step exists to prevent. `pre-commit install` is
+# idempotent, and in a git worktree it writes to the shared hooks directory,
+# so one install serves every checkout of this repo on the machine.
+brew_ensure pre-commit pre-commit
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ "$CHECK_ONLY" -eq 1 ]]; then
+  if have pre-commit && git -C "$REPO_ROOT" rev-parse --git-path hooks >/dev/null 2>&1 &&
+    [[ -f "$(git -C "$REPO_ROOT" rev-parse --git-path hooks)/pre-push" ]]; then
+    skip "git hooks" "pre-commit + pre-push installed"
+  else
+    warn "git hooks are MISSING (would: pre-commit install --hook-type pre-commit --hook-type pre-push)"
+  fi
+elif have pre-commit; then
+  (cd "$REPO_ROOT" && pre-commit install --hook-type pre-commit --hook-type pre-push >/dev/null) &&
+    ok "git hooks installed (pre-commit: format + lint; pre-push: unit tests)"
+fi
+
 # Docker is a daemon/GUI concern — check only, never auto-install. services/api
 # local dev (docker compose) and its Lambda image build need it.
 if have docker; then skip docker "$(command -v docker)"; else

@@ -1,0 +1,27 @@
+{
+  "//": [
+    "What the fixture bucket holds for this version, and how to verify it.",
+    "",
+    "The loader (services/admin, entrypoints/seed.py) copies each object",
+    "server-side from s3://<fixture bucket>/v1/<key> into the target's",
+    "case-documents bucket and checks the size it lands at against this",
+    "file. `seed publish` is what puts the bytes in the bucket, from the",
+    "copies committed beside this file; `seed capture` is what writes a",
+    "new version out of a developer's dev stack. Never hand-edit the",
+    "sizes or digests \u2014 regenerate them, or the loader refuses the copy.",
+    "",
+    "Every object is synthetic and describes nobody. Nothing under",
+    "seeds/fixtures/ may ever hold a real person's document."
+  ],
+  "version": "v1",
+  "objects": {
+    "objects/sample-pay-stub.pdf": {
+      "size": 859,
+      "sha256": "23a4cc15ee9d513cc9db34a52d5249378b374e48f38e12c516b89b3518591ccf"
+    },
+    "objects/sample-bank-statement.pdf": {
+      "size": 867,
+      "sha256": "4ae3235c6698f67700c15e35c6e21c24328653f9233a056ff6fd1f86a917107e"
+    }
+  }
+}

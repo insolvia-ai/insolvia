@@ -52,11 +52,20 @@
 # seeds/dev.json, which is the answer to "what is on a developer's machine" and
 # is reviewable as a diff. This script does not describe the data; it only says
 # WHERE to put it. The same loader puts seeds/staging.json into staging from
-# app-staging.yml, so the two environments differ in their fixture and their
-# tables, never in the code path that built the rows. The account step lives
-# HERE in the wrapper, not in the loader, for the same reason: staging's
-# accounts come from its fixture (password via ${E2E_TEST_USER_PASSWORD}), so
-# a prompt in the loader would be a dev-only fork of a CI-shared path.
+# the seed step CI runs (.github/actions/seed-staging), so the two environments
+# differ in their fixture and their tables, never in the code path that built
+# the rows. The account step lives HERE in the wrapper, not in the loader, for
+# the same reason: staging's accounts come from its fixture (password via
+# ${E2E_TEST_USER_PASSWORD}), so a prompt in the loader would be a dev-only
+# fork of a CI-shared path.
+#
+# The fixture also names CASES (seeds/fixtures/<version>/), whose sample
+# documents live in the shared fixture bucket — one bucket for the account,
+# infra/modules/dev_fixtures, applied by CI as part of envs/shared. The loader
+# copies them server-side into this machine's own case-documents bucket; the
+# developer's credentials are what read the shared bucket. If the copy is
+# refused, the bucket has not been applied yet or the fixture version has not
+# been published (scripts/dev-fixture.sh publish).
 #
 # ## Why this is shell and the loading is Python
 #
@@ -78,8 +87,9 @@
 # and could be pointed at the prod pool by changing one argument is a script
 # that eventually is. The names come from THIS machine's Terraform state and
 # must carry this machine's short id; the loader re-checks each name's shape
-# itself, so neither guard is load-bearing alone. Staging is seeded by
-# app-staging.yml calling the loader directly, and prod is refused outright.
+# itself, so neither guard is load-bearing alone. Staging is seeded by the
+# .github/actions/seed-staging step its deploy workflows share, and prod is
+# refused outright.
 #
 # ## AWS credentials
 #
@@ -137,6 +147,21 @@ FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
   die "No firm_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
 [[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
   die "Refusing: firm table '$FIRM_TABLE' is not '$FIRM_TABLE_NAME_EXPECTED'."
+
+CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
+[[ -n "$CASE_TABLE" ]] ||
+  die "No case_table_name in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
+[[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
+  die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
+DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
+[[ -n "$DOCUMENT_BUCKET" ]] ||
+  die "No case_document_bucket in this machine's Terraform state. Run ./scripts/dev-aws-setup.sh first."
+[[ "$DOCUMENT_BUCKET" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
+  die "Refusing: document bucket '$DOCUMENT_BUCKET' does not carry this machine's prefix."
+# The shared fixture bucket is account-level and named deterministically
+# (infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET overrides it for
+# an account that names it differently.
+FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AWS_REGION_VALUE}"
 
 POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"
 [[ -n "$POOL_ID" ]] ||
@@ -290,10 +315,13 @@ ensure_account() {
 # cover everything the seeder imports, and a second venv for one entrypoint
 # would be setup for setup's sake.
 seed() {
-  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed \
+  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.seed load \
     --fixture "$FIXTURE" \
     --firm-table "$FIRM_TABLE" \
     --user-pool-id "$POOL_ID" \
+    --case-table "$CASE_TABLE" \
+    --document-bucket "$DOCUMENT_BUCKET" \
+    --fixture-bucket "$FIXTURE_BUCKET" \
     "$@"
 }
 
@@ -312,6 +340,6 @@ for email in "${ACCOUNT_EMAILS[@]}"; do
 done
 offer_to_save_password
 
-log "Loading $(basename "$FIXTURE") into $FIRM_TABLE"
+log "Loading $(basename "$FIXTURE") into $FIRM_TABLE and $CASE_TABLE (documents from s3://$FIXTURE_BUCKET)"
 seed
 ok "Done. Start ./scripts/dev-up.sh if it is not running, then sign in at http://localhost:3000 as ${ACCOUNT_EMAILS[0]}."
