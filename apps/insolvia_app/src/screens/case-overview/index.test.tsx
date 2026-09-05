@@ -75,6 +75,32 @@ function debtor(given: string, surname: string) {
   };
 }
 
+/** A `GET /v1/cases/{id}/summary` body, in the route's exact wire shape. */
+function summaryBody(
+  over: { readonly readyToFile?: boolean; readonly problems?: unknown[] } = {},
+  totals: Readonly<Record<string, string>> = {},
+) {
+  return {
+    readyToFile: over.readyToFile ?? false,
+    problems: over.problems ?? [
+      {
+        source: 'debtors',
+        message: "The case has no Debtor 1 record — every form prints the debtor's name.",
+      },
+    ],
+    totals: {
+      realEstate: '0',
+      personalProperty: '0',
+      assets: '0',
+      secured: '0',
+      priorityUnsecured: '0',
+      nonpriorityUnsecured: '0',
+      liabilities: '0',
+      ...totals,
+    },
+  };
+}
+
 /**
  * Everything the layout and the overview read, each empty by default, so a test
  * states only the endpoint it is about.
@@ -93,6 +119,7 @@ function caseReads(
     [`/v1/cases/${CASE_ID}/packets`]: () => jsonResponse(200, { packets: [] }),
     [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, { assignees: [] }),
     [`/v1/cases/${CASE_ID}/extraction/candidates`]: () => jsonResponse(200, { candidates: [] }),
+    [`/v1/cases/${CASE_ID}/summary`]: () => jsonResponse(200, summaryBody()),
     ...over,
   };
 }
@@ -214,7 +241,8 @@ describe('the case overview', () => {
     ready({ [`/v1/cases/${CASE_ID}/creditors`]: () => jsonResponse(500, { message: 'nope' }) });
     await screen.findByText('Nobody assigned');
 
-    expect(screen.getByText('—')).toBeTruthy();
+    // Exactly one: the creditors row. Everything else answered.
+    expect(screen.getAllByText('—')).toHaveLength(1);
   });
 
   it('keeps extraction review out of the page when the firm cannot see it', async () => {
@@ -318,5 +346,89 @@ describe('the case rail', () => {
     await userEvent.press(screen.getByLabelText('All cases'));
 
     expect(router.getPathname()).toBe('/cases');
+  });
+});
+
+/**
+ * Filing readiness and the money.
+ *
+ * Both come from `GET /v1/cases/{id}/summary`, and both are things the screen
+ * must not compute for itself — the totals because a second sum is a second
+ * answer to what a debtor owes, and readiness because an overview that says
+ * "ready" over a case the assembler refuses is worse than one that says
+ * nothing.
+ */
+describe('the case overview’s readiness and totals', () => {
+  let browser: FakeBrowser;
+  const realFetch = globalThis.fetch;
+
+  function withSummary(body: unknown) {
+    const route = routeFetch({
+      '/oauth2/token': tokenEndpointResponse,
+      '/v1/me': () => jsonResponse(200, me()),
+      '/v1/firm/directory': () => jsonResponse(200, DIRECTORY),
+      ...caseReads({ [`/v1/cases/${CASE_ID}/summary`]: () => jsonResponse(200, body) }),
+      [`/v1/cases/${CASE_ID}`]: () => jsonResponse(200, caseBody(CASE_ID)),
+    });
+    globalThis.fetch = jest.fn((url: string, _init?: RequestInit) =>
+      route(url),
+    ) as unknown as typeof fetch;
+    renderRouter('src/app', { initialUrl: `/cases/${CASE_ID}` });
+  }
+
+  beforeEach(() => {
+    mockAuthConfig = TEST_AUTH_CONFIG;
+    browser = installFakeBrowser();
+    writeRefreshToken('stored-refresh-token');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    browser.restore();
+    jest.clearAllMocks();
+  });
+
+  it('says what blocks filing, naming where each fix belongs', async () => {
+    withSummary(
+      summaryBody({
+        problems: [
+          { source: 'form/b106d', field: 'amount', message: 'Schedule D needs an amount.' },
+        ],
+      }),
+    );
+
+    expect(await screen.findByText('Schedule D needs an amount.')).toBeTruthy();
+    // `form/b106d` is not what a paralegal calls it.
+    expect(screen.getByText('B106D')).toBeTruthy();
+  });
+
+  it('says so plainly when nothing blocks filing', async () => {
+    withSummary(summaryBody({ readyToFile: true, problems: [] }));
+
+    expect(await screen.findByText(/can assemble its packet/)).toBeTruthy();
+  });
+
+  it('renders the totals exactly as the server sent them', async () => {
+    // Digit for digit, and never re-derived. `liabilities` is the server's sum;
+    // a screen that added the three itself could disagree with the schedules.
+    withSummary(
+      summaryBody(
+        {},
+        { secured: '14500.00', nonpriorityUnsecured: '8412.66', liabilities: '22912.66' },
+      ),
+    );
+
+    expect(await screen.findByText('22912.66')).toBeTruthy();
+    expect(screen.getByText('14500.00')).toBeTruthy();
+    expect(screen.getByText('8412.66')).toBeTruthy();
+  });
+
+  it('claims nothing about readiness when the summary could not be read', async () => {
+    // The dangerous failure is the optimistic one: a case that looks filable
+    // because the check failed.
+    withSummary(undefined);
+    await screen.findByText('Nobody assigned');
+
+    expect(screen.queryByText(/can assemble its packet/)).toBeNull();
   });
 });

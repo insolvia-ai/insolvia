@@ -21,10 +21,31 @@ import {
 import type {
   AddFirmUserRequest,
   Address,
+  CandidateOrigin,
+  CandidateStatus,
   Case,
   CaseAssignee,
   CaseChapter,
+  CaseCollection,
+  CaseEntity,
+  CaseEntityRequest,
+  CaseProblem,
   CaseStatus,
+  CaseSummary,
+  CaseTotals,
+  CreateCaseRequest,
+  CreateDocumentRequest,
+  CreateDocumentResult,
+  CreditCounseling,
+  CreditorMatrix,
+  CreditorMatrixProblem,
+  Debtor,
+  Document,
+  DocumentDownload,
+  DocumentStatus,
+  DocumentUpload,
+  ExtractionCandidate,
+  FilingRole,
   Firm,
   FirmColleague,
   FirmFeature,
@@ -33,46 +54,28 @@ import type {
   FirmStatus,
   FirmUser,
   FirmUserStatus,
-  PermissionLevel,
-  UpdateFirmRequest,
-  UpdateFirmUserRequest,
-  UpdateMeRequest,
-  CreateCaseRequest,
-  CreateDocumentRequest,
-  CreateDocumentResult,
-  Document,
-  DocumentDownload,
-  DocumentStatus,
-  DocumentUpload,
-  CaseCollection,
-  CaseEntity,
-  CaseEntityRequest,
-  CreditCounseling,
-  CreditorMatrix,
-  CreditorMatrixProblem,
-  Debtor,
-  FilingRole,
   HealthStatus,
-  CandidateOrigin,
-  CandidateStatus,
-  ExtractionCandidate,
   Job,
   JobFailure,
   JobKind,
   JobStatus,
-  ReviewCandidateRequest,
-  ReviewedCandidate,
   ListCasesOptions,
   ListCasesResult,
   OtherName,
   Packet,
   PacketDownload,
+  PermissionLevel,
   PersonName,
   Principal,
   ProvenanceEntry,
   ProvenanceMap,
   PutDebtorRequest,
+  ReviewCandidateRequest,
+  ReviewedCandidate,
   UpdateCaseChanges,
+  UpdateFirmRequest,
+  UpdateFirmUserRequest,
+  UpdateMeRequest,
   UploadDocumentOptions,
   Venue,
   WaitlistConfirmation,
@@ -915,6 +918,30 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return creditorMatrixFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/summary` — what this case is worth, what it owes,
+   * and whether it could be filed today.
+   *
+   * The case overview's one read. It is a separate endpoint rather than fields
+   * on {@link getCase} because it is expensive in a way the case record is
+   * not: every total is computed across the case's collections, so the server
+   * reads all of them. A caller who wants the chapter and district should call
+   * {@link getCase}.
+   *
+   * `readyToFile` comes from the same gate `packet_assembly` runs, so it and
+   * the assembler cannot disagree. Like {@link getCase}, a 404 means the case
+   * is unknown *or* not the caller's.
+   */
+  async getCaseSummary(caseId: string): Promise<CaseSummary> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/summary`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseSummaryFromJson(decoded);
   }
 
   /**
@@ -2271,6 +2298,42 @@ function creditorMatrixProblemFromJson(response: DecodedResponse): CreditorMatri
  * Decodes a {@link CreditorMatrix} — `matrix_json`'s exact shape. `content`
  * is absent, never null, when the server refused to produce the file.
  */
+function caseProblemFromJson(response: DecodedResponse): CaseProblem {
+  return definedMembers<CaseProblem>({
+    source: requireString(response, 'source'),
+    itemId: optionalString(response, 'itemId'),
+    field: optionalString(response, 'field'),
+    message: requireString(response, 'message'),
+  });
+}
+
+/**
+ * Every total is decoded as a STRING and never coerced to a number.
+ *
+ * `requireString` is doing real work here rather than being ceremony: a server
+ * that started sending these as JSON numbers would be a silent precision bug
+ * on money, and this is the boundary that turns it into a loud one.
+ */
+function caseTotalsFromJson(response: DecodedResponse): CaseTotals {
+  return {
+    realEstate: requireString(response, 'realEstate'),
+    personalProperty: requireString(response, 'personalProperty'),
+    assets: requireString(response, 'assets'),
+    secured: requireString(response, 'secured'),
+    priorityUnsecured: requireString(response, 'priorityUnsecured'),
+    nonpriorityUnsecured: requireString(response, 'nonpriorityUnsecured'),
+    liabilities: requireString(response, 'liabilities'),
+  };
+}
+
+function caseSummaryFromJson(response: DecodedResponse): CaseSummary {
+  return {
+    readyToFile: requireBoolean(response, 'readyToFile'),
+    problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
+    totals: caseTotalsFromJson(childObject(response, 'totals')),
+  };
+}
+
 function creditorMatrixFromJson(response: DecodedResponse): CreditorMatrix {
   return definedMembers<CreditorMatrix>({
     fileName: requireString(response, 'fileName'),

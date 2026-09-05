@@ -2541,6 +2541,73 @@ function pruneJsonValue(value: unknown): unknown {
 }
 
 /**
+ * One reason a case cannot assemble its filing packet as it stands.
+ *
+ * `source` says where the fix belongs: a collection name (`"claims"`,
+ * `"households"`), `"case"` or `"debtors"` for the two non-generic records, or
+ * a form series id (`"form/b101"`) when a projection is what refuses. `itemId`
+ * names the record when one record owns the fix, and `field` is the body path
+ * the entity endpoints validate — so a screen can send someone to the exact
+ * input rather than to "the case is incomplete". Both are absent, never null,
+ * where the problem belongs to a whole collection.
+ *
+ * The same shape the `packet_assembly` job reports when it refuses, because it
+ * is the same gate: see {@link CaseSummary.readyToFile}.
+ */
+export interface CaseProblem {
+  readonly source: string;
+  readonly itemId?: string;
+  readonly field?: string;
+  readonly message: string;
+}
+
+/**
+ * What a case is worth and what it owes — **every figure a decimal STRING**.
+ *
+ * Strings and not numbers, all the way from the server: these are amounts on a
+ * bankruptcy filing, and JSON numbers arrive as IEEE doubles where `1234.05`
+ * does not survive the trip. The same reason the domain stores a claim's
+ * `amount` as a string.
+ *
+ * **Do not add these up in a client.** They are already the totals, computed
+ * from the same functions the official forms print from — `secured` is what
+ * B106D's Column A totals, the unsecured pair is B106E/F lines 6e and 6j, and
+ * the asset pair is B106A/B lines 55 and 62. A second sum computed in a screen
+ * is a second answer to "what does this debtor owe", and the two agree only
+ * until somebody edits one.
+ */
+export interface CaseTotals {
+  readonly realEstate: string;
+  readonly personalProperty: string;
+  /** `realEstate` + `personalProperty`. */
+  readonly assets: string;
+  readonly secured: string;
+  readonly priorityUnsecured: string;
+  readonly nonpriorityUnsecured: string;
+  /** `secured` + `priorityUnsecured` + `nonpriorityUnsecured`. */
+  readonly liabilities: string;
+}
+
+/**
+ * `GET /v1/cases/{caseId}/summary` — one case from above.
+ *
+ * `readyToFile` is the SAME completeness gate packet assembly runs, not a
+ * cheaper approximation of it, so a screen showing "ready" can never be
+ * contradicted by the assembler a click later. When it is `false`, `problems`
+ * is why and is never empty.
+ *
+ * Expensive relative to {@link Case}: the totals are computed from the case's
+ * collections, so this reads all of them. Fetch it for a case overview, not to
+ * learn a chapter.
+ */
+export interface CaseSummary {
+  readonly readyToFile: boolean;
+  /** Empty exactly when `readyToFile` is true. */
+  readonly problems: readonly CaseProblem[];
+  readonly totals: CaseTotals;
+}
+
+/**
  * One reason one creditor cannot go on the matrix as recorded — issue #94.
  *
  * `creditorId` is absent on the single case-level problem (a case with no

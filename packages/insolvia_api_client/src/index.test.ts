@@ -4420,3 +4420,144 @@ describe('the extraction review endpoints', () => {
     expect(accepted).toEqual(job);
   });
 });
+
+describe('getCaseSummary', () => {
+  // The literal 200 body routes/case_summary.py answers for a bare case: every
+  // total zero, and the completeness gate's first structural refusal. Copied
+  // from the route, not inferred — `str(Decimal("0"))` really is "0" and not
+  // "0.00", and a decoder written against the prettier guess would be wrong.
+  const BARE = {
+    readyToFile: false,
+    problems: [
+      {
+        source: 'debtors',
+        message:
+          "The case has no Debtor 1 record — every form in the packet prints the debtor's name.",
+      },
+    ],
+    totals: {
+      realEstate: '0',
+      personalProperty: '0',
+      assets: '0',
+      secured: '0',
+      priorityUnsecured: '0',
+      nonpriorityUnsecured: '0',
+      liabilities: '0',
+    },
+  };
+
+  test('GETs /v1/cases/{caseId}/summary and maps the whole body', async () => {
+    const stub = stubFetch(() => jsonResponse(BARE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/summary`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(summary).toEqual(BARE);
+  });
+
+  test('keeps every total a string, digit for digit', async () => {
+    // The whole reason these are strings on the wire. `8412.66` through a JSON
+    // number is a double, and this is money on a bankruptcy filing.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...BARE,
+          totals: { ...BARE.totals, nonpriorityUnsecured: '8412.66', liabilities: '8412.66' },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.totals.nonpriorityUnsecured).toBe('8412.66');
+    expect(typeof summary.totals.liabilities).toBe('string');
+  });
+
+  test('rejects a total sent as a JSON number rather than coercing it', async () => {
+    // A server that started sending these as numbers is a silent precision bug
+    // on money; this boundary is what turns it into a loud one.
+    const stub = stubFetch(() =>
+      jsonResponse({ ...BARE, totals: { ...BARE.totals, liabilities: 8412.66 } }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseSummary(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('a problem omits itemId and field rather than sending them null', async () => {
+    // problem_json's optional-key rule: absent, never null. A decoder that
+    // accepted null would let `itemId: null` reach a screen as a record id.
+    const stub = stubFetch(() => jsonResponse(BARE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.problems[0]).not.toHaveProperty('itemId');
+    expect(summary.problems[0]).not.toHaveProperty('field');
+  });
+
+  test('carries itemId and field when one record owns the fix', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...BARE,
+          problems: [
+            {
+              source: 'claims',
+              itemId: ENTITY_ID,
+              field: 'amount',
+              message: 'A claim needs an amount.',
+            },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.problems[0]).toEqual({
+      source: 'claims',
+      itemId: ENTITY_ID,
+      field: 'amount',
+      message: 'A claim needs an amount.',
+    });
+  });
+
+  test('a ready case has no problems', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...BARE, readyToFile: true, problems: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.readyToFile).toBe(true);
+    expect(summary.problems).toEqual([]);
+  });
+});
