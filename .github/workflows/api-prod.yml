@@ -173,6 +173,7 @@ jobs:
       - name: Re-derive Lambda environment from SSM
         env:
           FUNCTION: ${{ steps.tf.outputs.function }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # /insolvia/prod/api/<kebab-key> -> KEBAB_KEY:
           #   insolvia-env        -> INSOLVIA_ENV  (= "production"; the infra
@@ -193,6 +194,14 @@ jobs:
           # Refuse to ship nonsense: an empty or half-applied namespace would
           # otherwise silently wipe every variable the service reads.
           echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          # The Anthropic key rides a GitHub environment secret, not SSM —
+          # the founder's choice (2026-09-05): pasted once into the
+          # environment, overlaid here onto the derived namespace. Empty
+          # secret = variable absent = the worker composes no ReviewModel
+          # and AI jobs fail honestly with not_configured (core/config.py).
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
+          fi
           aws lambda update-function-configuration \
             --function-name "$FUNCTION" \
             --environment "$environment"
@@ -323,6 +332,7 @@ jobs:
       - name: Re-derive worker environment from SSM
         env:
           WORKER: ${{ steps.tf.outputs.worker_function }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # The SAME /insolvia/prod/api namespace as the API Lambda — the
           # worker is the API's long-running half and reads the same config.
@@ -336,6 +346,14 @@ jobs:
                      | {Variables: from_entries}'
           )"
           echo "$environment" | jq -e '.Variables.INSOLVIA_ENV == "production"' > /dev/null
+          # The Anthropic key rides a GitHub environment secret, not SSM —
+          # the founder's choice (2026-09-05): pasted once into the
+          # environment, overlaid here onto the derived namespace. Empty
+          # secret = variable absent = the worker composes no ReviewModel
+          # and AI jobs fail honestly with not_configured (core/config.py).
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            environment="$(echo "$environment" | jq -c --arg v "$ANTHROPIC_API_KEY" '.Variables.ANTHROPIC_API_KEY = $v')"
+          fi
           aws lambda update-function-configuration \
             --function-name "$WORKER" \
             --environment "$environment"
