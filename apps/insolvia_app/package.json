@@ -60,8 +60,8 @@
   ],
   "dependencies": {
     "@insolvia-ai/api-client": "*",
-    "@insolvia-ai/design-system": "^0.16.0",
-    "@insolvia-ai/tokens": "^0.3.2",
+    "@insolvia-ai/design-system": "^0.20.0",
+    "@insolvia-ai/tokens": "^0.5.1",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.7",
     "expo-linking": "~57.0.4",

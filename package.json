@@ -51,8 +51,8 @@
       "Run with plain `node`, no loader and no build step: Node >=24 strips",
       "TypeScript types natively, so the tool stays dependency-free."
     ],
-    "tokens": "node tool/reconcile-cognito-branding.ts",
-    "tokens:check": "node tool/reconcile-cognito-branding.ts --check",
+    "tokens": "node tool/render-brand-theme.ts && node tool/reconcile-cognito-branding.ts",
+    "tokens:check": "node tool/render-brand-theme.ts --check && node tool/reconcile-cognito-branding.ts --check",
     "//lint": [
       "Fans out per member rather than running ESLint once from the root, and",
       "there is deliberately NO `eslint.config.js` at the repo root \u2014 the rules",
@@ -105,7 +105,7 @@
   ],
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia-ai/tokens": "^0.3.2",
+    "@insolvia-ai/tokens": "^0.5.1",
     "@types/node": "^24.13.3",
     "eslint": "^9.17.0",
     "globals": "^15.14.0",

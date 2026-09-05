@@ -183,14 +183,27 @@ below the `<title>` and why this paragraph is here rather than in the file.
 
 ## Everything else
 
-- **No hard-coded colors, radii, or spacing steps.** Everything comes from
-  `@insolvia-ai/tokens` via [`src/theme/`](src/theme/index.ts), and only the
-  **semantic** color layer is exported — the raw ink/brass/paper palette is
-  unreachable on purpose. Font sizes are the one scale tokens do not carry yet;
-  `theme/theme.ts`'s `fontSizes` is their single owner, so a literal `fontSize:` in a
-  component is a bug. The two colors in `public/manifest.json` are the unavoidable
-  exception — JSON cannot import tokens — so update them by hand if the brand
-  changes.
+- **No hard-coded colors, radii, or spacing steps.** Everything comes through
+  [`src/theme/`](src/theme/index.ts), and only the **semantic** color layer is
+  exported — the raw ink/brass/paper palette is unreachable on purpose.
+
+  Colours are now **two layers**: `@insolvia-ai/tokens` underneath, with
+  Insolvia's brand over the top. From tokens 0.5.0 the package's base theme is
+  deliberately unbranded (monochrome, square, sans headings), so the navy and
+  brass arrive as overrides from
+  [`brand/colors.json`](../../brand/colors.json) at the repo root, via the
+  GENERATED `src/theme/brand-colors.ts` — never edit that file, run
+  `npm run tokens`. `themeFor()` does the layering for this app's own
+  components; `ThemePreferenceProvider`'s `ThemeProvider` does it for the design
+  system's `.native` leaves, and it must pass the brand in *every* arm now —
+  passing nothing renders the package's monochrome chrome next to our navy. The
+  decision is [ADR 0020](../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md).
+
+  Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
+  `fontSizes` is their single owner, so a literal `fontSize:` in a component is
+  a bug. The two colors in `public/manifest.json` and the `themeColor` in
+  `app.config.ts` are the unavoidable exceptions — neither can import anything —
+  so check them by hand against `brand/colors.json` when the brand changes.
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
   `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.

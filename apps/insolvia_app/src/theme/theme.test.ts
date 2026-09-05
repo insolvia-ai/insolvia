@@ -1,6 +1,7 @@
 import { colors, radii, spacing } from '@insolvia-ai/tokens';
 
 import { contentMaxWidth, fontSizes, themeFor } from '@/theme';
+import { brandColors } from '@/theme/brand-colors';
 
 /**
  * Theme wiring.
@@ -10,12 +11,36 @@ import { contentMaxWidth, fontSizes, themeFor } from '@/theme';
  * someone opens the app in dark mode.
  */
 describe('themeFor', () => {
-  it('paints the light canvas in light mode', () => {
-    expect(themeFor('light').colors.bg).toBe(colors.light.bg);
+  it('paints the light canvas in Insolvia’s light canvas', () => {
+    expect(themeFor('light').colors.bg).toBe(brandColors.light.bg);
   });
 
-  it('paints the dark canvas in dark mode', () => {
-    expect(themeFor('dark').colors.bg).toBe(colors.dark.bg);
+  it('paints the dark canvas in Insolvia’s dark canvas', () => {
+    expect(themeFor('dark').colors.bg).toBe(brandColors.dark.bg);
+  });
+
+  /**
+   * The brand LAYERS over the tokens base rather than replacing it, and both
+   * halves of that are load-bearing.
+   *
+   * From tokens 0.5.0 the package's base theme is deliberately unbranded, so a
+   * role Insolvia claims must come from `brand/colors.json` — otherwise the app
+   * renders the package's monochrome chrome. But a role it does NOT claim must
+   * still come from the package, or every future tokens release (a new role, a
+   * re-measured contrast) would be silently pinned to whatever was current when
+   * the brand was written.
+   *
+   * `bg` is claimed and `success` is not, which is exactly why they are the two
+   * probed here — see brand/colors.json for why the status colours stay the
+   * package's.
+   */
+  it.each(['light', 'dark'] as const)('layers the brand over the tokens base in %s', (scheme) => {
+    const theme = themeFor(scheme);
+
+    expect(theme.colors.bg).toBe(brandColors[scheme].bg);
+    expect(theme.colors.bg).not.toBe(colors[scheme].bg);
+
+    expect(theme.colors.success).toBe(colors[scheme].success);
   });
 
   it('resolves an absent scheme to light rather than throwing', () => {

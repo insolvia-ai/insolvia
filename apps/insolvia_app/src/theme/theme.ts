@@ -1,6 +1,7 @@
 import { colors, radii, spacing, typography } from '@insolvia-ai/tokens';
 import type { ColorScheme, ColorSchemeName } from '@insolvia-ai/tokens';
 
+import { brandColors } from './brand-colors';
 import { useColorSchemeName } from './preference';
 
 /**
@@ -15,6 +16,12 @@ import { useColorSchemeName } from './preference';
  * Only the **semantic** color layer is reachable: `@insolvia-ai/tokens` does
  * not export the raw ink/brass/paper palette at all, so UI code cannot couple
  * to it and a re-brand stays a one-file change.
+ *
+ * That one file is `brand/colors.json` at the repo root. From tokens 0.5.0 the
+ * package's base theme is deliberately unbranded — monochrome chrome, square
+ * corners, no display face — so Insolvia's navy and brass arrive as overrides
+ * layered here rather than as package defaults. `themeFor` does the layering;
+ * `brand-colors.ts` next door is generated and must not be edited.
  */
 export interface Theme {
   readonly scheme: ColorSchemeName;
@@ -82,7 +89,12 @@ export function themeFor(scheme: string | null | undefined): Theme {
   const resolved: ColorSchemeName = scheme === 'dark' ? 'dark' : 'light';
   return {
     scheme: resolved,
-    colors: colors[resolved],
+    // Brand over base, not brand instead of base. `brandColors` names only the
+    // roles Insolvia moves, so every role it does not claim — the status
+    // colours, `dangerText`, the overlay values, the neutral ramp — stays the
+    // package's, and a tokens release that adds or re-measures one reaches this
+    // app without an edit here.
+    colors: { ...colors[resolved], ...brandColors[resolved] },
     spacing,
     radii,
     typography,

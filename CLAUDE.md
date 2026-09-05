@@ -40,7 +40,8 @@ packages/   insolvia_api_client · insolvia_core (Python — shared by the servi
 services/   api · admin · mailer · mcp    (Python on Lambda)
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
 infra/      Terraform: ci-trust · shared · staging · prod
-tool/       reconcile-cognito-branding.ts  (the sign-in page's colours)
+brand/      colors.json — Insolvia's palette, the ONE place it is written down
+tool/       brand-palette.ts · render-brand-theme.ts · reconcile-cognito-branding.ts
 docs/       plan.md · reference/ · runbooks/ · adr/ · business/
 ```
 
@@ -98,7 +99,8 @@ before you touch anything:
 | **touching the firm or case domain, token verification, or their stores** — item shapes, permissions, `FirmStore`, the case stores, JWKS | [`packages/insolvia_core/CLAUDE.md`](packages/insolvia_core/CLAUDE.md) — shared by the Python services; the item shapes have one owner · [ADR 0012](docs/adr/0012-shared-python-domain-package.md) · [ADR 0016](docs/adr/0016-mcp-server-is-its-own-service.md) |
 | **taking a new design-system / tokens version** (bumping the dependency) | `insolvia-design-system-bump` skill — bump every consumer's manifest and lockfile (app, admin portal, marketing), and regenerate the Cognito branding |
 | changing the app-local components (`apps/insolvia_app/src/components/`) | [`apps/insolvia_app/CLAUDE.md`](apps/insolvia_app/CLAUDE.md) · [ADR 0005](docs/adr/0005-expo-app-layout.md) — no version bump, not published; shared Button/Field come from the package, row above |
-| **the sign-in page's colours** (`infra/modules/auth/managed-login-settings.json`) | [`tool/reconcile-cognito-branding.ts`](tool/reconcile-cognito-branding.ts) — generated from the installed `@insolvia-ai/tokens`; `npm run tokens` regenerates, `npm run tokens:check` gates it |
+| **changing a brand colour**, or wondering why a surface renders monochrome | [`brand/colors.json`](brand/colors.json) — the design system's base theme is deliberately *unbranded* (tokens 0.5.0+), so Insolvia's navy and brass are overrides layered on top. Four surfaces are generated from this one file; `npm run tokens` regenerates, `npm run tokens:check` gates it. **Never hand-edit a generated output** · [ADR 0020](docs/adr/0020-the-brand-is-a-consumer-owned-override.md) |
+| **the sign-in page's colours** (`infra/modules/auth/managed-login-settings.json`) | [`tool/reconcile-cognito-branding.ts`](tool/reconcile-cognito-branding.ts) — one of the four outputs above, so it is the row above you want; this is the mapping onto AWS's document |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/reference/package-publishing.md`](docs/reference/package-publishing.md) |
 | touching env model, hosting, or PR-gate design | [`docs/reference/architecture.md`](docs/reference/architecture.md) |

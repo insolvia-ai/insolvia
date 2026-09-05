@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@insolvia-ai/design-system": "^0.14.1",
+    "@insolvia-ai/design-system": "^0.20.0",
     "@tailwindcss/vite": "^4.3.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
