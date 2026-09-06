@@ -22,9 +22,14 @@
     "                bankruptcy filing tool actually works in. It is also the",
     "                one of the three chosen for how it reads at 12-14px in a",
     "                dense table, not for how it looks in a heading.",
-    "  Archivo       the display face, and the only place the brand gets to",
-    "                have a voice. A grotesque with enough width and weight to",
-    "                hold a page title without shouting.",
+    "  Playfair Display  the display face, and the only place the brand gets",
+    "                    to have a voice. A high-contrast serif — thick stems,",
+    "                    fine serifs — which is what lets it read as",
+    "                    authoritative at 600 rather than merely large. It",
+    "                    replaced Archivo when the palette lost its colour:",
+    "                    with no navy and no brass doing the work, the display",
+    "                    face became the only thing carrying the brand, and a",
+    "                    grotesque could not carry it alone.",
     "  IBM Plex Mono case numbers, districts, form references (B106 · Schedule",
     "                D), amounts, timestamps. Anything that must align by",
     "                column or be read back to somebody over the phone.",
@@ -51,7 +56,7 @@
     "from this file by `npm run tokens`, and `npm run tokens:check` fails the",
     "build when one has drifted."
   ],
-  "heading": "Archivo, ui-sans-serif, system-ui, sans-serif",
+  "heading": "\"Playfair Display\", Georgia, \"Times New Roman\", serif",
   "body": "\"Public Sans\", ui-sans-serif, system-ui, sans-serif",
   "mono": "\"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
 }

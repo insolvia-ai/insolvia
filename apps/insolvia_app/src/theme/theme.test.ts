@@ -1,7 +1,22 @@
 import { colors, radii, spacing, typography as baseTypography } from '@insolvia-ai/tokens';
 
+/** WCAG relative-contrast, so a colour pairing can be asserted rather than eyeballed. */
+function contrast(a: string, b: string): number {
+  const channel = (h: string, i: number) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = (hex: string) =>
+    0.2126 * channel(hex, 1) + 0.7152 * channel(hex, 3) + 0.0722 * channel(hex, 5);
+  // Destructuring a sorted array gives `number | undefined` under
+  // noUncheckedIndexedAccess; Math.max/min say the same thing without it.
+  const one = luminance(a);
+  const two = luminance(b);
+  return (Math.max(one, two) + 0.05) / (Math.min(one, two) + 0.05);
+}
+
 import { contentMaxWidth, fontSizes, themeFor } from '@/theme';
-import { brandColors, brandFonts } from '@/theme/brand-colors';
+import { brandColors, brandFonts, brandRadii } from '@/theme/brand-colors';
 
 /**
  * Theme wiring.
@@ -40,8 +55,24 @@ describe('themeFor', () => {
     expect(theme.colors.bg).toBe(brandColors[scheme].bg);
     expect(theme.colors.bg).not.toBe(colors[scheme].bg);
 
-    expect(theme.colors.success).toBe(colors[scheme].success);
+    // `dangerText` is the probe for the OTHER half now. `success` used to be —
+    // it fell through to the package — but the warm-neutral palette claims all
+    // three status colours, because the base's saturated versions would be the
+    // only vivid marks on an otherwise neutral page.
+    expect(theme.colors.dangerText).toBe(colors[scheme].dangerText);
   });
+
+  it.each(['light', 'dark'] as const)(
+    'leaves dangerText readable on the danger the brand DID claim in %s',
+    (scheme) => {
+      // The half of layering that can go wrong quietly. The package measures
+      // `dangerText` against ITS `danger`; the brand replaced `danger` and did
+      // not replace the text colour, so the pairing has to be re-checked rather
+      // than assumed. It still clears — 6.63:1 light, 6.76:1 dark.
+      const theme = themeFor(scheme);
+      expect(contrast(theme.colors.dangerText, theme.colors.danger)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
   it('resolves an absent scheme to light rather than throwing', () => {
     // `useColorScheme()` returns null when the platform has no preference.
@@ -57,11 +88,25 @@ describe('themeFor', () => {
     expect(light.colors.ink).not.toBe(dark.colors.ink);
   });
 
-  it('passes the scheme-independent tokens through unchanged', () => {
-    // Spacing and radii are the same in both schemes — only colors differ — so
-    // the theme must not fork them.
+  it('passes spacing through untouched — the brand states no opinion on it', () => {
     expect(themeFor('dark').spacing).toBe(spacing);
-    expect(themeFor('dark').radii).toBe(radii);
+  });
+
+  it.each(['light', 'dark'] as const)('brands the corners, and identically in %s', (scheme) => {
+    // Radii USED to pass through unchanged. They no longer do: the base states
+    // 0 at every step because a corner is a brand decision, and
+    // `brand/radii.json` makes it. Same in both schemes — a corner does not
+    // depend on the light level.
+    expect(themeFor(scheme).radii.lg).toBe(brandRadii.lg);
+    expect(themeFor(scheme).radii.lg).not.toBe(radii.lg);
+    expect(themeFor('light').radii).toEqual(themeFor('dark').radii);
+  });
+
+  it('leaves pill alone, because the package refuses to theme it', () => {
+    // `nativeRadiiWith` drops a `pill` override — the leaves that draw a
+    // capsule compute their own — so stating one would be honoured by nothing.
+    expect(themeFor('light').radii.pill).toBe(radii.pill);
+    expect(brandRadii).not.toHaveProperty('pill');
   });
 });
 
@@ -103,17 +148,25 @@ describe('the brand type families', () => {
     expect(themeFor('light').typography).toEqual(themeFor('dark').typography);
   });
 
-  it.each(['heading', 'body', 'mono'] as const)(
-    'ends the %s stack in the generic the base theme used',
-    (role) => {
-      // A face that fails to load must fall back to what shipped before it, not
-      // to the browser's default serif. Each stack keeps the package's own
-      // last-resort generic as its final entry.
-      const base = baseTypography[role];
-      const generic = base.slice(base.lastIndexOf(',') + 1).trim();
-      expect(brandFonts[role].endsWith(generic)).toBe(true);
-    },
-  );
+  it.each(['heading', 'body', 'mono'] as const)('ends the %s stack in a real generic', (role) => {
+    // A face that fails to load must still resolve to SOMETHING chosen, rather
+    // than to whatever the browser defaults to.
+    //
+    // This used to assert the stack ended in the generic the BASE used, which
+    // was right while every role was a sans. `heading` is a serif now — a
+    // deliberate brand decision — so the rule is that the stack names a
+    // generic, not that it names the package's.
+    const generic = brandFonts[role].slice(brandFonts[role].lastIndexOf(',') + 1).trim();
+    expect(['serif', 'sans-serif', 'monospace']).toContain(generic);
+  });
+
+  it('gives the heading a serif and the body a sans, not two of a kind', () => {
+    // The pairing is the point: the display face carries the brand precisely
+    // because it contrasts with the face beside it.
+    expect(brandFonts.heading.endsWith('serif')).toBe(true);
+    expect(brandFonts.heading.endsWith('sans-serif')).toBe(false);
+    expect(brandFonts.body.endsWith('sans-serif')).toBe(true);
+  });
 
   it('names a real family before the fallbacks', () => {
     // Guards the case where a stack is edited down to only generics, which

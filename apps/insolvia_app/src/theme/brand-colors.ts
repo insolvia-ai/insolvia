@@ -12,35 +12,40 @@
 
 export const brandColors = {
   light: {
-    accent: '#B8863B',
-    accentHover: '#A27634',
-    bg: '#FAF9F6',
-    brand: '#0B2A4A',
+    accent: '#8A6524',
+    accentHover: '#75551E',
+    bg: '#FAFAF9',
+    brand: '#0F0E0D',
     card: '#FFFFFF',
-    ink: '#141A1F',
-    line: '#C9D0D8',
-    muted: '#5A6672',
-    primary: '#0B2A4A',
-    primaryActive: '#09223B',
-    primaryHover: '#0A2541',
-    primaryText: '#FFFFFF',
-    surfaceAlt: '#EFEDE6',
+    danger: '#8C4A3F',
+    ink: '#0F0E0D',
+    line: '#E4E2DE',
+    muted: '#706D66',
+    primary: '#1A1917',
+    primaryActive: '#0A0908',
+    primaryHover: '#0F0E0D',
+    primaryText: '#FAFAF9',
+    success: '#3F6B52',
+    surfaceAlt: '#F1F0ED',
+    warning: '#8A6524',
   },
   dark: {
-    accent: '#D2A857',
-    accentHover: '#D7B26B',
-    bg: '#0B1622',
-    brand: '#E9EEF4',
-    card: '#122032',
-    ink: '#E9EEF4',
-    line: '#2E4459',
-    muted: '#889CB1',
-    primary: '#D2A857',
-    primaryActive: '#B08D49',
-    primaryHover: '#D7B26B',
-    primaryText: '#0B1622',
-    surfaceAlt: '#1B2D42',
-    warning: '#E0913C',
+    accent: '#C6A059',
+    accentHover: '#D2B074',
+    bg: '#100F0E',
+    brand: '#F5F4F2',
+    card: '#1A1917',
+    danger: '#C88C80',
+    ink: '#F5F4F2',
+    line: '#2E2C29',
+    muted: '#9A968F',
+    primary: '#F5F4F2',
+    primaryActive: '#DAD7D2',
+    primaryHover: '#FFFFFF',
+    primaryText: '#100F0E',
+    success: '#7FA98D',
+    surfaceAlt: '#242220',
+    warning: '#C6A059',
   },
 } as const;
 
@@ -56,7 +61,23 @@ export const brandColors = {
  * `public/fonts`, declared @font-face in `public/index.html`.
  */
 export const brandFonts = {
-  heading: 'Archivo, ui-sans-serif, system-ui, sans-serif',
+  heading: '"Playfair Display", Georgia, "Times New Roman", serif',
   body: '"Public Sans", ui-sans-serif, system-ui, sans-serif',
   mono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+} as const;
+
+/**
+ * The brand corner radii, from brand/radii.json.
+ *
+ * Two consumers again: the app's own `useTheme()` reads them as `radii`,
+ * and `ThemeProvider` takes them so the package's native leaves follow.
+ * `pill` is absent because the package refuses to theme it — the leaves
+ * that draw a capsule compute their own.
+ */
+export const brandRadii = {
+  none: 0,
+  xs: 3,
+  sm: 4,
+  md: 6,
+  lg: 10,
 } as const;

@@ -1,6 +1,6 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
-import { Badge, Sidebar } from '@insolvia-ai/design-system';
+import { Badge, Sidebar, ThemeProvider } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
+import { brandColors, brandFonts, brandRadii } from '@/theme/brand-colors';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -92,6 +93,48 @@ const SECTIONS: readonly Section[] = [
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
 ];
+
+/**
+ * The rail's own colours, taken from the DARK scheme whatever the app's scheme
+ * is.
+ *
+ * The rail is chrome and stays dark in both — near-black beside an ivory
+ * workspace in light mode, a step above the ground in dark. Reading these from
+ * `theme.colors` instead would paint near-black text on near-black the moment
+ * somebody switched to light.
+ *
+ * They come from `brandColors.dark` rather than being spelled out, so the one
+ * file that owns the palette still owns this.
+ */
+const railColors = {
+  bg: brandColors.dark.card,
+  line: brandColors.dark.line,
+  ink: brandColors.dark.ink,
+  muted: brandColors.dark.muted,
+  active: brandColors.dark.surfaceAlt,
+} as const;
+
+/**
+ * The theme the rail's own package components run under.
+ *
+ * BOTH slots hold the dark palette, which is the same trick
+ * `ThemePreferenceProvider` uses for an explicit scheme: the package's leaves
+ * consult the OS themselves and cannot be redirected, so the way to pin them is
+ * to make both answers the same one. Without it a `Sidebar.Item` in light mode
+ * takes near-black ink from the active scheme and paints it on the near-black
+ * rail.
+ *
+ * Nesting is supported and the nearest provider wins outright — the package
+ * says so explicitly — so this pins the rail without touching the rest of the
+ * app. Frozen and hoisted so it is one stable object for the module's life,
+ * which is what keeps the leaves' `React.memo` boundaries intact.
+ */
+const RAIL_THEME = Object.freeze({
+  light: brandColors.dark,
+  dark: brandColors.dark,
+  fonts: brandFonts,
+  radii: brandRadii,
+});
 
 const STATUS_LABEL: Record<Case['status'], string> = {
   intake: 'In intake',
@@ -275,79 +318,104 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
     <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
       <AppShell frame="workspace">
         <View style={[styles.workspace, stacked ? styles.workspaceStacked : null]}>
-          <View style={stacked ? styles.railStacked : styles.rail}>
-            <Sidebar.Root>
-              <Sidebar.Head>
-                <Sidebar.Title>{title}</Sidebar.Title>
-              </Sidebar.Head>
+          {/*
+            THE RAIL IS DARK ON EVERY SCHEME, and that is the composition rather
+            than an oversight. In light mode it is near-black against an ivory
+            workspace, which is what gives a case a permanent identity and what
+            keeps the chrome from dissolving into the page now that no colour is
+            doing that job. In dark mode it is a step ABOVE the ground for the
+            same reason — the rail must read as chrome either way.
 
-              <View style={styles.identity}>
-                {titleIsDebtors ? (
+            It is the one place in the app that paints a colour the scheme did
+            not choose, so it takes its ink and its muted text from the DARK
+            scheme explicitly rather than from `theme.colors`, which would hand
+            it near-black text on near-black in light mode.
+          */}
+          <View
+            style={[
+              stacked ? styles.railStacked : styles.rail,
+              { backgroundColor: railColors.bg, borderRightColor: railColors.line },
+            ]}
+          >
+            <ThemeProvider theme={RAIL_THEME}>
+              <Sidebar.Root>
+                <Sidebar.Head>
                   <Text
-                    style={[
-                      styles.identityLine,
-                      { color: theme.colors.muted, fontFamily: theme.typography.body },
-                    ]}
+                    numberOfLines={2}
+                    style={[styles.railTitle, { fontFamily: theme.typography.heading }]}
                   >
-                    {chapterAndDistrict(matter)}
+                    {title}
                   </Text>
-                ) : null}
-                <View style={styles.status}>
-                  <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                    {STATUS_LABEL[matter.status]}
-                  </Badge>
+                </Sidebar.Head>
+
+                <View style={styles.identity}>
+                  {titleIsDebtors ? (
+                    <Text
+                      style={[
+                        styles.identityLine,
+                        { color: theme.colors.muted, fontFamily: theme.typography.body },
+                      ]}
+                    >
+                      {chapterAndDistrict(matter)}
+                    </Text>
+                  ) : null}
+                  <View style={styles.status}>
+                    <Badge intent={STATUS_INTENT[matter.status]} size="sm">
+                      {STATUS_LABEL[matter.status]}
+                    </Badge>
+                  </View>
                 </View>
-              </View>
 
-              <Sidebar.Separator />
+                <Sidebar.Separator />
 
-              {/* NAMED, and named something other than "Primary". `Sidebar.Nav`
+                {/* NAMED, and named something other than "Primary". `Sidebar.Nav`
                 emits `role="navigation"`, which is a landmark, and so does
                 `AppShell`'s header nav. Two landmarks of a kind on one page
                 have to be told apart by name — axe flags the pair when both
                 take the default, and a screen reader offers "navigation,
                 navigation". This is also why "All cases" sits in the footer
                 below rather than in a second nav of its own. */}
-              <Sidebar.Nav label="Case sections">
-                {visible.map((section) => {
-                  const badge = section.count === undefined ? null : counts[section.count];
-                  return (
-                    <Sidebar.Item
-                      key={section.segment}
-                      // The count rides in the LABEL rather than as a node
-                      // beside it: `Sidebar.Item` pins its accessible name to
-                      // `label`, so a separately-rendered badge would be
-                      // invisible to a screen reader — "Extraction review"
-                      // whether twelve records were waiting or none.
-                      label={
-                        badge === null || badge === 0
-                          ? section.label
-                          : `${section.label} (${badge})`
-                      }
-                      active={section.segment === current}
-                      onPress={() => {
-                        router.push(
-                          section.segment === ''
-                            ? `/cases/${caseId}`
-                            : `/cases/${caseId}/${section.segment}`,
-                        );
-                      }}
-                    />
-                  );
-                })}
-              </Sidebar.Nav>
+                <Sidebar.Nav label="Case sections">
+                  {visible.map((section) => {
+                    const badge = section.count === undefined ? null : counts[section.count];
+                    return (
+                      <Sidebar.Item
+                        key={section.segment}
+                        // The count rides in the LABEL rather than as a node
+                        // beside it: `Sidebar.Item` pins its accessible name to
+                        // `label`, so a separately-rendered badge would be
+                        // invisible to a screen reader — "Extraction review"
+                        // whether twelve records were waiting or none.
+                        label={
+                          badge === null || badge === 0
+                            ? section.label
+                            : `${section.label} (${badge})`
+                        }
+                        active={section.segment === current}
+                        onPress={() => {
+                          router.push(
+                            section.segment === ''
+                              ? `/cases/${caseId}`
+                              : `/cases/${caseId}/${section.segment}`,
+                          );
+                        }}
+                      />
+                    );
+                  })}
+                </Sidebar.Nav>
 
-              <Sidebar.Separator />
+                <Sidebar.Separator />
 
-              <Sidebar.Footer>
-                <Sidebar.Item
-                  label="All cases"
-                  onPress={() => {
-                    router.push('/cases');
-                  }}
-                />
-              </Sidebar.Footer>
-            </Sidebar.Root>
+                <Sidebar.Footer>
+                  <Sidebar.Item
+                    label="All cases"
+                    onPress={() => {
+                      router.push('/cases');
+                    }}
+                  />
+                </Sidebar.Footer>
+              </Sidebar.Root>
+            </ThemeProvider>
           </View>
 
           <View style={styles.content}>{children}</View>
@@ -382,12 +450,19 @@ const styles = StyleSheet.create({
   identityLine: {
     fontSize: fontSizes.caption,
   },
+  railTitle: {
+    color: brandColors.dark.ink,
+    fontSize: fontSizes.body,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
   rail: {
     // `Sidebar.Root` sets its OWN width — `sidebarWidth.expanded`, 256 — so
     // this holds exactly that and nothing else. It used to say 232, which the
     // sidebar overflowed by 24: precisely the `spacing.lg` gap that used to be
     // on `workspace`, so the two columns rendered flush against each other and
     // the gap looked like it had never been written.
+    borderRightWidth: 1,
     width: 256,
   },
   railStacked: {

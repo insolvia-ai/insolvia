@@ -21,7 +21,7 @@
       behind a sign-in and the person using it is looking at a named client's
       bankruptcy file, so it should not be announcing page views to a third
       party to fetch a typeface. The .woff2 files are latin-subset and total
-      about 76KB for all five; `scripts/fetch-brand-fonts.sh` regenerates them
+      about 109KB for all six; `scripts/fetch-brand-fonts.sh` regenerates them
       and `public/fonts/OFL.txt` carries the licence they ship under.
 
       The families themselves are declared once in `brand/fonts.json` and reach
@@ -43,18 +43,25 @@
     />
     <style id="insolvia-fonts">
       @font-face {
-        font-family: 'Archivo';
+        font-family: 'Playfair Display';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/playfair-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Playfair Display';
         font-style: normal;
         font-weight: 600;
         font-display: swap;
-        src: url('/fonts/archivo-600.woff2') format('woff2');
+        src: url('/fonts/playfair-600.woff2') format('woff2');
       }
       @font-face {
-        font-family: 'Archivo';
+        font-family: 'Playfair Display';
         font-style: normal;
         font-weight: 700;
         font-display: swap;
-        src: url('/fonts/archivo-700.woff2') format('woff2');
+        src: url('/fonts/playfair-700.woff2') format('woff2');
       }
       @font-face {
         font-family: 'Public Sans';

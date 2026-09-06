@@ -39,8 +39,9 @@ grab() { # grab <family-query> <weight> <output-name>
 }
 
 echo "fetching brand faces into ${OUT#"$ROOT/"}"
-grab "Archivo"       600 "archivo-600.woff2"
-grab "Archivo"       700 "archivo-700.woff2"
+grab "Playfair+Display" 500 "playfair-500.woff2"
+grab "Playfair+Display" 600 "playfair-600.woff2"
+grab "Playfair+Display" 700 "playfair-700.woff2"
 grab "Public+Sans"   400 "public-sans-400.woff2"
 grab "Public+Sans"   600 "public-sans-600.woff2"
 grab "IBM+Plex+Mono" 400 "ibm-plex-mono-400.woff2"

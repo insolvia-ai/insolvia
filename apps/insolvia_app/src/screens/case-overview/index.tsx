@@ -276,9 +276,7 @@ export function CaseOverview() {
         {/* ── At a glance ─────────────────────────────────────────────── */}
         <View style={stacked ? styles.asideStacked : styles.aside}>
           <Section title="At a glance">
-            {/* The 1px gaps show the rule colour through, so four tiles read as
-                one panel rather than four floating boxes. */}
-            <View style={[styles.tiles, { backgroundColor: theme.colors.line }]}>
+            <View style={styles.tiles}>
               <Tile
                 value={counts.creditors === null ? '—' : String(counts.creditors)}
                 label="Creditors"
@@ -313,11 +311,28 @@ export function CaseOverview() {
   );
 }
 
-/** A titled block with a rule under its heading — the page's one grouping unit. */
+/**
+ * A titled block — the page's one grouping unit, and now a CARD.
+ *
+ * A hairline under a heading was enough while the palette had a saturated
+ * ground doing the separating. It is not enough on warm neutrals: with no
+ * colour between a block and the page, a rule on its own reads as a wireframe
+ * rather than as an object. A white surface, a hairline border and the brand's
+ * `lg` corner is what makes it a thing rather than a gap.
+ */
 function Section({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
   const theme = useTheme();
   return (
-    <View style={styles.section}>
+    <View
+      style={[
+        styles.section,
+        {
+          backgroundColor: theme.colors.card,
+          borderColor: theme.colors.line,
+          borderRadius: theme.radii.lg,
+        },
+      ]}
+    >
       <View style={[styles.sectionHead, { borderBottomColor: theme.colors.line }]}>
         <Heading level={2} size="body">
           {title}
@@ -401,16 +416,7 @@ function stageTone(state: StageState, colors: ReturnType<typeof useTheme>['color
 function Blocker({ label, message }: { label: string; message: string }) {
   const theme = useTheme();
   return (
-    <View
-      style={[
-        styles.blocker,
-        {
-          backgroundColor: theme.colors.card,
-          borderColor: theme.colors.line,
-          borderLeftColor: theme.colors.danger,
-        },
-      ]}
-    >
+    <View style={[styles.blocker, { borderLeftColor: theme.colors.danger }]}>
       <View style={styles.blockerTop}>
         <Badge intent="danger" size="sm">
           {label}
@@ -432,7 +438,7 @@ function Blocker({ label, message }: { label: string; message: string }) {
 function Tile({ value, label }: { value: string; label: string }) {
   const theme = useTheme();
   return (
-    <View style={[styles.tile, { backgroundColor: theme.colors.card }]}>
+    <View style={styles.tile}>
       <Text
         style={[
           styles.tileValue,
@@ -512,10 +518,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   blocker: {
-    borderLeftWidth: 3,
-    borderWidth: 1,
+    // Inside a card already, so this drops its own fill and border and keeps
+    // only the severity stripe. A card within a card is two objects where
+    // there is one.
+    borderLeftWidth: 2,
     gap: spacing.xs,
-    padding: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingLeft: spacing.md,
   },
   blockerText: {
     fontSize: fontSizes.label,
@@ -577,7 +586,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   section: {
+    borderWidth: 1,
     gap: spacing.sm,
+    padding: spacing.lg,
   },
   sectionHead: {
     alignItems: 'baseline',
@@ -641,10 +652,10 @@ const styles = StyleSheet.create({
     width: 11,
   },
   tile: {
-    flexBasis: '48%',
+    flexBasis: '46%',
     flexGrow: 1,
     gap: 2,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
   },
   tileLabel: {
     fontSize: 10,
@@ -660,6 +671,6 @@ const styles = StyleSheet.create({
   tiles: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 1,
+    gap: spacing.md,
   },
 });

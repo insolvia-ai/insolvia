@@ -210,6 +210,20 @@ below the `<title>` and why this paragraph is here rather than in the file.
   `public/index.html` — naming a family does not load it — and
   `scripts/fetch-brand-fonts.sh` regenerates them.
 
+  Corner radii layer the same way, from `brand/radii.json`, through the same
+  two seams. The package states 0 at every step because a corner is a brand
+  decision; Insolvia now states small ones (10 on a card, 6 on a control) — the
+  warm-neutral palette has no colour separating a card from the page, so at 0
+  the hairlines read as a wireframe. `pill` is deliberately absent: the package
+  refuses to theme it.
+
+  **The case rail is the one surface that paints a colour the scheme did not
+  choose.** It is dark in both schemes, because it is chrome; `CaseShell` pins
+  the package's leaves inside it with a nested `ThemeProvider` holding the dark
+  palette in BOTH slots, the same trick `ThemePreferenceProvider` uses for an
+  explicit scheme. Without it a `Sidebar.Item` in light mode paints near-black
+  ink on the near-black rail.
+
   Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
   `fontSizes` is their single owner, so a literal `fontSize:` in a component is
   a bug. The two colors in `public/manifest.json` and the `themeColor` in
