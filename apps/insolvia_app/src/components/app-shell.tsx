@@ -2,6 +2,7 @@ import { permits } from '@insolvia-ai/api-client';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Link } from 'expo-router';
+import type { ExternalPathString } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
@@ -138,11 +139,20 @@ export function AppShell({ children, maxContentWidth = contentMaxWidth }: AppShe
               that part is a Pressable with `accessibilityRole="link"`, which
               react-native-web renders as `<div role="link">` — no href, so no
               middle-click and no open-in-new-tab. These leave the app, so a
-              real anchor matters more than the shared styling. */}
-          <Link href={`${marketingUrl(env.name)}/privacy`} style={footerLink}>
+              real anchor matters more than the shared styling.
+
+              THE CASTS ARE LOAD-BEARING, and not a way around a type error.
+              `Href` is expo-router's union of this app's OWN routes, generated
+              into `.expo/types/router.d.ts` — which only the dev server writes,
+              and which CI therefore never has. So `typecheck` passed in CI and
+              failed on any machine that had run the app, on two links that were
+              always correct: an absolute marketing URL is an external
+              destination and can never be a member of that union.
+              `ExternalPathString` is the arm expo-router provides to say so. */}
+          <Link href={`${marketingUrl(env.name)}/privacy` as ExternalPathString} style={footerLink}>
             Privacy
           </Link>
-          <Link href={marketingUrl(env.name)} style={footerLink}>
+          <Link href={marketingUrl(env.name) as ExternalPathString} style={footerLink}>
             Get help
           </Link>
         </View>

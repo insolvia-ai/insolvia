@@ -13,12 +13,33 @@ import { AppShell } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
 import { fontSizes, railBreakpoint, spacing, useTheme, workspaceMaxWidth } from '@/theme';
 
+/**
+ * The one count the rail shows beside a section's name.
+ *
+ * `null` is "not read yet, or could not be read", and renders as no badge at
+ * all rather than as a zero — a rail that says "Extraction review 0" on every
+ * case whose count request failed is worse than one that says nothing.
+ *
+ * ONLY the review queue, and that is a deliberate limit. The rail is on all
+ * seven case screens, so anything counted here is a request every one of them
+ * pays. A documents badge cost exactly that and duplicated the documents
+ * screen's own listing; the review queue earns it because it is the "somebody
+ * owes this case work" signal and no other screen fetches it. The overview
+ * reads this rather than asking again.
+ */
+export interface CaseCounts {
+  readonly pendingReview: number | null;
+}
+
 /** The case a screen is inside, loaded once by {@link CaseShell}. */
 export interface CaseContextValue {
   readonly caseId: string;
   readonly matter: Case;
   /** Empty until intake has been started. */
   readonly debtors: readonly Debtor[];
+  readonly counts: CaseCounts;
+  /** Whether this firm may see the extraction queue — the rail's own gate. */
+  readonly mayReview: boolean;
   /** Re-reads the case and its debtors — for a screen that just changed one. */
   readonly reload: () => Promise<void>;
 }
@@ -53,13 +74,20 @@ interface Section {
   readonly label: string;
   /** Present when the section sits behind a firm permission. */
   readonly feature?: 'extraction_review';
+  /** Which count, if any, this section shows beside its name. */
+  readonly count?: 'pendingReview';
 }
 
 const SECTIONS: readonly Section[] = [
   { segment: '', label: 'Overview' },
   { segment: 'intake', label: 'Intake' },
   { segment: 'documents', label: 'Documents' },
-  { segment: 'extraction-review', label: 'Extraction review', feature: 'extraction_review' },
+  {
+    segment: 'extraction-review',
+    label: 'Extraction review',
+    feature: 'extraction_review',
+    count: 'pendingReview',
+  },
   { segment: 'creditor-matrix', label: 'Creditor matrix' },
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
@@ -150,7 +178,16 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
 
   const [matter, setMatter] = useState<Case | null>(null);
   const [debtors, setDebtors] = useState<readonly Debtor[]>([]);
+  const [counts, setCounts] = useState<CaseCounts>({ pendingReview: null });
   const [error, setError] = useState<string | null>(null);
+
+  // A COURTESY, never a control — the same `permits` rule the case list and the
+  // firm screen document. It decides whether the rail shows the section at all
+  // AND whether its count is worth asking for; the API re-checks regardless,
+  // and the extraction-review screen states the refusal itself rather than
+  // 404ing on a page a colleague linked.
+  const mayReview =
+    membership != null && permits(membership.permissions.extraction_review, 'view_only');
 
   const load = useCallback(async () => {
     try {
@@ -168,6 +205,18 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
       return;
     }
 
+    // The rail's badge. Read after the case, never before: if the case itself
+    // is unreachable this never runs, and the shell shows the refusal rather
+    // than a second request failing behind it.
+    if (mayReview) {
+      try {
+        const queue = await call((client) => client.listExtractionCandidates(caseId, 'pending'));
+        setCounts({ pendingReview: queue.ok ? queue.value.length : null });
+      } catch {
+        // A badge is a nicety; the rail is not.
+      }
+    }
+
     try {
       const result = await call((client) => client.listDebtors(caseId));
       if (result.ok) setDebtors(result.value);
@@ -177,7 +226,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
       // nicer heading and nothing else — the same trade the case list makes
       // over its colleague names.
     }
-  }, [call, caseId]);
+  }, [call, caseId, mayReview]);
 
   useEffect(() => {
     void load();
@@ -190,14 +239,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
     return <StatusScreen title="Opening case" message="Loading this case…" />;
   }
 
-  // A COURTESY, never a control — the same `permits` rule the case list and the
-  // firm screen document. The API re-checks, and the extraction-review screen
-  // states the refusal itself rather than 404ing on a page a colleague linked.
-  const visible = SECTIONS.filter(
-    (section) =>
-      section.feature === undefined ||
-      (membership != null && permits(membership.permissions[section.feature], 'view_only')),
-  );
+  const visible = SECTIONS.filter((section) => section.feature === undefined || mayReview);
 
   // Which section is showing, as its route segment — '' for the overview.
   // Derived from the pathname rather than `useSegments()`, whose return type is
@@ -214,7 +256,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   const titleIsDebtors = title !== chapterAndDistrict(matter);
 
   return (
-    <CaseContext.Provider value={{ caseId, matter, debtors, reload: load }}>
+    <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
       <AppShell maxContentWidth={workspaceMaxWidth}>
         <View style={[styles.workspace, stacked ? styles.workspaceStacked : null]}>
           <View style={stacked ? styles.railStacked : styles.rail}>
@@ -251,20 +293,32 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
                 navigation". This is also why "All cases" sits in the footer
                 below rather than in a second nav of its own. */}
               <Sidebar.Nav label="Case sections">
-                {visible.map((section) => (
-                  <Sidebar.Item
-                    key={section.segment}
-                    label={section.label}
-                    active={section.segment === current}
-                    onPress={() => {
-                      router.push(
-                        section.segment === ''
-                          ? `/cases/${caseId}`
-                          : `/cases/${caseId}/${section.segment}`,
-                      );
-                    }}
-                  />
-                ))}
+                {visible.map((section) => {
+                  const badge = section.count === undefined ? null : counts[section.count];
+                  return (
+                    <Sidebar.Item
+                      key={section.segment}
+                      // The count rides in the LABEL rather than as a node
+                      // beside it: `Sidebar.Item` pins its accessible name to
+                      // `label`, so a separately-rendered badge would be
+                      // invisible to a screen reader — "Extraction review"
+                      // whether twelve records were waiting or none.
+                      label={
+                        badge === null || badge === 0
+                          ? section.label
+                          : `${section.label} (${badge})`
+                      }
+                      active={section.segment === current}
+                      onPress={() => {
+                        router.push(
+                          section.segment === ''
+                            ? `/cases/${caseId}`
+                            : `/cases/${caseId}/${section.segment}`,
+                        );
+                      }}
+                    />
+                  );
+                })}
               </Sidebar.Nav>
 
               <Sidebar.Separator />
