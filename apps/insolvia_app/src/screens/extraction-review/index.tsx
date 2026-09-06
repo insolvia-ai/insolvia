@@ -6,6 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
+import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -326,7 +327,7 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
   };
 
   return (
-    <>
+    <CaseColumn>
       <Heading level={1}>Extraction review</Heading>
       <Text style={[styles.body, muted]}>
         Nothing extracted enters the case until a person confirms it. Each record below was read
@@ -494,7 +495,7 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
           })}
         </View>
       ) : null}
-    </>
+    </CaseColumn>
   );
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
+import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
 import { saveTextFile } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -162,7 +163,7 @@ export function CreditorMatrixScreen({ caseId }: { readonly caseId: string }) {
   const ink = { color: theme.colors.ink, fontFamily: theme.typography.body };
 
   return (
-    <>
+    <CaseColumn>
       <Heading level={1}>Creditor matrix</Heading>
       <Text style={[styles.body, muted]}>
         Generates the court’s creditor mailing list — a plain-text file, one block per creditor, in
@@ -232,7 +233,7 @@ export function CreditorMatrixScreen({ caseId }: { readonly caseId: string }) {
           </View>
         </View>
       ) : null}
-    </>
+    </CaseColumn>
   );
 }
 
