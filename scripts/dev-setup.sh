@@ -186,15 +186,26 @@ fi
 # so one install serves every checkout of this repo on the machine.
 brew_ensure pre-commit pre-commit
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-if [[ "$CHECK_ONLY" -eq 1 ]]; then
-  if have pre-commit && git -C "$REPO_ROOT" rev-parse --git-path hooks >/dev/null 2>&1 &&
-    [[ -f "$(git -C "$REPO_ROOT" rev-parse --git-path hooks)/pre-push" ]]; then
-    skip "git hooks" "pre-commit + pre-push installed"
-  else
-    warn "git hooks are MISSING (would: pre-commit install --hook-type pre-commit --hook-type pre-push)"
-  fi
-elif have pre-commit; then
-  (cd "$REPO_ROOT" && pre-commit install --hook-type pre-commit --hook-type pre-push >/dev/null) &&
+# Where git will look for hooks. A git WORKTREE created by an agent harness
+# carries `core.hooksPath` pointing at the primary checkout's hooks directory,
+# and `pre-commit install` refuses to run at all when that key is set — so
+# the question is whether the hooks THERE are pre-commit's, not whether an
+# install would succeed. Both hook files are checked, because the pre-push
+# one is the half that is easy to have never installed.
+hooks_dir="$(git -C "$REPO_ROOT" rev-parse --git-path hooks 2>/dev/null || true)"
+hooks_installed() {
+  [[ -n "$hooks_dir" ]] &&
+    grep -qs 'pre-commit' "$hooks_dir/pre-commit" &&
+    grep -qs 'pre-commit' "$hooks_dir/pre-push"
+}
+if hooks_installed; then
+  skip "git hooks" "$hooks_dir (pre-commit + pre-push)"
+elif [[ "$CHECK_ONLY" -eq 1 ]] || ! have pre-commit; then
+  warn "git hooks are MISSING in $hooks_dir (would: pre-commit install --hook-type pre-commit --hook-type pre-push)"
+elif [[ -n "$(git -C "$REPO_ROOT" config --get core.hooksPath || true)" ]]; then
+  warn "git hooks are MISSING and core.hooksPath is set, so pre-commit will not install them here. Run from the primary checkout: pre-commit install --hook-type pre-commit --hook-type pre-push"
+else
+  (cd "$REPO_ROOT" && pre-commit install --hook-type pre-commit --hook-type pre-push) &&
     ok "git hooks installed (pre-commit: format + lint; pre-push: unit tests)"
 fi
 

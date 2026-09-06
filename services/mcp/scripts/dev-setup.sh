@@ -79,7 +79,13 @@ else
 
   log "installing Python dependencies (runtime + dev)..."
   "$VENV/bin/pip" install --quiet --upgrade pip
-  "$VENV/bin/pip" install --quiet -r "$MCP_DIR/requirements.txt" -r "$MCP_DIR/requirements-dev.txt"
+  # FROM THE SERVICE DIRECTORY, not from wherever this script was invoked:
+  # requirements.txt installs packages/insolvia_core by the RELATIVE path
+  # `../../packages/insolvia_core`, and pip resolves that against the current
+  # working directory, not the requirements file. Run from the repo root it
+  # fails with "Invalid requirement ... looks like a path" — which is how CI
+  # (working-directory: services/<x>) never saw this and a laptop did.
+  (cd "$MCP_DIR" && "$VENV/bin/pip" install --quiet -r requirements.txt -r requirements-dev.txt)
 fi
 
 # Chained unconditionally: the per-machine AWS resources are the local dev
