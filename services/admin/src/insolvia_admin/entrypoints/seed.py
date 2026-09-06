@@ -350,16 +350,20 @@ class S3FixtureObjects:
     def copy(self, source_key: str, *, target_key: str, content_type: str) -> None:
         if self.target_bucket is None:
             raise RefusedError("no document bucket to copy into")
-        # SSE stated, because the target bucket's policy refuses a PutObject
-        # that arrives without `x-amz-server-side-encryption: aws:kms`
-        # (modules/case_documents, DenyEncryptionDowngrade); the key is the
-        # bucket's default — the case key — so none is named here. REPLACE so
-        # the content type is the document's, not the fixture upload's.
+        # NO ENCRYPTION HEADERS, DELIBERATELY, and the first staging run is why.
+        # `ServerSideEncryption="aws:kms"` WITHOUT a key id does not mean "the
+        # bucket's default key": S3 fills in the AWS-managed `aws/s3` key, and
+        # the target bucket's DenyForeignEncryptionKey statement
+        # (modules/case_documents) then refuses the copy with an explicit
+        # deny — which is exactly what happened. Sending no header at all is
+        # the one shape that lands on the bucket's default encryption, the
+        # case key, and the policy's DenyEncryptionDowngrade is written to
+        # allow an absent header for precisely that reason. REPLACE so the
+        # content type is the document's, not the fixture upload's.
         self.client.copy_object(
             Bucket=self.target_bucket,
             Key=target_key,
             CopySource={"Bucket": self.fixture_bucket, "Key": source_key},
-            ServerSideEncryption="aws:kms",
             ContentType=content_type,
             MetadataDirective="REPLACE",
         )
