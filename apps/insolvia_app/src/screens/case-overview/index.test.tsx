@@ -186,7 +186,7 @@ describe('the case overview', () => {
     // The shell shows a "Opening case" status screen while the case loads, and
     // that screen has an `<h1>` too — querying headings straight away resolves
     // against it and then reads props off a node that has since unmounted.
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
     const h1 = screen.getAllByRole('heading').find((node) => node.props['aria-level'] === 1);
     expect(h1).toBeDefined();
     return String(h1?.props.children);
@@ -230,9 +230,14 @@ describe('the case overview', () => {
     // the same name by design (that is what tells you which case you are in on
     // the other six screens). THREE was the defect.
     ready();
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
 
-    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(2);
+    // THREE, and each earns its place: the rail's title, the page's own <h1>
+    // (the same name deliberately — that is what tells you which case you are
+    // in on the other six screens), and the meta line under it. FOUR was the
+    // defect: the rail printed its title and then repeated it directly
+    // underneath.
+    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(3);
   });
 
   it('keeps the chapter and district once a debtor DOES name the case', async () => {
@@ -242,9 +247,11 @@ describe('the case overview', () => {
       [`/v1/cases/${CASE_ID}/debtors`]: () =>
         jsonResponse(200, { debtors: [debtor('Marisol', 'Reyes')] }),
     });
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
 
-    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(1);
+    // The rail's identity line and the page's meta line. The title is a person
+    // now, so it is no longer one of them.
+    expect(screen.getAllByText('Chapter 7 · NDCA')).toHaveLength(2);
   });
 
   it('reports what each section actually holds', async () => {
@@ -257,19 +264,21 @@ describe('the case overview', () => {
         }),
     });
 
-    expect(await screen.findByText('1 person')).toBeTruthy();
-    // Zero is a real answer and reads as one, rather than as a bare "0".
-    expect(screen.getByText('No creditors yet')).toBeTruthy();
+    // The tile carries the number; the spine carries the sentence.
+    expect(await screen.findByText('No creditors yet')).toBeTruthy();
+    expect(screen.getByText('On the case')).toBeTruthy();
   });
 
   it('does not report a count it failed to read as zero', async () => {
     // "0 creditors" and "we could not ask" look identical if both say zero, and
     // only one of them means "go and add some".
     ready({ [`/v1/cases/${CASE_ID}/creditors`]: () => jsonResponse(500, { message: 'nope' }) });
-    await screen.findByText('Nobody assigned');
+    await screen.findByText('Filing readiness');
 
-    // Exactly one: the creditors row. Everything else answered.
-    expect(screen.getAllByText('—')).toHaveLength(1);
+    // The creditors tile and its spine row both decline to guess. What matters
+    // is that neither says "0", which would read as "no creditors yet".
+    expect(await screen.findAllByText('—')).toBeTruthy();
+    expect(screen.queryByText('No creditors yet')).toBeNull();
   });
 
   it('keeps extraction review out of the page when the firm cannot see it', async () => {
@@ -279,9 +288,9 @@ describe('the case overview', () => {
       ...caseReads(),
       [`/v1/cases/${CASE_ID}`]: () => jsonResponse(200, caseBody(CASE_ID)),
     });
-    await screen.findByText('Nobody assigned');
+    await screen.findByText('Filing readiness');
 
-    // Neither in the rail nor in the standing list.
+    // Neither in the rail nor on the spine.
     expect(screen.queryByText('Extraction review')).toBeNull();
   });
 
@@ -339,7 +348,7 @@ describe('the case rail', () => {
     // returning to /cases and finding the row again, because the six links only
     // ever existed there.
     const router = ready();
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
 
     await userEvent.press(screen.getByLabelText('Documents'));
 
@@ -351,7 +360,7 @@ describe('the case rail', () => {
 
   it('offers every section of a case in one place', async () => {
     ready();
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
 
     for (const label of [
       'Overview',
@@ -368,7 +377,7 @@ describe('the case rail', () => {
 
   it('keeps a way back out to the case list', async () => {
     const router = ready();
-    await screen.findByText('Where this case stands');
+    await screen.findByText('Filing readiness');
 
     await userEvent.press(screen.getByLabelText('All cases'));
 
@@ -429,10 +438,15 @@ describe('the case overview’s readiness and totals', () => {
     expect(screen.getByText('B106D')).toBeTruthy();
   });
 
-  it('says so plainly when nothing blocks filing', async () => {
+  it('drops the blocker list entirely when nothing blocks filing', async () => {
+    // A "Needs a human" heading over an empty list is worse than no heading:
+    // it reads as a section that failed to load.
     withSummary(summaryBody({ readyToFile: true, problems: [] }));
+    await screen.findByText('Filing readiness');
 
-    expect(await screen.findByText(/can assemble its packet/)).toBeTruthy();
+    expect(screen.queryByText('Needs a human')).toBeNull();
+    // The spine says it instead, on the stage it belongs to.
+    expect(screen.getByText('Ready to assemble')).toBeTruthy();
   });
 
   it('renders the totals exactly as the server sent them', async () => {
@@ -452,10 +466,12 @@ describe('the case overview’s readiness and totals', () => {
 
   it('claims nothing about readiness when the summary could not be read', async () => {
     // The dangerous failure is the optimistic one: a case that looks filable
-    // because the check failed.
+    // because the check failed. The spine still draws — it has the counts —
+    // but the packet stage must not offer itself.
     withSummary(undefined);
-    await screen.findByText('Nobody assigned');
+    await screen.findByText('Filing readiness');
 
-    expect(screen.queryByText(/can assemble its packet/)).toBeNull();
+    expect(screen.queryByText('Ready to assemble')).toBeNull();
+    expect(screen.getByText('checking…')).toBeTruthy();
   });
 });

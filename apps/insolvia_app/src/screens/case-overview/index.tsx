@@ -1,14 +1,17 @@
-import { permits } from '@insolvia-ai/api-client';
 import type { CaseSummary, FirmColleague, InsolviaApiClient } from '@insolvia-ai/api-client';
-import { Link } from 'expo-router';
+import { Badge, Button } from '@insolvia-ai/design-system';
+import { Link, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
-import { caseTitle, useCase } from '@/components/case-shell';
+import { caseTitle, chapterAndDistrict, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
+
+import { filingStages, stagesComplete } from './stages';
+import type { Stage, StageState } from './stages';
 
 /**
  * A count this screen shows, once it knows it.
@@ -20,33 +23,25 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  */
 type Count = number | null;
 
+/**
+ * The counts THIS screen reads.
+ *
+ * The review queue is deliberately absent: the shell already reads it for the
+ * rail's badge and publishes it through `useCase()`, and asking again here
+ * would be two requests for one number. Documents are read here rather than
+ * there because the rail does not show them — see `CaseCounts`.
+ */
 interface Counts {
   readonly documents: Count;
   readonly creditors: Count;
   readonly packets: Count;
   readonly people: Count;
-  readonly pendingReview: Count;
 }
 
-const NOTHING: Counts = {
-  documents: null,
-  creditors: null,
-  packets: null,
-  people: null,
-  pendingReview: null,
-};
+const NOTHING: Counts = { documents: null, creditors: null, packets: null, people: null };
 
-/** One row of the standing list: what the section is, and where it has got to. */
-interface Standing {
-  readonly segment: string;
-  readonly label: string;
-  readonly value: string;
-  /** Draws attention — work is waiting on a person here. */
-  readonly waiting?: boolean;
-}
-
-/** How many blockers the overview lists before deferring to the packet screen. */
-const PROBLEMS_SHOWN = 4;
+/** How many blockers the "needs a human" list shows before deferring. */
+const PROBLEMS_SHOWN = 3;
 
 /**
  * A problem's `source` as a human reads it.
@@ -55,20 +50,26 @@ const PROBLEMS_SHOWN = 4;
  * `form/b106d`. The form ids are the ones worth translating — `B106D` is what
  * the schedule is actually called, and what a paralegal would search for.
  */
-function sourceLabel(source: string): string {
+export function sourceLabel(source: string): string {
   if (source.startsWith('form/')) return source.slice('form/'.length).toUpperCase();
   return source.replace(/_/g, ' ');
 }
 
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
-/** A count as a sentence, or the em dash that means "we do not know". */
-function says(count: Count, one: string, many: string, none: string): string {
-  if (count === null) return '—';
-  if (count === 0) return none;
-  return plural(count, one, many);
+/**
+ * A total for a stat tile: `8412.66` → `$8.4k`.
+ *
+ * PRESENTATION ONLY, and only ever narrowing. The exact figure is what the
+ * schedules print and what the table below it shows; a tile is for the glance,
+ * and `$74,182.10` at 24px in a 2×2 grid is a number nobody reads. Parsing is
+ * tolerant because the value is a decimal STRING from the server (see
+ * `CaseTotals`) and an unparseable one must not take the screen down.
+ */
+export function abbreviateMoney(value: string): string {
+  const amount = Number.parseFloat(value);
+  if (!Number.isFinite(amount)) return '—';
+  if (Math.abs(amount) >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}m`;
+  if (Math.abs(amount) >= 1_000) return `$${(amount / 1_000).toFixed(1)}k`;
+  return `$${Math.round(amount)}`;
 }
 
 /**
@@ -81,17 +82,19 @@ function says(count: Count, one: string, many: string, none: string): string {
  * has this got to, and what is waiting on me.
  *
  * **Everything here is read from the API, and only what the API has.** The
- * counts come from the same endpoints the sections themselves use. There is
- * deliberately no activity feed, no "schedules complete" fraction and no
- * unsecured-debt total, all of which would make a better-looking page: nothing
- * serves them, and inventing them on the client would mean a case overview that
- * disagrees with the case. They are worth adding to the API, not faking here.
+ * spine is derived in `stages.ts` from the counts and the completeness gate's
+ * own problem list; the money comes from `GET /v1/cases/{id}/summary`, which
+ * computes it from the same functions the official schedules print from. There
+ * is deliberately no activity feed and no "schedules complete" fraction — the
+ * audit log is unreadable to this API by design and nothing serves the other,
+ * and inventing either would mean an overview that disagrees with the case.
  */
 export function CaseOverview() {
   const theme = useTheme();
-  const { caseId, matter, debtors } = useCase();
-  const membership = useMembership();
+  const router = useRouter();
+  const { caseId, matter, debtors, counts: shellCounts, mayReview } = useCase();
   const { call } = useApi();
+  const { width } = useWindowDimensions();
 
   const [counts, setCounts] = useState<Counts>(NOTHING);
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
@@ -99,13 +102,6 @@ export function CaseOverview() {
   // use, and for the same reason: a case that looks ready because its summary
   // failed to load is worse than one that says nothing.
   const [summary, setSummary] = useState<CaseSummary | null>(null);
-
-  // The extraction queue is the one gated read: the feature defaults to hidden
-  // across the firm, so asking for it unconditionally would 403 for most users
-  // and cost a request to learn what `permits` already knows. Same courtesy
-  // rule as the rail — the API re-checks regardless.
-  const mayReview =
-    membership != null && permits(membership.permissions.extraction_review, 'view_only');
 
   useEffect(() => {
     // Guards the state writes against a case the user navigated away from
@@ -132,24 +128,21 @@ export function CaseOverview() {
     };
 
     const loadAll = async () => {
-      const [documents, creditors, packets, people, pendingReview] = await Promise.all([
+      const [documents, creditors, packets, people] = await Promise.all([
         read((client) => client.listDocuments(caseId)),
         read((client) => client.listCaseEntities(caseId, 'creditors')),
         read((client) => client.listCasePackets(caseId)),
         read((client) => client.listCaseAssignees(caseId)),
-        mayReview
-          ? read((client) => client.listExtractionCandidates(caseId, 'pending'))
-          : Promise.resolve<Count>(null),
       ]);
       if (!live) return;
-      setCounts({ documents, creditors, packets, people, pendingReview });
+      setCounts({ documents, creditors, packets, people });
 
       try {
-        const read = await call((client) => client.getCaseSummary(caseId));
-        if (live && read.ok) setSummary(read.value);
+        const answered = await call((client) => client.getCaseSummary(caseId));
+        if (live && answered.ok) setSummary(answered.value);
       } catch {
-        // Same trade as the counts. The sections below still render, and the
-        // readiness block simply does not claim anything.
+        // Same trade as the counts. The spine still renders from what the
+        // counts know, and simply claims nothing about readiness.
       }
 
       try {
@@ -166,219 +159,492 @@ export function CaseOverview() {
     return () => {
       live = false;
     };
-  }, [call, caseId, mayReview]);
+  }, [call, caseId]);
 
   const openedBy =
     colleagues.find((colleague) => colleague.subject === matter.createdBy)?.displayName ??
     matter.createdBy;
 
-  const standing: readonly Standing[] = [
-    {
-      segment: 'intake',
-      label: 'Intake',
-      value:
-        debtors.length === 0
-          ? 'Not started'
-          : `${plural(debtors.length, 'debtor', 'debtors')} recorded`,
-    },
-    {
-      segment: 'documents',
-      label: 'Documents',
-      value: says(counts.documents, 'document', 'documents', 'None uploaded'),
-    },
-    ...(mayReview
-      ? [
-          {
-            segment: 'extraction-review',
-            label: 'Extraction review',
-            value: says(
-              counts.pendingReview,
-              'record waiting',
-              'records waiting',
-              'Nothing waiting',
-            ),
-            waiting: counts.pendingReview !== null && counts.pendingReview > 0,
-          },
-        ]
-      : []),
-    {
-      segment: 'creditor-matrix',
-      label: 'Creditor matrix',
-      value: says(counts.creditors, 'creditor', 'creditors', 'No creditors yet'),
-    },
-    {
-      segment: 'packet',
-      label: 'Filing packet',
-      value: says(counts.packets, 'packet assembled', 'packets assembled', 'Not assembled'),
-    },
-    {
-      segment: 'team',
-      label: 'Team',
-      value: says(counts.people, 'person', 'people', 'Nobody assigned'),
-    },
-  ];
+  const stages = filingStages({
+    matter,
+    debtors,
+    documents: counts.documents,
+    creditors: counts.creditors,
+    packets: counts.packets,
+    pendingReview: shellCounts.pendingReview,
+    problems: summary?.problems ?? null,
+    readyToFile: summary?.readyToFile ?? null,
+    mayReview,
+  });
 
-  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
-  const mono = { color: theme.colors.ink, fontFamily: theme.typography.mono };
+  const stacked = width < railBreakpoint;
+  const waiting = shellCounts.pendingReview !== null && shellCounts.pendingReview > 0;
 
   return (
     <>
-      <Heading level={1}>{caseTitle(matter, debtors)}</Heading>
-      <Text style={[styles.body, muted]}>
-        Chapter {matter.chapter} · {matter.district} · opened {matter.createdAt.slice(0, 10)} by{' '}
-        {openedBy}
-      </Text>
-
-      <Heading level={2}>Filing readiness</Heading>
-      {summary === null ? (
-        <Text aria-live="polite" style={[styles.body, muted]}>
-          Checking what this case still needs…
-        </Text>
-      ) : summary.readyToFile ? (
+      {/* ── Identity ───────────────────────────────────────────────────── */}
+      <View style={styles.head}>
+        <Heading level={1}>{caseTitle(matter, debtors)}</Heading>
         <Text
-          style={[styles.body, { color: theme.colors.success, fontFamily: theme.typography.body }]}
+          style={[styles.meta, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
         >
-          Every schedule has what it needs. This case can assemble its packet.
+          {chapterAndDistrict(matter)} · opened {matter.createdAt.slice(0, 10)} by {openedBy}
         </Text>
-      ) : (
-        <>
-          <Text style={[styles.body, muted]}>
-            {plural(summary.problems.length, 'thing', 'things')} still to resolve before this case
-            can be filed.
-          </Text>
-          {/*
-            The SAME list the packet screen shows, because it is the same gate —
-            `readyToFile` is `completeness_problems`, not an approximation of it.
-            Each row leads with where the fix belongs, which is the only part of
-            a problem that tells somebody what to do next.
-          */}
-          <View role="list" style={styles.problems}>
-            {summary.problems.slice(0, PROBLEMS_SHOWN).map((problem, index) => (
-              <View role="listitem" key={`${problem.source}-${problem.field ?? index}`}>
-                <Text style={[styles.problemSource, mono]}>{sourceLabel(problem.source)}</Text>
-                <Text style={[styles.problemMessage, muted]}>{problem.message}</Text>
-              </View>
-            ))}
-          </View>
-          {summary.problems.length > PROBLEMS_SHOWN ? (
-            <Text style={[styles.body, muted]}>
-              …and {summary.problems.length - PROBLEMS_SHOWN} more, listed in full on the filing
-              packet screen.
-            </Text>
-          ) : null}
-        </>
-      )}
+        {waiting ? (
+          <Link
+            href={`/cases/${caseId}/extraction-review`}
+            aria-label={`Review ${shellCounts.pendingReview} extracted records`}
+            style={[
+              styles.alert,
+              { color: theme.colors.warning, fontFamily: theme.typography.body },
+            ]}
+          >
+            {shellCounts.pendingReview} records waiting on review
+          </Link>
+        ) : null}
+      </View>
 
-      <Heading level={2}>Assets and liabilities</Heading>
-      {summary === null ? (
-        <Text style={[styles.body, muted]}>—</Text>
-      ) : (
-        <View role="list" style={styles.list}>
-          {(
-            [
-              ['Assets', summary.totals.assets],
-              ['Secured claims', summary.totals.secured],
-              ['Priority unsecured', summary.totals.priorityUnsecured],
-              ['Nonpriority unsecured', summary.totals.nonpriorityUnsecured],
-              ['Total liabilities', summary.totals.liabilities],
-            ] as const
-          ).map(([label, value]) => (
-            <View role="listitem" key={label} style={styles.row}>
-              <Text
-                style={[
-                  styles.rowValue,
-                  { color: theme.colors.ink, fontFamily: theme.typography.body },
-                ]}
-              >
-                {label}
-              </Text>
-              {/* Rendered exactly as the server sent it. These are the
-                  schedules' own totals and the client does no arithmetic on
-                  them — see `CaseTotals`. */}
-              <Text style={[styles.money, mono]}>{value}</Text>
+      <View style={[styles.columns, stacked ? styles.columnsStacked : null]}>
+        <View style={styles.main}>
+          {/* ── The spine ───────────────────────────────────────────────── */}
+          <Section
+            title="Filing readiness"
+            meta={
+              summary === null
+                ? 'checking…'
+                : `${stagesComplete(stages)} of ${stages.length} stages complete`
+            }
+          >
+            <View style={styles.spine}>
+              {stages.map((stage, index) => (
+                <StageRow key={stage.key} stage={stage} last={index === stages.length - 1} />
+              ))}
             </View>
-          ))}
-        </View>
-      )}
+          </Section>
 
-      <Heading level={2}>Where this case stands</Heading>
-      <View role="list" style={styles.list}>
-        {standing.map((row) => (
-          <View role="listitem" key={row.segment} style={styles.row}>
-            {/*
-              A `Link`, not a pressable row: these render real `<a href>`s, which
-              is what lets a paralegal keep the packet open in one tab while
-              working the review queue in another. The accessible name carries
-              the section AND its state, so "Documents, 9 documents" makes sense
-              read out of context — WCAG 2.4.4 — while the visible label stays
-              the start of that name for 2.5.3.
-            */}
-            <Link
-              href={`/cases/${caseId}/${row.segment}`}
-              aria-label={`${row.label} — ${row.value}`}
-              style={[
-                styles.rowLink,
-                { color: theme.colors.primary, fontFamily: theme.typography.body },
-              ]}
-            >
-              {row.label}
-            </Link>
-            <Text
-              style={[
-                styles.rowValue,
-                {
-                  color: row.waiting === true ? theme.colors.warning : theme.colors.muted,
-                  fontFamily: theme.typography.body,
-                },
-              ]}
-            >
-              {row.value}
-            </Text>
-          </View>
-        ))}
+          {/* ── What the gate is waiting on ─────────────────────────────── */}
+          {summary !== null && !summary.readyToFile ? (
+            <Section title="Needs a human" meta="what the filing gate is waiting on">
+              <View style={styles.stack}>
+                {summary.problems.slice(0, PROBLEMS_SHOWN).map((problem, index) => (
+                  <Blocker
+                    key={`${problem.source}-${problem.field ?? index}`}
+                    label={sourceLabel(problem.source)}
+                    message={problem.message}
+                  />
+                ))}
+              </View>
+              {summary.problems.length > PROBLEMS_SHOWN ? (
+                <Text
+                  style={[
+                    styles.note,
+                    { color: theme.colors.muted, fontFamily: theme.typography.body },
+                  ]}
+                >
+                  …and {summary.problems.length - PROBLEMS_SHOWN} more, listed in full on the filing
+                  packet screen.
+                </Text>
+              ) : null}
+              <View style={styles.actions}>
+                {waiting ? (
+                  <Button
+                    size="lg"
+                    onPress={() => {
+                      router.push(`/cases/${caseId}/extraction-review`);
+                    }}
+                  >
+                    Review {String(shellCounts.pendingReview)} records
+                  </Button>
+                ) : null}
+                <Button
+                  size="lg"
+                  intent="secondary"
+                  onPress={() => {
+                    router.push(`/cases/${caseId}/packet`);
+                  }}
+                >
+                  Filing packet
+                </Button>
+              </View>
+            </Section>
+          ) : null}
+        </View>
+
+        {/* ── At a glance ─────────────────────────────────────────────── */}
+        <View style={stacked ? styles.asideStacked : styles.aside}>
+          <Section title="At a glance">
+            {/* The 1px gaps show the rule colour through, so four tiles read as
+                one panel rather than four floating boxes. */}
+            <View style={[styles.tiles, { backgroundColor: theme.colors.line }]}>
+              <Tile
+                value={counts.creditors === null ? '—' : String(counts.creditors)}
+                label="Creditors"
+              />
+              <Tile
+                value={summary === null ? '—' : abbreviateMoney(summary.totals.liabilities)}
+                label="Liabilities"
+              />
+              <Tile
+                value={counts.documents === null ? '—' : String(counts.documents)}
+                label="Documents"
+              />
+              <Tile
+                value={counts.people === null ? '—' : String(counts.people)}
+                label="On the case"
+              />
+            </View>
+          </Section>
+
+          <Section title="Assets and liabilities">
+            <View style={styles.figures}>
+              <Figure label="Assets" value={summary?.totals.assets} />
+              <Figure label="Secured claims" value={summary?.totals.secured} />
+              <Figure label="Priority unsecured" value={summary?.totals.priorityUnsecured} />
+              <Figure label="Nonpriority unsecured" value={summary?.totals.nonpriorityUnsecured} />
+              <Figure label="Total liabilities" value={summary?.totals.liabilities} emphasis />
+            </View>
+          </Section>
+        </View>
       </View>
     </>
   );
 }
 
+/** A titled block with a rule under its heading — the page's one grouping unit. */
+function Section({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.section}>
+      <View style={[styles.sectionHead, { borderBottomColor: theme.colors.line }]}>
+        <Heading level={2} size="body">
+          {title}
+        </Heading>
+        {meta === undefined ? null : (
+          <Text
+            style={[
+              styles.sectionMeta,
+              { color: theme.colors.muted, fontFamily: theme.typography.body },
+            ]}
+          >
+            {meta}
+          </Text>
+        )}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * One stage of the spine.
+ *
+ * The state is carried THREE ways — the marker's fill, the word in the right
+ * column, and the sentence underneath — because colour alone is not a status.
+ * A reader who cannot use the hue still gets "blocked" and the reason.
+ */
+function StageRow({ stage, last }: { stage: Stage; last: boolean }) {
+  const theme = useTheme();
+  const tone = stageTone(stage.state, theme.colors);
+
+  return (
+    <View style={styles.stage}>
+      <View style={styles.stageRail}>
+        <View
+          style={[
+            styles.stageMark,
+            { borderColor: tone, backgroundColor: stage.state === 'done' ? tone : 'transparent' },
+          ]}
+        />
+        {last ? null : <View style={[styles.stageLine, { backgroundColor: theme.colors.line }]} />}
+      </View>
+
+      <View style={styles.stageBody}>
+        <Text
+          style={[
+            styles.stageLabel,
+            {
+              color: stage.state === 'idle' ? theme.colors.muted : theme.colors.ink,
+              fontFamily: theme.typography.body,
+            },
+          ]}
+        >
+          {stage.label}
+        </Text>
+        <Text
+          style={[
+            styles.stageNote,
+            { color: theme.colors.muted, fontFamily: theme.typography.body },
+          ]}
+        >
+          {stage.note}
+        </Text>
+      </View>
+
+      <Text style={[styles.stageMeta, { color: tone, fontFamily: theme.typography.mono }]}>
+        {stage.meta}
+      </Text>
+    </View>
+  );
+}
+
+function stageTone(state: StageState, colors: ReturnType<typeof useTheme>['colors']): string {
+  if (state === 'done') return colors.success;
+  if (state === 'active') return colors.primary;
+  if (state === 'blocked') return colors.danger;
+  return colors.muted;
+}
+
+/** One reason the gate refused, with the stripe that says it is a refusal. */
+function Blocker({ label, message }: { label: string; message: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[
+        styles.blocker,
+        {
+          backgroundColor: theme.colors.card,
+          borderColor: theme.colors.line,
+          borderLeftColor: theme.colors.danger,
+        },
+      ]}
+    >
+      <View style={styles.blockerTop}>
+        <Badge intent="danger" size="sm">
+          {label}
+        </Badge>
+      </View>
+      <Text
+        style={[
+          styles.blockerText,
+          { color: theme.colors.muted, fontFamily: theme.typography.body },
+        ]}
+      >
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+/** One number, big, in a grid whose 1px gaps show the rule colour through. */
+function Tile({ value, label }: { value: string; label: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.tile, { backgroundColor: theme.colors.card }]}>
+      <Text
+        style={[
+          styles.tileValue,
+          { color: theme.colors.ink, fontFamily: theme.typography.heading },
+        ]}
+      >
+        {value}
+      </Text>
+      <Text
+        style={[styles.tileLabel, { color: theme.colors.muted, fontFamily: theme.typography.mono }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** One exact figure. Rendered as the server sent it — no arithmetic here. */
+function Figure({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value?: string | undefined;
+  emphasis?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.figure, { borderTopColor: theme.colors.line }]}>
+      <Text
+        style={[
+          styles.figureLabel,
+          {
+            color: emphasis ? theme.colors.ink : theme.colors.muted,
+            fontFamily: theme.typography.body,
+          },
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.figureValue,
+          {
+            color: theme.colors.ink,
+            fontFamily: theme.typography.mono,
+            fontWeight: emphasis ? '600' : '400',
+          },
+        ]}
+      >
+        {value ?? '—'}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  body: {
-    fontSize: fontSizes.body,
-    lineHeight: fontSizes.body * 1.5,
-  },
-  list: {
-    gap: spacing.xs,
-  },
-  row: {
-    alignItems: 'baseline',
+  actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    justifyContent: 'space-between',
+    marginTop: spacing.md,
   },
-  rowLink: {
-    fontSize: fontSizes.body,
+  alert: {
+    fontSize: fontSizes.label,
     fontWeight: '600',
     // 44dp, the WCAG 2.5.5 target size this app enforces on anything pressable.
     lineHeight: 44,
   },
-  rowValue: {
+  aside: {
+    gap: spacing.lg,
+    width: 300,
+  },
+  asideStacked: {
+    gap: spacing.lg,
+    width: '100%',
+  },
+  blocker: {
+    borderLeftWidth: 3,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+  },
+  blockerText: {
+    fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.5,
+  },
+  blockerTop: {
+    flexDirection: 'row',
+  },
+  columns: {
+    flexDirection: 'row',
+    gap: spacing.xl,
+  },
+  columnsStacked: {
+    flexDirection: 'column',
+  },
+  figure: {
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  figureLabel: {
     fontSize: fontSizes.label,
   },
-  money: {
+  figureValue: {
     fontSize: fontSizes.label,
-    // Digits line up in a column, which is the whole reason these are mono.
     fontVariant: ['tabular-nums'],
   },
-  problems: {
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+  figures: {
+    marginTop: spacing.xs,
   },
-  problemSource: {
+  head: {
+    gap: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  main: {
+    flex: 1,
+    gap: spacing.lg,
+    minWidth: 0,
+  },
+  meta: {
+    fontSize: fontSizes.label,
+  },
+  note: {
+    fontSize: fontSizes.caption,
+    marginTop: spacing.sm,
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  sectionHead: {
+    alignItems: 'baseline',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    // Wraps rather than crushing the meta against the title in the 300px
+    // aside; on the wide main column both still sit on one line.
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+    paddingBottom: spacing.xs,
+  },
+  sectionMeta: {
     fontSize: fontSizes.caption,
   },
-  problemMessage: {
+  spine: {
+    marginTop: spacing.xs,
+  },
+  stack: {
+    gap: spacing.sm,
+  },
+  stage: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  stageBody: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0,
+    paddingBottom: spacing.md,
+  },
+  stageLabel: {
     fontSize: fontSizes.label,
-    lineHeight: fontSizes.label * 1.45,
+    fontWeight: '600',
+  },
+  stageLine: {
+    bottom: 0,
+    left: 5,
+    position: 'absolute',
+    top: 14,
+    width: 1,
+  },
+  stageMark: {
+    borderWidth: 1.5,
+    height: 11,
+    marginTop: 3,
+    width: 11,
+  },
+  stageMeta: {
+    fontSize: fontSizes.caption,
+    paddingTop: 3,
+  },
+  stageNote: {
+    fontSize: fontSizes.caption,
+    lineHeight: fontSizes.caption * 1.5,
+  },
+  stageRail: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    width: 11,
+  },
+  tile: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    gap: 2,
+    padding: spacing.md,
+  },
+  tileLabel: {
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  tileValue: {
+    fontSize: fontSizes.section,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  tiles: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 1,
   },
 });
