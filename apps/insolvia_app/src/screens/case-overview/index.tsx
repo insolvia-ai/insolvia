@@ -8,7 +8,7 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { caseTitle, chapterAndDistrict, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
-import { fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
+import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
 import { filingStages, stagesComplete } from './stages';
 import type { Stage, StageState } from './stages';
@@ -39,6 +39,9 @@ interface Counts {
 }
 
 const NOTHING: Counts = { documents: null, creditors: null, packets: null, people: null };
+
+/** The aside's width — stat tiles and the figures, both of which want a set measure. */
+const ASIDE_WIDTH = 300;
 
 /** How many blockers the "needs a human" list shows before deferring. */
 const PROBLEMS_SHOWN = 3;
@@ -502,7 +505,7 @@ const styles = StyleSheet.create({
   },
   aside: {
     gap: spacing.lg,
-    width: 300,
+    width: ASIDE_WIDTH,
   },
   asideStacked: {
     gap: spacing.lg,
@@ -524,6 +527,11 @@ const styles = StyleSheet.create({
   columns: {
     flexDirection: 'row',
     gap: spacing.xl,
+    // THE ONE SCREEN THAT ASKS FOR MORE than the default reading measure, and
+    // it says so here rather than making the shell decide for all six. This is
+    // exactly the two columns below — the capped spine plus the aside — so on
+    // a wide display the pair stays together instead of drifting apart.
+    maxWidth: contentMaxWidth + spacing.xl + ASIDE_WIDTH,
   },
   columnsStacked: {
     flexDirection: 'column',
@@ -552,6 +560,13 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
     gap: spacing.lg,
+    // CAPPED AT THE READING MEASURE, and that is what this column is: every row
+    // in it puts a label at one edge and its state at the other — "Documents"
+    // and "—", "Total liabilities" and its figure. Left to stretch on a wide
+    // display those two ends drift a thousand pixels apart and stop reading as
+    // one row. The workspace around it still uses the full frame; the tables on
+    // the sibling screens want that width and this column does not.
+    maxWidth: contentMaxWidth,
     minWidth: 0,
   },
   meta: {

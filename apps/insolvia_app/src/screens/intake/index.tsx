@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
+import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -224,7 +225,7 @@ export function Intake() {
   const spec = COLLECTION_SPECS.find((candidate) => candidate.collection === section);
 
   return (
-    <>
+    <CaseColumn>
       <Heading level={1}>Intake</Heading>
 
       <View style={styles.sectionPicker}>
@@ -302,7 +303,7 @@ export function Intake() {
           </Tabs.Panel>
         </Tabs.Root>
       ) : null}
-    </>
+    </CaseColumn>
   );
 }
 

@@ -16,8 +16,26 @@ import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 export interface AppShellProps {
   children: ReactNode;
 
-  /** Overrides the centered column's cap. */
+  /** Overrides the centered column's cap. Ignored when `frame` is `workspace`. */
   maxContentWidth?: number;
+
+  /**
+   * How `main` lays its child out.
+   *
+   * `document` (the default) is the centered, capped, padded column every
+   * reading screen wants — an account form, a questionnaire, a list.
+   *
+   * `workspace` hands the child the whole frame: no cap, no centering, no
+   * padding. It is for a screen that carries its own CHROME — today that means
+   * {@link CaseShell}, whose navigation rail has to sit flush against the
+   * header above it and the window edge beside it. Rendered in a `document`
+   * frame the rail became an island floating in the middle of the page, with
+   * the header's rule stopping short of it on both sides, and on a wide display
+   * the whole app looked marooned in a 1180px strip. Padding a workspace is the
+   * child's job, because only the child knows which of its parts is chrome and
+   * which is content.
+   */
+  frame?: 'document' | 'workspace';
 }
 
 /**
@@ -57,7 +75,11 @@ export interface AppShellProps {
  * react-native-web gives every View `position: relative`. So the state lives
  * here, and {@link AccountMenu} is controlled.
  */
-export function AppShell({ children, maxContentWidth = contentMaxWidth }: AppShellProps) {
+export function AppShell({
+  children,
+  maxContentWidth = contentMaxWidth,
+  frame = 'document',
+}: AppShellProps) {
   const theme = useTheme();
   const membership = useMembership();
   const env = environmentInfo(appEnvironment);
@@ -128,7 +150,13 @@ export function AppShell({ children, maxContentWidth = contentMaxWidth }: AppShe
       </View>
 
       <View role="main" style={styles.main}>
-        <ScrollView contentContainerStyle={[styles.mainContent, { maxWidth: maxContentWidth }]}>
+        <ScrollView
+          contentContainerStyle={
+            frame === 'workspace'
+              ? styles.workspaceContent
+              : [styles.mainContent, { maxWidth: maxContentWidth }]
+          }
+        >
           {children}
         </ScrollView>
       </View>
@@ -220,6 +248,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 'auto',
     padding: spacing.xl,
     width: '100%',
+  },
+  workspaceContent: {
+    // No padding, no cap, no centering — the child is chrome and owns all
+    // three. `flexGrow` rather than `height: '100%'` so a rail can stretch to
+    // the viewport on a short page AND the whole thing still scrolls on a long
+    // one.
+    flexGrow: 1,
   },
   nav: {
     flexDirection: 'row',

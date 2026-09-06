@@ -11,7 +11,7 @@ import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
-import { fontSizes, railBreakpoint, spacing, useTheme, workspaceMaxWidth } from '@/theme';
+import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -143,6 +143,22 @@ export function chapterAndDistrict(matter: Case): string {
 }
 
 /**
+ * The reading column a case screen renders into.
+ *
+ * The shell gives its child the whole frame beside the rail and caps nothing,
+ * because the six screens do not want one measure: five are forms and prose
+ * that want a short line, and the overview lays out two columns and wants more.
+ * A cap in the shell served whichever of those it was written for and broke the
+ * other — at 1440 it gave intake a 1280px-wide "First name" box.
+ *
+ * So the measure is the screen's own choice, and this is the default: wrap in
+ * it, or state a wider one, but state one.
+ */
+export function CaseColumn({ children }: { children: ReactNode }) {
+  return <View style={styles.column}>{children}</View>;
+}
+
+/**
  * The frame every screen under `/cases/[caseId]` sits inside: the case's
  * identity, the rail that moves between its sections, and the content column
  * beside them.
@@ -257,7 +273,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
 
   return (
     <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
-      <AppShell maxContentWidth={workspaceMaxWidth}>
+      <AppShell frame="workspace">
         <View style={[styles.workspace, stacked ? styles.workspaceStacked : null]}>
           <View style={stacked ? styles.railStacked : styles.rail}>
             <Sidebar.Root>
@@ -344,11 +360,21 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    gap: spacing.md,
     // Without this a long unbroken cell — a filename, an email — makes the
     // flex child refuse to shrink and pushes the rail off screen.
     minWidth: 0,
+    padding: spacing.xl,
   },
+  column: {
+    gap: spacing.md,
+    // The DEFAULT measure for a case screen, and the reason `CaseColumn`
+    // exists rather than a cap up here: these six screens are forms and prose,
+    // not tables. Letting the frame decide gave a "First name" input 1280px of
+    // it. The one screen that genuinely needs two columns says so itself.
+    maxWidth: contentMaxWidth,
+    width: '100%',
+  },
+
   identity: {
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
@@ -357,7 +383,12 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.caption,
   },
   rail: {
-    width: 232,
+    // `Sidebar.Root` sets its OWN width — `sidebarWidth.expanded`, 256 — so
+    // this holds exactly that and nothing else. It used to say 232, which the
+    // sidebar overflowed by 24: precisely the `spacing.lg` gap that used to be
+    // on `workspace`, so the two columns rendered flush against each other and
+    // the gap looked like it had never been written.
+    width: 256,
   },
   railStacked: {
     width: '100%',
@@ -368,8 +399,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   workspace: {
+    // No gap and no padding: the rail is CHROME. It sits flush against the
+    // header above it and the window edge beside it, and carries its own
+    // right-hand rule — which is what makes it read as one frame with the top
+    // bar rather than as a floating island. Padding belongs to `content`.
     flexDirection: 'row',
-    gap: spacing.lg,
+    flexGrow: 1,
   },
   workspaceStacked: {
     flexDirection: 'column',

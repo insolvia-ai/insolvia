@@ -72,22 +72,27 @@ export const fontSizes = {
 export const contentMaxWidth = 720;
 
 /**
- * The cap for a screen that is a WORKSPACE rather than a document: a case's
- * navigation rail beside its content, and the wide tables that live in there —
- * the creditor matrix, the document list, the extraction queue.
+ * The cap for the CONTENT BESIDE a case's rail — not for the workspace itself.
  *
  * It exists because {@link contentMaxWidth} is a *reading* measure, chosen so a
  * line of prose stays short enough to track. Applying it to a creditor matrix
  * is the same number answering a different question: that table carries a name,
  * an address, an account number and an amount, and 720 cannot hold them without
- * wrapping every row into a paragraph. Both screens were capped at 720 because
- * only one number existed.
+ * wrapping every row into a paragraph.
  *
- * 1180 is a cap, not a width — `AppShell` still centers, so nothing stretches
- * on a very wide display, and {@link CaseShell} stacks the rail above the
- * content below `railBreakpoint` rather than squeezing both.
+ * WHAT IT NO LONGER CAPS is the frame. Capping the whole workspace put the rail
+ * inside a centred column, which left the app marooned in a strip down the
+ * middle of a wide display and the rail floating as an island with the header's
+ * rule stopping short of it. The rail is chrome now — flush to the header and
+ * the window edge — and this caps only what sits beside it.
+ *
+ * 1440 rather than something larger because the number still has a job: the
+ * spine and the figures put a label at one edge of this measure and its value
+ * at the other, and past about this width that pairing stops reading as a row.
+ * Letting the content simply fill a 2560px display would put four feet of empty
+ * space between "Total liabilities" and its figure.
  */
-export const workspaceMaxWidth = 1180;
+export const workspaceMaxWidth = 1440;
 
 /**
  * Below this viewport width a case's rail stops sitting beside the content and
