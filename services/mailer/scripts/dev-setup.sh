@@ -78,7 +78,9 @@ else
 
   log "installing Python dependencies (runtime + dev)..."
   "$VENV/bin/pip" install --quiet --upgrade pip
-  "$VENV/bin/pip" install --quiet -r "$MAILER_DIR/requirements.txt" -r "$MAILER_DIR/requirements-dev.txt"
+  # From the service directory, as the sibling services do (a relative path
+  # in a requirements file resolves against the working directory).
+  (cd "$MAILER_DIR" && "$VENV/bin/pip" install --quiet -r requirements.txt -r requirements-dev.txt)
 fi
 
 ok "Mailer service is ready."

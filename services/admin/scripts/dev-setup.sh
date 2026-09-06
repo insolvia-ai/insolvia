@@ -25,5 +25,11 @@ command -v "$PYTHON" >/dev/null 2>&1 ||
 if [[ ! -x "$VENV/bin/python" ]]; then
   "$PYTHON" -m venv "$VENV"
 fi
-"$VENV/bin/pip" install --quiet -r "$ADMIN_DIR/requirements.txt" -r "$ADMIN_DIR/requirements-dev.txt"
+# FROM THE SERVICE DIRECTORY, not from wherever this script was invoked:
+# requirements.txt installs packages/insolvia_core by the RELATIVE path
+# `../../packages/insolvia_core`, and pip resolves that against the current
+# working directory, not the requirements file. Run from the repo root it
+# fails with "Invalid requirement ... looks like a path" — which is how CI
+# (working-directory: services/<x>) never saw this and a laptop did.
+(cd "$ADMIN_DIR" && "$VENV/bin/pip" install --quiet -r requirements.txt -r requirements-dev.txt)
 printf '\033[1;32m[ ok ]\033[0m services/admin venv ready. Gate: ./services/admin/scripts/dev-test.sh\n'
