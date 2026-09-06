@@ -1,0 +1,165 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { cognitoHostDescription, isCognitoHost, testUser } from '../../support/env';
+
+/**
+ * The authenticated round trip against deployed staging (issue #80, seed of the
+ * suite in #40).
+ *
+ * WHAT THIS PROVES that a `curl /` smoke check cannot: that the bundle shipped
+ * with a usable `EXPO_PUBLIC_COGNITO_DOMAIN` / `EXPO_PUBLIC_COGNITO_CLIENT_ID`
+ * pair, that Cognito's app client still lists this origin's `/auth/callback` as
+ * a callback URL (Cognito matches those EXACTLY — see infra/modules/auth), that
+ * the code-for-token exchange works, and that the API accepts the resulting ID
+ * token. The email assertion is the load-bearing one: the address only reaches
+ * the screen if the whole `/v1/me` + ID-token loop closed.
+ *
+ * SELECTOR CONTRACT with the app. Role-based, by accessible name — the same
+ * discipline `app-pr.yml`'s axe audit already enforces on the app, so these
+ * selectors break only if the app's accessibility does:
+ *
+ *   - sign-in trigger : button named "Sign in"
+ *   - account menu    : button named "Account menu" — the header's one account
+ *                       control, which opens the rest
+ *   - sign-out control: MENUITEM named "Sign out", inside that menu
+ *   - signed-in state : the user's email address, visible once the menu is open
+ *
+ * The last three changed together when the header's three account controls
+ * became one avatar. The email is no longer on screen at rest, which is why
+ * step 5 opens the menu before looking for it.
+ *
+ * Cognito's pages are NOT ours and get no such contract. The pool serves
+ * MANAGED LOGIN (`managed_login_version = 2`), whose markup was read off the
+ * deployed staging page rather than inferred — the classic hosted UI's markup
+ * is completely different and none of it survived the switch.
+ *
+ * What is stable there, and what is not:
+ *
+ *   - `input[name="username"]` / `input[name="password"]` — STABLE. These are
+ *     the one thing both the classic UI and managed login agree on.
+ *   - `form#primary-form` — STABLE. It is a real id (and its own aria-label),
+ *     not a build artifact. Managed login renders exactly ONE sign-in form,
+ *     unlike the classic UI which rendered two responsive copies and made
+ *     `.first()` pick a hidden one.
+ *   - Element `id`s on the fields — NOT stable. They are React-generated
+ *     (`formField:R6dpf55:`) and change between renders. Never select on them.
+ *   - The submit button's classes — NOT stable. They are hashed
+ *     (`awsui_button_vjswe_1oayo_157`). It also carries NO `type` attribute,
+ *     so `button[type="submit"]` does not match it. Select it by role and
+ *     accessible name ("Sign in"), scoped to the form so it cannot collide
+ *     with the app's own "Sign in" button on the other side of the redirect.
+ *
+ * NO SLEEPS. Every wait below is on a condition.
+ */
+
+const signInButton = (page: Page) => page.getByRole('button', { name: 'Sign in' });
+const accountMenu = (page: Page) => page.getByRole('button', { name: 'Account menu' });
+const signOutItem = (page: Page) => page.getByRole('menuitem', { name: 'Sign out' });
+
+test.describe('staging auth round trip', () => {
+  test('signs in through the Cognito hosted UI and back out again', async ({ page }) => {
+    const { email, password } = testUser();
+
+    // Record every top-level navigation from here on. The return leg lands on
+    // `/auth/callback?code=…` and the app then routes away from it as soon as
+    // the exchange completes, so asserting on `page.url()` alone would be a
+    // race against the app's own redirect. The recorded history is not.
+    const visited: string[] = [];
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) visited.push(frame.url());
+    });
+
+    // ── 1. The app, signed out ────────────────────────────────────────────
+    await page.goto('/');
+    const appOrigin = new URL(page.url()).origin;
+    await expect(
+      signInButton(page),
+      'the staging app should render a "Sign in" button when signed out',
+    ).toBeVisible();
+
+    // ── 2. Off to the hosted UI ───────────────────────────────────────────
+    await signInButton(page).click();
+    await page.waitForURL((url) => isCognitoHost(url.hostname));
+
+    // `waitForURL` above would have timed out had this not held; restating it
+    // as an assertion is what puts the expected host in the failure output
+    // instead of a bare timeout.
+    expect(
+      isCognitoHost(new URL(page.url()).hostname),
+      `"Sign in" should redirect to the Cognito hosted UI (expected ${cognitoHostDescription()}, ` +
+        `landed on ${new URL(page.url()).hostname})`,
+    ).toBe(true);
+
+    // ── 3. Authenticate ───────────────────────────────────────────────────
+    //
+    // The only two lines in this suite that touch the credentials. `fill()`
+    // sets the value through the DOM — it is not typed into a log, not
+    // interpolated into a URL, and no trace is recorded in CI (see
+    // playwright.config.ts for why).
+    const form = page.locator('form#primary-form');
+    await expect(
+      form,
+      'the Cognito page should show its sign-in form — if this fails, either the ' +
+        'host redirected but served something else (OAuth error pages live on this ' +
+        'same host, so the host check above cannot catch that), or the app client ' +
+        'lost its managed-login branding style, which makes Cognito serve ' +
+        '"Login pages unavailable" instead of a form',
+    ).toBeVisible();
+
+    await form.locator('input[name="username"]').fill(email);
+    await form.locator('input[name="password"]').fill(password);
+    await form.getByRole('button', { name: 'Sign in' }).click();
+
+    // ── 4. The return leg ─────────────────────────────────────────────────
+    //
+    // Wait for the app to have taken over: back on our own origin, and off the
+    // callback route. `expect.poll` below retries its predicate on the
+    // configured expect timeout — a condition, not a sleep.
+    await page.waitForURL(
+      (url) => url.origin === appOrigin && !url.pathname.startsWith('/auth/callback'),
+      { timeout: 30_000 },
+    );
+
+    await expect
+      .poll(() => visited.some((href) => new URL(href).pathname.startsWith('/auth/callback')), {
+        message:
+          'the hosted UI should redirect back to /auth/callback — if it did not, the ' +
+          'app client\'s callback URLs no longer match this origin (they match exactly)',
+      })
+      .toBe(true);
+
+    expect(
+      new URL(page.url()).pathname,
+      'the app should route away from /auth/callback once the code exchange completes',
+    ).not.toContain('/auth/callback');
+
+    // ── 5. The signed-in identity ─────────────────────────────────────────
+    //
+    // This is the assertion issue #80 exists for: the address is on screen only
+    // if the token exchange succeeded, the ID token was accepted, and the app
+    // rendered the identity it got back.
+    //
+    // It lives inside the account menu now, so the menu is opened first. That
+    // is not merely a selector change — pressing the trigger and finding the
+    // address behind it proves the menu opens at all, which nothing else here
+    // would catch.
+    await expect(accountMenu(page)).toBeVisible();
+    await accountMenu(page).click();
+    await expect(
+      page.getByText(email).first(),
+      'the signed-in app should render the test user\'s email address — its absence ' +
+        'means the /v1/me + ID-token loop did not close, or the account menu did not open',
+    ).toBeVisible();
+
+    // ── 6. Sign out ───────────────────────────────────────────────────────
+    await signOutItem(page).click();
+    await expect(
+      signInButton(page),
+      'signing out should return the app to its signed-out state',
+    ).toBeVisible();
+    await expect(
+      page.getByText(email),
+      'the signed-out app should render no trace of the previous identity',
+    ).toHaveCount(0);
+  });
+});

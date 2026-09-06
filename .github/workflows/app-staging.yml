@@ -67,7 +67,12 @@ jobs:
       auth_domain: ${{ steps.tf.outputs.auth_domain }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
       firm_table: ${{ steps.tf.outputs.firm_table }}
+      case_table: ${{ steps.tf.outputs.case_table }}
+      document_bucket: ${{ steps.tf.outputs.document_bucket }}
+      fixture_bucket: ${{ steps.tf.outputs.fixture_bucket }}
       auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
+      api_domain: ${{ steps.tf.outputs.api_domain }}
+      marketing_url: ${{ steps.tf.outputs.marketing_url }}
     steps:
       - uses: actions/checkout@v5
 
@@ -104,7 +109,13 @@ jobs:
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
             echo "firm_table=$(tf firm_table_name)"
+            echo "case_table=$(tf case_table_name)"
+            echo "document_bucket=$(tf case_document_bucket)"
+            echo "fixture_bucket=$(tf dev_fixtures_bucket)"
             echo "auth_pool_id=$(tf auth_user_pool_id)"
+            # For the smoke project: the API and marketing origins it probes.
+            echo "api_domain=$(tf api_domain)"
+            echo "marketing_url=$(tf marketing_url)"
           } >> "$GITHUB_OUTPUT"
 
   # ── 2. Build + publish the artifact (no AWS credentials needed) ────
@@ -332,74 +343,20 @@ jobs:
       # POST /v1/firm/users is itself behind FIRM_ADMINISTRATION.
       #
       # It runs on EVERY deploy rather than once by hand, and that is the point
-      # — it is idempotent (it converges on the people seeds/staging.json
-      # names), so if staging's tables are ever recreated the next run restores
-      # this instead of failing a week later as a mystery app regression.
-      #
-      # A SECOND, NARROWER ROLE than the deploy one. The deploy role is
-      # deliberately control-plane only — "manages tables, never their
-      # contents" — and a firm-user row IS an access grant. See the seed role's
-      # header in infra/envs/ci-trust/main.tf for what it can and cannot reach.
-      #
-      # NAME THE MISSING INPUT BEFORE AWS SWALLOWS IT. An unset environment
-      # secret resolves to an empty string in silence, and an empty
-      # `role-to-assume` makes configure-aws-credentials fail with "Could not
-      # load credentials from any providers" — which names neither the secret
-      # nor the environment, and reads like a broken action. This is the same
-      # discipline support/env.ts applies to the suite's own inputs: fail on the
-      # missing NAME, never on what it contained.
-      - name: Check the seed step has its inputs
-        env:
-          SEED_ROLE_ARN: ${{ secrets.AWS_SEED_ROLE_ARN }}
-          SEED_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: |
-          missing=()
-          [ -n "$SEED_ROLE_ARN" ] || missing+=(AWS_SEED_ROLE_ARN)
-          [ -n "$SEED_PASSWORD" ] || missing+=(E2E_TEST_USER_PASSWORD)
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Not set on the insolvia-staging environment: ${missing[*]}"
-            echo "Either the secret is unset, or this job lost its"
-            echo "'environment: insolvia-staging' key — an environment-scoped secret"
-            echo "resolves to an empty string in silence when the environment is"
-            echo "missing or borrowed. docs/runbooks/staging-e2e-setup.md has both."
-            exit 1
-          fi
-
-      - uses: aws-actions/configure-aws-credentials@v6
+      # — it is idempotent (it converges on the people and the fixture case
+      # seeds/staging.json names), so if staging's tables are ever recreated
+      # the next run restores this instead of failing a week later as a
+      # mystery app regression. The step is shared with api-staging.yml's
+      # integration job; the action's header owns the role and the inputs.
+      - uses: ./.github/actions/seed-staging
         with:
-          role-to-assume: ${{ secrets.AWS_SEED_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      # From the admin service's requirements rather than a bare `pip install
-      # boto3`, so the seeder resolves the same pinned boto3 the service that
-      # owns it does — and from that service's OWN directory, because its
-      # requirements.txt names ../../packages/insolvia_core and pip resolves
-      # that path against the current working directory, not the file.
-      - name: Install the admin service's runtime dependencies
-        run: pip install -r requirements.txt
-        working-directory: services/admin
-
-      # Accounts AND firms, from one fixture. Adding a test user is an edit to
-      # seeds/staging.json — no secret per person, no script run, nothing here
-      # to change. The addresses are committed (they are unroutable `.test`
-      # ones); the shared password is the only secret involved.
-      - name: Seed the staging accounts and firms
-        env:
-          # The seeder lives in the ADMIN service (#212 — provisioning
-          # tooling has one home); the requirements installed above are that
-          # service's own, so the pins match what the seeder runs against
-          # in Lambda.
-          PYTHONPATH: services/admin/src
-          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
-        run: |
-          python -m insolvia_admin.entrypoints.seed \
-            --fixture seeds/staging.json \
-            --firm-table "${{ needs.terraform.outputs.firm_table }}" \
-            --user-pool-id "${{ needs.terraform.outputs.auth_pool_id }}"
+          seed-role-arn: ${{ secrets.AWS_SEED_ROLE_ARN }}
+          test-user-password: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+          firm-table: ${{ needs.terraform.outputs.firm_table }}
+          case-table: ${{ needs.terraform.outputs.case_table }}
+          document-bucket: ${{ needs.terraform.outputs.document_bucket }}
+          fixture-bucket: ${{ needs.terraform.outputs.fixture_bucket }}
+          user-pool-id: ${{ needs.terraform.outputs.auth_pool_id }}
 
       # No artifact upload, deliberately, and no trace: a Playwright trace
       # records `fill()` arguments verbatim — including the password typed into
@@ -409,11 +366,24 @@ jobs:
       # nothing here to leak; failures are diagnosed from this step's log, whose
       # assertion messages name what was expected and never a credential. Debug
       # locally (`cd e2e && npm test`) where the trace stays on your machine.
-      - name: Auth round trip against staging
+      # BOTH projects: `smoke` (no credentials — the shell, the build stamp,
+      # the sign-in hand-off, the API's refusals, the marketing site) and
+      # `flows` (signed in as the seeded people). The smoke half is what
+      # app-prod.yml runs against production afterwards, so it is exercised
+      # here first, where a broken assertion costs a staging run rather than
+      # a false alarm on a production deploy.
+      - name: E2E against staging (smoke + flows)
         working-directory: e2e
         env:
+          E2E_TARGET: staging
           E2E_BASE_URL: ${{ needs.terraform.outputs.url }}
+          E2E_API_URL: https://${{ needs.terraform.outputs.api_domain }}
+          E2E_MARKETING_URL: ${{ needs.terraform.outputs.marketing_url }}
           E2E_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
+          E2E_COGNITO_CLIENT_ID: ${{ needs.terraform.outputs.auth_client_id }}
+          # The footer's build stamp must be THIS commit's — proof the bundle
+          # CloudFront serves is the one this run just shipped.
+          E2E_EXPECTED_BUILD_SHA: ${{ github.sha }}
           # No address here any more: the suite reads it from
           # seeds/staging.json, the same file the seed step above loaded, so
           # who exists and who signs in cannot drift onto two different people.

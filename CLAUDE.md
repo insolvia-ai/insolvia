@@ -39,6 +39,8 @@ apps/       insolvia_app (Expo / React Native, web) · insolvia_admin (staff por
 packages/   insolvia_api_client · insolvia_core (Python — shared by the services, not an npm member)
 services/   api · admin · mailer · mcp    (Python on Lambda)
 forms/      official-form field specs (B101, B106*, B107) — data + checker, no build
+seeds/      who exists per environment (dev.json, staging.json) · fixtures/<version>/ — what a seeded case contains
+e2e/        Playwright against deployed environments: flows (signed in; dev, staging) · smoke (no credentials; also prod)
 infra/      Terraform: ci-trust · shared · staging · prod
 brand/      colors.json · fonts.json — Insolvia's palette and typefaces, the ONE place each is written down
 tool/       brand-palette.ts · render-brand-theme.ts · reconcile-cognito-branding.ts
@@ -90,7 +92,8 @@ before you touch anything:
 | rotating an IAM user's **MFA device** | [`docs/runbooks/iam-mfa-rotation.md`](docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
 | adding a new package/app/service | `insolvia-new-package` skill |
 | **opening a PR / writing or editing its description** | `insolvia-pr-description` skill — the body is the durable record, not a review request; CI is the only gate |
-| **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md) |
+| **writing or changing any test**, or asked to "improve coverage" | `insolvia-testing` skill — the shape differs by area on purpose · [ADR 0008](docs/adr/0008-testing-shape-follows-the-code-it-tests.md); **which tier** (unit / integration / e2e flows / e2e smoke) and which environment runs it · [ADR 0021](docs/adr/0021-test-tiers-and-seed-fixtures.md) |
+| **seeding an environment**, adding a test user or a fixture case, or wondering why a signed-in test user 403s | [`seeds/README.md`](seeds/README.md) — `seeds/<env>.json` is who exists, `seeds/fixtures/<version>/` is what a case contains; `scripts/dev-aws-seed.sh` (dev), `.github/actions/seed-staging` (staging), `scripts/dev-fixture.sh` (publish / capture a version). Prod is refused by the loader |
 | **building or changing any UI** in the app, admin portal, or marketing — picking a component, calling it, wondering whether the package already has one | `design-system-catalogue` skill **first**, before writing the screen. The package ships 43 components; the habit to break is hand-rolling one it already owns |
 | a component **renders unstyled**, resolves to the wrong leaf, or `react-native` turns up in the marketing bundle | `design-system-platforms` skill — the `.web`/`.native` split, and why this app renders `.native` on web too |
 | **re-branding**: changing a brand colour or font the design system owns | `design-system-theming` skill — the override seams, and why `primaryHover` follows the base colour on web but is pre-computed on native |

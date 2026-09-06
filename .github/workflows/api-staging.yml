@@ -14,6 +14,18 @@ name: API · Deploy · Staging
 #
 # Deploy workflows are not required status checks, so — unlike the *-pr.yml
 # gates — a `paths:` filter here is safe (same as app-staging.yml).
+#
+# ── Job order: deploy → integration ──────────────────────────────────────────
+#
+# `deploy` publishes, shifts the alias and smoke-tests /health. `integration`
+# then seeds staging (accounts, firms, the fixture case) and runs
+# services/api/tests/integration against the live API as those people —
+# the same tier a developer runs against their dev stack with
+# services/api/scripts/dev-test-integration.sh. It runs AFTER the shift, so it
+# exercises the version now serving; staging is the proving ground and that
+# window is accepted, exactly as app-staging.yml's e2e job accepts it. Its
+# failure fails this workflow, which is what makes it gate the release's
+# production stage (release.yml `needs`) and the verified-commit status.
 
 on:
   # Reusable: release.yml calls this as one leg of a staging
@@ -39,6 +51,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: insolvia-staging
+    # Frozen for the integration job, so it never reads state that moved on.
+    outputs:
+      domain: ${{ steps.tf.outputs.domain }}
+      firm_table: ${{ steps.tf.outputs.firm_table }}
+      case_table: ${{ steps.tf.outputs.case_table }}
+      document_bucket: ${{ steps.tf.outputs.document_bucket }}
+      fixture_bucket: ${{ steps.tf.outputs.fixture_bucket }}
+      auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
+      auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -65,6 +86,14 @@ jobs:
             echo "alias=$(terraform -chdir=infra/envs/staging output -raw api_lambda_alias_name)"
             echo "jobs_repo=$(terraform -chdir=infra/envs/staging output -raw jobs_ecr_repository_url)"
             echo "worker_function=$(terraform -chdir=infra/envs/staging output -raw jobs_worker_function_name)"
+            # The integration job's inputs: what the seed step loads into, and
+            # the pool + client the suite signs in against (public values).
+            echo "firm_table=$(terraform -chdir=infra/envs/staging output -raw firm_table_name)"
+            echo "case_table=$(terraform -chdir=infra/envs/staging output -raw case_table_name)"
+            echo "document_bucket=$(terraform -chdir=infra/envs/staging output -raw case_document_bucket)"
+            echo "fixture_bucket=$(terraform -chdir=infra/envs/staging output -raw dev_fixtures_bucket)"
+            echo "auth_pool_id=$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)"
+            echo "auth_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_web_client_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -261,3 +290,53 @@ jobs:
             cat worker-response.json
             exit 1
           fi
+
+  # ── Integration: the live API, signed in as the seeded people ──────────
+  #
+  # THIS IS WHAT MAKES THE API LEG ASSERT BEHAVIOUR. /health proves the
+  # function booted; this proves a real token from the real pool verifies
+  # against the deployed configuration, that the Lambda's own execution role
+  # may make every call the routes make (DynamoDB, KMS, S3 — the one thing
+  # no test on a laptop can exercise, because a developer's credentials are
+  # wider than the role's), that the bucket policy admits the presigned PUT
+  # the API mints, and that ADR 0009's refusals hold from outside.
+  #
+  # `environment: insolvia-staging` is load-bearing twice: it is what lets the
+  # seed action assume the seed role (its trust policy accepts only this
+  # environment's tokens) and where E2E_TEST_USER_PASSWORD lives. No AWS
+  # credentials reach the suite itself — sign-in is SRP over unsigned Cognito
+  # calls and everything after is HTTPS to the API.
+  integration:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/seed-staging
+        with:
+          seed-role-arn: ${{ secrets.AWS_SEED_ROLE_ARN }}
+          test-user-password: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+          firm-table: ${{ needs.deploy.outputs.firm_table }}
+          case-table: ${{ needs.deploy.outputs.case_table }}
+          document-bucket: ${{ needs.deploy.outputs.document_bucket }}
+          fixture-bucket: ${{ needs.deploy.outputs.fixture_bucket }}
+          user-pool-id: ${{ needs.deploy.outputs.auth_pool_id }}
+
+      # The API's own pins (the seed action installed the admin service's;
+      # this tier imports nothing from either service, but runs under the
+      # same pytest the unit tier does).
+      - name: Install the API's test toolchain
+        run: pip install -r requirements.txt -r requirements-dev.txt
+        working-directory: services/api
+
+      - name: Integration tier against staging
+        working-directory: services/api
+        env:
+          INSOLVIA_INTEGRATION: "1"
+          INTEGRATION_TARGET: staging
+          INTEGRATION_API_URL: https://${{ needs.deploy.outputs.domain }}
+          INTEGRATION_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
+          INTEGRATION_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+        run: pytest tests/integration

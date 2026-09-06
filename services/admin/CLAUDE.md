@@ -5,7 +5,7 @@ provisioning surface #178 asked for. Human docs: [`README.md`](README.md).
 Gate: `scripts/dev-test.sh` (ruff + mypy + pytest, exactly as CI).
 
 - **Layered `core / api / adapters / entrypoints`**, enforced by
-  `tests/test_architecture.py` — same direction rules as the tenant API,
+  `tests/unit/test_architecture.py` — same direction rules as the tenant API,
   plus one of its own: **`insolvia_api` is out of bounds everywhere**;
   shared domain comes only from
   [`packages/insolvia_core`](../../packages/insolvia_core/CLAUDE.md)
@@ -15,7 +15,7 @@ Gate: `scripts/dev-test.sh` (ruff + mypy + pytest, exactly as CI).
   Workspace ID token (`@require_staff`, issuer + audience + `hd` checks in
   `insolvia_core.auth`), and the cross-issuer 401 is the service's security
   invariant: a firm-pool token must die in verification, and
-  `tests/test_firm_routes.py` pins it. There is deliberately no third
+  `tests/unit/test_firm_routes.py` pins it. There is deliberately no third
   authenticated-but-unpermitted state here — the Workspace check IS the
   authorization ([ADR 0011](../../docs/adr/0011-cross-tenant-administration-is-a-separate-principal-class.md)).
 - **Firm ids appear in URLs here**, which ADR 0009 forbids the tenant API —

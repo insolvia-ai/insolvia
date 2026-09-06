@@ -1,10 +1,13 @@
 # services/api — agent rules
 
 Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
-`scripts/dev-up.sh`; test gate `scripts/dev-test.sh` (ruff + pytest, exactly as CI).
+`scripts/dev-up.sh`; unit gate `scripts/dev-test.sh` (ruff + mypy + pytest, exactly as
+CI); integration tier `scripts/dev-test-integration.sh` (the running API over HTTP,
+signed in — [ADR 0021](../../docs/adr/0021-test-tiers-and-seed-fixtures.md)).
+`tests/__init__.py` is the map of the tiers.
 
 - **Layered `core / api / adapters / entrypoints`** with the dependency
-  direction enforced by `tests/test_architecture.py`: `core` depends on nothing
+  direction enforced by `tests/unit/test_architecture.py`: `core` depends on nothing
   else; `api` depends only on `core`. The firm domain, token verification, the
   case domain (cases, debtors, documents, case collections, provenance —
   ADR 0016), and their adapters live in the shared
@@ -54,4 +57,4 @@ Flask + Mangum on Lambda. Human docs: [`README.md`](README.md). Run with
   which extraction (8.7) inherits.
   `core/jobs.py` owns the queue message contract; both entrypoints
   (`worker_lambda`, the local `worker_poller`) parse with it, and
-  `tests/test_jobs.py` pins the wire shape.
+  `tests/unit/test_jobs.py` pins the wire shape.

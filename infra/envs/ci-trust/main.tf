@@ -643,6 +643,21 @@ data "aws_iam_policy_document" "github_permissions" {
     ]
   }
 
+  # The shared seed-fixture bucket (infra/modules/dev_fixtures, applied by CI
+  # as part of envs/shared). Its own family: it holds synthetic sample
+  # documents that every dev stack and staging copies from, and it must not
+  # be reachable through the case-document grant above — one is fixtures,
+  # the other is a client's tax returns, and the ARN prefix is what keeps a
+  # future `insolvia-*-case-*` rename from silently widening this.
+  statement {
+    sid     = "DevFixtureBucket"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::insolvia-*-dev-fixtures-*",
+      "arn:aws:s3:::insolvia-*-dev-fixtures-*/*",
+    ]
+  }
+
   # The trail's own destination bucket, in its own family so the grant that
   # manages case documents is not the same grant that manages the log of
   # access to them. Object deletion is denied separately below — a bucket
@@ -1090,10 +1105,10 @@ resource "aws_iam_role" "github_seed" {
 }
 
 data "aws_iam_policy_document" "github_seed_permissions" {
-  # The firm table and its by-subject index, in staging, and nothing else. No
-  # Scan: the loader converges by looking up the people the fixture names, so
-  # it never needs to enumerate a firm it was not told about. No DeleteItem:
-  # unseeding is dev's `dev-aws-reset.sh`, which is a different principal.
+  # The firm table and its by-subject index, in staging. No Scan: the loader
+  # converges by looking up the people the fixture names, so it never needs
+  # to enumerate a firm it was not told about. No DeleteItem: unseeding is
+  # dev's `dev-aws-reset.sh`, which is a different principal.
   statement {
     sid = "StagingFirmTableRows"
     actions = [
@@ -1107,7 +1122,38 @@ data "aws_iam_policy_document" "github_seed_permissions" {
     ]
   }
 
-  # The key the firm table is encrypted with, reachable ONLY through DynamoDB.
+  # THE CASE TABLE, in staging, since the seed grew cases (seeds/fixtures/).
+  # The same verbs as the firm table plus what a transaction needs:
+  # CaseStore.create writes the case and its assignment as ONE
+  # TransactWriteItems, and IAM authorises a transaction by the per-item
+  # actions it contains (PutItem, plus ConditionCheckItem for the
+  # attribute_not_exists guards). UpdateItem is DocumentStore.update, which
+  # is how a seeded document goes from `pending` to `stored`. No Scan, no
+  # DeleteItem, for the firm table's reasons.
+  #
+  # THIS IS A DATA-PLANE GRANT ON THE CASE TABLE, and it is bounded the way
+  # the firm grant is: staging only, exact table name, and the role is
+  # assumable only by a job carrying the `insolvia-staging` environment.
+  # Staging holds synthetic cases and nothing else; the deploy role's
+  # DenyCaseDataDecryption is untouched (it is a different role) and prod's
+  # table is not named here in any form.
+  statement {
+    sid = "StagingCaseTableRows"
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:UpdateItem",
+      "dynamodb:ConditionCheckItem",
+    ]
+    resources = [
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-staging-cases",
+      "arn:aws:dynamodb:*:${data.aws_caller_identity.current.account_id}:table/insolvia-staging-cases/index/*",
+    ]
+  }
+
+  # The key the firm table AND the case table are encrypted with, reachable
+  # ONLY through DynamoDB (below) and S3 (further below).
   #
   # Scoped by alias for the same reason DenyCaseDataDecryption is: this root is
   # applied by a human before staging exists, so it cannot know the key ARN.
@@ -1140,6 +1186,71 @@ data "aws_iam_policy_document" "github_seed_permissions" {
       variable = "kms:ViaService"
       values   = ["dynamodb.${var.aws_region}.amazonaws.com"]
     }
+  }
+
+  # Staging's case-documents bucket, for the sample documents a seeded case
+  # carries. PutObject is the server-side copy out of the fixture bucket;
+  # GetObject is what HeadObject is authorised by (the loader confirms the
+  # copy landed exactly as the API's `complete` route does); PutObjectTagging
+  # is the empty tag set that keeps the bucket's unconfirmed-upload reaper
+  # away from a seeded object. No ListBucket, no DeleteObject: the case
+  # table is the record of what should be there, and unseeding is not this
+  # role's job.
+  #
+  # `insolvia-staging-case-documents-*` exactly — the region suffix is the
+  # only wildcard — so this cannot reach prod's bucket or dev's.
+  statement {
+    sid = "StagingCaseDocumentObjects"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:PutObjectTagging",
+    ]
+    resources = ["arn:aws:s3:::insolvia-staging-case-documents-*/*"]
+  }
+
+  # The same case key, through S3 this time: the document bucket encrypts
+  # every object under it (modules/case_documents), so the copy above needs
+  # GenerateDataKey and the HeadObject needs nothing, but a later GetObject
+  # would need Decrypt. Bounded exactly as the DynamoDB statement is — the
+  # alias, and the one calling service.
+  statement {
+    sid = "StagingCaseKeyThroughS3Only"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:DescribeKey",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "ForAnyValue:StringEquals"
+      variable = "kms:ResourceAliases"
+      values   = ["alias/insolvia-staging-cases"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  # The shared fixture bucket (infra/modules/dev_fixtures): read only. The
+  # objects are synthetic sample documents and the manifest that checksums
+  # them; the loader copies them server-side into the bucket above. Writing
+  # a fixture is `seed publish`, run by a developer under their own
+  # credentials — CI never curates fixtures.
+  statement {
+    sid = "DevFixtureObjectsRead"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      "arn:aws:s3:::insolvia-shared-dev-fixtures-*",
+      "arn:aws:s3:::insolvia-shared-dev-fixtures-*/*",
+    ]
   }
 
   # The staging pool's accounts — the people seeds/staging.json names.

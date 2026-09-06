@@ -9,7 +9,7 @@ The official MCP Python SDK + Mangum on Lambda (ADR 0016). Human docs:
   all decided THERE — change the design doc first, then this service, never
   the reverse. The protocol facts it cites are spec revision 2026-07-28.
 - **Layered `core / api / adapters / entrypoints`**, enforced by
-  `tests/test_architecture.py`: `core` is the surface's meaning (tool logic,
+  `tests/unit/test_architecture.py`: `core` is the surface's meaning (tool logic,
   config) and never imports the MCP SDK; `api` owns the SDK the
   way the tenant API's api layer owns Flask; adapters own boto3. The case
   domain itself lives in [`packages/insolvia_core`](../../packages/insolvia_core/CLAUDE.md)
@@ -46,7 +46,7 @@ The official MCP Python SDK + Mangum on Lambda (ADR 0016). Human docs:
   emulator; `infra/envs/dev` is the dev database, `scripts/dev-aws-setup.sh`
   writes `services/mcp/.env`. The bare server (no .env) is in-memory with
   auth failing closed.
-- **The MCP protocol seam is pinned** in `tests/test_protocol.py` the way
+- **The MCP protocol seam is pinned** in `tests/unit/test_protocol.py` the way
   the api-client contract test pins the REST surface: real JSON-RPC bodies,
   real headers, real RS256 tokens. A wire-visible change is SUPPOSED to break
   it.

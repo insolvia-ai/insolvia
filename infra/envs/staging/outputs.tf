@@ -267,3 +267,24 @@ output "mcp_client_ids" {
   description = "MCP harness app client ids — the service's token allowlist (#261)."
   value       = module.auth.mcp_client_ids
 }
+
+# ── The seed step's inputs ──────────────────────────────────────
+# Read by .github/actions/seed-staging from the workflow, for the reason
+# firm_table_name above gives: the values are Terraform's already, and an SSM
+# read from the workflow would need one more grant on the seed role. The
+# case table and document bucket are ALSO published to SSM (main.tf) for the
+# API; these outputs are the workflow's copy.
+output "case_table_name" {
+  description = "Cases, debtors, collection items and document records (CASE_TABLE_NAME for the API)."
+  value       = module.case_store.table_name
+}
+
+output "case_document_bucket" {
+  description = "The case-documents bucket (CASE_DOCUMENT_BUCKET for the API)."
+  value       = module.case_documents.bucket_name
+}
+
+output "dev_fixtures_bucket" {
+  description = "The account's shared seed-fixture bucket (infra/modules/dev_fixtures, owned by envs/shared), resolved by data lookup like every other shared resource."
+  value       = data.aws_s3_bucket.dev_fixtures.id
+}

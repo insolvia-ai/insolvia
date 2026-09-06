@@ -33,7 +33,7 @@ that is rewritten as work lands.
 | [`app-deploy-verification.md`](runbooks/app-deploy-verification.md) | Six checks proving a host serves the app, and the right build. | Both envs verified; re-run per deploy |
 | [`iam-mfa-rotation.md`](runbooks/iam-mfa-rotation.md) | Replacing a human IAM user's MFA device — and the two failures that look like missing permissions and are not. | Live; run per device change |
 | [`ses-production-access.md`](runbooks/ses-production-access.md) | The SES sandbox exit: checklist, request text, human console steps. | **Open** — actionable now |
-| [`staging-e2e-setup.md`](runbooks/staging-e2e-setup.md) | One-time setup for the post-deploy auth E2E: the staging test user, then its Actions environment secrets. | **Open** — actionable now |
+| [`staging-e2e-setup.md`](runbooks/staging-e2e-setup.md) | One-time setup for the post-deploy suites against staging: the seed role's grants (a human `ci-trust` apply), the shared password, and publishing the seed fixture. | **Open** — re-run step 1 for the case grants ([ADR 0021](adr/0021-test-tiers-and-seed-fixtures.md)) |
 
 ## [`adr/`](adr/) — decisions and their reasoning
 

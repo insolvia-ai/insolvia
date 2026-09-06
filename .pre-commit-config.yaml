@@ -1,5 +1,6 @@
-# Local hooks that mirror the PR checks. Install with:
-#   pip install pre-commit && pre-commit install
+# Local hooks that mirror the PR checks. scripts/dev-setup.sh installs them
+# (both hook types); by hand:
+#   brew install pre-commit && pre-commit install --hook-type pre-commit --hook-type pre-push
 repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.96.1
@@ -53,6 +54,36 @@ repos:
         pass_filenames: false
         files: \.(ts|tsx|js|jsx|mjs|cjs)$
 
-  # Not hooked: `npm run typecheck` and `npm run test` are too slow for every
-  # commit. `npm run ci` runs the whole npm gate (tokens:check, format, lint,
-  # typecheck, test) — the same set the PR checks run.
+      # ── The unit tier, at PUSH time ─────────────────────────────────────
+      #
+      # Tests are too slow for every commit and exactly right for every push:
+      # a commit is a save point, a push is the moment the work leaves this
+      # machine and a red PR check becomes the feedback loop. `stages:
+      # [pre-push]` keeps this off the commit path; `pre-commit install` has
+      # to have been run with `--hook-type pre-push` as well (dev-setup.sh
+      # does both) or this entry simply never fires.
+      #
+      # The script reads the range being pushed from PRE_COMMIT_FROM_REF /
+      # PRE_COMMIT_TO_REF and maps the changed files to the suites they could
+      # have broken (its header owns the map) — so a push touching one
+      # service pays for one service's tests and a docs-only push pays for
+      # none. `pass_filenames: false` is load-bearing: pre-commit splits a
+      # long file list across several invocations, and each would have run
+      # the same suites again. `always_run` because with no filenames passed
+      # the `files:` filter would otherwise decide the hook has nothing to do.
+      # Unit only, by construction: nothing it runs needs AWS, a server, a
+      # secret or the network. The integration tier is a differently named
+      # script (services/api/scripts/dev-test-integration.sh) so a hook can
+      # never reach for it by accident.
+      - id: unit-tests
+        name: unit tests for the areas this push touches (scripts/dev-test-unit.sh)
+        entry: scripts/dev-test-unit.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
+  # Not hooked at commit time: `npm run typecheck` and `npm run test` are too
+  # slow for every commit. `npm run ci` runs the whole npm gate (tokens:check,
+  # format, lint, typecheck, test) — the same set the PR checks run. The unit
+  # tier runs at PUSH time instead (the `unit-tests` hook above).

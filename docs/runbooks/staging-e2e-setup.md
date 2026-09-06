@@ -1,23 +1,29 @@
 # Staging E2E — one-time setup
 
-**State:** open — actionable now. Two steps by hand, once; after that the
-pipeline provisions its own test data on every staging deploy.
+**State:** open — actionable now. **Step 1 must be re-run** for the seed role's
+case-table and document-bucket grants ([ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)),
+and step 3 (publishing the seed fixture) is new. Three steps by hand, once;
+after that the pipeline provisions its own test data on every staging deploy.
 
-The post-deploy suite in [`e2e/`](../../e2e/README.md) signs in against real
-staging through the Cognito hosted UI, and a signed-in user is useless to it
-without a **firm** — a case belongs to one (ADR 0009), so a user in none
-resolves to no accessor and every route behind `current_accessor()` answers
-403.
+Two post-deploy suites sign in against real staging: the browser suite in
+[`e2e/`](../../e2e/README.md) through the Cognito hosted UI, and the API's
+integration tier in [`services/api/tests/integration/`](../../services/api/tests/integration/)
+by SRP. A signed-in user is useless to either without a **firm** — a case
+belongs to one (ADR 0009), so a user in none resolves to no accessor and every
+route behind `current_accessor()` answers 403 — and the specs that touch a case
+with documents in it need one to exist.
 
-**Both of those are now the pipeline's job.** `app-staging.yml` loads
-[`../../seeds/staging.json`](../../seeds/staging.json) before the suite runs:
-it creates each account in the pool, sets its password, and puts it in the firm
-the fixture names — idempotently, every deploy. A pool or a table recreated
-tomorrow is restored by the next run rather than found a week later as a
-mystery app regression.
+**All of that is the pipeline's job.** `.github/actions/seed-staging` (run by
+`api-staging.yml` and `app-staging.yml`) loads
+[`../../seeds/staging.json`](../../seeds/staging.json) before each suite: it
+creates each account in the pool, sets its password, puts it in the firm the
+fixture names, and converges the fixture case — rows in the case table and its
+sample documents copied server-side out of the shared fixture bucket —
+idempotently, every deploy. A pool or a table recreated tomorrow is restored by
+the next run rather than found a week later as a mystery app regression.
 
-What is left for a human is what CI cannot grant itself: **one IAM apply and
-one secret.**
+What is left for a human is what CI cannot grant itself: **one IAM apply, one
+secret, and one publish of the fixture bytes.**
 
 Why it is worth doing: production only ships behind a green staging stage of
 `release.yml` (in-run via `needs`, or via the `insolvia/staging-release`
@@ -60,12 +66,16 @@ echo.
 
 ## The order
 
-### 1. Let the pipeline into the staging pool
+### 1. Let the pipeline into the staging pool, the case table and the buckets
 
 The seed role (`insolvia-staging-seed-role`) needs to create accounts in the
-staging pool. That pool's ARN is not knowable when `ci-trust` is first applied —
-a pool ARN contains a generated id — so it is passed in as a variable once
-staging exists.
+staging pool, write the firm and case tables, copy fixture objects into
+staging's case-documents bucket, and read the shared fixture bucket. The
+table and bucket grants are in `ci-trust` already (`StagingCaseTableRows`,
+`StagingCaseDocumentObjects`, `StagingCaseKeyThroughS3Only`,
+`DevFixtureObjectsRead`) and only need the apply. The pool's ARN is not
+knowable when `ci-trust` is first applied — a pool ARN contains a generated
+id — so it is passed in as a variable once staging exists.
 
 **CI cannot apply this root.** `DenySelfPrivilegeEscalation` means an apply run
 as the deploy role fails by design; see the `insolvia-deploy-role-permissions`
@@ -82,8 +92,10 @@ Put that value in `infra/envs/ci-trust/terraform.tfvars` as
 ./scripts/apply-ci-trust.sh
 ```
 
-Expect **one** added statement on the seed role's policy, and nothing destroyed
-or replaced.
+Expect added statements on the seed role's policy (and the deploy role's
+`DevFixtureBucket` statement), and nothing destroyed or replaced. Until this
+apply, the seed step fails on `AccessDenied` for the first grant it lacks and
+the staging stage fails with it — that is this step, not a regression.
 
 Also set `AWS_SEED_ROLE_ARN` on the **`insolvia-staging` environment** if it is
 not already there — `terraform -chdir=infra/envs/ci-trust output -raw
@@ -113,12 +125,27 @@ silence.
 ./scripts/staging-github-set-secrets.sh --check
 ```
 
+### 3. Publish the seed fixture's bytes
+
+The fixture case's sample documents are committed under
+[`../../seeds/fixtures/v1/`](../../seeds/fixtures/v1/) and loaded from the
+account's shared fixture bucket (`infra/modules/dev_fixtures`, applied by CI as
+part of `envs/shared` — the first release after it merges creates the bucket).
+CI never writes that bucket; a developer publishes, once per version:
+
+```bash
+./scripts/dev-fixture.sh publish v1
+```
+
+Idempotent by digest — re-running it is free, and `--check` says what would
+upload. Until this has run, the seed step fails naming the missing object.
+
 ## Then: prove it end to end
 
-Trigger a staging deploy — merge to `main`, or dispatch **App · Deploy ·
-Staging** — and watch the `e2e` job. The seed step runs before Playwright, so a
-provisioning problem fails there with a named error rather than as a mystery
-assertion afterwards.
+Trigger a staging deploy — merge to `main`, or dispatch **API · Deploy ·
+Staging** and **App · Deploy · Staging** — and watch the `integration` job and
+the `e2e` job. The seed step runs before each suite, so a provisioning problem
+fails there with a named error rather than as a mystery assertion afterwards.
 
 Green means a real Chromium signed in against real staging, came back through
 `/auth/callback`, and saw the test user's own email address rendered by the app.
@@ -128,7 +155,9 @@ if the token exchange and the `/v1/me` call both worked.
 ## Done when
 
 - `./scripts/staging-github-set-secrets.sh --check` passes.
-- One `App · Deploy · Staging` run has a green `e2e` job.
+- `./scripts/dev-fixture.sh publish v1 --check` reports nothing to upload.
+- One `API · Deploy · Staging` run has a green `integration` job and one
+  `App · Deploy · Staging` run has a green `e2e` job.
 - A production promotion of that commit is no longer blessed by a deploy that
   asserted nothing.
 
@@ -140,6 +169,9 @@ recognising on sight:
 | Symptom | Cause |
 |---|---|
 | Seed step: `AccessDenied` on `cognito-idp:AdminCreateUser` | Step 1 has not been done, or `staging_user_pool_arn` is empty in `ci-trust` — the grant is conditional on it, so the statement is simply absent. |
+| Seed step: `AccessDenied` on a `dynamodb:*` call against `insolvia-staging-cases`, on `s3:PutObject`, or on `s3:GetObject` from the fixture bucket | Step 1 has not been re-applied since the case grants were added to `ci-trust`. |
+| Seed step: `refusing: … the copy of objects/… did not land` or `NoSuchKey` | Step 3 has not been done for this fixture version, or `envs/shared` has not applied the bucket yet. |
+| Integration: `could not sign in as 'admin': … NotAuthorized` | The password secret and the pool disagree — a rotation that only half landed — or the account is not CONFIRMED. If the seed step was green, suspect the former. |
 | Seed step: `refusing: fixture references ${E2E_TEST_USER_PASSWORD}` | The secret is unset, **or** the job lost its `environment: insolvia-staging` key — an environment-scoped secret resolves to an empty string in silence when the environment is missing or borrowed (`infra/CLAUDE.md`). |
 | Seed step: `InvalidPasswordException` | The stored password no longer meets the pool policy. Re-run step 2. |
 | Suite: `No user with handle 'x' in …/seeds/staging.json` | A spec names a handle the fixture does not define. Add the person to the fixture, or fix the handle. |

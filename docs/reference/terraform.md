@@ -47,7 +47,7 @@ infra/
 |---|---|---|
 | ci-trust | `insolvia/ci-trust/terraform.tfstate` | GitHub OIDC provider + `insolvia-shared-deploy-role` deploy role + its policy — **human-applied only**, never by CI (see below) |
 | account-access | `insolvia/account-access/terraform.tfstate` | The human IAM users, the groups they belong to, and the policies attached to them — **human-applied only**, and CI *cannot* apply it at all (see below) |
-| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer`, `insolvia-shared-jobs` — one per image, shared by every env) |
+| shared | `insolvia/shared/terraform.tfstate` | zone, wildcard cert, SES identity + mail DNS, **the container repositories** (`insolvia-shared-api`, `insolvia-shared-marketing`, `insolvia-shared-mailer`, `insolvia-shared-jobs` — one per image, shared by every env), and **the seed-fixture bucket** (`insolvia-shared-dev-fixtures-us-east-1`, `modules/dev_fixtures` — the bytes behind `seeds/fixtures/`, read by every dev stack and by staging's seed step; CI applies it and never writes it) |
 | staging | `insolvia/staging/terraform.tfstate` | staging S3 + CloudFront + DNS record; staging API stack (Lambda, HTTP API, `insolvia-staging-waitlist`, alarms); staging auth (`insolvia-staging-users`) |
 | prod | `insolvia/prod/terraform.tfstate` | prod S3 + CloudFront + DNS record; prod API stack (Lambda, HTTP API, `insolvia-prod-waitlist`, alarms); prod auth (`insolvia-prod-users`); the marketing stack (see below) |
 | dev | `insolvia/dev/<account-id>/<machine-id>/terraform.tfstate` — one per developer machine | that machine's `insolvia-dev-<short-id>-waitlist` and `insolvia-dev-<short-id>-cases` tables and `insolvia-dev-<short-id>-users` pool; the audit trail only with `-var=enable_audit_trail=true` |
@@ -491,8 +491,13 @@ What it owns is deliberately only what local dev consumes today:
   `services/api/.env`) and the worker poller consumes it — the pipeline's
   local story, ADR 0018.
 
-No ECR/Lambda/API Gateway/S3 (local dev runs the API via compose, not
-Lambda), and no IAM — the developer's own credentials are the principal.
+No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
+and no IAM — the developer's own credentials are the principal. The stack is
+**seeded, not empty**: `scripts/dev-aws-seed.sh` converges it on
+`seeds/dev.json` — the dev account's firm and the fixture case it names, whose
+sample documents are copied server-side out of the shared fixture bucket
+(`envs/shared`) into this machine's own case-documents bucket. The same loader
+seeds staging on every deploy ([ADR 0021](../adr/0021-test-tiers-and-seed-fixtures.md)).
 
 **CI never touches this env.** It is applied, reset, and destroyed only by
 `scripts/dev-aws-{setup,reset,destroy}.sh` (see `scripts/README.md`) with the

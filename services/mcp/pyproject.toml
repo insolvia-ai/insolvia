@@ -9,7 +9,7 @@ dependencies = []
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
 # --strict-markers / --strict-config: same guards as services/api's
 # pyproject, for the same reasons — a typo'd mark or ini key is an error,
 # not a warning.

@@ -28,7 +28,7 @@ insolvia_core = ["py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
 # Same guards as services/api's pyproject, for the same reasons: an
 # unregistered mark or a typo in this block is an error, not a warning.
 addopts = "-q --strict-markers --strict-config"
