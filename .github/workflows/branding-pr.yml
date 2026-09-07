@@ -66,14 +66,25 @@ jobs:
           paths: |
             # The documents under gate, and the tools that write them.
             infra/modules/auth/managed-login-settings.json
+            infra/modules/auth/wordmark-light.svg
+            infra/modules/auth/wordmark-dark.svg
+            infra/modules/auth/favicon.svg
             apps/insolvia_app/src/theme/brand-colors.ts
+            apps/insolvia_app/public/favicon.svg
             apps/insolvia_marketing/app/styles/brand.css
             apps/insolvia_admin/src/styles/brand.css
             tool/**
-            # The palette every one of them is generated FROM. A change here
+            # Everything they are generated FROM: the palette, the typefaces,
+            # the corner radii, and the two marks. A change to any of these
             # with no regeneration is the exact drift this gate exists to
             # catch, and it touches nothing else in the tree.
-            brand/colors.json
+            #
+            # `brand/**`, not a list of filenames. It was `brand/colors.json`
+            # alone, which silently stopped covering the inputs as fonts.json,
+            # radii.json, wordmark.svg and icon.svg were each added beside it —
+            # a PR changing only one of those would have skipped its own gate.
+            # A glob cannot fall behind that way.
+            brand/**
             # The root manifest and lockfile ARE the input now: they pin which
             # @insolvia-ai/tokens version the colours are checked against. A
             # tokens bump with no regeneration changes nothing else in the

@@ -15,34 +15,44 @@
  */
 
 @theme {
-  --color-accent: #b8863b;
-  --color-bg: #faf9f6;
-  --color-brand: #0b2a4a;
+  --color-accent: #8a6524;
+  --color-bg: #fafaf9;
+  --color-brand: #0f0e0d;
   --color-card: #ffffff;
-  --color-ink: #141a1f;
-  --color-line: #c9d0d8;
-  --color-muted: #5a6672;
-  --color-primary: #0b2a4a;
-  --color-primary-text: #ffffff;
-  --color-surface-alt: #efede6;
+  --color-danger: #8c4a3f;
+  --color-ink: #0f0e0d;
+  --color-line: #e4e2de;
+  --color-muted: #706d66;
+  --color-primary: #1a1917;
+  --color-primary-text: #fafaf9;
+  --color-success: #3f6b52;
+  --color-surface-alt: #f1f0ed;
+  --color-warning: #8a6524;
 
-  --font-heading: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-body: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
+  --radius-none: 0px;
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 [data-theme='dark'] {
-  --color-accent: #d2a857;
-  --color-bg: #0b1622;
-  --color-brand: #e9eef4;
-  --color-card: #122032;
-  --color-ink: #e9eef4;
-  --color-line: #2e4459;
-  --color-muted: #889cb1;
-  --color-primary: #d2a857;
-  --color-primary-text: #0b1622;
-  --color-surface-alt: #1b2d42;
-  --color-warning: #e0913c;
+  --color-accent: #c6a059;
+  --color-bg: #100f0e;
+  --color-brand: #f5f4f2;
+  --color-card: #1a1917;
+  --color-danger: #c88c80;
+  --color-ink: #f5f4f2;
+  --color-line: #2e2c29;
+  --color-muted: #9a968f;
+  --color-primary: #f5f4f2;
+  --color-primary-text: #100f0e;
+  --color-success: #7fa98d;
+  --color-surface-alt: #242220;
+  --color-warning: #c6a059;
 }

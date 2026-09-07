@@ -306,18 +306,13 @@ resource "aws_route53_record" "auth" {
 # (ReturnMergedResources), commit, then re-run `npm run tokens` to restore the
 # token colours over whatever the console wrote.
 #
-# COLOURS ONLY, NO ASSETS, on purpose — two separate reasons:
-#
-#   • No logo has been uploaded yet. The logo slots currently hold Cognito's
-#     grey placeholder graphic, and committing that would make AWS's placeholder
-#     the thing Terraform reapplies on every deploy and carries to prod. When a
-#     real wordmark exists, it lands here as `asset` blocks
-#     (filebase64, <= 40 assets, 2 MB each).
-#   • The export merges in Cognito's OWN illustrations — the email, SMS,
-#     passkey and password graphics, plus identity-provider button icons for
-#     providers this pool does not use. Those are AWS's artwork; declaring them
-#     here would commit someone else's assets to a public repo to no purpose.
-#     Assets we do not declare are left alone, so Cognito keeps supplying them.
+# ONE ASSET, THE WORDMARK, and no others. The export merges in Cognito's OWN
+# illustrations — the email, SMS, passkey and password graphics, plus
+# identity-provider button icons for providers this pool does not use. Those
+# are AWS's artwork; declaring them here would commit someone else's assets to
+# a public repo to no purpose. Assets we do not declare are left alone, so
+# Cognito keeps supplying them, and the two we do declare replace nothing but
+# the grey placeholder that used to sit in the form's logo slot.
 #
 # Dark mode is fully branded, and the dark primary button is brass rather than
 # the inverted white-on-navy a hand-mapping reaches for. That is not a taste
@@ -330,6 +325,36 @@ resource "aws_cognito_managed_login_branding" "web" {
   client_id    = aws_cognito_user_pool_client.web.id
 
   settings = file("${path.module}/managed-login-settings.json")
+
+  # The wordmark above the form, and the favicon on the tab it opens in. Both
+  # are GENERATED — `brand/wordmark.svg` and `brand/icon.svg` cut from the
+  # display face by scripts/render-brand-marks.sh, then coloured into this
+  # directory by `npm run tokens` and gated by `npm run tokens:check`. Never
+  # hand-edit one; the next `npm run tokens` overwrites it.
+  #
+  # The wordmark is TWO assets, one per colour mode, because Cognito's
+  # light/dark is its own toggle and an <img> served from AWS's origin can only
+  # follow the OS. The favicon is one, because the tile is dark in both schemes
+  # — tool/render-brand-marks.ts owns both arguments.
+  #
+  # The API takes base64 (<= 40 assets, 2 MB each); these are ~7 KB of outlines.
+  dynamic "asset" {
+    for_each = toset(["LIGHT", "DARK"])
+
+    content {
+      category   = "FORM_LOGO"
+      color_mode = asset.value
+      extension  = "SVG"
+      bytes      = filebase64("${path.module}/wordmark-${lower(asset.value)}.svg")
+    }
+  }
+
+  asset {
+    category   = "FAVICON_SVG"
+    color_mode = "DYNAMIC"
+    extension  = "SVG"
+    bytes      = filebase64("${path.module}/favicon.svg")
+  }
 }
 
 # ── App client ──────────────────────────────────────────────────

@@ -1,7 +1,12 @@
-import { colors, radii, spacing, typography as baseTypography } from '@insolvia-ai/tokens';
+import {
+  colors,
+  radii as baseRadii,
+  spacing,
+  typography as baseTypography,
+} from '@insolvia-ai/tokens';
 import type { ColorScheme, ColorSchemeName, Typography } from '@insolvia-ai/tokens';
 
-import { brandColors, brandFonts } from './brand-colors';
+import { brandColors, brandFonts, brandRadii } from './brand-colors';
 import { useColorSchemeName } from './preference';
 
 /**
@@ -27,7 +32,12 @@ export interface Theme {
   readonly scheme: ColorSchemeName;
   readonly colors: ColorScheme;
   readonly spacing: typeof spacing;
-  readonly radii: typeof radii;
+  /**
+   * The corner scale. `typeof baseRadii` would be the package's literal zeroes
+   * and would reject the brand's own corners — the same reason `typography` is
+   * typed by its interface rather than by the const.
+   */
+  readonly radii: Readonly<Record<keyof typeof baseRadii, number>>;
   /**
    * The type families. `Typography` and not `typeof baseTypography`: the
    * package declares its own `as const`, so that would be the LITERAL system
@@ -112,7 +122,16 @@ export const railBreakpoint = 900;
  * from `@insolvia-ai/tokens` keeps `@/theme` the single import a component
  * needs.
  */
-export { radii, spacing } from '@insolvia-ai/tokens';
+export { spacing } from '@insolvia-ai/tokens';
+
+/**
+ * The corner scale, branded.
+ *
+ * Re-exported from here for the reason `typography` is: importing the
+ * package's `radii` directly would be a second, UNBRANDED answer to "how round
+ * is this", reachable from any `StyleSheet.create` block. There is one answer.
+ */
+export const radii = { ...baseRadii, ...brandRadii } as const;
 
 /**
  * The type families, branded.
@@ -146,7 +165,11 @@ export function themeFor(scheme: string | null | undefined): Theme {
     // app without an edit here.
     colors: { ...colors[resolved], ...brandColors[resolved] },
     spacing,
-    radii,
+    // Brand over base, third seam. The package states 0 at every step because a
+    // corner is a brand decision it declines to make; `brand/radii.json` makes
+    // it. `pill` is not in the override and falls through, which is correct —
+    // the package refuses to theme it.
+    radii: { ...baseRadii, ...brandRadii },
     // Brand over base again, and the same layering argument. The package's
     // base theme sets `heading` and `body` to the same system sans and says
     // why — a display face is a brand decision it declines to make — so all

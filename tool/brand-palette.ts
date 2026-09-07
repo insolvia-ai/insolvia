@@ -34,6 +34,9 @@ export const BRAND = 'brand/colors.json';
 /** The brand's typefaces, relative to the repo root. Companion to {@link BRAND}. */
 export const BRAND_FONTS = 'brand/fonts.json';
 
+/** The brand's corners. The third of the three brand files. */
+export const BRAND_RADII = 'brand/radii.json';
+
 const TOKENS_PACKAGE = '@insolvia-ai/tokens';
 
 /**
@@ -56,6 +59,10 @@ export type Mode = (typeof MODES)[number];
 /** The type roles `@insolvia-ai/tokens` declares, and this file must state. */
 export const FONT_ROLES = ['heading', 'body', 'mono'] as const;
 export type FontRole = (typeof FONT_ROLES)[number];
+
+/** The radius steps the brand states. `pill` is deliberately not one of them. */
+export const RADIUS_STEPS = ['none', 'xs', 'sm', 'md', 'lg'] as const;
+export type RadiusStep = (typeof RADIUS_STEPS)[number];
 
 export type Scheme = Readonly<Record<string, string>>;
 export type Palette = Readonly<Record<Mode, Scheme>>;
@@ -203,6 +210,42 @@ export function fonts(root: string): Readonly<Record<FontRole, string>> {
     result[role] = value;
   }
   return result as Readonly<Record<FontRole, string>>;
+}
+
+/**
+ * The brand's corner radii, in density-independent pixels.
+ *
+ * Numbers rather than strings, because that is what React Native's
+ * `borderRadius` takes and what the package's `Radii` declares; the CSS output
+ * renders them with a `px` suffix.
+ *
+ * `pill` is absent by design and stating it would be honoured by nothing — the
+ * package's own `nativeRadiiWith` drops it, because the leaves that draw a
+ * capsule compute their own. Every other step must be present: a partially
+ * stated scale leaves a card rounded and its own header square.
+ */
+export function radii(root: string): Readonly<Record<RadiusStep, number>> {
+  const path = join(root, BRAND_RADII);
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    throw new Error(`Cannot read ${BRAND_RADII}. It is the source of every generated theme here.`);
+  }
+
+  const document = asObject(JSON.parse(raw) as JsonValue, BRAND_RADII);
+  const result: Record<string, number> = {};
+  for (const step of RADIUS_STEPS) {
+    const value = document[step];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `${BRAND_RADII}: ${step} is missing or not a non-negative number. All of ` +
+          `${RADIUS_STEPS.join(', ')} must be stated — see the file's own header.`,
+      );
+    }
+    result[step] = value;
+  }
+  return result as Readonly<Record<RadiusStep, number>>;
 }
 
 export function repoRoot(): string {

@@ -38,7 +38,11 @@ const config: ExpoConfig = {
     // comes from `name` above.
     lang: 'en',
     description: 'Bankruptcy case preparation and e-filing.',
-    themeColor: '#0B2A4A',
+    // Warm neutral, matching `bg` in brand/colors.json. One of the three
+    // places a brand colour is written by hand — nothing here can import the
+    // generated theme — so it is checked against that file on a re-brand (see
+    // CLAUDE.md); the other two are public/manifest.json's pair.
+    themeColor: '#FAFAF9',
 
     // A single-page app: one index.html plus content-hashed assets under
     // _expo/static/{js,css}. That is exactly the shape infra/modules/web_hosting
@@ -47,7 +51,12 @@ const config: ExpoConfig = {
     // server, is the only thing that can say "not found".
     output: 'single',
 
-    favicon: './public/favicon.png',
+    // No `favicon:` key. Expo's own favicon pipeline reshapes one source
+    // image into a single .ico and injects the link itself, which cannot
+    // express what we ship: an SVG icon for browsers that take one, the .ico
+    // only as the fallback. Both files are in public/ and so are copied to the
+    // export root verbatim; public/index.html links them explicitly. They come
+    // from scripts/render-brand-marks.sh — see brand/icon.svg.
   },
 
   plugins: ['expo-router'],

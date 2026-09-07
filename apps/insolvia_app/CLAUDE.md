@@ -210,11 +210,39 @@ below the `<title>` and why this paragraph is here rather than in the file.
   `public/index.html` — naming a family does not load it — and
   `scripts/fetch-brand-fonts.sh` regenerates them.
 
+  Corner radii layer the same way, from `brand/radii.json`, through the same
+  two seams. The package states 0 at every step because a corner is a brand
+  decision; Insolvia now states small ones (10 on a card, 6 on a control) — the
+  warm-neutral palette has no colour separating a card from the page, so at 0
+  the hairlines read as a wireframe. `pill` is deliberately absent: the package
+  refuses to theme it.
+
+  **The case rail is the one surface that paints a colour the scheme did not
+  choose.** It is dark in both schemes, because it is chrome; `CaseShell` pins
+  the package's leaves inside it with a nested `ThemeProvider` holding the dark
+  palette in BOTH slots, the same trick `ThemePreferenceProvider` uses for an
+  explicit scheme. Without it a `Sidebar.Item` in light mode paints near-black
+  ink on the near-black rail.
+
   Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
   `fontSizes` is their single owner, so a literal `fontSize:` in a component is
   a bug. The two colors in `public/manifest.json` and the `themeColor` in
   `app.config.ts` are the unavoidable exceptions — neither can import anything —
   so check them by hand against `brand/colors.json` when the brand changes.
+  (They were missed on the warm-neutral change and shipped the old navy for a
+  while, which is what that sentence is now for.)
+
+  **The icon files under `public/` are generated — never hand-edit or replace
+  one.** `favicon.svg` is written by `npm run tokens`; `favicon.ico` and the
+  four `icons/Icon-*.png` are cut by `scripts/render-brand-marks.sh` from
+  [`brand/icon.svg`](../../brand/icon.svg), which is itself cut from the
+  display face. The tile is the letter "I" in Cormorant on near-black, and it
+  is **dark in both schemes** for the same reason the case rail is: it is
+  chrome, and at 16px it sits against a browser tab strip that follows the OS
+  rather than the page. `app.config.ts` deliberately sets no `favicon:` key —
+  Expo's pipeline reshapes one source image into a single `.ico` and cannot
+  express an SVG icon with an `.ico` fallback, so `public/index.html` links
+  both itself.
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
   `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.

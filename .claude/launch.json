@@ -1,0 +1,61 @@
+{
+  "//": [
+    "Dev servers the Claude Code browser pane may start or attach to.",
+    "",
+    "TRACKED, like .claude/settings.json and .claude/hooks \u2014 this is shared",
+    "configuration, not per-machine state. `.claude/skills/` is the only thing",
+    "under here that is ignored, and only the third-party half of it.",
+    "",
+    "THE PREVIEWABLE SURFACES ONLY. scripts/dev-up.sh runs six services; three",
+    "of them are HTTP APIs (api 8080, admin-api 8090, mailer 8026) with nothing",
+    "to render, so they are absent \u2014 a preview pane pointed at a JSON health",
+    "check is noise. MAILPIT IS NOT ONE OF THOSE: the mailer service is an API,",
+    "but the Mailpit UI it delivers into is a real page on 8025, and it is where",
+    "you read what the app actually sent. It is listed for that reason.",
+    "",
+    "`stack` IS THE ONE TO REACH FOR. scripts/dev-up.sh is a supervisor: it",
+    "brings up all six together and, when any one of them exits, brings the",
+    "rest down with it. That is a real trap \u2014 running an individual app's",
+    "dev-down.sh takes the WHOLE stack with it, which has already happened here.",
+    "So there is no per-app `runtimeExecutable` entry; every other configuration",
+    "ATTACHES (a `url` and no command) and can neither start nor stop anything.",
+    "",
+    "`autoPort` IS FALSE, AND MUST STAY FALSE. The browser pane offers to move a",
+    "server to a free port when its own is taken; this one cannot move.",
+    "infra/envs/{dev,staging} register http://localhost:3000 as an EXACT-match",
+    "Cognito allowed origin \u2014 Cognito matches no wildcard host, path or port \u2014",
+    "so a reassigned port does not degrade, it breaks sign-in outright. If 3000",
+    "is busy, free it (./scripts/dev-down.sh) rather than moving the server.",
+    "",
+    "WHEN THE SPA SHELL CHANGES, RESTART. apps/insolvia_app/public/index.html",
+    "and app.config.ts are read once when the dev server starts, so an edit to",
+    "either is invisible until `stack` is restarted \u2014 a live-looking page that",
+    "silently predates the change. Metro hot-reloads src/, not these two."
+  ],
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stack",
+      "runtimeExecutable": "./scripts/dev-up.sh",
+      "runtimeArgs": [],
+      "port": 3000,
+      "url": "http://localhost:3000",
+      "autoPort": false
+    },
+    {
+      "name": "portal",
+      "url": "http://localhost:3100",
+      "port": 3100
+    },
+    {
+      "name": "marketing",
+      "url": "http://localhost:5173",
+      "port": 5173
+    },
+    {
+      "name": "mailpit",
+      "url": "http://localhost:8025",
+      "port": 8025
+    }
+  ]
+}

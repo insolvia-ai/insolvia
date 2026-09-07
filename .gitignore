@@ -72,6 +72,10 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+# The disposable toolchain scripts/render-brand-marks.sh builds to cut the
+# wordmark and icon out of the display face. Anchored: it is one known path,
+# not a licence for any `.cache` anywhere.
+/.cache/
 # setuptools drops this when a consumer pip-installs the shared package from
 # its local path (ADR 0012). Anchored, matching the Node rule below: a bare
 # `build/` would silently swallow any future build directory anywhere.
