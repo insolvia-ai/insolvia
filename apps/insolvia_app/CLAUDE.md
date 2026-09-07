@@ -229,6 +229,20 @@ below the `<title>` and why this paragraph is here rather than in the file.
   a bug. The two colors in `public/manifest.json` and the `themeColor` in
   `app.config.ts` are the unavoidable exceptions — neither can import anything —
   so check them by hand against `brand/colors.json` when the brand changes.
+  (They were missed on the warm-neutral change and shipped the old navy for a
+  while, which is what that sentence is now for.)
+
+  **The icon files under `public/` are generated — never hand-edit or replace
+  one.** `favicon.svg` is written by `npm run tokens`; `favicon.ico` and the
+  four `icons/Icon-*.png` are cut by `scripts/render-brand-marks.sh` from
+  [`brand/icon.svg`](../../brand/icon.svg), which is itself cut from the
+  display face. The tile is the letter "I" in Cormorant on near-black, and it
+  is **dark in both schemes** for the same reason the case rail is: it is
+  chrome, and at 16px it sits against a browser tab strip that follows the OS
+  rather than the page. `app.config.ts` deliberately sets no `favicon:` key —
+  Expo's pipeline reshapes one source image into a single `.ico` and cannot
+  express an SVG icon with an `.ico` fallback, so `public/index.html` links
+  both itself.
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
   `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.

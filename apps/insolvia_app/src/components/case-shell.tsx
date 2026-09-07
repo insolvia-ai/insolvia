@@ -453,7 +453,10 @@ const styles = StyleSheet.create({
   railTitle: {
     color: brandColors.dark.ink,
     fontSize: fontSizes.body,
-    fontWeight: '600',
+    // 700, like every other use of `heading`. Cormorant is drawn for large
+    // sizes and thins out fast — at 600 on a dark ground this title loses its
+    // stems. See brand/fonts.json.
+    fontWeight: '700',
     letterSpacing: -0.2,
   },
   rail: {

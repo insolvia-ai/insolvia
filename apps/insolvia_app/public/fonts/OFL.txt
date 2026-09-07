@@ -6,12 +6,19 @@ firm is signed in and looking at a client's case. Regenerate them with
 `scripts/fetch-brand-fonts.sh`; the families themselves are declared once, in
 `brand/fonts.json`.
 
-  Archivo         Copyright 2020 The Archivo Project Authors
-                  https://github.com/Omnibus-Type/Archivo
+  Cormorant       Copyright 2015 The Cormorant Project Authors
+    Garamond      https://github.com/CatharsisFonts/Cormorant
   Public Sans     Copyright 2015-2019 The Public Sans Project Authors
                   https://github.com/uswds/public-sans
   IBM Plex Mono   Copyright 2017 IBM Corp.
                   https://github.com/IBM/plex
+
+IT ALSO COVERS THE MARKS. brand/wordmark.svg and brand/icon.svg are glyph
+OUTLINES extracted from Cormorant Garamond by scripts/render-brand-marks.sh,
+along with everything generated from them — the favicon, the PWA icons, and
+the logo uploaded to the sign-in page. OFL 1.1 clause 1 puts extracted
+outlines under the same terms as the font, so this notice is theirs as well as
+the .woff2 files' here.
 
 The licence text below is the canonical SIL OFL 1.1, and applies to all three.
 

@@ -61,7 +61,7 @@ export const brandColors = {
  * `public/fonts`, declared @font-face in `public/index.html`.
  */
 export const brandFonts = {
-  heading: '"Playfair Display", Georgia, "Times New Roman", serif',
+  heading: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
   body: '"Public Sans", ui-sans-serif, system-ui, sans-serif',
   mono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 } as const;

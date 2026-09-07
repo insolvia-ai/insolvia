@@ -665,6 +665,8 @@ const styles = StyleSheet.create({
   tileValue: {
     fontSize: fontSizes.section,
     fontVariant: ['tabular-nums'],
+    // 700 for the reason brand/fonts.json gives: Cormorant at anything less
+    // reads as a hairline at this size.
     fontWeight: '700',
     letterSpacing: -0.5,
   },

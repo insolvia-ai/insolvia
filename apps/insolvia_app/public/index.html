@@ -15,13 +15,23 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/Icon-192.png" />
     <!--
+      THE ICON, linked here rather than through app.config.ts's `favicon` key,
+      which can only produce one .ico. Order matters: a browser that
+      understands `image/svg+xml` takes the first and stops, and one that does
+      not falls through to the .ico, which carries 16/32/48. Both files come
+      from scripts/render-brand-marks.sh — see brand/icon.svg — and both are
+      copied to the export root verbatim by the public/ step.
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <!--
       THE BRAND FACES, self-hosted.
 
       Self-hosted and not linked from a font CDN, deliberately: this app is
       behind a sign-in and the person using it is looking at a named client's
       bankruptcy file, so it should not be announcing page views to a third
       party to fetch a typeface. The .woff2 files are latin-subset and total
-      about 109KB for all six; `scripts/fetch-brand-fonts.sh` regenerates them
+      about 85KB for all five; `scripts/fetch-brand-fonts.sh` regenerates them
       and `public/fonts/OFL.txt` carries the licence they ship under.
 
       The families themselves are declared once in `brand/fonts.json` and reach
@@ -43,25 +53,18 @@
     />
     <style id="insolvia-fonts">
       @font-face {
-        font-family: 'Playfair Display';
-        font-style: normal;
-        font-weight: 500;
-        font-display: swap;
-        src: url('/fonts/playfair-500.woff2') format('woff2');
-      }
-      @font-face {
-        font-family: 'Playfair Display';
+        font-family: 'Cormorant Garamond';
         font-style: normal;
         font-weight: 600;
         font-display: swap;
-        src: url('/fonts/playfair-600.woff2') format('woff2');
+        src: url('/fonts/cormorant-600.woff2') format('woff2');
       }
       @font-face {
-        font-family: 'Playfair Display';
+        font-family: 'Cormorant Garamond';
         font-style: normal;
         font-weight: 700;
         font-display: swap;
-        src: url('/fonts/playfair-700.woff2') format('woff2');
+        src: url('/fonts/cormorant-700.woff2') format('woff2');
       }
       @font-face {
         font-family: 'Public Sans';
