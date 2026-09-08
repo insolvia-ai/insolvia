@@ -753,6 +753,76 @@ def test_check_reports_the_missing_case_and_writes_nothing(tmp_path: Path) -> No
     assert env.objects.copied == []
 
 
+def test_check_names_each_missing_part_of_a_seeded_case(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The report a partially-seeded environment gives.
+
+    A case row survives while its children do not — a copy that failed, a
+    fixture loaded before its documents existed — and the loader has always
+    counted those. Counting is not diagnosing: `case 'sample': present`
+    followed by "not fully loaded" sent the reader into this module's source
+    to learn that the documents were the absent part. Every missing thing is
+    now named where it is counted.
+    """
+    env = Env(tmp_path)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    creditor = env.entities.list_for_case(case.id, COLLECTIONS["creditors"])[0]
+    document = env.documents.list_for_case(case.id)[0]
+    assert env.debtors.debtors.pop((case.id, "debtor_1"), None) is not None
+    assert env.entities.delete(case.id, COLLECTIONS["creditors"], creditor.id)
+    assert env.documents.delete(case.id, document.id)
+    capsys.readouterr()
+
+    # 1 is "not fully loaded", not a count — which is exactly why the lines
+    # below have to carry the detail.
+    assert env.load("--check") == 1
+
+    printed = capsys.readouterr().out
+    assert "case 'sample': present" in printed
+    assert "debtor debtor_1: missing" in printed
+    assert "creditors[0]: missing" in printed
+    assert "document stub.pdf: missing" in printed
+
+
+def test_check_names_a_document_whose_bytes_never_landed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`pending` is not `absent`. A row written before its copy confirmed is
+    an interrupted load, not an unseeded one, and the two are fixed
+    differently — so the report distinguishes them."""
+    from dataclasses import replace
+
+    env = Env(tmp_path)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    document = env.documents.list_for_case(case.id)[0]
+    assert env.documents.update(replace(document, status="pending")) is not None
+    capsys.readouterr()
+
+    assert env.load("--check") == 1
+
+    assert "document stub.pdf: not stored" in capsys.readouterr().out
+
+
+def test_check_names_a_case_row_that_is_missing_entirely(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The counterpart to `case 'sample': created (<id>)` on the write path,
+    which under --check printed nothing at all."""
+    env = Env(tmp_path)
+    assert env.load() == 0
+    env.cases.cases.clear()
+    capsys.readouterr()
+
+    assert env.load("--check") == 1
+
+    assert "case 'sample': missing" in capsys.readouterr().out
+
+
 def test_a_copy_that_did_not_land_is_refused_before_the_row(tmp_path: Path) -> None:
     env = Env(tmp_path)
     env.objects.objects.clear()  # the bucket is empty
