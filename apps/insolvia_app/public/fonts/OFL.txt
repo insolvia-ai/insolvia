@@ -8,8 +8,8 @@ firm is signed in and looking at a client's case. Regenerate them with
 
   Cormorant       Copyright 2015 The Cormorant Project Authors
     Garamond      https://github.com/CatharsisFonts/Cormorant
-  Public Sans     Copyright 2015-2019 The Public Sans Project Authors
-                  https://github.com/uswds/public-sans
+  Open Sans       Copyright 2020 The Open Sans Project Authors
+                  https://github.com/googlefonts/opensans
   IBM Plex Mono   Copyright 2017 IBM Corp.
                   https://github.com/IBM/plex
 

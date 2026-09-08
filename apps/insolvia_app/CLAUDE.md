@@ -199,8 +199,8 @@ below the `<title>` and why this paragraph is here rather than in the file.
   passing nothing renders the package's monochrome chrome next to our navy. The
   decision is [ADR 0020](../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md).
 
-  Font FAMILIES layer the same way as of `brand/fonts.json`: Archivo for
-  headings, Public Sans for body, IBM Plex Mono for case numbers and form
+  Font FAMILIES layer the same way as of `brand/fonts.json`: Cormorant Garamond for
+  headings, Open Sans for body, IBM Plex Mono for case numbers and form
   references. They reach the screen through two seams and need both —
   `themeFor()` for this app's own components, and `ThemeProvider`'s `fonts` for
   the package's native leaves, whose `StyleSheet.create` runs at module load
