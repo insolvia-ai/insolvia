@@ -104,17 +104,12 @@ export interface AppShellProps {
  */
 const FOOTER_MARK = '/favicon.svg';
 
-/**
- * The link column pitch. Not on the 4pt grid because it is not a gap — it is a
- * COLUMN WIDTH, mirroring the ~220px pitch the reference footer (harvey.ai)
- * lays its link columns on. We have two links where it has fifteen; setting
- * them on the same grid is what makes two links look deliberate rather than
- * stranded. `minWidth`, so a narrow viewport wraps them instead of clipping.
- */
-const FOOTER_COLUMN = 224;
-
 const footerColors = {
   bg: brandColors.dark.bg,
+  // The links are the bright role and the copyright the muted one — the
+  // reference footer separates them the same way, so the destinations read as
+  // the active thing and the legal line recedes.
+  ink: brandColors.dark.ink,
   muted: brandColors.dark.muted,
 } as const;
 
@@ -142,8 +137,7 @@ export function AppShell({
   ];
   const footerLink = [
     styles.footerLinkText,
-    styles.footerLink,
-    { color: footerColors.muted, fontFamily: theme.typography.body },
+    { color: footerColors.ink, fontFamily: theme.typography.body },
   ];
 
   return (
@@ -223,10 +217,14 @@ export function AppShell({
         <View role="contentinfo" style={styles.footer}>
           {/* Decorative: the build stamp below already names Insolvia in text,
               so announcing the mark too would read the identity twice. */}
-          <Image alt="" source={{ uri: FOOTER_MARK }} style={styles.footerMark} />
+          {/* The mark on the left, the links stacked on the right — the shape
+              the reference footer (harvey.ai) uses, where a column of links
+              sits away from the identity rather than beside it. */}
+          <View style={styles.footerTop}>
+            <Image alt="" source={{ uri: FOOTER_MARK }} style={styles.footerMark} />
 
-          <View style={styles.footerLinks}>
-            {/* expo-router `Link`s rather than the design system's `Footer.Link`:
+            <View style={styles.footerLinks}>
+              {/* expo-router `Link`s rather than the design system's `Footer.Link`:
               that part is a Pressable with `accessibilityRole="link"`, which
               react-native-web renders as `<div role="link">` — no href, so no
               middle-click and no open-in-new-tab. These leave the app, so a
@@ -240,15 +238,16 @@ export function AppShell({
               always correct: an absolute marketing URL is an external
               destination and can never be a member of that union.
               `ExternalPathString` is the arm expo-router provides to say so. */}
-            <Link
-              href={`${marketingUrl(env.name)}/privacy` as ExternalPathString}
-              style={footerLink}
-            >
-              Privacy
-            </Link>
-            <Link href={marketingUrl(env.name) as ExternalPathString} style={footerLink}>
-              Get help
-            </Link>
+              <Link
+                href={`${marketingUrl(env.name)}/privacy` as ExternalPathString}
+                style={footerLink}
+              >
+                Privacy
+              </Link>
+              <Link href={marketingUrl(env.name) as ExternalPathString} style={footerLink}>
+                Get help
+              </Link>
+            </View>
           </View>
           {/* THE BUILD STAMP, and the honest home for what the home screen used
             to say in prose. It is what a customer reads back over a call: which
@@ -291,20 +290,27 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     paddingTop: spacing.xl,
   },
-  footerLinks: {
+  footerTop: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
-    // Wraps rather than squeezing: at a narrow width the columns stack, which
-    // is what the reference does too.
-    flexWrap: 'wrap',
-    rowGap: spacing.md,
+    // Pushes the link stack to the far edge, which is what puts it opposite
+    // the mark rather than next to it.
+    justifyContent: 'space-between',
   },
-  footerLink: {
-    // The column, not a gap — see FOOTER_COLUMN.
-    minWidth: FOOTER_COLUMN,
+  footerLinks: {
+    // STACKED, and LEFT-aligned inside the stack: the reference sets its link
+    // columns flush-left within each column and pushes the whole block right,
+    // rather than right-aligning the text itself. `gap` lands the rows on its
+    // ~34px pitch once the line box is taken off.
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    gap: spacing.md,
   },
   footerMark: {
-    height: 28,
-    width: 28,
+    // Larger than a favicon's natural reading: in the reference the mark is the
+    // counterweight to the link block, not a bullet beside it.
+    height: 44,
+    width: 44,
   },
   footerText: {
     fontSize: fontSizes.caption,
