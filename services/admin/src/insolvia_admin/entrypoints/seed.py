@@ -625,7 +625,14 @@ def _seed_one_case(
     stores: CaseStores,
     check: bool,
 ) -> int:
-    """Converge one fixture case. Returns how many things were missing."""
+    """Converge one fixture case. Returns how many things were missing.
+
+    UNDER --check EVERY MISSING THING IS NAMED, in the same vocabulary the
+    write path prints. A count alone is unreadable: a case row can be present
+    while its debtors, items or documents are not, and the report was then
+    `case 'x': present` followed by a bare "not fully loaded" — which leaves
+    reading this source as the only way to learn what was absent.
+    """
     handle = str(spec.get("handle") or "")
     if not handle:
         raise RefusedError("every fixture case needs a handle")
@@ -636,7 +643,9 @@ def _seed_one_case(
     # factory, and then given its derived id and a matching assignment.
     if stores.cases.read_for_worker(case_id) is None:
         missing += 1
-        if not check:
+        if check:
+            print(f"  case '{handle}': missing")
+        else:
             draft = parse_case_creation(
                 {"chapter": spec.get("chapter"), "district": spec.get("district")}
             )
@@ -658,7 +667,9 @@ def _seed_one_case(
         if stores.debtors.get(case_id, filing_role=role) is not None:
             continue
         missing += 1
-        if not check:
+        if check:
+            print(f"    debtor {role}: missing")
+        else:
             stores.debtors.create(
                 create_debtor(debtor_draft, case_id=case_id, filing_role=role)
             )
@@ -679,7 +690,9 @@ def _seed_one_case(
             if stores.entities.get(case_id, kind, entity_id) is not None:
                 continue
             missing += 1
-            if not check:
+            if check:
+                print(f"    {name}[{index}]: missing")
+            else:
                 minted_entity = create_entity(kind, entity_draft, case_id=case_id)
                 stores.entities.create(replace(minted_entity, id=entity_id))
                 print(f"    {name}[{index}]: created")
@@ -700,6 +713,11 @@ def _seed_one_case(
             continue
         missing += 1
         if check:
+            # A row that exists but is not `stored` is a DIFFERENT failure from
+            # no row at all — an interrupted copy rather than an unseeded case —
+            # and saying which is the whole point of naming them.
+            state = "not stored" if existing is not None else "missing"
+            print(f"    document {document.get('fileName')}: {state}")
             continue
         document_draft = parse_document_upload(
             {
