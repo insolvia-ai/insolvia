@@ -45,4 +45,25 @@ describe('Heading', () => {
     expect(trackingAt('display')).toBeLessThan(trackingAt('section'));
     expect(trackingAt('section')).toBeLessThan(trackingAt('body'));
   });
+
+  // The same shape of assertion for leading: the RATIO of line height to size
+  // tightens as the heading grows, and every size states one — an absent
+  // `lineHeight` is `line-height: normal`, the one value for all sizes this
+  // component exists to avoid.
+  it('tightens the leading as the heading gets larger', () => {
+    const leadingRatioAt = (size: 'display' | 'section' | 'body') => {
+      render(
+        <Heading level={2} size={size}>
+          A heading long enough to wrap onto a second line
+        </Heading>,
+      );
+      const { fontSize, lineHeight } = StyleSheet.flatten(screen.getByRole('heading').props.style);
+      screen.unmount();
+      expect(lineHeight).toBeDefined();
+      return (lineHeight as number) / (fontSize as number);
+    };
+
+    expect(leadingRatioAt('display')).toBeLessThan(leadingRatioAt('section'));
+    expect(leadingRatioAt('section')).toBeLessThan(leadingRatioAt('body'));
+  });
 });

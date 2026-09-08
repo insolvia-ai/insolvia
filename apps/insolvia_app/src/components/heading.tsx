@@ -83,18 +83,31 @@ const styles = StyleSheet.create({
   // is being used far below its optical size. A single value in `base` applied
   // display-scale tightening to every heading — worst on `body`, where a case
   // name like "Probemtpvbjkj" ran its letters together.
+  //
+  // LEADING RUNS THE OTHER WAY from the size, for the same reason. Without a
+  // `lineHeight` react-native-web falls back to `line-height: normal`, which
+  // for Cormorant is about 1.21 of the size at EVERY size — so a two-line
+  // display heading at 34px carried eight pixels of air between its lines
+  // that a 24px section heading did not need and body copy (at 1.5) had far
+  // more of. Large text wants its lines close: the eye reads the block as one
+  // shape, and the tall ascenders already keep the lines apart. Body-size
+  // headings take body copy's 1.5, so a heading beside a paragraph shares its
+  // rhythm instead of sitting a few pixels short of the line next to it.
   display: {
     fontSize: fontSizes.display,
     letterSpacing: -0.5,
+    lineHeight: 38,
   },
   section: {
     fontSize: fontSizes.section,
     letterSpacing: -0.2,
+    lineHeight: 28,
   },
   body: {
     fontSize: fontSizes.body,
     // POSITIVE, and not a typo: below about 20px this face needs opening up
     // rather than tightening.
     letterSpacing: 0.2,
+    lineHeight: fontSizes.body * 1.5,
   },
 });
