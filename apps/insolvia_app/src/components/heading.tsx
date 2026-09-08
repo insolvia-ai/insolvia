@@ -76,15 +76,25 @@ export function Heading({ level, size, children, style }: HeadingProps) {
 const styles = StyleSheet.create({
   base: {
     fontWeight: '700',
-    letterSpacing: -0.5,
   },
+  // TRACKING BELONGS TO THE SIZE, NOT TO THE COMPONENT. Cormorant is drawn for
+  // large sizes (brand/fonts.json), so it arrives already tight; the amount of
+  // correction that flatters it at 34px closes the letters up at 16px, where it
+  // is being used far below its optical size. A single value in `base` applied
+  // display-scale tightening to every heading — worst on `body`, where a case
+  // name like "Probemtpvbjkj" ran its letters together.
   display: {
     fontSize: fontSizes.display,
+    letterSpacing: -0.5,
   },
   section: {
     fontSize: fontSizes.section,
+    letterSpacing: -0.2,
   },
   body: {
     fontSize: fontSizes.body,
+    // POSITIVE, and not a typo: below about 20px this face needs opening up
+    // rather than tightening.
+    letterSpacing: 0.2,
   },
 });
