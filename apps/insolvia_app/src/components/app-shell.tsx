@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import type { ExternalPathString } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
@@ -11,6 +11,7 @@ import { EnvBadge } from '@/components/env-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
+import { brandColors } from '@/theme/brand-colors';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
 export interface AppShellProps {
@@ -75,6 +76,43 @@ export interface AppShellProps {
  * react-native-web gives every View `position: relative`. So the state lives
  * here, and {@link AccountMenu} is controlled.
  */
+/**
+ * THE FOOTER IS ALWAYS DARK, in both colour schemes — the same trick
+ * `case-shell`'s `railColors` plays, and for the same reason: this is chrome,
+ * not page content. It closes the document with a band that reads as the edge
+ * of the product rather than as more page, which is how the reference this was
+ * measured against (harvey.ai) ends a page.
+ *
+ * Pinned to the DARK scheme's roles rather than to literals, so a brand change
+ * still reaches it — `brand/colors.json` remains the one place these are
+ * written down. The text roles have to come from the same scheme or the light
+ * theme would put its dark ink on this dark ground.
+ */
+/**
+ * THE "I" TILE, served from `public/` rather than imported.
+ *
+ * It is a GENERATED mark — `brand/icon.svg` cut from the display face, coloured
+ * by `npm run tokens`, gated by `npm run tokens:check`. Inlining its path data
+ * into this component would fork a generated artifact, which is exactly what
+ * "never hand-edit a mark" forbids, and the drift check could not see the copy.
+ *
+ * Its ground is the dark chrome colour, which is the SAME colour this footer
+ * band uses, so the rounded square disappears into the band and what reads is
+ * the ivory letterform on black. That is not a happy accident to rely on
+ * blindly, but it is stable by construction: both resolve from the dark
+ * scheme's roles in `brand/colors.json`, so a brand change moves them together.
+ */
+const FOOTER_MARK = '/favicon.svg';
+
+const footerColors = {
+  bg: brandColors.dark.bg,
+  // The links are the bright role and the copyright the muted one — the
+  // reference footer separates them the same way, so the destinations read as
+  // the active thing and the legal line recedes.
+  ink: brandColors.dark.ink,
+  muted: brandColors.dark.muted,
+} as const;
+
 export function AppShell({
   children,
   maxContentWidth = contentMaxWidth,
@@ -98,8 +136,8 @@ export function AppShell({
     { color: theme.colors.muted, fontFamily: theme.typography.body },
   ];
   const footerLink = [
-    styles.footerText,
-    { color: theme.colors.muted, fontFamily: theme.typography.body },
+    styles.footerLinkText,
+    { color: footerColors.ink, fontFamily: theme.typography.body },
   ];
 
   return (
@@ -149,21 +187,44 @@ export function AppShell({
         <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
       </View>
 
-      <View role="main" style={styles.main}>
-        <ScrollView
-          contentContainerStyle={
+      {/* ONE SCROLLER FOR THE PAGE, holding `main` and the footer as SIBLINGS.
+          It used to sit inside `main`, which made the footer a flex child of
+          the page and therefore pinned to the bottom of the viewport on every
+          screen — visible at all times, which is not what a footer is for.
+          Moving the scroll up one level lets the footer flow after the content
+          and leave the viewport on a long page.
+
+          The footer could not simply move INSIDE the old ScrollView: a
+          `contentinfo` landmark nested inside `main` is invalid ARIA, and the
+          landmarks are this component's whole reason for existing (see above).
+          As siblings here, both stay top-level landmarks.
+
+          The header stays outside the scroller deliberately. It carries the
+          primary nav and the way out, which should not require scrolling back
+          up; nobody has ever needed the build stamp that way. */}
+      <ScrollView contentContainerStyle={styles.scroller}>
+        <View
+          role="main"
+          style={
             frame === 'workspace'
               ? styles.workspaceContent
               : [styles.mainContent, { maxWidth: maxContentWidth }]
           }
         >
           {children}
-        </ScrollView>
-      </View>
+        </View>
 
-      <View role="contentinfo" style={[styles.footer, { borderTopColor: theme.colors.line }]}>
-        <View style={styles.footerLinks}>
-          {/* expo-router `Link`s rather than the design system's `Footer.Link`:
+        <View role="contentinfo" style={styles.footer}>
+          {/* Decorative: the build stamp below already names Insolvia in text,
+              so announcing the mark too would read the identity twice. */}
+          {/* The mark on the left, the links stacked on the right — the shape
+              the reference footer (harvey.ai) uses, where a column of links
+              sits away from the identity rather than beside it. */}
+          <View style={styles.footerTop}>
+            <Image alt="" source={{ uri: FOOTER_MARK }} style={styles.footerMark} />
+
+            <View style={styles.footerLinks}>
+              {/* expo-router `Link`s rather than the design system's `Footer.Link`:
               that part is a Pressable with `accessibilityRole="link"`, which
               react-native-web renders as `<div role="link">` — no href, so no
               middle-click and no open-in-new-tab. These leave the app, so a
@@ -177,25 +238,30 @@ export function AppShell({
               always correct: an absolute marketing URL is an external
               destination and can never be a member of that union.
               `ExternalPathString` is the arm expo-router provides to say so. */}
-          <Link href={`${marketingUrl(env.name)}/privacy` as ExternalPathString} style={footerLink}>
-            Privacy
-          </Link>
-          <Link href={marketingUrl(env.name) as ExternalPathString} style={footerLink}>
-            Get help
-          </Link>
-        </View>
-        {/* THE BUILD STAMP, and the honest home for what the home screen used
+              <Link
+                href={`${marketingUrl(env.name)}/privacy` as ExternalPathString}
+                style={footerLink}
+              >
+                Privacy
+              </Link>
+              <Link href={marketingUrl(env.name) as ExternalPathString} style={footerLink}>
+                Get help
+              </Link>
+            </View>
+          </View>
+          {/* THE BUILD STAMP, and the honest home for what the home screen used
             to say in prose. It is what a customer reads back over a call: which
             environment they are on, and exactly which bundle. */}
-        <Text
-          style={[
-            styles.footerText,
-            { color: theme.colors.muted, fontFamily: theme.typography.body },
-          ]}
-        >
-          © 2026 Insolvia · {env.label} · {env.host} · {buildStamp}
-        </Text>
-      </View>
+          <Text
+            style={[
+              styles.footerText,
+              { color: footerColors.muted, fontFamily: theme.typography.body },
+            ]}
+          >
+            © 2026 Insolvia · {env.label} · {env.host} · {buildStamp}
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -213,17 +279,44 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   footer: {
-    borderTopWidth: 1,
-    gap: spacing.xs,
+    backgroundColor: footerColors.bg,
+    gap: spacing.xl,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    // Asymmetric on purpose. The rule that used to divide this from the page
+    // was doing the work of separation while the footer was pinned; now that it
+    // is reached by scrolling to the end, distance says the same thing more
+    // quietly, and a hairline across the full width would read as another band
+    // of chrome. Generous above, ordinary below.
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  footerTop: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    // Pushes the link stack to the far edge, which is what puts it opposite
+    // the mark rather than next to it.
+    justifyContent: 'space-between',
   },
   footerLinks: {
-    flexDirection: 'row',
+    // STACKED, and LEFT-aligned inside the stack: the reference sets its link
+    // columns flush-left within each column and pushes the whole block right,
+    // rather than right-aligning the text itself. `gap` lands the rows on its
+    // ~34px pitch once the line box is taken off.
+    alignItems: 'flex-start',
+    flexDirection: 'column',
     gap: spacing.md,
+  },
+  footerMark: {
+    // Larger than a favicon's natural reading: in the reference the mark is the
+    // counterweight to the link block, not a bullet beside it.
+    height: 44,
+    width: 44,
   },
   footerText: {
     fontSize: fontSizes.caption,
+  },
+  footerLinkText: {
+    fontSize: fontSizes.label,
   },
   header: {
     alignItems: 'center',
@@ -239,15 +332,21 @@ const styles = StyleSheet.create({
     // covers only what is behind it.
     zIndex: 10,
   },
-  main: {
-    flex: 1,
-  },
   mainContent: {
+    // `flexGrow` so a SHORT page still pushes the footer to the bottom of the
+    // viewport rather than leaving it stranded mid-screen with bare canvas
+    // under it. On a long page it does nothing and the footer scrolls away.
+    flexGrow: 1,
     gap: spacing.md,
     // Centers the column itself; `alignItems` would stretch it instead.
     marginHorizontal: 'auto',
     padding: spacing.xl,
     width: '100%',
+  },
+  scroller: {
+    // The page-level scroll container. `flexGrow` rather than a height so its
+    // children can share the viewport when the content is short.
+    flexGrow: 1,
   },
   workspaceContent: {
     // No padding, no cap, no centering — the child is chrome and owns all
