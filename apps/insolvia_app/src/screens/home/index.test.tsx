@@ -126,7 +126,7 @@ describe('the home route', () => {
     expect(screen.queryByText(/Cognito subject/)).toBeNull();
   });
 
-  it('reflects the resolved environment in the badge, and only there', async () => {
+  it('names the resolved environment in the footer stamp, and nowhere in the body', async () => {
     await renderSignedInHome();
 
     // Tests run without EXPO_PUBLIC_INSOLVIA_ENV, so this is the `local`
@@ -134,12 +134,13 @@ describe('the home route', () => {
     const env = environmentInfo(appEnvironment);
     expect(env.name).toBe('local');
 
-    expect(screen.getByText(env.label.toUpperCase())).toBeTruthy();
-    expect(screen.getByLabelText(`${env.label} environment, ${env.host}`)).toBeTruthy();
-    // The body used to repeat this as "Serving local · localhost". The badge
-    // above already says it, and the footer's build stamp says it with the
-    // bundle id attached — so the prose line went, and this asserts it stayed
-    // gone rather than merely not asserting it.
+    // The footer's build stamp is the one always-visible statement of the
+    // environment now that the header pill is gone (the account menu states
+    // it too, behind its trigger — see account-menu.test.tsx).
+    expect(screen.getByText(new RegExp(`${env.label} · ${env.host}`))).toBeTruthy();
+    // The body used to repeat this as "Serving local · localhost". The footer
+    // already says it with the bundle id attached — so the prose line went,
+    // and this asserts it stayed gone rather than merely not asserting it.
     expect(screen.queryByText(/^Serving /)).toBeNull();
   });
 

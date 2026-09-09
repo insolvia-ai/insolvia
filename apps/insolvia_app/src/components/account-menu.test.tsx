@@ -12,6 +12,7 @@ import {
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
+import { brandColors } from '@/theme/brand-colors';
 
 let mockAuthConfig: AuthConfig | null = null;
 
@@ -130,6 +131,96 @@ describe('the account menu', () => {
     expect(screen.queryByText(TEST_EMAIL)).toBeNull();
   });
 
+  it('names the environment, spelled out, inside the identity block', async () => {
+    // The header pill that said "LOCAL" is gone; this is where the answer to
+    // "which deployment am I signed in to" lives now, in the same words a
+    // screen reader gets. Tests run without EXPO_PUBLIC_INSOLVIA_ENV, so this
+    // is the `local` arm — the same one an unconfigured build takes.
+    signedIn();
+    const user = userEvent.setup();
+    await ready();
+
+    await user.press(screen.getByRole('button', { name: 'Account menu' }));
+
+    expect(screen.getByText('Local environment · localhost')).toBeTruthy();
+  });
+
+  /**
+   * The colour-scheme preference, which used to be a cycling button in the
+   * header and is three menu items now.
+   *
+   * THE ONE THING WORTH PINNING HARDEST is that the choice reaches the DESIGN
+   * SYSTEM, not just this app's own components. Its `.native` leaves — which
+   * this app renders on every platform — call React Native's `useColorScheme()`
+   * themselves, and react-native-web implements that as a `prefers-color-scheme`
+   * media query with no setter. So the only way to move them is a
+   * `ThemeProvider` whose `light` and `dark` slots both hold the chosen palette,
+   * and a test that only checked app-owned chrome would pass with that seam
+   * removed. The `Button` below is a design-system component; its rendered
+   * colour is the assertion.
+   */
+  describe('appearance', () => {
+    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+      await ready();
+      await user.press(screen.getByRole('button', { name: 'Account menu' }));
+    }
+
+    it('offers three choices and marks the device setting as current, in the name', async () => {
+      // THREE, not two: "follow device" is what a phone that goes dark in the
+      // evening needs. The tick is part of the accessible name, because
+      // `Dropdown.Item` exposes no checked state — the name is the only
+      // channel a screen reader has for "this is the one you are on".
+      signedIn();
+      const user = userEvent.setup();
+      await openMenu(user);
+
+      expect(screen.getByRole('menuitem', { name: 'Follow device ✓' })).toBeTruthy();
+      expect(screen.getByRole('menuitem', { name: 'Light' })).toBeTruthy();
+      expect(screen.getByRole('menuitem', { name: 'Dark' })).toBeTruthy();
+    });
+
+    it('moves the DESIGN SYSTEM’s components, not only our own', async () => {
+      // Remove the `ThemeProvider` from `ThemePreferenceProvider` and this is
+      // the test that fails while everything else still passes. It asserts the
+      // BRAND value, not the tokens default: from tokens 0.5.0 the package's
+      // base theme is deliberately unbranded, so a `ThemeProvider` that passed
+      // nothing would render the package's monochrome primary here.
+      signedIn();
+      const user = userEvent.setup();
+
+      const cta = await screen.findByRole('button', { name: 'Start a case' });
+      expect(flattenedBackground(cta)).toBe(brandColors.light.primary);
+
+      await openMenu(user);
+      await user.press(screen.getByRole('menuitem', { name: 'Dark' }));
+
+      expect(flattenedBackground(screen.getByRole('button', { name: 'Start a case' }))).toBe(
+        brandColors.dark.primary,
+      );
+      // Choosing closes the menu, like every other item; reopening shows the
+      // tick moved.
+      await openMenu(user);
+      expect(screen.getByRole('menuitem', { name: 'Dark ✓' })).toBeTruthy();
+    });
+
+    it('remembers the choice across a reload', async () => {
+      // It is stored in `localStorage` and read synchronously in the state
+      // initialiser rather than in an effect — an effect would paint one frame
+      // in the device's scheme before correcting itself, which is the flash
+      // the preference exists to avoid.
+      signedIn();
+      const user = userEvent.setup();
+      await openMenu(user);
+      await user.press(screen.getByRole('menuitem', { name: 'Light' }));
+
+      screen.unmount();
+      signedIn();
+      await openMenu(user);
+
+      expect(screen.getByRole('menuitem', { name: 'Light ✓' })).toBeTruthy();
+    });
+  });
+
   it('falls back to the email for initials when there is no name yet', async () => {
     // `principalResponse()` carries no firm, so there is no display name — the
     // state a member sits in before `RequireProfile` has their name. An empty
@@ -139,3 +230,13 @@ describe('the account menu', () => {
     expect(await screen.findByText('AT')).toBeTruthy();
   });
 });
+
+/** The `backgroundColor` a component resolved to, through RN's style array. */
+function flattenedBackground(node: { props: { style?: unknown } }): string | undefined {
+  const flatten = (style: unknown): Record<string, unknown> => {
+    if (Array.isArray(style))
+      return Object.assign({}, ...style.map(flatten)) as Record<string, unknown>;
+    return (style ?? {}) as Record<string, unknown>;
+  };
+  return flatten(node.props.style).backgroundColor as string | undefined;
+}

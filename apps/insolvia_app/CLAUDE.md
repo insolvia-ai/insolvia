@@ -12,14 +12,14 @@ package at a time.
 
 **No component library and no styling library.** Not gluestack, not NativeWind,
 not Unistyles, not UniWind, not Tailwind. Bare React Native primitives plus
-`StyleSheet.create` was the lightest *and* fastest of six configurations measured,
+`StyleSheet.create` was the lightest _and_ fastest of six configurations measured,
 and the only one clearing all seven Lighthouse gates; every layer added made both
 script weight and LCP worse. The numbers are in
 [ADR 0004](../../docs/adr/0004-react-native-replaces-flutter.md) — read it before
 proposing one, because "we should just add NativeWind" is the first thing this
 setup invites and it has already been tested and rejected.
 
-The app *does* consume `@insolvia-ai/design-system`, and that is not the thing
+The app _does_ consume `@insolvia-ai/design-system`, and that is not the thing
 this paragraph forbids. What ADR 0004 measured and rejected is a **third-party**
 component library and a **styling runtime**; the design system is our own code,
 and its `.native` leaves are exactly the pattern above — bare RN primitives plus
@@ -74,7 +74,7 @@ Rules that follow from it:
 - **`src/app` is routes-only.** Every file there becomes a URL, so a helper, a
   type, or a test file dropped in it becomes a route. Screen bodies go in
   `screens/`, shared UI in `components/`.
-- **Kebab-case filenames** (`env-badge.tsx`), matching Expo's own template.
+- **Kebab-case filenames** (`account-menu.tsx`), matching Expo's own template.
 - **`StyleSheet.create` at the bottom of the component file**, never a separate
   `.styles.ts`. Colors are applied from `useTheme()` at render time because a
   `StyleSheet` block runs once at module load and cannot read the color scheme;
@@ -108,30 +108,33 @@ UI comes from two places, both rendering bare RN primitives:
   its two-leaf tests. `components/` is for what marketing could never use, not
   for a second copy of something shared. When a component resolves oddly or
   renders unstyled, that is `design-system-platforms`.
+
 - **Everything else in `components/` is app-specific** — the shell chrome and
-  branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`, `ThemeToggle`,
-  `AccountMenu`) that marketing has no use for. It stays here by decision
+  branding (`AppShell`, `Heading`, `Wordmark`, `AccountMenu`) that marketing
+  has no use for. It stays here by decision
   ([ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md)).
 
-  Two of them are app-local **because the package cannot express them**, not
-  by preference. `ThemeToggle` drives an app-level colour-scheme preference the
-  package knows nothing about; `AccountMenu` supplies its own trigger because
-  `Dropdown.Trigger` wraps children in a `Text` and so cannot hold an `Avatar`.
-  Each says so at its definition.
+  `AccountMenu` is app-local **because the package cannot express it**, not by
+  preference: it supplies its own trigger because `Dropdown.Trigger` wraps
+  children in a `Text` and so cannot hold an `Avatar`, and it drives an
+  app-level colour-scheme preference the package knows nothing about. It is
+  **the header's one control** — identity, environment, appearance, account,
+  sign-out — and the environment pill and theme toggle that once sat beside
+  it were folded into it on purpose; do not grow the header a second box.
 
 Both exist in this shape because react-native-web maps accessibility props onto
 real HTML elements (`propsToAccessibilityComponent.js`). That mapping is the
 whole accessibility story, and it only fires if a component asks for it:
 
-| Component    | Source | Primitive + role                            | Emits                          |
-| ------------ | ------ | ------------------------------------------- | ------------------------------ |
-| `Heading`    | app    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
-| `Button`     | design system | `Pressable accessibilityRole="button"` | `<button type="button">`       |
-| `AppShell`   | app    | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
+| Component     | Source              | Primitive + role                                                         | Emits                                           |
+| ------------- | ------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
+| `Heading`     | app                 | `Text role="heading" aria-level={level}`                                 | `<h1>`–`<h6>`                                   |
+| `Button`      | design system       | `Pressable accessibilityRole="button"`                                   | `<button type="button">`                        |
+| `AppShell`    | app                 | `View role="banner"/"navigation"/"main"/"contentinfo"`                   | `<header>/<nav>/<main>/<footer>`                |
 | `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu | `<button aria-haspopup="menu">` + `role="menu"` |
-| `Field`      | design system | compound `Field.Root/Label/Description/Error` around a control | labelled input group |
-| `Input`      | design system | `TextInput` + the Field's ids, read from context | labelled `<input>`        |
-| `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
+| `Field`       | design system       | compound `Field.Root/Label/Description/Error` around a control           | labelled input group                            |
+| `Input`       | design system       | `TextInput` + the Field's ids, read from context                         | labelled `<input>`                              |
+| `Wordmark`    | app                 | `Text`                                                                   | —                                               |
 
 Three rules:
 
@@ -147,10 +150,11 @@ Three rules:
   `Input` — or `Select`, `DateInput`, `Textarea`, `Combobox` — directly inside
   `Field.Root`; each reads `FieldContext` itself for the id, the
   `aria-describedby` and the invalid flag. `Field.Control` now takes a required
-  `render` element and is only for a control the package does *not* own. Note
+  `render` element and is only for a control the package does _not_ own. Note
   `Input` is `value` + **`onValueChange`**, not `onChangeText`, and takes
   `type="email"` rather than a hand-set `keyboardType`/`autoCapitalize` — the
   native leaf derives both from `type`, so spelling them out binds only one leaf.
+
 - **No `role="region"`.** A `<section>` without an accessible name is invalid ARIA
   and axe flags it. Open a block with a heading instead.
 
@@ -159,7 +163,7 @@ Two usage rules the package's API makes easy to drop, both asserted in
 
 - **Decorative glyphs never enter the accessible name.** The package button is
   children-based with no `icon` prop, so a trailing glyph is an
-  `aria-hidden` `<Text>` child *and* `aria-label` pins the name to the visible
+  `aria-hidden` `<Text>` child _and_ `aria-label` pins the name to the visible
   label (WCAG 2.5.3) — see the home screen's CTA.
 - **Buttons are `size="lg"`.** The package's `md` is 40dp, under the 44dp
   WCAG 2.5.5 target-size floor this app enforces.
@@ -178,7 +182,7 @@ the meta tags are injected before the first `</head>`.** So nothing above the re
 `<head>` may mention a placeholder name or contain a head-closing tag — including
 a comment. Written the natural way (a header comment explaining the file), the
 export shipped `<html lang="%LANG_ISO_CODE%">`, a literal `%WEB_TITLE%` title, and
-`<meta name="description">` *inside the comment*. That is why the commentary sits
+`<meta name="description">` _inside the comment_. That is why the commentary sits
 below the `<title>` and why this paragraph is here rather than in the file.
 
 ## Everything else
@@ -195,7 +199,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   GENERATED `src/theme/brand-colors.ts` — never edit that file, run
   `npm run tokens`. `themeFor()` does the layering for this app's own
   components; `ThemePreferenceProvider`'s `ThemeProvider` does it for the design
-  system's `.native` leaves, and it must pass the brand in *every* arm now —
+  system's `.native` leaves, and it must pass the brand in _every_ arm now —
   passing nothing renders the package's monochrome chrome next to our navy. The
   decision is [ADR 0020](../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md).
 
@@ -259,6 +263,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   Expo's pipeline reshapes one source image into a single `.ico` and cannot
   express an SVG icon with an `.ico` fallback, so `public/index.html` links
   both itself.
+
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
   `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.
@@ -273,7 +278,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   is the only thing that can tell a user the page does not exist.
 - **`/auth/callback` must stay in step with `infra/modules/auth/main.tf`**, whose
   web client registers `<origin>/auth/callback` as its only OAuth callback URL.
-  Under file-based routing that path *is* the file's location, so moving the file
+  Under file-based routing that path _is_ the file's location, so moving the file
   breaks sign-in's return leg. `auth-callback.test.tsx` guards it.
 - **`src/session/` owns sign-in, and
   [ADR 0007](../../docs/adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md)
@@ -300,6 +305,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   `platform/browser.ts` so a non-web runtime degrades instead of crashing. A
   future **native** client is what would justify `expo-auth-session`; on web it
   would buy nothing.
+
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and
   `infra/envs/{dev,staging}` register `http://localhost:3000` as an
   **exact-match** Cognito allowed origin.

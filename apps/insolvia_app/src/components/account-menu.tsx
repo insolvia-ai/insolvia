@@ -4,8 +4,10 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
+import { appEnvironment, environmentInfo } from '@/config/environment';
 import { useSession } from '@/session';
-import { fontSizes, spacing, useTheme } from '@/theme';
+import { fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
+import type { ThemePreference } from '@/theme';
 
 export interface AccountMenuProps {
   readonly open: boolean;
@@ -13,11 +15,29 @@ export interface AccountMenuProps {
 }
 
 /**
- * Who is signed in, and everything you can do about it, behind one avatar.
+ * The header's ONE control: who is signed in, where, how the app looks, and
+ * everything you can do about any of it, behind one avatar.
  *
  * It replaced a row of three controls — the email as plain text, an "Account"
  * link, and a full-size "Sign out" button — which together were most of the
- * header's height and width for something a user touches rarely.
+ * header's height and width for something a user touches rarely. Then it
+ * absorbed two more: the environment pill and the light/dark toggle sat
+ * beside it as their own boxes, and three unrelated controls in a row read as
+ * a toolbar on a header that has nothing to tool. Both are settings-shaped —
+ * consulted rarely, changed rarer — which is what a menu behind an avatar is
+ * for. The environment is stated in the identity block, because "which
+ * deployment am I signed in to" is part of who you are here; the footer's
+ * build stamp still says it on every page, signed in or not, so nothing
+ * at-a-glance was lost by taking the pill down.
+ *
+ * THE APPEARANCE ITEMS ARE THREE, NOT A CYCLE. The old toggle cycled
+ * system → light → dark because a 44px square could hold one glyph; a menu
+ * can hold three named rows, which is the honest shape — a choice, not a
+ * step. The current one carries a trailing tick that IS part of its accessible
+ * name: `Dropdown.Item` exposes no checked state, so the name is the only
+ * channel, and "Light ✓" announced is the state announced. Trailing rather
+ * than leading so the three labels stay on one left edge whichever is
+ * current — the package's item has no gutter for a mark.
  *
  * **The address still comes from the ID token, never `/v1/me`.** The pool uses
  * `username_attributes = ["email"]`, which makes the access token's `username`
@@ -51,8 +71,10 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
   const { status, user, signOut } = useSession();
   const membership = useMembership();
   const theme = useTheme();
+  const { preference, setPreference } = useThemePreference();
   const router = useRouter();
   const pathname = usePathname();
+  const env = environmentInfo(appEnvironment);
 
   // A menu that survived a navigation would hang over a screen the user has
   // already moved on from.
@@ -119,6 +141,13 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
               {email}
             </Text>
           )}
+          {/* Spelled out rather than the old pill's all-caps abbreviation, so
+              the visible text and the announced text are the same string. */}
+          <Text
+            style={[styles.email, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+          >
+            {env.label} environment · {env.host}
+          </Text>
         </View>
 
         <Dropdown.Divider />
@@ -129,12 +158,39 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         >
           Your account
         </Dropdown.Item>
+
+        <Dropdown.Divider />
+        <Dropdown.Label>Appearance</Dropdown.Label>
+        {APPEARANCES.map(({ value, label }) => (
+          <Dropdown.Item
+            key={value}
+            onSelect={() => {
+              setPreference(value);
+            }}
+          >
+            {preference === value ? `${label} ✓` : label}
+          </Dropdown.Item>
+        ))}
+
         <Dropdown.Divider />
         <Dropdown.Item onSelect={signOut}>Sign out</Dropdown.Item>
       </Dropdown.Content>
     </Dropdown.Root>
   );
 }
+
+/**
+ * The three colour-scheme preferences, in the order the menu lists them.
+ *
+ * THREE, NOT TWO, and the first is the point: `system` is what a device that
+ * switches to dark in the evening needs, and a plain light/dark pair cannot
+ * express it. Its label says what it does rather than naming a mechanism.
+ */
+const APPEARANCES: ReadonlyArray<{ readonly value: ThemePreference; readonly label: string }> = [
+  { value: 'system', label: 'Follow device' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
 
 /**
  * Up to two letters for the avatar.

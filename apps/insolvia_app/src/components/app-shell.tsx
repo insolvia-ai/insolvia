@@ -7,8 +7,6 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
-import { EnvBadge } from '@/components/env-badge';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
 import { brandColors } from '@/theme/brand-colors';
@@ -61,12 +59,14 @@ export interface AppShellProps {
  *
  * ## Two things this owns that look like they belong elsewhere
  *
- * **The env badge is rendered here, unconditionally.** It used to arrive
- * through an `actions` prop each screen passed, which meant it vanished on
- * every `StatusScreen` — the loading and error states, which are exactly when
- * "which environment am I on?" is worth answering. It is now the single
- * answer to that question anywhere in the app, which is what let the home
- * screen stop repeating it in prose.
+ * **The environment is named here, unconditionally — in the footer.** It
+ * used to be a pill in the header, arriving through an `actions` prop each
+ * screen passed, which meant it vanished on every `StatusScreen` — the loading
+ * and error states, which are exactly when "which environment am I on?" is
+ * worth answering. The pill is gone (the header's right edge is one control
+ * now, {@link AccountMenu}, which states the environment in its identity
+ * block); the footer's build stamp is the answer that is on every page, signed
+ * in or not, and what let the home screen stop repeating it in prose.
  *
  * **The account menu's open state.** The design system's dropdown cannot
  * dismiss on an outside press — React Native has no document to listen to, and
@@ -182,8 +182,6 @@ export function AppShell({
             </Link>
           ) : null}
         </View>
-        <EnvBadge env={env.name} />
-        <ThemeToggle />
         <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
       </View>
 
