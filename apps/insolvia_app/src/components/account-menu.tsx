@@ -1,4 +1,4 @@
-import { Dropdown } from '@insolvia-ai/design-system';
+import { Dropdown, ThemeProvider } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -81,7 +81,7 @@ export function AccountMenu({ open, onOpenChange, collapsed = false }: AccountMe
   const { status, user, signOut } = useSession();
   const membership = useMembership();
   const theme = useTheme();
-  const { preference, setPreference } = useThemePreference();
+  const { preference, setPreference, packageTheme } = useThemePreference();
   const router = useRouter();
   const pathname = usePathname();
   const env = environmentInfo(appEnvironment);
@@ -159,67 +159,81 @@ export function AccountMenu({ open, onOpenChange, collapsed = false }: AccountMe
         )}
       </Pressable>
 
-      <Dropdown.Content
-        // OPENS UPWARD: the trigger is the last thing in the rail, so the
-        // package's `top: 100%` would put the panel under the window's bottom
-        // edge. `Content` spreads `style` last, so the call site can win.
-        style={{ top: 'auto', bottom: '100%', left: 0, marginBottom: spacing.xs }}
-      >
-        {/* Identity, as a plain block rather than a `Dropdown.Item`. An item is
+      {/* THE PANEL FOLLOWS THE SCHEME, THE ROW DOES NOT. The row sits inside
+          the rail's pinned dark theme; the panel hangs over the page, and a
+          dark panel on a light page is a second colour scheme two inches
+          from the first. The nearest provider wins outright, so the page's
+          own theme is handed back here, around the panel alone. */}
+      <ThemeProvider theme={packageTheme}>
+        <Dropdown.Content
+          // OPENS UPWARD: the trigger is the last thing in the rail, so the
+          // package's `top: 100%` would put the panel under the window's
+          // bottom edge. `Content` spreads `style` last, so the call site
+          // can win.
+          style={{ top: 'auto', bottom: '100%', left: 0, marginBottom: spacing.xs }}
+        >
+          {/* Identity, as a plain block rather than a `Dropdown.Item`. An item is
             a `menuitem` — focusable, activatable — and a name you cannot press
             must not pretend to be one. */}
-        <View style={styles.identity}>
-          {fullName === '' ? null : (
-            <Text
-              style={[styles.name, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
-            >
-              {fullName}
-            </Text>
-          )}
-          {email === null ? null : (
+          <View style={styles.identity}>
+            {fullName === '' ? null : (
+              <Text
+                style={[
+                  styles.name,
+                  { color: theme.colors.ink, fontFamily: theme.typography.body },
+                ]}
+              >
+                {fullName}
+              </Text>
+            )}
+            {email === null ? null : (
+              <Text
+                style={[
+                  styles.email,
+                  { color: theme.colors.muted, fontFamily: theme.typography.body },
+                ]}
+              >
+                {email}
+              </Text>
+            )}
+            {/* Spelled out rather than the old pill's all-caps abbreviation, so
+              the visible text and the announced text are the same string. */}
             <Text
               style={[
                 styles.email,
                 { color: theme.colors.muted, fontFamily: theme.typography.body },
               ]}
             >
-              {email}
+              {env.label} environment · {env.host}
             </Text>
-          )}
-          {/* Spelled out rather than the old pill's all-caps abbreviation, so
-              the visible text and the announced text are the same string. */}
-          <Text
-            style={[styles.email, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
-          >
-            {env.label} environment · {env.host}
-          </Text>
-        </View>
+          </View>
 
-        <Dropdown.Divider />
-        <Dropdown.Item
-          onSelect={() => {
-            router.push('/account');
-          }}
-        >
-          Your account
-        </Dropdown.Item>
-
-        <Dropdown.Divider />
-        <Dropdown.Label>Appearance</Dropdown.Label>
-        {APPEARANCES.map(({ value, label }) => (
+          <Dropdown.Divider />
           <Dropdown.Item
-            key={value}
             onSelect={() => {
-              setPreference(value);
+              router.push('/account');
             }}
           >
-            {preference === value ? `${label} ✓` : label}
+            Your account
           </Dropdown.Item>
-        ))}
 
-        <Dropdown.Divider />
-        <Dropdown.Item onSelect={signOut}>Sign out</Dropdown.Item>
-      </Dropdown.Content>
+          <Dropdown.Divider />
+          <Dropdown.Label>Appearance</Dropdown.Label>
+          {APPEARANCES.map(({ value, label }) => (
+            <Dropdown.Item
+              key={value}
+              onSelect={() => {
+                setPreference(value);
+              }}
+            >
+              {preference === value ? `${label} ✓` : label}
+            </Dropdown.Item>
+          ))}
+
+          <Dropdown.Divider />
+          <Dropdown.Item onSelect={signOut}>Sign out</Dropdown.Item>
+        </Dropdown.Content>
+      </ThemeProvider>
     </Dropdown.Root>
   );
 }
