@@ -1,10 +1,16 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { fontSizes, useTheme } from '@/theme';
+import { chromeColors, fontSizes, useTheme } from '@/theme';
 
 export interface WordmarkProps {
   /** Font size in dp. Defaults to the app header's size. */
   size?: number;
+  /**
+   * Drawn on the app's chrome, which is dark in both schemes: takes its ink
+   * and its accent from `chromeColors` rather than from the active scheme,
+   * so it does not vanish into the header in light mode.
+   */
+  onChrome?: boolean;
 }
 
 /**
@@ -22,18 +28,17 @@ export interface WordmarkProps {
  * Not a heading: the wordmark is the site identity, and marking it up as one
  * would put it in the document outline ahead of every page's real `<h1>`.
  */
-export function Wordmark({ size = fontSizes.wordmark }: WordmarkProps) {
+export function Wordmark({ size = fontSizes.wordmark, onChrome = false }: WordmarkProps) {
   const theme = useTheme();
+  const ink = onChrome ? chromeColors.ink : theme.colors.brand;
+  const accent = onChrome ? chromeColors.accent : theme.colors.accent;
 
   return (
     <Text
-      style={[
-        styles.base,
-        { color: theme.colors.brand, fontFamily: theme.typography.wordmark, fontSize: size },
-      ]}
+      style={[styles.base, { color: ink, fontFamily: theme.typography.wordmark, fontSize: size }]}
     >
       Insolvia
-      <Text style={{ color: theme.colors.accent }}>.</Text>
+      <Text style={{ color: accent }}>.</Text>
     </Text>
   );
 }

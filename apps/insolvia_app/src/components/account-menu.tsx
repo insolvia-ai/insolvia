@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMembership } from '@/api/me';
 import { appEnvironment, environmentInfo } from '@/config/environment';
 import { useSession } from '@/session';
-import { fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
+import { chromeColors, fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
 import type { ThemePreference } from '@/theme';
 
 export interface AccountMenuProps {
@@ -111,9 +111,18 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         }}
         style={styles.trigger}
       >
-        <Avatar.Root size="md">
-          <Avatar.Fallback>{initials(fullName, email)}</Avatar.Fallback>
-        </Avatar.Root>
+        {/* A ring, because the avatar's fill is one step off its ground —
+            which is the right weight for a resting control and not enough
+            edge for the one control the header has. The package's Avatar
+            draws no border of its own (its ring exists only inside a Group),
+            so the ring is this wrapper's. */}
+        <View
+          style={[styles.ring, { borderColor: chromeColors.line, borderRadius: theme.radii.pill }]}
+        >
+          <Avatar.Root size="md">
+            <Avatar.Fallback>{initials(fullName, email)}</Avatar.Fallback>
+          </Avatar.Root>
+        </View>
       </Pressable>
 
       <Dropdown.Content
@@ -126,7 +135,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         <View style={styles.identity}>
           {fullName === '' ? null : (
             <Text
-              style={[styles.name, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
+              style={[styles.name, { color: chromeColors.ink, fontFamily: theme.typography.body }]}
             >
               {fullName}
             </Text>
@@ -135,7 +144,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
             <Text
               style={[
                 styles.email,
-                { color: theme.colors.muted, fontFamily: theme.typography.body },
+                { color: chromeColors.muted, fontFamily: theme.typography.body },
               ]}
             >
               {email}
@@ -144,7 +153,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
           {/* Spelled out rather than the old pill's all-caps abbreviation, so
               the visible text and the announced text are the same string. */}
           <Text
-            style={[styles.email, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+            style={[styles.email, { color: chromeColors.muted, fontFamily: theme.typography.body }]}
           >
             {env.label} environment · {env.host}
           </Text>
@@ -223,6 +232,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: fontSizes.label,
     fontWeight: '600',
+  },
+  ring: {
+    borderWidth: 1,
+    // One pixel of air between the ring and the fill, so the ring reads as a
+    // ring and not as a darker edge on the circle.
+    padding: 1,
   },
   trigger: {
     alignItems: 'center',

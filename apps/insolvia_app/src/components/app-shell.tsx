@@ -1,6 +1,7 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { ThemeProvider } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import type { ExternalPathString } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,8 +10,7 @@ import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
-import { brandColors } from '@/theme/brand-colors';
-import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
+import { CHROME_THEME, chromeColors, contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
 export interface AppShellProps {
   children: ReactNode;
@@ -104,14 +104,12 @@ export interface AppShellProps {
  */
 const FOOTER_MARK = '/favicon.svg';
 
-const footerColors = {
-  bg: brandColors.dark.bg,
-  // The links are the bright role and the copyright the muted one — the
-  // reference footer separates them the same way, so the destinations read as
-  // the active thing and the legal line recedes.
-  ink: brandColors.dark.ink,
-  muted: brandColors.dark.muted,
-} as const;
+/**
+ * The chrome's palette, dark in both schemes — `@/theme` owns why. The links
+ * are the bright role and the copyright the muted one, so the destinations
+ * read as the active thing and the legal line recedes.
+ */
+const footerColors = chromeColors;
 
 export function AppShell({
   children,
@@ -131,9 +129,11 @@ export function AppShell({
   const showFirmLink =
     membership != null && permits(membership.permissions.firm_administration, 'view_only');
 
+  // On the chrome, so the chrome's ink — not the scheme's, which would be
+  // near-black on near-black in light mode.
   const navLink = [
     styles.navLink,
-    { color: theme.colors.muted, fontFamily: theme.typography.body },
+    { color: chromeColors.muted, fontFamily: theme.typography.body },
   ];
   const footerLink = [
     styles.footerLinkText,
@@ -163,8 +163,20 @@ export function AppShell({
         />
       ) : null}
 
-      <View role="banner" style={[styles.header, { borderBottomColor: theme.colors.line }]}>
-        <Wordmark />
+      {/* THE HEADER IS CHROME, and chrome is dark in both schemes: the same
+          composition the case rail and the footer already make, so the three
+          read as one frame around the page rather than two dark bands and a
+          light one. Everything drawn on it takes the chrome palette — the
+          wordmark and the links here, and the account menu's leaves through
+          the pinned theme below. */}
+      <View
+        role="banner"
+        style={[
+          styles.header,
+          { backgroundColor: chromeColors.bg, borderBottomColor: chromeColors.line },
+        ]}
+      >
+        <Wordmark onChrome />
         <View role="navigation" aria-label="Primary" style={styles.nav}>
           <Link href="/" style={navLink}>
             Home
@@ -182,7 +194,9 @@ export function AppShell({
             </Link>
           ) : null}
         </View>
-        <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
+        <ThemeProvider theme={CHROME_THEME}>
+          <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
+        </ThemeProvider>
       </View>
 
       {/* ONE SCROLLER FOR THE PAGE, holding `main` and the footer as SIBLINGS.
@@ -215,9 +229,12 @@ export function AppShell({
         <View role="contentinfo" style={styles.footer}>
           {/* Decorative: the build stamp below already names Insolvia in text,
               so announcing the mark too would read the identity twice. */}
-          {/* The mark on the left, the links stacked on the right — the shape
-              the reference footer (harvey.ai) uses, where a column of links
-              sits away from the identity rather than beside it. */}
+          {/* ONE ROW, LEFT-ALIGNED: the mark, then the links beside it, then
+              the stamp underneath on the same left edge. The links used to be
+              a column pushed to the far right of a 2000px band, opposite the
+              mark — two things that belong together, a page-width apart, with
+              nothing between them to explain the distance. Two links are not
+              a column; they sit where the eye already is. */}
           <View style={styles.footerTop}>
             <Image alt="" source={{ uri: FOOTER_MARK }} style={styles.footerMark} />
 
@@ -278,7 +295,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     backgroundColor: footerColors.bg,
-    gap: spacing.xl,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     // Asymmetric on purpose. The rule that used to divide this from the page
     // was doing the work of separation while the footer was pinned; now that it
@@ -289,32 +306,29 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
   },
   footerTop: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
-    // Pushes the link stack to the far edge, which is what puts it opposite
-    // the mark rather than next to it.
-    justifyContent: 'space-between',
+    gap: spacing.lg,
   },
   footerLinks: {
-    // STACKED, and LEFT-aligned inside the stack: the reference sets its link
-    // columns flush-left within each column and pushes the whole block right,
-    // rather than right-aligning the text itself. `gap` lands the rows on its
-    // ~34px pitch once the line box is taken off.
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.lg,
   },
   footerMark: {
-    // Larger than a favicon's natural reading: in the reference the mark is the
-    // counterweight to the link block, not a bullet beside it.
-    height: 44,
-    width: 44,
+    // The header's avatar is 32; the mark takes the same size so the two ends
+    // of the frame carry the same weight.
+    height: 32,
+    width: 32,
   },
   footerText: {
     fontSize: fontSizes.caption,
   },
   footerLinkText: {
     fontSize: fontSizes.label,
+    // A link is a target: the label rides in a 44dp line box, WCAG 2.5.5's
+    // floor, without the row growing a visible button around it.
+    lineHeight: 44,
   },
   header: {
     alignItems: 'center',

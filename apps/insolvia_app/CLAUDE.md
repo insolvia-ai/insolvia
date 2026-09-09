@@ -237,12 +237,16 @@ below the `<title>` and why this paragraph is here rather than in the file.
   the hairlines read as a wireframe. `pill` is deliberately absent: the package
   refuses to theme it.
 
-  **The case rail is the one surface that paints a colour the scheme did not
-  choose.** It is dark in both schemes, because it is chrome; `CaseShell` pins
-  the package's leaves inside it with a nested `ThemeProvider` holding the dark
-  palette in BOTH slots, the same trick `ThemePreferenceProvider` uses for an
-  explicit scheme. Without it a `Sidebar.Item` in light mode paints near-black
-  ink on the near-black rail.
+  **The chrome — header, case rail, footer — paints a colour the scheme did
+  not choose.** All three are dark in both schemes, so they read as one frame
+  around the page; `src/theme/chrome.ts` owns that decision as `chromeColors`
+  (the dark palette) and `CHROME_THEME` (a `ThemeProvider` value holding it in
+  BOTH slots, the same trick `ThemePreferenceProvider` uses for an explicit
+  scheme). Anything drawn on the chrome takes its ink from `chromeColors`,
+  never from `theme.colors`, and any package leaf on it — the rail's
+  `Sidebar`, the header's `Avatar` and `Dropdown` — sits under a nested
+  `ThemeProvider theme={CHROME_THEME}`. Without that a `Sidebar.Item` in light
+  mode paints near-black ink on the near-black rail.
 
   Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
   `fontSizes` is their single owner, so a literal `fontSize:` in a component is

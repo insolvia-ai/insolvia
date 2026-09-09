@@ -11,8 +11,15 @@ import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
-import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
-import { brandColors, brandFonts, brandRadii } from '@/theme/brand-colors';
+import {
+  CHROME_THEME,
+  chromeColors,
+  contentMaxWidth,
+  fontSizes,
+  railBreakpoint,
+  spacing,
+  useTheme,
+} from '@/theme';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -95,46 +102,16 @@ const SECTIONS: readonly Section[] = [
 ];
 
 /**
- * The rail's own colours, taken from the DARK scheme whatever the app's scheme
- * is.
- *
- * The rail is chrome and stays dark in both — near-black beside an ivory
- * workspace in light mode, a step above the ground in dark. Reading these from
- * `theme.colors` instead would paint near-black text on near-black the moment
- * somebody switched to light.
- *
- * They come from `brandColors.dark` rather than being spelled out, so the one
- * file that owns the palette still owns this.
+ * The rail's own colours: the app's chrome palette (`@/theme`'s `chromeColors`,
+ * dark in both schemes), with the rail one step above the header and footer
+ * so the three read as one frame with a little depth in it.
  */
 const railColors = {
-  bg: brandColors.dark.card,
-  line: brandColors.dark.line,
-  ink: brandColors.dark.ink,
-  muted: brandColors.dark.muted,
-  active: brandColors.dark.surfaceAlt,
+  bg: chromeColors.card,
+  line: chromeColors.line,
+  ink: chromeColors.ink,
+  muted: chromeColors.muted,
 } as const;
-
-/**
- * The theme the rail's own package components run under.
- *
- * BOTH slots hold the dark palette, which is the same trick
- * `ThemePreferenceProvider` uses for an explicit scheme: the package's leaves
- * consult the OS themselves and cannot be redirected, so the way to pin them is
- * to make both answers the same one. Without it a `Sidebar.Item` in light mode
- * takes near-black ink from the active scheme and paints it on the near-black
- * rail.
- *
- * Nesting is supported and the nearest provider wins outright — the package
- * says so explicitly — so this pins the rail without touching the rest of the
- * app. Frozen and hoisted so it is one stable object for the module's life,
- * which is what keeps the leaves' `React.memo` boundaries intact.
- */
-const RAIL_THEME = Object.freeze({
-  light: brandColors.dark,
-  dark: brandColors.dark,
-  fonts: brandFonts,
-  radii: brandRadii,
-});
 
 const STATUS_LABEL: Record<Case['status'], string> = {
   intake: 'In intake',
@@ -337,7 +314,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
               { backgroundColor: railColors.bg, borderRightColor: railColors.line },
             ]}
           >
-            <ThemeProvider theme={RAIL_THEME}>
+            <ThemeProvider theme={CHROME_THEME}>
               <Sidebar.Root>
                 <Sidebar.Head>
                   <Text
@@ -353,7 +330,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
                     <Text
                       style={[
                         styles.identityLine,
-                        { color: theme.colors.muted, fontFamily: theme.typography.body },
+                        { color: railColors.muted, fontFamily: theme.typography.body },
                       ]}
                     >
                       {chapterAndDistrict(matter)}
@@ -406,7 +383,11 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
 
                 <Sidebar.Separator />
 
-                <Sidebar.Footer>
+                {/* The package's footer pads its own edge and its item pads
+                    again, which put "All cases" a step further in than every
+                    row above it. Dropping the footer's pad lands the item on
+                    the rail's one left edge. */}
+                <Sidebar.Footer style={styles.railFooter}>
                   <Sidebar.Item
                     label="All cases"
                     onPress={() => {
@@ -445,13 +426,20 @@ const styles = StyleSheet.create({
 
   identity: {
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    // ONE LEFT EDGE. `Sidebar.Head` pads the title by `md`, a `Sidebar.Item`
+    // lands its label at `sm` margin plus `sm` padding — also `md` — and the
+    // separator is inset by `md`. This block sat at `sm` and was the one
+    // thing on the rail that started somewhere else.
+    paddingHorizontal: spacing.md,
   },
   identityLine: {
     fontSize: fontSizes.caption,
   },
+  railFooter: {
+    paddingHorizontal: 0,
+  },
   railTitle: {
-    color: brandColors.dark.ink,
+    color: railColors.ink,
     fontSize: fontSizes.body,
     // The same weight and leading as `Heading`'s `body` size, because that is
     // what this is: the case's title, set in the UI face. It is not a
