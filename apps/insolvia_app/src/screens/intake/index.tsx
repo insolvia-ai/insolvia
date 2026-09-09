@@ -241,7 +241,12 @@ export function Intake() {
           one message most worth hearing and the one guaranteed not to be. */}
       <Text
         aria-live={load.kind === 'error' ? 'assertive' : 'polite'}
-        style={[styles.status, load.kind === 'error' ? { color: theme.colors.danger } : muted]}
+        style={[
+          styles.status,
+          load.kind === 'error'
+            ? { color: theme.colors.danger, fontFamily: theme.typography.body }
+            : muted,
+        ]}
       >
         {section === 'debtor' && load.kind === 'loading'
           ? 'Loading this intake…'
@@ -309,5 +314,11 @@ export function Intake() {
 
 const styles = StyleSheet.create({
   sectionPicker: { marginBottom: spacing.sm },
-  status: { fontSize: fontSizes.label },
+  status: {
+    fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.5,
+    // The heading, this line and the first field group were one flush stack;
+    // the section step below separates the "what this is" pair from the form.
+    marginBottom: spacing.md,
+  },
 });

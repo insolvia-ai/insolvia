@@ -319,6 +319,14 @@ export function CaseOverview() {
  * colour between a block and the page, a rule on its own reads as a wireframe
  * rather than as an object. A white surface, a hairline border and the brand's
  * `lg` corner is what makes it a thing rather than a gap.
+ *
+ * THE HEAD IS A BAND, NOT A LINE. The title used to sit four pixels above its
+ * rule with the first row eight below it, which put the heading closer to the
+ * content than the content's rows were to each other — so the eye read it as
+ * the first row rather than as the label of the block. It now takes a gutter
+ * on each side of the rule (`spacing.md`, the same step as the card's own
+ * rhythm), which is what every card pattern this app sits beside does: the
+ * head is its own region, and the space is what says so.
  */
 function Section({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
   const theme = useTheme();
@@ -334,7 +342,7 @@ function Section({ title, meta, children }: { title: string; meta?: string; chil
       ]}
     >
       <View style={[styles.sectionHead, { borderBottomColor: theme.colors.line }]}>
-        <Heading level={2} size="body">
+        <Heading level={2} size="body" style={styles.sectionTitle}>
           {title}
         </Heading>
         {meta === undefined ? null : (
@@ -398,7 +406,11 @@ function StageRow({ stage, last }: { stage: Stage; last: boolean }) {
         </Text>
       </View>
 
-      <Text style={[styles.stageMeta, { color: tone, fontFamily: theme.typography.mono }]}>
+      {/* The UI face, not mono: this column holds a state word ("blocked",
+          "complete") far more often than a figure, and brand/fonts.json keeps
+          mono for what has to align or be read back. The one date it carries
+          gets `tabular-nums` and nothing else. */}
+      <Text style={[styles.stageMeta, { color: tone, fontFamily: theme.typography.body }]}>
         {stage.meta}
       </Text>
     </View>
@@ -448,7 +460,7 @@ function Tile({ value, label }: { value: string; label: string }) {
         {value}
       </Text>
       <Text
-        style={[styles.tileLabel, { color: theme.colors.muted, fontFamily: theme.typography.mono }]}
+        style={[styles.tileLabel, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
       >
         {label}
       </Text>
@@ -554,17 +566,20 @@ const styles = StyleSheet.create({
   },
   figureLabel: {
     fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.5,
   },
   figureValue: {
     fontSize: fontSizes.label,
     fontVariant: ['tabular-nums'],
+    lineHeight: fontSizes.label * 1.5,
   },
-  figures: {
-    marginTop: spacing.xs,
-  },
+  figures: {},
   head: {
     gap: spacing.xs,
-    marginBottom: spacing.lg,
+    // A section step, not a block step: the page title and its meta line are
+    // the frame the cards sit in, and they need more air than two cards need
+    // from each other or the first card reads as part of the title.
+    marginBottom: spacing.xl,
   },
   main: {
     flex: 1,
@@ -587,7 +602,6 @@ const styles = StyleSheet.create({
   },
   section: {
     borderWidth: 1,
-    gap: spacing.sm,
     padding: spacing.lg,
   },
   sectionHead: {
@@ -599,14 +613,19 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.md,
     justifyContent: 'space-between',
-    paddingBottom: spacing.xs,
+    // The gutter on each side of the rule — see `Section`.
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
   },
   sectionMeta: {
-    fontSize: fontSizes.caption,
+    fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.5,
   },
-  spine: {
-    marginTop: spacing.xs,
+  sectionTitle: {
+    // The row wraps; the title must never be the thing that shrinks.
+    flexShrink: 0,
   },
+  spine: {},
   stack: {
     gap: spacing.sm,
   },
@@ -624,6 +643,7 @@ const styles = StyleSheet.create({
   stageLabel: {
     fontSize: fontSizes.label,
     fontWeight: '600',
+    lineHeight: fontSizes.label * 1.5,
   },
   stageLine: {
     bottom: 0,
@@ -640,7 +660,10 @@ const styles = StyleSheet.create({
   },
   stageMeta: {
     fontSize: fontSizes.caption,
-    paddingTop: 3,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '600',
+    // The label's line box, so the two sit on one baseline without a nudge.
+    lineHeight: fontSizes.label * 1.5,
   },
   stageNote: {
     fontSize: fontSizes.caption,
@@ -654,21 +677,28 @@ const styles = StyleSheet.create({
   tile: {
     flexBasis: '46%',
     flexGrow: 1,
-    gap: 2,
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
   },
   tileLabel: {
-    fontSize: 10,
-    letterSpacing: 0.8,
+    fontSize: fontSizes.caption,
+    fontWeight: '600',
+    // Tracked caps: 0.6px on 12px is 5%, the low end of the 5–12% a run of
+    // capitals needs to stop the letters touching. 10px with 0.8 was both
+    // under the smallest step of the scale and over-tracked for it.
+    letterSpacing: 0.6,
+    lineHeight: fontSizes.caption * 1.5,
     textTransform: 'uppercase',
   },
   tileValue: {
-    fontSize: fontSizes.section,
+    // A tile is the glance, so its figure takes the display step — the same
+    // size as the page title, one weight down from bold, tabular so a column
+    // of them lines up.
+    fontSize: fontSizes.display,
     fontVariant: ['tabular-nums'],
-    // 700 for the reason brand/fonts.json gives: Cormorant at anything less
-    // reads as a hairline at this size.
-    fontWeight: '700',
-    letterSpacing: -0.5,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    lineHeight: 34,
   },
   tiles: {
     flexDirection: 'row',

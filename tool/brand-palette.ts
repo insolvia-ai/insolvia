@@ -56,8 +56,15 @@ const COLORS_SPECIFIER = `${TOKENS_PACKAGE}/colors.json`;
 export const MODES = ['light', 'dark'] as const;
 export type Mode = (typeof MODES)[number];
 
-/** The type roles `@insolvia-ai/tokens` declares, and this file must state. */
-export const FONT_ROLES = ['heading', 'body', 'mono'] as const;
+/**
+ * The type roles this file must state: the three `@insolvia-ai/tokens`
+ * declares, plus `wordmark`, which is Insolvia's own. The package knows
+ * nothing of a logotype face and ignores the extra key in `ThemeProvider`'s
+ * `fonts`; the app's `Wordmark` component is its only reader. It is a role
+ * here rather than a literal in that component so the brand file stays the
+ * one place a family is written down.
+ */
+export const FONT_ROLES = ['heading', 'body', 'mono', 'wordmark'] as const;
 export type FontRole = (typeof FONT_ROLES)[number];
 
 /** The radius steps the brand states. `pill` is deliberately not one of them. */

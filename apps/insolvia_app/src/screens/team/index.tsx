@@ -94,7 +94,10 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
       <Heading level={1}>Who is on this case</Heading>
 
       {notice === null ? null : (
-        <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+        <Text
+          aria-live="assertive"
+          style={[styles.error, { color: theme.colors.danger, fontFamily: theme.typography.body }]}
+        >
           {notice}
         </Text>
       )}
@@ -111,7 +114,12 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
             <View role="list" style={styles.list}>
               {state.assignees.map((assignee) => (
                 <View role="listitem" key={assignee.subject} style={styles.row}>
-                  <Text style={[styles.name, { color: theme.colors.ink }]}>
+                  <Text
+                    style={[
+                      styles.name,
+                      { color: theme.colors.ink, fontFamily: theme.typography.body },
+                    ]}
+                  >
                     {nameFor(assignee.subject)}
                   </Text>
                   <Text style={[styles.meta, muted]}>
@@ -151,7 +159,12 @@ export function Team({ caseId, membership }: { caseId: string; membership: FirmM
                     .filter((colleague) => !assigned.has(colleague.subject))
                     .map((colleague) => (
                       <View role="listitem" key={colleague.subject} style={styles.row}>
-                        <Text style={[styles.name, { color: theme.colors.ink }]}>
+                        <Text
+                          style={[
+                            styles.name,
+                            { color: theme.colors.ink, fontFamily: theme.typography.body },
+                          ]}
+                        >
                           {colleague.displayName}
                         </Text>
                         <Text style={[styles.meta, muted]}>{colleague.role}</Text>

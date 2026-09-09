@@ -453,16 +453,12 @@ const styles = StyleSheet.create({
   railTitle: {
     color: brandColors.dark.ink,
     fontSize: fontSizes.body,
-    // 700, like every other use of `heading`. Cormorant is drawn for large
-    // sizes and thins out fast — at 600 on a dark ground this title loses its
-    // stems. See brand/fonts.json.
-    fontWeight: '700',
-    // Positive for the same reason `Heading`'s `body` size is: at 16px this
-    // face is well under its optical size and needs opening up. This title
-    // carries a case name, so it is the one heading in the app whose string is
-    // arbitrary — a run of narrow letters is exactly what negative tracking
-    // turned into a smear.
-    letterSpacing: 0.2,
+    // The same weight and leading as `Heading`'s `body` size, because that is
+    // what this is: the case's title, set in the UI face. It is not a
+    // `Heading` only because the rail is chrome and the page's real `<h1>` is
+    // the overview's — two headings for one case would double the outline.
+    fontWeight: '600',
+    lineHeight: fontSizes.body * 1.5,
   },
   rail: {
     // `Sidebar.Root` sets its OWN width — `sidebarWidth.expanded`, 256 — so

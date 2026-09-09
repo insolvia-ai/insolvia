@@ -199,16 +199,32 @@ below the `<title>` and why this paragraph is here rather than in the file.
   passing nothing renders the package's monochrome chrome next to our navy. The
   decision is [ADR 0020](../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md).
 
-  Font FAMILIES layer the same way as of `brand/fonts.json`: Cormorant Garamond for
-  headings, Open Sans for body, IBM Plex Mono for case numbers and form
-  references. They reach the screen through two seams and need both —
-  `themeFor()` for this app's own components, and `ThemeProvider`'s `fonts` for
-  the package's native leaves, whose `StyleSheet.create` runs at module load
-  where no context reaches. Import `typography` from `@/theme`, never from
-  `@insolvia-ai/tokens`: the latter is the unbranded answer. The faces are
-  self-hosted `.woff2` under `public/fonts` with `@font-face` in
-  `public/index.html` — naming a family does not load it — and
-  `scripts/fetch-brand-fonts.sh` regenerates them.
+  Font FAMILIES layer the same way as of `brand/fonts.json`: **Open Sans for
+  headings AND body** — the UI is one sans, and hierarchy comes from size,
+  weight and space — IBM Plex Mono for case numbers, amounts and form
+  references, and Cormorant Garamond for the **wordmark only** (a fourth role,
+  `typography.wordmark`, that the package does not know and only `Wordmark`
+  reads). A heading set in the serif is the regression `theme.test.ts` pins;
+  the brand file owns the reasoning. Two weights of Open Sans are loaded, 400
+  and 600, and **every heading and emphasised label is 600** — there is no
+  700 in the app except the wordmark's Cormorant. They reach the screen
+  through two seams and need both — `themeFor()` for this app's own
+  components, and `ThemeProvider`'s `fonts` for the package's native leaves,
+  whose `StyleSheet.create` runs at module load where no context reaches.
+  Import `typography` from `@/theme`, never from `@insolvia-ai/tokens`: the
+  latter is the unbranded answer. The faces are self-hosted `.woff2` under
+  `public/fonts` with `@font-face` in `public/index.html` — naming a family
+  does not load it — and `scripts/fetch-brand-fonts.sh` regenerates them.
+
+  **Every `Text` states a `fontFamily`**, including the package's leaves: from
+  design system 0.22.0 `ThemeProvider`'s `fonts.body` reaches every control
+  (before it, Button, Badge, Field and two dozen more rendered the browser's
+  system sans beside this app's Open Sans, which is what "the font isn't
+  applied consistently" looked like). A bare `<Text>` in a screen with no
+  family is therefore a bug, not a default — and `eslint.config.mjs` carries a
+  local rule, `insolvia/text-states-family`, that fails the lint on one. It
+  accepts an inline `fontFamily`, one of the render-time `muted`/`ink`/`danger`
+  objects, a Text nested in a Text, or an `aria-hidden` glyph; nothing else.
 
   Corner radii layer the same way, from `brand/radii.json`, through the same
   two seams. The package states 0 at every step because a corner is a brand
