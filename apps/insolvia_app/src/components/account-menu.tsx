@@ -143,7 +143,7 @@ export function AccountMenu({ open, onOpenChange, collapsed = false }: AccountMe
         {/* The person's initial on the identity tile — the same square the
             collapsed head shows the app's own "I" on — rather than a round
             avatar: one shape for "who", on a rail whose rows are all tiles. */}
-        <Tile tone="mark">{initial(fullName, email)}</Tile>
+        <Tile>{initial(fullName, email)}</Tile>
         {/* ONE LINE: the name, or the address until there is one. The row's
             text sits on the rail, so it takes the chrome's ink; the panel
             carries the address and the environment, so the row need not.

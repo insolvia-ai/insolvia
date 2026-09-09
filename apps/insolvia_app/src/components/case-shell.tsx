@@ -10,6 +10,7 @@ import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import type { CaseNav } from '@/components/app-shell';
+import type { IconName } from '@/components/icon';
 import { StatusScreen } from '@/components/status-screen';
 import { contentMaxWidth, spacing } from '@/theme';
 
@@ -72,6 +73,7 @@ export function useCase(): CaseContextValue {
 interface Section {
   readonly segment: string;
   readonly label: string;
+  readonly icon: IconName;
   /** Present when the section sits behind a firm permission. */
   readonly feature?: 'extraction_review';
   /** Which count, if any, this section shows beside its name. */
@@ -79,18 +81,19 @@ interface Section {
 }
 
 const SECTIONS: readonly Section[] = [
-  { segment: '', label: 'Overview' },
-  { segment: 'intake', label: 'Intake' },
-  { segment: 'documents', label: 'Documents' },
+  { segment: '', label: 'Overview', icon: 'grid' },
+  { segment: 'intake', label: 'Intake', icon: 'clipboard' },
+  { segment: 'documents', label: 'Documents', icon: 'file-text' },
   {
     segment: 'extraction-review',
     label: 'Extraction review',
+    icon: 'check-square',
     feature: 'extraction_review',
     count: 'pendingReview',
   },
-  { segment: 'creditor-matrix', label: 'Creditor matrix' },
-  { segment: 'packet', label: 'Filing packet' },
-  { segment: 'team', label: 'Team' },
+  { segment: 'creditor-matrix', label: 'Creditor matrix', icon: 'list' },
+  { segment: 'packet', label: 'Filing packet', icon: 'package' },
+  { segment: 'team', label: 'Team', icon: 'users' },
 ];
 
 const STATUS_LABEL: Record<Case['status'], string> = {
@@ -285,6 +288,7 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
       const badge = section.count === undefined ? null : counts[section.count];
       return {
         key: section.segment,
+        icon: section.icon,
         label: badge === null || badge === 0 ? section.label : `${section.label} (${badge})`,
         active: section.segment === current,
         onPress: () => {

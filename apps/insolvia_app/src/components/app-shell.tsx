@@ -17,6 +17,8 @@ import {
 
 import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
+import { Icon } from '@/components/icon';
+import type { IconName } from '@/components/icon';
 import { Tile } from '@/components/tile';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
@@ -35,6 +37,7 @@ import {
 export interface CaseNavItem {
   readonly key: string;
   readonly label: string;
+  readonly icon: IconName;
   readonly active: boolean;
   readonly onPress: () => void;
 }
@@ -202,10 +205,15 @@ export function AppShell({
     { color: chromeColors.ink, fontFamily: theme.typography.body },
   ];
 
-  const primary: ReadonlyArray<{ label: string; href: '/' | '/cases' | '/firm'; show: boolean }> = [
-    { label: 'Home', href: '/', show: true },
-    { label: 'Cases', href: '/cases', show: true },
-    { label: 'Firm', href: '/firm', show: showFirmLink },
+  const primary: ReadonlyArray<{
+    label: string;
+    icon: IconName;
+    href: '/' | '/cases' | '/firm';
+    show: boolean;
+  }> = [
+    { label: 'Home', icon: 'home', href: '/', show: true },
+    { label: 'Cases', icon: 'folder', href: '/cases', show: true },
+    { label: 'Firm', icon: 'briefcase', href: '/firm', show: showFirmLink },
   ];
 
   return (
@@ -258,9 +266,7 @@ export function AppShell({
               {/* Named, because collapsed this IS the wordmark: the same name
                   the expanded head announces, on the tile that stands in. */}
               <View accessible aria-label="Insolvia" role="img">
-                <Tile tone="mark" size={32}>
-                  I
-                </Tile>
+                <Tile size={32}>I</Tile>
               </View>
               <RailToggle />
             </View>
@@ -282,6 +288,7 @@ export function AppShell({
                 <RailItem
                   key={entry.href}
                   label={entry.label}
+                  icon={entry.icon}
                   active={pathname === entry.href}
                   collapsed={collapsed}
                   onPress={() => {
@@ -330,6 +337,7 @@ export function AppShell({
                     <RailItem
                       key={item.key}
                       label={item.label}
+                      icon={item.icon}
                       active={item.active}
                       collapsed={collapsed}
                       onPress={item.onPress}
@@ -338,7 +346,7 @@ export function AppShell({
                 </Sidebar.Section>
                 <RailItem
                   label="All cases"
-                  glyph="←"
+                  icon="arrow-left"
                   active={false}
                   collapsed={collapsed}
                   onPress={caseNav.onAllCases}
@@ -468,7 +476,7 @@ function RailToggle() {
 }
 
 /**
- * One row of the rail: a letter tile and its label.
+ * One row of the rail: a line icon and its label.
  *
  * The app's own rather than the package's `Sidebar.Item`, for one reason:
  * collapsed, the package shows the icon alone, and the reference this rail is
@@ -481,14 +489,13 @@ function RailToggle() {
  */
 function RailItem({
   label,
-  glyph,
+  icon,
   active,
   collapsed,
   onPress,
 }: {
   label: string;
-  /** What the tile shows; the label's initial when absent. */
-  glyph?: string;
+  icon: IconName;
   active: boolean;
   collapsed: boolean;
   onPress: () => void;
@@ -509,9 +516,15 @@ function RailItem({
         active || pressed ? { backgroundColor: chromeColors.surfaceAlt } : null,
       ]}
     >
-      <Tile tone="nav">{glyph ?? label[0] ?? ''}</Tile>
+      <Icon
+        name={icon}
+        size={collapsed ? 20 : 16}
+        color={active ? chromeColors.ink : chromeColors.muted}
+      />
       <Text
-        numberOfLines={1}
+        // Two lines collapsed: the strip is 64px and "Extraction review" is
+        // not, and a caption cut to "Extractio…" names nothing.
+        numberOfLines={collapsed ? 2 : 1}
         style={[
           collapsed ? styles.itemCaption : styles.itemLabel,
           {
@@ -616,10 +629,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     maxWidth: 60,
+    textAlign: 'center',
   },
   itemCollapsed: {
     alignItems: 'center',
-    // Tile over caption with air between rows: the reference this is measured
+    // Icon over caption with air between rows: the reference this is measured
     // against gives each collapsed entry about a 56px pitch, which is what
     // stops a column of tile-and-word pairs reading as one run of text.
     gap: spacing.xs,
