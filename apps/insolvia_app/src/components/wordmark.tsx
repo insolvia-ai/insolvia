@@ -11,6 +11,13 @@ export interface WordmarkProps {
    * so it does not vanish into the header in light mode.
    */
   onChrome?: boolean;
+  /**
+   * The mark alone — "I." — for a place too narrow for the word, such as the
+   * collapsed rail. The same face, weight and dot, so it reads as the wordmark
+   * cut down rather than as a different mark; the accessible name stays the
+   * full one.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -28,16 +35,21 @@ export interface WordmarkProps {
  * Not a heading: the wordmark is the site identity, and marking it up as one
  * would put it in the document outline ahead of every page's real `<h1>`.
  */
-export function Wordmark({ size = fontSizes.wordmark, onChrome = false }: WordmarkProps) {
+export function Wordmark({
+  size = fontSizes.wordmark,
+  onChrome = false,
+  compact = false,
+}: WordmarkProps) {
   const theme = useTheme();
   const ink = onChrome ? chromeColors.ink : theme.colors.brand;
   const accent = onChrome ? chromeColors.accent : theme.colors.accent;
 
   return (
     <Text
+      aria-label="Insolvia"
       style={[styles.base, { color: ink, fontFamily: theme.typography.wordmark, fontSize: size }]}
     >
-      Insolvia
+      {compact ? 'I' : 'Insolvia'}
       <Text style={{ color: accent }}>.</Text>
     </Text>
   );

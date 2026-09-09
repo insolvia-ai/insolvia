@@ -1,25 +1,17 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
-import { Badge, Sidebar, ThemeProvider } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import type { CaseNav } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
-import {
-  CHROME_THEME,
-  chromeColors,
-  contentMaxWidth,
-  fontSizes,
-  railBreakpoint,
-  spacing,
-  useTheme,
-} from '@/theme';
+import { contentMaxWidth, spacing } from '@/theme';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -100,18 +92,6 @@ const SECTIONS: readonly Section[] = [
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
 ];
-
-/**
- * The rail's own colours: the app's chrome palette (`@/theme`'s `chromeColors`,
- * dark in both schemes), with the rail one step above the header and footer
- * so the three read as one frame with a little depth in it.
- */
-const railColors = {
-  bg: chromeColors.card,
-  line: chromeColors.line,
-  ink: chromeColors.ink,
-  muted: chromeColors.muted,
-} as const;
 
 const STATUS_LABEL: Record<Case['status'], string> = {
   intake: 'In intake',
@@ -205,12 +185,10 @@ export function CaseColumn({ children }: { children: ReactNode }) {
  * the router handles either way.
  */
 export function CaseShell({ caseId, children }: { caseId: string; children: ReactNode }) {
-  const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const membership = useMembership();
   const { call } = useApi();
-  const { width } = useWindowDimensions();
 
   const [matter, setMatter] = useState<Case | null>(null);
   const [debtors, setDebtors] = useState<readonly Debtor[]>([]);
@@ -283,124 +261,48 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   // type error rather than the `undefined` the runtime would hand back.
   const base = `/cases/${caseId}`;
   const current = pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : '';
-  const stacked = width < railBreakpoint;
   const title = caseTitle(matter, debtors);
   // `caseTitle` falls back to "Chapter 7 · NDCA" when intake has not named a
-  // debtor yet, which is exactly what the line below says — so on a fresh case
-  // the rail printed it twice, one above the other. Only worth showing when
-  // the title is a person.
-  const titleIsDebtors = title !== chapterAndDistrict(matter);
+  // debtor yet, which is exactly what the subtitle would say — so on a fresh
+  // case the nav printed it twice, one above the other. Only worth showing
+  // when the title is a person.
+  const subtitle = title === chapterAndDistrict(matter) ? null : chapterAndDistrict(matter);
+
+  // THE RAIL IS THE SHELL'S. This used to render a second dark column beside
+  // the header's nav, with the case's sections in it; the app has one nav now,
+  // on the left, and the case's sections are a group in it. What this hands
+  // over is a description — see `CaseNav` — and the shell draws every row the
+  // same way it draws Home and Cases.
+  const caseNav: CaseNav = {
+    title,
+    subtitle,
+    status: { label: STATUS_LABEL[matter.status], intent: STATUS_INTENT[matter.status] },
+    items: visible.map((section) => {
+      // The count rides in the LABEL rather than as a node beside it: the
+      // nav pins its accessible name to `label`, so a separately-rendered
+      // badge would be invisible to a screen reader — "Extraction review"
+      // whether twelve records were waiting or none.
+      const badge = section.count === undefined ? null : counts[section.count];
+      return {
+        key: section.segment,
+        label: badge === null || badge === 0 ? section.label : `${section.label} (${badge})`,
+        active: section.segment === current,
+        onPress: () => {
+          router.push(
+            section.segment === '' ? `/cases/${caseId}` : `/cases/${caseId}/${section.segment}`,
+          );
+        },
+      };
+    }),
+    onAllCases: () => {
+      router.push('/cases');
+    },
+  };
 
   return (
     <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
-      <AppShell frame="workspace">
-        <View style={[styles.workspace, stacked ? styles.workspaceStacked : null]}>
-          {/*
-            THE RAIL IS DARK ON EVERY SCHEME, and that is the composition rather
-            than an oversight. In light mode it is near-black against an ivory
-            workspace, which is what gives a case a permanent identity and what
-            keeps the chrome from dissolving into the page now that no colour is
-            doing that job. In dark mode it is a step ABOVE the ground for the
-            same reason — the rail must read as chrome either way.
-
-            It is the one place in the app that paints a colour the scheme did
-            not choose, so it takes its ink and its muted text from the DARK
-            scheme explicitly rather than from `theme.colors`, which would hand
-            it near-black text on near-black in light mode.
-          */}
-          <View
-            style={[
-              stacked ? styles.railStacked : styles.rail,
-              { backgroundColor: railColors.bg, borderRightColor: railColors.line },
-            ]}
-          >
-            <ThemeProvider theme={CHROME_THEME}>
-              <Sidebar.Root>
-                <Sidebar.Head>
-                  <Text
-                    numberOfLines={2}
-                    style={[styles.railTitle, { fontFamily: theme.typography.heading }]}
-                  >
-                    {title}
-                  </Text>
-                </Sidebar.Head>
-
-                <View style={styles.identity}>
-                  {titleIsDebtors ? (
-                    <Text
-                      style={[
-                        styles.identityLine,
-                        { color: railColors.muted, fontFamily: theme.typography.body },
-                      ]}
-                    >
-                      {chapterAndDistrict(matter)}
-                    </Text>
-                  ) : null}
-                  <View style={styles.status}>
-                    <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                      {STATUS_LABEL[matter.status]}
-                    </Badge>
-                  </View>
-                </View>
-
-                <Sidebar.Separator />
-
-                {/* NAMED, and named something other than "Primary". `Sidebar.Nav`
-                emits `role="navigation"`, which is a landmark, and so does
-                `AppShell`'s header nav. Two landmarks of a kind on one page
-                have to be told apart by name — axe flags the pair when both
-                take the default, and a screen reader offers "navigation,
-                navigation". This is also why "All cases" sits in the footer
-                below rather than in a second nav of its own. */}
-                <Sidebar.Nav label="Case sections">
-                  {visible.map((section) => {
-                    const badge = section.count === undefined ? null : counts[section.count];
-                    return (
-                      <Sidebar.Item
-                        key={section.segment}
-                        // The count rides in the LABEL rather than as a node
-                        // beside it: `Sidebar.Item` pins its accessible name to
-                        // `label`, so a separately-rendered badge would be
-                        // invisible to a screen reader — "Extraction review"
-                        // whether twelve records were waiting or none.
-                        label={
-                          badge === null || badge === 0
-                            ? section.label
-                            : `${section.label} (${badge})`
-                        }
-                        active={section.segment === current}
-                        onPress={() => {
-                          router.push(
-                            section.segment === ''
-                              ? `/cases/${caseId}`
-                              : `/cases/${caseId}/${section.segment}`,
-                          );
-                        }}
-                      />
-                    );
-                  })}
-                </Sidebar.Nav>
-
-                <Sidebar.Separator />
-
-                {/* The package's footer pads its own edge and its item pads
-                    again, which put "All cases" a step further in than every
-                    row above it. Dropping the footer's pad lands the item on
-                    the rail's one left edge. */}
-                <Sidebar.Footer style={styles.railFooter}>
-                  <Sidebar.Item
-                    label="All cases"
-                    onPress={() => {
-                      router.push('/cases');
-                    }}
-                  />
-                </Sidebar.Footer>
-              </Sidebar.Root>
-            </ThemeProvider>
-          </View>
-
-          <View style={styles.content}>{children}</View>
-        </View>
+      <AppShell frame="workspace" caseNav={caseNav}>
+        <View style={styles.content}>{children}</View>
       </AppShell>
     </CaseContext.Provider>
   );
@@ -422,58 +324,5 @@ const styles = StyleSheet.create({
     // it. The one screen that genuinely needs two columns says so itself.
     maxWidth: contentMaxWidth,
     width: '100%',
-  },
-
-  identity: {
-    gap: spacing.xs,
-    // ONE LEFT EDGE. `Sidebar.Head` pads the title by `md`, a `Sidebar.Item`
-    // lands its label at `sm` margin plus `sm` padding — also `md` — and the
-    // separator is inset by `md`. This block sat at `sm` and was the one
-    // thing on the rail that started somewhere else.
-    paddingHorizontal: spacing.md,
-  },
-  identityLine: {
-    fontSize: fontSizes.caption,
-  },
-  railFooter: {
-    paddingHorizontal: 0,
-  },
-  railTitle: {
-    color: railColors.ink,
-    fontSize: fontSizes.body,
-    // The same weight and leading as `Heading`'s `body` size, because that is
-    // what this is: the case's title, set in the UI face. It is not a
-    // `Heading` only because the rail is chrome and the page's real `<h1>` is
-    // the overview's — two headings for one case would double the outline.
-    fontWeight: '600',
-    lineHeight: fontSizes.body * 1.5,
-  },
-  rail: {
-    // `Sidebar.Root` sets its OWN width — `sidebarWidth.expanded`, 256 — so
-    // this holds exactly that and nothing else. It used to say 232, which the
-    // sidebar overflowed by 24: precisely the `spacing.lg` gap that used to be
-    // on `workspace`, so the two columns rendered flush against each other and
-    // the gap looked like it had never been written.
-    borderRightWidth: 1,
-    width: 256,
-  },
-  railStacked: {
-    width: '100%',
-  },
-  status: {
-    // `alignItems: 'flex-start'` on the parent would stretch nothing else, but
-    // a Badge in a full-width column would grow to fill it.
-    flexDirection: 'row',
-  },
-  workspace: {
-    // No gap and no padding: the rail is CHROME. It sits flush against the
-    // header above it and the window edge beside it, and carries its own
-    // right-hand rule — which is what makes it read as one frame with the top
-    // bar rather than as a floating island. Padding belongs to `content`.
-    flexDirection: 'row',
-    flexGrow: 1,
-  },
-  workspaceStacked: {
-    flexDirection: 'column',
   },
 });

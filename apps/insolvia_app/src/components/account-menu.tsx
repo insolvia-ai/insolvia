@@ -1,4 +1,4 @@
-import { Avatar, Dropdown } from '@insolvia-ai/design-system';
+import { Dropdown } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,14 +6,17 @@ import type { View as ViewHandle } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { appEnvironment, environmentInfo } from '@/config/environment';
+import { Tile } from '@/components/tile';
 import { onEscapeKey } from '@/platform/browser';
 import { useSession } from '@/session';
-import { fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
+import { chromeColors, fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
 import type { ThemePreference } from '@/theme';
 
 export interface AccountMenuProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  /** The rail is collapsed to its 64px strip: the avatar alone, no name. */
+  readonly collapsed?: boolean;
 }
 
 /**
@@ -53,13 +56,13 @@ export interface AccountMenuProps {
  * ## Three things the package cannot do here, and what this does instead
  *
  * **The trigger is ours.** `Dropdown.Trigger` wraps its children in a `Text`,
- * so it cannot hold an `Avatar`. `Dropdown.Root` is controllable, so the state
- * lives outside and this supplies its own trigger with the aria wiring the
- * part would have contributed.
+ * so it cannot hold a tile beside a name. `Dropdown.Root` is controllable, so
+ * the state lives outside and this supplies its own trigger with the aria
+ * wiring the part would have contributed.
  *
- * **The menu is right-aligned by a style override.** `Dropdown.Content` is
- * absolutely positioned at `left: 0` with no alignment prop, which for a
- * trigger at the right edge of the header means a menu running off-screen.
+ * **The menu opens upward by a style override.** `Dropdown.Content` is
+ * absolutely positioned below its trigger with no placement prop, which for
+ * the last row of the rail means a panel under the window's bottom edge.
  * `Content` spreads `style` last, so the call site can win.
  *
  * **Dismissal comes from the shell, except Escape.** The native leaf closes
@@ -74,7 +77,7 @@ export interface AccountMenuProps {
  * Nothing closed on Escape at all before: a comment in the shell said the
  * trigger did, and it did not.
  */
-export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
+export function AccountMenu({ open, onOpenChange, collapsed = false }: AccountMenuProps) {
   const { status, user, signOut } = useSession();
   const membership = useMembership();
   const theme = useTheme();
@@ -135,25 +138,32 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         onPress={() => {
           onOpenChange(!open);
         }}
-        style={styles.trigger}
+        style={[styles.trigger, collapsed ? styles.triggerCollapsed : styles.triggerExpanded]}
       >
-        {/* A ring, in the scheme's own hairline: on the black header a light
-          disc has its edge already, and in dark mode — a dark disc on a dark
-          band — the ring is what gives it one. The package's Avatar draws no
-          border of its own (its ring exists only inside a Group), so the ring
-          is this wrapper's. */}
-        <View
-          style={[styles.ring, { borderColor: theme.colors.line, borderRadius: theme.radii.pill }]}
-        >
-          <Avatar.Root size="md">
-            <Avatar.Fallback>{initials(fullName, email)}</Avatar.Fallback>
-          </Avatar.Root>
-        </View>
+        {/* The person's initial on the identity tile — the same square the
+            collapsed head shows the app's own "I" on — rather than a round
+            avatar: one shape for "who", on a rail whose rows are all tiles. */}
+        <Tile tone="mark">{initial(fullName, email)}</Tile>
+        {/* ONE LINE: the name, or the address until there is one. The row's
+            text sits on the rail, so it takes the chrome's ink; the panel
+            carries the address and the environment, so the row need not.
+            Removed when collapsed, like every label on the rail — the
+            accessible name is the button's. */}
+        {collapsed ? null : (
+          <Text
+            numberOfLines={1}
+            style={[styles.name, { color: chromeColors.ink, fontFamily: theme.typography.body }]}
+          >
+            {fullName === '' ? (email ?? '') : fullName}
+          </Text>
+        )}
       </Pressable>
 
       <Dropdown.Content
-        // See the note above: `left: 0` would run this off the right edge.
-        style={{ left: 'auto', right: 0 }}
+        // OPENS UPWARD: the trigger is the last thing in the rail, so the
+        // package's `top: 100%` would put the panel under the window's bottom
+        // edge. `Content` spreads `style` last, so the call site can win.
+        style={{ top: 'auto', bottom: '100%', left: 0, marginBottom: spacing.xs }}
       >
         {/* Identity, as a plain block rather than a `Dropdown.Item`. An item is
             a `menuitem` — focusable, activatable — and a name you cannot press
@@ -228,22 +238,17 @@ const APPEARANCES: ReadonlyArray<{ readonly value: ThemePreference; readonly lab
 ];
 
 /**
- * Up to two letters for the avatar.
+ * One letter for the tile.
  *
- * Falls back through name → email → `?` rather than rendering an empty circle:
+ * Falls back through name → email → `?` rather than rendering an empty tile:
  * a member whose name is still being asked for (see `RequireProfile`) has a
- * half-populated one, and the header renders before that is resolved.
+ * half-populated one, and the rail renders before that is resolved.
  */
-function initials(fullName: string, email: string | null): string {
-  const parts = fullName.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]![0]!}${parts[parts.length - 1]![0]!}`.toUpperCase();
-  }
-  if (parts.length === 1) {
-    return parts[0]!.slice(0, 2).toUpperCase();
-  }
+function initial(fullName: string, email: string | null): string {
+  const name = fullName.trim();
+  if (name !== '') return name[0]!.toUpperCase();
   const local = email?.trim() ?? '';
-  return local === '' ? '?' : local.slice(0, 2).toUpperCase();
+  return local === '' ? '?' : local[0]!.toUpperCase();
 }
 
 const styles = StyleSheet.create({
@@ -256,20 +261,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   name: {
+    flexShrink: 1,
     fontSize: fontSizes.label,
     fontWeight: '600',
   },
-  ring: {
-    borderWidth: 1,
-    // One pixel of air between the ring and the fill, so the ring reads as a
-    // ring and not as a darker edge on the circle.
-    padding: 1,
-  },
   trigger: {
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
     // The 44dp WCAG 2.5.5 floor this app enforces; the avatar itself is 32.
-    height: 44,
+    // The row lands the avatar on the rail's one left edge: `sm` margin plus
+    // `sm` padding, the same sum a `Sidebar.Item` reaches its icon with.
+    marginHorizontal: spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+  },
+  triggerCollapsed: {
     justifyContent: 'center',
-    width: 44,
+    width: 48,
+  },
+  triggerExpanded: {
+    width: 240,
   },
 });

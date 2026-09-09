@@ -53,6 +53,8 @@ if (!transformIgnorePatterns.some((pattern) => pattern.includes('@insolvia-ai'))
 
 module.exports = {
   preset: 'jest-expo',
+  // Merged after the preset's own; see the file for what it pins.
+  setupFiles: ['<rootDir>/jest.setup.js'],
 
   // Jest's default is 5000ms, which is a UNIT-test number, and this suite's
   // route-level tests are not unit tests: `renderRouter('src/app', …)` mounts

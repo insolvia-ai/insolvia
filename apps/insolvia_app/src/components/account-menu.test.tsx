@@ -8,7 +8,6 @@ import {
   principalResponse,
   routeFetch,
   TEST_AUTH_CONFIG,
-  TEST_EMAIL,
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
@@ -62,6 +61,9 @@ describe('the account menu', () => {
     return screen.findByRole('button', { name: 'Account menu' });
   }
 
+  /** Whether the PANEL is open — the trigger row names the person either way. */
+  const panelOpen = () => screen.queryByRole('menuitem', { name: 'Your account' }) !== null;
+
   it('reports its expanded state, which is the whole of its a11y contract', async () => {
     // The trigger is ours rather than `Dropdown.Trigger` — that part wraps its
     // children in a `Text` and so cannot hold an Avatar — so the aria wiring
@@ -89,10 +91,10 @@ describe('the account menu', () => {
     await ready();
 
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(panelOpen()).toBe(true);
 
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
   });
 
   it('closes when the page behind it is pressed', async () => {
@@ -104,7 +106,7 @@ describe('the account menu', () => {
     const user = userEvent.setup();
     await ready();
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(panelOpen()).toBe(true);
 
     // By test id, because the layer is deliberately absent from the
     // accessibility tree and so has no role or name to be found by. AppShell's
@@ -115,7 +117,7 @@ describe('the account menu', () => {
     // affordance, invisible to assistive tech on purpose.
     await user.press(screen.getByTestId('account-menu-dismiss', { includeHiddenElements: true }));
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
   });
 
   it('closes on Escape from wherever focus is', async () => {
@@ -130,7 +132,7 @@ describe('the account menu', () => {
     await ready();
 
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(panelOpen()).toBe(true);
 
     // A document event lands outside React's scheduler, so the state change
     // it causes is wrapped the way `userEvent` wraps its own.
@@ -138,7 +140,7 @@ describe('the account menu', () => {
       browser.pressKey('Escape');
     });
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
     expect(
       screen.getByRole('button', { name: 'Account menu' }).props.accessibilityState?.expanded,
     ).toBe(false);
@@ -154,7 +156,7 @@ describe('the account menu', () => {
 
     await user.press(screen.getByRole('menuitem', { name: 'Your account' }));
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
   });
 
   it('names the environment, spelled out, inside the identity block', async () => {
@@ -247,13 +249,13 @@ describe('the account menu', () => {
     });
   });
 
-  it('falls back to the email for initials when there is no name yet', async () => {
+  it('falls back to the email for the initial when there is no name yet', async () => {
     // `principalResponse()` carries no firm, so there is no display name — the
     // state a member sits in before `RequireProfile` has their name. An empty
-    // circle would be worse than two letters from the address.
+    // tile would be worse than the address's first letter.
     signedIn();
 
-    expect(await screen.findByText('AT')).toBeTruthy();
+    expect(await screen.findByText('A')).toBeTruthy();
   });
 });
 
