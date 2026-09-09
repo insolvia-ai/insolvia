@@ -1,18 +1,17 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
+import { Badge } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import type { CaseNav } from '@/components/app-shell';
-import type { IconName } from '@/components/icon';
 import { StatusScreen } from '@/components/status-screen';
-import { contentMaxWidth, spacing } from '@/theme';
+import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -73,7 +72,6 @@ export function useCase(): CaseContextValue {
 interface Section {
   readonly segment: string;
   readonly label: string;
-  readonly icon: IconName;
   /** Present when the section sits behind a firm permission. */
   readonly feature?: 'extraction_review';
   /** Which count, if any, this section shows beside its name. */
@@ -81,19 +79,18 @@ interface Section {
 }
 
 const SECTIONS: readonly Section[] = [
-  { segment: '', label: 'Overview', icon: 'grid' },
-  { segment: 'intake', label: 'Intake', icon: 'clipboard' },
-  { segment: 'documents', label: 'Documents', icon: 'file-text' },
+  { segment: '', label: 'Overview' },
+  { segment: 'intake', label: 'Intake' },
+  { segment: 'documents', label: 'Documents' },
   {
     segment: 'extraction-review',
     label: 'Extraction review',
-    icon: 'check-square',
     feature: 'extraction_review',
     count: 'pendingReview',
   },
-  { segment: 'creditor-matrix', label: 'Creditor matrix', icon: 'list' },
-  { segment: 'packet', label: 'Filing packet', icon: 'package' },
-  { segment: 'team', label: 'Team', icon: 'users' },
+  { segment: 'creditor-matrix', label: 'Creditor matrix' },
+  { segment: 'packet', label: 'Filing packet' },
+  { segment: 'team', label: 'Team' },
 ];
 
 const STATUS_LABEL: Record<Case['status'], string> = {
@@ -188,6 +185,7 @@ export function CaseColumn({ children }: { children: ReactNode }) {
  * the router handles either way.
  */
 export function CaseShell({ caseId, children }: { caseId: string; children: ReactNode }) {
+  const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const membership = useMembership();
@@ -267,45 +265,134 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   const title = caseTitle(matter, debtors);
   // `caseTitle` falls back to "Chapter 7 · NDCA" when intake has not named a
   // debtor yet, which is exactly what the subtitle would say — so on a fresh
-  // case the nav printed it twice, one above the other. Only worth showing
-  // when the title is a person.
+  // case the header printed it twice. Only worth showing when the title is a
+  // person.
   const subtitle = title === chapterAndDistrict(matter) ? null : chapterAndDistrict(matter);
-
-  // THE RAIL IS THE SHELL'S. This used to render a second dark column beside
-  // the header's nav, with the case's sections in it; the app has one nav now,
-  // on the left, and the case's sections are a group in it. What this hands
-  // over is a description — see `CaseNav` — and the shell draws every row the
-  // same way it draws Home and Cases.
-  const caseNav: CaseNav = {
-    title,
-    subtitle,
-    status: { label: STATUS_LABEL[matter.status], intent: STATUS_INTENT[matter.status] },
-    items: visible.map((section) => {
-      // The count rides in the LABEL rather than as a node beside it: the
-      // nav pins its accessible name to `label`, so a separately-rendered
-      // badge would be invisible to a screen reader — "Extraction review"
-      // whether twelve records were waiting or none.
-      const badge = section.count === undefined ? null : counts[section.count];
-      return {
-        key: section.segment,
-        icon: section.icon,
-        label: badge === null || badge === 0 ? section.label : `${section.label} (${badge})`,
-        active: section.segment === current,
-        onPress: () => {
-          router.push(
-            section.segment === '' ? `/cases/${caseId}` : `/cases/${caseId}/${section.segment}`,
-          );
-        },
-      };
-    }),
-    onAllCases: () => {
-      router.push('/cases');
-    },
-  };
 
   return (
     <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
-      <AppShell frame="workspace" caseNav={caseNav}>
+      <AppShell frame="workspace">
+        {/* THE CASE HEADER: who this is, and its sections as a strip. Chrome
+            of the page rather than of the app — the rail holds the app's three
+            links and collapses to three icons; a case's seven sections lived
+            there for a day and collapsed into a column nobody could read. A
+            repository's tabs sit on the repository, not in the site's
+            sidebar, and this is the same shape: context line, then the strip,
+            then whichever section is open. */}
+        <View
+          style={[
+            styles.head,
+            { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.line },
+          ]}
+        >
+          <View style={styles.context}>
+            {/* A `link` and not a `Sidebar.Item` now that it has left the rail;
+                the same role, so the tests and the flows that press "All
+                cases" by name still find it. */}
+            <Pressable
+              accessibilityRole="link"
+              aria-label="All cases"
+              onPress={() => {
+                router.push('/cases');
+              }}
+              style={styles.back}
+            >
+              <Text
+                style={[
+                  styles.backText,
+                  { color: theme.colors.muted, fontFamily: theme.typography.body },
+                ]}
+              >
+                ← All cases
+              </Text>
+            </Pressable>
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
+            >
+              {title}
+            </Text>
+            {subtitle === null ? null : (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.subtitle,
+                  { color: theme.colors.muted, fontFamily: theme.typography.body },
+                ]}
+              >
+                {subtitle}
+              </Text>
+            )}
+            {/* The package's Badge pins itself to the top of a row
+                (`alignSelf: 'flex-start'`, so it hugs its content); a box of
+                its own height is what lets the row centre it. */}
+            <View style={styles.status}>
+              <Badge intent={STATUS_INTENT[matter.status]} size="sm">
+                {STATUS_LABEL[matter.status]}
+              </Badge>
+            </View>
+          </View>
+
+          {/* NAMED, and named something other than the rail's: both are
+              `role="navigation"`, a landmark, and a screen reader offers
+              landmarks by name — "navigation, navigation" is the failure
+              this avoids. Links, not tabs: these change the route, and the
+              end-to-end flows press "Intake" as a link. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sections}
+            role="navigation"
+            aria-label="Case sections"
+          >
+            {visible.map((section) => {
+              // The count rides in the LABEL rather than as a node beside it:
+              // the link's accessible name is its text, so a separately
+              // rendered badge would be invisible to a screen reader —
+              // "Extraction review" whether twelve records were waiting or
+              // none.
+              const badge = section.count === undefined ? null : counts[section.count];
+              const label =
+                badge === null || badge === 0 ? section.label : `${section.label} (${badge})`;
+              const active = section.segment === current;
+              // `aria-current` is web-only and outside RN's types; omitted
+              // rather than set to undefined when this is not the page.
+              const webAria = (active ? { 'aria-current': 'page' } : {}) as object;
+              return (
+                <Pressable
+                  key={section.segment}
+                  accessibilityRole="link"
+                  accessibilityLabel={label}
+                  {...webAria}
+                  onPress={() => {
+                    router.push(
+                      section.segment === ''
+                        ? `/cases/${caseId}`
+                        : `/cases/${caseId}/${section.segment}`,
+                    );
+                  }}
+                  style={[
+                    styles.section,
+                    { borderBottomColor: active ? theme.colors.primary : 'transparent' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sectionLabel,
+                      {
+                        color: active ? theme.colors.ink : theme.colors.muted,
+                        fontFamily: theme.typography.body,
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         <View style={styles.content}>{children}</View>
       </AppShell>
     </CaseContext.Provider>
@@ -313,6 +400,53 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
 }
 
 const styles = StyleSheet.create({
+  back: {
+    // A 44dp target that does not look like a button: the text rides in a
+    // tall line box, the way the footer's links do.
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  backText: {
+    fontSize: fontSizes.label,
+  },
+  context: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  head: {
+    borderBottomWidth: 1,
+  },
+  section: {
+    alignItems: 'center',
+    // The package's Tab, in the same numbers, so this strip and the intake
+    // screen's tabs read as one family — minus the tab role, which these are
+    // not.
+    borderBottomWidth: 2,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  sectionLabel: {
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
+  sections: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+  },
+  status: {
+    flexDirection: 'row',
+  },
+  subtitle: {
+    fontSize: fontSizes.label,
+  },
+  title: {
+    flexShrink: 1,
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
   content: {
     flex: 1,
     // Without this a long unbroken cell — a filename, an email — makes the

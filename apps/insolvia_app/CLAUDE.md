@@ -116,25 +116,40 @@ UI comes from two places, both rendering bare RN primitives:
 
   `AccountMenu` is app-local **because the package cannot express it**, not by
   preference: it supplies its own trigger because `Dropdown.Trigger` wraps
-  children in a `Text` and so cannot hold an `Avatar`, and it drives an
-  app-level colour-scheme preference the package knows nothing about. It is
-  **the header's one control** — identity, environment, appearance, account,
-  sign-out — and the environment pill and theme toggle that once sat beside
-  it were folded into it on purpose; do not grow the header a second box.
+  children in a `Text` and so cannot hold a tile beside a name, and it drives
+  an app-level colour-scheme preference the package knows nothing about. It
+  is **the rail's account row and the app's one settings surface** —
+  identity, environment, appearance, account, sign-out — and the environment
+  pill and theme toggle that once sat beside it were folded into it on
+  purpose; do not grow the chrome a second control for any of those.
+
+  **The navigation is one rail, on the left, and it is the APP's.** `AppShell`
+  renders it from the package's `Sidebar` for structure and state, with the
+  app's own rows (`RailItem`, icon over caption when collapsed — the package's
+  collapsed item shows no caption), its own toggle (a panel glyph), a `Tile`
+  for the two identity marks and an `Icon` for a row's glyph. It holds Home,
+  Cases and Firm and collapses to three. **A case's sections are NOT in it**:
+  they were for a day and collapsed into eleven icons nobody could read. They
+  are a strip of links under the case's name at the top of the page, in
+  `CaseShell` — the object's tabs on the object, the app's links in the rail.
+  `Icon` is three Feather paths as data URIs, deliberately not an icon font or
+  an SVG runtime (ADR 0004 asks for a dependency to be measured first); add a
+  path there before reaching for either.
 
 Both exist in this shape because react-native-web maps accessibility props onto
 real HTML elements (`propsToAccessibilityComponent.js`). That mapping is the
 whole accessibility story, and it only fires if a component asks for it:
 
-| Component     | Source              | Primitive + role                                                         | Emits                                           |
-| ------------- | ------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
-| `Heading`     | app                 | `Text role="heading" aria-level={level}`                                 | `<h1>`–`<h6>`                                   |
-| `Button`      | design system       | `Pressable accessibilityRole="button"`                                   | `<button type="button">`                        |
-| `AppShell`    | app                 | `View role="banner"/"navigation"/"main"/"contentinfo"`                   | `<header>/<nav>/<main>/<footer>`                |
-| `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu | `<button aria-haspopup="menu">` + `role="menu"` |
-| `Field`       | design system       | compound `Field.Root/Label/Description/Error` around a control           | labelled input group                            |
-| `Input`       | design system       | `TextInput` + the Field's ids, read from context                         | labelled `<input>`                              |
-| `Wordmark`    | app                 | `Text`                                                                   | —                                               |
+| Component     | Source              | Primitive + role                                                                                                    | Emits                                                                  |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `Heading`     | app                 | `Text role="heading" aria-level={level}`                                                                            | `<h1>`–`<h6>`                                                          |
+| `Button`      | design system       | `Pressable accessibilityRole="button"`                                                                              | `<button type="button">`                                               |
+| `AppShell`    | app + design system | `Sidebar.Nav` (`role="navigation"`, named "Primary"), `View role="main"/"contentinfo"`                              | `<nav>/<main>/<footer>` — no `<header>`: the wordmark lives in the nav |
+| `CaseShell`   | app                 | `ScrollView role="navigation"` named "Case sections", `Pressable accessibilityRole="link"` rows with `aria-current` | `<nav>` of `<div role="link">`, one `aria-current="page"`              |
+| `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu                                            | `<button aria-haspopup="menu">` + `role="menu"`                        |
+| `Field`       | design system       | compound `Field.Root/Label/Description/Error` around a control                                                      | labelled input group                                                   |
+| `Input`       | design system       | `TextInput` + the Field's ids, read from context                                                                    | labelled `<input>`                                                     |
+| `Wordmark`    | app                 | `Text`                                                                                                              | —                                                                      |
 
 Three rules:
 

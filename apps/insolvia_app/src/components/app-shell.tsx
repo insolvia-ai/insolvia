@@ -1,6 +1,5 @@
 import { permits } from '@insolvia-ai/api-client';
-import { Badge, Sidebar, ThemeProvider, useSidebar } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
+import { Sidebar, ThemeProvider, useSidebar } from '@insolvia-ai/design-system';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Link, usePathname, useRouter } from 'expo-router';
@@ -33,34 +32,6 @@ import {
   useTheme,
 } from '@/theme';
 
-/** One entry in the nav's case group. */
-export interface CaseNavItem {
-  readonly key: string;
-  readonly label: string;
-  readonly icon: IconName;
-  readonly active: boolean;
-  readonly onPress: () => void;
-}
-
-/**
- * The case a screen is inside, as the nav shows it: its identity above its
- * sections, and a way back to the list.
- *
- * DATA, NOT ELEMENTS. `CaseShell` renders this shell and knows the case; the
- * shell renders the nav and knows nothing about cases. Handing over a
- * description rather than a subtree keeps every row a `Sidebar.Item` from one
- * place, so the case's sections and the primary links cannot drift apart in
- * how they look or how they announce.
- */
-export interface CaseNav {
-  readonly title: string;
-  /** The chapter and district — omitted when the title already says it. */
-  readonly subtitle: string | null;
-  readonly status: { readonly label: string; readonly intent: BadgeIntent };
-  readonly items: readonly CaseNavItem[];
-  readonly onAllCases: () => void;
-}
-
 export interface AppShellProps {
   children: ReactNode;
 
@@ -74,14 +45,12 @@ export interface AppShellProps {
    * reading screen wants — an account form, a questionnaire, a list.
    *
    * `workspace` hands the child the whole frame: no cap, no centering, no
-   * padding. It is for a screen whose child decides its own measure — today
-   * {@link CaseShell}, whose six screens want different ones. Padding a
-   * workspace is the child's job.
+   * padding. It is for a screen that carries its own chrome — today
+   * {@link CaseShell}, whose case header and section strip run edge to edge
+   * above content whose measure the screen chooses. Padding a workspace is
+   * the child's job.
    */
   frame?: 'document' | 'workspace';
-
-  /** The case the screen is inside, for the nav's case group. */
-  caseNav?: CaseNav;
 }
 
 /**
@@ -89,16 +58,22 @@ export interface AppShellProps {
  * down the left, and the page beside it — `main` over a footer, in one
  * scroller.
  *
- * **One nav, on the left, that opens and collapses.** It used to be a top
- * header carrying the wordmark, three links and an avatar, with the case rail
- * as a second dark column underneath it — two pieces of chrome for one
- * navigation, and a header whose right edge kept growing controls. The rail
- * holds all of it now: the wordmark at the top, the primary links, the case's
- * own sections when the screen is inside one, and who is signed in at the
- * bottom, the shape a workspace product's sidebar takes. Collapsed, it is a
- * 64px strip of letter tiles with the same accessible names, and the choice
- * is remembered (`insolvia.nav`) and defaults to collapsed on a narrow
+ * **One nav, on the left, that opens and collapses — and it is the APP's.**
+ * It used to be a top header carrying the wordmark, three links and an
+ * avatar, with the case rail as a second dark column underneath it — two
+ * pieces of chrome for one navigation, and a header whose right edge kept
+ * growing controls. The rail holds the app now: the wordmark at the top, the
+ * three primary links, and who is signed in at the bottom. Collapsed, it is a
+ * 64px strip of icons over captions with the same accessible names, and the
+ * choice is remembered (`insolvia.nav`) and defaults to collapsed on a narrow
  * window.
+ *
+ * A CASE'S SECTIONS ARE NOT HERE. They were, for a day: a group of seven
+ * under the three links, which collapsed into eleven icons in a strip and
+ * stopped being a nav. They belong to the case, so they sit on the case —
+ * `CaseShell` puts them in a strip under the case's name at the top of the
+ * page, the way a repository's tabs sit on the repository and not in the
+ * site's sidebar. The rail collapses to three either way.
  *
  * **The landmarks are the point.** `role="navigation"` (the rail's nav),
  * `role="main"` and `role="contentinfo"` are what react-native-web maps to
@@ -181,7 +156,6 @@ export function AppShell({
   children,
   maxContentWidth = contentMaxWidth,
   frame = 'document',
-  caseNav,
 }: AppShellProps) {
   const theme = useTheme();
   const membership = useMembership();
@@ -296,62 +270,6 @@ export function AppShell({
                   }}
                 />
               ) : null,
-            )}
-
-            {caseNav === undefined ? null : (
-              <>
-                <Sidebar.Separator />
-                {/* The case's identity, above its sections: what the rail is
-                    FOR while a case is open. Removed rather than hidden when
-                    collapsed, like `Sidebar.Title`, because a truncated name
-                    in a 64px strip says nothing a tile does not. */}
-                {collapsed ? null : (
-                  <View style={styles.caseIdentity}>
-                    <Text
-                      numberOfLines={2}
-                      style={[styles.caseTitle, { fontFamily: theme.typography.heading }]}
-                    >
-                      {caseNav.title}
-                    </Text>
-                    {caseNav.subtitle === null ? null : (
-                      <Text
-                        style={[
-                          styles.caseSubtitle,
-                          { color: chromeColors.muted, fontFamily: theme.typography.body },
-                        ]}
-                      >
-                        {caseNav.subtitle}
-                      </Text>
-                    )}
-                    <View style={styles.caseStatus}>
-                      <Badge intent={caseNav.status.intent} size="sm">
-                        {caseNav.status.label}
-                      </Badge>
-                    </View>
-                  </View>
-                )}
-                {/* A labelled group, not a second landmark: the sections are
-                    part of the one navigation, grouped under the case. */}
-                <Sidebar.Section title="Case">
-                  {caseNav.items.map((item) => (
-                    <RailItem
-                      key={item.key}
-                      label={item.label}
-                      icon={item.icon}
-                      active={item.active}
-                      collapsed={collapsed}
-                      onPress={item.onPress}
-                    />
-                  ))}
-                </Sidebar.Section>
-                <RailItem
-                  label="All cases"
-                  icon="arrow-left"
-                  active={false}
-                  collapsed={collapsed}
-                  onPress={caseNav.onAllCases}
-                />
-              </>
             )}
           </Sidebar.Nav>
 
@@ -540,28 +458,6 @@ function RailItem({
 }
 
 const styles = StyleSheet.create({
-  caseIdentity: {
-    gap: spacing.xs,
-    // ONE LEFT EDGE. `Sidebar.Head` pads the title by `md`, a row lands its
-    // tile at `sm` margin plus `sm` padding — also `md` — and the separator
-    // is inset by `md`.
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  caseStatus: {
-    // `alignItems: 'flex-start'` on the parent would stretch nothing else, but
-    // a Badge in a full-width column would grow to fill it.
-    flexDirection: 'row',
-  },
-  caseSubtitle: {
-    fontSize: fontSizes.caption,
-  },
-  caseTitle: {
-    color: chromeColors.ink,
-    fontSize: fontSizes.body,
-    fontWeight: '600',
-    lineHeight: fontSizes.body * 1.5,
-  },
   dismissLayer: {
     bottom: 0,
     left: 0,
