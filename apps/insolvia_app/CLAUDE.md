@@ -244,9 +244,11 @@ below the `<title>` and why this paragraph is here rather than in the file.
   BOTH slots, the same trick `ThemePreferenceProvider` uses for an explicit
   scheme). Anything drawn on the chrome takes its ink from `chromeColors`,
   never from `theme.colors`, and any package leaf on it — the rail's
-  `Sidebar`, the header's `Avatar` and `Dropdown` — sits under a nested
-  `ThemeProvider theme={CHROME_THEME}`. Without that a `Sidebar.Item` in light
-  mode paints near-black ink on the near-black rail.
+  `Sidebar` — sits under a nested `ThemeProvider theme={CHROME_THEME}`.
+  Without that a `Sidebar.Item` in light mode paints near-black ink on the
+  near-black rail. The account menu is NOT chrome, though it sits on it: its
+  avatar and its dropdown follow the scheme (a light disc on the black band in
+  light mode; a panel that matches the page it hangs over).
 
   Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
   `fontSizes` is their single owner, so a literal `fontSize:` in a component is

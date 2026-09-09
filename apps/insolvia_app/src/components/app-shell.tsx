@@ -1,7 +1,6 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { ThemeProvider } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import type { ExternalPathString } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,7 +9,7 @@ import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
-import { CHROME_THEME, chromeColors, contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
+import { chromeColors, contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
 export interface AppShellProps {
   children: ReactNode;
@@ -144,8 +143,8 @@ export function AppShell({
     <View style={[styles.page, { backgroundColor: theme.colors.bg }]}>
       {/* Below the header in the tree but above `main` in paint order, so a
           press anywhere on the page closes the menu. Hidden from assistive
-          tech: it is a mouse affordance, and the menu already closes on Escape
-          through the trigger. */}
+          tech: it is a mouse affordance; Escape is the menu's own, at
+          document level, with focus handed back to the trigger. */}
       {menuOpen ? (
         <Pressable
           accessibilityElementsHidden
@@ -167,8 +166,8 @@ export function AppShell({
           composition the case rail and the footer already make, so the three
           read as one frame around the page rather than two dark bands and a
           light one. Everything drawn on it takes the chrome palette — the
-          wordmark and the links here, and the account menu's leaves through
-          the pinned theme below. */}
+          wordmark and the links here. The account menu does not: its avatar
+          and its panel follow the scheme, and say why. */}
       <View
         role="banner"
         style={[
@@ -194,9 +193,7 @@ export function AppShell({
             </Link>
           ) : null}
         </View>
-        <ThemeProvider theme={CHROME_THEME}>
-          <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
-        </ThemeProvider>
+        <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
       </View>
 
       {/* ONE SCROLLER FOR THE PAGE, holding `main` and the footer as SIBLINGS.

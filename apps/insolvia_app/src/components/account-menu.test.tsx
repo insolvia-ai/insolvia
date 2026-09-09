@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { act, screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -116,6 +116,32 @@ describe('the account menu', () => {
     await user.press(screen.getByTestId('account-menu-dismiss', { includeHiddenElements: true }));
 
     expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+  });
+
+  it('closes on Escape from wherever focus is', async () => {
+    // Nothing did this before: the package's native leaf has no document to
+    // listen to, and a comment in the shell claimed the trigger handled it. A
+    // keyboard user who had tabbed into the menu and changed their mind was
+    // stuck pressing something. The listener is document-level, which is what
+    // `pressKey` drives — `userEvent` types into a focused element, and the
+    // whole point is that focus may be anywhere.
+    signedIn();
+    const user = userEvent.setup();
+    await ready();
+
+    await user.press(screen.getByRole('button', { name: 'Account menu' }));
+    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+
+    // A document event lands outside React's scheduler, so the state change
+    // it causes is wrapped the way `userEvent` wraps its own.
+    act(() => {
+      browser.pressKey('Escape');
+    });
+
+    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Account menu' }).props.accessibilityState?.expanded,
+    ).toBe(false);
   });
 
   it('closes when the route changes', async () => {

@@ -1,12 +1,14 @@
 import { Avatar, Dropdown } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { View as ViewHandle } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { appEnvironment, environmentInfo } from '@/config/environment';
+import { onEscapeKey } from '@/platform/browser';
 import { useSession } from '@/session';
-import { chromeColors, fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
+import { fontSizes, spacing, useTheme, useThemePreference } from '@/theme';
 import type { ThemePreference } from '@/theme';
 
 export interface AccountMenuProps {
@@ -60,12 +62,17 @@ export interface AccountMenuProps {
  * trigger at the right edge of the header means a menu running off-screen.
  * `Content` spreads `style` last, so the call site can win.
  *
- * **Dismissal comes from the shell.** The native leaf closes only on an item
- * press or a second trigger press — React Native has no document to listen to,
- * and the package says so. `AppShell` owns the open state and renders the
- * full-screen press target, because that target has to be a sibling of the
- * whole page rather than of this component; and it closes on navigation, since
- * a menu left open over a new screen is worse than either.
+ * **Dismissal comes from the shell, except Escape.** The native leaf closes
+ * only on an item press or a second trigger press — React Native has no
+ * document to listen to, and the package says so. `AppShell` owns the open
+ * state and renders the full-screen press target, because that target has to
+ * be a sibling of the whole page rather than of this component; and it closes
+ * on navigation, since a menu left open over a new screen is worse than
+ * either. Escape is handled HERE, at document level through
+ * `platform/browser.ts`, because closing has to hand focus back to the
+ * trigger — the APG menu-button pattern — and the trigger is this component's.
+ * Nothing closed on Escape at all before: a comment in the shell said the
+ * trigger did, and it did not.
  */
 export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
   const { status, user, signOut } = useSession();
@@ -75,6 +82,18 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const env = environmentInfo(appEnvironment);
+  const trigger = useRef<ViewHandle>(null);
+
+  // Escape closes the menu from wherever focus is, and puts focus back on the
+  // trigger so a keyboard user is left where they started rather than nowhere.
+  // Subscribed only while open, so a closed menu costs no listener.
+  useEffect(() => {
+    if (!open) return undefined;
+    return onEscapeKey(() => {
+      onOpenChange(false);
+      trigger.current?.focus();
+    });
+  }, [open, onOpenChange]);
 
   // A menu that survived a navigation would hang over a screen the user has
   // already moved on from.
@@ -91,7 +110,14 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
 
   return (
     <Dropdown.Root open={open} onOpenChange={onOpenChange}>
+      {/* THE HEADER IS CHROME; THIS IS NOT. Neither the avatar nor the menu
+          takes the chrome's dark palette: the disc follows the scheme like
+          every other control (a light disc on the black band in light mode,
+          which is what gives it an edge there), and the menu hangs over the
+          PAGE, where a dark panel dropping onto a light page would be a second
+          colour scheme two inches from the first. */}
       <Pressable
+        ref={trigger}
         accessibilityRole="button"
         // A stable name whatever the user is called: the end-to-end suite
         // matches on it, and a label built from a name would change per user.
@@ -111,13 +137,13 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         }}
         style={styles.trigger}
       >
-        {/* A ring, because the avatar's fill is one step off its ground —
-            which is the right weight for a resting control and not enough
-            edge for the one control the header has. The package's Avatar
-            draws no border of its own (its ring exists only inside a Group),
-            so the ring is this wrapper's. */}
+        {/* A ring, in the scheme's own hairline: on the black header a light
+          disc has its edge already, and in dark mode — a dark disc on a dark
+          band — the ring is what gives it one. The package's Avatar draws no
+          border of its own (its ring exists only inside a Group), so the ring
+          is this wrapper's. */}
         <View
-          style={[styles.ring, { borderColor: chromeColors.line, borderRadius: theme.radii.pill }]}
+          style={[styles.ring, { borderColor: theme.colors.line, borderRadius: theme.radii.pill }]}
         >
           <Avatar.Root size="md">
             <Avatar.Fallback>{initials(fullName, email)}</Avatar.Fallback>
@@ -135,7 +161,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
         <View style={styles.identity}>
           {fullName === '' ? null : (
             <Text
-              style={[styles.name, { color: chromeColors.ink, fontFamily: theme.typography.body }]}
+              style={[styles.name, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
             >
               {fullName}
             </Text>
@@ -144,7 +170,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
             <Text
               style={[
                 styles.email,
-                { color: chromeColors.muted, fontFamily: theme.typography.body },
+                { color: theme.colors.muted, fontFamily: theme.typography.body },
               ]}
             >
               {email}
@@ -153,7 +179,7 @@ export function AccountMenu({ open, onOpenChange }: AccountMenuProps) {
           {/* Spelled out rather than the old pill's all-caps abbreviation, so
               the visible text and the announced text are the same string. */}
           <Text
-            style={[styles.email, { color: chromeColors.muted, fontFamily: theme.typography.body }]}
+            style={[styles.email, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
           >
             {env.label} environment · {env.host}
           </Text>
