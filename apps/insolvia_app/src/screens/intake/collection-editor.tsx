@@ -275,7 +275,12 @@ export function CollectionEditor({ caseId, spec }: CollectionEditorProps) {
 
       <Text
         aria-live={load.kind === 'error' ? 'assertive' : 'polite'}
-        style={[styles.help, load.kind === 'error' ? { color: theme.colors.danger } : muted]}
+        style={[
+          styles.help,
+          load.kind === 'error'
+            ? { color: theme.colors.danger, fontFamily: theme.typography.body }
+            : muted,
+        ]}
       >
         {load.kind === 'loading'
           ? `Loading ${spec.title}…`
@@ -291,7 +296,12 @@ export function CollectionEditor({ caseId, spec }: CollectionEditorProps) {
           ) : (
             rows.map((row, index) => (
               <View key={row.id} style={[styles.row, { borderColor: theme.colors.line }]}>
-                <Text style={[styles.rowSummary, { color: theme.colors.ink }]}>
+                <Text
+                  style={[
+                    styles.rowSummary,
+                    { color: theme.colors.ink, fontFamily: theme.typography.body },
+                  ]}
+                >
                   {spec.summary(row.body)}
                 </Text>
                 <View style={styles.rowActions}>
@@ -518,7 +528,13 @@ function FieldControl({
                 <Checkbox.Root value={option.value} aria-label={option.label}>
                   <Checkbox.Indicator>✓</Checkbox.Indicator>
                 </Checkbox.Root>
-                <Text aria-hidden style={[styles.checkboxLabel, { color: theme.colors.ink }]}>
+                <Text
+                  aria-hidden
+                  style={[
+                    styles.checkboxLabel,
+                    { color: theme.colors.ink, fontFamily: theme.typography.body },
+                  ]}
+                >
                   {option.label}
                 </Text>
               </View>
@@ -626,7 +642,12 @@ function FieldControl({
                   ) : null}
                 </Field.Root>
                 {wholeRowMessage ? (
-                  <Text style={[styles.help, { color: theme.colors.danger }]}>
+                  <Text
+                    style={[
+                      styles.help,
+                      { color: theme.colors.danger, fontFamily: theme.typography.body },
+                    ]}
+                  >
                     {wholeRowMessage}
                   </Text>
                 ) : null}
@@ -641,7 +662,14 @@ function FieldControl({
             );
           })}
           {listMessage ? (
-            <Text style={[styles.help, { color: theme.colors.danger }]}>{listMessage}</Text>
+            <Text
+              style={[
+                styles.help,
+                { color: theme.colors.danger, fontFamily: theme.typography.body },
+              ]}
+            >
+              {listMessage}
+            </Text>
           ) : null}
           <Button
             size="lg"

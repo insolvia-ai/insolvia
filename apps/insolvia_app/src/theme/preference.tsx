@@ -1,5 +1,6 @@
 import type { ColorSchemeName } from '@insolvia-ai/tokens';
 import { ThemeProvider } from '@insolvia-ai/design-system';
+import type { ThemeOverrides } from '@insolvia-ai/design-system';
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
@@ -28,6 +29,15 @@ interface ThemePreferenceValue {
   /** What that resolves to right now, with the OS consulted for `system`. */
   readonly scheme: ColorSchemeName;
   readonly setPreference: (next: ThemePreference) => void;
+  /**
+   * The value this provider hands the design system's `ThemeProvider` — the
+   * brand, in the slots the preference decides. Exposed so a component that
+   * sits INSIDE a pinned region (the account row on the dark rail) can hand a
+   * surface that hangs over the page (its menu) the page's own theme back:
+   * nesting is supported and the nearest provider wins outright, so the way
+   * out of a pin is another provider holding this.
+   */
+  readonly packageTheme: ThemeOverrides;
 }
 
 const ThemePreferenceContext = createContext<ThemePreferenceValue | null>(null);
@@ -110,11 +120,6 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
     writeTo(persistentStore(), STORAGE_KEY, next);
   }, []);
 
-  const value = useMemo<ThemePreferenceValue>(
-    () => ({ preference, scheme, setPreference }),
-    [preference, scheme, setPreference],
-  );
-
   // `system` hands each slot its own scheme and lets the package's leaves ask
   // the OS, exactly as they would unthemed. An explicit preference puts the
   // CHOSEN scheme in BOTH slots — the leaves still ask the OS, and now both
@@ -143,6 +148,11 @@ export function ThemePreferenceProvider({ children }: { children: ReactNode }) {
             radii: brandRadii,
           },
     [preference, scheme],
+  );
+
+  const value = useMemo<ThemePreferenceValue>(
+    () => ({ preference, scheme, setPreference, packageTheme: overrides }),
+    [preference, scheme, setPreference, overrides],
   );
 
   return (

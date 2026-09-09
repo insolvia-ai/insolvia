@@ -12,14 +12,14 @@ package at a time.
 
 **No component library and no styling library.** Not gluestack, not NativeWind,
 not Unistyles, not UniWind, not Tailwind. Bare React Native primitives plus
-`StyleSheet.create` was the lightest *and* fastest of six configurations measured,
+`StyleSheet.create` was the lightest _and_ fastest of six configurations measured,
 and the only one clearing all seven Lighthouse gates; every layer added made both
 script weight and LCP worse. The numbers are in
 [ADR 0004](../../docs/adr/0004-react-native-replaces-flutter.md) — read it before
 proposing one, because "we should just add NativeWind" is the first thing this
 setup invites and it has already been tested and rejected.
 
-The app *does* consume `@insolvia-ai/design-system`, and that is not the thing
+The app _does_ consume `@insolvia-ai/design-system`, and that is not the thing
 this paragraph forbids. What ADR 0004 measured and rejected is a **third-party**
 component library and a **styling runtime**; the design system is our own code,
 and its `.native` leaves are exactly the pattern above — bare RN primitives plus
@@ -74,7 +74,7 @@ Rules that follow from it:
 - **`src/app` is routes-only.** Every file there becomes a URL, so a helper, a
   type, or a test file dropped in it becomes a route. Screen bodies go in
   `screens/`, shared UI in `components/`.
-- **Kebab-case filenames** (`env-badge.tsx`), matching Expo's own template.
+- **Kebab-case filenames** (`account-menu.tsx`), matching Expo's own template.
 - **`StyleSheet.create` at the bottom of the component file**, never a separate
   `.styles.ts`. Colors are applied from `useTheme()` at render time because a
   `StyleSheet` block runs once at module load and cannot read the color scheme;
@@ -108,30 +108,48 @@ UI comes from two places, both rendering bare RN primitives:
   its two-leaf tests. `components/` is for what marketing could never use, not
   for a second copy of something shared. When a component resolves oddly or
   renders unstyled, that is `design-system-platforms`.
+
 - **Everything else in `components/` is app-specific** — the shell chrome and
-  branding (`AppShell`, `Heading`, `Wordmark`, `EnvBadge`, `ThemeToggle`,
-  `AccountMenu`) that marketing has no use for. It stays here by decision
+  branding (`AppShell`, `Heading`, `Wordmark`, `AccountMenu`) that marketing
+  has no use for. It stays here by decision
   ([ADR 0006](../../docs/adr/0006-owned-cross-platform-design-system.md)).
 
-  Two of them are app-local **because the package cannot express them**, not
-  by preference. `ThemeToggle` drives an app-level colour-scheme preference the
-  package knows nothing about; `AccountMenu` supplies its own trigger because
-  `Dropdown.Trigger` wraps children in a `Text` and so cannot hold an `Avatar`.
-  Each says so at its definition.
+  `AccountMenu` is app-local **because the package cannot express it**, not by
+  preference: it supplies its own trigger because `Dropdown.Trigger` wraps
+  children in a `Text` and so cannot hold a tile beside a name, and it drives
+  an app-level colour-scheme preference the package knows nothing about. It
+  is **the rail's account row and the app's one settings surface** —
+  identity, environment, appearance, account, sign-out — and the environment
+  pill and theme toggle that once sat beside it were folded into it on
+  purpose; do not grow the chrome a second control for any of those.
+
+  **The navigation is one rail, on the left, and it is the APP's.** `AppShell`
+  renders it from the package's `Sidebar` for structure and state, with the
+  app's own rows (`RailItem`, icon over caption when collapsed — the package's
+  collapsed item shows no caption), its own toggle (a panel glyph), a `Tile`
+  for the two identity marks and an `Icon` for a row's glyph. It holds Home,
+  Cases and Firm and collapses to three. **A case's sections are NOT in it**:
+  they were for a day and collapsed into eleven icons nobody could read. They
+  are a strip of links under the case's name at the top of the page, in
+  `CaseShell` — the object's tabs on the object, the app's links in the rail.
+  `Icon` is three Feather paths as data URIs, deliberately not an icon font or
+  an SVG runtime (ADR 0004 asks for a dependency to be measured first); add a
+  path there before reaching for either.
 
 Both exist in this shape because react-native-web maps accessibility props onto
 real HTML elements (`propsToAccessibilityComponent.js`). That mapping is the
 whole accessibility story, and it only fires if a component asks for it:
 
-| Component    | Source | Primitive + role                            | Emits                          |
-| ------------ | ------ | ------------------------------------------- | ------------------------------ |
-| `Heading`    | app    | `Text role="heading" aria-level={level}`     | `<h1>`–`<h6>`                  |
-| `Button`     | design system | `Pressable accessibilityRole="button"` | `<button type="button">`       |
-| `AppShell`   | app    | `View role="banner"/"navigation"/"main"/"contentinfo"` | `<header>/<nav>/<main>/<footer>` |
-| `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu | `<button aria-haspopup="menu">` + `role="menu"` |
-| `Field`      | design system | compound `Field.Root/Label/Description/Error` around a control | labelled input group |
-| `Input`      | design system | `TextInput` + the Field's ids, read from context | labelled `<input>`        |
-| `Wordmark`, `EnvBadge` | app | `Text` / `View`                   | —                              |
+| Component     | Source              | Primitive + role                                                                                                    | Emits                                                                  |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `Heading`     | app                 | `Text role="heading" aria-level={level}`                                                                            | `<h1>`–`<h6>`                                                          |
+| `Button`      | design system       | `Pressable accessibilityRole="button"`                                                                              | `<button type="button">`                                               |
+| `AppShell`    | app + design system | `Sidebar.Nav` (`role="navigation"`, named "Primary"), `View role="main"/"contentinfo"`                              | `<nav>/<main>/<footer>` — no `<header>`: the wordmark lives in the nav |
+| `CaseShell`   | app                 | `ScrollView role="navigation"` named "Case sections", `Pressable accessibilityRole="link"` rows with `aria-current` | `<nav>` of `<div role="link">`, one `aria-current="page"`              |
+| `AccountMenu` | app + design system | own `Pressable` trigger around `Avatar`, package `Dropdown` for the menu                                            | `<button aria-haspopup="menu">` + `role="menu"`                        |
+| `Field`       | design system       | compound `Field.Root/Label/Description/Error` around a control                                                      | labelled input group                                                   |
+| `Input`       | design system       | `TextInput` + the Field's ids, read from context                                                                    | labelled `<input>`                                                     |
+| `Wordmark`    | app                 | `Text`                                                                                                              | —                                                                      |
 
 Three rules:
 
@@ -147,10 +165,11 @@ Three rules:
   `Input` — or `Select`, `DateInput`, `Textarea`, `Combobox` — directly inside
   `Field.Root`; each reads `FieldContext` itself for the id, the
   `aria-describedby` and the invalid flag. `Field.Control` now takes a required
-  `render` element and is only for a control the package does *not* own. Note
+  `render` element and is only for a control the package does _not_ own. Note
   `Input` is `value` + **`onValueChange`**, not `onChangeText`, and takes
   `type="email"` rather than a hand-set `keyboardType`/`autoCapitalize` — the
   native leaf derives both from `type`, so spelling them out binds only one leaf.
+
 - **No `role="region"`.** A `<section>` without an accessible name is invalid ARIA
   and axe flags it. Open a block with a heading instead.
 
@@ -159,7 +178,7 @@ Two usage rules the package's API makes easy to drop, both asserted in
 
 - **Decorative glyphs never enter the accessible name.** The package button is
   children-based with no `icon` prop, so a trailing glyph is an
-  `aria-hidden` `<Text>` child *and* `aria-label` pins the name to the visible
+  `aria-hidden` `<Text>` child _and_ `aria-label` pins the name to the visible
   label (WCAG 2.5.3) — see the home screen's CTA.
 - **Buttons are `size="lg"`.** The package's `md` is 40dp, under the 44dp
   WCAG 2.5.5 target-size floor this app enforces.
@@ -178,7 +197,7 @@ the meta tags are injected before the first `</head>`.** So nothing above the re
 `<head>` may mention a placeholder name or contain a head-closing tag — including
 a comment. Written the natural way (a header comment explaining the file), the
 export shipped `<html lang="%LANG_ISO_CODE%">`, a literal `%WEB_TITLE%` title, and
-`<meta name="description">` *inside the comment*. That is why the commentary sits
+`<meta name="description">` _inside the comment_. That is why the commentary sits
 below the `<title>` and why this paragraph is here rather than in the file.
 
 ## Everything else
@@ -195,20 +214,36 @@ below the `<title>` and why this paragraph is here rather than in the file.
   GENERATED `src/theme/brand-colors.ts` — never edit that file, run
   `npm run tokens`. `themeFor()` does the layering for this app's own
   components; `ThemePreferenceProvider`'s `ThemeProvider` does it for the design
-  system's `.native` leaves, and it must pass the brand in *every* arm now —
+  system's `.native` leaves, and it must pass the brand in _every_ arm now —
   passing nothing renders the package's monochrome chrome next to our navy. The
   decision is [ADR 0020](../../docs/adr/0020-the-brand-is-a-consumer-owned-override.md).
 
-  Font FAMILIES layer the same way as of `brand/fonts.json`: Cormorant Garamond for
-  headings, Open Sans for body, IBM Plex Mono for case numbers and form
-  references. They reach the screen through two seams and need both —
-  `themeFor()` for this app's own components, and `ThemeProvider`'s `fonts` for
-  the package's native leaves, whose `StyleSheet.create` runs at module load
-  where no context reaches. Import `typography` from `@/theme`, never from
-  `@insolvia-ai/tokens`: the latter is the unbranded answer. The faces are
-  self-hosted `.woff2` under `public/fonts` with `@font-face` in
-  `public/index.html` — naming a family does not load it — and
-  `scripts/fetch-brand-fonts.sh` regenerates them.
+  Font FAMILIES layer the same way as of `brand/fonts.json`: **Open Sans for
+  headings AND body** — the UI is one sans, and hierarchy comes from size,
+  weight and space — IBM Plex Mono for case numbers, amounts and form
+  references, and Cormorant Garamond for the **wordmark only** (a fourth role,
+  `typography.wordmark`, that the package does not know and only `Wordmark`
+  reads). A heading set in the serif is the regression `theme.test.ts` pins;
+  the brand file owns the reasoning. Two weights of Open Sans are loaded, 400
+  and 600, and **every heading and emphasised label is 600** — there is no
+  700 in the app except the wordmark's Cormorant. They reach the screen
+  through two seams and need both — `themeFor()` for this app's own
+  components, and `ThemeProvider`'s `fonts` for the package's native leaves,
+  whose `StyleSheet.create` runs at module load where no context reaches.
+  Import `typography` from `@/theme`, never from `@insolvia-ai/tokens`: the
+  latter is the unbranded answer. The faces are self-hosted `.woff2` under
+  `public/fonts` with `@font-face` in `public/index.html` — naming a family
+  does not load it — and `scripts/fetch-brand-fonts.sh` regenerates them.
+
+  **Every `Text` states a `fontFamily`**, including the package's leaves: from
+  design system 0.22.0 `ThemeProvider`'s `fonts.body` reaches every control
+  (before it, Button, Badge, Field and two dozen more rendered the browser's
+  system sans beside this app's Open Sans, which is what "the font isn't
+  applied consistently" looked like). A bare `<Text>` in a screen with no
+  family is therefore a bug, not a default — and `eslint.config.mjs` carries a
+  local rule, `insolvia/text-states-family`, that fails the lint on one. It
+  accepts an inline `fontFamily`, one of the render-time `muted`/`ink`/`danger`
+  objects, a Text nested in a Text, or an `aria-hidden` glyph; nothing else.
 
   Corner radii layer the same way, from `brand/radii.json`, through the same
   two seams. The package states 0 at every step because a corner is a brand
@@ -217,12 +252,18 @@ below the `<title>` and why this paragraph is here rather than in the file.
   the hairlines read as a wireframe. `pill` is deliberately absent: the package
   refuses to theme it.
 
-  **The case rail is the one surface that paints a colour the scheme did not
-  choose.** It is dark in both schemes, because it is chrome; `CaseShell` pins
-  the package's leaves inside it with a nested `ThemeProvider` holding the dark
-  palette in BOTH slots, the same trick `ThemePreferenceProvider` uses for an
-  explicit scheme. Without it a `Sidebar.Item` in light mode paints near-black
-  ink on the near-black rail.
+  **The chrome — header, case rail, footer — paints a colour the scheme did
+  not choose.** All three are dark in both schemes, so they read as one frame
+  around the page; `src/theme/chrome.ts` owns that decision as `chromeColors`
+  (the dark palette) and `CHROME_THEME` (a `ThemeProvider` value holding it in
+  BOTH slots, the same trick `ThemePreferenceProvider` uses for an explicit
+  scheme). Anything drawn on the chrome takes its ink from `chromeColors`,
+  never from `theme.colors`, and any package leaf on it — the rail's
+  `Sidebar` — sits under a nested `ThemeProvider theme={CHROME_THEME}`.
+  Without that a `Sidebar.Item` in light mode paints near-black ink on the
+  near-black rail. The account menu is NOT chrome, though it sits on it: its
+  avatar and its dropdown follow the scheme (a light disc on the black band in
+  light mode; a panel that matches the page it hangs over).
 
   Font sizes are the one scale tokens do not carry yet; `theme/theme.ts`'s
   `fontSizes` is their single owner, so a literal `fontSize:` in a component is
@@ -243,6 +284,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   Expo's pipeline reshapes one source image into a single `.ico` and cannot
   express an SVG icon with an `.ico` fallback, so `public/index.html` links
   both itself.
+
 - **Environment** comes from `EXPO_PUBLIC_INSOLVIA_ENV` (`local` default), read in
   [`src/config/environment.ts`](src/config/environment.ts). Expo inlines **only**
   `EXPO_PUBLIC_*` variables — an unprefixed name reads as `undefined` at runtime.
@@ -257,7 +299,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   is the only thing that can tell a user the page does not exist.
 - **`/auth/callback` must stay in step with `infra/modules/auth/main.tf`**, whose
   web client registers `<origin>/auth/callback` as its only OAuth callback URL.
-  Under file-based routing that path *is* the file's location, so moving the file
+  Under file-based routing that path _is_ the file's location, so moving the file
   breaks sign-in's return leg. `auth-callback.test.tsx` guards it.
 - **`src/session/` owns sign-in, and
   [ADR 0007](../../docs/adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md)
@@ -284,6 +326,7 @@ below the `<title>` and why this paragraph is here rather than in the file.
   `platform/browser.ts` so a non-web runtime degrades instead of crashing. A
   future **native** client is what would justify `expo-auth-session`; on web it
   would buy nothing.
+
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and
   `infra/envs/{dev,staging}` register `http://localhost:3000` as an
   **exact-match** Cognito allowed origin.

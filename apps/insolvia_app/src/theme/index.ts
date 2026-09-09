@@ -22,7 +22,8 @@ export {
   useTheme,
   workspaceMaxWidth,
 } from './theme';
-export type { Theme } from './theme';
+export type { BrandTypography, Theme } from './theme';
 
+export { CHROME_THEME, chromeColors } from './chrome';
 export { THEME_PREFERENCES, ThemePreferenceProvider, useThemePreference } from './preference';
 export type { ThemePreference } from './preference';

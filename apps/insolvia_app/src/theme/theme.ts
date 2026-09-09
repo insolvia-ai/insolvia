@@ -43,9 +43,19 @@ export interface Theme {
    * package declares its own `as const`, so that would be the LITERAL system
    * stacks and would reject any brand replacing them — which is the seam.
    */
-  readonly typography: Typography;
+  readonly typography: BrandTypography;
   readonly fontSizes: typeof fontSizes;
 }
+
+/**
+ * The three roles `@insolvia-ai/tokens` declares plus Insolvia's fourth.
+ *
+ * `wordmark` is the logotype's face and nothing else's — see brand/fonts.json
+ * for why the UI is one sans and the serif is kept for the mark. The package
+ * has no such role and ignores the key when `ThemeProvider` receives it; the
+ * type exists so the one component that reads it can do so without a cast.
+ */
+export type BrandTypography = Typography & { readonly wordmark: string };
 
 /**
  * The type scale, in density-independent pixels.
@@ -54,25 +64,35 @@ export interface Theme {
  * This is therefore the single place a font size is declared; a
  * component that spells one out inline is a bug. Promote this to `tokens.json`
  * the moment marketing needs the same numbers.
+ *
+ * SIX STEPS, AND EACH PAIRS WITH A LINE HEIGHT IN `Heading` OR THE SCREEN
+ * THAT USES IT. The steps were sized for a serif display face, which needed
+ * 34px to hold its own against 16px body copy; the UI is one sans now
+ * (brand/fonts.json), and Open Sans's tall x-height makes 28 read as large
+ * as Cormorant's 34 did. The ratios are close to the platform scales this
+ * app sits beside — 12 · 14 · 16 · 20 · 28 is within a pixel of Material's
+ * label/body/title/headline steps and of macOS's caption/body/title steps —
+ * so a control from the design system (whose own scale is 12/14/16/18) sits
+ * on the same grid as the text around it.
  */
 export const fontSizes = {
-  /** 12 — captions and metadata. */
+  /** 12 — captions, metadata, and tracked uppercase labels. */
   caption: 12,
 
-  /** 14 — button and badge labels. */
+  /** 14 — table cells, list rows, button and badge labels. */
   label: 14,
 
-  /** 16 — body copy. */
+  /** 16 — body copy, and the title of a card. */
   body: 16,
 
-  /** 22 — the wordmark in the app header. */
+  /** 20 — a section heading within a page. */
+  section: 20,
+
+  /** 22 — the wordmark in the app header. Cormorant, not Open Sans. */
   wordmark: 22,
 
-  /** 24 — section headings. */
-  section: 24,
-
-  /** 34 — the page's one display heading. */
-  display: 34,
+  /** 28 — the page's one display heading. */
+  display: 28,
 } as const;
 
 /**
@@ -173,10 +193,11 @@ export function themeFor(scheme: string | null | undefined): Theme {
     // Brand over base again, and the same layering argument. The package's
     // base theme sets `heading` and `body` to the same system sans and says
     // why — a display face is a brand decision it declines to make — so all
-    // three roles here are Insolvia's, from brand/fonts.json. The faces
-    // themselves are @font-face'd in public/index.html; this only asks for
-    // them, and every stack ends in the generic the base used, so a face that
-    // fails to load renders what shipped before it.
+    // four roles here are Insolvia's, from brand/fonts.json (the fourth,
+    // `wordmark`, is the app's own). The faces themselves are @font-face'd in
+    // public/index.html; this only asks for them, and every stack ends in the
+    // generic the base used, so a face that fails to load renders what
+    // shipped before it.
     typography: { ...baseTypography, ...brandFonts },
     fontSizes,
   };

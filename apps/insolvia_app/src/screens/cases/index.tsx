@@ -157,12 +157,25 @@ export function Cases() {
               <RadioGroup.Item value={String(option.value)} aria-label={option.label} hitSlop={12}>
                 <RadioGroup.Indicator />
               </RadioGroup.Item>
-              <Text style={[styles.chapterLabel, { color: theme.colors.ink }]}>{option.label}</Text>
+              <Text
+                style={[
+                  styles.chapterLabel,
+                  { color: theme.colors.ink, fontFamily: theme.typography.body },
+                ]}
+              >
+                {option.label}
+              </Text>
             </View>
           ))}
         </RadioGroup.Root>
         {fieldErrors.chapter ? (
-          <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+          <Text
+            aria-live="assertive"
+            style={[
+              styles.error,
+              { color: theme.colors.danger, fontFamily: theme.typography.body },
+            ]}
+          >
             {fieldErrors.chapter}
           </Text>
         ) : null}
@@ -191,7 +204,13 @@ export function Cases() {
         </View>
 
         {formError === null ? null : (
-          <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+          <Text
+            aria-live="assertive"
+            style={[
+              styles.error,
+              { color: theme.colors.danger, fontFamily: theme.typography.body },
+            ]}
+          >
             {formError}
           </Text>
         )}

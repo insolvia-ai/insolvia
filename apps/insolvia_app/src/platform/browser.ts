@@ -48,6 +48,11 @@ export interface StorageLike {
   removeItem(key: string): void;
 }
 
+/** The one keyboard event the app listens for at document level. */
+export interface KeyEventLike {
+  readonly key?: string;
+}
+
 interface BrowserGlobals {
   location?: {
     origin?: string;
@@ -56,6 +61,10 @@ interface BrowserGlobals {
   };
   localStorage?: StorageLike;
   sessionStorage?: StorageLike;
+  document?: {
+    addEventListener?: (type: 'keydown', listener: (event: KeyEventLike) => void) => void;
+    removeEventListener?: (type: 'keydown', listener: (event: KeyEventLike) => void) => void;
+  };
 }
 
 function globals(): BrowserGlobals {
@@ -95,6 +104,34 @@ export function navigateTo(url: string): void {
     return;
   }
   location.href = url;
+}
+
+/**
+ * Runs `handler` on every Escape press anywhere in the document, until the
+ * returned function is called.
+ *
+ * Document-level on purpose. React Native has no document, so the design
+ * system's dropdown closes only on an item press or a second trigger press —
+ * and the package says so. On the web that leaves a keyboard user whose
+ * focus has moved off the trigger with no way to dismiss a menu except
+ * pressing something else, which WCAG 2.1.2 and the APG menu pattern both
+ * say is not good enough: Escape closes a menu from wherever focus is.
+ *
+ * A no-op off the web, returning a no-op unsubscribe, which is the same
+ * "there is no browser here" answer every other read in this file gives.
+ */
+export function onEscapeKey(handler: () => void): () => void {
+  const document = globals().document;
+  if (document?.addEventListener === undefined || document.removeEventListener === undefined) {
+    return () => {};
+  }
+  const listener = (event: KeyEventLike) => {
+    if (event.key === 'Escape') handler();
+  };
+  document.addEventListener('keydown', listener);
+  return () => {
+    document.removeEventListener?.('keydown', listener);
+  };
 }
 
 /**

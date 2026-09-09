@@ -1,18 +1,36 @@
 import { permits } from '@insolvia-ai/api-client';
+import { Sidebar, ThemeProvider, useSidebar } from '@insolvia-ai/design-system';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { Link } from 'expo-router';
+import { Link, usePathname, useRouter } from 'expo-router';
 import type { ExternalPathString } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { AccountMenu } from '@/components/account-menu';
-import { EnvBadge } from '@/components/env-badge';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { Icon } from '@/components/icon';
+import type { IconName } from '@/components/icon';
+import { Tile } from '@/components/tile';
 import { Wordmark } from '@/components/wordmark';
 import { appEnvironment, buildStamp, environmentInfo, marketingUrl } from '@/config/environment';
-import { brandColors } from '@/theme/brand-colors';
-import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
+import { persistentStore, readFrom, writeTo } from '@/platform/browser';
+import {
+  CHROME_THEME,
+  chromeColors,
+  contentMaxWidth,
+  fontSizes,
+  railBreakpoint,
+  spacing,
+  useTheme,
+} from '@/theme';
 
 export interface AppShellProps {
   children: ReactNode;
@@ -27,66 +45,78 @@ export interface AppShellProps {
    * reading screen wants — an account form, a questionnaire, a list.
    *
    * `workspace` hands the child the whole frame: no cap, no centering, no
-   * padding. It is for a screen that carries its own CHROME — today that means
-   * {@link CaseShell}, whose navigation rail has to sit flush against the
-   * header above it and the window edge beside it. Rendered in a `document`
-   * frame the rail became an island floating in the middle of the page, with
-   * the header's rule stopping short of it on both sides, and on a wide display
-   * the whole app looked marooned in a 1180px strip. Padding a workspace is the
-   * child's job, because only the child knows which of its parts is chrome and
-   * which is content.
+   * padding. It is for a screen that carries its own chrome — today
+   * {@link CaseShell}, whose case header and section strip run edge to edge
+   * above content whose measure the screen chooses. Padding a workspace is
+   * the child's job.
    */
   frame?: 'document' | 'workspace';
 }
 
 /**
- * The branded page frame every Insolvia screen sits inside: the wordmark header
- * over a centered, max-width content column on the brand canvas.
+ * The page frame every Insolvia screen sits inside: a dark navigation rail
+ * down the left, and the page beside it — `main` over a footer, in one
+ * scroller.
  *
- * **The landmarks are the point.** `role="banner"`, `role="navigation"`,
- * `role="main"` and `role="contentinfo"` are what react-native-web maps to real
- * `<header>`, `<nav>`, `<main>` and `<footer>` elements, so "skip to main
- * content" and landmark navigation work. Nothing generates them automatically —
- * they exist because this file declares them once, here, for every screen.
+ * **One nav, on the left, that opens and collapses — and it is the APP's.**
+ * It used to be a top header carrying the wordmark, three links and an
+ * avatar, with the case rail as a second dark column underneath it — two
+ * pieces of chrome for one navigation, and a header whose right edge kept
+ * growing controls. The rail holds the app now: the wordmark at the top, the
+ * three primary links, and who is signed in at the bottom. Collapsed, it is a
+ * 64px strip of icons over captions with the same accessible names, and the
+ * choice is remembered (`insolvia.nav`) and defaults to collapsed on a narrow
+ * window.
  *
- * Note there is no `role="region"`: a `<section>` without an accessible name is
- * invalid ARIA and axe flags it. Use a heading, not a landmark, to open a block.
+ * A CASE'S SECTIONS ARE NOT HERE. They were, for a day: a group of seven
+ * under the three links, which collapsed into eleven icons in a strip and
+ * stopped being a nav. They belong to the case, so they sit on the case —
+ * `CaseShell` puts them in a strip under the case's name at the top of the
+ * page, the way a repository's tabs sit on the repository and not in the
+ * site's sidebar. The rail collapses to three either way.
  *
- * The header ends with {@link AccountMenu} — the signed-in user's name, email
- * and the way out, behind one avatar. It lives here, not on each screen, so
- * signing out is reachable from wherever the user happens to be; it renders
- * `null` when there is no session, which is what keeps this frame usable on
- * `/sign-in` and `/auth/callback`. Because of it, every `AppShell` needs a
- * `SessionProvider` above it — which `src/app/_layout.tsx` guarantees.
+ * **The landmarks are the point.** `role="navigation"` (the rail's nav),
+ * `role="main"` and `role="contentinfo"` are what react-native-web maps to
+ * real `<nav>`, `<main>` and `<footer>` elements, so "skip to main content"
+ * and landmark navigation work. Nothing generates them automatically — they
+ * exist because this file declares them once, here, for every screen. There
+ * is no `banner` any more: the wordmark lives in the nav, and a `<header>`
+ * around one word would be a landmark with nothing in it.
+ *
+ * Note there is no `role="region"`: a `<section>` without an accessible name
+ * is invalid ARIA and axe flags it. Use a heading, not a landmark, to open a
+ * block.
+ *
+ * The rail ends with {@link AccountMenu} — the signed-in user's name, email,
+ * environment, appearance and the way out, behind one row. It lives here, not
+ * on each screen, so signing out is reachable from wherever the user happens
+ * to be; it renders `null` when there is no session, which is what keeps this
+ * frame usable on `/sign-in` and `/auth/callback`. Because of it, every
+ * `AppShell` needs a `SessionProvider` above it — which
+ * `src/app/_layout.tsx` guarantees.
  *
  * ## Two things this owns that look like they belong elsewhere
  *
- * **The env badge is rendered here, unconditionally.** It used to arrive
- * through an `actions` prop each screen passed, which meant it vanished on
- * every `StatusScreen` — the loading and error states, which are exactly when
- * "which environment am I on?" is worth answering. It is now the single
- * answer to that question anywhere in the app, which is what let the home
- * screen stop repeating it in prose.
+ * **The environment is named in the footer, unconditionally.** It used to be
+ * a pill in the header, arriving through an `actions` prop each screen
+ * passed, which meant it vanished on every `StatusScreen` — the loading and
+ * error states, which are exactly when "which environment am I on?" is worth
+ * answering. The footer's build stamp is the answer that is on every page,
+ * signed in or not; the account menu states it too.
  *
  * **The account menu's open state.** The design system's dropdown cannot
- * dismiss on an outside press — React Native has no document to listen to, and
- * its native leaf says so. What closes it is a full-screen press target, and
- * that target has to be a sibling of the whole page rather than of the menu:
- * inside the header it would be clipped to the header's own box, because
+ * dismiss on an outside press — React Native has no document to listen to,
+ * and its native leaf says so. What closes it is a full-screen press target,
+ * and that target has to be a sibling of the whole page rather than of the
+ * menu: inside the rail it would be clipped to the rail's own box, because
  * react-native-web gives every View `position: relative`. So the state lives
  * here, and {@link AccountMenu} is controlled.
  */
 /**
- * THE FOOTER IS ALWAYS DARK, in both colour schemes — the same trick
- * `case-shell`'s `railColors` plays, and for the same reason: this is chrome,
- * not page content. It closes the document with a band that reads as the edge
- * of the product rather than as more page, which is how the reference this was
- * measured against (harvey.ai) ends a page.
- *
- * Pinned to the DARK scheme's roles rather than to literals, so a brand change
- * still reaches it — `brand/colors.json` remains the one place these are
- * written down. The text roles have to come from the same scheme or the light
- * theme would put its dark ink on this dark ground.
+ * THE RAIL AND THE FOOTER ARE ALWAYS DARK, in both colour schemes — they are
+ * chrome, not page content, and `@/theme`'s `chromeColors` owns why. The
+ * footer closes the document with a band that reads as the edge of the
+ * product rather than as more page.
  */
 /**
  * THE "I" TILE, served from `public/` rather than imported.
@@ -96,7 +126,7 @@ export interface AppShellProps {
  * into this component would fork a generated artifact, which is exactly what
  * "never hand-edit a mark" forbids, and the drift check could not see the copy.
  *
- * Its ground is the dark chrome colour, which is the SAME colour this footer
+ * Its ground is the dark chrome colour, which is the SAME colour the footer
  * band uses, so the rounded square disappears into the band and what reads is
  * the ivory letterform on black. That is not a happy accident to rely on
  * blindly, but it is stable by construction: both resolve from the dark
@@ -104,14 +134,23 @@ export interface AppShellProps {
  */
 const FOOTER_MARK = '/favicon.svg';
 
-const footerColors = {
-  bg: brandColors.dark.bg,
-  // The links are the bright role and the copyright the muted one — the
-  // reference footer separates them the same way, so the destinations read as
-  // the active thing and the legal line recedes.
-  ink: brandColors.dark.ink,
-  muted: brandColors.dark.muted,
-} as const;
+/** Where the rail remembers whether it was collapsed. */
+const NAV_STORAGE_KEY = 'insolvia.nav';
+
+/**
+ * Whether the rail starts collapsed.
+ *
+ * The user's last choice wins; failing one, a narrow window starts collapsed
+ * because 256px of rail on a 900px window leaves the page too little.
+ * Read synchronously in the state initialiser, like the theme preference, so
+ * the rail does not paint open and then snap shut.
+ */
+function initialCollapsed(width: number): boolean {
+  const stored = readFrom(persistentStore(), NAV_STORAGE_KEY);
+  if (stored === 'collapsed') return true;
+  if (stored === 'expanded') return false;
+  return width < railBreakpoint;
+}
 
 export function AppShell({
   children,
@@ -120,8 +159,12 @@ export function AppShell({
 }: AppShellProps) {
   const theme = useTheme();
   const membership = useMembership();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { width } = useWindowDimensions();
   const env = environmentInfo(appEnvironment);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => initialCollapsed(width));
 
   // A COURTESY, never a control — the same `permits` rule the firm screen
   // documents. The value is MeProvider's session-lifetime read, so a demoted
@@ -131,21 +174,28 @@ export function AppShell({
   const showFirmLink =
     membership != null && permits(membership.permissions.firm_administration, 'view_only');
 
-  const navLink = [
-    styles.navLink,
-    { color: theme.colors.muted, fontFamily: theme.typography.body },
-  ];
   const footerLink = [
     styles.footerLinkText,
-    { color: footerColors.ink, fontFamily: theme.typography.body },
+    { color: chromeColors.ink, fontFamily: theme.typography.body },
+  ];
+
+  const primary: ReadonlyArray<{
+    label: string;
+    icon: IconName;
+    href: '/' | '/cases' | '/firm';
+    show: boolean;
+  }> = [
+    { label: 'Home', icon: 'home', href: '/', show: true },
+    { label: 'Cases', icon: 'folder', href: '/cases', show: true },
+    { label: 'Firm', icon: 'briefcase', href: '/firm', show: showFirmLink },
   ];
 
   return (
     <View style={[styles.page, { backgroundColor: theme.colors.bg }]}>
-      {/* Below the header in the tree but above `main` in paint order, so a
-          press anywhere on the page closes the menu. Hidden from assistive
-          tech: it is a mouse affordance, and the menu already closes on Escape
-          through the trigger. */}
+      {/* Above `main` in paint order, so a press anywhere on the page closes
+          the menu. Hidden from assistive tech: it is a mouse affordance;
+          Escape is the menu's own, at document level, with focus handed back
+          to the trigger. */}
       {menuOpen ? (
         <Pressable
           accessibilityElementsHidden
@@ -163,46 +213,84 @@ export function AppShell({
         />
       ) : null}
 
-      <View role="banner" style={[styles.header, { borderBottomColor: theme.colors.line }]}>
-        <Wordmark />
-        <View role="navigation" aria-label="Primary" style={styles.nav}>
-          <Link href="/" style={navLink}>
-            Home
-          </Link>
-          {/* Cases belongs in the primary nav because a case is what this
-              product is about. It was reachable only through two buttons on
-              the home screen, which put the app's central object one hop
-              further away than the firm's settings. */}
-          <Link href="/cases" style={navLink}>
-            Cases
-          </Link>
-          {showFirmLink ? (
-            <Link href="/firm" style={navLink}>
-              Firm
-            </Link>
-          ) : null}
-        </View>
-        <EnvBadge env={env.name} />
-        <ThemeToggle />
-        <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
-      </View>
+      {/* THE RAIL IS CHROME, dark in both schemes — as dark as the footer,
+          which set the colour. The package's leaves in it run under the
+          pinned chrome theme, and everything the app draws on it takes
+          `chromeColors`. The one exception is the account row's avatar and
+          menu, which follow the scheme, and say why. */}
+      <ThemeProvider theme={CHROME_THEME}>
+        <Sidebar.Root
+          collapsed={collapsed}
+          onCollapsedChange={(next) => {
+            setCollapsed(next);
+            writeTo(persistentStore(), NAV_STORAGE_KEY, next ? 'collapsed' : 'expanded');
+          }}
+          style={[
+            styles.rail,
+            { backgroundColor: chromeColors.bg, borderRightColor: chromeColors.line },
+          ]}
+        >
+          {/* Expanded, the wordmark leads and the toggle sits at the far edge
+              of the same row — a panel glyph, the shape of the thing it
+              moves. Collapsed, the head is the mark alone — the "I" in the
+              wordmark's serif on an ivory tile, the favicon inverted for the
+              dark ground — centred in the strip, with the toggle under it. */}
+          {collapsed ? (
+            <View style={styles.headCollapsed}>
+              {/* Named, because collapsed this IS the wordmark: the same name
+                  the expanded head announces, on the tile that stands in. */}
+              <View accessible aria-label="Insolvia" role="img">
+                <Tile size={32}>I</Tile>
+              </View>
+              <RailToggle />
+            </View>
+          ) : (
+            <Sidebar.Head>
+              <Wordmark onChrome />
+              <View style={styles.headToggle}>
+                <RailToggle />
+              </View>
+            </Sidebar.Head>
+          )}
 
-      {/* ONE SCROLLER FOR THE PAGE, holding `main` and the footer as SIBLINGS.
-          It used to sit inside `main`, which made the footer a flex child of
-          the page and therefore pinned to the bottom of the viewport on every
-          screen — visible at all times, which is not what a footer is for.
-          Moving the scroll up one level lets the footer flow after the content
-          and leave the viewport on a long page.
+          {/* NAMED, and named something other than the package's default:
+              `Sidebar.Nav` emits `role="navigation"`, a landmark, and a screen
+              reader lists landmarks by name. */}
+          <Sidebar.Nav label="Primary">
+            {primary.map((entry) =>
+              entry.show ? (
+                <RailItem
+                  key={entry.href}
+                  label={entry.label}
+                  icon={entry.icon}
+                  active={pathname === entry.href}
+                  collapsed={collapsed}
+                  onPress={() => {
+                    router.push(entry.href);
+                  }}
+                />
+              ) : null,
+            )}
+          </Sidebar.Nav>
 
-          The footer could not simply move INSIDE the old ScrollView: a
-          `contentinfo` landmark nested inside `main` is invalid ARIA, and the
-          landmarks are this component's whole reason for existing (see above).
-          As siblings here, both stay top-level landmarks.
+          {/* The package's footer pads its own edge and a row inside pads
+              again; dropping the footer's pad lands the account row on the
+              rail's one left edge, with every item above it. */}
+          <Sidebar.Footer style={styles.railFooter}>
+            <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} collapsed={collapsed} />
+          </Sidebar.Footer>
+        </Sidebar.Root>
+      </ThemeProvider>
 
-          The header stays outside the scroller deliberately. It carries the
-          primary nav and the way out, which should not require scrolling back
-          up; nobody has ever needed the build stamp that way. */}
-      <ScrollView contentContainerStyle={styles.scroller}>
+      {/* ONE SCROLLER FOR THE PAGE, holding `main` and the footer as SIBLINGS,
+          beside the rail rather than under a header. The footer flows after
+          the content and leaves the viewport on a long page, which is what a
+          footer is for; the rail stays put, because it carries the way out.
+
+          A `contentinfo` landmark nested inside `main` is invalid ARIA, and
+          the landmarks are this component's whole reason for existing — so
+          the two are siblings here, both top-level. */}
+      <ScrollView style={styles.scrollerFrame} contentContainerStyle={styles.scroller}>
         <View
           role="main"
           style={
@@ -217,9 +305,12 @@ export function AppShell({
         <View role="contentinfo" style={styles.footer}>
           {/* Decorative: the build stamp below already names Insolvia in text,
               so announcing the mark too would read the identity twice. */}
-          {/* The mark on the left, the links stacked on the right — the shape
-              the reference footer (harvey.ai) uses, where a column of links
-              sits away from the identity rather than beside it. */}
+          {/* ONE ROW, LEFT-ALIGNED: the mark, then the links beside it, then
+              the stamp underneath on the same left edge. The links used to be
+              a column pushed to the far right of a 2000px band, opposite the
+              mark — two things that belong together, a page-width apart, with
+              nothing between them to explain the distance. Two links are not
+              a column; they sit where the eye already is. */}
           <View style={styles.footerTop}>
             <Image alt="" source={{ uri: FOOTER_MARK }} style={styles.footerMark} />
 
@@ -255,7 +346,7 @@ export function AppShell({
           <Text
             style={[
               styles.footerText,
-              { color: footerColors.muted, fontFamily: theme.typography.body },
+              { color: chromeColors.muted, fontFamily: theme.typography.body },
             ]}
           >
             © 2026 Insolvia · {env.label} · {env.host} · {buildStamp}
@@ -266,6 +357,106 @@ export function AppShell({
   );
 }
 
+/**
+ * The rail's collapse control: a panel glyph — a small outlined rectangle
+ * with its left third marked off, the shape of the rail it moves — drawn
+ * with Views rather than a character, because no font's glyph for it lines
+ * up with the Open Sans beside it and the app ships no icon set.
+ *
+ * The app's own rather than the package's `Sidebar.Toggle` for the glyph
+ * alone; the state, the toggle and the nav id it points `aria-controls` at
+ * are the package's, through `useSidebar()`. The accessible name says what
+ * pressing does, as the package's does.
+ */
+function RailToggle() {
+  const { collapsed, toggle, navId } = useSidebar();
+  const theme = useTheme();
+  const webAria = { 'aria-controls': navId } as object;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+      accessibilityState={{ expanded: !collapsed }}
+      aria-expanded={!collapsed}
+      {...webAria}
+      onPress={toggle}
+      style={({ pressed }) => [
+        styles.toggle,
+        { borderRadius: theme.radii.sm },
+        pressed ? { backgroundColor: chromeColors.surfaceAlt } : null,
+      ]}
+    >
+      <View aria-hidden style={[styles.toggleGlyph, { borderColor: chromeColors.muted }]}>
+        <View style={[styles.toggleGlyphPane, { borderRightColor: chromeColors.muted }]} />
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * One row of the rail: a line icon and its label.
+ *
+ * The app's own rather than the package's `Sidebar.Item`, for one reason:
+ * collapsed, the package shows the icon alone, and the reference this rail is
+ * measured against keeps a small caption under every icon — which is what
+ * lets a 64px strip stay legible without hovering. Everything else the
+ * package's item does is done the same way here: `accessibilityRole="link"`
+ * with the full label as the accessible name in both states (so a collapsed
+ * rail is never a column of unnamed links), `aria-current` on the current
+ * page, and the 44dp target-size floor.
+ */
+function RailItem({
+  label,
+  icon,
+  active,
+  collapsed,
+  onPress,
+}: {
+  label: string;
+  icon: IconName;
+  active: boolean;
+  collapsed: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  // `aria-current` is web-only and outside RN's types; omitted rather than set
+  // to undefined when this is not the current page.
+  const webAria = (active ? { 'aria-current': 'page' } : {}) as object;
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      {...webAria}
+      onPress={onPress}
+      style={({ pressed }) => [
+        collapsed ? styles.itemCollapsed : styles.item,
+        { borderRadius: theme.radii.md },
+        active || pressed ? { backgroundColor: chromeColors.surfaceAlt } : null,
+      ]}
+    >
+      <Icon
+        name={icon}
+        size={collapsed ? 20 : 16}
+        color={active ? chromeColors.ink : chromeColors.muted}
+      />
+      <Text
+        // Two lines collapsed: the strip is 64px and "Extraction review" is
+        // not, and a caption cut to "Extractio…" names nothing.
+        numberOfLines={collapsed ? 2 : 1}
+        style={[
+          collapsed ? styles.itemCaption : styles.itemLabel,
+          {
+            color: active ? chromeColors.ink : chromeColors.muted,
+            fontFamily: theme.typography.body,
+          },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   dismissLayer: {
     bottom: 0,
@@ -273,14 +464,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    // Under the header (which the open menu hangs from) and over everything
-    // else. react-native-web makes every View a stacking context, so siblings
+    // Over the page and under the rail (which the open menu hangs from).
+    // react-native-web makes every View a stacking context, so siblings
     // otherwise paint in document order and `main` would cover this.
     zIndex: 5,
   },
   footer: {
-    backgroundColor: footerColors.bg,
-    gap: spacing.xl,
+    backgroundColor: chromeColors.bg,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     // Asymmetric on purpose. The rule that used to divide this from the page
     // was doing the work of separation while the footer was pinned; now that it
@@ -291,46 +482,65 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
   },
   footerTop: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
-    // Pushes the link stack to the far edge, which is what puts it opposite
-    // the mark rather than next to it.
-    justifyContent: 'space-between',
+    gap: spacing.lg,
   },
   footerLinks: {
-    // STACKED, and LEFT-aligned inside the stack: the reference sets its link
-    // columns flush-left within each column and pushes the whole block right,
-    // rather than right-aligning the text itself. `gap` lands the rows on its
-    // ~34px pitch once the line box is taken off.
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.lg,
   },
   footerMark: {
-    // Larger than a favicon's natural reading: in the reference the mark is the
-    // counterweight to the link block, not a bullet beside it.
-    height: 44,
-    width: 44,
+    height: 32,
+    width: 32,
   },
   footerText: {
     fontSize: fontSizes.caption,
   },
   footerLinkText: {
     fontSize: fontSizes.label,
+    // A link is a target: the label rides in a 44dp line box, WCAG 2.5.5's
+    // floor, without the row growing a visible button around it.
+    lineHeight: 44,
   },
-  header: {
+  headCollapsed: {
     alignItems: 'center',
-    borderBottomWidth: 1,
+    gap: spacing.xs,
+    paddingHorizontal: 0,
+  },
+  headToggle: {
+    marginLeft: 'auto',
+  },
+  item: {
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
-    // Was `padding: spacing.lg` on all four sides, which with a 48dp button in
-    // it made a ~96px header. The account controls are one 44dp avatar now, so
-    // the vertical padding can come right down.
-    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+    marginHorizontal: spacing.sm,
+    // 44dp, the WCAG 2.5.5 target-size floor.
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+  },
+  itemCaption: {
+    fontSize: 11,
+    lineHeight: 14,
+    maxWidth: 60,
+    textAlign: 'center',
+  },
+  itemCollapsed: {
+    alignItems: 'center',
+    // Icon over caption with air between rows: the reference this is measured
+    // against gives each collapsed entry about a 56px pitch, which is what
+    // stops a column of tile-and-word pairs reading as one run of text.
+    gap: spacing.xs,
+    marginHorizontal: spacing.xs,
+    minHeight: 44,
     paddingVertical: spacing.sm,
-    // Above the dismiss layer, so the open menu is pressable and the layer
-    // covers only what is behind it.
-    zIndex: 10,
+  },
+  itemLabel: {
+    flexShrink: 1,
+    fontSize: fontSizes.label,
+    lineHeight: fontSizes.label * 1.5,
   },
   mainContent: {
     // `flexGrow` so a SHORT page still pushes the footer to the bottom of the
@@ -343,27 +553,52 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     width: '100%',
   },
+  page: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  rail: {
+    // Above the dismiss layer, so the open menu is pressable and the layer
+    // covers only the page.
+    zIndex: 10,
+  },
+  railFooter: {
+    gap: spacing.xs,
+    paddingHorizontal: 0,
+  },
   scroller: {
     // The page-level scroll container. `flexGrow` rather than a height so its
     // children can share the viewport when the content is short.
     flexGrow: 1,
   },
-  workspaceContent: {
-    // No padding, no cap, no centering — the child is chrome and owns all
-    // three. `flexGrow` rather than `height: '100%'` so a rail can stretch to
-    // the viewport on a short page AND the whole thing still scrolls on a long
-    // one.
-    flexGrow: 1,
-  },
-  nav: {
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: spacing.md,
-  },
-  navLink: {
-    fontSize: fontSizes.label,
-  },
-  page: {
+  scrollerFrame: {
     flex: 1,
+    // Without this a long unbroken cell — a filename, an email — makes the
+    // flex child refuse to shrink and pushes the rail off screen.
+    minWidth: 0,
+  },
+  toggle: {
+    alignItems: 'center',
+    // 32 like the package's own toggle: the head row is 32 high, and the
+    // glyph is the target's centre rather than its extent.
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  toggleGlyph: {
+    borderRadius: 3,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    height: 12,
+    width: 16,
+  },
+  toggleGlyphPane: {
+    borderRightWidth: 1.5,
+    width: 5,
+  },
+  workspaceContent: {
+    // No padding, no cap, no centering — the child owns all three. `flexGrow`
+    // rather than `height: '100%'` so the page still scrolls on a long one.
+    flexGrow: 1,
   },
 });

@@ -42,6 +42,13 @@ function defaultSize(level: HeadingLevel): HeadingSize {
  * A heading. `role="heading"` + `aria-level` is what react-native-web maps to a
  * real `<h1>`–`<h6>` element (`propsToAccessibilityComponent.js`), so the
  * document outline a screen reader and Lighthouse see is the one written here.
+ *
+ * SET IN THE SAME FACE AS THE TEXT AROUND IT. `typography.heading` is Open
+ * Sans, like `body`, and that is the brand's decision rather than an accident
+ * of the generator (brand/fonts.json says why). What makes this a heading is
+ * therefore weight, size and the space around it — not a change of family —
+ * which is how every platform's own UI type builds hierarchy, and what stops
+ * a card title reading as a decoration.
  */
 export function Heading({ level, size, children, style }: HeadingProps) {
   const theme = useTheme();
@@ -75,39 +82,38 @@ export function Heading({ level, size, children, style }: HeadingProps) {
 // do, and those are applied above.
 const styles = StyleSheet.create({
   base: {
-    fontWeight: '700',
+    // 600, not 700. Semibold is the heaviest weight the app loads
+    // (public/index.html), and at UI sizes it is the right one: bold over a
+    // 400 body adds bulk without adding hierarchy, and a 600 title beside a
+    // 600 button label reads as one system. Every emphasised label in the app
+    // uses the same value, so a heading is distinguished by size and space.
+    fontWeight: '600',
   },
-  // TRACKING BELONGS TO THE SIZE, NOT TO THE COMPONENT. Cormorant is drawn for
-  // large sizes (brand/fonts.json), so it arrives already tight; the amount of
-  // correction that flatters it at 34px closes the letters up at 16px, where it
-  // is being used far below its optical size. A single value in `base` applied
-  // display-scale tightening to every heading — worst on `body`, where a case
-  // name like "Probemtpvbjkj" ran its letters together.
+  // TRACKING BELONGS TO THE SIZE, NOT TO THE COMPONENT. Type is tightened as it
+  // grows and left alone as it shrinks: at display size the letters of a sans
+  // drift apart and want pulling in (about -0.01em), at body size Open Sans's
+  // own spacing is already right for reading, and a single value for all
+  // sizes is wrong at one end or the other.
   //
-  // LEADING RUNS THE OTHER WAY from the size, for the same reason. Without a
-  // `lineHeight` react-native-web falls back to `line-height: normal`, which
-  // for Cormorant is about 1.21 of the size at EVERY size — so a two-line
-  // display heading at 34px carried eight pixels of air between its lines
-  // that a 24px section heading did not need and body copy (at 1.5) had far
-  // more of. Large text wants its lines close: the eye reads the block as one
-  // shape, and the tall ascenders already keep the lines apart. Body-size
-  // headings take body copy's 1.5, so a heading beside a paragraph shares its
-  // rhythm instead of sitting a few pixels short of the line next to it.
+  // LEADING RUNS THE OTHER WAY. Without a `lineHeight` react-native-web falls
+  // back to `line-height: normal`, about 1.36 of the size for Open Sans at
+  // every size. Large text wants its lines close — the eye reads a two-line
+  // title as one shape — and small text wants them open. Body-size headings
+  // take body copy's 1.5, so a card title shares the rhythm of the rows under
+  // it instead of sitting a few pixels short of them.
   display: {
     fontSize: fontSizes.display,
-    letterSpacing: -0.5,
-    lineHeight: 38,
+    letterSpacing: -0.3,
+    lineHeight: 34,
   },
   section: {
     fontSize: fontSizes.section,
-    letterSpacing: -0.2,
+    letterSpacing: -0.15,
     lineHeight: 28,
   },
   body: {
     fontSize: fontSizes.body,
-    // POSITIVE, and not a typo: below about 20px this face needs opening up
-    // rather than tightening.
-    letterSpacing: 0.2,
+    letterSpacing: 0,
     lineHeight: fontSizes.body * 1.5,
   },
 });

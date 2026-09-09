@@ -319,7 +319,14 @@ export function Documents({ caseId }: { readonly caseId: string }) {
           >
             Choose a file
           </Button>
-          <Text style={[styles.body, picked === null ? muted : { color: theme.colors.ink }]}>
+          <Text
+            style={[
+              styles.body,
+              picked === null
+                ? muted
+                : { color: theme.colors.ink, fontFamily: theme.typography.body },
+            ]}
+          >
             {picked === null
               ? 'No file chosen yet.'
               : `${picked.name} · ${formatSize(picked.size)}`}
@@ -473,7 +480,11 @@ function DocumentRow({
 
   return (
     <View role="listitem" style={styles.listItem}>
-      <Text style={[styles.fileName, { color: theme.colors.ink }]}>{entry.fileName}</Text>
+      <Text
+        style={[styles.fileName, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
+      >
+        {entry.fileName}
+      </Text>
       {/*
         Never `storageRef` — the API does not send it, and the object layout is
         not a thing a client may come to depend on. `byteSize` means different
@@ -486,7 +497,9 @@ function DocumentRow({
       </Text>
 
       {pending ? (
-        <Text style={[styles.meta, { color: theme.colors.danger }]}>
+        <Text
+          style={[styles.meta, { color: theme.colors.danger, fontFamily: theme.typography.body }]}
+        >
           Upload didn’t finish. None of this file’s contents reached us, so there is nothing to
           open. Insolvia deletes an unfinished upload 24 hours after it starts — choose the file
           above and upload it again to keep it.

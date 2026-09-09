@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { act, screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -8,10 +8,10 @@ import {
   principalResponse,
   routeFetch,
   TEST_AUTH_CONFIG,
-  TEST_EMAIL,
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
+import { brandColors } from '@/theme/brand-colors';
 
 let mockAuthConfig: AuthConfig | null = null;
 
@@ -61,6 +61,9 @@ describe('the account menu', () => {
     return screen.findByRole('button', { name: 'Account menu' });
   }
 
+  /** Whether the PANEL is open — the trigger row names the person either way. */
+  const panelOpen = () => screen.queryByRole('menuitem', { name: 'Your account' }) !== null;
+
   it('reports its expanded state, which is the whole of its a11y contract', async () => {
     // The trigger is ours rather than `Dropdown.Trigger` — that part wraps its
     // children in a `Text` and so cannot hold an Avatar — so the aria wiring
@@ -88,10 +91,10 @@ describe('the account menu', () => {
     await ready();
 
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(panelOpen()).toBe(true);
 
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
   });
 
   it('closes when the page behind it is pressed', async () => {
@@ -103,7 +106,7 @@ describe('the account menu', () => {
     const user = userEvent.setup();
     await ready();
     await user.press(screen.getByRole('button', { name: 'Account menu' }));
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(panelOpen()).toBe(true);
 
     // By test id, because the layer is deliberately absent from the
     // accessibility tree and so has no role or name to be found by. AppShell's
@@ -114,7 +117,33 @@ describe('the account menu', () => {
     // affordance, invisible to assistive tech on purpose.
     await user.press(screen.getByTestId('account-menu-dismiss', { includeHiddenElements: true }));
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
+  });
+
+  it('closes on Escape from wherever focus is', async () => {
+    // Nothing did this before: the package's native leaf has no document to
+    // listen to, and a comment in the shell claimed the trigger handled it. A
+    // keyboard user who had tabbed into the menu and changed their mind was
+    // stuck pressing something. The listener is document-level, which is what
+    // `pressKey` drives — `userEvent` types into a focused element, and the
+    // whole point is that focus may be anywhere.
+    signedIn();
+    const user = userEvent.setup();
+    await ready();
+
+    await user.press(screen.getByRole('button', { name: 'Account menu' }));
+    expect(panelOpen()).toBe(true);
+
+    // A document event lands outside React's scheduler, so the state change
+    // it causes is wrapped the way `userEvent` wraps its own.
+    act(() => {
+      browser.pressKey('Escape');
+    });
+
+    expect(panelOpen()).toBe(false);
+    expect(
+      screen.getByRole('button', { name: 'Account menu' }).props.accessibilityState?.expanded,
+    ).toBe(false);
   });
 
   it('closes when the route changes', async () => {
@@ -127,15 +156,115 @@ describe('the account menu', () => {
 
     await user.press(screen.getByRole('menuitem', { name: 'Your account' }));
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(panelOpen()).toBe(false);
   });
 
-  it('falls back to the email for initials when there is no name yet', async () => {
+  it('names the environment, spelled out, inside the identity block', async () => {
+    // The header pill that said "LOCAL" is gone; this is where the answer to
+    // "which deployment am I signed in to" lives now, in the same words a
+    // screen reader gets. Tests run without EXPO_PUBLIC_INSOLVIA_ENV, so this
+    // is the `local` arm — the same one an unconfigured build takes.
+    signedIn();
+    const user = userEvent.setup();
+    await ready();
+
+    await user.press(screen.getByRole('button', { name: 'Account menu' }));
+
+    expect(screen.getByText('Local environment · localhost')).toBeTruthy();
+  });
+
+  /**
+   * The colour-scheme preference, which used to be a cycling button in the
+   * header and is three menu items now.
+   *
+   * THE ONE THING WORTH PINNING HARDEST is that the choice reaches the DESIGN
+   * SYSTEM, not just this app's own components. Its `.native` leaves — which
+   * this app renders on every platform — call React Native's `useColorScheme()`
+   * themselves, and react-native-web implements that as a `prefers-color-scheme`
+   * media query with no setter. So the only way to move them is a
+   * `ThemeProvider` whose `light` and `dark` slots both hold the chosen palette,
+   * and a test that only checked app-owned chrome would pass with that seam
+   * removed. The `Button` below is a design-system component; its rendered
+   * colour is the assertion.
+   */
+  describe('appearance', () => {
+    async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+      await ready();
+      await user.press(screen.getByRole('button', { name: 'Account menu' }));
+    }
+
+    it('offers three choices and marks the device setting as current, in the name', async () => {
+      // THREE, not two: "follow device" is what a phone that goes dark in the
+      // evening needs. The tick is part of the accessible name, because
+      // `Dropdown.Item` exposes no checked state — the name is the only
+      // channel a screen reader has for "this is the one you are on".
+      signedIn();
+      const user = userEvent.setup();
+      await openMenu(user);
+
+      expect(screen.getByRole('menuitem', { name: 'Follow device ✓' })).toBeTruthy();
+      expect(screen.getByRole('menuitem', { name: 'Light' })).toBeTruthy();
+      expect(screen.getByRole('menuitem', { name: 'Dark' })).toBeTruthy();
+    });
+
+    it('moves the DESIGN SYSTEM’s components, not only our own', async () => {
+      // Remove the `ThemeProvider` from `ThemePreferenceProvider` and this is
+      // the test that fails while everything else still passes. It asserts the
+      // BRAND value, not the tokens default: from tokens 0.5.0 the package's
+      // base theme is deliberately unbranded, so a `ThemeProvider` that passed
+      // nothing would render the package's monochrome primary here.
+      signedIn();
+      const user = userEvent.setup();
+
+      const cta = await screen.findByRole('button', { name: 'Start a case' });
+      expect(flattenedBackground(cta)).toBe(brandColors.light.primary);
+
+      await openMenu(user);
+      await user.press(screen.getByRole('menuitem', { name: 'Dark' }));
+
+      expect(flattenedBackground(screen.getByRole('button', { name: 'Start a case' }))).toBe(
+        brandColors.dark.primary,
+      );
+      // Choosing closes the menu, like every other item; reopening shows the
+      // tick moved.
+      await openMenu(user);
+      expect(screen.getByRole('menuitem', { name: 'Dark ✓' })).toBeTruthy();
+    });
+
+    it('remembers the choice across a reload', async () => {
+      // It is stored in `localStorage` and read synchronously in the state
+      // initialiser rather than in an effect — an effect would paint one frame
+      // in the device's scheme before correcting itself, which is the flash
+      // the preference exists to avoid.
+      signedIn();
+      const user = userEvent.setup();
+      await openMenu(user);
+      await user.press(screen.getByRole('menuitem', { name: 'Light' }));
+
+      screen.unmount();
+      signedIn();
+      await openMenu(user);
+
+      expect(screen.getByRole('menuitem', { name: 'Light ✓' })).toBeTruthy();
+    });
+  });
+
+  it('falls back to the email for the initial when there is no name yet', async () => {
     // `principalResponse()` carries no firm, so there is no display name — the
     // state a member sits in before `RequireProfile` has their name. An empty
-    // circle would be worse than two letters from the address.
+    // tile would be worse than the address's first letter.
     signedIn();
 
-    expect(await screen.findByText('AT')).toBeTruthy();
+    expect(await screen.findByText('A')).toBeTruthy();
   });
 });
+
+/** The `backgroundColor` a component resolved to, through RN's style array. */
+function flattenedBackground(node: { props: { style?: unknown } }): string | undefined {
+  const flatten = (style: unknown): Record<string, unknown> => {
+    if (Array.isArray(style))
+      return Object.assign({}, ...style.map(flatten)) as Record<string, unknown>;
+    return (style ?? {}) as Record<string, unknown>;
+  };
+  return flatten(node.props.style).backgroundColor as string | undefined;
+}

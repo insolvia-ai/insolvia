@@ -1,18 +1,17 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
-import { Badge, Sidebar, ThemeProvider } from '@insolvia-ai/design-system';
+import { Badge } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { StatusScreen } from '@/components/status-screen';
-import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
-import { brandColors, brandFonts, brandRadii } from '@/theme/brand-colors';
+import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
 /**
  * The one count the rail shows beside a section's name.
@@ -93,48 +92,6 @@ const SECTIONS: readonly Section[] = [
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
 ];
-
-/**
- * The rail's own colours, taken from the DARK scheme whatever the app's scheme
- * is.
- *
- * The rail is chrome and stays dark in both — near-black beside an ivory
- * workspace in light mode, a step above the ground in dark. Reading these from
- * `theme.colors` instead would paint near-black text on near-black the moment
- * somebody switched to light.
- *
- * They come from `brandColors.dark` rather than being spelled out, so the one
- * file that owns the palette still owns this.
- */
-const railColors = {
-  bg: brandColors.dark.card,
-  line: brandColors.dark.line,
-  ink: brandColors.dark.ink,
-  muted: brandColors.dark.muted,
-  active: brandColors.dark.surfaceAlt,
-} as const;
-
-/**
- * The theme the rail's own package components run under.
- *
- * BOTH slots hold the dark palette, which is the same trick
- * `ThemePreferenceProvider` uses for an explicit scheme: the package's leaves
- * consult the OS themselves and cannot be redirected, so the way to pin them is
- * to make both answers the same one. Without it a `Sidebar.Item` in light mode
- * takes near-black ink from the active scheme and paints it on the near-black
- * rail.
- *
- * Nesting is supported and the nearest provider wins outright — the package
- * says so explicitly — so this pins the rail without touching the rest of the
- * app. Frozen and hoisted so it is one stable object for the module's life,
- * which is what keeps the leaves' `React.memo` boundaries intact.
- */
-const RAIL_THEME = Object.freeze({
-  light: brandColors.dark,
-  dark: brandColors.dark,
-  fonts: brandFonts,
-  radii: brandRadii,
-});
 
 const STATUS_LABEL: Record<Case['status'], string> = {
   intake: 'In intake',
@@ -233,7 +190,6 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   const pathname = usePathname();
   const membership = useMembership();
   const { call } = useApi();
-  const { width } = useWindowDimensions();
 
   const [matter, setMatter] = useState<Case | null>(null);
   const [debtors, setDebtors] = useState<readonly Debtor[]>([]);
@@ -306,126 +262,191 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
   // type error rather than the `undefined` the runtime would hand back.
   const base = `/cases/${caseId}`;
   const current = pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : '';
-  const stacked = width < railBreakpoint;
   const title = caseTitle(matter, debtors);
   // `caseTitle` falls back to "Chapter 7 · NDCA" when intake has not named a
-  // debtor yet, which is exactly what the line below says — so on a fresh case
-  // the rail printed it twice, one above the other. Only worth showing when
-  // the title is a person.
-  const titleIsDebtors = title !== chapterAndDistrict(matter);
+  // debtor yet, which is exactly what the subtitle would say — so on a fresh
+  // case the header printed it twice. Only worth showing when the title is a
+  // person.
+  const subtitle = title === chapterAndDistrict(matter) ? null : chapterAndDistrict(matter);
 
   return (
     <CaseContext.Provider value={{ caseId, matter, debtors, counts, mayReview, reload: load }}>
       <AppShell frame="workspace">
-        <View style={[styles.workspace, stacked ? styles.workspaceStacked : null]}>
-          {/*
-            THE RAIL IS DARK ON EVERY SCHEME, and that is the composition rather
-            than an oversight. In light mode it is near-black against an ivory
-            workspace, which is what gives a case a permanent identity and what
-            keeps the chrome from dissolving into the page now that no colour is
-            doing that job. In dark mode it is a step ABOVE the ground for the
-            same reason — the rail must read as chrome either way.
-
-            It is the one place in the app that paints a colour the scheme did
-            not choose, so it takes its ink and its muted text from the DARK
-            scheme explicitly rather than from `theme.colors`, which would hand
-            it near-black text on near-black in light mode.
-          */}
-          <View
-            style={[
-              stacked ? styles.railStacked : styles.rail,
-              { backgroundColor: railColors.bg, borderRightColor: railColors.line },
-            ]}
-          >
-            <ThemeProvider theme={RAIL_THEME}>
-              <Sidebar.Root>
-                <Sidebar.Head>
-                  <Text
-                    numberOfLines={2}
-                    style={[styles.railTitle, { fontFamily: theme.typography.heading }]}
-                  >
-                    {title}
-                  </Text>
-                </Sidebar.Head>
-
-                <View style={styles.identity}>
-                  {titleIsDebtors ? (
-                    <Text
-                      style={[
-                        styles.identityLine,
-                        { color: theme.colors.muted, fontFamily: theme.typography.body },
-                      ]}
-                    >
-                      {chapterAndDistrict(matter)}
-                    </Text>
-                  ) : null}
-                  <View style={styles.status}>
-                    <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                      {STATUS_LABEL[matter.status]}
-                    </Badge>
-                  </View>
-                </View>
-
-                <Sidebar.Separator />
-
-                {/* NAMED, and named something other than "Primary". `Sidebar.Nav`
-                emits `role="navigation"`, which is a landmark, and so does
-                `AppShell`'s header nav. Two landmarks of a kind on one page
-                have to be told apart by name — axe flags the pair when both
-                take the default, and a screen reader offers "navigation,
-                navigation". This is also why "All cases" sits in the footer
-                below rather than in a second nav of its own. */}
-                <Sidebar.Nav label="Case sections">
-                  {visible.map((section) => {
-                    const badge = section.count === undefined ? null : counts[section.count];
-                    return (
-                      <Sidebar.Item
-                        key={section.segment}
-                        // The count rides in the LABEL rather than as a node
-                        // beside it: `Sidebar.Item` pins its accessible name to
-                        // `label`, so a separately-rendered badge would be
-                        // invisible to a screen reader — "Extraction review"
-                        // whether twelve records were waiting or none.
-                        label={
-                          badge === null || badge === 0
-                            ? section.label
-                            : `${section.label} (${badge})`
-                        }
-                        active={section.segment === current}
-                        onPress={() => {
-                          router.push(
-                            section.segment === ''
-                              ? `/cases/${caseId}`
-                              : `/cases/${caseId}/${section.segment}`,
-                          );
-                        }}
-                      />
-                    );
-                  })}
-                </Sidebar.Nav>
-
-                <Sidebar.Separator />
-
-                <Sidebar.Footer>
-                  <Sidebar.Item
-                    label="All cases"
-                    onPress={() => {
-                      router.push('/cases');
-                    }}
-                  />
-                </Sidebar.Footer>
-              </Sidebar.Root>
-            </ThemeProvider>
+        {/* THE CASE HEADER: who this is, and its sections as a strip. Chrome
+            of the page rather than of the app — the rail holds the app's three
+            links and collapses to three icons; a case's seven sections lived
+            there for a day and collapsed into a column nobody could read. A
+            repository's tabs sit on the repository, not in the site's
+            sidebar, and this is the same shape: context line, then the strip,
+            then whichever section is open. */}
+        <View
+          style={[
+            styles.head,
+            { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.line },
+          ]}
+        >
+          <View style={styles.context}>
+            {/* A `link` and not a `Sidebar.Item` now that it has left the rail;
+                the same role, so the tests and the flows that press "All
+                cases" by name still find it. */}
+            <Pressable
+              accessibilityRole="link"
+              aria-label="All cases"
+              onPress={() => {
+                router.push('/cases');
+              }}
+              style={styles.back}
+            >
+              <Text
+                style={[
+                  styles.backText,
+                  { color: theme.colors.muted, fontFamily: theme.typography.body },
+                ]}
+              >
+                ← All cases
+              </Text>
+            </Pressable>
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
+            >
+              {title}
+            </Text>
+            {subtitle === null ? null : (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.subtitle,
+                  { color: theme.colors.muted, fontFamily: theme.typography.body },
+                ]}
+              >
+                {subtitle}
+              </Text>
+            )}
+            {/* The package's Badge pins itself to the top of a row
+                (`alignSelf: 'flex-start'`, so it hugs its content); a box of
+                its own height is what lets the row centre it. */}
+            <View style={styles.status}>
+              <Badge intent={STATUS_INTENT[matter.status]} size="sm">
+                {STATUS_LABEL[matter.status]}
+              </Badge>
+            </View>
           </View>
 
-          <View style={styles.content}>{children}</View>
+          {/* NAMED, and named something other than the rail's: both are
+              `role="navigation"`, a landmark, and a screen reader offers
+              landmarks by name — "navigation, navigation" is the failure
+              this avoids. Links, not tabs: these change the route, and the
+              end-to-end flows press "Intake" as a link. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sections}
+            role="navigation"
+            aria-label="Case sections"
+          >
+            {visible.map((section) => {
+              // The count rides in the LABEL rather than as a node beside it:
+              // the link's accessible name is its text, so a separately
+              // rendered badge would be invisible to a screen reader —
+              // "Extraction review" whether twelve records were waiting or
+              // none.
+              const badge = section.count === undefined ? null : counts[section.count];
+              const label =
+                badge === null || badge === 0 ? section.label : `${section.label} (${badge})`;
+              const active = section.segment === current;
+              // `aria-current` is web-only and outside RN's types; omitted
+              // rather than set to undefined when this is not the page.
+              const webAria = (active ? { 'aria-current': 'page' } : {}) as object;
+              return (
+                <Pressable
+                  key={section.segment}
+                  accessibilityRole="link"
+                  accessibilityLabel={label}
+                  {...webAria}
+                  onPress={() => {
+                    router.push(
+                      section.segment === ''
+                        ? `/cases/${caseId}`
+                        : `/cases/${caseId}/${section.segment}`,
+                    );
+                  }}
+                  style={[
+                    styles.section,
+                    { borderBottomColor: active ? theme.colors.primary : 'transparent' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sectionLabel,
+                      {
+                        color: active ? theme.colors.ink : theme.colors.muted,
+                        fontFamily: theme.typography.body,
+                      },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
+
+        <View style={styles.content}>{children}</View>
       </AppShell>
     </CaseContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
+  back: {
+    // A 44dp target that does not look like a button: the text rides in a
+    // tall line box, the way the footer's links do.
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  backText: {
+    fontSize: fontSizes.label,
+  },
+  context: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  head: {
+    borderBottomWidth: 1,
+  },
+  section: {
+    alignItems: 'center',
+    // The package's Tab, in the same numbers, so this strip and the intake
+    // screen's tabs read as one family — minus the tab role, which these are
+    // not.
+    borderBottomWidth: 2,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  sectionLabel: {
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
+  sections: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+  },
+  status: {
+    flexDirection: 'row',
+  },
+  subtitle: {
+    fontSize: fontSizes.label,
+  },
+  title: {
+    flexShrink: 1,
+    fontSize: fontSizes.label,
+    fontWeight: '600',
+  },
   content: {
     flex: 1,
     // Without this a long unbroken cell — a filename, an email — makes the
@@ -441,55 +462,5 @@ const styles = StyleSheet.create({
     // it. The one screen that genuinely needs two columns says so itself.
     maxWidth: contentMaxWidth,
     width: '100%',
-  },
-
-  identity: {
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  identityLine: {
-    fontSize: fontSizes.caption,
-  },
-  railTitle: {
-    color: brandColors.dark.ink,
-    fontSize: fontSizes.body,
-    // 700, like every other use of `heading`. Cormorant is drawn for large
-    // sizes and thins out fast — at 600 on a dark ground this title loses its
-    // stems. See brand/fonts.json.
-    fontWeight: '700',
-    // Positive for the same reason `Heading`'s `body` size is: at 16px this
-    // face is well under its optical size and needs opening up. This title
-    // carries a case name, so it is the one heading in the app whose string is
-    // arbitrary — a run of narrow letters is exactly what negative tracking
-    // turned into a smear.
-    letterSpacing: 0.2,
-  },
-  rail: {
-    // `Sidebar.Root` sets its OWN width — `sidebarWidth.expanded`, 256 — so
-    // this holds exactly that and nothing else. It used to say 232, which the
-    // sidebar overflowed by 24: precisely the `spacing.lg` gap that used to be
-    // on `workspace`, so the two columns rendered flush against each other and
-    // the gap looked like it had never been written.
-    borderRightWidth: 1,
-    width: 256,
-  },
-  railStacked: {
-    width: '100%',
-  },
-  status: {
-    // `alignItems: 'flex-start'` on the parent would stretch nothing else, but
-    // a Badge in a full-width column would grow to fill it.
-    flexDirection: 'row',
-  },
-  workspace: {
-    // No gap and no padding: the rail is CHROME. It sits flush against the
-    // header above it and the window edge beside it, and carries its own
-    // right-hand rule — which is what makes it read as one frame with the top
-    // bar rather than as a floating island. Padding belongs to `content`.
-    flexDirection: 'row',
-    flexGrow: 1,
-  },
-  workspaceStacked: {
-    flexDirection: 'column',
   },
 });

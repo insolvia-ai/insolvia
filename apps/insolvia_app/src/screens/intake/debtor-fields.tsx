@@ -81,7 +81,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
   return (
     <View style={styles.form}>
       <Section title="Name">
-        <Text style={[styles.help, { color: theme.colors.muted }]}>
+        <Text
+          style={[styles.help, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+        >
           As it appears on a government-issued picture identification.
         </Text>
         <TextField
@@ -116,7 +118,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
 
       <Section title="Other names used in the last 8 years">
         {(body.other_names_used ?? []).length === 0 ? (
-          <Text style={[styles.help, { color: theme.colors.muted }]}>
+          <Text
+            style={[styles.help, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+          >
             None recorded. Add one if this person has filed, worked or held accounts under another
             name.
           </Text>
@@ -130,7 +134,12 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
           // need attention" with no field flagged, and every autosave after
           // it failed the same way.
           <View key={alias.id} style={styles.aliasRow}>
-            <Text style={[styles.aliasLabel, { color: theme.colors.muted }]}>
+            <Text
+              style={[
+                styles.aliasLabel,
+                { color: theme.colors.muted, fontFamily: theme.typography.body },
+              ]}
+            >
               Other name {index + 1}
             </Text>
             <TextField
@@ -196,7 +205,9 @@ export function DebtorFields({ body, onChange, errors }: DebtorFieldsProps) {
       </Section>
 
       <Section title="Mailing address">
-        <Text style={[styles.help, { color: theme.colors.muted }]}>
+        <Text
+          style={[styles.help, { color: theme.colors.muted, fontFamily: theme.typography.body }]}
+        >
           Only if it is different from the address above.
         </Text>
         <AddressFields
