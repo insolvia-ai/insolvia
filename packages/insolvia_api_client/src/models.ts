@@ -2329,12 +2329,82 @@ export interface MaritalAdjustmentItem {
   readonly amount?: Money | undefined;
 }
 
-/** One B122A-2 line-33d row; `id` is client-chosen and required (provenance). */
+/**
+ * Which IRS ownership allowance a secured payment offsets (issue #349):
+ * the home (B122A-2 line 9b), the first or second claimed vehicle (lines
+ * 13b/13e), or none of them (line 33d, "other debts secured by your
+ * property"). Mirrors `insolvia_core.means_test_inputs.SECURED_PAYMENT_BUCKETS`.
+ */
+export const SECURED_PAYMENT_BUCKETS = ['home', 'vehicle_1', 'vehicle_2', 'other'] as const;
+export type SecuredPaymentBucket = (typeof SECURED_PAYMENT_BUCKETS)[number];
+
+/**
+ * One B122A-2 line-33d row; `id` is client-chosen and required (provenance).
+ *
+ * Widened by issue #349 so the row can be entered BESIDE the secured claim
+ * it belongs to: `claim_id` keys it to that claim, `bucket` says which IRS
+ * ownership line its payment offsets, and `cure_total` is the past-due
+ * amount line 34 divides by 60. The engine sums the bucketed rows where the
+ * single typed totals on the body are absent — never both.
+ */
 export interface OtherSecuredPayment {
   readonly id: string;
   readonly creditor_name?: string | undefined;
   readonly property_description?: string | undefined;
   readonly monthly_payment?: Money | undefined;
+  readonly claim_id?: string | undefined;
+  readonly bucket?: SecuredPaymentBucket | undefined;
+  readonly cure_total?: Money | undefined;
+}
+
+/**
+ * B122A-1 line 1's four answers (issue #349), named for their meaning.
+ * Mirrors `insolvia_core.means_test_inputs.MARITAL_FILING_STATUSES`. Entered
+ * only to override what the debtor records already say — the "living
+ * separately" declaration, under which Column B is not filled in, is the
+ * one the records cannot express.
+ */
+export const MARITAL_FILING_STATUSES = [
+  'not_married',
+  'married_filing_jointly',
+  'married_not_filing_same_household',
+  'married_not_filing_separated',
+] as const;
+export type MaritalFilingStatus = (typeof MARITAL_FILING_STATUSES)[number];
+
+/** B122A-1's two columns: A is Debtor 1, B is Debtor 2 or the spouse. */
+export const INCOME_COLUMNS = ['A', 'B'] as const;
+export type IncomeColumn = (typeof INCOME_COLUMNS)[number];
+
+/**
+ * Line 8's contention: unemployment compensation the debtor contends is a
+ * Social Security Act benefit, its own override line (issue #349).
+ */
+export const UNEMPLOYMENT_AS_SSA = 'unemployment_as_ssa' as const;
+
+/**
+ * Every B122A-1 income line an override may name: the nine counted lines
+ * (2-10), the § 101(10A)(B)(ii) exclusions, and the line-8 contention.
+ * Mirrors `insolvia_core.means_test_inputs.INCOME_LINE_CATEGORIES`.
+ */
+export const INCOME_LINE_CATEGORIES = [
+  'wages',
+  ...OTHER_INCOME_CATEGORIES,
+  ...EXCLUDED_INCOME_CATEGORIES,
+  UNEMPLOYMENT_AS_SSA,
+] as const;
+export type IncomeLineCategory = (typeof INCOME_LINE_CATEGORIES)[number];
+
+/**
+ * One entered B122A-1 income line (issue #349), replacing what the dated
+ * records derive for that column; `id` is client-chosen and required
+ * (provenance). One row per column per line — the server refuses a second.
+ */
+export interface IncomeLineOverride {
+  readonly id: string;
+  readonly column?: IncomeColumn | undefined;
+  readonly category?: IncomeLineCategory | undefined;
+  readonly monthly_amount?: Money | undefined;
 }
 
 /**
@@ -2343,10 +2413,23 @@ export interface OtherSecuredPayment {
  * SUBJECT, not its number; every money member is a monthly amount unless
  * the name says otherwise. `vehicle_count` is at most 2 (the form's own
  * "2 or more"; the Local Standards publish no third column).
+ *
+ * Issue #349 added the screen's inputs: the marital status override, the
+ * three household sizes (each absent = `people_under_65 +
+ * people_65_or_older`), the three Form 122A-1Supp exemptions (any one
+ * short-circuits the test), and the per-line income overrides.
  */
 export interface MeansTestInputBody {
   readonly people_under_65?: number | undefined;
   readonly people_65_or_older?: number | undefined;
+  readonly median_household_size?: number | undefined;
+  readonly irs_family_size?: number | undefined;
+  readonly irs_housing_family_size?: number | undefined;
+  readonly marital_filing_status?: MaritalFilingStatus | undefined;
+  readonly non_consumer_debts?: boolean | undefined;
+  readonly disabled_veteran?: boolean | undefined;
+  readonly reservist_national_guard?: boolean | undefined;
+  readonly income_overrides?: readonly IncomeLineOverride[] | undefined;
   readonly marital_adjustments?: readonly MaritalAdjustmentItem[] | undefined;
   readonly home_secured_monthly_total?: Money | undefined;
   readonly housing_adjustment_amount?: Money | undefined;
@@ -3076,6 +3159,184 @@ export interface ExemptionAnalysis {
   readonly lookbacks: ExemptionLookbacks;
   readonly assets: readonly AssetExemptionFigures[];
   readonly warnings: readonly string[];
+  readonly problems: readonly string[];
+}
+
+/** One dated receipt behind a CMI line — the derivation's atoms. */
+export interface CmiEntry {
+  readonly receivedOn: FormDate;
+  readonly amount: Money;
+  readonly description: string;
+}
+
+/**
+ * One B122A-1 income line of one column, as `core/cmi.py` derived it: the
+ * six-month total, the monthly average the form prints, and every entry
+ * behind them. `note` explains line-level arithmetic (the business/rental
+ * expense subtraction, an entered override); `citation` is set on an
+ * excluded line. The two extra averages appear only on business and rental
+ * lines.
+ */
+export interface CmiLine {
+  readonly category: string;
+  readonly label: string;
+  readonly totalReceived: Money;
+  readonly monthlyAverage: Money;
+  readonly citation: string;
+  readonly note: string;
+  readonly entries: readonly CmiEntry[];
+  readonly grossMonthlyAverage?: Money;
+  readonly expensesMonthlyAverage?: Money;
+}
+
+/** One B122A-1 column: A is Debtor 1, B is Debtor 2 or the spouse. */
+export interface CmiColumn {
+  readonly column: IncomeColumn;
+  readonly lines: readonly CmiLine[];
+  /** The § 101(10A)(B)(ii) receipts — recorded, shown, never counted. */
+  readonly excluded: readonly CmiLine[];
+  readonly monthlyTotal: Money;
+}
+
+/** The six-month lookback the derivation read the records over. */
+export interface CmiWindow {
+  readonly filingDate: FormDate;
+  readonly start: FormDate;
+  readonly end: FormDate;
+  /** `YYYY-MM`, earliest first, six of them. */
+  readonly months: readonly string[];
+}
+
+/** A window month with no paycheck from an employment that should have one. */
+export interface CmiGap {
+  readonly employer: string;
+  readonly months: readonly string[];
+}
+
+/** The § 101(10A) derivation, line by line — `core/cmi.py`'s result. */
+export interface CmiTrace {
+  readonly window: CmiWindow;
+  readonly columns: readonly CmiColumn[];
+  readonly combinedMonthlyTotal: Money;
+  readonly annualized: Money;
+  readonly gaps: readonly CmiGap[];
+  readonly problems: readonly string[];
+}
+
+/** B122A-1 lines 12-14: annualized CMI against the applicable median. */
+export interface MedianComparison {
+  readonly state: string;
+  readonly householdSize: number;
+  readonly monthlyCmi: Money;
+  readonly annualizedCmi: Money;
+  readonly annualMedian: Money;
+  readonly aboveMedian: boolean;
+  /** Names the Census table and release the median came from. */
+  readonly source: string;
+}
+
+/**
+ * One line of the B122A-2 trace: the printed line number, its subject, the
+ * computed amount, and where it came from — a dataset release, an entered
+ * field, a derived input, or line arithmetic.
+ */
+export interface MeansTestLine {
+  readonly line: string;
+  readonly label: string;
+  readonly amount: Money;
+  readonly source: string;
+}
+
+/** A household size the engine read, and where it came from — both `null`
+ * until the inputs can answer it. */
+export interface HouseholdFigure {
+  readonly value: number | null;
+  readonly source: string | null;
+}
+
+/** The three household sizes and the age bands, as the engine read them. */
+export interface MeansTestHousehold {
+  readonly peopleUnder65: number | null;
+  readonly people65OrOlder: number | null;
+  readonly medianHouseholdSize: HouseholdFigure;
+  readonly irsFamilySize: HouseholdFigure;
+  readonly irsHousingFamilySize: HouseholdFigure;
+  /** Dependents under 18, from the dependents collection (line 29's cap). */
+  readonly childrenUnder18: number;
+}
+
+/** The three Form 122A-1Supp exemption flags. */
+export const PRESUMPTION_EXEMPTIONS = [
+  'non_consumer_debts',
+  'disabled_veteran',
+  'reservist_national_guard',
+] as const;
+export type PresumptionExemption = (typeof PRESUMPTION_EXEMPTIONS)[number];
+
+/** The exemptions as entered, and which one (if any) ended the test. */
+export interface MeansTestExemptions {
+  readonly nonConsumerDebts: boolean;
+  readonly disabledVeteran: boolean;
+  readonly reservistNationalGuard: boolean;
+  readonly applied: PresumptionExemption | null;
+  /** The statute and form part granting `applied`. */
+  readonly rule: string | null;
+  readonly available: readonly PresumptionExemption[];
+}
+
+/**
+ * How the test ended. `undetermined` means the engine refused and
+ * {@link CaseMeansTest.problems} says why; `exempt` means a Form 122A-1Supp
+ * exemption ended it before the median.
+ */
+export const MEANS_TEST_OUTCOMES = [
+  'below_median',
+  'no_presumption',
+  'presumption_of_abuse',
+  'exempt',
+  'undetermined',
+] as const;
+export type MeansTestOutcome = (typeof MEANS_TEST_OUTCOMES)[number];
+
+/**
+ * `GET /v1/cases/{caseId}/means-test` — the § 707(b) trace for one case as
+ * of its expected filing date (issue #349), run by the SAME code path the
+ * packet's B122A-1 and B122A-2 use. Nothing here is for the client to add
+ * up: every figure names the rule, input or dataset release it came from.
+ *
+ * Always 200. `outcome` is `undetermined` with the reasons in `problems`
+ * while the case is too early to answer (no household entered yet, a
+ * planned filing date the datasets do not cover); `comparison` is `null`
+ * then, and for an exempt debtor whose household is not entered. `lines` is
+ * empty below the median and for an exempt debtor — Form 122A-2 is not
+ * filed in either case.
+ */
+export interface CaseMeansTest {
+  readonly asOf: FormDate;
+  /** `petition.expected_filing_date` or `case.created_at`. */
+  readonly asOfSource: string;
+  /** Series id → release id, for every dataset the run read. */
+  readonly releaseIds: Readonly<Record<string, string>>;
+  readonly jurisdiction: {
+    readonly state: string | null;
+    readonly county: string | null;
+    readonly district: string;
+  };
+  readonly maritalFilingStatus: {
+    readonly value: MaritalFilingStatus | null;
+    readonly source: string;
+  };
+  readonly household: MeansTestHousehold;
+  readonly exemptions: MeansTestExemptions;
+  readonly cmi: CmiTrace;
+  readonly debt: {
+    readonly priorityTotal: Money;
+    readonly nonpriorityUnsecuredTotal: Money;
+  };
+  readonly comparison: MedianComparison | null;
+  readonly outcome: MeansTestOutcome;
+  readonly determinedBy: string | null;
+  readonly lines: readonly MeansTestLine[];
   readonly problems: readonly string[];
 }
 
