@@ -7,11 +7,15 @@ was dropped entirely (D9); this document no longer plans for it.
 
 Status: **foundation, intake, forms & petition engine, and the MCP server
 (12.1–12.3) all built; forms and MCP await their staging validations (#96,
-#97, 12.4–12.5); means test and AI extraction built 2026-09-04 — every
-product milestone's build work is done. What remains is validation and
-go-to-market: the staging walkthroughs, the MCP harness round-trip
-(12.4–12.5), SES production access, the design partner, and the
-positioning rewrites (12.7/12.8)** · Last pruned 2026-09-04
+#97, 12.4–12.5); means test and AI extraction built 2026-09-04. A gap
+analysis against the incumbent consumer-bankruptcy product (2026-09-16)
+showed the engines are at parity and the layers around them are not: the
+Chapter 7 data-entry surface is unfinished, and there is no practice
+management, client portal, Chapter 13 or post-filing. Those are now five
+milestones (13.x–17.x, below); 13.x is the current build. Still open from
+before: the staging walkthroughs, the MCP harness round-trip (12.4–12.5),
+SES production access, the design partner, and the positioning rewrites
+(12.7/12.8)** · Last pruned 2026-09-16
 
 The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
 pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
@@ -147,7 +151,7 @@ leaving it open-ended.
 
 Each is a GitHub milestone with its issues filed; the issue bodies carry the
 scope and "done when", so this table stays one line each. Ordering is the
-dependency order. PMS integration is deliberately **out** of all five — since
+dependency order. PMS integration is deliberately **out** of all of them — since
 the pivot (D11) it is not sync at all but the
 [Case-management MCP milestone](https://github.com/insolvia-ai/insolvia/milestone/10)
 above; the intake data model's old sync seam narrowed to an origin pointer
@@ -161,6 +165,11 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · Means test`](https://github.com/insolvia-ai/insolvia/milestone/7) — **built 2026-09-04** | P3 | 10.1–10.4 | §707(b) engine, CMI, UST/IRS/Census registry series with a weekly staleness tripwire (`regulatory-refresh.yml`), B122A-1/A-2 in the packet. `code/dollar-amounts` now written at pin time. |
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
+| [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **current** | M3 / P2 | 13.1–13.11 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030), output options. |
+| [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) | — | 14.1–14.8 | The layer around the case: a client distinct from the case (ADR first), the client list, a real lifecycle with post-filing fields, tasks, notes, events with generated deadlines, a dashboard, a court registry and firm defaults. |
+| [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. Identity and isolation are an ADR before any code. |
+| [`Product · Chapter 13`](https://github.com/insolvia-ai/insolvia/milestone/14) | — | 16.1–16.3 | B122C-1/C-2 on the existing engine, the plan model and calculator (waterfall, feasibility, §1325(a)(4) liquidation test), the plan form and the Chapter 13 packet. |
+| [`Product · Filing and after`](https://github.com/insolvia-ai/insolvia/milestone/15) | — | 17.1–17.4 | Two spikes (CM/ECF filing, importing from other software) that end in decisions, court-notice intake, and amendments. Nothing here is scheduled until 13.x lands. |
 
 ### Why extraction is its own milestone now (2026-08-11)
 
