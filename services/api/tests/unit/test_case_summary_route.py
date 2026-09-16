@@ -194,6 +194,49 @@ def summary(client, case_id, subject=ALICE):
     return client.get(f"/v1/cases/{case_id}/summary", headers=auth(subject))
 
 
+def add_debtor_1(client, case_id):
+    response = client.put(
+        f"/v1/cases/{case_id}/debtors/debtor_1",
+        json={"name": {"given": "Ada"}, "provenance": {"name.given": TYPED}},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201
+    return response.get_json()["id"]
+
+
+def add_income_summary(client, case_id, debtor_id, **amounts):
+    body = {"debtor_id": debtor_id, **amounts}
+    response = client.post(
+        f"/v1/cases/{case_id}/income_summaries",
+        json={**body, "provenance": dict.fromkeys(body, TYPED)},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
+def add_household(client, case_id, which_household="main"):
+    body = {"which_household": which_household}
+    response = client.post(
+        f"/v1/cases/{case_id}/households",
+        json={**body, "provenance": dict.fromkeys(body, TYPED)},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
+def add_expense(client, case_id, household_id, category, amount):
+    body = {"household_id": household_id, "category": category, "amount": amount}
+    response = client.post(
+        f"/v1/cases/{case_id}/expenses",
+        json={**body, "provenance": dict.fromkeys(body, TYPED)},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
 # ── Auth and ownership ──────────────────────────────────────────
 
 
@@ -237,6 +280,9 @@ def test_an_empty_case_totals_zero_rather_than_omitting_the_figures(client):
         "priorityUnsecured": "0",
         "nonpriorityUnsecured": "0",
         "liabilities": "0",
+        "monthlyIncome": "0",
+        "monthlyExpenses": "0",
+        "monthlyExcess": "0",
     }
 
 
@@ -395,3 +441,67 @@ def test_a_problem_names_the_record_when_one_record_owns_the_fix(client):
 
     for problem in problems:
         assert "itemId" not in problem or isinstance(problem["itemId"], str)
+
+
+# ── Monthly income, expenses, and the I-J excess (issue #348) ───
+
+
+def test_an_empty_case_has_zero_income_expenses_and_excess(client):
+    case_id = open_case(client)
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["monthlyIncome"] == "0"
+    assert totals["monthlyExpenses"] == "0"
+    assert totals["monthlyExcess"] == "0"
+
+
+def test_monthly_income_is_the_same_figure_106i_line_12_prints(client):
+    # No new arithmetic here — this pins the DELEGATION, the way the asset and
+    # liability tests above do; the arithmetic itself is
+    # test_form_projections.py's job.
+    case_id = open_case(client)
+    debtor_id = add_debtor_1(client, case_id)
+    add_income_summary(
+        client, case_id, debtor_id, wages="3000.00", deduction_tax="500.00"
+    )
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["monthlyIncome"] == "2500.00"
+
+
+def test_monthly_expenses_is_the_same_figure_106j_line_22c_prints(client):
+    case_id = open_case(client)
+    household_id = add_household(client, case_id)
+    add_expense(client, case_id, household_id, "food_and_housekeeping", "600.00")
+    add_expense(client, case_id, household_id, "transportation", "200.00")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["monthlyExpenses"] == "800.00"
+
+
+def test_monthly_excess_is_income_minus_expenses_and_may_go_negative(client):
+    case_id = open_case(client)
+    debtor_id = add_debtor_1(client, case_id)
+    add_income_summary(client, case_id, debtor_id, wages="1000.00")
+    household_id = add_household(client, case_id)
+    add_expense(client, case_id, household_id, "food_and_housekeeping", "1500.00")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["monthlyIncome"] == "1000.00"
+    assert totals["monthlyExpenses"] == "1500.00"
+    assert totals["monthlyExcess"] == "-500.00"
+
+
+def test_monthly_figures_are_strings_never_json_numbers(client):
+    case_id = open_case(client)
+    debtor_id = add_debtor_1(client, case_id)
+    add_income_summary(client, case_id, debtor_id, wages="1234.56")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert isinstance(totals["monthlyIncome"], str)
+    assert isinstance(totals["monthlyExcess"], str)

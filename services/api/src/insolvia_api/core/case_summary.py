@@ -48,6 +48,8 @@ from .form_projections.b106ef import (
     nonpriority_unsecured_total,
     priority_unsecured_total,
 )
+from .form_projections.b106i import monthly_income_line_12
+from .form_projections.b106j import monthly_expenses_line_22c
 from .liens import LienFigures, derive_liens
 from .packet_assembly import (
     CaseData,
@@ -75,6 +77,14 @@ class CaseTotals:
     priority_unsecured: Decimal
     nonpriority_unsecured: Decimal
     liabilities: Decimal
+    #: 106I line 12 — the SAME figure that form prints, never re-derived here.
+    monthly_income: Decimal
+    #: 106J line 22c — likewise the schedule's own figure.
+    monthly_expenses: Decimal
+    #: income minus expenses — the Chapter 13 plan's starting number, and the
+    #: one figure the income and expenses screens both show (issue #348).
+    #: Can be negative; a debtor with no excess is a fact, not an error.
+    monthly_excess: Decimal
 
 
 @dataclass(frozen=True)
@@ -114,6 +124,8 @@ def summarise(data: CaseData) -> CaseSummary:
     secured = secured_total(case_file)
     priority = priority_unsecured_total(case_file)
     nonpriority = nonpriority_unsecured_total(case_file)
+    monthly_income = monthly_income_line_12(case_file)
+    monthly_expenses = monthly_expenses_line_22c(case_file)
 
     return CaseSummary(
         totals=CaseTotals(
@@ -124,6 +136,9 @@ def summarise(data: CaseData) -> CaseSummary:
             priority_unsecured=priority,
             nonpriority_unsecured=nonpriority,
             liabilities=secured + priority + nonpriority,
+            monthly_income=monthly_income,
+            monthly_expenses=monthly_expenses,
+            monthly_excess=monthly_income - monthly_expenses,
         ),
         problems=completeness_problems(data),
         liens=derive_liens(case_file),
