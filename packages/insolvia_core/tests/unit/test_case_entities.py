@@ -221,6 +221,23 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "priority_cure_total": "2400.00",
         "ch13_eligible": True,
         "ch13_projected_plan_payment": "500.00",
+        # Issue #349's inputs, so the round trip through the item shape covers
+        # the nested override rows and the widened secured-payment rows.
+        "marital_filing_status": "married_not_filing_same_household",
+        "median_household_size": 3,
+        "irs_family_size": 2,
+        "irs_housing_family_size": 3,
+        "non_consumer_debts": False,
+        "disabled_veteran": False,
+        "reservist_national_guard": False,
+        "income_overrides": [
+            {
+                "id": "ov1",
+                "column": "A",
+                "category": "wages",
+                "monthly_amount": "4100.00",
+            }
+        ],
     },
 }
 

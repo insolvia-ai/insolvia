@@ -38,6 +38,17 @@ What lands where, and why:
   debtor is married and not separated. Whether column B applies at all
   (the line 2 marital question) is the form projection's gate; this module
   computes every column the records populate.
+- **An entered override replaces a line, and says so** (issue #349). The
+  means-test screen lets a preparer state one column's line 2-10 figure by
+  hand — a pay history that is known to be incomplete, a figure the client
+  swears to — and `means_test_input.income_overrides` carries it. The
+  override replaces the derived line (its six-month total becomes 6x the
+  entered monthly figure, its entries empty, its note naming the input);
+  it never adds to it. The statutory exclusions are overridable the same
+  way, and line 8's contention — unemployment compensation the debtor
+  contends is a Social Security Act benefit — is its own override line:
+  it moves that amount out of line 8 and into the excluded list, the
+  form's own "do not enter the amount ... instead, list it here".
 
 Everything is pure over its inputs — no store, no clock — which is what
 makes the known-answer tests possible. The derivation is line by line:
@@ -60,9 +71,17 @@ from insolvia_core.income import (
     OtherIncomeRecordBody,
     PayPeriodRecordBody,
 )
+from insolvia_core.means_test_inputs import UNEMPLOYMENT_AS_SSA, IncomeLineOverride
 
 # The § 101(10A)(B)(ii) citation every excluded line carries.
 EXCLUSION_CITATION: Final = "11 U.S.C. § 101(10A)(B)(ii)"
+
+# What an overridden line's note says — the screen and the projection both
+# read it to label the figure "entered manually".
+OVERRIDE_NOTE: Final = (
+    "entered manually (means_test_input.income_overrides) — replaces the "
+    "figure derived from the dated records"
+)
 
 # How each other-income category prints, in B122A-1's own line order.
 _INCOME_LABELS: Final = {
@@ -81,6 +100,9 @@ _INCOME_LABELS: Final = {
     ),
     "war_crime_victim_payment": "Payments to victims of war crimes",
     "terrorism_victim_payment": "Payments to victims of terrorism",
+    UNEMPLOYMENT_AS_SSA: (
+        "Unemployment compensation claimed as a Social Security Act benefit"
+    ),
 }
 
 _LINE_ORDER: Final = (
@@ -318,6 +340,79 @@ def _line(
     )
 
 
+def _override_line(category: str, monthly: Decimal, *, excluded: bool) -> CmiLine:
+    """The line an override produces: 6x the entered monthly figure as the
+    six-month total (the average the form prints IS the entered figure),
+    no entries, and the note that names the input."""
+    citation = EXCLUSION_CITATION if excluded else ""
+    return CmiLine(
+        category=category,
+        label=_INCOME_LABELS[category],
+        total_received=_money(monthly * 6),
+        monthly_average=_money(monthly),
+        entries=(),
+        citation=citation,
+        note=OVERRIDE_NOTE,
+    )
+
+
+def _apply_overrides(
+    column: str,
+    lines: list[CmiLine],
+    excluded: list[CmiLine],
+    total: Decimal,
+    overrides: Sequence[IncomeLineOverride],
+) -> tuple[list[CmiLine], list[CmiLine], Decimal]:
+    """One column's lines with its entered overrides applied. `total` is the
+    column's six-month counted total and is returned adjusted, so the
+    column and combined averages keep the same ÷ 6 arithmetic the derived
+    lines use rather than summing already-rounded per-line averages."""
+    for override in overrides:
+        if (
+            override.column != column
+            or override.category is None
+            or override.monthly_amount is None
+        ):
+            continue
+        monthly = Decimal(override.monthly_amount)
+        category = override.category
+        if category == UNEMPLOYMENT_AS_SSA:
+            # Line 8's contention: the amount leaves the counted line
+            # (never below zero) and is shown among the exclusions.
+            existing = next((ln for ln in lines if ln.category == "unemployment"), None)
+            if existing is not None:
+                before = Decimal(existing.total_received)
+                after = max(before - monthly * 6, Decimal("0"))
+                total -= before - after
+                lines[lines.index(existing)] = CmiLine(
+                    category=existing.category,
+                    label=existing.label,
+                    total_received=_money(after),
+                    monthly_average=_monthly_average(after),
+                    entries=existing.entries,
+                    citation=existing.citation,
+                    note=(
+                        f"{_money(monthly)} per month is contended to be a "
+                        "Social Security Act benefit and listed as excluded "
+                        "(B122A-1 line 8)"
+                    ),
+                )
+            excluded = [ln for ln in excluded if ln.category != category]
+            excluded.append(_override_line(category, monthly, excluded=True))
+        elif category in EXCLUDED_INCOME_CATEGORIES:
+            excluded = [ln for ln in excluded if ln.category != category]
+            excluded.append(_override_line(category, monthly, excluded=True))
+        else:
+            existing = next((ln for ln in lines if ln.category == category), None)
+            if existing is not None:
+                total -= Decimal(existing.total_received)
+                lines = [ln for ln in lines if ln.category != category]
+            total += monthly * 6
+            lines.append(_override_line(category, monthly, excluded=False))
+    lines.sort(key=lambda ln: _LINE_ORDER.index(ln.category))
+    return lines, excluded, total
+
+
 def current_monthly_income(
     *,
     filing_date: date,
@@ -325,12 +420,14 @@ def current_monthly_income(
     employments: Sequence[tuple[str, EmploymentBody]],
     pay_periods: Sequence[PayPeriodRecordBody],
     other_income: Sequence[OtherIncomeRecordBody],
+    overrides: Sequence[IncomeLineOverride] = (),
 ) -> CmiResult:
     """The CMI derivation for a case, line by line.
 
     `filing_date` is the anticipated filing date while the case floats
     (resolution's as_of rule); `employments` are (id, body) pairs because
-    pay periods reference them by id.
+    pay periods reference them by id; `overrides` are the entered lines
+    from `means_test_input.income_overrides`, applied last.
     """
     window = cmi_window(filing_date)
     problems: list[str] = []
@@ -450,6 +547,10 @@ def current_monthly_income(
                     note="recorded and excluded from current monthly income",
                 )
             )
+
+        lines, excluded, total = _apply_overrides(
+            column, lines, excluded, total, overrides
+        )
 
         if lines or excluded:
             columns.append(
