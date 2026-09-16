@@ -34,6 +34,26 @@ the app can exfiltrate a credential valid for up to 30 days against GLBA-scope
 data.** Memory-only storage is the more secure option and it was rejected on UX
 grounds — see *Alternatives considered*.
 
+> **Amended 2026-09-16 (the reload is optimistic).** The first version of
+> the client blocked every page load on that exchange: the session sat in a
+> `loading` state and the route guard rendered a whole-page "Checking your
+> session" screen until Cognito answered, which meant every reload painted an
+> interstitial. That was a property of the guard, not of this decision, and
+> it is gone. Whether a refresh token is stored is a synchronous read, so the
+> session now starts `signed-in` on the first render when one is — the app's
+> chrome and each screen's own loading state render at once — while the
+> exchange runs in the background, flagged as `restoring`. Nothing this ADR
+> protects moved: the access and ID tokens are still memory-only, and no
+> protected *data* can render before the exchange succeeds, because every API
+> call obtains its bearer token through the session and that call waits for
+> the exchange. A failed exchange still ends in `signed-out` and the guard's
+> redirect. What the user with a stale token sees is one round trip of chrome
+> and skeleton, then sign-in. The argument in full is the header of
+> `apps/insolvia_app/src/session/session-provider.tsx`. Persisting the access
+> token instead — the obvious way to get an instant boot — was considered
+> and rejected: it would put a second bearer credential and the ID token's
+> claims on disk for the same user experience the optimistic guard delivers.
+
 **The app refreshes the access token from the stored refresh token** when it is
 expired or near expiry: proactively on a small clock skew, and reactively on a
 401 from the API. Refresh goes through the hosted domain's token endpoint as an

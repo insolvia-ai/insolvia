@@ -316,6 +316,13 @@ below the `<title>` and why this paragraph is here rather than in the file.
   - **PKCE is the client's obligation.** Cognito has no "require PKCE" toggle, so
     `pkce.test.ts` and `oauth.test.ts` are the only things asserting we send
     `code_challenge`/S256 at all. Do not delete them as redundant.
+  - **A reload never blocks on the session.** With a stored refresh token the
+    session starts `signed-in` on the first render and exchanges the token in
+    the background (`restoring`); there is no `loading` status and no
+    "Checking your session" page. Safe because every API call waits on
+    `accessToken()`, so no case data renders before Cognito answers. The
+    provider's header owns the argument — do not reintroduce a blocking check
+    to "fix" a screen that shows its own loading state for one round trip.
 
   `@/session` is the barrel and the public surface; screens need only
   `useSession()`. The browser globals it used to hold moved to

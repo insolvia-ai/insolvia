@@ -21,7 +21,9 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * Three states, in the order they are handled below:
  *
  * 1. **Already signed in** — bounce onward. Reachable by pressing Back after a
- *    sign-in, or by bookmarking the URL.
+ *    sign-in, or by bookmarking the URL. While the session is still being
+ *    restored the bounce waits: a stored token that turns out to be stale
+ *    would otherwise send the user to `/` and straight back here.
  * 2. **No hosted UI configured** — the `local` default, with no
  *    `EXPO_PUBLIC_COGNITO_*` variables. An explicit, announced screen; the
  *    alternative is a button that redirects to `https://undefined/oauth2/…`.
@@ -30,7 +32,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 export function SignIn() {
   const theme = useTheme();
   const router = useRouter();
-  const { status, isConfigured, error, signIn } = useSession();
+  const { status, restoring, isConfigured, error, signIn } = useSession();
 
   // `useLocalSearchParams` types values as `string | string[]`: a parameter can
   // legally repeat in a query string. `safeReturnTo` rejects the array case
@@ -44,14 +46,17 @@ export function SignIn() {
   const returnTo = safeReturnTo(requestedReturnTo);
 
   useEffect(() => {
-    if (status === 'signed-in') {
+    if (status === 'signed-in' && !restoring) {
       router.replace(returnTo);
     }
-  }, [returnTo, router, status]);
+  }, [restoring, returnTo, router, status]);
 
-  if (status === 'loading' || status === 'signed-in') {
+  if (status === 'signed-in') {
+    // Restoring, or the frame before the bounce commits. Deferred: on a good
+    // connection the exchange finishes before the screen would have shown.
     return (
       <StatusScreen
+        defer
         title="Checking your session"
         message="One moment while we confirm you are signed in."
       />
