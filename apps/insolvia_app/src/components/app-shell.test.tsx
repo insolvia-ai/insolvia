@@ -113,7 +113,7 @@ describe('the shell navigation', () => {
     // the membership's display name, so seeing them means the round trip
     // resolved AND a firm came back with it. (It used to be MePanel's claim
     // rows, which have moved off the home screen to /account.)
-    await screen.findByText('AA');
+    await screen.findByText('Alice Attorney');
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();

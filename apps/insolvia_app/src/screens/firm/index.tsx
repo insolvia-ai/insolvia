@@ -147,7 +147,10 @@ export function Firm({ membership }: { membership: FirmMembership }) {
           aria-live="assertive"
           style={[
             styles.error,
-            { color: notice.tone === 'error' ? theme.colors.danger : theme.colors.muted },
+            {
+              color: notice.tone === 'error' ? theme.colors.danger : theme.colors.muted,
+              fontFamily: theme.typography.body,
+            },
           ]}
         >
           {notice.message}
@@ -377,12 +380,22 @@ function AddColleague({
             <RadioGroup.Item value={option.value} aria-label={option.label} hitSlop={12}>
               <RadioGroup.Indicator />
             </RadioGroup.Item>
-            <Text style={[styles.roleLabel, { color: theme.colors.ink }]}>{option.label}</Text>
+            <Text
+              style={[
+                styles.roleLabel,
+                { color: theme.colors.ink, fontFamily: theme.typography.body },
+              ]}
+            >
+              {option.label}
+            </Text>
           </View>
         ))}
       </RadioGroup.Root>
       {fieldErrors.role ? (
-        <Text aria-live="assertive" style={[styles.error, { color: theme.colors.danger }]}>
+        <Text
+          aria-live="assertive"
+          style={[styles.error, { color: theme.colors.danger, fontFamily: theme.typography.body }]}
+        >
           {fieldErrors.role}
         </Text>
       ) : null}
@@ -440,7 +453,11 @@ function Colleague({
 
   return (
     <View style={styles.person}>
-      <Text style={[styles.personName, { color: theme.colors.ink }]}>{user.displayName}</Text>
+      <Text
+        style={[styles.personName, { color: theme.colors.ink, fontFamily: theme.typography.body }]}
+      >
+        {user.displayName}
+      </Text>
       <Text style={[styles.personMeta, muted]}>
         {user.email} · {user.role}
         {user.isAdmin ? ' · administrator' : ''}

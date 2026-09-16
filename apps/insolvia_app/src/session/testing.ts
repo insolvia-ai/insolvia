@@ -57,6 +57,12 @@ export interface FakeBrowser {
   readonly sessionStorage: FakeStorage;
   /** Every URL passed to a full-page navigation, in order. */
   readonly navigations: string[];
+  /**
+   * Presses a key at DOCUMENT level — what a `keydown` listener registered
+   * through `platform/browser.ts` receives — as opposed to `userEvent`, which
+   * types into a focused element. The menu's Escape handling is the caller.
+   */
+  pressKey(key: string): void;
   /** Restores whatever was on `globalThis` before. */
   restore(): void;
 }
@@ -65,6 +71,7 @@ interface MutableGlobals {
   localStorage?: unknown;
   sessionStorage?: unknown;
   location?: unknown;
+  document?: unknown;
 }
 
 /**
@@ -84,6 +91,7 @@ export function installFakeBrowser(origin: string = TEST_ORIGIN): FakeBrowser {
     localStorage: globals.localStorage,
     sessionStorage: globals.sessionStorage,
     location: globals.location,
+    document: globals.document,
   };
 
   const localStorage = createFakeStorage();
@@ -99,15 +107,31 @@ export function installFakeBrowser(origin: string = TEST_ORIGIN): FakeBrowser {
       navigations.push(url);
     },
   };
+  // The one slice of `document` the app reads: a keydown listener registry.
+  // jest-expo's native environment has no `document` at all, so without this
+  // the Escape path is a no-op and untestable.
+  const keyListeners = new Set<(event: { key: string }) => void>();
+  globals.document = {
+    addEventListener: (_type: 'keydown', listener: (event: { key: string }) => void) => {
+      keyListeners.add(listener);
+    },
+    removeEventListener: (_type: 'keydown', listener: (event: { key: string }) => void) => {
+      keyListeners.delete(listener);
+    },
+  };
 
   return {
     localStorage,
     sessionStorage,
     navigations,
+    pressKey: (key: string) => {
+      for (const listener of keyListeners) listener({ key });
+    },
     restore: () => {
       globals.localStorage = previous.localStorage;
       globals.sessionStorage = previous.sessionStorage;
       globals.location = previous.location;
+      globals.document = previous.document;
     },
   };
 }

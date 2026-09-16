@@ -138,7 +138,7 @@ describe('the content column', () => {
  * load rather than a bug — see `preference.tsx`.
  */
 describe('the brand type families', () => {
-  it.each(['light', 'dark'] as const)('states all three families in %s', (scheme) => {
+  it.each(['light', 'dark'] as const)('states all four families in %s', (scheme) => {
     expect(themeFor(scheme).typography).toEqual(brandFonts);
   });
 
@@ -148,24 +148,27 @@ describe('the brand type families', () => {
     expect(themeFor('light').typography).toEqual(themeFor('dark').typography);
   });
 
-  it.each(['heading', 'body', 'mono'] as const)('ends the %s stack in a real generic', (role) => {
-    // A face that fails to load must still resolve to SOMETHING chosen, rather
-    // than to whatever the browser defaults to.
-    //
-    // This used to assert the stack ended in the generic the BASE used, which
-    // was right while every role was a sans. `heading` is a serif now — a
-    // deliberate brand decision — so the rule is that the stack names a
-    // generic, not that it names the package's.
-    const generic = brandFonts[role].slice(brandFonts[role].lastIndexOf(',') + 1).trim();
-    expect(['serif', 'sans-serif', 'monospace']).toContain(generic);
-  });
+  it.each(['heading', 'body', 'mono', 'wordmark'] as const)(
+    'ends the %s stack in a real generic',
+    (role) => {
+      // A face that fails to load must still resolve to SOMETHING chosen,
+      // rather than to whatever the browser defaults to. The rule is that the
+      // stack names a generic, not that it names the package's — `wordmark`
+      // is a serif and the package has no such role at all.
+      const generic = brandFonts[role].slice(brandFonts[role].lastIndexOf(',') + 1).trim();
+      expect(['serif', 'sans-serif', 'monospace']).toContain(generic);
+    },
+  );
 
-  it('gives the heading a serif and the body a sans, not two of a kind', () => {
-    // The pairing is the point: the display face carries the brand precisely
-    // because it contrasts with the face beside it.
-    expect(brandFonts.heading.endsWith('serif')).toBe(true);
-    expect(brandFonts.heading.endsWith('sans-serif')).toBe(false);
+  it('sets the UI in one sans and keeps the serif for the wordmark', () => {
+    // The decision brand/fonts.json makes, pinned: a heading in the app is the
+    // same family as the text beside it, and the serif appears in exactly one
+    // role. A serif creeping back into `heading` is the regression this
+    // catches, and so is the wordmark quietly becoming a sans.
+    expect(brandFonts.heading).toBe(brandFonts.body);
     expect(brandFonts.body.endsWith('sans-serif')).toBe(true);
+    expect(brandFonts.wordmark.endsWith('serif')).toBe(true);
+    expect(brandFonts.wordmark.endsWith('sans-serif')).toBe(false);
   });
 
   it('names a real family before the fallbacks', () => {
@@ -174,6 +177,8 @@ describe('the brand type families', () => {
     // the app.
     for (const role of ['heading', 'body', 'mono'] as const) {
       expect(brandFonts[role]).not.toBe(baseTypography[role]);
+    }
+    for (const role of ['heading', 'body', 'mono', 'wordmark'] as const) {
       expect(brandFonts[role].split(',')[0]?.trim()).not.toMatch(/^(ui-|system-)/);
     }
   });

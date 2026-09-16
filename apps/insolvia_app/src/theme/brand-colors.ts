@@ -61,9 +61,10 @@ export const brandColors = {
  * `public/fonts`, declared @font-face in `public/index.html`.
  */
 export const brandFonts = {
-  heading: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
+  heading: '"Open Sans", ui-sans-serif, system-ui, sans-serif',
   body: '"Open Sans", ui-sans-serif, system-ui, sans-serif',
   mono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  wordmark: '"Cormorant Garamond", Georgia, "Times New Roman", serif',
 } as const;
 
 /**

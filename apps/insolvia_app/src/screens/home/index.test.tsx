@@ -126,7 +126,7 @@ describe('the home route', () => {
     expect(screen.queryByText(/Cognito subject/)).toBeNull();
   });
 
-  it('reflects the resolved environment in the badge, and only there', async () => {
+  it('names the resolved environment in the footer stamp, and nowhere in the body', async () => {
     await renderSignedInHome();
 
     // Tests run without EXPO_PUBLIC_INSOLVIA_ENV, so this is the `local`
@@ -134,12 +134,13 @@ describe('the home route', () => {
     const env = environmentInfo(appEnvironment);
     expect(env.name).toBe('local');
 
-    expect(screen.getByText(env.label.toUpperCase())).toBeTruthy();
-    expect(screen.getByLabelText(`${env.label} environment, ${env.host}`)).toBeTruthy();
-    // The body used to repeat this as "Serving local · localhost". The badge
-    // above already says it, and the footer's build stamp says it with the
-    // bundle id attached — so the prose line went, and this asserts it stayed
-    // gone rather than merely not asserting it.
+    // The footer's build stamp is the one always-visible statement of the
+    // environment now that the header pill is gone (the account menu states
+    // it too, behind its trigger — see account-menu.test.tsx).
+    expect(screen.getByText(new RegExp(`${env.label} · ${env.host}`))).toBeTruthy();
+    // The body used to repeat this as "Serving local · localhost". The footer
+    // already says it with the bundle id attached — so the prose line went,
+    // and this asserts it stayed gone rather than merely not asserting it.
     expect(screen.queryByText(/^Serving /)).toBeNull();
   });
 
@@ -179,13 +180,14 @@ describe('the home route', () => {
     });
   });
 
-  it('frames every screen with the header, nav, main and footer landmarks', async () => {
+  it('frames every screen with the nav, main and footer landmarks', async () => {
     await renderSignedInHome();
 
-    // react-native-web maps these four roles to <header>, <nav>, <main> and
-    // <footer>. The built DOM is re-checked in the deploy verification; this is
-    // the guard that stops the roles being dropped from AppShell in the first
-    // place.
+    // react-native-web maps these three roles to <nav>, <main> and <footer>.
+    // (There is no <header> any more: the wordmark lives in the nav, and a
+    // banner around one word would be a landmark with nothing in it.) The
+    // built DOM is re-checked in the deploy verification; this is the guard
+    // that stops the roles being dropped from AppShell in the first place.
     //
     // Walked from the rendered tree rather than queried with `getByRole`:
     // Testing Library only matches *accessibility elements*, and a landmark
@@ -193,7 +195,7 @@ describe('the home route', () => {
     // header into a single element for a screen reader on native, which is a
     // worse app in exchange for a prettier test.
     expect(rolesIn(screen.toJSON())).toEqual(
-      expect.arrayContaining(['banner', 'navigation', 'main', 'contentinfo']),
+      expect.arrayContaining(['navigation', 'main', 'contentinfo']),
     );
   });
 });
@@ -225,29 +227,33 @@ describe('the signed-in shell', () => {
     await userEvent.press(screen.getByRole('button', { name: 'Account menu' }));
   }
 
-  it('keeps the identity out of the header until the menu is opened', async () => {
-    // The header used to carry the address as plain text beside an Account
-    // link and a full-size Sign out button — most of its height, for something
-    // touched rarely. One avatar replaces all three.
+  it('names the signed-in person on the rail, and keeps the rest behind the menu', async () => {
+    // The rail's last row says who is signed in — the name, or the address
+    // until there is one (this principal has no firm, so no name). The menu
+    // is closed until pressed: the address on the rail is the row's, and the
+    // panel that repeats it with the environment, appearance and the way out
+    // is not mounted.
     await renderSignedInHome();
 
-    expect(screen.queryByText(TEST_EMAIL)).toBeNull();
+    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(1);
+    expect(screen.queryByRole('menuitem', { name: 'Your account' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Account menu' })).toBeTruthy();
   });
 
   it("shows the user's email address in the menu", async () => {
     // From the ID token's `email` claim, never `/v1/me` — the pool's
     // `username_attributes = ["email"]` means no access-token claim carries it.
+    // Twice once open: the rail's row and the panel's identity block.
     await openAccountMenu();
 
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(screen.getAllByText(TEST_EMAIL)).toHaveLength(2);
   });
 
   it('never renders the Cognito username where an email belongs', async () => {
     // `/v1/me`'s `username` is a UUID. Rendering it as an account label would
     // be a plausible-looking lie.
     await openAccountMenu();
-    expect(screen.getByText(TEST_EMAIL)).toBeTruthy();
+    expect(screen.getAllByText(TEST_EMAIL).length).toBeGreaterThan(0);
 
     expect(screen.queryByText(/^00000000-0000-4000-8000-000000000001$/)).toBeNull();
   });

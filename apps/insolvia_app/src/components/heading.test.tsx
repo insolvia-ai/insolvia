@@ -24,12 +24,13 @@ describe('Heading', () => {
     expect(screen.getByRole('heading').props['aria-level']).toBe(1);
   });
 
-  // The RELATIONSHIP, not the numbers. Cormorant arrives tight because it is
-  // drawn for large sizes, so the tightening that flatters a 34px display
-  // heading closes the letters up at 16px. This once shared one value across
-  // every size, which read worst on a case name — an arbitrary string, where a
-  // run of narrow letters became a smear. Asserting the ordering rather than
-  // the values leaves the tuning free to move.
+  // The RELATIONSHIP, not the numbers. Tracking is size-specific: the letters
+  // of a sans drift apart as it grows and want pulling in at display size,
+  // while at body size the face's own spacing is right and tightening it
+  // closes the letters up. This once shared one value across every size,
+  // which read worst on a case name — an arbitrary string, where a run of
+  // narrow letters became a smear. Asserting the ordering rather than the
+  // values leaves the tuning free to move.
   it('loosens the tracking as the heading gets smaller', () => {
     const trackingAt = (size: 'display' | 'section' | 'body') => {
       render(

@@ -123,7 +123,9 @@ describe('the case team screen', () => {
       [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, assignees([ALICE])),
     });
 
-    expect(await screen.findByText('Alice Attorney')).toBeTruthy();
+    // TWICE: once in the assignee list, and once in the rail's account row —
+    // Alice is signed in as well as assigned. Neither is the subject.
+    expect(await screen.findAllByText('Alice Attorney')).toHaveLength(2);
     expect(screen.queryByText(ALICE)).toBeNull();
   });
 
@@ -146,7 +148,7 @@ describe('the case team screen', () => {
       '/v1/firm/directory': () => jsonResponse(200, DIRECTORY),
       [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, assignees([ALICE])),
     });
-    await screen.findByText('Alice Attorney');
+    await screen.findAllByText('Alice Attorney');
 
     expect(screen.getByRole('button', { name: 'Add Bob Paralegal to this case' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Add Alice Attorney to this case' })).toBeNull();
@@ -158,7 +160,7 @@ describe('the case team screen', () => {
       '/v1/firm/directory': () => jsonResponse(200, DIRECTORY),
       [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, assignees([ALICE])),
     });
-    await screen.findByText('Alice Attorney');
+    await screen.findAllByText('Alice Attorney');
 
     await userEvent
       .setup()
@@ -195,7 +197,7 @@ describe('the case team screen', () => {
       '/v1/firm/directory': () => jsonResponse(200, DIRECTORY),
       [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, assignees([ALICE])),
     });
-    await screen.findByText('Alice Attorney');
+    await screen.findAllByText('Alice Attorney');
 
     expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Add somebody' })).toBeNull();

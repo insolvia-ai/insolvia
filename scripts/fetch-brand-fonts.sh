@@ -7,7 +7,12 @@
 # .woff2 files are committed, because a build that reaches out to a third party
 # for a font is a build that breaks when that third party does.
 #
-# LATIN SUBSET ONLY, which is what keeps all five faces under 80KB together.
+# LATIN SUBSET ONLY, which is what keeps all four faces under 70KB together.
+#
+# FOUR FILES, TWO WEIGHTS OF THE UI FACE. Open Sans at 400 and 600 is the
+# whole app — every heading is 600 (see brand/fonts.json for why there is no
+# 700). Cormorant is fetched at 700 only, because the wordmark is its only
+# reader and sets exactly that; the 600 it once shipped had no caller.
 # Google Fonts serves a different subset per Accept-Encoding/UA, so this asks
 # with a modern browser UA to get woff2 rather than the ttf fallback, then takes
 # the block the CSS labels `/* latin */`.
@@ -39,7 +44,6 @@ grab() { # grab <family-query> <weight> <output-name>
 }
 
 echo "fetching brand faces into ${OUT#"$ROOT/"}"
-grab "Cormorant+Garamond" 600 "cormorant-600.woff2"
 grab "Cormorant+Garamond" 700 "cormorant-700.woff2"
 grab "Open+Sans"     400 "open-sans-400.woff2"
 grab "Open+Sans"     600 "open-sans-600.woff2"
