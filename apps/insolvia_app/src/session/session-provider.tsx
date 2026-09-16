@@ -55,11 +55,11 @@ import {
  * ## The state machine
  *
  * ```text
- *            ┌──────────┐  no stored refresh token   ┌─────────────┐
- *            │ loading  │ ─────────────────────────► │ signed-out  │
- *            └────┬─────┘                            └──────┬──────┘
- *   stored token  │                                         │ signIn()
- *   refreshes OK  ▼                                         ▼
+ *   no stored refresh token          ┌─────────────┐
+ *   ─────────────────────────────►   │ signed-out  │
+ *                                    └──────┬──────┘
+ *   stored refresh token                    │ signIn()
+ *   ─────────────────────────────►          ▼
  *            ┌───────────┐   refresh fails / signOut()   hosted UI
  *            │ signed-in │ ─────────────────────────►  /oauth2/authorize
  *            └───────────┘                                  │
@@ -67,12 +67,27 @@ import {
  *                  └──────── completeSignIn() ◄──── /auth/callback
  * ```
  *
- * `loading` is not cosmetic: it is what stops a signed-in user's protected
- * content flashing the sign-in screen on every reload while the stored refresh
- * token is being exchanged, and it is why `RequireSession` renders neither the
- * children nor a redirect until it resolves (issue #78).
+ * **There is no `loading` state, and the first render already knows which of
+ * the two it is in.** Whether a refresh token is stored is a synchronous read,
+ * so a reload with one starts as `signed-in` — optimistically, with
+ * {@link SessionContextValue.restoring} set while the stored token is being
+ * exchanged for an access token in the background — and a reload without one
+ * starts as `signed-out` with no request made.
+ *
+ * The optimism is safe because of what `signed-in` does and does not unlock.
+ * It lets the app's chrome and each screen's own loading skeleton render at
+ * once. It does not let any protected DATA render: every API call goes through
+ * {@link SessionContextValue.accessToken}, which waits for the in-flight
+ * exchange, so nothing is fetched — and nothing case-shaped is shown — until
+ * Cognito has actually vouched for the session. If the exchange fails the
+ * status flips to `signed-out` and the route guard redirects, exactly as it
+ * would have after a blocking check. What is gone is the blocking check
+ * itself, and with it the "Checking your session" page every reload used to
+ * paint (issue #78 wanted two things — never bounce a signed-in user to
+ * sign-in, never flash case data at someone with no session — and both hold
+ * without it).
  */
-export type SessionStatus = 'loading' | 'signed-in' | 'signed-out';
+export type SessionStatus = 'signed-in' | 'signed-out';
 
 /** Display identity, read from the ID token. Never used for authorization. */
 export interface SessionUser {
@@ -97,6 +112,16 @@ export interface CallbackParams {
 export interface SessionContextValue {
   /** Where the session is. See the diagram above. */
   readonly status: SessionStatus;
+
+  /**
+   * `true` from a reload with a stored refresh token until that token has been
+   * exchanged — the window in which {@link status} is `signed-in` on trust and
+   * {@link user} is still `null`. It ends in `signed-in` with a `user`, or in
+   * `signed-out`. Screens rarely need it: a screen that fetches its data waits
+   * on {@link accessToken} implicitly. The sign-in screen is the one caller,
+   * so it does not bounce a user onward and then straight back.
+   */
+  readonly restoring: boolean;
 
   /** Display identity while {@link status} is `signed-in`, else `null`. */
   readonly user: SessionUser | null;
@@ -179,7 +204,15 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
   // invalidate the memo below.
   const [config] = useState<AuthConfig | null>(() => configOverride ?? resolveAuthConfig());
 
-  const [status, setStatus] = useState<SessionStatus>('loading');
+  /**
+   * Decided on the first render, from storage, so no render ever has to show
+   * a "not sure yet" state — see the header. `config === null` (no hosted UI)
+   * short-circuits to `signed-out` without touching storage at all.
+   */
+  const [status, setStatus] = useState<SessionStatus>(() =>
+    config !== null && readRefreshToken() !== null ? 'signed-in' : 'signed-out',
+  );
+  const [restoring, setRestoring] = useState<boolean>(() => status === 'signed-in');
   const [user, setUser] = useState<SessionUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -218,6 +251,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
     const claims = readIdTokenClaims(tokens.idToken);
     setUser({ email: claims.email, subject: claims.subject });
     setStatus('signed-in');
+    setRestoring(false);
     setError(null);
   }, []);
 
@@ -228,6 +262,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
     clearPendingAuthorization();
     setUser(null);
     setStatus('signed-out');
+    setRestoring(false);
   }, []);
 
   const refresh = useCallback(async (): Promise<boolean> => {
@@ -264,33 +299,21 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
   }, [adopt, clearSession, config]);
 
   /**
-   * Bootstrap: a reload with a stored refresh token restores the session before
-   * anything protected renders.
+   * Bootstrap: a reload with a stored refresh token exchanges it in the
+   * background. The status was already set to `signed-in` above; this effect
+   * is what makes it true — `adopt` — or, on failure, what flips it to
+   * `signed-out` through `clearSession`. Both end the `restoring` window.
    *
-   * The `cancelled` flag is not ceremony — React 19 runs effects twice in
-   * development, and a component unmounted mid-exchange must not call
-   * `setState`.
+   * React 19 runs effects twice in development. The second run finds the first
+   * run's exchange already in flight and shares it through `refreshInFlight`,
+   * so the stored token is presented once, which rotation requires.
    */
   useEffect(() => {
-    let cancelled = false;
-
-    const restore = async () => {
-      // No hosted UI, or nothing stored: signed out, with no request made.
-      if (config === null || readRefreshToken() === null) {
-        if (!cancelled) {
-          setStatus('signed-out');
-        }
-        return;
-      }
-      // `refresh` settles the status itself — `signed-in` on success,
-      // `signed-out` after clearing the session on failure.
-      await refresh();
-    };
-
-    void restore();
-    return () => {
-      cancelled = true;
-    };
+    // No hosted UI, or nothing stored: already `signed-out`, no request.
+    if (config === null || readRefreshToken() === null) {
+      return;
+    }
+    void refresh();
     // Runs once per mount: `config` is fixed for the provider's lifetime and
     // `refresh` is stable, so this is a mount effect stated honestly.
   }, [config, refresh]);
@@ -298,7 +321,17 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
   const accessToken = useCallback(async (): Promise<string | undefined> => {
     const current = tokensRef.current;
     if (current === null) {
-      return undefined;
+      // Nothing in memory. With nothing stored either there is no session and
+      // no request to make. With a stored refresh token this is the restore
+      // window — the caller is a screen that rendered optimistically — so
+      // wait for the exchange the bootstrap effect already started (the
+      // in-flight promise is shared) rather than answering `undefined` and
+      // sending the caller to sign-in over a session that is about to exist.
+      if (readRefreshToken() === null) {
+        return undefined;
+      }
+      const restored = await refresh();
+      return restored ? (tokensRef.current?.accessToken ?? undefined) : undefined;
     }
     if (current.expiresAt - Date.now() > EXPIRY_SKEW_MS) {
       return current.accessToken;
@@ -408,6 +441,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
   const value = useMemo<SessionContextValue>(
     () => ({
       status,
+      restoring,
       user,
       isConfigured: config !== null,
       error,
@@ -417,7 +451,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
       refresh,
       completeSignIn,
     }),
-    [accessToken, completeSignIn, config, error, refresh, signIn, signOut, status, user],
+    [accessToken, completeSignIn, config, error, refresh, restoring, signIn, signOut, status, user],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

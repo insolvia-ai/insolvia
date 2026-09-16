@@ -14,17 +14,21 @@ export interface RequireSessionProps {
  * The route guard: renders `children` only for a signed-in user with a usable
  * name, and sends everyone else to sign-in.
  *
- * **The `loading` arm is the acceptance criterion of issue #78, not a nicety.**
- * On every reload the session starts as `loading` while the stored refresh
- * token is exchanged. The two obvious shapes both fail there:
+ * **It never blocks on the session being confirmed.** A reload with a stored
+ * refresh token starts `signed-in` while the token is exchanged in the
+ * background (`SessionProvider`'s header has the argument). Issue #78 wanted
+ * two things here, and both still hold:
  *
- * - treating "not signed in yet" as signed out bounces an *already signed-in*
- *   user to `/sign-in` for a moment on every single reload;
- * - rendering `children` optimistically flashes protected content — case data —
- *   to someone who may turn out not to have a session at all.
+ * - an *already signed-in* user is never bounced to `/sign-in` for a moment
+ *   on reload — the status is `signed-in` from the first frame;
+ * - protected content — case data — never flashes at someone who turns out
+ *   to have no session — every fetch waits on `accessToken()`, so nothing
+ *   case-shaped renders until Cognito has answered, and a failed exchange
+ *   lands in `signed-out` and the redirect below.
  *
- * So this component renders neither until the status resolves. There is no
- * third state to add later: `loading` ends in `signed-in` or `signed-out`.
+ * What the user with a stale token sees is the app's chrome and a screen's
+ * loading skeleton for the length of one round trip, then sign-in. That is
+ * the trade for every other reload painting nothing in between.
  *
  * The redirect is an **effect**, not something computed during render, because
  * navigating is a side effect and `router.replace` during render is a React
@@ -58,14 +62,15 @@ export function RequireSession({ children }: RequireSessionProps) {
     return <RequireProfile>{children}</RequireProfile>;
   }
 
-  // Covers both `loading` and the frame or two after `signed-out` before the
-  // effect's navigation commits. Deliberately the same screen: the difference
-  // is not something a user needs to be told, and a bare `null` here would be
-  // a blank page with no heading for axe to find.
+  // `signed-out`: the frame or two before the effect's navigation commits.
+  // Deferred, so that frame is an empty shell rather than a titled page that
+  // flickers past — and not a bare `null`, so a navigation that stalls still
+  // ends up with a heading for axe to find.
   return (
     <StatusScreen
-      title="Checking your session"
-      message="One moment while we confirm you are signed in."
+      defer
+      title="Taking you to sign-in"
+      message="One moment while we take you to the sign-in page."
     />
   );
 }

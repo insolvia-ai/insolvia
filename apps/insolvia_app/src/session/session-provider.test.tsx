@@ -29,6 +29,7 @@ function Probe() {
   return (
     <>
       <Text>{`status:${session.status}`}</Text>
+      <Text>{`restoring:${String(session.restoring)}`}</Text>
       <Text>{`email:${session.user?.email ?? 'none'}`}</Text>
       <Text>{`configured:${String(session.isConfigured)}`}</Text>
     </>
@@ -78,12 +79,27 @@ describe('the session', () => {
 
       renderSession();
 
-      expect(await screen.findByText('status:signed-in')).toBeTruthy();
-      expect(screen.getByText(`email:${TEST_EMAIL}`)).toBeTruthy();
+      expect(await screen.findByText(`email:${TEST_EMAIL}`)).toBeTruthy();
+      expect(screen.getByText('status:signed-in')).toBeTruthy();
+      expect(screen.getByText('restoring:false')).toBeTruthy();
 
       const [url, init] = fetchMock.mock.calls[0] ?? [];
       expect(url).toBe(`${TEST_AUTH_CONFIG.domain}/oauth2/token`);
       expect(String(init?.body)).toContain('grant_type=refresh_token');
+    });
+
+    it('is signed-in, and restoring, from the very first render', async () => {
+      // The optimistic half: no render ever shows a "not sure yet" state. A
+      // stored token means `signed-in` at once — with no user yet, because the
+      // ID token has not arrived — and `restoring` marks the window.
+      writeRefreshToken('stored-refresh-token');
+      fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+
+      renderSession();
+
+      expect(screen.getByText('status:signed-in')).toBeTruthy();
+      expect(screen.getByText('restoring:true')).toBeTruthy();
+      expect(screen.getByText('email:none')).toBeTruthy();
     });
 
     it('persists the rotated replacement token', async () => {
@@ -106,6 +122,13 @@ describe('the session', () => {
       await screen.findByText('status:signed-in');
 
       expect(readRefreshToken()).toBe('stored-refresh-token');
+    });
+
+    it('starts signed-out, and not restoring, when nothing is stored', async () => {
+      renderSession();
+
+      expect(screen.getByText('status:signed-out')).toBeTruthy();
+      expect(screen.getByText('restoring:false')).toBeTruthy();
     });
 
     it('settles on signed-out with no request when nothing is stored', async () => {
@@ -134,6 +157,7 @@ describe('the session', () => {
       renderSession();
 
       expect(await screen.findByText('status:signed-out')).toBeTruthy();
+      expect(screen.getByText('restoring:false')).toBeTruthy();
       expect(readRefreshToken()).toBeNull();
       expect(browser.localStorage.entries.size).toBe(0);
     });
@@ -185,6 +209,41 @@ describe('the session', () => {
         await expect(session().accessToken()).resolves.toBe('renewed-access-token');
       });
       expect(fetchMock).toHaveBeenCalled();
+    });
+
+    it('waits for the restore in flight instead of answering undefined', async () => {
+      // The optimistic guard means a screen asks for a token before the
+      // bootstrap exchange has answered. Answering `undefined` there would send
+      // it to sign-in over a session that is about to exist.
+      writeRefreshToken('stored-refresh-token');
+      let respond: (response: Response) => void = () => undefined;
+      fetchMock.mockReturnValue(
+        new Promise<Response>((resolve) => {
+          respond = resolve;
+        }),
+      );
+
+      renderSession();
+      expect(screen.getByText('restoring:true')).toBeTruthy();
+
+      let token: string | undefined = 'unanswered';
+      const asked = session()
+        .accessToken()
+        .then((value) => {
+          token = value;
+        });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(token).toBe('unanswered');
+
+      await act(async () => {
+        respond(tokenEndpointResponse({ accessToken: 'restored-access-token' }));
+        await asked;
+      });
+      expect(token).toBe('restored-access-token');
+      // One exchange, shared with the bootstrap — rotation forbids a second.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it('yields undefined when there is no session', async () => {

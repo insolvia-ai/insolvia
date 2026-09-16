@@ -8,6 +8,7 @@ import {
   principalResponse,
   routeFetch,
   TEST_AUTH_CONFIG,
+  tokenEndpointError,
   tokenEndpointResponse,
 } from '@/session/testing';
 import type { FakeBrowser } from '@/session/testing';
@@ -151,24 +152,58 @@ describe('the route guard', () => {
     expect(router.getSearchParams()).toMatchObject({ returnTo: '/' });
   });
 
-  it('renders no protected content while the session is still loading', async () => {
-    // Issue #78's explicit acceptance criterion. The refresh never settles, so
-    // the session is pinned in `loading` — the exact window in which an
-    // optimistic guard would flash case data at someone who may have no
-    // session at all.
+  it('renders no protected data, and no sign-in, while the session is being restored', async () => {
+    // Issue #78's acceptance criterion, restated for the optimistic guard. The
+    // refresh never settles, so the session is pinned in its restore window.
+    // The app's chrome may render — that is the point — but nothing may be
+    // FETCHED, because a fetch is the only way case data reaches the screen,
+    // and the user must not be bounced to sign-in either.
+    writeRefreshToken('stored-refresh-token');
+    const fetchMock = jest.fn(
+      (_url: string, _init?: unknown) => new Promise<Response>(() => undefined),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const router = renderRouter('src/app', { initialUrl: '/' });
+
+    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Checking your session' })).toBeNull();
+    // Only the token endpoint has been asked anything: the API waits on it.
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(urls.every((url) => url.includes('/oauth2/token'))).toBe(true);
+    expect(urls).toHaveLength(1);
+    // And it has NOT bounced an about-to-be-signed-in user to sign-in either.
+    expect(router.getPathname()).toBe('/');
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('waits for a restore before bouncing a signed-in visitor off /sign-in', async () => {
+    // A stale stored token would otherwise send the visitor to `/` and straight
+    // back here. The page stays empty for the deferral, then names itself.
     writeRefreshToken('stored-refresh-token');
     globalThis.fetch = jest.fn(
       () => new Promise<Response>(() => undefined),
     ) as unknown as typeof fetch;
 
+    const router = renderRouter('src/app', { initialUrl: '/sign-in' });
+
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Checking your session' })).toBeTruthy();
+    expect(router.getPathname()).toBe('/sign-in');
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('sends a visitor with a stale stored token to sign in', async () => {
+    writeRefreshToken('stale-refresh-token');
+    globalThis.fetch = jest.fn(
+      routeFetch({ '/oauth2/token': () => tokenEndpointError() }),
+    ) as unknown as typeof fetch;
+
     const router = renderRouter('src/app', { initialUrl: '/' });
 
-    expect(await screen.findByRole('heading', { name: 'Checking your session' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Your case workspace' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Start a case' })).toBeNull();
-    // And it has NOT bounced an about-to-be-signed-in user to sign-in either.
-    expect(router.getPathname()).toBe('/');
-    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
+    expect(router.getPathname()).toBe('/sign-in');
+    expect(router.getSearchParams()).toMatchObject({ returnTo: '/' });
   });
 
   it('lets a restored session through to the protected screen', async () => {
