@@ -368,14 +368,22 @@ per-field, carried on every record as a map keyed by field path:
 ```
 provenance: {
   "<field_path>": {
-    source: staff_typed | ai_extracted | imported,
+    source: staff_typed | ai_extracted | imported | library,
     confirmed_by, confirmed_at,
     document_id, locator,
     extraction_id,          // the extraction_candidate.id this value came from
-    confidence
+    confidence,
+    library_creditor_id     // the library_creditor.id this value was copied from
   }
 }
 ```
+
+`library` (issue 13.9 / #350) names a value copied from the firm's reusable
+creditor library (`insolvia_core.library_creditors`) onto a case record — a
+COPY, never a live link, so a later edit to the library entry never rewrites a
+filed schedule. It sits with `staff_typed` rather than in the confirmation
+rule below: a person chose the library entry, which is the same kind of act
+as typing the value themselves, not something machine-supplied.
 
 Field paths are dotted, with embedded list elements addressed by their `id`
 rather than their position — `other_names_used[<id>].surname` — so that
@@ -626,10 +634,10 @@ quietly comes to mean "can see everything"; collapsing `is_admin` into
 able to change everyone's permissions.
 
 The feature list is ours — `cases`, `intake`, `documents`,
-`extraction_review`, `firm_administration` — and the default for anything not
-in a user's map is `hidden`. That is what lets a feature be listed before it
-exists (`extraction_review` is) without arriving already granted to every row
-written before it was named.
+`extraction_review`, `creditor_library`, `firm_administration` — and the
+default for anything not in a user's map is `hidden`. That is what lets a
+feature be listed before it exists (`extraction_review` is) without arriving
+already granted to every row written before it was named.
 
 ## Not here, on purpose
 

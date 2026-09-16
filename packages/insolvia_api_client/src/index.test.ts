@@ -49,6 +49,7 @@ import {
   isDocumentContentType,
   isDocumentKind,
   isUploadIncomplete,
+  libraryProvenance,
   permits,
   staffTypedProvenance,
   submittedAtUtc,
@@ -56,6 +57,7 @@ import {
 import type {
   Debtor,
   FetchLike,
+  LibraryCreditor,
   PutDebtorRequest,
   WaitlistSubmission,
 } from '@insolvia-ai/api-client';
@@ -2987,6 +2989,7 @@ describe('the firm block on /v1/me', () => {
     intake: 'add_edit',
     documents: 'add_edit',
     extraction_review: 'add_edit',
+    creditor_library: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -3466,6 +3469,7 @@ describe('the firm user endpoints', () => {
       intake: 'add_edit',
       documents: 'add_edit',
       extraction_review: 'add_edit',
+      creditor_library: 'add_edit',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -3621,6 +3625,147 @@ describe('the firm user endpoints', () => {
     await expect(client.removeFirmUser(SUBJECT_ID)).resolves.toBeUndefined();
     expect(stub.lastRequest().method).toBe('DELETE');
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/users/${SUBJECT_ID}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The firm's reusable creditor library (issue 13.9 / #350). SNAKE_CASE on the
+// wire, unlike every other firm-domain endpoint above — see
+// insolvia_core.library_creditors' module docstring for why.
+// ---------------------------------------------------------------------------
+
+describe('the library creditor endpoints', () => {
+  const CREDITOR_ID = 'c1a2b3c4-0000-4000-8000-000000000001';
+  const CREDITOR_JSON = {
+    id: CREDITOR_ID,
+    name: 'Acme Collections',
+    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+    additional_notice_parties: [
+      { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
+    ],
+    preferred: true,
+    notes: 'Reach the legal department directly.',
+    created_at: '2026-07-23T09:15:00.123Z',
+    updated_at: '2026-07-23T09:15:00.123Z',
+  };
+  const CREDITOR: LibraryCreditor = {
+    id: CREDITOR_ID,
+    name: 'Acme Collections',
+    address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+    additional_notice_parties: [
+      { id: 'np1', name: 'Legal Dept', address: {}, account_last4: '1234' },
+    ],
+    preferred: true,
+    notes: 'Reach the legal department directly.',
+    created_at: '2026-07-23T09:15:00.123Z',
+    updated_at: '2026-07-23T09:15:00.123Z',
+  };
+
+  test('GETs /v1/firm/creditors and maps the whole library', async () => {
+    const stub = stubFetch(() => jsonResponse({ creditors: [CREDITOR_JSON] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const creditors = await client.listLibraryCreditors();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/creditors`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(creditors).toEqual([CREDITOR]);
+  });
+
+  test('POSTs a draft and maps the 201 back, snake_case throughout', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.addLibraryCreditor({
+      name: 'Acme Collections',
+      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+      additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
+      preferred: true,
+      notes: 'Reach the legal department directly.',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/creditors`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: 'Acme Collections',
+      address: { line1: '1 Main St', city: 'Springfield', state: 'IL', postal_code: '62701' },
+      additional_notice_parties: [{ id: 'np1', name: 'Legal Dept', account_last4: '1234' }],
+      preferred: true,
+      notes: 'Reach the legal department directly.',
+    });
+    expect(created).toEqual(CREDITOR);
+  });
+
+  test('a draft with only a name omits every other key — no undefined leaks', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addLibraryCreditor({ name: 'Acme Collections' });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({ name: 'Acme Collections' });
+  });
+
+  test('PUTs a whole replacement to /v1/firm/creditors/{id}', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_JSON, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateLibraryCreditor(CREDITOR_ID, {
+      name: 'Acme Collections',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/creditors/${CREDITOR_ID}`);
+    expect(stub.lastRequest().method).toBe('PUT');
+    expect(updated).toEqual(CREDITOR);
+  });
+
+  test('DELETEs and resolves on 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.removeLibraryCreditor(CREDITOR_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/creditors/${CREDITOR_ID}`);
+  });
+
+  test('a 400 on POST throws ApiValidationException with the server field messages', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'validation failed', fields: { name: 'A creditor name is required.' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client.addLibraryCreditor({ name: '' }).catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.name).toBe('A creditor name is required.');
+  });
+
+  test('libraryProvenance tags every populated field with the library entry id', () => {
+    const body = { name: 'Acme Collections', address: { line1: '1 Main St' } };
+    expect(libraryProvenance(body, CREDITOR_ID)).toEqual({
+      name: { source: 'library', library_creditor_id: CREDITOR_ID },
+      'address.line1': { source: 'library', library_creditor_id: CREDITOR_ID },
+    });
   });
 });
 

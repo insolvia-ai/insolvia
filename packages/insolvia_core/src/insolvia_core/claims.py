@@ -172,9 +172,14 @@ def _lien_position(value: object, errors: dict[str, str]) -> int | None:
     return position
 
 
-def _parse_notice_parties(
+def parse_notice_parties(
     value: object, errors: dict[str, str]
 ) -> tuple[NoticeParty, ...]:
+    """Parse a `notice_parties` list. Public: `library_creditors.py` reuses
+    this for a library creditor's additional notice parties, which the issue
+    that added them (13.9) specifies as "the same shape `claim.notice_parties`
+    uses" — one parser rather than a second copy of the id/name/address/
+    account_last4 rules to keep in step."""
     if value is None:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
@@ -232,7 +237,7 @@ def parse_claim(payload: Mapping[str, object]) -> ClaimBody:
             payload.get("who_incurred"), DEBTOR_ATTRIBUTION, "who_incurred", errors
         ),
         community_debt=boolean(payload.get("community_debt"), "community_debt", errors),
-        notice_parties=_parse_notice_parties(payload.get("notice_parties"), errors),
+        notice_parties=parse_notice_parties(payload.get("notice_parties"), errors),
         asset_id=text(payload.get("asset_id"), "asset_id", errors, limit=64),
         lien_position=_lien_position(payload.get("lien_position"), errors),
         collateral_description=text(

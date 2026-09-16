@@ -81,7 +81,12 @@ export interface Principal {
  * a general RBAC vocabulary — adding one is a server change.
  */
 export type FirmFeature =
-  'cases' | 'intake' | 'documents' | 'extraction_review' | 'firm_administration';
+  | 'cases'
+  | 'intake'
+  | 'documents'
+  | 'extraction_review'
+  | 'creditor_library'
+  | 'firm_administration';
 
 /**
  * How much of a feature a firm user may reach. Ordered weakest to strongest:
@@ -375,6 +380,76 @@ export function updateFirmUserRequestToJson(
   if (request.permissions !== undefined) body.permissions = request.permissions;
   if (request.status !== undefined) body.status = request.status;
   return body;
+}
+
+/**
+ * A firm's reusable creditor (issue 13.9 / #350) — `/v1/firm/creditors`, gated
+ * by the `creditor_library` feature.
+ *
+ * **Snake_case, unlike every other type on this page.** Every other
+ * firm-domain response (`Firm`, `FirmUser`) is camelCase because `firm.py`
+ * invented its own field names; this one reuses `claims.py`'s `NoticeParty`
+ * and the case domain's `Address` verbatim (the issue specifies "the same
+ * shape `claim.notice_parties` uses"), so the wire follows the case domain's
+ * snake_case rather than adding a second, camelCase copy of the same fields.
+ */
+export interface LibraryCreditor {
+  readonly id: string;
+  readonly name: string;
+  readonly address: Address;
+  /** Other parties to notify about a debt to this creditor — copy target for
+   * a claim's {@link ClaimBody.notice_parties} once the claim exists; not
+   * copied onto the case creditor itself, which carries no such field. */
+  readonly additional_notice_parties: readonly NoticeParty[];
+  /** Surfaced first by a picker; set by whoever curates the library. */
+  readonly preferred: boolean;
+  readonly notes?: string | undefined;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The `POST` / `PUT /v1/firm/creditors/{id}` request body — a WHOLE record,
+ * never a partial PATCH. `insolvia_core.library_creditors` owns why: every
+ * field is edited together on one form, and `notes` must be able to become
+ * empty again, which "omitted means unchanged" cannot express for the same
+ * field that also needs "omitted means clear it".
+ */
+export interface LibraryCreditorDraft {
+  /** Required — a library entry with no name is not a record the picker can show. */
+  readonly name: string;
+  readonly address?: Address | undefined;
+  readonly additional_notice_parties?: readonly NoticeParty[] | undefined;
+  readonly preferred?: boolean | undefined;
+  readonly notes?: string | undefined;
+}
+
+function noticePartyToJson(party: NoticeParty): Record<string, unknown> {
+  return assignDefined(
+    { id: party.id },
+    {
+      name: party.name,
+      address: addressToJson(party.address),
+      account_last4: party.account_last4,
+    },
+  );
+}
+
+/** The `POST`/`PUT /v1/firm/creditors[/{id}]` body, snake_case, absent
+ * optionals omitted entirely. */
+export function libraryCreditorDraftToJson(draft: LibraryCreditorDraft): Record<string, unknown> {
+  return assignDefined(
+    { name: draft.name },
+    {
+      address: addressToJson(draft.address),
+      additional_notice_parties:
+        draft.additional_notice_parties === undefined
+          ? undefined
+          : draft.additional_notice_parties.map(noticePartyToJson),
+      preferred: draft.preferred,
+      notes: draft.notes,
+    },
+  );
 }
 
 /** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */
@@ -1170,8 +1245,13 @@ export type CounselingExemption = (typeof COUNSELING_EXEMPTIONS)[number];
  * `imported` sits with `ai_extracted` rather than with `staff_typed`: machine-
  * supplied is machine-supplied, and the source system does not change who is
  * signing the form. Both are subject to the confirm-before-entry rule below.
+ *
+ * `library` (issue 13.9 / #350) is a value COPIED from the firm's reusable
+ * creditor library onto a case record — a human chose the entry, so it needs
+ * no confirmation, the same as `staff_typed`. See {@link libraryProvenance}
+ * and {@link ProvenanceEntry.library_creditor_id}.
  */
-export const PROVENANCE_SOURCES = ['staff_typed', 'ai_extracted', 'imported'] as const;
+export const PROVENANCE_SOURCES = ['staff_typed', 'ai_extracted', 'imported', 'library'] as const;
 
 /** Who supplied a value. See {@link PROVENANCE_SOURCES}. */
 export type ProvenanceSource = (typeof PROVENANCE_SOURCES)[number];
@@ -1209,6 +1289,13 @@ export interface ProvenanceEntry {
   readonly extraction_id?: string | undefined;
   /** The extractor's confidence, between 0 and 1 inclusive. */
   readonly confidence?: number | undefined;
+  /**
+   * The {@link LibraryCreditor.id} this value was copied from. Present only
+   * when {@link source} is `'library'`. Not validated against the firm's
+   * library by the API — a library entry deleted after the copy leaves this
+   * readable rather than the case record unwritable.
+   */
+  readonly library_creditor_id?: string | undefined;
 }
 
 /**
@@ -1548,6 +1635,7 @@ function provenanceToJson(
         locator: entry.locator,
         extraction_id: entry.extraction_id,
         confidence: entry.confidence,
+        library_creditor_id: entry.library_creditor_id,
       },
     );
   }
@@ -1605,6 +1693,35 @@ export function staffTypedProvenance(body: DebtorBodyLike): Record<string, Prove
   const entries: Record<string, ProvenanceEntry> = {};
   for (const path of populatedPaths(caseDataOf(body))) {
     entries[path] = { source: 'staff_typed' };
+  }
+  return entries;
+}
+
+/**
+ * A `provenance` map that says "copied from the firm's creditor library" for
+ * every populated field of `body` (issue 13.9 / #350) — the map a case
+ * creditor built from a library pick needs, the same walk
+ * {@link staffTypedProvenance} does with `source: 'library'` and
+ * {@link libraryCreditorId} recorded on every entry.
+ *
+ * `library` needs no `confirmed_by`/`confirmed_at`: a person chose the entry,
+ * which is the same kind of act as typing the value themselves.
+ *
+ * ```ts
+ * const body = { name: creditor.name, address: creditor.address };
+ * await client.addCaseEntity(caseId, 'creditors', {
+ *   ...body,
+ *   provenance: libraryProvenance(body, creditor.id),
+ * });
+ * ```
+ */
+export function libraryProvenance(
+  body: DebtorBodyLike,
+  libraryCreditorId: string,
+): Record<string, ProvenanceEntry> {
+  const entries: Record<string, ProvenanceEntry> = {};
+  for (const path of populatedPaths(caseDataOf(body))) {
+    entries[path] = { source: 'library', library_creditor_id: libraryCreditorId };
   }
   return entries;
 }

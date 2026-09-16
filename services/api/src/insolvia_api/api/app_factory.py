@@ -30,6 +30,9 @@ from insolvia_api.api.routes.extraction_review import (
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
+from insolvia_api.api.routes.library_creditors import (
+    blueprint as library_creditors_blueprint,
+)
 from insolvia_api.api.routes.liens import blueprint as liens_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
@@ -57,6 +60,10 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/cases/<id>/standards — a static segment, same argument as /summary.
     app.register_blueprint(standards_blueprint)
     app.register_blueprint(firm_blueprint)
+    # /v1/firm/creditors — a static segment under the same firm-scoped
+    # namespace as firm_blueprint, registered as its own module for the same
+    # reason case_entities is its own module rather than a growing firm.py.
+    app.register_blueprint(library_creditors_blueprint)
     app.register_blueprint(documents_blueprint)
     app.register_blueprint(debtors_blueprint)
     app.register_blueprint(creditor_matrix_blueprint)
