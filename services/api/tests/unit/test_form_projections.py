@@ -446,9 +446,16 @@ def _claims() -> tuple[tuple[str, ClaimBody], ...]:
                 unliquidated=False,
                 disputed=False,
                 who_incurred="both",
+                # Linked to the homestead (issue #345), with the typed value
+                # and description kept as the override: the preparer values
+                # the collateral at the family's portion, not the asset's
+                # `value_entire` — the override is what says so.
+                asset_id="asset-house",
+                lien_position=1,
                 collateral_description="12 Byron Court, Tampa, FL 33601",
                 collateral_value="240000.00",
                 lien_nature=("agreement",),
+                intention="retain_reaffirm",
                 notice_parties=(
                     NoticeParty(
                         id="np-mortgage-servicer",
@@ -474,9 +481,13 @@ def _claims() -> tuple[tuple[str, ClaimBody], ...]:
                 date_incurred="2023-04-15",
                 amount="7400.00",
                 who_incurred="debtor_1",
-                collateral_description="2016 Honda Civic LX",
-                collateral_value="9000.00",
+                # No typed collateral: the description and Column B's value
+                # resolve through the asset (issue #345), and the golden
+                # proves they print exactly as the typed pair did.
+                asset_id="asset-civic",
+                lien_position=1,
                 lien_nature=("agreement",),
+                intention="retain_redeem",
             ),
         ),
         (
@@ -1649,6 +1660,50 @@ def test_b106d_underwater_collateral_leaves_an_unsecured_portion() -> None:
         project(release, CaseFile(**{**case_file.__dict__, "claims": resized}))
     )
     assert row(values, release, "claim.unsecured_portion", 0) == Text("15,000.00")
+
+
+def test_b106d_collateral_columns_resolve_through_the_asset() -> None:
+    # The auto claim types no collateral at all (issue #345): the description
+    # and Column B come from `asset-civic`, and the golden above proves the
+    # printed row is byte-identical to the typed pair it replaced.
+    release = latest_form("form/b106d")
+    values = dict(project(release, reference_case_file()))
+    assert row(values, release, "claim.collateral_description", 1) == Text(
+        "2016 Honda Civic LX"
+    )
+    assert row(values, release, "claim.collateral_value", 1) == Text("9,000.00")
+    assert row(values, release, "claim.unsecured_portion", 1) == Text("0.00")
+
+
+def test_b106d_senior_liens_and_the_override_reach_column_b() -> None:
+    # A second mortgage behind the first: 240,000 of collateral (the typed
+    # override on the mortgage does NOT carry to the junior lien — the junior
+    # reads the asset's 265,000) less 195,000 senior leaves 70,000, so a
+    # 100,000 second is 30,000 short. A third claim states its own figure.
+    case_file = reference_case_file()
+    junior = ClaimBody(
+        creditor_id="cred-auto",
+        claim_class="secured",
+        amount="100000.00",
+        asset_id="asset-house",
+        lien_position=2,
+        lien_nature=("agreement",),
+    )
+    manual = ClaimBody(
+        creditor_id="cred-auto",
+        claim_class="secured",
+        amount="5000.00",
+        collateral_value="1.00",
+        unsecured_amount_override="4321.00",
+    )
+    claims = (*case_file.claims, ("claim-second", junior), ("claim-manual", manual))
+    release = latest_form("form/b106d")
+    values = dict(
+        project(release, CaseFile(**{**case_file.__dict__, "claims": claims}))
+    )
+    assert row(values, release, "claim.collateral_value", 2) == Text("265,000.00")
+    assert row(values, release, "claim.unsecured_portion", 2) == Text("30,000.00")
+    assert row(values, release, "claim.unsecured_portion", 3) == Text("4,321.00")
 
 
 def test_b106d_broken_who_owes_rows_use_the_widget_escape_hatches() -> None:

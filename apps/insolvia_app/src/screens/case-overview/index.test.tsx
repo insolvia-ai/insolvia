@@ -98,6 +98,7 @@ function summaryBody(
       liabilities: '0',
       ...totals,
     },
+    liens: { claims: [], assets: [] },
   };
 }
 

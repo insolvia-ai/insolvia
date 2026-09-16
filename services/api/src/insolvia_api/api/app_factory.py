@@ -30,6 +30,7 @@ from insolvia_api.api.routes.extraction_review import (
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
+from insolvia_api.api.routes.liens import blueprint as liens_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
@@ -51,6 +52,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.extensions["insolvia_api_dependencies"] = dependencies
     app.register_blueprint(cases_blueprint)
     app.register_blueprint(case_summary_blueprint)
+    app.register_blueprint(liens_blueprint)
     app.register_blueprint(firm_blueprint)
     app.register_blueprint(documents_blueprint)
     app.register_blueprint(debtors_blueprint)

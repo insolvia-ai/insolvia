@@ -277,12 +277,17 @@ describe('the intake collection sections', () => {
         fragment: `/v1/cases/${CASE_ID}/claims`,
         respond: () => jsonResponse(200, { claims: [] }),
       },
-      // The claims spec references creditors, so opening the section also
-      // loads them for the picker.
+      // The claims spec references creditors and assets (the collateral
+      // picker), so opening the section also loads both.
       {
         method: 'GET',
         fragment: `/v1/cases/${CASE_ID}/creditors`,
         respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/assets`,
+        respond: () => jsonResponse(200, { assets: [] }),
       },
       {
         method: 'POST',
@@ -341,6 +346,11 @@ describe('the intake collection sections', () => {
         respond: () => jsonResponse(200, { creditors: [] }),
       },
       {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/assets`,
+        respond: () => jsonResponse(200, { assets: [] }),
+      },
+      {
         method: 'POST',
         fragment: `/v1/cases/${CASE_ID}/claims`,
         respond: () =>
@@ -376,6 +386,11 @@ describe('the intake collection sections', () => {
         method: 'GET',
         fragment: `/v1/cases/${CASE_ID}/creditors`,
         respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/assets`,
+        respond: () => jsonResponse(200, { assets: [] }),
       },
       {
         method: 'POST',

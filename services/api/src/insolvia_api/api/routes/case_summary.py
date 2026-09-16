@@ -26,6 +26,7 @@ from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore, DebtorSto
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.case_summary import CaseTotals, summarise
+from insolvia_api.core.liens import liens_json
 from insolvia_api.core.packet_assembly import problem_json, read_case_data
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,7 @@ def case_summary_route(case_id: str) -> ResponseReturnValue:
                 "readyToFile": summary.ready_to_file,
                 "problems": [problem_json(p) for p in summary.problems],
                 "totals": _totals_json(summary.totals),
+                "liens": liens_json(summary.liens),
             }
         ),
         200,

@@ -1759,6 +1759,20 @@ export const NONPRIORITY_TYPES = [
 export type NonpriorityType = (typeof NONPRIORITY_TYPES)[number];
 
 /**
+ * B108's four boxes for one item of collateral (issue #345) — the debtor's
+ * Statement of Intention, stored on the secured claim. The three `retain_*`
+ * members are the form's own split of "retain"; `retain_other` carries its
+ * explanation in `intention_explanation`.
+ */
+export const INTENTIONS = [
+  'surrender',
+  'retain_redeem',
+  'retain_reaffirm',
+  'retain_other',
+] as const;
+export type Intention = (typeof INTENTIONS)[number];
+
+/**
  * The "which debtor" column that recurs across the schedules — who incurred a
  * claim, who owns an asset. One vocabulary, verbatim from the forms.
  */
@@ -1975,7 +1989,9 @@ export interface NoticeParty {
  * {@link claim_class}. The class-specific members are accepted regardless of
  * the class (intake is progressive; the class may be decided last). The
  * unsecured portion of a secured claim and a priority claim's total are
- * arithmetic and never stored or sent.
+ * arithmetic and never stored or sent — a secured claim's secured and
+ * unsecured portions come back derived, from `getCaseLiens` and the
+ * summary's `liens`, never from adding these fields up in a screen.
  */
 export interface ClaimBody {
   /**
@@ -1995,10 +2011,30 @@ export interface ClaimBody {
   readonly who_incurred?: DebtorAttribution | undefined;
   readonly community_debt?: boolean | undefined;
   readonly notice_parties?: readonly NoticeParty[] | undefined;
+  /**
+   * The Schedule A/B asset this lien encumbers (issue #345). Shape-checked
+   * only, like `creditor_id`; a dangling id is the completeness gate's to
+   * flag. The asset supplies the collateral's description and value unless
+   * the two typed fields below override it.
+   */
+  readonly asset_id?: string | undefined;
+  /** Order among the liens on one asset: 1 is the senior lien; 1–99. */
+  readonly lien_position?: number | undefined;
+  /** Free-text collateral — the override, or collateral not on Schedule A/B. */
   readonly collateral_description?: string | undefined;
+  /** Typed collateral value — wins over the linked asset's value when present. */
   readonly collateral_value?: Money | undefined;
   readonly lien_nature?: readonly LienNature[] | undefined;
   readonly lien_nature_other?: string | undefined;
+  /**
+   * "Enter the unsecured portion manually." Present means the server reports
+   * this figure with `unsecuredSource: 'manual'` instead of deriving it; its
+   * provenance entry is the record of who entered it.
+   */
+  readonly unsecured_amount_override?: Money | undefined;
+  /** B108's answer for this collateral; data only until #351 prints it. */
+  readonly intention?: Intention | undefined;
+  readonly intention_explanation?: string | undefined;
   readonly priority_amount?: Money | undefined;
   readonly nonpriority_amount?: Money | undefined;
   readonly priority_type?: PriorityType | undefined;
@@ -2588,6 +2624,54 @@ export interface CaseTotals {
   readonly liabilities: string;
 }
 
+/** Whether a claim's unsecured portion was derived or typed by a preparer. */
+export type UnsecuredSource = 'manual' | 'derived';
+
+/**
+ * One secured claim's collateral, resolved, and its two portions — the
+ * server's `core/liens.py` figures (issue #345), the same ones B106D's
+ * Column B prints from. **Every money member is a decimal STRING** and is
+ * already the answer: a screen shows these, never recomputes them.
+ *
+ * `collateralDescription` and `collateralValue` are the RESOLVED values (the
+ * claim's typed override where there is one, the linked asset's otherwise).
+ * A portion is absent, never null, while it cannot be derived yet — no
+ * amount, or no collateral value from either source — so `=== undefined` is
+ * the whole "not known yet" check.
+ */
+export interface ClaimLien {
+  readonly claimId: string;
+  readonly assetId?: string;
+  readonly lienPosition?: number;
+  readonly amount?: string;
+  readonly collateralDescription?: string;
+  readonly collateralValue?: string;
+  /** The amounts of the liens senior to this one on the same asset. */
+  readonly seniorLiens: string;
+  readonly securedAmount?: string;
+  readonly unsecuredAmount?: string;
+  readonly unsecuredSource: UnsecuredSource;
+}
+
+/** What one asset carries: its secured claims, and the sum of their amounts. */
+export interface AssetLiens {
+  readonly assetId: string;
+  /** In creation order. */
+  readonly claimIds: readonly string[];
+  /** Column A's amounts summed — what is owed against the property. */
+  readonly securedTotal: string;
+}
+
+/**
+ * `GET /v1/cases/{caseId}/liens`, and the `liens` member of the summary —
+ * every secured claim's figures, and every asset that carries a lien. An
+ * asset with no linked claim is absent rather than listed at zero.
+ */
+export interface CaseLiens {
+  readonly claims: readonly ClaimLien[];
+  readonly assets: readonly AssetLiens[];
+}
+
 /**
  * `GET /v1/cases/{caseId}/summary` — one case from above.
  *
@@ -2605,6 +2689,8 @@ export interface CaseSummary {
   /** Empty exactly when `readyToFile` is true. */
   readonly problems: readonly CaseProblem[];
   readonly totals: CaseTotals;
+  /** The same block `getCaseLiens` returns, for the overview. */
+  readonly liens: CaseLiens;
 }
 
 /**

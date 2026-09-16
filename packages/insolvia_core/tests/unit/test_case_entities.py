@@ -40,9 +40,14 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "claim_class": "secured",
         "amount": "12500.00",
         "contingent": False,
+        "asset_id": "as-1",
+        "lien_position": 1,
         "collateral_description": "2016 sedan",
         "collateral_value": "9000.00",
         "lien_nature": ["agreement"],
+        "unsecured_amount_override": "3500.00",
+        "intention": "retain_reaffirm",
+        "intention_explanation": "Keeping the car; payments are current.",
         "notice_parties": [{"id": "np1", "name": "Example Servicer"}],
     },
     "assets": {
@@ -381,6 +386,35 @@ def test_an_unknown_enum_member_is_rejected() -> None:
     with pytest.raises(FieldValidationError) as failure:
         parse_claim({"claim_class": "unsecured"})
     assert "claim_class" in failure.value.fields
+
+
+@pytest.mark.parametrize("position", [0, -1, 100, "1", 1.0, True])
+def test_a_lien_position_outside_one_to_ninety_nine_is_refused(position) -> None:
+    # Zero is refused rather than read as "first" — two counting conventions
+    # on one asset would order the liens wrongly with nothing malformed.
+    with pytest.raises(FieldValidationError) as failure:
+        parse_claim({"lien_position": position})
+    assert "lien_position" in failure.value.fields
+
+
+def test_a_lien_position_of_one_is_the_senior_lien() -> None:
+    assert parse_claim({"lien_position": 1}).lien_position == 1
+    assert parse_claim({"lien_position": 3}).lien_position == 3
+
+
+def test_an_unknown_intention_is_refused() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_claim({"intention": "keep"})
+    assert "intention" in failure.value.fields
+
+
+def test_the_unsecured_override_is_money_like_every_other_amount() -> None:
+    assert parse_claim(
+        {"unsecured_amount_override": "1200"}
+    ).unsecured_amount_override == ("1200.00")
+    with pytest.raises(FieldValidationError) as failure:
+        parse_claim({"unsecured_amount_override": "-1"})
+    assert "unsecured_amount_override" in failure.value.fields
 
 
 def test_a_notice_party_without_an_id_is_refused() -> None:

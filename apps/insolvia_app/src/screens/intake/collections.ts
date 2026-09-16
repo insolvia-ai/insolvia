@@ -4,6 +4,7 @@ import {
   DEBTOR_ATTRIBUTION,
   EMPLOYMENT_STATUSES,
   EXPENSE_CATEGORIES,
+  INTENTIONS,
   LIEN_NATURES,
   NONPRIORITY_TYPES,
   PRIORITY_TYPES,
@@ -394,10 +395,38 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
         label: 'Others to be notified about this debt',
         itemLabel: 'notice party',
       },
-      narrative('collateral_description', 'Collateral — describe the property (secured)'),
-      money('collateral_value', 'Value of the collateral (secured)'),
+      // The collateral, by reference first (issue #345): the asset supplies
+      // the description and Column B's value, and the secured and unsecured
+      // portions are derived server-side — `ClaimCollateralPanel` shows them
+      // beside this form. The two typed fields stay as the override, for
+      // collateral not on Schedule A/B or a value the preparer prefers.
+      {
+        kind: 'reference',
+        key: 'asset_id',
+        label: 'Collateral — property on Schedule A/B (secured)',
+        refers: 'assets',
+      },
+      {
+        kind: 'count',
+        key: 'lien_position',
+        label: 'Lien position — 1 is the senior lien (secured)',
+      },
+      narrative(
+        'collateral_description',
+        'Collateral — describe it here only if it is not the property above (secured)',
+      ),
+      money(
+        'collateral_value',
+        'Value of the collateral — overrides the property’s value (secured)',
+      ),
       multichoice('lien_nature', 'Nature of the lien (secured)', LIEN_NATURES),
       text('lien_nature_other', 'Other lien — specify'),
+      money(
+        'unsecured_amount_override',
+        'Unsecured portion — enter only to override the calculated figure (secured)',
+      ),
+      choice('intention', 'Statement of intention for this collateral (secured)', INTENTIONS),
+      narrative('intention_explanation', 'Intention — explanation'),
       money('priority_amount', 'Priority amount (priority unsecured)'),
       money('nonpriority_amount', 'Nonpriority amount (priority unsecured)'),
       choice('priority_type', 'Type of priority', PRIORITY_TYPES),

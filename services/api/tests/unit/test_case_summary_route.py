@@ -179,6 +179,17 @@ def add_claim(client, case_id, creditor_id, claim_class, **amounts):
     return response.get_json()["id"]
 
 
+def add_asset(client, case_id, **fields):
+    body = {"category": "vehicle", **fields}
+    response = client.post(
+        f"/v1/cases/{case_id}/assets",
+        json={**body, "provenance": dict.fromkeys(body, TYPED)},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
 def summary(client, case_id, subject=ALICE):
     return client.get(f"/v1/cases/{case_id}/summary", headers=auth(subject))
 
@@ -284,6 +295,70 @@ def test_liabilities_is_the_sum_of_the_three_it_reports(client):
 
     assert totals["priorityUnsecured"] == "50.00"
     assert totals["liabilities"] == "150.00"
+
+
+# ── The lien figures (issue #345) ───────────────────────────────
+
+
+def test_an_empty_case_reports_no_liens_rather_than_omitting_the_block(client):
+    case_id = open_case(client)
+
+    body = summary(client, case_id).get_json()
+
+    assert body["liens"] == {"claims": [], "assets": []}
+
+
+def test_linking_a_claim_to_an_asset_derives_both_figures_without_typing_either(
+    client,
+):
+    # The issue's definition of done: the asset's secured total and the
+    # claim's deficiency follow from the link, and neither was entered.
+    case_id = open_case(client)
+    creditor_id = add_creditor(client, case_id)
+    asset_id = add_asset(client, case_id, value_entire="9000.00")
+    claim_id = add_claim(
+        client,
+        case_id,
+        creditor_id,
+        "secured",
+        amount="12000.00",
+        asset_id=asset_id,
+        lien_position=1,
+    )
+
+    liens = summary(client, case_id).get_json()["liens"]
+
+    assert liens["assets"] == [
+        {"assetId": asset_id, "claimIds": [claim_id], "securedTotal": "12000.00"}
+    ]
+    (row,) = liens["claims"]
+    assert row["claimId"] == claim_id
+    assert row["collateralValue"] == "9000.00"
+    assert row["securedAmount"] == "9000.00"
+    assert row["unsecuredAmount"] == "3000.00"
+    assert row["unsecuredSource"] == "derived"
+    # Column A is untouched by the link: the summary still owes the whole
+    # claim, as B106D line 1 totals it.
+    assert summary(client, case_id).get_json()["totals"]["secured"] == "12000.00"
+
+
+def test_a_typed_override_is_reported_as_manual(client):
+    case_id = open_case(client)
+    creditor_id = add_creditor(client, case_id)
+    claim_id = add_claim(
+        client,
+        case_id,
+        creditor_id,
+        "secured",
+        amount="12000.00",
+        unsecured_amount_override="4000.00",
+    )
+
+    (row,) = summary(client, case_id).get_json()["liens"]["claims"]
+
+    assert row["claimId"] == claim_id
+    assert row["unsecuredAmount"] == "4000.00"
+    assert row["unsecuredSource"] == "manual"
 
 
 # ── Readiness ───────────────────────────────────────────────────

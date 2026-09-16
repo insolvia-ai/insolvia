@@ -90,6 +90,13 @@ export function Intake() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
 
   const [section, setSection] = useState<Section>('debtor');
+  // A record another section asked to open — the property's "add a secured
+  // claim", already pointed at the property (issue #345). Consumed by the
+  // editor at mount; cleared by any ordinary section change.
+  const [handoff, setHandoff] = useState<{
+    readonly collection: CaseCollection;
+    readonly body: Record<string, unknown>;
+  } | null>(null);
   const [role, setRole] = useState<FilingRole>('debtor_1');
   const [bodies, setBodies] = useState<Partial<Record<FilingRole, DebtorBody>>>({});
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
@@ -210,8 +217,18 @@ export function Intake() {
     // Leaving the debtor section is navigation like any other: the pending
     // debounce flushes rather than being dropped with the section.
     flush();
+    setHandoff(null);
     setSection(chosen.value);
   };
+
+  const openCollection = useCallback(
+    (collection: CaseCollection, body: Record<string, unknown>) => {
+      flush();
+      setHandoff({ collection, body });
+      setSection(collection);
+    },
+    [flush],
+  );
 
   // FLUSHES on unmount rather than discarding. Clearing the timer alone lost
   // every keystroke typed in the last 800ms whenever the user navigated away —
@@ -258,7 +275,13 @@ export function Intake() {
       {spec !== undefined ? (
         // `key` remounts the editor on a section change so one section's list,
         // form and errors cannot leak into another's.
-        <CollectionEditor key={spec.collection} caseId={caseId} spec={spec} />
+        <CollectionEditor
+          key={spec.collection}
+          caseId={caseId}
+          spec={spec}
+          initialForm={handoff?.collection === spec.collection ? handoff.body : undefined}
+          onOpenCollection={openCollection}
+        />
       ) : null}
 
       {section === 'debtor' && load.kind === 'ready' ? (

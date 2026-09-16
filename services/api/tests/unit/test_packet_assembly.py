@@ -231,6 +231,12 @@ def test_two_income_summaries_for_one_debtor_are_refused():
             "creditor_id",
         ),
         (
+            "claims",
+            CLAIM,
+            lambda: ClaimBody(claim_class="secured", asset_id="no-such-asset"),
+            "asset_id",
+        ),
+        (
             "exemptions",
             EXEMPTION,
             lambda: ExemptionBody(asset_id="no-such-asset"),

@@ -36,6 +36,7 @@ import {
   EXCLUDED_INCOME_CATEGORIES,
   FEE_HANDLING,
   FILING_PROFESSIONAL_ROLES,
+  INTENTIONS,
   OTHER_INCOME_CATEGORIES,
   SMALL_BUSINESS_STATUSES,
   SOFA_ENTRY_TYPES,
@@ -4178,6 +4179,47 @@ describe('the case-collection enums', () => {
   test('CLAIM_CLASSES mirrors core/claims.py', () => {
     expect(CLAIM_CLASSES).toEqual(['secured', 'priority_unsecured', 'nonpriority_unsecured']);
   });
+
+  test('INTENTIONS mirrors core/claims.py', () => {
+    expect(INTENTIONS).toEqual(['surrender', 'retain_redeem', 'retain_reaffirm', 'retain_other']);
+  });
+
+  test('a secured claim sends its collateral reference, order, override and intention', async () => {
+    // The five members issue #345 added, as core/claims.py reads them:
+    // `lien_position` is the one JSON NUMBER on a claim (a whole number, like
+    // a dependent's age), every amount stays a string.
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addCaseEntity(ENTITY_CASE_ID, 'claims', {
+      claim_class: 'secured',
+      amount: '12000.00',
+      asset_id: 'asset-0001',
+      lien_position: 2,
+      unsecured_amount_override: '3000.00',
+      intention: 'retain_reaffirm',
+      intention_explanation: 'Payments are current.',
+      provenance: {
+        claim_class: { source: 'staff_typed' },
+        amount: { source: 'staff_typed' },
+        asset_id: { source: 'staff_typed' },
+        lien_position: { source: 'staff_typed' },
+        unsecured_amount_override: { source: 'staff_typed' },
+        intention: { source: 'staff_typed' },
+        intention_explanation: { source: 'staff_typed' },
+      },
+    });
+
+    const body = JSON.parse(stub.lastRequest().body);
+    expect(body.asset_id).toBe('asset-0001');
+    expect(body.lien_position).toBe(2);
+    expect(body.unsecured_amount_override).toBe('3000.00');
+    expect(body.intention).toBe('retain_reaffirm');
+    expect(body.intention_explanation).toBe('Payments are current.');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -4444,6 +4486,9 @@ describe('getCaseSummary', () => {
       nonpriorityUnsecured: '0',
       liabilities: '0',
     },
+    // `liens_json` on a case with no secured claims: both lists present and
+    // empty, never omitted (issue #345).
+    liens: { claims: [], assets: [] },
   };
 
   test('GETs /v1/cases/{caseId}/summary and maps the whole body', async () => {
@@ -4559,5 +4604,181 @@ describe('getCaseSummary', () => {
 
     expect(summary.readyToFile).toBe(true);
     expect(summary.problems).toEqual([]);
+  });
+
+  test('carries the lien figures, the same block getCaseLiens returns', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...BARE, liens: LIENS }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.liens).toEqual(LIENS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The lien figures (issue #345). Pinned against services/api/.../routes/
+// liens.py and core/liens.py's `liens_json`: the per-claim row with every
+// member known, the row with only the knowable members, and the per-asset
+// block. Every money member is a STRING, two places.
+// ---------------------------------------------------------------------------
+
+/** The literal `liens_json` for a house behind a first and second mortgage,
+ * plus a claim whose portions cannot be derived yet. */
+const LIENS = {
+  claims: [
+    {
+      claimId: 'claim-first',
+      assetId: 'asset-house',
+      lienPosition: 1,
+      amount: '250000.00',
+      collateralDescription: '12 Byron Court',
+      collateralValue: '300000.00',
+      seniorLiens: '0.00',
+      securedAmount: '250000.00',
+      unsecuredAmount: '0.00',
+      unsecuredSource: 'derived',
+    },
+    {
+      claimId: 'claim-second',
+      assetId: 'asset-house',
+      lienPosition: 2,
+      amount: '80000.00',
+      collateralDescription: '12 Byron Court',
+      collateralValue: '300000.00',
+      seniorLiens: '250000.00',
+      securedAmount: '50000.00',
+      unsecuredAmount: '30000.00',
+      unsecuredSource: 'derived',
+    },
+    {
+      claimId: 'claim-bare',
+      amount: '1000.00',
+      seniorLiens: '0.00',
+      unsecuredSource: 'derived',
+    },
+  ],
+  assets: [
+    {
+      assetId: 'asset-house',
+      claimIds: ['claim-first', 'claim-second'],
+      securedTotal: '330000.00',
+    },
+  ],
+} as const;
+
+describe('getCaseLiens', () => {
+  test('GETs /v1/cases/{caseId}/liens and maps the whole body', async () => {
+    const stub = stubFetch(() => jsonResponse(LIENS, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const liens = await client.getCaseLiens(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/liens`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(liens).toEqual(LIENS);
+  });
+
+  test('a portion the server cannot derive is absent, never null or zero', async () => {
+    const stub = stubFetch(() => jsonResponse(LIENS, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const liens = await client.getCaseLiens(ENTITY_CASE_ID);
+
+    const bare = liens.claims[2];
+    expect(bare).not.toHaveProperty('unsecuredAmount');
+    expect(bare).not.toHaveProperty('securedAmount');
+    expect(bare).not.toHaveProperty('assetId');
+  });
+
+  test('a manual override is reported by its source', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          claims: [
+            {
+              claimId: 'claim-manual',
+              amount: '5000.00',
+              seniorLiens: '0.00',
+              securedAmount: '679.00',
+              unsecuredAmount: '4321.00',
+              unsecuredSource: 'manual',
+            },
+          ],
+          assets: [],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const liens = await client.getCaseLiens(ENTITY_CASE_ID);
+
+    expect(liens.claims[0]?.unsecuredSource).toBe('manual');
+    expect(liens.claims[0]?.unsecuredAmount).toBe('4321.00');
+  });
+
+  test('rejects a figure sent as a JSON number rather than coercing it', async () => {
+    // The same boundary the summary's totals hold: money on a filing never
+    // passes through a double unnoticed.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          claims: [],
+          assets: [{ assetId: 'asset-house', claimIds: [], securedTotal: 330000 }],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseLiens(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('rejects an unknown unsecuredSource', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          claims: [{ claimId: 'c', seniorLiens: '0.00', unsecuredSource: 'guessed' }],
+          assets: [],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseLiens(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('an unknown or foreign case is a 404, not a summary', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'case not found' }, 404));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseLiens(ENTITY_CASE_ID)).rejects.toBeInstanceOf(ApiException);
   });
 });

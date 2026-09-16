@@ -195,8 +195,12 @@ claim {
   notice_parties: [ { id, name, address, account_last4 } ]
 
   // class: secured
-  collateral_description, collateral_value
+  asset_id                                  // the Schedule A/B asset the lien encumbers
+  lien_position                             // 1 is the senior lien; explicit, never creation order
+  collateral_description, collateral_value  // the override: collateral not on A/B, or a preferred value
   lien_nature: [ agreement | statutory | judgment | other(+text) ]   // check all that apply
+  unsecured_amount_override                 // present = "entered manually"; its provenance is the record
+  intention: surrender | retain_redeem | retain_reaffirm | retain_other(+explanation)   // B108
   // class: priority_unsecured
   priority_amount, nonpriority_amount
   priority_type: domestic_support | tax_and_government
@@ -208,8 +212,15 @@ claim {
 ```
 
 Two amounts here are arithmetic and are not stored: the unsecured portion of a
-secured claim (claim amount less collateral value), and a priority claim's
-total (priority plus nonpriority). Only the three priority categories printed
+secured claim, and a priority claim's total (priority plus nonpriority). The
+unsecured portion is derived from three records — the claim's amount, the
+collateral's value (the linked asset's, unless the claim types its own), and
+the liens senior to it on the same asset: `amount − max(collateral − senior
+liens, 0)`, floored at zero. The one stored exception is
+`unsecured_amount_override`: a figure a preparer typed because the arithmetic
+is wrong for this claim, whose presence is what "entered manually" means and
+whose provenance entry records who entered it. The asset's secured total is
+the sum of the claims linked to it. Only the three priority categories printed
 on 106E/F are enumerated; the fuller §507 taxonomy lives in the instruction
 booklet and belongs to the forms engine's mapping, not here.
 
@@ -483,7 +494,7 @@ never in the client, which does not hold the data to check it (ADR 0001):
 |---|---|
 | 106Sum | The entire form — every line is copied forward from another schedule |
 | 106A/B | All seven part subtotals and the Part 8 rollup |
-| 106D | Column A total; the unsecured portion of each claim |
+| 106D | Column A total; each claim's collateral value and description through `asset_id`, and the unsecured portion (senior liens included) |
 | 106E/F | Each priority claim's total; Part 4's statistical rollup, lines 6a–6j |
 | 106I | Gross income, total deductions, take-home pay, total other income, combined monthly income |
 | 106J | Total expenses, the 106J-2 carry-forward, and net monthly income |

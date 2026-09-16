@@ -21,6 +21,7 @@ import {
 import type {
   AddFirmUserRequest,
   Address,
+  AssetLiens,
   CandidateOrigin,
   CandidateStatus,
   Case,
@@ -29,10 +30,12 @@ import type {
   CaseCollection,
   CaseEntity,
   CaseEntityRequest,
+  CaseLiens,
   CaseProblem,
   CaseStatus,
   CaseSummary,
   CaseTotals,
+  ClaimLien,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -942,6 +945,33 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return caseSummaryFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/liens` — what each secured claim is secured by
+   * and what each asset carries (issue #345): the claim read path for the
+   * derived collateral figures.
+   *
+   * The generic collection routes never special-case a kind, so a claim's
+   * secured and unsecured portions — arithmetic over the claim, its asset and
+   * the liens senior to it — do not ride on {@link getCaseEntity}. They come
+   * from here: one light read of the assets and the claims, the same
+   * function B106D prints Column B from. Fetch it beside a claim or an
+   * asset; **never add the figures up in a screen** (ADR 0001).
+   *
+   * The summary carries the same block for the overview, but runs the whole
+   * completeness gate to get there; a form under a preparer's cursor should
+   * call this. Like {@link getCase}, a 404 means the case is unknown *or*
+   * not the caller's.
+   */
+  async getCaseLiens(caseId: string): Promise<CaseLiens> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/liens`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseLiensFromJson(decoded);
   }
 
   /**
@@ -2331,6 +2361,47 @@ function caseSummaryFromJson(response: DecodedResponse): CaseSummary {
     readyToFile: requireBoolean(response, 'readyToFile'),
     problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
     totals: caseTotalsFromJson(childObject(response, 'totals')),
+    liens: caseLiensFromJson(childObject(response, 'liens')),
+  };
+}
+
+/**
+ * One row of `liens_json` — `claim_lien_json`'s exact shape. Money stays a
+ * string (the `caseTotalsFromJson` argument), and the portions are decoded
+ * as optional because the server omits a figure it cannot derive yet rather
+ * than sending null or zero.
+ */
+function claimLienFromJson(response: DecodedResponse): ClaimLien {
+  const source = requireString(response, 'unsecuredSource');
+  if (source !== 'manual' && source !== 'derived') {
+    throw malformedField(response, 'unsecuredSource', "'manual' | 'derived'");
+  }
+  return definedMembers<ClaimLien>({
+    claimId: requireString(response, 'claimId'),
+    assetId: optionalString(response, 'assetId'),
+    lienPosition: optionalNumber(response, 'lienPosition'),
+    amount: optionalString(response, 'amount'),
+    collateralDescription: optionalString(response, 'collateralDescription'),
+    collateralValue: optionalString(response, 'collateralValue'),
+    seniorLiens: requireString(response, 'seniorLiens'),
+    securedAmount: optionalString(response, 'securedAmount'),
+    unsecuredAmount: optionalString(response, 'unsecuredAmount'),
+    unsecuredSource: source,
+  });
+}
+
+function assetLiensFromJson(response: DecodedResponse): AssetLiens {
+  return {
+    assetId: requireString(response, 'assetId'),
+    claimIds: requireStringArray(response, 'claimIds'),
+    securedTotal: requireString(response, 'securedTotal'),
+  };
+}
+
+function caseLiensFromJson(response: DecodedResponse): CaseLiens {
+  return {
+    claims: requireArrayOf(response, 'claims', 'ClaimLien', claimLienFromJson),
+    assets: requireArrayOf(response, 'assets', 'AssetLiens', assetLiensFromJson),
   };
 }
 
