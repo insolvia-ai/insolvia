@@ -707,8 +707,7 @@
    "type": "text",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "make"
+    "attribute": "make"
    },
    "pdf": {
     "names": [
@@ -733,8 +732,7 @@
    "type": "text",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "model"
+    "attribute": "model"
    },
    "pdf": {
     "names": [
@@ -758,8 +756,7 @@
    "type": "year",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "year"
+    "attribute": "year"
    },
    "pdf": {
     "names": [
@@ -783,8 +780,7 @@
    "type": "integer",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "mileage"
+    "attribute": "mileage"
    },
    "pdf": {
     "names": [
@@ -809,7 +805,7 @@
    "maps_to": {
     "entity": "asset",
     "attribute": "detail",
-    "notes": "free-text extras"
+    "notes": "free-text extras once year/make/model/mileage are filled"
    },
    "pdf": {
     "pattern": "Other information(_[234])?"
@@ -978,8 +974,7 @@
    "type": "text",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "make"
+    "attribute": "make"
    },
    "pdf": {
     "names": [
@@ -1001,8 +996,7 @@
    "type": "text",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "model"
+    "attribute": "model"
    },
    "pdf": {
     "names": [
@@ -1024,8 +1018,7 @@
    "type": "year",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
-    "notes": "year"
+    "attribute": "year"
    },
    "pdf": {
     "names": [
@@ -3511,7 +3504,7 @@
    "type": "radio",
    "maps_to": {
     "entity": "asset",
-    "attribute": "detail",
+    "attribute": "includes_personal_information",
     "notes": "whether the lists carry PII"
    },
    "pdf": {

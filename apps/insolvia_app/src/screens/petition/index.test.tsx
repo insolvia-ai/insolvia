@@ -113,6 +113,8 @@ describe('the petition screen', () => {
               realEstate: '0.00',
               personalProperty: '0.00',
               assets: '0.00',
+              totalExempt: '0.00',
+              totalNonExempt: '0.00',
               secured: '0.00',
               priorityUnsecured: '0.00',
               nonpriorityUnsecured: '0.00',

@@ -191,7 +191,11 @@ def _assets() -> tuple[tuple[str, AssetBody], ...]:
             AssetBody(
                 category="vehicle",
                 description="2016 Honda Civic LX",
-                detail="Approx. 92,000 miles",
+                year=2016,
+                make="Honda",
+                model="Civic LX",
+                mileage=92000,
+                detail="One owner; always garaged",
                 value_entire="9000.00",
                 value_portion_owned="9000.00",
                 ownership_interest="debtor_1",
@@ -202,6 +206,9 @@ def _assets() -> tuple[tuple[str, AssetBody], ...]:
             AssetBody(
                 category="watercraft_aircraft_or_recreational_vehicle",
                 description="2005 Sun Tracker pontoon boat",
+                year=2005,
+                make="Sun Tracker",
+                model="Pontoon boat",
                 detail="Trailer included; engine needs work",
                 value_entire="3500.00",
                 value_portion_owned="3500.00",
@@ -329,6 +336,15 @@ def _assets() -> tuple[tuple[str, AssetBody], ...]:
                 category="inventory",
                 description="Replacement engine parts inventory",
                 value_portion_owned="1200.00",
+                ownership_interest="debtor_1",
+            ),
+        ),
+        (
+            "asset-customer-list",
+            AssetBody(
+                category="customer_lists_and_intangibles",
+                description="Walk-in repair customers' names and phone numbers",
+                includes_personal_information=True,
                 ownership_interest="debtor_1",
             ),
         ),
@@ -1452,17 +1468,30 @@ def test_b106ab_lands_the_homestead_on_row_one() -> None:
     )
 
 
-def test_b106ab_vehicle_free_text_lands_in_other_information() -> None:
-    # The spec maps make/model/year/mileage all to the one free-text
-    # `detail`, which cannot be split back apart — the whole text lands in
-    # the row's Other information box and the four sub-boxes stay blank.
+def test_b106ab_vehicle_structured_fields_land_in_their_own_boxes() -> None:
+    # Issue 13.3 / #344: year/make/model/mileage print in their own boxes,
+    # and `detail` is left for whatever else belongs in "Other information".
     release = latest_form("form/b106ab")
     values = dict(project(release, reference_case_file()))
+    assert row(values, release, "vehicle.year", 0) == Text("2016")
+    assert row(values, release, "vehicle.make", 0) == Text("Honda")
+    assert row(values, release, "vehicle.model", 0) == Text("Civic LX")
+    assert row(values, release, "vehicle.mileage", 0) == Text("92000")
     assert row(values, release, "vehicle.other_information", 0) == Text(
-        "2016 Honda Civic LX; Approx. 92,000 miles"
+        "One owner; always garaged"
     )
-    assert "vehicle.make" not in values
     assert row(values, release, "vehicle.who_has_interest", 0) == Option("Debtor 1")
+
+
+def test_b106ab_other_vehicle_has_no_mileage_box() -> None:
+    # The pontoon (watercraft/aircraft/RV) row prints year/make/model like a
+    # vehicle, but there is no odometer box on that row of the form.
+    release = latest_form("form/b106ab")
+    values = dict(project(release, reference_case_file()))
+    assert row(values, release, "other_vehicle.year", 0) == Text("2005")
+    assert row(values, release, "other_vehicle.make", 0) == Text("Sun Tracker")
+    assert row(values, release, "other_vehicle.model", 0) == Text("Pontoon boat")
+    assert "other_vehicle.mileage" not in values
 
 
 def test_b106ab_single_box_lines_aggregate_their_category() -> None:
@@ -1473,6 +1502,44 @@ def test_b106ab_single_box_lines_aggregate_their_category() -> None:
     # An empty category answers its gate No and prints nothing else.
     assert values["line_8_gate"] == Option("no")
     assert "line_8_amount" not in values
+
+
+def test_b106ab_line_43_pii_gate_answers_yes_when_any_list_carries_it() -> None:
+    values = b106ab_values()
+    assert values["line_43_gate"] == Option("yes")
+    assert values["line_43_pii_gate"] == Option("yes")
+
+    case_file = reference_case_file()
+    no_pii = tuple(
+        (
+            asset_id,
+            replace(body, includes_personal_information=False)
+            if asset_id == "asset-customer-list"
+            else body,
+        )
+        for asset_id, body in case_file.assets
+    )
+    values = dict(
+        project(
+            latest_form("form/b106ab"),
+            CaseFile(**{**case_file.__dict__, "assets": no_pii}),
+        )
+    )
+    assert values["line_43_pii_gate"] == Option("no")
+
+    without_the_category = tuple(
+        (asset_id, body)
+        for asset_id, body in case_file.assets
+        if asset_id != "asset-customer-list"
+    )
+    values = dict(
+        project(
+            latest_form("form/b106ab"),
+            CaseFile(**{**case_file.__dict__, "assets": without_the_category}),
+        )
+    )
+    assert values["line_43_gate"] == Option("no")
+    assert "line_43_pii_gate" not in values
 
 
 def test_b106ab_deposits_take_one_printed_row_each() -> None:

@@ -11,12 +11,28 @@ them once liens and tenancy are involved (docs/reference/case-data-model.md).
 The seven part subtotals and the Part 8 rollup are arithmetic and never
 stored.
 
-`detail` is one free-text field for the category-specific extras — make,
-model, year and mileage for a vehicle; institution and account type for a
-deposit; percentage ownership for an entity interest. One field rather than a
-per-category shape, because the form itself prints one description box and a
-typed sub-schema per category would be a second enum to keep in lockstep with
-the first for no reader that exists yet.
+`detail` is one free-text field for the category-specific extras that stay
+free text — institution and account type for a deposit, percentage ownership
+for an entity interest, and a vehicle's "Other information" box once its own
+boxes are filled. One field rather than a per-category shape, because the
+form itself mostly prints one description box and a typed sub-schema per
+category would be a second enum to keep in lockstep with the first for no
+reader that exists yet.
+
+`year`/`make`/`model`/`mileage` are the one exception (issue 13.3 / #344):
+106A/B Part 2 prints a vehicle's year, make, model and mileage as their own
+boxes (`vehicle.year` etc. in forms/specs/b106ab.json), not one free-text
+run, and `detail` cannot be split back apart into four fields once it has
+been typed as one. They apply to both vehicle categories — a car's mileage
+box and a boat's do not both exist on the form, so `mileage` simply goes
+unprinted for a watercraft/aircraft/RV row (`form_projections/b106ab.py`
+skips the box for that prefix, it is not that the field refuses the value).
+
+`includes_personal_information` answers line 43's own sub-question — whether
+a customer/mailing list carries personally identifiable information as
+§ 101(41A) defines it — for `customer_lists_and_intangibles` assets. It is a
+separate boolean rather than folded into `detail` for the same reason: the
+form prints it as its own Yes/No box (`line_43_pii_gate`), not text.
 """
 
 from __future__ import annotations
@@ -36,7 +52,19 @@ from .fields import (
     money,
     narrative,
     text,
+    whole_number,
 )
+
+# A vehicle's year is a small bounded integer, like a count — no model year
+# on a filing is before the automobile or more than a couple of years past
+# the current one, and `whole_number`'s shape-only contract (no such thing as
+# "too far in the future" here) matches the storage-validation rule the rest
+# of this module follows: shape and type only, completeness is the forms
+# engine's job.
+_MAX_VEHICLE_YEAR: Final = 2100
+# Odometers roll well past six digits on an old car; this is a sanity cap,
+# not a real-world limit.
+_MAX_MILEAGE: Final = 999_999
 
 # The 106A/B line set, part by part. Named for what the line asks about.
 ASSET_CATEGORIES: Final = (
@@ -119,6 +147,13 @@ class AssetBody:
     ownership_interest_description: str | None = None
     community_property: bool | None = None
     detail: str | None = None
+    # Vehicle-only (both vehicle categories) — see the module docstring.
+    year: int | None = None
+    make: str | None = None
+    model: str | None = None
+    mileage: int | None = None
+    # `customer_lists_and_intangibles` only — line 43's § 101(41A) question.
+    includes_personal_information: bool | None = None
 
 
 def parse_asset(payload: Mapping[str, object]) -> AssetBody:
@@ -150,6 +185,19 @@ def parse_asset(payload: Mapping[str, object]) -> AssetBody:
             payload.get("community_property"), "community_property", errors
         ),
         detail=narrative(payload.get("detail"), "detail", errors),
+        year=whole_number(
+            payload.get("year"), "year", errors, maximum=_MAX_VEHICLE_YEAR
+        ),
+        make=text(payload.get("make"), "make", errors, limit=60),
+        model=text(payload.get("model"), "model", errors, limit=60),
+        mileage=whole_number(
+            payload.get("mileage"), "mileage", errors, maximum=_MAX_MILEAGE
+        ),
+        includes_personal_information=boolean(
+            payload.get("includes_personal_information"),
+            "includes_personal_information",
+            errors,
+        ),
     )
     if errors:
         raise FieldValidationError(errors)

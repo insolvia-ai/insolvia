@@ -28,12 +28,19 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 import type { ChoiceOption, CollectionSpec, FieldSpec } from './collections';
 import { COLLECTION_SPECS, labelize } from './collections';
-import { AssetLiensPanel, ClaimCollateralPanel } from './liens';
+import { ClaimCollateralPanel } from './liens';
 import { newRowId } from './row-id';
 
 /**
  * List, add, edit and remove for one generic case collection (issue #249) —
- * one component for all ten, driven by the specs in `collections.ts`.
+ * one component for every collection driven by the specs in `collections.ts`
+ * EXCEPT `assets`, whose category-driven form (issue 13.3 / #344) needs a
+ * field set that changes with a selection, which a flat `CollectionSpec`
+ * cannot express — see `AssetsEditor` in `./assets.tsx`, rendered in its
+ * place by `screens/intake/index.tsx`. `assets` stays a normal entry in
+ * `COLLECTION_SPECS` for the parts every OTHER section still needs from it
+ * (its `summary`, and the claims section's `reference` picker), just not for
+ * this component's own list-and-form UI.
  *
  * UNLIKE THE DEBTOR FORM, SAVES ARE EXPLICIT. The debtor is one continuous
  * record and autosaves; a collection is discrete records, and autosaving a
@@ -48,13 +55,12 @@ import { newRowId } from './row-id';
  * validates shape (ADR 0001) and its per-field messages render under the
  * fields they name, keyed by the same dotted paths the fields write to.
  *
- * Two collections carry a panel the specs cannot express (issue #345): a
- * claim's form shows what its collateral covers, and a property's form
- * lists the liens on it and can open the claims section on a new claim
- * already pointed at the property. That hand-off is `onOpenCollection` —
- * the intake screen owns which section is showing, so the editor asks it —
- * and `initialForm` is how the receiving editor starts on the form instead
- * of the list. Both panels are read-only over server-derived figures.
+ * `claims` carries a panel the spec cannot express (issue #345): a claim's
+ * form shows what its collateral covers. `onOpenCollection` is the same
+ * hand-off `AssetsEditor` uses to open the claims section on a new secured
+ * claim already pointed at a property — the intake screen owns which
+ * section is showing, so both editors ask it — and `initialForm` is how the
+ * receiving editor starts on the form instead of the list.
  */
 
 type Body = Record<string, unknown>;
@@ -117,7 +123,13 @@ const DEBTOR_LABELS: Readonly<Record<string, string>> = {
   non_filing_spouse: 'Non-filing spouse',
 };
 
-function bodyOf(record: Record<string, unknown>): Body {
+/**
+ * Exported for `AssetsEditor` (issue 13.3 / #344): the category-driven
+ * assets screen is its own file, not a `CollectionEditor` spec, but it reads
+ * and writes a record body the same dotted-path way every generic form here
+ * does — reusing these three rather than a second copy of them.
+ */
+export function bodyOf(record: Record<string, unknown>): Body {
   const {
     id: _id,
     case_id: _caseId,
@@ -130,7 +142,7 @@ function bodyOf(record: Record<string, unknown>): Body {
 }
 
 /** Reads a dotted path (`payload.recipient.name`) out of a nested body. */
-function getAt(body: Body, path: string): unknown {
+export function getAt(body: Body, path: string): unknown {
   let value: unknown = body;
   for (const segment of path.split('.')) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
@@ -140,7 +152,7 @@ function getAt(body: Body, path: string): unknown {
 }
 
 /** Writes a dotted path immutably; `undefined` removes the key. */
-function setAt(body: Body, path: string, value: unknown): Body {
+export function setAt(body: Body, path: string, value: unknown): Body {
   const [head, ...rest] = path.split('.');
   if (head === undefined) return body;
   if (rest.length === 0) {
@@ -201,18 +213,15 @@ function linkedSummaries(
 export interface CollectionEditorProps {
   readonly caseId: string;
   readonly spec: CollectionSpec;
-  /** Start on a new record's form with this body, rather than on the list. */
+  /**
+   * Start on a new record's form with this body, rather than on the list —
+   * how the claims section lands pre-filled after `AssetsEditor`'s "add a
+   * secured claim" hand-off.
+   */
   readonly initialForm?: Body | undefined;
-  /** Open another collection's section on a new record with this body. */
-  readonly onOpenCollection?: ((collection: CaseCollection, body: Body) => void) | undefined;
 }
 
-export function CollectionEditor({
-  caseId,
-  spec,
-  initialForm,
-  onOpenCollection,
-}: CollectionEditorProps) {
+export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditorProps) {
   const theme = useTheme();
   const { call } = useApi();
 
@@ -554,13 +563,6 @@ export function CollectionEditor({
           ))}
           {spec.collection === 'claims' ? (
             <ClaimCollateralPanel caseId={caseId} claimId={mode.id} />
-          ) : null}
-          {spec.collection === 'assets' ? (
-            <AssetLiensPanel
-              caseId={caseId}
-              assetId={mode.id}
-              onAddSecuredClaim={(body) => onOpenCollection?.('claims', body)}
-            />
           ) : null}
           {spec.collection === 'creditors' ? (
             <View style={styles.checkboxRow}>

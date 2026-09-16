@@ -14,12 +14,14 @@ shapes exist and the tables below drive them:
   category-specific `detail` is appended to the description text so a fact
   with no box of its own still lands on the page.
 
-Two mappings the model cannot serve yet stay blank, deliberately: a
-vehicle's make/model/year/mileage boxes (the spec maps all four to the one
-free-text `detail`, which cannot be split back apart — the whole text lands
-in the row's "Other information" box instead), and line 43's PII question
-(nothing structured records it). Line 28/29's amount columns route by
-keyword over `detail` ("federal", "alimony", …) — the spec's own note.
+A vehicle's year/make/model/mileage print in their own boxes (issue 13.3 /
+#344) from `AssetBody`'s own fields of those names; `detail` is left for
+whatever else belongs in the row's "Other information" box once those four
+are filled. `mileage` has no box on the `other_vehicle` row (a boat or
+aircraft has no odometer), so it is simply never filled there. Line 43's
+§ 101(41A) question prints from `AssetBody.includes_personal_information`.
+Line 28/29's amount columns route by keyword over `detail` ("federal",
+"alimony", …) — the spec's own note.
 """
 
 from __future__ import annotations
@@ -329,6 +331,11 @@ def _shared_columns(
     )
 
 
+def _num_text(value: int | None) -> str | None:
+    """A stored int as the Text a row wants — `None` stays blank."""
+    return None if value is None else str(value)
+
+
 def _part_2(
     release: FormRelease,
     case_file: CaseFile,
@@ -346,14 +353,47 @@ def _part_2(
         assets = _in(case_file, category)
         values[gate] = yes_no(release, gate, bool(assets))
         for index, asset in enumerate(assets):
-            # Make/model/year/mileage stay blank — see the module docstring;
-            # the whole free-text lands in the Other information box.
+            row_fill(
+                release,
+                values,
+                f"{prefix}.year",
+                index,
+                text_or_none(_num_text(asset.year)),
+                problems,
+            )
+            row_fill(
+                release,
+                values,
+                f"{prefix}.make",
+                index,
+                text_or_none(asset.make),
+                problems,
+            )
+            row_fill(
+                release,
+                values,
+                f"{prefix}.model",
+                index,
+                text_or_none(asset.model),
+                problems,
+            )
+            if prefix == "vehicle":
+                # No mileage box on the other_vehicle row — a boat or
+                # aircraft has no odometer.
+                row_fill(
+                    release,
+                    values,
+                    "vehicle.mileage",
+                    index,
+                    text_or_none(_num_text(asset.mileage)),
+                    problems,
+                )
             row_fill(
                 release,
                 values,
                 f"{prefix}.other_information",
                 index,
-                text_or_none(_entry_text(asset)),
+                text_or_none(asset.detail),
                 problems,
             )
             _shared_columns(release, values, prefix, index, asset, problems)
@@ -377,6 +417,16 @@ def _single_box_lines(
             if texts:
                 values[f"line_{line}_description"] = Text("; ".join(texts))
         values[f"line_{line}_amount"] = Text(format_money(_portion_total(assets)))
+        if line == "43":
+            # § 101(41A): "yes" if ANY customer-list asset says its lists
+            # carry personally identifiable information — one Yes/No box for
+            # a category that can hold more than one asset, the same
+            # aggregation the description and amount boxes above already do.
+            values["line_43_pii_gate"] = yes_no(
+                release,
+                "line_43_pii_gate",
+                any(asset.includes_personal_information for asset in assets),
+            )
 
 
 def _keyword_lines(
@@ -447,8 +497,6 @@ def _row_lines(
                 ),
                 problems,
             )
-    # Line 43's PII question has no structured fact to answer it — blank.
-
     # Line 53: one description box, three amount rows.
     others = _in(case_file, "other_property_not_listed")
     values["line_53_gate"] = yes_no(release, "line_53_gate", bool(others))

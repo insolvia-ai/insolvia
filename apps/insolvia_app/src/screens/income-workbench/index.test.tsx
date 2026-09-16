@@ -37,6 +37,8 @@ const ZERO_TOTALS = {
   realEstate: '0',
   personalProperty: '0',
   assets: '0',
+  totalExempt: '0',
+  totalNonExempt: '0',
   secured: '0',
   priorityUnsecured: '0',
   nonpriorityUnsecured: '0',

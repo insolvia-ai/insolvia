@@ -2453,6 +2453,8 @@ function caseTotalsFromJson(response: DecodedResponse): CaseTotals {
     realEstate: requireString(response, 'realEstate'),
     personalProperty: requireString(response, 'personalProperty'),
     assets: requireString(response, 'assets'),
+    totalExempt: requireString(response, 'totalExempt'),
+    totalNonExempt: requireString(response, 'totalNonExempt'),
     secured: requireString(response, 'secured'),
     priorityUnsecured: requireString(response, 'priorityUnsecured'),
     nonpriorityUnsecured: requireString(response, 'nonpriorityUnsecured'),
