@@ -32,19 +32,18 @@ from datetime import date
 from decimal import Decimal
 from typing import Final
 
-from insolvia_core.means_test_inputs import MeansTestInputBody
-
 from ..form_fill import Option, Text
 from ..form_templates import FormRelease
 from ..means_test import (
     MeansTestCase,
     MeansTestError,
     MeansTestResult,
+    presumption_exemption,
     resolve_means_test_data,
     run_means_test,
 )
 from ..ust_data import median_income_table
-from .b122a1 import compute_cmi, household_size
+from .b122a1 import compute_cmi, household_size, means_test_as_of, means_test_inputs
 from .shared import (
     CaseFile,
     FieldValues,
@@ -134,7 +133,7 @@ _UNPRINTED_LINES: Final = frozenset(
 
 
 def _as_of(case_file: CaseFile) -> date:
-    return date.fromisoformat(case_file.case.created_at[:10])
+    return means_test_as_of(case_file)[0]
 
 
 def files_b122a2(case_file: CaseFile) -> bool:
@@ -142,12 +141,15 @@ def files_b122a2(case_file: CaseFile) -> bool:
     for packet assembly's `packet_form_series`.
 
     False only when the median comparison determinately answers below the
-    median (line 14a: do not fill out or file 122A-2). Above the median, or
-    not yet determinable (household composition or state missing, no median
-    release for the date), the form stays in the set so ITS projection can
-    name what is missing through the gate instead of the packet silently
-    shipping without the calculation.
+    median (line 14a: do not fill out or file 122A-2), or an entered Form
+    122A-1Supp exemption ends the test before it (issue #349). Above the
+    median, or not yet determinable (household composition or state
+    missing, no median release for the date), the form stays in the set so
+    ITS projection can name what is missing through the gate instead of the
+    packet silently shipping without the calculation.
     """
+    if presumption_exemption(means_test_inputs(case_file)) is not None:
+        return False
     size = household_size(case_file)
     debtor1 = case_file.debtor("debtor_1")
     state = (
@@ -195,11 +197,7 @@ def build_means_test_case(case_file: CaseFile) -> MeansTestCase:
         ),
         start=amount(None),
     )
-    inputs = (
-        case_file.means_test_inputs[0]
-        if case_file.means_test_inputs
-        else MeansTestInputBody()
-    )
+    inputs = means_test_inputs(case_file)
     return MeansTestCase(
         state=(address.state if address is not None and address.state else ""),
         county=(address.county if address is not None and address.county else ""),
@@ -370,6 +368,14 @@ def project_b122a2_0425(release: FormRelease, case_file: CaseFile) -> FieldValue
             [
                 "the debtor's annualized income is below the applicable "
                 "median — Form 122A-2 is not filed (B122A-1 line 14a)"
+            ]
+        )
+    if result.outcome == "exempt":
+        raise FormProjectionError(
+            [
+                f"the debtor is exempt from the presumption "
+                f"({result.determined_by}) — Form 122A-2 is not filed "
+                "(Form 122A-1Supp)"
             ]
         )
 

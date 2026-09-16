@@ -464,3 +464,152 @@ def test_unused_secured_rows_and_sixty_month_math() -> None:
     assert line(result, "33d")[0] == "120.00"
     assert "Marina Finance" in line(result, "33d")[1]
     assert line(result, "35")[0] == "150.02"  # 9001 / 60, half-up
+
+
+# ── issue #349: the screen's inputs ─────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "flag", ["non_consumer_debts", "disabled_veteran", "reservist_national_guard"]
+)
+def test_an_exemption_ends_the_test_before_any_line(flag: str) -> None:
+    inputs = household(**{flag: True})
+    result = run_means_test(case_for(monthly_cmi="9000.00", inputs=inputs), DATA)
+    assert result.outcome == "exempt"
+    assert result.determined_by == flag
+    assert result.lines == ()
+    # The comparison is still reported for the attorney's benefit.
+    assert result.comparison is not None
+    assert result.comparison.above_median
+
+
+def test_an_exempt_debtor_needs_no_household_at_all() -> None:
+    inputs = parse_means_test_input({"non_consumer_debts": True})
+    result = run_means_test(case_for(monthly_cmi="9000.00", inputs=inputs), DATA)
+    assert result.outcome == "exempt"
+    assert result.comparison is None
+
+
+def test_a_declined_exemption_is_not_an_exemption() -> None:
+    result = run_means_test(
+        case_for(monthly_cmi="4000.00", inputs=household(disabled_veteran=False)),
+        DATA,
+    )
+    assert result.outcome == "below_median"
+
+
+def test_the_median_household_size_override_wins_the_comparison() -> None:
+    # Two by age band, but the median table is read at four: FL's
+    # household-of-4 median is what an 8,000 monthly CMI is now under.
+    inputs = household(under_65=2, median_household_size=4)
+    result = run_means_test(case_for(monthly_cmi="8000.00", inputs=inputs), DATA)
+    assert result.comparison is not None
+    assert result.comparison.household_size == 4
+    assert result.outcome == "below_median"
+
+
+def test_the_median_size_alone_decides_a_below_median_case() -> None:
+    inputs = parse_means_test_input({"median_household_size": 4})
+    result = run_means_test(case_for(monthly_cmi="4000.00", inputs=inputs), DATA)
+    assert result.outcome == "below_median"
+
+
+def test_above_the_median_the_age_bands_are_still_required() -> None:
+    inputs = parse_means_test_input({"median_household_size": 1})
+    with pytest.raises(MeansTestError, match="age bands"):
+        run_means_test(case_for(monthly_cmi="9000.00", inputs=inputs), DATA)
+
+
+def test_the_irs_family_size_drives_lines_5_and_6_only() -> None:
+    base = run_means_test(
+        case_for(monthly_cmi="9000.00", inputs=household(under_65=2)), DATA
+    )
+    sized = run_means_test(
+        case_for(
+            monthly_cmi="9000.00", inputs=household(under_65=2, irs_family_size=3)
+        ),
+        DATA,
+    )
+    assert line(sized, "5")[0] == "3.00"
+    assert "irs_family_size" in line(sized, "5")[1]
+    assert line(sized, "6")[0] != line(base, "6")[0]
+    assert "household of 3" in line(sized, "6")[1]
+    # The median comparison and the housing standard keep the two-person
+    # figures.
+    assert sized.comparison is not None
+    assert sized.comparison.household_size == 2
+    assert line(sized, "8")[0] == line(base, "8")[0]
+
+
+def test_the_housing_family_size_drives_lines_8_and_9a_only() -> None:
+    base = run_means_test(
+        case_for(monthly_cmi="9000.00", inputs=household(under_65=2)), DATA
+    )
+    sized = run_means_test(
+        case_for(
+            monthly_cmi="9000.00",
+            inputs=household(under_65=2, irs_housing_family_size=4),
+        ),
+        DATA,
+    )
+    assert line(sized, "8")[0] != line(base, "8")[0]
+    assert "household of 4" in line(sized, "8")[1]
+    assert "irs_housing_family_size" in line(sized, "9a")[1]
+    assert line(sized, "6")[0] == line(base, "6")[0]
+    assert line(sized, "5")[0] == "2.00"
+
+
+def secured_row(
+    row_id: str, bucket: str | None, monthly: str, cure: str | None = None
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "id": row_id,
+        "creditor_name": f"Lender {row_id}",
+        "property_description": "Collateral",
+        "monthly_payment": monthly,
+    }
+    if bucket is not None:
+        row["bucket"] = bucket
+    if cure is not None:
+        row["cure_total"] = cure
+    return row
+
+
+def test_bucketed_claim_rows_feed_the_home_and_vehicle_lines() -> None:
+    inputs = household(
+        under_65=1,
+        vehicle_count=2,
+        other_secured_payments=[
+            secured_row("h1", "home", "1200.00", "600.00"),
+            secured_row("h2", "home", "300.00"),
+            secured_row("v1", "vehicle_1", "400.00", "60.00"),
+            secured_row("v2", "vehicle_2", "250.00"),
+            secured_row("o1", "other", "95.00"),
+            secured_row("legacy", None, "50.00"),
+        ],
+    )
+    result = run_means_test(case_for(monthly_cmi="9000.00", inputs=inputs), DATA)
+    assert line(result, "9b")[0] == "1500.00"
+    assert "bucket home" in line(result, "9b")[1]
+    assert line(result, "13b")[0] == "400.00"
+    assert line(result, "13e")[0] == "250.00"
+    # Only the rows in no bucket or `other` reach 33d.
+    assert line(result, "33d")[0] == "145.00"
+    assert line(result, "33e")[0] == "2295.00"
+    # Line 34: the per-claim cure amounts summed, then ÷ 60.
+    assert line(result, "34")[0] == "11.00"
+    assert "cure_total" in line(result, "34")[1]
+
+
+def test_a_typed_total_wins_over_the_bucketed_rows_rather_than_adding() -> None:
+    inputs = household(
+        under_65=1,
+        home_secured_monthly_total="1000.00",
+        priority_cure_total="600.00",
+        other_secured_payments=[secured_row("h1", "home", "1200.00", "6000.00")],
+    )
+    result = run_means_test(case_for(monthly_cmi="9000.00", inputs=inputs), DATA)
+    assert line(result, "9b")[0] == "1000.00"
+    assert "home_secured_monthly_total" in line(result, "9b")[1]
+    assert line(result, "34")[0] == "10.00"
+    assert line(result, "33d")[0] == "0.00"

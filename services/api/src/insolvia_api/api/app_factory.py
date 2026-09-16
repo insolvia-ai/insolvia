@@ -35,6 +35,7 @@ from insolvia_api.api.routes.library_creditors import (
 )
 from insolvia_api.api.routes.liens import blueprint as liens_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
+from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
@@ -59,6 +60,8 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(liens_blueprint)
     # /v1/cases/<id>/standards — a static segment, same argument as /summary.
     app.register_blueprint(standards_blueprint)
+    # /v1/cases/<id>/means-test — the same static-segment argument again.
+    app.register_blueprint(means_test_blueprint)
     app.register_blueprint(firm_blueprint)
     # /v1/firm/creditors — a static segment under the same firm-scoped
     # namespace as firm_blueprint, registered as its own module for the same

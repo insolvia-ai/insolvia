@@ -15,6 +15,7 @@ from datetime import date
 import pytest
 from insolvia_api.core.cmi import (
     EXCLUSION_CITATION,
+    OVERRIDE_NOTE,
     cmi_window,
     current_monthly_income,
 )
@@ -24,6 +25,7 @@ from insolvia_core.income import (
     OtherIncomeRecordBody,
     PayPeriodRecordBody,
 )
+from insolvia_core.means_test_inputs import IncomeLineOverride
 
 
 def debtor(role: str, debtor_id: str) -> Debtor:
@@ -328,3 +330,96 @@ def test_every_line_derivation_is_traceable_entry_by_entry() -> None:
                 line.total_received
             )
     assert result.combined_monthly_total == "5215.00"  # 5200 + 90/6
+
+
+# --- entered overrides (issue #349) ------------------------------------------
+
+
+def override(column: str, category: str, monthly: str, row_id: str = "ov"):
+    return IncomeLineOverride(
+        id=row_id, column=column, category=category, monthly_amount=monthly
+    )
+
+
+def test_an_override_replaces_the_derived_line_and_says_so() -> None:
+    result = compute(
+        pay_periods=[paycheck(f"2026-0{m}-25", "5200.00") for m in range(3, 9)],
+        overrides=[override("A", "wages", "6000.00")],
+    )
+    [column] = result.columns
+    [wages] = column.lines
+    assert wages.monthly_average == "6000.00"
+    assert wages.total_received == "36000.00"
+    assert wages.entries == ()
+    assert wages.note == OVERRIDE_NOTE
+    # Replaced, never added: the column is the entered figure alone.
+    assert column.monthly_total == "6000.00"
+    assert result.combined_monthly_total == "6000.00"
+
+
+def test_an_override_creates_a_line_the_records_never_produced() -> None:
+    result = compute(
+        pay_periods=[paycheck(f"2026-0{m}-25", "5200.00") for m in range(3, 9)],
+        overrides=[override("A", "pension_retirement", "300.00")],
+    )
+    [column] = result.columns
+    assert [line.category for line in column.lines] == ["wages", "pension_retirement"]
+    assert column.monthly_total == "5500.00"
+
+
+def test_an_override_for_the_other_column_leaves_this_one_alone() -> None:
+    result = compute(
+        pay_periods=[paycheck(f"2026-0{m}-25", "5200.00") for m in range(3, 9)],
+        overrides=[override("B", "wages", "6000.00")],
+    )
+    columns = {column.column: column for column in result.columns}
+    assert columns["A"].monthly_total == "5200.00"
+    assert columns["B"].monthly_total == "6000.00"
+    assert result.combined_monthly_total == "11200.00"
+
+
+def test_an_excluded_kind_can_be_entered_and_stays_uncounted() -> None:
+    result = compute(
+        pay_periods=[paycheck(f"2026-0{m}-25", "5200.00") for m in range(3, 9)],
+        overrides=[override("A", "social_security_act_benefit", "900.00")],
+    )
+    [column] = result.columns
+    [excluded] = column.excluded
+    assert excluded.category == "social_security_act_benefit"
+    assert excluded.monthly_average == "900.00"
+    assert excluded.citation == EXCLUSION_CITATION
+    assert column.monthly_total == "5200.00"
+
+
+def test_unemployment_claimed_as_ssa_moves_out_of_line_8() -> None:
+    receipts = [
+        OtherIncomeRecordBody(
+            debtor_id="d-1",
+            category="unemployment",
+            received_on=f"2026-0{month}-07",
+            amount="1200.00",
+        )
+        for month in range(3, 9)
+    ]
+    result = compute(
+        employments=[],
+        other_income=receipts,
+        overrides=[override("A", "unemployment_as_ssa", "500.00")],
+    )
+    [column] = result.columns
+    [unemployment] = column.lines
+    assert unemployment.monthly_average == "700.00"
+    assert "Social Security Act" in unemployment.note
+    [contended] = column.excluded
+    assert contended.category == "unemployment_as_ssa"
+    assert contended.monthly_average == "500.00"
+    assert contended.citation == EXCLUSION_CITATION
+    assert column.monthly_total == "700.00"
+
+
+def test_an_incomplete_override_row_is_ignored() -> None:
+    result = compute(
+        pay_periods=[paycheck(f"2026-0{m}-25", "5200.00") for m in range(3, 9)],
+        overrides=[IncomeLineOverride(id="half", column="A", category="wages")],
+    )
+    assert result.combined_monthly_total == "5200.00"

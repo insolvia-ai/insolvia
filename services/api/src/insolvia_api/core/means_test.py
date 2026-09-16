@@ -27,6 +27,27 @@ Line numbering follows the 04/25 revision so the trace reads against the
 printed form; `MeansTestLine.source` says where each amount came from. All
 arithmetic is Decimal, quantized to cents per line the way the form's boxes
 are, half-up.
+
+Issue #349 (the means-test screen) widened the ENTERED inputs without
+touching a rule — every new field defaults to what the engine did before:
+
+- **The presumption exemptions** (Form 122A-1Supp; `non_consumer_debts`,
+  `disabled_veteran`, `reservist_national_guard`) are checked first. Any
+  one ends the test with outcome `exempt`, `determined_by` naming the
+  flag, no B122A-2 lines, and the median comparison still reported when
+  the household is known — the screen shows it, the form does not need it.
+- **Three household sizes.** The median comparison takes
+  `median_household_size`, line 5's IRS family size takes
+  `irs_family_size`, and the housing standard (lines 8 and 9a) takes
+  `irs_housing_family_size`; each falls back to `people_under_65 +
+  people_65_or_older`, the one figure the engine read before.
+- **Per-claim secured payments.** Where the single typed totals
+  (`home_secured_monthly_total`, `vehicle_1_loan_monthly`,
+  `vehicle_2_loan_monthly`, `priority_cure_total`) are absent, lines 9b,
+  13b, 13e and 34 are the sums of the `other_secured_payments` rows in the
+  matching bucket, and line 33d takes the rows in no bucket or `other`.
+  A typed total wins outright rather than adding, so the panel beside a
+  claim and the typed figure can never both count.
 """
 
 from __future__ import annotations
@@ -36,12 +57,87 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
 
-from insolvia_core.means_test_inputs import MeansTestInputBody
+from insolvia_core.means_test_inputs import MeansTestInputBody, OtherSecuredPayment
 
 from . import dollar_amounts, ust_data
 from .cmi import CmiResult
 
 _CENT: Final = Decimal("0.01")
+
+# The three Form 122A-1Supp exemptions, in the order the form asks them,
+# each with the rule that grants it.
+PRESUMPTION_EXEMPTIONS: Final = (
+    (
+        "non_consumer_debts",
+        "debts are not primarily consumer debts — 11 U.S.C. § 707(b)(1); "
+        "Form 122A-1Supp Part 1",
+    ),
+    (
+        "disabled_veteran",
+        "disabled veteran whose debts were incurred primarily during active "
+        "duty or homeland-defense activity — 11 U.S.C. § 707(b)(2)(D)(i); "
+        "Form 122A-1Supp Part 2",
+    ),
+    (
+        "reservist_national_guard",
+        "reservist or National Guard member called to active duty after "
+        "September 11, 2001 — 11 U.S.C. § 707(b)(2)(D)(ii); "
+        "Form 122A-1Supp Part 2",
+    ),
+)
+
+
+def presumption_exemption(inputs: MeansTestInputBody) -> tuple[str, str] | None:
+    """The first exemption the entered inputs claim, as (flag, rule), or
+    None when the presumption can arise."""
+    for flag, rule in PRESUMPTION_EXEMPTIONS:
+        if getattr(inputs, flag) is True:
+            return flag, rule
+    return None
+
+
+def _entered_household(inputs: MeansTestInputBody) -> int | None:
+    if inputs.people_under_65 is None or inputs.people_65_or_older is None:
+        return None
+    return inputs.people_under_65 + inputs.people_65_or_older
+
+
+def median_household_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
+    """B122A-1 line 13's household size and where it came from: the entered
+    override, else the sum of the age bands; None until either exists."""
+    if inputs.median_household_size is not None:
+        return (
+            inputs.median_household_size,
+            "entered (means_test_input.median_household_size)",
+        )
+    entered = _entered_household(inputs)
+    if entered is None:
+        return None
+    return entered, "entered (means_test_input.people_under_65 + people_65_or_older)"
+
+
+def irs_family_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
+    """B122A-2 line 5's "number of people used in determining deductions"."""
+    if inputs.irs_family_size is not None:
+        return inputs.irs_family_size, "entered (means_test_input.irs_family_size)"
+    entered = _entered_household(inputs)
+    if entered is None:
+        return None
+    return entered, "entered (means_test_input.people_under_65 + people_65_or_older)"
+
+
+def irs_housing_family_size(inputs: MeansTestInputBody) -> tuple[int, str] | None:
+    """The family size the IRS housing and utilities standard is read at
+    (lines 8 and 9a)."""
+    if inputs.irs_housing_family_size is not None:
+        return (
+            inputs.irs_housing_family_size,
+            "entered (means_test_input.irs_housing_family_size)",
+        )
+    entered = _entered_household(inputs)
+    if entered is None:
+        return None
+    return entered, "entered (means_test_input.people_under_65 + people_65_or_older)"
 
 
 class MeansTestError(ValueError):
@@ -169,13 +265,16 @@ class MeansTestResult:
     and the § 707(b)(2) outcome.
 
     `outcome` is one of `below_median` / `no_presumption` /
-    `presumption_of_abuse`; `determined_by` names the rule that settled it
-    (`median`, `threshold_floor`, `threshold_ceiling`, `unsecured_ratio`).
+    `presumption_of_abuse` / `exempt`; `determined_by` names the rule that
+    settled it (`median`, `threshold_floor`, `threshold_ceiling`,
+    `unsecured_ratio`, or the exemption flag). `comparison` is None only
+    for an exempt debtor whose household has not been entered — the one
+    outcome the median does not decide.
     """
 
     as_of: date
     release_ids: dict[str, str]
-    comparison: MedianComparison
+    comparison: MedianComparison | None
     outcome: str
     determined_by: str
     lines: tuple[MeansTestLine, ...]
@@ -216,6 +315,47 @@ def _sixty_month_average(total: Decimal) -> Decimal:
     return (total / 60).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
+def _row_name(payment: OtherSecuredPayment) -> str:
+    creditor = payment.creditor_name or payment.id
+    return f"{creditor} ({payment.property_description or 'property'})"
+
+
+def _secured_payment(
+    inputs: MeansTestInputBody, *, bucket: str, typed: str | None, field_name: str
+) -> tuple[Decimal, str]:
+    """One of lines 9b / 13b / 13e: the typed total when entered, else the
+    sum of the per-claim rows in this bucket, with the source saying which."""
+    if typed is not None:
+        return _entered(typed), f"entered (means_test_input.{field_name})"
+    rows = [p for p in inputs.other_secured_payments if p.bucket == bucket]
+    if not rows:
+        return Decimal("0"), f"entered (means_test_input.{field_name})"
+    total = sum((_entered(p.monthly_payment) for p in rows), Decimal("0"))
+    return total, (
+        f"entered per claim (means_test_input.other_secured_payments, "
+        f"bucket {bucket}: " + "; ".join(_row_name(p) for p in rows) + ")"
+    )
+
+
+def _cure_total(inputs: MeansTestInputBody) -> tuple[Decimal, str]:
+    """Line 34's past-due total before ÷ 60: the typed figure when entered,
+    else the per-claim cure amounts summed."""
+    if inputs.priority_cure_total is not None:
+        return (
+            _entered(inputs.priority_cure_total),
+            "entered (means_test_input.priority_cure_total)",
+        )
+    rows = [p for p in inputs.other_secured_payments if p.cure_total is not None]
+    if not rows:
+        return Decimal("0"), "entered (means_test_input.priority_cure_total)"
+    total = sum((_entered(p.cure_total) for p in rows), Decimal("0"))
+    return total, (
+        "entered per claim (means_test_input.other_secured_payments[].cure_total: "
+        + "; ".join(_row_name(p) for p in rows)
+        + ")"
+    )
+
+
 def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
     """The whole § 707(b) determination for one case.
 
@@ -227,9 +367,34 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
     problems: list[str] = []
     inputs = case.inputs
 
-    under_65 = inputs.people_under_65
-    over_65 = inputs.people_65_or_older
-    if under_65 is None or over_65 is None:
+    median_size = median_household_size(inputs)
+
+    exemption = presumption_exemption(inputs)
+    if exemption is not None:
+        # Form 122A-1Supp ends the test here. The comparison is still
+        # reported when it can be made — an attorney advising a client wants
+        # to see it — but nothing depends on it.
+        preview: MedianComparison | None = None
+        if median_size is not None and median_size[0] >= 1:
+            try:
+                preview = median_comparison(
+                    monthly_cmi=case.cmi.combined_monthly_total,
+                    state=case.state,
+                    household_size=median_size[0],
+                    data=data,
+                )
+            except MeansTestError:
+                preview = None
+        return MeansTestResult(
+            as_of=data.as_of,
+            release_ids=data.release_ids,
+            comparison=preview,
+            outcome="exempt",
+            determined_by=exemption[0],
+            lines=(),
+        )
+
+    if median_size is None:
         raise MeansTestError(
             [
                 "the household composition (people under 65 / 65 and older) "
@@ -237,14 +402,13 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
                 "comparison both need it"
             ]
         )
-    household = under_65 + over_65
-    if household < 1:
+    if median_size[0] < 1:
         raise MeansTestError(["the household cannot be empty"])
 
     comparison = median_comparison(
         monthly_cmi=case.cmi.combined_monthly_total,
         state=case.state,
-        household_size=household,
+        household_size=median_size[0],
         data=data,
     )
     if not comparison.above_median:
@@ -256,6 +420,24 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
             determined_by="median",
             lines=(),
         )
+
+    under_65 = inputs.people_under_65
+    over_65 = inputs.people_65_or_older
+    if under_65 is None or over_65 is None:
+        raise MeansTestError(
+            [
+                "the household's age bands (people under 65 / 65 and older) "
+                "have not been entered — line 7's health care allowance "
+                "needs them"
+            ]
+        )
+    family = irs_family_size(inputs)
+    housing_family = irs_housing_family_size(inputs)
+    assert family is not None  # both age bands are set above
+    assert housing_family is not None
+    household, household_source = family
+    if household < 1:
+        raise MeansTestError(["the household cannot be empty"])
 
     lines: list[MeansTestLine] = []
 
@@ -306,7 +488,7 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         "5",
         "Number of people used in determining deductions",
         Decimal(household),
-        "entered (means_test_input.people_under_65 + people_65_or_older)",
+        household_source,
     )
     national_source = (
         f"IRS National Standards, household of {household} — "
@@ -351,27 +533,34 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         county_row = data.local.housing_for(case.state, case.county)
     except KeyError as error:
         raise MeansTestError([*problems, str(error)]) from error
+    housing_size, housing_size_source = housing_family
     housing_source = (
         f"IRS Local Standards, {county_row.county}, {case.state.upper()}, "
-        f"household of {household} — {data.local_release.release_id}"
+        f"household of {housing_size} — {data.local_release.release_id}"
     )
+    if housing_size != household:
+        housing_source += f" ({housing_size_source})"
     line_8 = put(
         "8",
         "Housing and utilities — insurance and operating expenses",
-        county_row.non_mortgage_for(household),
+        county_row.non_mortgage_for(housing_size),
         housing_source,
     )
     line_9a = put(
         "9a",
         "Housing and utilities — mortgage or rent expense (IRS Local Standard)",
-        county_row.mortgage_rent_for(household),
+        county_row.mortgage_rent_for(housing_size),
         housing_source,
     )
     line_9b = put(
         "9b",
         "Average monthly payment for all debts secured by your home",
-        _entered(inputs.home_secured_monthly_total),
-        "entered (means_test_input.home_secured_monthly_total)",
+        *_secured_payment(
+            inputs,
+            bucket="home",
+            typed=inputs.home_secured_monthly_total,
+            field_name="home_secured_monthly_total",
+        ),
     )
     line_9c = put(
         "9c",
@@ -437,8 +626,12 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         line_13b = put(
             "13b",
             "Average monthly payment for debts secured by Vehicle 1",
-            _entered(inputs.vehicle_1_loan_monthly),
-            "entered (means_test_input.vehicle_1_loan_monthly)",
+            *_secured_payment(
+                inputs,
+                bucket="vehicle_1",
+                typed=inputs.vehicle_1_loan_monthly,
+                field_name="vehicle_1_loan_monthly",
+            ),
         )
         line_13c = put(
             "13c",
@@ -458,8 +651,12 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         line_13e = put(
             "13e",
             "Average monthly payment for debts secured by Vehicle 2",
-            _entered(inputs.vehicle_2_loan_monthly),
-            "entered (means_test_input.vehicle_2_loan_monthly)",
+            *_secured_payment(
+                inputs,
+                bucket="vehicle_2",
+                typed=inputs.vehicle_2_loan_monthly,
+                field_name="vehicle_2_loan_monthly",
+            ),
         )
         line_13f = put(
             "13f",
@@ -636,23 +833,20 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
     put("33a", "Copy of line 9b", line_9b, "line 9b")
     put("33b", "Copy of line 13b", line_13b, "line 13b")
     put("33c", "Copy of line 13e", line_13e, "line 13e")
+    # Rows in a home or vehicle bucket already landed on 9b/13b/13e (or were
+    # displaced by a typed total there); only the rest are "other".
+    other_rows = [
+        p for p in inputs.other_secured_payments if p.bucket in (None, "other")
+    ]
     line_33d = Decimal("0")
-    for payment in inputs.other_secured_payments:
+    for payment in other_rows:
         line_33d += _entered(payment.monthly_payment)
     put(
         "33d",
         "Other debts secured by your property",
         line_33d,
         "entered (means_test_input.other_secured_payments"
-        + (
-            ": "
-            + "; ".join(
-                f"{p.creditor_name or p.id} ({p.property_description or 'property'})"
-                for p in inputs.other_secured_payments
-            )
-            if inputs.other_secured_payments
-            else ""
-        )
+        + (": " + "; ".join(_row_name(p) for p in other_rows) if other_rows else "")
         + ")",
     )
     line_33e = put(
@@ -661,12 +855,12 @@ def run_means_test(case: MeansTestCase, data: MeansTestData) -> MeansTestResult:
         line_9b + line_13b + line_13e + line_33d,
         "lines 33a through 33d",
     )
+    cure_total, cure_source = _cure_total(inputs)
     line_34 = put(
         "34",
         "Past-due amounts on secured debts necessary for support (÷ 60)",
-        _sixty_month_average(_entered(inputs.priority_cure_total)),
-        "entered (means_test_input.priority_cure_total) divided by 60 — "
-        "11 U.S.C. § 707(b)(2)(A)(iii)(II)",
+        _sixty_month_average(cure_total),
+        f"{cure_source} divided by 60 — 11 U.S.C. § 707(b)(2)(A)(iii)(II)",
     )
     line_35 = put(
         "35",
