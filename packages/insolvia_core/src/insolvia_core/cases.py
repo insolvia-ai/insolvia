@@ -32,6 +32,19 @@ CHAPTERS = (7, 11, 12, 13)
 # happens after filing is the forms milestone's problem.
 STATUSES = ("intake", "ready_to_file", "filed")
 
+# 106C line 1 — which § 522(b) set the debtor claims (issue #346). Named for
+# the MEANING the form prints, never the box index: `federal` is § 522(b)(2),
+# the § 522(d) list; `state_and_federal_nonbankruptcy` is § 522(b)(3), the
+# domicile state's scheme plus the federal NON-bankruptcy exemptions. A
+# case-level fact rather than a petition field because B101 never asks it —
+# it is Schedule C's question, answered once for the whole estate, and the
+# B106C projection reads it from the case. Whether `federal` is even
+# available is the domicile state's opt-out rule, which the exemptions
+# registry knows and the API's PATCH route checks (`core/exemption_analysis`);
+# this module validates shape only, the usual storage-versus-completeness
+# split.
+EXEMPTION_SETS = ("state_and_federal_nonbankruptcy", "federal")
+
 # A bankruptcy court district identifier. Kept loose on purpose: the
 # authoritative list belongs to the forms/e-filing work, which will have the
 # CM/ECF court codes, and inventing a half-list here would be a constraint the
@@ -79,6 +92,11 @@ class Case:
     # the same date as the forms and records both in one write.
     form_revisions: Mapping[str, str] | None = None
     constants_set_id: str | None = None
+    # 106C line 1's election, one of EXEMPTION_SETS. None until the preparer
+    # chooses — and in an opt-out state the law forces the answer whether or
+    # not one is stored, which the analysis and the B106C projection both
+    # apply on read rather than writing a value nobody chose.
+    exemption_set: str | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +139,7 @@ class CaseChanges:
     chapter: int | None = None
     district: str | None = None
     status: str | None = None
+    exemption_set: str | None = None
 
 
 @dataclass(frozen=True)
@@ -183,6 +202,15 @@ def _parse_status(value: object, errors: dict[str, str]) -> str | None:
     return value
 
 
+def _parse_exemption_set(value: object, errors: dict[str, str]) -> str | None:
+    if not isinstance(value, str) or value not in EXEMPTION_SETS:
+        errors["exemption_set"] = (
+            "Exemption set must be one of " + ", ".join(EXEMPTION_SETS) + "."
+        )
+        return None
+    return value
+
+
 def parse_case_creation(payload: Mapping[str, object]) -> CaseDraft:
     """Validate POST /v1/cases. Unknown keys are ignored.
 
@@ -223,6 +251,10 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
         status = _parse_status(payload["status"], errors)
         if status is not None:
             changes["status"] = status
+    if "exemption_set" in payload:
+        exemption_set = _parse_exemption_set(payload["exemption_set"], errors)
+        if exemption_set is not None:
+            changes["exemption_set"] = exemption_set
 
     if errors:
         raise FieldValidationError(errors)
@@ -290,6 +322,7 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
             ("chapter", changes.chapter),
             ("district", changes.district),
             ("status", changes.status),
+            ("exemption_set", changes.exemption_set),
         )
         if value is not None
     }
@@ -375,6 +408,8 @@ def case_item(case: Case) -> dict[str, object]:
         item["formRevisions"] = dict(case.form_revisions)
     if case.constants_set_id is not None:
         item["constantsSetId"] = case.constants_set_id
+    if case.exemption_set is not None:
+        item["exemptionSet"] = case.exemption_set
     return item
 
 
@@ -398,6 +433,7 @@ def case_from_item(item: Mapping[str, object]) -> Case:
             else None
         )
         raw_constants = item.get("constantsSetId")
+        raw_exemption_set = item.get("exemptionSet")
         chapter = item["chapter"]
         if not isinstance(chapter, (int, str)):
             raise ValueError(f"chapter is {chapter!r}")
@@ -412,6 +448,9 @@ def case_from_item(item: Mapping[str, object]) -> Case:
             updated_at=str(item["updatedAt"]),
             form_revisions=form_revisions,
             constants_set_id=str(raw_constants) if raw_constants is not None else None,
+            exemption_set=(
+                str(raw_exemption_set) if raw_exemption_set is not None else None
+            ),
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored case item is malformed: {error}") from error
@@ -493,6 +532,10 @@ def case_json(case: Case) -> dict[str, object]:
         body["formRevisions"] = dict(case.form_revisions)
     if case.constants_set_id is not None:
         body["constantsSetId"] = case.constants_set_id
+    # Absent until chosen, like the pins — `PATCH /v1/cases/<id>` with
+    # `exemption_set` is the one writer (issue #346).
+    if case.exemption_set is not None:
+        body["exemptionSet"] = case.exemption_set
     return body
 
 

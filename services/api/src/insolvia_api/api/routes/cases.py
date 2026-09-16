@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access_log import record_access
 from insolvia_core.cases import (
+    CaseChanges,
     apply_changes,
     assign_case,
     case_json,
@@ -14,12 +16,14 @@ from insolvia_core.cases import (
     parse_case_update,
     parse_list_limit,
 )
-from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.errors import FieldValidationError, NotFoundError, ValidationError
 from insolvia_core.firms import ADD_EDIT, CASES, VIEW_ONLY
+from insolvia_core.petitions import PETITION
 from insolvia_core.ports import AccessLog, CaseStore, FirmStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
+from insolvia_api.core.exemption_analysis import election_refusal, resolution_date
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,40 @@ def _firm_store() -> FirmStore:
     if deps.firm_store is None:
         raise RuntimeError("firm store is not composed")
     return deps.firm_store
+
+
+def _refuse_forbidden_election(case_id: str, changes: CaseChanges) -> None:
+    """106C line 1's opt-out rule, applied at the write (issue #346).
+
+    A Florida or Georgia debtor cannot elect the federal § 522(d) list
+    (Fla. Stat. § 222.20; O.C.G.A. § 44-13-100(b)), and the registry knows
+    which states have opted out. Checked here rather than left to the
+    analysis's read-time fallback because the case record is what B106C
+    prints from, and a stored answer the law forbids is a record that lies
+    even while every screen corrects it. The state comes from Debtor 1's
+    residence address and the registry resolves as of the expected filing
+    date (else today); a case that cannot yet say its state is not refused —
+    the analysis reports that on read.
+    """
+    if changes.exemption_set is None:
+        return
+    deps = dependencies()
+    if deps.debtor_store is None or deps.case_entity_store is None:
+        raise RuntimeError("debtor store and entity store are not composed")
+    debtors = deps.debtor_store.list_for_case(case_id)
+    debtor_1 = next((d for d in debtors if d.filing_role == "debtor_1"), None)
+    state = debtor_1.residence_address.state if debtor_1 is not None else None
+    petitions = deps.case_entity_store.list_for_case(case_id, PETITION)
+    as_of, _source = resolution_date(
+        petitions[0].body if petitions else None, date.today()
+    )
+    refusal = election_refusal(
+        changes.exemption_set,
+        state=state.strip().upper() if state else None,
+        as_of=as_of,
+    )
+    if refusal is not None:
+        raise FieldValidationError({"exemption_set": refusal})
 
 
 def _json_body() -> dict[str, object]:
@@ -176,7 +214,7 @@ def get_case_route(case_id: str) -> ResponseReturnValue:
 @require_auth
 @requires(CASES, ADD_EDIT)
 def update_case_route(case_id: str) -> ResponseReturnValue:
-    """Change a case's chapter, district or status.
+    """Change a case's chapter, district, status or exemption election.
 
     Read-modify-write. The read applies the whole access rule; the store's
     conditional write closes the gap between the two, so a case cannot move
@@ -192,6 +230,8 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
     accessor = current_accessor()
 
     existing = store.get(case_id, accessor=accessor)
+    if existing is not None:
+        _refuse_forbidden_election(case_id, changes)
     updated = (
         None if existing is None else store.update(apply_changes(existing, changes))
     )

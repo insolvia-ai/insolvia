@@ -1612,9 +1612,50 @@ def test_b106c_line_1_is_forced_by_the_opt_out_rule() -> None:
     assert values["line_1_exemption_set"] == Option("state and federal")
 
 
-def test_b106c_line_1_stays_blank_where_the_debtor_may_elect() -> None:
+def _texan_case_file(exemption_set: str | None = None) -> CaseFile:
+    case_file = reference_case_file()
+    debtor = _debtor_1()
+    texan = Debtor(
+        **{
+            **debtor.__dict__,
+            "residence_address": Address(
+                line1="1 Alamo Plaza",
+                city="San Antonio",
+                state="TX",
+                postal_code="78205",
+            ),
+        }
+    )
+    return CaseFile(
+        **{
+            **case_file.__dict__,
+            "case": replace(case_file.case, exemption_set=exemption_set),
+            "debtors": (texan, _debtor_2()),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("exemption_set", "export"),
+    [
+        pytest.param("federal", "federal", id="federal"),
+        pytest.param(
+            "state_and_federal_nonbankruptcy", "state and federal", id="state"
+        ),
+    ],
+)
+def test_b106c_line_1_prints_the_cases_election_where_the_debtor_may_elect(
+    exemption_set: str, export: str
+) -> None:
     # Texas allows the federal election; the choice is the debtor's own
-    # fact (case.exemption_set), which code has not grown yet — blank.
+    # fact, case.exemption_set (issue #346), and prints as made.
+    values = project(latest_form("form/b106c"), _texan_case_file(exemption_set))
+    assert values["line_1_exemption_set"] == Option(export)
+
+
+def test_b106c_line_1_stays_blank_where_the_debtor_may_elect() -> None:
+    # Texas allows the federal election; until the case records one the
+    # box stays blank — the completeness gate's question, not the form's.
     case_file = reference_case_file()
     debtor = _debtor_1()
     texan = Debtor(
