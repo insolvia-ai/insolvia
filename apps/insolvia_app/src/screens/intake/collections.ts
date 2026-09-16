@@ -2,6 +2,7 @@ import {
   ASSET_CATEGORIES,
   BUSINESS_TYPES,
   CLAIM_CLASSES,
+  CONTRACT_LEASE_INTENTIONS,
   DEBTOR_ATTRIBUTION,
   EMPLOYMENT_STATUSES,
   EXPENSE_CATEGORIES,
@@ -112,6 +113,17 @@ export interface CollectionSpec {
   readonly fields: (body: Readonly<Record<string, unknown>>) => readonly FieldSpec[];
   /** One line identifying a record in the list, from whatever is filled in. */
   readonly summary: (body: Readonly<Record<string, unknown>>) => string;
+  /**
+   * A read-only backlink (issue #347): another collection's `reference-list`
+   * field that names records of THIS collection — a codebtor's `claim_ids`
+   * naming a claim, or `contract_lease_ids` naming a lease. Declared on the
+   * record being pointed AT, not the pointer, so the editor can show which
+   * codebtors are linked to each claim or lease row, read only.
+   */
+  readonly linkedFrom?: {
+    readonly collection: CaseCollection;
+    readonly field: string;
+  };
 }
 
 /**
@@ -444,6 +456,9 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       ].filter((part): part is string => part !== undefined);
       return parts.length > 0 ? parts.join(' — ') : 'New claim';
     },
+    // A codebtor names claims it co-signed via `claim_ids` (Schedule H's
+    // "Schedule D/E/F, line __" column) — issue #347.
+    linkedFrom: { collection: 'codebtors', field: 'claim_ids' },
   },
   {
     collection: 'assets',
@@ -584,16 +599,67 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
     },
   },
   {
+    collection: 'contract_leases',
+    title: 'Contracts and leases',
+    recordName: 'contract or lease',
+    help:
+      'Schedule G — executory contracts and unexpired leases. Intention and ' +
+      'the Statement of Intention flag are Form 108’s own columns, entered ' +
+      'here so 108 can read them when that form is built.',
+    fields: () => [
+      // A plain party field for now — the library picker arrives with the
+      // creditor library (issue #350).
+      text('counterparty_name', 'Other party — name'),
+      { kind: 'address', key: 'counterparty_address', label: 'Other party — address' },
+      narrative(
+        'description',
+        'What the contract or lease is for, the nature of the debtor’s ' +
+          'interest, the remaining term, and any government contract number',
+      ),
+      choice('intention', 'Intention', CONTRACT_LEASE_INTENTIONS),
+      yesNo('list_on_statement_of_intention', 'List on the Statement of Intention (Form 108)?'),
+    ],
+    summary: (body) => asText(body.counterparty_name) ?? 'New contract or lease',
+    // A codebtor names leases it co-signed via `contract_lease_ids`
+    // (Schedule H's "Schedule G, line __" column) — issue #347.
+    linkedFrom: { collection: 'codebtors', field: 'contract_lease_ids' },
+  },
+  {
     collection: 'codebtors',
     title: 'Codebtors',
     recordName: 'codebtor',
-    help: 'Schedule H — anyone else liable on the debtor’s debts.',
+    help:
+      'Schedule H — anyone else liable on the debtor’s debts. A codebtor ' +
+      'without a link to a claim or lease is meaningless on this schedule, ' +
+      'so link them to what they co-signed below.',
     fields: () => [
       text('name', 'Codebtor name'),
       { kind: 'address', key: 'address', label: 'Address' },
       { kind: 'reference-list', key: 'claim_ids', label: 'On which claims', refers: 'claims' },
+      {
+        kind: 'reference-list',
+        key: 'contract_lease_ids',
+        label: 'On which contracts or leases',
+        refers: 'contract_leases',
+      },
     ],
     summary: (body) => asText(body.name) ?? 'New codebtor',
+  },
+  {
+    collection: 'community_household_members',
+    title: 'Community property household',
+    recordName: 'community property household member',
+    help:
+      'Schedule H line 2 / Form 107 Q3 — a spouse or former spouse in a ' +
+      'community property state within the last 8 years. Shown only when ' +
+      'the debtor’s state is one of them.',
+    fields: () => [
+      text('name', 'Name'),
+      { kind: 'address', key: 'address', label: 'Address' },
+      text('community_state', 'Community property state (two-letter code)'),
+      yesNo('lived_with_debtor', 'Lived with the debtor?'),
+    ],
+    summary: (body) => asText(body.name) ?? 'New household member',
   },
   {
     collection: 'sofa_entries',

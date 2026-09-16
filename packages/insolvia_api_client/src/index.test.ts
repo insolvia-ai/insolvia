@@ -30,6 +30,7 @@ import {
   BUSINESS_TYPES,
   CASE_COLLECTIONS,
   CLAIM_CLASSES,
+  CONTRACT_LEASE_INTENTIONS,
   DEBT_CHARACTERS,
   ESTIMATED_CREDITORS_BANDS,
   ESTIMATED_DOLLAR_BANDS,
@@ -4219,6 +4220,10 @@ describe('the case-collection enums', () => {
     expect(body.unsecured_amount_override).toBe('3000.00');
     expect(body.intention).toBe('retain_reaffirm');
     expect(body.intention_explanation).toBe('Payments are current.');
+  });
+
+  test('CONTRACT_LEASE_INTENTIONS mirrors core/contract_leases.py', () => {
+    expect(CONTRACT_LEASE_INTENTIONS).toEqual(['assume', 'reject']);
   });
 });
 

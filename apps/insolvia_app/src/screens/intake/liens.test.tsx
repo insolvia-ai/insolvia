@@ -152,6 +152,9 @@ describe('the collateral panels', () => {
     get(`/v1/cases/${CASE_ID}/debtors`, { debtors: [] }),
     get(`/v1/cases/${CASE_ID}/creditors`, { creditors: [] }),
     get(`/v1/cases/${CASE_ID}/liens`, LIENS),
+    // The claims spec also backlinks to codebtors (issue #347) — every claims
+    // load fetches it, whether or not this suite cares about the answer.
+    get(`/v1/cases/${CASE_ID}/codebtors`, { codebtors: [] }),
   ];
 
   async function openSection(label: string) {
@@ -210,6 +213,7 @@ describe('the collateral panels', () => {
         ],
         assets: LIENS.assets,
       }),
+      get(`/v1/cases/${CASE_ID}/codebtors`, { codebtors: [] }),
       get(`/v1/cases/${CASE_ID}/claims`, { claims: [LINKED_CLAIM] }),
       get(`/v1/cases/${CASE_ID}/assets`, { assets: [SAVED_ASSET] }),
     ]);
@@ -296,6 +300,7 @@ describe('the collateral panels', () => {
       get(`/v1/cases/${CASE_ID}/debtors`, { debtors: [] }),
       get(`/v1/cases/${CASE_ID}/creditors`, { creditors: [] }),
       get(`/v1/cases/${CASE_ID}/liens`, { claims: [], assets: [] }),
+      get(`/v1/cases/${CASE_ID}/codebtors`, { codebtors: [] }),
       get(`/v1/cases/${CASE_ID}/assets`, { assets: [SAVED_ASSET] }),
       {
         method: 'PUT',

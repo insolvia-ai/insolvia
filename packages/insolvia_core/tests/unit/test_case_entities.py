@@ -21,6 +21,7 @@ from insolvia_core.case_entities import (
 )
 from insolvia_core.claims import parse_claim
 from insolvia_core.codebtors import parse_community_household_member
+from insolvia_core.contract_leases import parse_contract_lease
 from insolvia_core.creditors import parse_creditor
 from insolvia_core.errors import FieldValidationError
 from insolvia_core.exemption_claims import parse_exemption
@@ -171,6 +172,8 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "counterparty_name": "Example Storage LLC",
         "counterparty_address": {"line1": "1 Example Way", "city": "Exampleville"},
         "description": "Month-to-month storage unit lease, unit 12",
+        "intention": "assume",
+        "list_on_statement_of_intention": True,
     },
     "community_household_members": {
         "name": "Example Former Spouse",
@@ -457,3 +460,17 @@ def test_a_community_state_is_a_two_letter_code() -> None:
     with pytest.raises(FieldValidationError) as failure:
         parse_community_household_member({"community_state": "Texas"})
     assert "community_state" in failure.value.fields
+
+
+def test_a_contract_lease_intention_is_assume_or_reject() -> None:
+    # Form 108's own vocabulary (11 U.S.C. § 365) — not 106G's, which prints
+    # neither this nor the statement-of-intention flag (issue #347).
+    with pytest.raises(FieldValidationError) as failure:
+        parse_contract_lease({"intention": "renegotiate"})
+    assert "intention" in failure.value.fields
+
+
+def test_a_contract_lease_statement_of_intention_flag_is_a_boolean() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_contract_lease({"list_on_statement_of_intention": "yes"})
+    assert "list_on_statement_of_intention" in failure.value.fields
