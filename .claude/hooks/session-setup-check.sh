@@ -15,6 +15,13 @@
 #    a worktree is exactly where that stray diff gets committed by accident).
 #    In the primary checkout it has nothing to link from and only reports.
 #
+# 1b. `dev-env-files.sh --link`, for the same reason and the same way. The
+#    per-machine `.env` files `dev-aws-setup.sh` writes are gitignored too, so
+#    a worktree starts without them — and the failure is quiet: the app boots
+#    with no Cognito config, the API's compose stack refuses to start, and an
+#    agent goes looking for a setup problem the primary checkout solved long
+#    ago. `--link` symlinks them from the primary; in the primary it is a no-op.
+#
 # 2. `dev-setup.sh --check` (fast, ~0.4s, installs nothing) for the toolchain,
 #    injecting one line when everything is present or the specific missing tools
 #    plus the fix when not. `--check` exits 0 either way and signals gaps with
@@ -26,12 +33,21 @@ set -uo pipefail
 root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 setup="$root/scripts/dev-setup.sh"
 skills="$root/scripts/dev-skills.sh"
+envfiles="$root/scripts/dev-env-files.sh"
 
 # Step 1 — repair. Quiet: only the one-line outcome below should reach context.
 if [ -x "$skills" ]; then
   skills_out="$(DEV_SKILLS_QUIET=1 "$skills" --link 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g')"
   case "$skills_out" in
     *"[warn]"*) printf 'Agent skills: %s\n' "$(printf '%s' "$skills_out" | head -2 | tr '\n' ' ')" ;;
+  esac
+fi
+
+# Step 1b — repair the per-machine env files. Same shape, same quietness.
+if [ -x "$envfiles" ]; then
+  env_out="$(DEV_ENV_FILES_QUIET=1 "$envfiles" --link 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g')"
+  case "$env_out" in
+    *"[warn]"*) printf 'Env files: %s\n' "$(printf '%s' "$env_out" | head -2 | tr '\n' ' ')" ;;
   esac
 fi
 

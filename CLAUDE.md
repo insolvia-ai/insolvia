@@ -144,6 +144,13 @@ one offline command, and it does **not** rewrite `skills-lock.json`:
 ./scripts/dev-skills.sh --link
 ```
 
+The same hook also links the four per-machine `.env` files
+(`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`) from the primary
+checkout, because they are gitignored and a worktree starts without them —
+the symptom is an app that says "Sign-in is not configured" and an API stack
+that refuses to start, not an error. By hand: `./scripts/dev-env-files.sh
+--link`. [`scripts/README.md`](scripts/README.md) owns the detail.
+
 They were vendored once, and 131 files of other people's documentation sat in
 the tree being reviewed as though we owned it and updated by hand. One
 consequence is worth keeping in mind: the installer takes each source at its
