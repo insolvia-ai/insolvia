@@ -132,11 +132,15 @@ describe('the intake collection sections', () => {
       'Households',
       'Monthly expenses',
       'Dependents',
+      'Contracts and leases',
       'Codebtors',
       'Financial affairs',
     ]) {
       expect(screen.getByRole('option', { name: section })).toBeTruthy();
     }
+    // No debtor has a residence recorded yet, so the community-property
+    // section — shown only in one of nine states (issue #347) — is absent.
+    expect(screen.queryByRole('option', { name: 'Community property household' })).toBeNull();
   });
 
   it('lists what is already recorded when a section opens', async () => {
@@ -284,6 +288,12 @@ describe('the intake collection sections', () => {
         fragment: `/v1/cases/${CASE_ID}/creditors`,
         respond: () => jsonResponse(200, { creditors: [] }),
       },
+      // And the codebtors backlink (issue #347).
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
       {
         method: 'GET',
         fragment: `/v1/cases/${CASE_ID}/assets`,
@@ -351,6 +361,11 @@ describe('the intake collection sections', () => {
         respond: () => jsonResponse(200, { assets: [] }),
       },
       {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
+      {
         method: 'POST',
         fragment: `/v1/cases/${CASE_ID}/claims`,
         respond: () =>
@@ -393,6 +408,11 @@ describe('the intake collection sections', () => {
         respond: () => jsonResponse(200, { assets: [] }),
       },
       {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
+      {
         method: 'POST',
         fragment: `/v1/cases/${CASE_ID}/claims`,
         respond: () =>
@@ -422,6 +442,175 @@ describe('the intake collection sections', () => {
         provenance: { account_last4: { source: 'staff_typed' } },
       }),
     );
+  });
+
+  it('saves a contract or lease’s intention and Statement of Intention flag', async () => {
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/contract_leases`,
+        respond: () => jsonResponse(200, { contract_leases: [] }),
+      },
+      // The backlink to codebtors (issue #347) — loaded even though nothing
+      // links here yet.
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/contract_leases`,
+        respond: () =>
+          jsonResponse(201, {
+            id: '00000000-0000-4000-8000-0000000000f4',
+            case_id: CASE_ID,
+            created_at: '2026-09-01T10:00:00.000000Z',
+            updated_at: '2026-09-01T10:00:00.000000Z',
+            provenance: {},
+            counterparty_name: 'StorSafe Tampa LLC',
+            intention: 'reject',
+            list_on_statement_of_intention: true,
+          }),
+      },
+    ]);
+
+    const user = await openSection('Contracts and leases');
+    await user.press(await screen.findByRole('button', { name: 'Add contract or lease' }));
+    await user.type(await screen.findByLabelText('Other party — name'), 'StorSafe Tampa LLC');
+    await user.press(await screen.findByRole('combobox', { name: 'Intention' }));
+    await user.press(await screen.findByRole('option', { name: 'Reject' }));
+    await user.press(
+      await screen.findByRole('combobox', {
+        name: 'List on the Statement of Intention (Form 108)?',
+      }),
+    );
+    await user.press(await screen.findByRole('option', { name: 'Yes' }));
+    await user.press(screen.getByRole('button', { name: 'Save contract or lease' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/contract_leases')).toEqual({
+        counterparty_name: 'StorSafe Tampa LLC',
+        intention: 'reject',
+        list_on_statement_of_intention: true,
+        provenance: {
+          counterparty_name: { source: 'staff_typed' },
+          intention: { source: 'staff_typed' },
+          list_on_statement_of_intention: { source: 'staff_typed' },
+        },
+      }),
+    );
+  });
+
+  it('links a codebtor to a claim and a lease, and shows the link back on each', async () => {
+    const LEASE = {
+      id: '00000000-0000-4000-8000-0000000000f5',
+      case_id: CASE_ID,
+      created_at: '2026-09-01T10:00:00.000000Z',
+      updated_at: '2026-09-01T10:00:00.000000Z',
+      provenance: { counterparty_name: { source: 'staff_typed' } },
+      counterparty_name: 'StorSafe Tampa LLC',
+    };
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () => jsonResponse(200, { claims: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/contract_leases`,
+        respond: () => jsonResponse(200, { contract_leases: [LEASE] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () =>
+          jsonResponse(201, {
+            id: '00000000-0000-4000-8000-0000000000f6',
+            case_id: CASE_ID,
+            created_at: '2026-09-01T10:00:00.000000Z',
+            updated_at: '2026-09-01T10:00:00.000000Z',
+            provenance: {
+              name: { source: 'staff_typed' },
+              contract_lease_ids: { source: 'staff_typed' },
+            },
+            name: 'Jane Doe',
+            contract_lease_ids: [LEASE.id],
+          }),
+      },
+    ]);
+
+    const user = await openSection('Codebtors');
+    await user.press(await screen.findByRole('button', { name: 'Add codebtor' }));
+    await user.type(await screen.findByLabelText('Codebtor name'), 'Jane Doe');
+    await user.press(await screen.findByLabelText('Contract or lease 1 — StorSafe Tampa LLC'));
+    await user.press(screen.getByRole('button', { name: 'Save codebtor' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/codebtors')).toEqual({
+        name: 'Jane Doe',
+        contract_lease_ids: [LEASE.id],
+        provenance: {
+          name: { source: 'staff_typed' },
+          contract_lease_ids: { source: 'staff_typed' },
+        },
+      }),
+    );
+  });
+
+  it('shows which codebtors are linked to a claim, read only', async () => {
+    const CLAIM = {
+      id: '00000000-0000-4000-8000-0000000000f7',
+      case_id: CASE_ID,
+      created_at: '2026-09-01T10:00:00.000000Z',
+      updated_at: '2026-09-01T10:00:00.000000Z',
+      provenance: { amount: { source: 'staff_typed' } },
+      amount: '500.00',
+    };
+    const CODEBTOR = {
+      id: '00000000-0000-4000-8000-0000000000f8',
+      case_id: CASE_ID,
+      created_at: '2026-09-01T10:00:00.000000Z',
+      updated_at: '2026-09-01T10:00:00.000000Z',
+      provenance: { name: { source: 'staff_typed' }, claim_ids: { source: 'staff_typed' } },
+      name: 'Jane Doe',
+      claim_ids: [CLAIM.id],
+    };
+    signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/claims`,
+        respond: () => jsonResponse(200, { claims: [CLAIM] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/assets`,
+        respond: () => jsonResponse(200, { assets: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/codebtors`,
+        respond: () => jsonResponse(200, { codebtors: [CODEBTOR] }),
+      },
+    ]);
+
+    await openSection('Claims');
+
+    expect(await screen.findByText('Codebtors: Jane Doe')).toBeTruthy();
   });
 
   it('types a SOFA entry by its question, and nests its answers under payload', async () => {

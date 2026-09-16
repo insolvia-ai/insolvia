@@ -12,6 +12,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 import { CollectionEditor } from './collection-editor';
 import { COLLECTION_SPECS } from './collections';
+import { isCommunityPropertyState } from './community-property';
 import { DebtorFields } from './debtor-fields';
 
 /**
@@ -45,10 +46,22 @@ import { DebtorFields } from './debtor-fields';
 
 type Section = 'debtor' | CaseCollection;
 
-const SECTION_OPTIONS: readonly { readonly value: Section; readonly label: string }[] = [
-  { value: 'debtor', label: 'About the debtor' },
-  ...COLLECTION_SPECS.map((spec) => ({ value: spec.collection, label: spec.title })),
-];
+/**
+ * Every collection's spec MINUS `community_household_members` when no
+ * debtor's residence is in a community-property state — the form asks about
+ * one only where §541(a)(2) applies (issue #347). Recomputed per render from
+ * `bodies` rather than memoised: it is cheap (ten specs, at most two debtors)
+ * and the alternative is a `useMemo` dependency array holding a freshly
+ * mapped array every render anyway.
+ */
+function visibleSpecs(bodies: Partial<Record<FilingRole, DebtorBody>>): typeof COLLECTION_SPECS {
+  const communityPropertyState = Object.values(bodies).some((body) =>
+    isCommunityPropertyState(body?.residence_address?.state),
+  );
+  return communityPropertyState
+    ? COLLECTION_SPECS
+    : COLLECTION_SPECS.filter((spec) => spec.collection !== 'community_household_members');
+}
 
 const ROLES: readonly { readonly value: FilingRole; readonly label: string }[] = [
   { value: 'debtor_1', label: 'Debtor 1' },
@@ -211,8 +224,15 @@ export function Intake() {
     setRole(next);
   };
 
+  // Recomputed from `bodies` on every render — see `visibleSpecs`.
+  const specs = visibleSpecs(bodies);
+  const sectionOptions: readonly { readonly value: Section; readonly label: string }[] = [
+    { value: 'debtor', label: 'About the debtor' },
+    ...specs.map((spec) => ({ value: spec.collection, label: spec.title })),
+  ];
+
   const switchSection = (next: string) => {
-    const chosen = SECTION_OPTIONS.find((option) => option.value === next);
+    const chosen = sectionOptions.find((option) => option.value === next);
     if (chosen === undefined) return;
     // Leaving the debtor section is navigation like any other: the pending
     // debounce flushes rather than being dropped with the section.
@@ -239,7 +259,10 @@ export function Intake() {
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const saveState: SaveState = save[role] ?? { kind: 'idle' };
 
-  const spec = COLLECTION_SPECS.find((candidate) => candidate.collection === section);
+  // Looked up in the FILTERED list, not the full one: a debtor edited back
+  // out of a community-property state while this section is open should stop
+  // rendering it, the same as it never appearing in the picker.
+  const spec = specs.find((candidate) => candidate.collection === section);
 
   return (
     <CaseColumn>
@@ -248,7 +271,7 @@ export function Intake() {
       <View style={styles.sectionPicker}>
         <Field.Root>
           <Field.Label>Section</Field.Label>
-          <Select options={[...SECTION_OPTIONS]} value={section} onValueChange={switchSection} />
+          <Select options={[...sectionOptions]} value={section} onValueChange={switchSection} />
         </Field.Root>
       </View>
 

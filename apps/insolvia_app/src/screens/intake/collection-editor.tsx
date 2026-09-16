@@ -140,6 +140,28 @@ function needsDebtors(spec: CollectionSpec): boolean {
   return spec.fields({}).some((field) => field.kind === 'debtor');
 }
 
+/**
+ * The summaries of every `linkedRows` record whose `linkedFrom.field` names
+ * `rowId` — "Codebtors: Jane Doe, John Roe" under a claim or lease (issue
+ * #347). Read only: editing the link happens on the codebtor's own record,
+ * via its `reference-list` field, not here.
+ */
+function linkedSummaries(
+  spec: CollectionSpec,
+  linkedRows: readonly Row[],
+  rowId: string,
+): readonly string[] {
+  const linkedFrom = spec.linkedFrom;
+  if (linkedFrom === undefined) return [];
+  const linkingSpec = specFor(linkedFrom.collection);
+  return linkedRows
+    .filter((row) => {
+      const ids = row.body[linkedFrom.field];
+      return Array.isArray(ids) && ids.includes(rowId);
+    })
+    .map((row) => linkingSpec?.summary(row.body) ?? row.id);
+}
+
 export interface CollectionEditorProps {
   readonly caseId: string;
   readonly spec: CollectionSpec;
@@ -169,6 +191,11 @@ export function CollectionEditor({
   const [references, setReferences] = useState<
     Readonly<Partial<Record<string, readonly ReferenceOption[]>>>
   >({});
+  // The records of `spec.linkedFrom.collection` (issue #347) — loaded so each
+  // row below can show which of THEM name it, read only. Not `references`:
+  // those are options for a picker on THIS spec's own fields, the opposite
+  // direction from a backlink.
+  const [linkedRows, setLinkedRows] = useState<readonly Row[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,6 +238,23 @@ export function CollectionEditor({
               label: DEBTOR_LABELS[debtor.filing_role] ?? debtor.filing_role,
             })),
           }));
+        }
+
+        // A read-only "who links to me" line (issue #347) — loaded after the
+        // list too, for the same reason references are: it decorates rows
+        // already on screen rather than gating them.
+        const linkedFrom = spec.linkedFrom;
+        if (linkedFrom !== undefined) {
+          const linked = await call((client) =>
+            client.listCaseEntities(caseId, linkedFrom.collection),
+          );
+          if (!linked.ok || cancelled) return;
+          setLinkedRows(
+            linked.value.map((record) => ({
+              id: record.id,
+              body: bodyOf(record as unknown as Record<string, unknown>),
+            })),
+          );
         }
       } catch {
         if (!cancelled) setLoad({ kind: 'error', message: `Could not load ${spec.title}.` });
@@ -314,40 +358,54 @@ export function CollectionEditor({
           {rows.length === 0 ? (
             <Text style={[styles.help, muted]}>Nothing recorded yet.</Text>
           ) : (
-            rows.map((row, index) => (
-              <View key={row.id} style={[styles.row, { borderColor: theme.colors.line }]}>
-                <Text
-                  style={[
-                    styles.rowSummary,
-                    { color: theme.colors.ink, fontFamily: theme.typography.body },
-                  ]}
-                >
-                  {spec.summary(row.body)}
-                </Text>
-                <View style={styles.rowActions}>
-                  <Button
-                    size="lg"
-                    intent="secondary"
-                    aria-label={`Edit ${spec.recordName} ${index + 1}`}
-                    onPress={() => {
-                      setErrors({});
-                      setStatus('');
-                      setMode({ kind: 'form', id: row.id, body: row.body });
-                    }}
+            rows.map((row, index) => {
+              const linked = linkedSummaries(spec, linkedRows, row.id);
+              const linkingTitle =
+                spec.linkedFrom !== undefined
+                  ? (specFor(spec.linkedFrom.collection)?.title ?? 'Linked records')
+                  : null;
+              return (
+                <View key={row.id} style={[styles.row, { borderColor: theme.colors.line }]}>
+                  <Text
+                    style={[
+                      styles.rowSummary,
+                      { color: theme.colors.ink, fontFamily: theme.typography.body },
+                    ]}
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    size="lg"
-                    intent="secondary"
-                    aria-label={`Remove ${spec.recordName} ${index + 1}`}
-                    onPress={() => void remove(row.id)}
-                  >
-                    Remove
-                  </Button>
+                    {spec.summary(row.body)}
+                  </Text>
+                  {linkingTitle === null ? null : (
+                    <Text style={[styles.help, muted]}>
+                      {linked.length > 0
+                        ? `${linkingTitle}: ${linked.join(', ')}`
+                        : `No ${linkingTitle.toLowerCase()} linked`}
+                    </Text>
+                  )}
+                  <View style={styles.rowActions}>
+                    <Button
+                      size="lg"
+                      intent="secondary"
+                      aria-label={`Edit ${spec.recordName} ${index + 1}`}
+                      onPress={() => {
+                        setErrors({});
+                        setStatus('');
+                        setMode({ kind: 'form', id: row.id, body: row.body });
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="lg"
+                      intent="secondary"
+                      aria-label={`Remove ${spec.recordName} ${index + 1}`}
+                      onPress={() => void remove(row.id)}
+                    >
+                      Remove
+                    </Button>
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
           <Button
             size="lg"

@@ -2274,6 +2274,14 @@ export interface ExemptionBody {
   readonly acquired_within_1215_days?: boolean | undefined;
 }
 
+/**
+ * Form 108's assume/reject column (11 U.S.C. § 365) for a lease, stored on
+ * the lease itself rather than a separate B108 record — see
+ * {@link ContractLeaseBody.intention}.
+ */
+export const CONTRACT_LEASE_INTENTIONS = ['assume', 'reject'] as const;
+export type ContractLeaseIntention = (typeof CONTRACT_LEASE_INTENTIONS)[number];
+
 /** 106G, one row: an executory contract or unexpired lease. */
 export interface ContractLeaseBody {
   /** One free-text line — counterparties are predominantly entities. */
@@ -2281,6 +2289,13 @@ export interface ContractLeaseBody {
   readonly counterparty_address?: Address | undefined;
   /** What the contract or lease is for, term remaining, contract number. */
   readonly description?: string | undefined;
+  /**
+   * Form 108's own column, NOT printed on 106G itself — stored here so the
+   * B108 projection (13.10) reads it rather than asking again.
+   */
+  readonly intention?: ContractLeaseIntention | undefined;
+  /** Whether this row belongs on the Statement of Intention at all. */
+  readonly list_on_statement_of_intention?: boolean | undefined;
 }
 
 /** 106H line 2 / B107 Q3: the community-property spouse or former spouse. */

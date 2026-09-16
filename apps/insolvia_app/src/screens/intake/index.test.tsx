@@ -157,6 +157,32 @@ describe('the intake screen', () => {
 
     expect(await screen.findByText('Changes save automatically')).toBeTruthy();
   });
+
+  it('offers the community-property section only once a debtor’s state is one of the nine', async () => {
+    // §541(a)(2) / Schedule H line 2 — issue #347. No debtor recorded yet, so
+    // the section is absent.
+    signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: noDebtors });
+
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('combobox', { name: 'Section' }));
+    expect(screen.queryByRole('option', { name: 'Community property household' })).toBeNull();
+  });
+
+  it('offers it once a debtor’s residence is in a community-property state', async () => {
+    const inTexas = {
+      ...SAVED,
+      residence_address: { city: 'Austin', state: 'TX' },
+      provenance: { ...SAVED.provenance, 'residence_address.city': { source: 'staff_typed' } },
+    };
+    signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [inTexas] }) });
+
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('combobox', { name: 'Section' }));
+    expect(
+      await screen.findByRole('option', { name: 'Community property household' }),
+    ).toBeTruthy();
+  });
+
   describe('the ways it used to lose work', () => {
     // Every one of these passed the old suite while being broken. They are
     // grouped so the next reader can see what an adversarial pass found.
