@@ -37,8 +37,12 @@ import {
   EXCLUDED_INCOME_CATEGORIES,
   FEE_HANDLING,
   FILING_PROFESSIONAL_ROLES,
+  INCOME_LINE_CATEGORIES,
   INTENTIONS,
+  MARITAL_FILING_STATUSES,
   OTHER_INCOME_CATEGORIES,
+  PRESUMPTION_EXEMPTIONS,
+  SECURED_PAYMENT_BUCKETS,
   SMALL_BUSINESS_STATUSES,
   SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
@@ -5111,5 +5115,368 @@ describe('getCaseStandards', () => {
 
     await expect(client.getCaseStandards(ENTITY_CASE_ID)).rejects.toThrow(ApiUnauthorizedException);
     expect(stub.requests()).toHaveLength(0);
+  });
+});
+
+describe('getCaseMeansTest', () => {
+  // Copied from `means_test_json` (core/means_test_trace.py) for the
+  // projection tests' reference case, entries trimmed to one per line —
+  // not inferred. Every money figure is a string on the wire.
+  const REFERENCE_TRACE = {
+    asOf: '2026-08-01',
+    asOfSource: 'case.created_at',
+    releaseIds: {
+      'ust/census-median-family-income': 'ust/census-median-family-income@2026-04-01',
+      'ust/irs-national-standards': 'ust/irs-national-standards@2026-07-15',
+      'ust/irs-local-standards': 'ust/irs-local-standards@2026-07-15',
+      'ust/ch13-admin-multipliers': 'ust/ch13-admin-multipliers@2026-07-15',
+      'code/dollar-amounts': 'code/dollar-amounts@2025-04-01',
+    },
+    jurisdiction: { state: 'FL', county: 'Hillsborough', district: 'Middle District of Florida' },
+    maritalFilingStatus: {
+      value: 'married_filing_jointly',
+      source: "the case's debtor_2 record",
+    },
+    household: {
+      peopleUnder65: 3,
+      people65OrOlder: 0,
+      medianHouseholdSize: {
+        value: 3,
+        source: 'entered (means_test_input.people_under_65 + people_65_or_older)',
+      },
+      irsFamilySize: {
+        value: 3,
+        source: 'entered (means_test_input.people_under_65 + people_65_or_older)',
+      },
+      irsHousingFamilySize: {
+        value: 3,
+        source: 'entered (means_test_input.people_under_65 + people_65_or_older)',
+      },
+      childrenUnder18: 1,
+    },
+    exemptions: {
+      nonConsumerDebts: false,
+      disabledVeteran: false,
+      reservistNationalGuard: false,
+      applied: null,
+      rule: null,
+      available: ['non_consumer_debts', 'disabled_veteran', 'reservist_national_guard'],
+    },
+    cmi: {
+      window: {
+        filingDate: '2026-08-01',
+        start: '2026-02-01',
+        end: '2026-07-31',
+        months: ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07'],
+      },
+      columns: [
+        {
+          column: 'A',
+          lines: [
+            {
+              category: 'wages',
+              label: 'Gross wages, salary, tips, bonuses, overtime, commissions',
+              totalReceived: '44400.00',
+              monthlyAverage: '7400.00',
+              citation: '',
+              note: '',
+              entries: [
+                {
+                  receivedOn: '2026-02-27',
+                  amount: '7400.00',
+                  description: 'paycheck (gross) — Menabrea Machines Inc',
+                },
+              ],
+            },
+          ],
+          excluded: [],
+          monthlyTotal: '7400.00',
+        },
+        {
+          column: 'B',
+          lines: [
+            {
+              category: 'unemployment',
+              label: 'Unemployment compensation',
+              totalReceived: '7800.00',
+              monthlyAverage: '1300.00',
+              citation: '',
+              note: '',
+              entries: [
+                {
+                  receivedOn: '2026-02-10',
+                  amount: '1300.00',
+                  description: 'Unemployment compensation — Florida Reemployment Assistance',
+                },
+              ],
+            },
+          ],
+          excluded: [
+            {
+              category: 'social_security_act_benefit',
+              label: 'Benefits received under the Social Security Act',
+              totalReceived: '900.00',
+              monthlyAverage: '150.00',
+              citation: '11 U.S.C. § 101(10A)(B)(ii)',
+              note: 'recorded and excluded from current monthly income',
+              entries: [
+                {
+                  receivedOn: '2026-05-20',
+                  amount: '900.00',
+                  description:
+                    'Benefits received under the Social Security Act — Social Security Administration',
+                },
+              ],
+            },
+          ],
+          monthlyTotal: '1300.00',
+        },
+      ],
+      combinedMonthlyTotal: '8700.00',
+      annualized: '104400.00',
+      gaps: [],
+      problems: [],
+    },
+    debt: { priorityTotal: '3200.00', nonpriorityUnsecuredTotal: '23250.00' },
+    comparison: {
+      state: 'FL',
+      householdSize: 3,
+      monthlyCmi: '8700.00',
+      annualizedCmi: '104400.00',
+      annualMedian: '97540.00',
+      aboveMedian: true,
+      source:
+        'Census median family income, FL household of 3 — ust/census-median-family-income@2026-04-01',
+    },
+    outcome: 'no_presumption',
+    determinedBy: 'threshold_floor',
+    lines: [
+      {
+        line: '1',
+        label: 'Total current monthly income',
+        amount: '8700.00',
+        source: 'Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)',
+      },
+      {
+        line: '6',
+        label: 'Food, clothing, and other items',
+        amount: '1857.00',
+        source: 'IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15',
+      },
+      {
+        line: '39d',
+        label: 'Total over 60 months',
+        amount: '-23359.80',
+        source: 'line 39c x 60',
+      },
+    ],
+    problems: [],
+  };
+
+  // A bare case: the engine refused, the derivation and window still landed.
+  const UNDETERMINED_TRACE = {
+    ...REFERENCE_TRACE,
+    household: {
+      peopleUnder65: null,
+      people65OrOlder: null,
+      medianHouseholdSize: { value: null, source: null },
+      irsFamilySize: { value: null, source: null },
+      irsHousingFamilySize: { value: null, source: null },
+      childrenUnder18: 0,
+    },
+    maritalFilingStatus: {
+      value: 'not_married',
+      source: "the case's debtor records (no spouse recorded)",
+    },
+    cmi: { ...REFERENCE_TRACE.cmi, columns: [], combinedMonthlyTotal: '0.00', annualized: '0.00' },
+    comparison: null,
+    outcome: 'undetermined',
+    determinedBy: null,
+    lines: [],
+    problems: [
+      'the household composition (people under 65 / 65 and older) has not been entered — ' +
+        "line 5's deductions and the median comparison both need it",
+    ],
+  };
+
+  test('GETs /v1/cases/{caseId}/means-test and maps the whole trace', async () => {
+    const stub = stubFetch(() => jsonResponse(REFERENCE_TRACE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/means-test`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(trace).toEqual(REFERENCE_TRACE);
+  });
+
+  test('a case too early to answer decodes with a null comparison and its problems', async () => {
+    const stub = stubFetch(() => jsonResponse(UNDETERMINED_TRACE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace.outcome).toBe('undetermined');
+    expect(trace.comparison).toBeNull();
+    expect(trace.determinedBy).toBeNull();
+    expect(trace.household.medianHouseholdSize).toEqual({ value: null, source: null });
+    expect(trace.problems).toHaveLength(1);
+  });
+
+  test('an exempt debtor decodes the exemption that ended the test', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...REFERENCE_TRACE,
+          exemptions: {
+            ...REFERENCE_TRACE.exemptions,
+            reservistNationalGuard: true,
+            applied: 'reservist_national_guard',
+            rule: 'reservist or National Guard member called to active duty after September 11, 2001 — 11 U.S.C. § 707(b)(2)(D)(ii); Form 122A-1Supp Part 2',
+          },
+          outcome: 'exempt',
+          determinedBy: 'reservist_national_guard',
+          lines: [],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace.outcome).toBe('exempt');
+    expect(trace.exemptions.applied).toBe('reservist_national_guard');
+    expect(trace.lines).toEqual([]);
+  });
+
+  test('a business line carries its gross and expense averages, others omit them', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...REFERENCE_TRACE,
+          cmi: {
+            ...REFERENCE_TRACE.cmi,
+            columns: [
+              {
+                column: 'A',
+                lines: [
+                  {
+                    category: 'business',
+                    label: 'Net income from operating a business, profession, or farm',
+                    totalReceived: '1800.00',
+                    monthlyAverage: '300.00',
+                    citation: '',
+                    note: 'gross receipts 3000.00 less ordinary and necessary operating expenses 1200.00',
+                    entries: [],
+                    grossMonthlyAverage: '500.00',
+                    expensesMonthlyAverage: '200.00',
+                  },
+                ],
+                excluded: [],
+                monthlyTotal: '300.00',
+              },
+            ],
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    const business = trace.cmi.columns[0]?.lines[0];
+    expect(business?.grossMonthlyAverage).toBe('500.00');
+    expect(business?.expensesMonthlyAverage).toBe('200.00');
+    expect(REFERENCE_TRACE.cmi.columns[0]?.lines[0]).not.toHaveProperty('grossMonthlyAverage');
+  });
+
+  test('rejects an amount sent as a JSON number rather than coercing it', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...REFERENCE_TRACE,
+          lines: [{ line: '1', label: 'Total current monthly income', amount: 8700, source: 'x' }],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('rejects an outcome the client does not know', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...REFERENCE_TRACE, outcome: 'maybe' }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('an unknown or foreign case is a 404, not a trace', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'case not found' }, 404));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow(ApiException);
+  });
+
+  test('refuses without a token before ever calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(REFERENCE_TRACE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => undefined,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow(ApiUnauthorizedException);
+    expect(stub.requests()).toHaveLength(0);
+  });
+});
+
+describe('the means-test input enums (issue #349)', () => {
+  test('mirror insolvia_core.means_test_inputs member for member', () => {
+    expect(MARITAL_FILING_STATUSES).toEqual([
+      'not_married',
+      'married_filing_jointly',
+      'married_not_filing_same_household',
+      'married_not_filing_separated',
+    ]);
+    expect(SECURED_PAYMENT_BUCKETS).toEqual(['home', 'vehicle_1', 'vehicle_2', 'other']);
+    expect(INCOME_LINE_CATEGORIES).toEqual([
+      'wages',
+      ...OTHER_INCOME_CATEGORIES,
+      ...EXCLUDED_INCOME_CATEGORIES,
+      'unemployment_as_ssa',
+    ]);
+    expect(PRESUMPTION_EXEMPTIONS).toEqual([
+      'non_consumer_debts',
+      'disabled_veteran',
+      'reservist_national_guard',
+    ]);
   });
 });
