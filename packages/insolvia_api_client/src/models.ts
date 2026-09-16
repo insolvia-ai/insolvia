@@ -2397,6 +2397,13 @@ export interface PetitionBody {
   readonly estimated_creditors?: EstimatedCreditorsBand | undefined;
   readonly estimated_assets?: EstimatedDollarBand | undefined;
   readonly estimated_liabilities?: EstimatedDollarBand | undefined;
+  /**
+   * NOT a B101 line — the form has no such box. The petition screen's own
+   * planning figure (issue #342): the base the §109(h) 180-day counseling
+   * window and the 8-year prior-case lookback are computed from. Mirrors
+   * `PetitionBody.expected_filing_date` in `core/petitions.py`.
+   */
+  readonly expected_filing_date?: FormDate | undefined;
 }
 
 /** B101 line 9: a bankruptcy filed within the last 8 years. */

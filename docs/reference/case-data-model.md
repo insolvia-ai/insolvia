@@ -94,6 +94,10 @@ petition {
   debt_character: consumer | business | other(+text)
   ch7_funds_available_for_creditors
   estimated_creditors, estimated_assets, estimated_liabilities   // banded enums, self-selected
+  expected_filing_date        // not a B101 line — the petition screen's own
+                               // planning figure (issue #342), the base the
+                               // §109(h) counseling window and the 8-year
+                               // prior-case lookback are computed from
 }
 ```
 

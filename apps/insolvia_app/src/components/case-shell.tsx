@@ -81,6 +81,7 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   { segment: '', label: 'Overview' },
   { segment: 'intake', label: 'Intake' },
+  { segment: 'petition', label: 'Petition' },
   { segment: 'documents', label: 'Documents' },
   {
     segment: 'extraction-review',

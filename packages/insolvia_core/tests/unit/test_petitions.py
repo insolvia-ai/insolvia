@@ -69,6 +69,14 @@ def test_petition_enums_are_closed(payload: dict[str, object], bad_field: str) -
     assert bad_field in excinfo.value.fields
 
 
+def test_expected_filing_date_is_a_form_date() -> None:
+    body = parse_petition({"expected_filing_date": "2026-06-15"})
+    assert body.expected_filing_date == "2026-06-15"
+    with pytest.raises(FieldValidationError) as excinfo:
+        parse_petition({"expected_filing_date": "06/15/2026"})
+    assert "expected_filing_date" in excinfo.value.fields
+
+
 def test_prior_case_dates_are_form_dates() -> None:
     with pytest.raises(FieldValidationError) as excinfo:
         parse_prior_case({"filed_on": "03/04/2019"})

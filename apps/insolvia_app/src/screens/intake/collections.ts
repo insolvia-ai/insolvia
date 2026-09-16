@@ -1,5 +1,6 @@
 import {
   ASSET_CATEGORIES,
+  BUSINESS_TYPES,
   CLAIM_CLASSES,
   DEBTOR_ATTRIBUTION,
   EMPLOYMENT_STATUSES,
@@ -613,5 +614,55 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       const entryType = asText(body.entry_type);
       return entryType !== undefined ? labelize(entryType) : 'New entry';
     },
+  },
+  // B101's three repeating lists (issue #342) — the petition screen's own
+  // collections, reusing this same CollectionEditor rather than a bespoke
+  // list UI for each. The petition body itself and the Part 7 signer block
+  // are NOT here: both are one-record-per-case forms, not plain lists, and
+  // live in screens/petition.
+  {
+    collection: 'prior_cases',
+    title: 'Prior bankruptcy cases',
+    recordName: 'prior case',
+    help: 'B101 line 9 — any bankruptcy case filed within the last 8 years.',
+    fields: () => [
+      text('district', 'District'),
+      date('filed_on', 'Date filed'),
+      text('case_number', 'Case number'),
+    ],
+    summary: (body) => {
+      const parts = [asText(body.district), asText(body.case_number)].filter(
+        (part): part is string => part !== undefined,
+      );
+      return parts.length > 0 ? parts.join(' — ') : 'New prior case';
+    },
+  },
+  {
+    collection: 'related_cases',
+    title: 'Related cases',
+    recordName: 'related case',
+    help: 'B101 line 10 — a pending case by a spouse, partner, or affiliate.',
+    fields: () => [
+      text('debtor_name', 'Debtor'),
+      text('relationship', 'Relationship'),
+      text('district', 'District'),
+      date('filed_on', 'Date filed'),
+      text('case_number', 'Case number'),
+    ],
+    summary: (body) => asText(body.debtor_name) ?? 'New related case',
+  },
+  {
+    collection: 'sole_proprietorships',
+    title: 'Sole proprietorships',
+    recordName: 'sole proprietorship',
+    help:
+      'B101 line 12 — a business the debtor runs as a sole proprietor. ' +
+      'The form prints one block; add a second only if the case genuinely has one.',
+    fields: () => [
+      text('name', 'Business name'),
+      { kind: 'address', key: 'address', label: 'Business address' },
+      choice('business_type', 'Type of business', BUSINESS_TYPES),
+    ],
+    summary: (body) => asText(body.name) ?? 'New sole proprietorship',
   },
 ];
