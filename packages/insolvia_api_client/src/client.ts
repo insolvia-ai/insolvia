@@ -32,6 +32,7 @@ import type {
   CaseEntityRequest,
   CaseLiens,
   CaseProblem,
+  CaseStandards,
   CaseStatus,
   CaseSummary,
   CaseTotals,
@@ -64,6 +65,8 @@ import type {
   JobStatus,
   ListCasesOptions,
   ListCasesResult,
+  LocalStandardsFigures,
+  NationalStandardsFigures,
   OtherName,
   Packet,
   PacketDownload,
@@ -972,6 +975,28 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return caseLiensFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/standards` — the published IRS National and
+   * Local Standards for the case's own jurisdiction and household (issue
+   * #348), for display beside Schedule J's health-care and transportation
+   * lines while a preparer types.
+   *
+   * Always resolves to 200; read {@link CaseStandards.problems} before
+   * rendering a `null` figure as zero — a case with no Debtor 1 or no county
+   * on file yet is simply too early for this lookup, not an error. Like
+   * {@link getCaseSummary}, a 404 means the case is unknown *or* not the
+   * caller's.
+   */
+  async getCaseStandards(caseId: string): Promise<CaseStandards> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/standards`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseStandardsFromJson(decoded);
   }
 
   /**
@@ -2353,6 +2378,9 @@ function caseTotalsFromJson(response: DecodedResponse): CaseTotals {
     priorityUnsecured: requireString(response, 'priorityUnsecured'),
     nonpriorityUnsecured: requireString(response, 'nonpriorityUnsecured'),
     liabilities: requireString(response, 'liabilities'),
+    monthlyIncome: requireString(response, 'monthlyIncome'),
+    monthlyExpenses: requireString(response, 'monthlyExpenses'),
+    monthlyExcess: requireString(response, 'monthlyExcess'),
   };
 }
 
@@ -2402,6 +2430,47 @@ function caseLiensFromJson(response: DecodedResponse): CaseLiens {
   return {
     claims: requireArrayOf(response, 'claims', 'ClaimLien', claimLienFromJson),
     assets: requireArrayOf(response, 'assets', 'AssetLiens', assetLiensFromJson),
+  };
+}
+
+function nationalStandardsFiguresFromJson(response: DecodedResponse): NationalStandardsFigures {
+  return {
+    releaseId: requireString(response, 'releaseId'),
+    allowance: requireNullableString(response, 'allowance'),
+    oopHealthcareUnder65: requireNullableString(response, 'oopHealthcareUnder65'),
+    oopHealthcare65AndOlder: requireNullableString(response, 'oopHealthcare65AndOlder'),
+  };
+}
+
+function localStandardsFiguresFromJson(response: DecodedResponse): LocalStandardsFigures {
+  return {
+    releaseId: requireString(response, 'releaseId'),
+    housingNonMortgage: requireNullableString(response, 'housingNonMortgage'),
+    housingMortgageRent: requireNullableString(response, 'housingMortgageRent'),
+    transportationPublicNational: requireNullableString(response, 'transportationPublicNational'),
+    transportationOwnershipOneCar: requireNullableString(response, 'transportationOwnershipOneCar'),
+    transportationOwnershipTwoCars: requireNullableString(
+      response,
+      'transportationOwnershipTwoCars',
+    ),
+    transportationOperatingOneCar: requireNullableString(response, 'transportationOperatingOneCar'),
+    transportationOperatingTwoCars: requireNullableString(
+      response,
+      'transportationOperatingTwoCars',
+    ),
+  };
+}
+
+function caseStandardsFromJson(response: DecodedResponse): CaseStandards {
+  return {
+    asOf: requireString(response, 'asOf'),
+    state: requireNullableString(response, 'state'),
+    county: requireNullableString(response, 'county'),
+    householdSize: requireNullableNumber(response, 'householdSize'),
+    jurisdictionSource: requireNullableString(response, 'jurisdictionSource'),
+    nationalStandards: nationalStandardsFiguresFromJson(childObject(response, 'nationalStandards')),
+    localStandards: localStandardsFiguresFromJson(childObject(response, 'localStandards')),
+    problems: requireStringArray(response, 'problems'),
   };
 }
 

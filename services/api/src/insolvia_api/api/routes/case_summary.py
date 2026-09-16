@@ -64,6 +64,9 @@ def _totals_json(totals: CaseTotals) -> dict[str, str]:
         "priorityUnsecured": str(totals.priority_unsecured),
         "nonpriorityUnsecured": str(totals.nonpriority_unsecured),
         "liabilities": str(totals.liabilities),
+        "monthlyIncome": str(totals.monthly_income),
+        "monthlyExpenses": str(totals.monthly_expenses),
+        "monthlyExcess": str(totals.monthly_excess),
     }
 
 

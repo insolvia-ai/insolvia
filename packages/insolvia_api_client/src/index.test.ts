@@ -4490,6 +4490,9 @@ describe('getCaseSummary', () => {
       priorityUnsecured: '0',
       nonpriorityUnsecured: '0',
       liabilities: '0',
+      monthlyIncome: '0',
+      monthlyExpenses: '0',
+      monthlyExcess: '0',
     },
     // `liens_json` on a case with no secured claims: both lists present and
     // empty, never omitted (issue #345).
@@ -4621,6 +4624,34 @@ describe('getCaseSummary', () => {
     const summary = await client.getCaseSummary(ENTITY_CASE_ID);
 
     expect(summary.liens).toEqual(LIENS);
+  });
+
+  test('the monthly excess can be negative, and stays a string', async () => {
+    // 106I line 12 minus 106J line 22c — a debtor with no excess is a fact,
+    // not an error, and it is still a decimal STRING like every other figure.
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...BARE,
+          totals: {
+            ...BARE.totals,
+            monthlyIncome: '1000.00',
+            monthlyExpenses: '1500.00',
+            monthlyExcess: '-500.00',
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const summary = await client.getCaseSummary(ENTITY_CASE_ID);
+
+    expect(summary.totals.monthlyExcess).toBe('-500.00');
+    expect(typeof summary.totals.monthlyExcess).toBe('string');
   });
 });
 
@@ -4785,5 +4816,155 @@ describe('getCaseLiens', () => {
     });
 
     await expect(client.getCaseLiens(ENTITY_CASE_ID)).rejects.toBeInstanceOf(ApiException);
+  });
+});
+
+describe('getCaseStandards', () => {
+  // Copied from routes/standards.py's response shape, not inferred: a
+  // jurisdiction the Local Standards launch set does not cover, so the local
+  // figures are null while the National figures — which apply everywhere —
+  // still resolve.
+  const UNSUPPORTED_JURISDICTION = {
+    asOf: '2026-09-04',
+    state: 'ZZ',
+    county: 'Nowhere County',
+    householdSize: 1,
+    jurisdictionSource:
+      "Debtor 1's residence address, plus 0 dependent(s) recorded as living with the debtor",
+    nationalStandards: {
+      releaseId: 'ust/irs-national-standards@2026-07-15',
+      allowance: '785.00',
+      oopHealthcareUnder65: '55.00',
+      oopHealthcare65AndOlder: '129.00',
+    },
+    localStandards: {
+      releaseId: 'ust/irs-local-standards@2026-07-15',
+      housingNonMortgage: null,
+      housingMortgageRent: null,
+      transportationPublicNational: '215.00',
+      transportationOwnershipOneCar: '318.00',
+      transportationOwnershipTwoCars: '618.00',
+      transportationOperatingOneCar: null,
+      transportationOperatingTwoCars: null,
+    },
+    problems: [
+      "the local standards carry no housing table for 'ZZ' (launch states: FL, TX)",
+      "no Census region is recorded for state 'ZZ'",
+    ],
+  };
+
+  test('GETs /v1/cases/{caseId}/standards and maps the whole body', async () => {
+    const stub = stubFetch(() => jsonResponse(UNSUPPORTED_JURISDICTION, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const standards = await client.getCaseStandards(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/standards`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(standards).toEqual(UNSUPPORTED_JURISDICTION);
+  });
+
+  test('a figure the jurisdiction lookup could not resolve decodes as null, not zero', async () => {
+    const stub = stubFetch(() => jsonResponse(UNSUPPORTED_JURISDICTION, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const standards = await client.getCaseStandards(ENTITY_CASE_ID);
+
+    expect(standards.localStandards.housingNonMortgage).toBeNull();
+    expect(standards.problems.length).toBeGreaterThan(0);
+  });
+
+  test('a case too early for the lookup has every jurisdiction field null', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...UNSUPPORTED_JURISDICTION,
+          state: null,
+          county: null,
+          householdSize: null,
+          jurisdictionSource: null,
+          nationalStandards: {
+            ...UNSUPPORTED_JURISDICTION.nationalStandards,
+            allowance: null,
+            oopHealthcareUnder65: null,
+            oopHealthcare65AndOlder: null,
+          },
+          problems: ['the case has no Debtor 1 record yet'],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const standards = await client.getCaseStandards(ENTITY_CASE_ID);
+
+    expect(standards.state).toBeNull();
+    expect(standards.householdSize).toBeNull();
+    expect(standards.nationalStandards.allowance).toBeNull();
+    expect(standards.problems).toEqual(['the case has no Debtor 1 record yet']);
+  });
+
+  test('every resolved money figure stays a string', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...UNSUPPORTED_JURISDICTION,
+          state: 'FL',
+          county: 'Alachua County',
+          localStandards: {
+            ...UNSUPPORTED_JURISDICTION.localStandards,
+            housingNonMortgage: '450.00',
+            housingMortgageRent: '1495.00',
+          },
+          problems: [],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const standards = await client.getCaseStandards(ENTITY_CASE_ID);
+
+    expect(standards.localStandards.housingNonMortgage).toBe('450.00');
+    expect(typeof standards.localStandards.housingMortgageRent).toBe('string');
+  });
+
+  test('an unknown case is a 404, matching every other case-scoped read', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseStandards(ENTITY_CASE_ID)).rejects.toThrow(ApiException);
+  });
+
+  test('refuses without a token before ever calling fetch', async () => {
+    const stub = stubFetch(() => jsonResponse(UNSUPPORTED_JURISDICTION, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => undefined,
+    });
+
+    await expect(client.getCaseStandards(ENTITY_CASE_ID)).rejects.toThrow(ApiUnauthorizedException);
+    expect(stub.requests()).toHaveLength(0);
   });
 });

@@ -82,6 +82,7 @@ const SECTIONS: readonly Section[] = [
   { segment: '', label: 'Overview' },
   { segment: 'intake', label: 'Intake' },
   { segment: 'petition', label: 'Petition' },
+  { segment: 'income', label: 'Income' },
   { segment: 'documents', label: 'Documents' },
   {
     segment: 'extraction-review',

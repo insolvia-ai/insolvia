@@ -2644,6 +2644,17 @@ export interface CaseTotals {
   readonly nonpriorityUnsecured: string;
   /** `secured` + `priorityUnsecured` + `nonpriorityUnsecured`. */
   readonly liabilities: string;
+  /** 106I line 12 — the same figure that form prints. */
+  readonly monthlyIncome: string;
+  /** 106J line 22c — likewise the schedule's own figure. */
+  readonly monthlyExpenses: string;
+  /**
+   * `monthlyIncome` minus `monthlyExpenses` — the Chapter 13 plan's starting
+   * number, shown on both the income and expenses screens (issue #348). Can
+   * be negative; a decimal STRING like every other figure here, so render it
+   * as given rather than parsing and re-formatting it.
+   */
+  readonly monthlyExcess: string;
 }
 
 /** Whether a claim's unsecured portion was derived or typed by a preparer. */
@@ -2713,6 +2724,62 @@ export interface CaseSummary {
   readonly totals: CaseTotals;
   /** The same block `getCaseLiens` returns, for the overview. */
   readonly liens: CaseLiens;
+}
+
+/**
+ * The IRS National Standards allowance for the case's household size
+ * (B122A-2 lines 6-7), and the per-person out-of-pocket health-care rates —
+ * these apply nationwide, so they are never `null` once a release exists.
+ */
+export interface NationalStandardsFigures {
+  readonly releaseId: string;
+  readonly allowance: string | null;
+  readonly oopHealthcareUnder65: string | null;
+  readonly oopHealthcare65AndOlder: string | null;
+}
+
+/**
+ * The IRS Local Standards for the case's county (B122A-2 lines 8-14).
+ * `null` on any figure means that county is outside the launch states this
+ * release covers, or the jurisdiction has not been entered yet — see
+ * {@link CaseStandards.problems} for which.
+ */
+export interface LocalStandardsFigures {
+  readonly releaseId: string;
+  readonly housingNonMortgage: string | null;
+  readonly housingMortgageRent: string | null;
+  readonly transportationPublicNational: string | null;
+  readonly transportationOwnershipOneCar: string | null;
+  readonly transportationOwnershipTwoCars: string | null;
+  readonly transportationOperatingOneCar: string | null;
+  readonly transportationOperatingTwoCars: string | null;
+}
+
+/**
+ * `GET /v1/cases/{caseId}/standards` — the published IRS allowances beside
+ * Schedule J's health-care and transportation lines, for the case's own
+ * jurisdiction and household (issue #348).
+ *
+ * NOT the means test: `state`/`county`/`householdSize` here come from
+ * Debtor 1's residence address and the dependents recorded as living with
+ * the debtor — the best facts on file while the workbench is being typed —
+ * not the confirmed household composition the means test itself asks for.
+ * The two are allowed to disagree.
+ *
+ * Always 200 with whichever figures resolved. `problems` explains any that
+ * did not (no Debtor 1 yet, no county on file, a state the Local Standards
+ * launch set does not cover) — read it before rendering a `null` figure as
+ * zero.
+ */
+export interface CaseStandards {
+  readonly asOf: string;
+  readonly state: string | null;
+  readonly county: string | null;
+  readonly householdSize: number | null;
+  readonly jurisdictionSource: string | null;
+  readonly nationalStandards: NationalStandardsFigures;
+  readonly localStandards: LocalStandardsFigures;
+  readonly problems: readonly string[];
 }
 
 /**

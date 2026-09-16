@@ -5,16 +5,25 @@ import {
   CONTRACT_LEASE_INTENTIONS,
   DEBTOR_ATTRIBUTION,
   EMPLOYMENT_STATUSES,
+  EXCLUDED_INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
   INTENTIONS,
   LIEN_NATURES,
   NONPRIORITY_TYPES,
+  OTHER_INCOME_CATEGORIES,
   PRIORITY_TYPES,
   PROPERTY_TYPES,
   SOFA_ENTRY_TYPES,
   WHICH_HOUSEHOLDS,
 } from '@insolvia-ai/api-client';
 import type { CaseCollection, SofaEntryType } from '@insolvia-ai/api-client';
+
+// Runtime choice lists the api-client does not (yet) export a constant for —
+// `PayFrequency` and `DeductionCategory` are type-only there, because nothing
+// consumed them at runtime before this screen. Mirrors
+// `insolvia_core.income.PAY_FREQUENCIES`; a mismatch would be caught by the
+// server rejecting the choice, the same as any other stale option list.
+const PAY_FREQUENCIES = ['weekly', 'biweekly', 'semimonthly', 'monthly', 'other'] as const;
 
 /**
  * What each case collection's form looks like — data, not components.
@@ -500,6 +509,59 @@ export const COLLECTION_SPECS: readonly CollectionSpec[] = [
       date('employed_since', 'Employed since'),
     ],
     summary: (body) => asText(body.employer_name) ?? asText(body.occupation) ?? 'New employment',
+  },
+  {
+    collection: 'pay_period_records',
+    title: 'Pay records',
+    recordName: 'pay period',
+    help:
+      'One entry per paycheck, dated — hand-entered here reads the same way ' +
+      'to the means test as one pay-stub extraction would have written. ' +
+      '`pay_date` is what the six-month lookback keys on.',
+    fields: () => [
+      { kind: 'reference', key: 'employment_id', label: 'Employer', refers: 'employments' },
+      date('period_start', 'Pay period start'),
+      date('period_end', 'Pay period end'),
+      date('pay_date', 'Date paid'),
+      money('gross', 'Gross pay this period'),
+      money('net', 'Net pay this period'),
+      choice('frequency', 'Pay frequency', PAY_FREQUENCIES),
+    ],
+    summary: (body) => {
+      const payDate = asText(body.pay_date);
+      const gross = asText(body.gross);
+      const parts = [payDate, gross !== undefined ? `$${gross}` : undefined].filter(
+        (part): part is string => part !== undefined,
+      );
+      return parts.length > 0 ? parts.join(' — ') : 'New pay period';
+    },
+  },
+  {
+    collection: 'other_income_records',
+    title: 'Other income',
+    recordName: 'receipt',
+    help:
+      'Dated non-wage income — the means test’s other half. An excluded ' +
+      'category (Social Security Act benefits, HAVEN Act veterans’ ' +
+      'compensation…) is still recorded, so the calculation can show it ' +
+      'excluded rather than silently dropping it.',
+    fields: () => [
+      { kind: 'debtor', key: 'debtor_id', label: 'Whose income' },
+      choice('category', 'Category', [...OTHER_INCOME_CATEGORIES, ...EXCLUDED_INCOME_CATEGORIES]),
+      date('received_on', 'Date received'),
+      money('amount', 'Amount received'),
+      money('expenses', 'Operating expenses (business or rental only)'),
+      text('payer', 'Payer'),
+      narrative('description', 'Description'),
+    ],
+    summary: (body) => {
+      const receivedOn = asText(body.received_on);
+      const amount = asText(body.amount);
+      const parts = [receivedOn, amount !== undefined ? `$${amount}` : undefined].filter(
+        (part): part is string => part !== undefined,
+      );
+      return parts.length > 0 ? parts.join(' — ') : 'New receipt';
+    },
   },
   {
     collection: 'income_summaries',
