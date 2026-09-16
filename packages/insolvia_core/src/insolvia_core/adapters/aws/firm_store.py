@@ -5,6 +5,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
+from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.firms import (
     Firm,
     FirmItemValue,
@@ -17,6 +18,12 @@ from insolvia_core.firms import (
     subject_key,
     user_sort_key,
 )
+from insolvia_core.library_creditors import (
+    LibraryCreditor,
+    library_creditor_from_item,
+    library_creditor_item,
+)
+from insolvia_core.library_creditors import sort_key as library_creditor_sort_key
 
 # The sparse index in infra/modules/firm_store — one entry per firm user,
 # keyed by their Cognito subject. See the FirmStore port for why this lookup
@@ -258,6 +265,103 @@ class DynamoDbFirmStore:
                 # Without this a delete of a subject that is not there succeeds
                 # silently, and two concurrent removals would both report
                 # success — the same reason DocumentStore.delete returns a bool.
+                ConditionExpression="attribute_exists(SK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return False
+            raise
+        return True
+
+    # ── Library creditors ───────────────────────────────────────────
+    #
+    # These four use the SHARED converter (`adapters.aws.dynamo`) rather than
+    # this file's own `_to_attributes`/`_from_attributes` above: a library
+    # creditor's `address` and `additionalNoticeParties` are nested maps and
+    # lists, which `FirmItemValue` (`str | bool | dict[str, str]`, one level
+    # deep) cannot express. Firm and firm-user items stay on the narrower
+    # converter unchanged — widening it would be a bigger diff than this
+    # feature needs, for rows that will never carry a third level of nesting.
+
+    def create_library_creditor(self, creditor: LibraryCreditor) -> None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=to_attributes(library_creditor_item(creditor)),
+                ConditionExpression="attribute_not_exists(SK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                raise RuntimeError(
+                    f"library creditor {creditor.id} already exists"
+                ) from error
+            raise
+
+    def get_library_creditor(
+        self, firm_id: str, creditor_id: str
+    ) -> LibraryCreditor | None:
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={
+                "PK": {"S": partition_key(firm_id)},
+                "SK": {"S": library_creditor_sort_key(creditor_id)},
+            },
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return None if not item else library_creditor_from_item(from_attributes(item))
+
+    def list_library_creditors(self, firm_id: str) -> tuple[LibraryCreditor, ...]:
+        creditors: list[LibraryCreditor] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "KeyConditionExpression": "PK = :firm AND begins_with(SK, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":firm": {"S": partition_key(firm_id)},
+                    ":prefix": {"S": "LIBCREDITOR#"},
+                },
+                "ConsistentRead": True,
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.query(**kwargs)
+            creditors.extend(
+                library_creditor_from_item(from_attributes(item))
+                for item in response.get("Items", [])
+            )
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        return tuple(
+            sorted(creditors, key=lambda creditor: (creditor.name, creditor.id))
+        )
+
+    def update_library_creditor(
+        self, creditor: LibraryCreditor
+    ) -> LibraryCreditor | None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=to_attributes(library_creditor_item(creditor)),
+                ConditionExpression="attribute_exists(SK) AND firmId = :firm",
+                ExpressionAttributeValues={":firm": {"S": creditor.firm_id}},
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return None
+            raise
+        return creditor
+
+    def delete_library_creditor(self, firm_id: str, creditor_id: str) -> bool:
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key={
+                    "PK": {"S": partition_key(firm_id)},
+                    "SK": {"S": library_creditor_sort_key(creditor_id)},
+                },
                 ConditionExpression="attribute_exists(SK)",
             )
         except ClientError as error:

@@ -20,6 +20,7 @@ from insolvia_core.cases import Case, CaseAssignment, CasePage
 from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firms import Firm, FirmUser
+from insolvia_core.library_creditors import LibraryCreditor
 
 BodyT = TypeVar("BodyT")
 
@@ -209,6 +210,47 @@ class FirmStore(Protocol):
         table and are cleaned by the administration route, which is the one
         place that can see both. A store that reached across would be a second
         thing to keep in step.
+        """
+        ...
+
+    # ── Library creditors (issue 13.9 / #350) ──────────────────────
+
+    def create_library_creditor(self, creditor: LibraryCreditor) -> None:
+        """Store a new library creditor. MUST refuse to overwrite an existing
+        (firm_id, id) — the same no-overwrite rule `add_user` follows, and for
+        the same reason: a server-minted uuid colliding means the minting is
+        broken, not that the caller meant to replace something."""
+        ...
+
+    def get_library_creditor(
+        self, firm_id: str, creditor_id: str
+    ) -> LibraryCreditor | None:
+        """One library creditor, firm-scoped by key — an admin of one firm
+        cannot read another firm's entry by knowing its id."""
+        ...
+
+    def list_library_creditors(self, firm_id: str) -> tuple[LibraryCreditor, ...]:
+        """A firm's whole library, ordered by name then id — the picker's and
+        the manager screen's index view. All of them: a caller cannot page,
+        and an implementation that can truncate must not."""
+        ...
+
+    def update_library_creditor(
+        self, creditor: LibraryCreditor
+    ) -> LibraryCreditor | None:
+        """Write `creditor` back, but only over a row that still exists AND
+        still belongs to `creditor.firm_id` — the same two-part condition
+        `update_user` enforces, and for the same reason."""
+        ...
+
+    def delete_library_creditor(self, firm_id: str, creditor_id: str) -> bool:
+        """Remove a library creditor. True if this call removed it, False if
+        there was nothing there.
+
+        Removes the LIBRARY ROW ONLY. Every case creditor already copied from
+        it survives untouched — a library pick copies the record, it does not
+        link to it (the module docstring owns why), so there is nothing else
+        for this store to clean up.
         """
         ...
 

@@ -40,7 +40,17 @@ from insolvia_core.errors import FieldValidationError
 # data model is explicit about why: machine-supplied is machine-supplied, and
 # the source system does not change who is signing the form. Anything in
 # MACHINE_SOURCES is subject to the confirmation rule below.
-SOURCES: Final = ("staff_typed", "ai_extracted", "imported")
+#
+# `library` is the fourth (issue 13.9 / #350): a value COPIED from the firm's
+# reusable creditor library (`library_creditors.py`) onto a case record. It
+# sits with `staff_typed` rather than in MACHINE_SOURCES — a human chose the
+# library entry and asked for it, the same kind of act as typing the value
+# themselves, and nothing extracted or synced produced it. `library_creditor_id`
+# below is what makes the entry nameable: none of `document_id`,
+# `extraction_id` or `external_refs` fit a firm's own prior record, so this is
+# the source-specific member that names it, the same way `extraction_id` names
+# an `extraction_candidate` for `ai_extracted`.
+SOURCES: Final = ("staff_typed", "ai_extracted", "imported", "library")
 MACHINE_SOURCES: Final = frozenset({"ai_extracted", "imported"})
 
 # A dotted field path, with embedded list elements addressed by their id in
@@ -84,6 +94,12 @@ class ProvenanceEntry:
     locator: Mapping[str, object] | None = None
     extraction_id: str | None = None
     confidence: float | None = None
+    # The library_creditors.py row a `library`-sourced value was copied from.
+    # Never validated against the store here — same "shape and type only" rule
+    # every other cross-reference in this layer follows (see claims.py's
+    # creditor_id) — so a library entry deleted after the copy leaves the
+    # provenance readable rather than the case record unwritable.
+    library_creditor_id: str | None = None
 
 
 def _is_utc_timestamp(value: object) -> bool:
@@ -228,6 +244,13 @@ def _parse_entry(
         errors[f"provenance.{path}.extraction_id"] = "extraction_id must be a string."
         return None
 
+    library_creditor_id = value.get("library_creditor_id")
+    if library_creditor_id is not None and not isinstance(library_creditor_id, str):
+        errors[f"provenance.{path}.library_creditor_id"] = (
+            "library_creditor_id must be a string."
+        )
+        return None
+
     return ProvenanceEntry(
         source=source,
         confirmed_by=confirmed_by,
@@ -236,6 +259,7 @@ def _parse_entry(
         locator=dict(locator) if locator is not None else None,
         extraction_id=extraction_id,
         confidence=confidence,
+        library_creditor_id=library_creditor_id,
     )
 
 
@@ -402,6 +426,7 @@ def provenance_json(
             ("locator", entry.locator),
             ("extraction_id", entry.extraction_id),
             ("confidence", entry.confidence),
+            ("library_creditor_id", entry.library_creditor_id),
         ):
             if value is not None:
                 member[key] = value

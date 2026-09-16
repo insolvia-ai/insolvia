@@ -28,6 +28,7 @@ const ALL_ADD_EDIT = {
   intake: 'add_edit',
   documents: 'add_edit',
   extraction_review: 'add_edit',
+  creditor_library: 'add_edit',
   firm_administration: 'add_edit',
 };
 

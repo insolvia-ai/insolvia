@@ -65,6 +65,17 @@ describe('the intake collection sections', () => {
         if (method === 'GET' && url.endsWith(`/v1/cases/${CASE_ID}`)) {
           return Promise.resolve(jsonResponse(200, caseBody(CASE_ID)));
         }
+        // The `creditors` collection's "Add creditor" flow loads its
+        // library/case-party picker sources (issue 13.9 / #350) the moment
+        // the form opens. Defaulted to empty here, same as the case
+        // fallback above, so every existing test that never asserts on the
+        // picker does not have to declare these two routes for itself.
+        if (method === 'GET' && url.endsWith('/v1/firm/creditors')) {
+          return Promise.resolve(jsonResponse(200, { creditors: [] }));
+        }
+        if (method === 'GET' && url.includes(`/v1/cases/${CASE_ID}/codebtors`)) {
+          return Promise.resolve(jsonResponse(200, { codebtors: [] }));
+        }
         return Promise.reject(new Error(`unexpected ${method} ${url}`));
       }
       return Promise.resolve(match.respond());
@@ -214,6 +225,108 @@ describe('the intake collection sections', () => {
     await user.press(screen.getByRole('button', { name: 'Save creditor' }));
 
     expect(await screen.findByText('Must be 200 characters or fewer.')).toBeTruthy();
+  });
+
+  it('picks a library creditor, prefilling the fields with library provenance', async () => {
+    const LIBRARY_CREDITOR_ID = '00000000-0000-4000-8000-0000000000e2';
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'GET',
+        fragment: '/v1/firm/creditors',
+        respond: () =>
+          jsonResponse(200, {
+            creditors: [
+              {
+                id: LIBRARY_CREDITOR_ID,
+                name: 'Acme Collections',
+                address: { line1: '1 Main St' },
+                additional_notice_parties: [],
+                preferred: false,
+                created_at: '2026-01-01T00:00:00.000Z',
+                updated_at: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(201, { ...SAVED_CREDITOR, address: { line1: '1 Main St' } }),
+      },
+    ]);
+
+    const user = await openSection('Creditors');
+    await user.press(await screen.findByRole('button', { name: 'Add creditor' }));
+    await user.press(
+      await screen.findByRole('combobox', { name: "Copy from your firm's creditor library" }),
+    );
+    await user.press(await screen.findByRole('option', { name: 'Acme Collections' }));
+
+    // Copied straight onto the ordinary field, editable like any other value.
+    expect(await screen.findByDisplayValue('Acme Collections')).toBeTruthy();
+
+    await user.press(screen.getByRole('button', { name: 'Save creditor' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/creditors')).toEqual({
+        name: 'Acme Collections',
+        address: { line1: '1 Main St' },
+        provenance: {
+          name: { source: 'library', library_creditor_id: LIBRARY_CREDITOR_ID },
+          'address.line1': { source: 'library', library_creditor_id: LIBRARY_CREDITOR_ID },
+        },
+      }),
+    );
+  });
+
+  it('adds the saved creditor to the firm library when the toggle is checked', async () => {
+    const fetchMock = signedIn([
+      noDebtors,
+      {
+        method: 'GET',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(200, { creditors: [] }),
+      },
+      {
+        method: 'POST',
+        fragment: `/v1/cases/${CASE_ID}/creditors`,
+        respond: () => jsonResponse(201, SAVED_CREDITOR),
+      },
+      {
+        method: 'POST',
+        fragment: '/v1/firm/creditors',
+        respond: () =>
+          jsonResponse(201, {
+            id: '00000000-0000-4000-8000-0000000000e3',
+            name: 'Example Bank',
+            address: {},
+            additional_notice_parties: [],
+            preferred: false,
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+          }),
+      },
+    ]);
+
+    const user = await openSection('Creditors');
+    await user.press(await screen.findByRole('button', { name: 'Add creditor' }));
+    await user.type(await screen.findByLabelText('Creditor name'), 'Example Bank');
+    await user.press(
+      await screen.findByRole('checkbox', { name: "Add to your firm's creditor library" }),
+    );
+    await user.press(screen.getByRole('button', { name: 'Save creditor' }));
+
+    await waitFor(() =>
+      expect(lastBody(fetchMock, 'POST', '/v1/firm/creditors')).toEqual({
+        name: 'Example Bank',
+      }),
+    );
   });
 
   it('edits a record by replacing it whole', async () => {

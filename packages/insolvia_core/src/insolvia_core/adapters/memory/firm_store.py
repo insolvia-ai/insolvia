@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.firms import Firm, FirmUser
+from insolvia_core.library_creditors import LibraryCreditor
 
 
 class MemoryFirmStore:
@@ -19,6 +20,8 @@ class MemoryFirmStore:
         # below impossible to get wrong, which is the problem — the DynamoDB
         # adapter CAN get them wrong, so this one has to be able to as well.
         self.users: dict[tuple[str, str], FirmUser] = {}
+        # Same keying discipline as `users` above, for the same reason.
+        self.library_creditors: dict[tuple[str, str], LibraryCreditor] = {}
 
     # ── Firms ───────────────────────────────────────────────────────
 
@@ -85,3 +88,42 @@ class MemoryFirmStore:
 
     def remove_user(self, firm_id: str, subject: str) -> bool:
         return self.users.pop((firm_id, subject), None) is not None
+
+    # ── Library creditors ───────────────────────────────────────────
+
+    def create_library_creditor(self, creditor: LibraryCreditor) -> None:
+        key = (creditor.firm_id, creditor.id)
+        if key in self.library_creditors:
+            raise RuntimeError(f"library creditor {creditor.id} already exists")
+        self.library_creditors[key] = creditor
+
+    def get_library_creditor(
+        self, firm_id: str, creditor_id: str
+    ) -> LibraryCreditor | None:
+        return self.library_creditors.get((firm_id, creditor_id))
+
+    def list_library_creditors(self, firm_id: str) -> tuple[LibraryCreditor, ...]:
+        # BY NAME, matching the DynamoDB adapter — the two stores exist to be
+        # interchangeable.
+        return tuple(
+            sorted(
+                (
+                    creditor
+                    for creditor in self.library_creditors.values()
+                    if creditor.firm_id == firm_id
+                ),
+                key=lambda creditor: (creditor.name, creditor.id),
+            )
+        )
+
+    def update_library_creditor(
+        self, creditor: LibraryCreditor
+    ) -> LibraryCreditor | None:
+        key = (creditor.firm_id, creditor.id)
+        if key not in self.library_creditors:
+            return None
+        self.library_creditors[key] = creditor
+        return creditor
+
+    def delete_library_creditor(self, firm_id: str, creditor_id: str) -> bool:
+        return self.library_creditors.pop((firm_id, creditor_id), None) is not None

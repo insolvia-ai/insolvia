@@ -33,11 +33,20 @@ from insolvia_core.firms import (
     FirmUser,
     default_permissions,
 )
+from insolvia_core.library_creditors import (
+    create_library_creditor,
+    parse_library_creditor,
+)
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
 OTHER_FIRM_ID = "00000000-0000-4000-8000-00000000f18b"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
 BOB = "00000000-0000-4000-8000-00000000b0b0"
+
+
+def library_creditor(firm_id: str = FIRM_ID, name: str = "Acme Collections"):
+    draft = parse_library_creditor({"name": name, "preferred": True})
+    return create_library_creditor(draft, firm_id=firm_id)
 
 
 def firm(firm_id: str = FIRM_ID, name: str = "Example & Partners") -> Firm:
@@ -508,3 +517,128 @@ def test_firm_provenance_survives_the_wire_format(monkeypatch):
     fake = FakeDynamoDb({"get_item": {"Item": item}})
     read_back = dynamo_store(monkeypatch, fake).get_firm(FIRM_ID)
     assert read_back == provisioned
+
+
+# ── Library creditors (issue 13.9 / #350) ────────────────────────────
+
+
+def test_creating_the_same_library_creditor_twice_is_refused():
+    store = MemoryFirmStore()
+    creditor = library_creditor()
+    store.create_library_creditor(creditor)
+    with pytest.raises(RuntimeError):
+        store.create_library_creditor(creditor)
+
+
+def test_a_library_creditor_is_read_within_its_firm():
+    store = MemoryFirmStore()
+    creditor = library_creditor()
+    store.create_library_creditor(creditor)
+    assert store.get_library_creditor(FIRM_ID, creditor.id) is not None
+    assert store.get_library_creditor(OTHER_FIRM_ID, creditor.id) is None
+
+
+def test_the_library_is_listed_by_name_within_one_firm():
+    store = MemoryFirmStore()
+    store.create_library_creditor(library_creditor(name="Zeta Bank"))
+    store.create_library_creditor(library_creditor(name="Acme Collections"))
+    store.create_library_creditor(
+        library_creditor(firm_id=OTHER_FIRM_ID, name="Other Firm's Bank")
+    )
+
+    listed = store.list_library_creditors(FIRM_ID)
+    assert [c.name for c in listed] == ["Acme Collections", "Zeta Bank"]
+
+
+def test_updating_a_library_creditor_that_is_not_there_is_none():
+    store = MemoryFirmStore()
+    assert store.update_library_creditor(library_creditor()) is None
+
+
+def test_updating_across_firms_does_not_move_a_library_creditor():
+    store = MemoryFirmStore()
+    creditor = library_creditor()
+    store.create_library_creditor(creditor)
+    moved = replace(creditor, firm_id=OTHER_FIRM_ID)
+    assert store.update_library_creditor(moved) is None
+    assert store.get_library_creditor(OTHER_FIRM_ID, creditor.id) is None
+
+
+def test_removing_a_library_creditor_twice_reports_the_truth():
+    store = MemoryFirmStore()
+    creditor = library_creditor()
+    store.create_library_creditor(creditor)
+    assert store.delete_library_creditor(FIRM_ID, creditor.id) is True
+    assert store.delete_library_creditor(FIRM_ID, creditor.id) is False
+
+
+def test_the_dynamodb_library_creditor_item_carries_nested_shapes(monkeypatch):
+    """Unlike firm/firm-user items, a library creditor's `address` and
+    `additionalNoticeParties` are nested — this is what proves the adapter
+    uses the SHARED converter (adapters.aws.dynamo) rather than firm_store's
+    own one-level-deep `_to_attributes`."""
+    fake = FakeDynamoDb()
+    draft = parse_library_creditor(
+        {
+            "name": "Acme Collections",
+            "address": {"line1": "1 Main St"},
+            "additional_notice_parties": [{"id": "np1", "name": "Legal"}],
+        }
+    )
+    creditor = create_library_creditor(draft, firm_id=FIRM_ID)
+    dynamo_store(monkeypatch, fake).create_library_creditor(creditor)
+
+    item = fake.calls[0][1]["Item"]
+    assert item["address"]["M"]["line1"] == {"S": "1 Main St"}
+    assert item["additionalNoticeParties"]["L"][0]["M"]["name"] == {"S": "Legal"}
+
+
+def test_a_library_creditor_round_trips_through_the_wire_format(monkeypatch):
+    draft = parse_library_creditor(
+        {
+            "name": "Acme Collections",
+            "address": {"line1": "1 Main St", "city": "Springfield"},
+            "additional_notice_parties": [
+                {"id": "np1", "name": "Legal", "account_last4": "9876"}
+            ],
+            "preferred": True,
+            "notes": "Call before 5pm.",
+        }
+    )
+    original = create_library_creditor(draft, firm_id=FIRM_ID)
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    store.create_library_creditor(original)
+
+    fake.responses["get_item"] = {"Item": fake.calls[0][1]["Item"]}
+    assert store.get_library_creditor(FIRM_ID, original.id) == original
+
+
+def test_a_library_creditor_update_is_scoped_to_the_firm(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_library_creditor(library_creditor())
+    _, kwargs = fake.calls[0]
+    assert kwargs["ConditionExpression"] == "attribute_exists(SK) AND firmId = :firm"
+    assert kwargs["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_refused_library_creditor_update_is_none(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    assert store.update_library_creditor(library_creditor()) is None
+
+
+def test_a_refused_library_creditor_delete_is_false(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    assert store.delete_library_creditor(FIRM_ID, "some-id") is False
+
+
+def test_the_library_query_excludes_the_firms_other_rows(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).list_library_creditors(FIRM_ID)
+    _, kwargs = fake.calls[0]
+    assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
+    assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "LIBCREDITOR#"}

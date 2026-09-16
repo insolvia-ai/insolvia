@@ -1,5 +1,14 @@
-import { ApiValidationException, staffTypedProvenance } from '@insolvia-ai/api-client';
-import type { CaseCollection, CaseEntityRequest } from '@insolvia-ai/api-client';
+import {
+  ApiValidationException,
+  libraryProvenance,
+  staffTypedProvenance,
+} from '@insolvia-ai/api-client';
+import type {
+  Address,
+  CaseCollection,
+  CaseEntityRequest,
+  LibraryCreditor,
+} from '@insolvia-ai/api-client';
 import {
   Button,
   Checkbox,
@@ -52,7 +61,19 @@ type Body = Record<string, unknown>;
 
 type Mode =
   | { readonly kind: 'list' }
-  | { readonly kind: 'form'; readonly id: string | null; readonly body: Body };
+  | {
+      readonly kind: 'form';
+      readonly id: string | null;
+      readonly body: Body;
+      /**
+       * The `LibraryCreditor.id` the current `name`/`address` were copied
+       * from (issue 13.9 / #350) — `creditors` only, `null` otherwise and
+       * whenever the fields were typed or edited by hand. Drives which
+       * provenance `persist` builds: `libraryProvenance` when set,
+       * `staffTypedProvenance` (the ordinary rule) when not.
+       */
+      readonly librarySourceId: string | null;
+    };
 
 type LoadState =
   | { readonly kind: 'loading' }
@@ -67,6 +88,21 @@ interface Row {
 interface ReferenceOption {
   readonly value: string;
   readonly label: string;
+}
+
+/**
+ * A name-and-address record already on this case — another creditor, or a
+ * codebtor — offered as a copy source alongside the firm's library (issue
+ * 13.9 / #350). `kind` labels which collection it came from, for the
+ * picker's option text; nothing here is a new party type, exactly as the
+ * issue asks — it is `creditors` and `codebtors` read through the same
+ * generic case-entity listing this screen already uses for everything else.
+ */
+interface CaseParty {
+  readonly id: string;
+  readonly kind: 'creditor' | 'codebtor';
+  readonly name: string;
+  readonly address: Address | undefined;
 }
 
 const YES_NO_OPTIONS = [
@@ -183,7 +219,9 @@ export function CollectionEditor({
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [rows, setRows] = useState<readonly Row[]>([]);
   const [mode, setMode] = useState<Mode>(
-    initialForm === undefined ? { kind: 'list' } : { kind: 'form', id: null, body: initialForm },
+    initialForm === undefined
+      ? { kind: 'list' }
+      : { kind: 'form', id: null, body: initialForm, librarySourceId: null },
   );
   const [status, setStatus] = useState<string>('');
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
@@ -196,6 +234,19 @@ export function CollectionEditor({
   // those are options for a picker on THIS spec's own fields, the opposite
   // direction from a backlink.
   const [linkedRows, setLinkedRows] = useState<readonly Row[]>([]);
+
+  // Creditor-library reuse (issue 13.9 / #350) — `creditors` only. Loaded
+  // lazily, once, the first time the picker is opened, rather than on every
+  // mount: most collections never touch either of these two extra requests.
+  const [libraryOptions, setLibraryOptions] = useState<readonly LibraryCreditor[] | null>(null);
+  const [caseParties, setCaseParties] = useState<readonly CaseParty[] | null>(null);
+  const [addToLibrary, setAddToLibrary] = useState(false);
+  const fetchCreditorSources = useCreditorSources(caseId);
+  const loadCreditorSources = useCallback(async () => {
+    const { library, caseParties: parties } = await fetchCreditorSources();
+    setLibraryOptions(library);
+    setCaseParties(parties);
+  }, [fetchCreditorSources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,9 +324,18 @@ export function CollectionEditor({
         // Cast once, here: the descriptor-driven form holds an untyped body by
         // construction, while the client's methods are typed for hand-written
         // callers. The server re-validates every field either way (ADR 0001).
+        //
+        // A LIBRARY PICK GETS `library` PROVENANCE, NAMING THE ENTRY (issue
+        // 13.9 / #350) — `librarySourceId` is set only when the fields were
+        // just copied verbatim and untouched since; any edit through
+        // `FieldControl` clears it, which is what keeps this honest. Every
+        // other save keeps the ordinary `staff_typed` rule.
         const request = {
           ...form.body,
-          provenance: staffTypedProvenance(form.body),
+          provenance:
+            form.librarySourceId === null
+              ? staffTypedProvenance(form.body)
+              : libraryProvenance(form.body, form.librarySourceId),
         } as unknown as CaseEntityRequest<CaseCollection>;
         const result = await call((client) =>
           form.id === null
@@ -295,7 +355,31 @@ export function CollectionEditor({
             ? [...current, saved]
             : current.map((row) => (row.id === saved.id ? saved : row)),
         );
+
+        // "Add to the library" on save (issue 13.9 / #350) — a COPY, the
+        // opposite direction of a library pick: the case record is already
+        // saved, and this writes a second, independent row to the firm's
+        // library from the same values. Best-effort: a failure here must not
+        // make the caller think the case creditor itself failed to save, so
+        // it is swallowed rather than surfaced through `errors`/`status`.
+        if (spec.collection === 'creditors' && addToLibrary) {
+          const name = typeof saved.body.name === 'string' ? saved.body.name.trim() : '';
+          if (name !== '') {
+            try {
+              await call((client) =>
+                client.addLibraryCreditor({
+                  name,
+                  address: saved.body.address as Address | undefined,
+                }),
+              );
+            } catch {
+              // Best-effort, per above.
+            }
+          }
+        }
+
         setErrors({});
+        setAddToLibrary(false);
         setStatus('Saved');
         setMode({ kind: 'list' });
       } catch (cause) {
@@ -309,7 +393,7 @@ export function CollectionEditor({
         setSaving(false);
       }
     },
-    [call, caseId, spec],
+    [addToLibrary, call, caseId, spec],
   );
 
   const remove = useCallback(
@@ -389,7 +473,13 @@ export function CollectionEditor({
                       onPress={() => {
                         setErrors({});
                         setStatus('');
-                        setMode({ kind: 'form', id: row.id, body: row.body });
+                        setAddToLibrary(false);
+                        setMode({
+                          kind: 'form',
+                          id: row.id,
+                          body: row.body,
+                          librarySourceId: null,
+                        });
                       }}
                     >
                       Edit
@@ -412,7 +502,11 @@ export function CollectionEditor({
             onPress={() => {
               setErrors({});
               setStatus('');
-              setMode({ kind: 'form', id: null, body: {} });
+              setAddToLibrary(false);
+              setMode({ kind: 'form', id: null, body: {}, librarySourceId: null });
+              if (spec.collection === 'creditors') {
+                void loadCreditorSources();
+              }
             }}
           >
             {`Add ${spec.recordName}`}
@@ -420,6 +514,34 @@ export function CollectionEditor({
         </View>
       ) : (
         <View style={styles.form}>
+          {spec.collection === 'creditors' && mode.id === null ? (
+            <CreditorSourcePicker
+              libraryOptions={libraryOptions}
+              caseParties={caseParties}
+              onPickLibrary={(creditor) => {
+                setMode((current) =>
+                  current.kind === 'form'
+                    ? {
+                        ...current,
+                        body: { ...current.body, name: creditor.name, address: creditor.address },
+                        librarySourceId: creditor.id,
+                      }
+                    : current,
+                );
+              }}
+              onPickCaseParty={(party) => {
+                setMode((current) =>
+                  current.kind === 'form'
+                    ? {
+                        ...current,
+                        body: { ...current.body, name: party.name, address: party.address ?? {} },
+                        librarySourceId: null,
+                      }
+                    : current,
+                );
+              }}
+            />
+          ) : null}
           {spec.fields(mode.body).map((field) => (
             <FieldControl
               key={field.key}
@@ -427,7 +549,7 @@ export function CollectionEditor({
               body={mode.body}
               references={references}
               errors={errors}
-              onChange={(next) => setMode({ ...mode, body: next })}
+              onChange={(next) => setMode({ ...mode, body: next, librarySourceId: null })}
             />
           ))}
           {spec.collection === 'claims' ? (
@@ -440,6 +562,25 @@ export function CollectionEditor({
               onAddSecuredClaim={(body) => onOpenCollection?.('claims', body)}
             />
           ) : null}
+          {spec.collection === 'creditors' ? (
+            <View style={styles.checkboxRow}>
+              <Checkbox.Root
+                aria-label="Add to your firm's creditor library"
+                checked={addToLibrary}
+                onCheckedChange={setAddToLibrary}
+              >
+                <Checkbox.Indicator>✓</Checkbox.Indicator>
+              </Checkbox.Root>
+              <Text
+                style={[
+                  styles.checkboxLabel,
+                  { color: theme.colors.ink, fontFamily: theme.typography.body },
+                ]}
+              >
+                Also save this creditor to your firm's library, for reuse on other cases
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.rowActions}>
             <Button size="lg" disabled={saving} onPress={() => void persist(mode)}>
               {mode.id === null ? `Save ${spec.recordName}` : 'Save changes'}
@@ -450,6 +591,7 @@ export function CollectionEditor({
               onPress={() => {
                 setErrors({});
                 setStatus('');
+                setAddToLibrary(false);
                 setMode({ kind: 'list' });
               }}
             >
@@ -458,6 +600,119 @@ export function CollectionEditor({
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+/**
+ * Where the "Add {recordName}" flow's `creditors`-only picker sources its two
+ * lists from (issue 13.9 / #350): the firm's whole library
+ * (`listLibraryCreditors`) and the parties already on this case — its other
+ * creditors and its codebtors, both already generic case-entity listings.
+ */
+function partyOf(
+  record: { readonly id: string },
+  body: Body,
+  kind: CaseParty['kind'],
+): CaseParty | null {
+  const name = typeof body.name === 'string' ? body.name : undefined;
+  if (name === undefined) return null;
+  return { id: record.id, kind, name, address: body.address as Address | undefined };
+}
+
+function useCreditorSources(caseId: string) {
+  const { call } = useApi();
+  return useCallback(async (): Promise<{
+    readonly library: readonly LibraryCreditor[];
+    readonly caseParties: readonly CaseParty[];
+  }> => {
+    const [libraryResult, creditorsResult, codebtorsResult] = await Promise.all([
+      call((client) => client.listLibraryCreditors()),
+      call((client) => client.listCaseEntities(caseId, 'creditors')),
+      call((client) => client.listCaseEntities(caseId, 'codebtors')),
+    ]);
+    const library = libraryResult.ok ? libraryResult.value : [];
+    const creditorParties: CaseParty[] = creditorsResult.ok
+      ? creditorsResult.value.flatMap((record) => {
+          const body = bodyOf(record as unknown as Record<string, unknown>);
+          const party = partyOf(record, body, 'creditor');
+          return party === null ? [] : [party];
+        })
+      : [];
+    const codebtorParties: CaseParty[] = codebtorsResult.ok
+      ? codebtorsResult.value.flatMap((record) => {
+          const body = bodyOf(record as unknown as Record<string, unknown>);
+          const party = partyOf(record, body, 'codebtor');
+          return party === null ? [] : [party];
+        })
+      : [];
+    return { library, caseParties: [...creditorParties, ...codebtorParties] };
+  }, [call, caseId]);
+}
+
+/**
+ * "Copy from your library" and "copy from this case", above the ordinary
+ * name/address fields on a NEW creditor (issue 13.9 / #350). Picking either
+ * fills the fields but leaves them editable — a pick is a starting point, not
+ * a lock — and `onPickLibrary` is the one that also records the copy's
+ * provenance source (see `persist` in the parent).
+ *
+ * Two `Select`s rather than one combined list: the library and the case's own
+ * parties are different kinds of thing (the firm's standing data vs. this
+ * case's own records) and a firm curating its library wants that told apart,
+ * not merged into one alphabetized pile.
+ */
+function CreditorSourcePicker({
+  libraryOptions,
+  caseParties,
+  onPickLibrary,
+  onPickCaseParty,
+}: {
+  libraryOptions: readonly LibraryCreditor[] | null;
+  caseParties: readonly CaseParty[] | null;
+  onPickLibrary: (creditor: LibraryCreditor) => void;
+  onPickCaseParty: (party: CaseParty) => void;
+}) {
+  const theme = useTheme();
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  if (libraryOptions === null && caseParties === null) {
+    return null;
+  }
+
+  return (
+    <View style={styles.group}>
+      <Text style={[styles.help, muted]}>
+        Start from a creditor already on file, or fill in the fields below by hand.
+      </Text>
+      {libraryOptions !== null && libraryOptions.length > 0 ? (
+        <Select
+          aria-label="Copy from your firm's creditor library"
+          placeholder="Copy from your library…"
+          options={libraryOptions.map((creditor) => ({
+            value: creditor.id,
+            label: creditor.preferred ? `${creditor.name} (preferred)` : creditor.name,
+          }))}
+          onValueChange={(value) => {
+            const picked = libraryOptions.find((creditor) => creditor.id === value);
+            if (picked) onPickLibrary(picked);
+          }}
+        />
+      ) : null}
+      {caseParties !== null && caseParties.length > 0 ? (
+        <Select
+          aria-label="Copy from a party already on this case"
+          placeholder="Copy from this case…"
+          options={caseParties.map((party) => ({
+            value: party.id,
+            label: `${party.name} (${party.kind})`,
+          }))}
+          onValueChange={(value) => {
+            const picked = caseParties.find((party) => party.id === value);
+            if (picked) onPickCaseParty(picked);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

@@ -10,6 +10,7 @@ import type {
   UpdateFirmUserRequest,
 } from '@insolvia-ai/api-client';
 import { Button, Field, Input, RadioGroup, Select } from '@insolvia-ai/design-system';
+import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -41,6 +42,7 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
   { value: 'intake', label: 'Intake' },
   { value: 'documents', label: 'Documents' },
   { value: 'extraction_review', label: 'Extraction review (not yet available)' },
+  { value: 'creditor_library', label: 'Creditor library' },
   { value: 'firm_administration', label: 'Firm administration' },
 ];
 
@@ -99,6 +101,11 @@ export function Firm({ membership }: { membership: FirmMembership }) {
 
   const mayAdminister = permits(membership.permissions.firm_administration, 'view_only');
   const mayChange = permits(membership.permissions.firm_administration, 'add_edit');
+  // A SEPARATE permission from firm_administration (issue 13.9 / #350) — a
+  // paralegal may curate the creditor library without being able to manage
+  // colleagues, so this link is gated and rendered independently of the
+  // `mayAdminister` branch below.
+  const mayReachLibrary = permits(membership.permissions.creditor_library, 'view_only');
 
   const load = useCallback(async () => {
     try {
@@ -128,6 +135,7 @@ export function Firm({ membership }: { membership: FirmMembership }) {
           Managing your firm’s people is an administrator’s job. Ask one of your firm’s
           administrators if you need somebody added or changed.
         </Text>
+        {mayReachLibrary ? <LibraryLink /> : null}
       </AppShell>
     );
   }
@@ -137,6 +145,8 @@ export function Firm({ membership }: { membership: FirmMembership }) {
       <Heading level={1}>{firmName}</Heading>
 
       <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />
+
+      {mayReachLibrary ? <LibraryLink /> : null}
 
       {mayChange ? <AddColleague onAdded={load} onNotice={setNotice} /> : null}
 
@@ -175,6 +185,26 @@ export function Firm({ membership }: { membership: FirmMembership }) {
         </Text>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * A single link to the reusable creditor library manager (issue 13.9 /
+ * #350), at `/firm/creditors`. Its own component only so the two call sites
+ * above — the administrator's screen and the non-administrator's read-only
+ * one — render identically rather than drifting.
+ */
+function LibraryLink() {
+  const theme = useTheme();
+  return (
+    <View style={styles.form}>
+      <Link
+        href="/firm/creditors"
+        style={[styles.body, { color: theme.colors.primary, fontFamily: theme.typography.body }]}
+      >
+        Manage your firm’s creditor library
+      </Link>
+    </View>
   );
 }
 

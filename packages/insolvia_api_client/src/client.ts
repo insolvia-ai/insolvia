@@ -10,6 +10,7 @@ import {
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
+  libraryCreditorDraftToJson,
   listCasesQuery,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
@@ -63,10 +64,13 @@ import type {
   JobFailure,
   JobKind,
   JobStatus,
+  LibraryCreditor,
+  LibraryCreditorDraft,
   ListCasesOptions,
   ListCasesResult,
   LocalStandardsFigures,
   NationalStandardsFigures,
+  NoticeParty,
   OtherName,
   Packet,
   PacketDownload,
@@ -1215,6 +1219,81 @@ export class InsolviaApiClient {
   /** `/v1/firm/users/{subject}`, with the subject encoded exactly once. */
   #firmUserUrl(subject: string): string {
     return `${this.#baseUrl}/v1/firm/users/${encodeURIComponent(subject)}`;
+  }
+
+  /** `/v1/firm/creditors/{id}`, with the id encoded exactly once. */
+  #libraryCreditorUrl(id: string): string {
+    return `${this.#baseUrl}/v1/firm/creditors/${encodeURIComponent(id)}`;
+  }
+
+  /**
+   * `GET /v1/firm/creditors` — the firm's whole reusable creditor library
+   * (issue 13.9 / #350), for the case creditor form's picker and the
+   * `/firm/creditors` manager screen alike.
+   *
+   * Needs `creditor_library` at `view_only`.
+   */
+  async listLibraryCreditors(): Promise<readonly LibraryCreditor[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/creditors`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'creditors', 'LibraryCreditor', libraryCreditorFromJson);
+  }
+
+  /**
+   * `POST /v1/firm/creditors` — add a creditor to the firm's library.
+   *
+   * Needs `creditor_library` at `add_edit`. Throws {@link ApiValidationException}
+   * on a 400 (per-field: `name`, `address.*`, `additional_notice_parties[n].*`).
+   */
+  async addLibraryCreditor(draft: LibraryCreditorDraft): Promise<LibraryCreditor> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/creditors`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(libraryCreditorDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return libraryCreditorFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/creditors/{id}` — replace a library creditor's WHOLE
+   * record. See {@link LibraryCreditorDraft} for why this is PUT, not PATCH.
+   *
+   * A 404 means the id is not in the caller's firm's library or does not
+   * exist — deliberately indistinguishable, the same anti-oracle rule
+   * {@link updateFirmUser} follows.
+   */
+  async updateLibraryCreditor(id: string, draft: LibraryCreditorDraft): Promise<LibraryCreditor> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#libraryCreditorUrl(id), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(libraryCreditorDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return libraryCreditorFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/firm/creditors/{id}` — remove a creditor from the library.
+   *
+   * Removes the LIBRARY ROW ONLY. Every case creditor already copied from it
+   * keeps its own values — a library pick copies, it does not link (see
+   * `insolvia_core.library_creditors`) — so nothing already saved on a case
+   * changes.
+   */
+  async removeLibraryCreditor(id: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#libraryCreditorUrl(id), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
   }
 
   /** `/v1/cases/{caseId}/assignees/{subject}`, each segment encoded once. */
@@ -2526,6 +2605,7 @@ const FIRM_FEATURES = [
   'intake',
   'documents',
   'extraction_review',
+  'creditor_library',
   'firm_administration',
 ] as const;
 
@@ -2587,6 +2667,59 @@ function firmFromJson(response: DecodedResponse): Firm {
     status: status as FirmStatus,
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
+/**
+ * A snake_case address decoder, alongside `optionalAddress` above rather than
+ * reusing it: `optionalAddress` deliberately omits `county` (no debtor
+ * address surface needs it yet), and a library creditor's does — it is the
+ * same `fields.Address` the debtor's residence address is, and the county is
+ * there because it exists on that shared shape.
+ */
+function libraryAddress(response: DecodedResponse, key: string): Address {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return {};
+  }
+  return definedMembers<Address>({
+    line1: optionalString(nested, 'line1'),
+    line2: optionalString(nested, 'line2'),
+    city: optionalString(nested, 'city'),
+    state: optionalString(nested, 'state'),
+    postal_code: optionalString(nested, 'postal_code'),
+    county: optionalString(nested, 'county'),
+  });
+}
+
+function libraryNoticePartyFromJson(response: DecodedResponse): NoticeParty {
+  return {
+    id: requireString(response, 'id'),
+    name: optionalString(response, 'name'),
+    address: libraryAddress(response, 'address'),
+    account_last4: optionalString(response, 'account_last4'),
+  };
+}
+
+function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
+  const parties =
+    response.json.additional_notice_parties === undefined
+      ? []
+      : requireArrayOf(
+          response,
+          'additional_notice_parties',
+          'NoticeParty',
+          libraryNoticePartyFromJson,
+        );
+  return {
+    id: requireString(response, 'id'),
+    name: requireString(response, 'name'),
+    address: libraryAddress(response, 'address'),
+    additional_notice_parties: parties,
+    preferred: requireBoolean(response, 'preferred'),
+    notes: optionalString(response, 'notes'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
   };
 }
 
