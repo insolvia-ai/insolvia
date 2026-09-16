@@ -30,6 +30,7 @@ import type { ChoiceOption, CollectionSpec, FieldSpec } from './collections';
 import { COLLECTION_SPECS, labelize } from './collections';
 import { AssetLiensPanel, ClaimCollateralPanel } from './liens';
 import { newRowId } from './row-id';
+import { ClaimSecuredPaymentPanel } from './secured-payment-panel';
 
 /**
  * List, add, edit and remove for one generic case collection (issue #249) —
@@ -174,6 +175,22 @@ function referencedCollections(spec: CollectionSpec): readonly CaseCollection[] 
 
 function needsDebtors(spec: CollectionSpec): boolean {
   return spec.fields({}).some((field) => field.kind === 'debtor');
+}
+
+/**
+ * The creditor's name for a claim's means-test row (issue #349), read off the
+ * already-loaded reference options rather than fetched again: the option
+ * label is `Creditor N — <name>`, the creditors spec's own summary.
+ */
+function creditorNameOf(
+  body: Body,
+  references: Readonly<Partial<Record<string, readonly ReferenceOption[]>>>,
+): string | undefined {
+  const creditorId = body.creditor_id;
+  if (typeof creditorId !== 'string') return undefined;
+  const label = references.creditors?.find((option) => option.value === creditorId)?.label;
+  const name = label?.split(' — ').slice(1).join(' — ');
+  return name === undefined || name === '' ? undefined : name;
 }
 
 /**
@@ -554,6 +571,18 @@ export function CollectionEditor({
           ))}
           {spec.collection === 'claims' ? (
             <ClaimCollateralPanel caseId={caseId} claimId={mode.id} />
+          ) : null}
+          {spec.collection === 'claims' && mode.body.claim_class === 'secured' ? (
+            <ClaimSecuredPaymentPanel
+              caseId={caseId}
+              claimId={mode.id}
+              creditorName={creditorNameOf(mode.body, references)}
+              propertyDescription={
+                typeof mode.body.collateral_description === 'string'
+                  ? mode.body.collateral_description
+                  : undefined
+              }
+            />
           ) : null}
           {spec.collection === 'assets' ? (
             <AssetLiensPanel
