@@ -1,10 +1,14 @@
 """B106D @ 2015-12-01 (revision 12/15) — Schedule D's mapping.
 
 Secured claims in creation order onto the five printed rows, each row's
-creditor block resolved through `claim.creditor_id`. The unsecured portion
-is derived per row (amount less collateral value, floored at zero — the
-model refuses to store it), Column A's page subtotals and total are summed
-here, and the total feeds 106Sum line 2 through `secured_total`.
+creditor block resolved through `claim.creditor_id`. The collateral columns
+come from `core/liens.py` (issue #345): the description and Column B's value
+resolve through `claim.asset_id` to the Schedule A/B asset unless the claim
+types its own, and the unsecured portion is that module's arithmetic — amount
+less what is left of the collateral after the senior liens, floored at zero,
+or the preparer's typed override. The model refuses to store any of the three
+derived figures. Column A's page subtotals and total are summed here, and the
+total feeds 106Sum line 2 through `secured_total`.
 
 Two rows carry the official PDF's broken who-owes groups (forms/README.md):
 row 2.4's four options share one field exporting `On`, so the selection is
@@ -26,6 +30,7 @@ from insolvia_core.claims import ClaimBody
 
 from ..form_fill import Check, Text, WidgetStates
 from ..form_templates import FormRelease
+from ..liens import derive_liens
 from .shared import (
     CaseFile,
     FieldValues,
@@ -172,8 +177,11 @@ def project_b106d_1215(release: FormRelease, case_file: CaseFile) -> FieldValues
     values["line_1_any_secured_claims"] = yes_no(
         release, "line_1_any_secured_claims", bool(secured)
     )
+    # The same figures the summary and the intake screens show, in the same
+    # order as `secured` (both filter the case file's claims by class).
+    liens = derive_liens(case_file).claims
 
-    for index, claim in enumerate(secured):
+    for index, (claim, lien) in enumerate(zip(secured, liens, strict=True)):
         creditor = case_file.creditor(claim.creditor_id)
         if creditor is not None:
             row_fill(
@@ -198,7 +206,7 @@ def project_b106d_1215(release: FormRelease, case_file: CaseFile) -> FieldValues
             values,
             "claim.collateral_description",
             index,
-            text_or_none(claim.collateral_description),
+            text_or_none(lien.collateral_description),
             problems,
         )
         row_fill(
@@ -209,28 +217,24 @@ def project_b106d_1215(release: FormRelease, case_file: CaseFile) -> FieldValues
             text_or_none(claim.amount and format_money(claim.amount)),
             problems,
         )
-        row_fill(
-            release,
-            values,
-            "claim.collateral_value",
-            index,
-            text_or_none(
-                claim.collateral_value and format_money(claim.collateral_value)
-            ),
-            problems,
-        )
-        # The unsecured portion: amount less collateral value, floored at
-        # zero — derived, never stored (case-data-model.md).
-        if claim.amount is not None and claim.collateral_value is not None:
-            unsecured = max(
-                amount(claim.amount) - amount(claim.collateral_value), Decimal("0")
+        if lien.collateral_value is not None:
+            row_fill(
+                release,
+                values,
+                "claim.collateral_value",
+                index,
+                Text(format_money(lien.collateral_value)),
+                problems,
             )
+        # Column B's unsecured portion — derived, never stored
+        # (case-data-model.md); blank while it cannot be derived.
+        if lien.unsecured_amount is not None:
             row_fill(
                 release,
                 values,
                 "claim.unsecured_portion",
                 index,
-                Text(format_money(unsecured)),
+                Text(format_money(lien.unsecured_amount)),
                 problems,
             )
         for attr, field_id in _FLAG_FIELDS:

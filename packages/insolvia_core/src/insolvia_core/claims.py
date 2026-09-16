@@ -13,14 +13,34 @@ before the class is chosen must persist. Which members a given class actually
 prints is the forms engine's mapping.
 
 Two amounts are arithmetic and deliberately absent: the unsecured portion of a
-secured claim (amount less collateral value) and a priority claim's total
-(priority plus nonpriority). Storing either would mean owning a reconciliation
-bug.
+secured claim and a priority claim's total (priority plus nonpriority).
+Storing either would mean owning a reconciliation bug. The unsecured portion
+is derived by the API (its `core/liens.py`) from the claim's amount, the
+collateral's value and the liens senior to it on the same asset; what IS
+stored is the one deliberate exception, `unsecured_amount_override` — a figure
+a preparer typed because the arithmetic is wrong for this claim (a cross-
+collateralised loan, a lien the court has already valued). Its presence is
+what "entered manually" means, and its provenance entry is the record of who
+entered it: a separate boolean would be a second fact that could disagree
+with the first.
 
-`creditor_id` names a creditor record but is not checked against the creditor
-collection here — storage validates shape and type only, and a claim typed
-before its creditor is saved must persist. Dangling references are the
-completeness gate's to flag (9.6).
+THE COLLATERAL IS A REFERENCE FIRST AND FREE TEXT SECOND (issue #345).
+`asset_id` names the Schedule A/B asset the lien encumbers, so the asset's
+secured total and the claim's deficiency follow from one record instead of
+two typed numbers that drift; `collateral_description` and `collateral_value`
+stay as the override for collateral not on Schedule A/B (property already
+surrendered, a co-signer's car) and, when both are present, the typed value
+wins over the asset's. `lien_position` is the explicit order among the claims
+on one asset — 1 is the senior lien — because "second mortgage" is a fact the
+form's Column B arithmetic depends on and creation order does not carry.
+`intention` is the debtor's Statement of Intention answer for this
+collateral (B108, issue #351 prints it): the enum spells the form's four
+boxes.
+
+`creditor_id` and `asset_id` name records but are not checked against their
+collections here — storage validates shape and type only, and a claim typed
+before its creditor or its asset is saved must persist. Dangling references
+are the completeness gate's to flag (9.6).
 """
 
 from __future__ import annotations
@@ -43,6 +63,7 @@ from .fields import (
     money,
     parse_address,
     text,
+    whole_number,
 )
 from .provenance import ADDRESSABLE_ID_RE
 
@@ -68,6 +89,17 @@ NONPRIORITY_TYPES: Final = (
     "pension_or_profit_sharing",
     "other",
 )
+
+# B108's four boxes for one item of collateral. The three `retain_*` members
+# are the form's own split of "retain" (redeem under §722, reaffirm under
+# §524(c), or "other" with an explanation); `intention_explanation` carries
+# the explanation for `retain_other` and any note on the rest.
+INTENTIONS: Final = ("surrender", "retain_redeem", "retain_reaffirm", "retain_other")
+
+# The senior-most lien is position 1. Nothing forbids two claims sharing a
+# position (pari passu liens exist); the derivation treats equals as neither
+# senior nor junior to each other.
+MAX_LIEN_POSITION: Final = 99
 
 
 @dataclass(frozen=True)
@@ -96,11 +128,16 @@ class ClaimBody:
     who_incurred: str | None = None
     community_debt: bool | None = None
     notice_parties: tuple[NoticeParty, ...] = ()
-    # class: secured
+    # class: secured — the collateral, by reference and by override
+    asset_id: str | None = None
+    lien_position: int | None = None
     collateral_description: str | None = None
     collateral_value: str | None = None
     lien_nature: tuple[str, ...] = ()
     lien_nature_other: str | None = None
+    unsecured_amount_override: str | None = None
+    intention: str | None = None
+    intention_explanation: str | None = None
     # class: priority_unsecured
     priority_amount: str | None = None
     nonpriority_amount: str | None = None
@@ -121,6 +158,18 @@ def _last4(value: object, path: str, errors: dict[str, str]) -> str | None:
         errors[path] = "Must be up to four digits."
         return None
     return last4
+
+
+def _lien_position(value: object, errors: dict[str, str]) -> int | None:
+    """1 is the senior lien. Zero is refused rather than read as "first":
+    a preparer counting from zero and one counting from one would otherwise
+    both be accepted, and the two conventions on one asset would order the
+    liens wrongly without any field being malformed."""
+    position = whole_number(value, "lien_position", errors, maximum=MAX_LIEN_POSITION)
+    if position == 0:
+        errors["lien_position"] = "Must be 1 or more — 1 is the senior lien."
+        return None
+    return position
 
 
 def _parse_notice_parties(
@@ -184,6 +233,8 @@ def parse_claim(payload: Mapping[str, object]) -> ClaimBody:
         ),
         community_debt=boolean(payload.get("community_debt"), "community_debt", errors),
         notice_parties=_parse_notice_parties(payload.get("notice_parties"), errors),
+        asset_id=text(payload.get("asset_id"), "asset_id", errors, limit=64),
+        lien_position=_lien_position(payload.get("lien_position"), errors),
         collateral_description=text(
             payload.get("collateral_description"),
             "collateral_description",
@@ -198,6 +249,18 @@ def parse_claim(payload: Mapping[str, object]) -> ClaimBody:
         ),
         lien_nature_other=text(
             payload.get("lien_nature_other"), "lien_nature_other", errors
+        ),
+        unsecured_amount_override=money(
+            payload.get("unsecured_amount_override"),
+            "unsecured_amount_override",
+            errors,
+        ),
+        intention=choice(payload.get("intention"), INTENTIONS, "intention", errors),
+        intention_explanation=text(
+            payload.get("intention_explanation"),
+            "intention_explanation",
+            errors,
+            limit=500,
         ),
         priority_amount=money(
             payload.get("priority_amount"), "priority_amount", errors

@@ -19,6 +19,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 import type { ChoiceOption, CollectionSpec, FieldSpec } from './collections';
 import { COLLECTION_SPECS, labelize } from './collections';
+import { AssetLiensPanel, ClaimCollateralPanel } from './liens';
 import { newRowId } from './row-id';
 
 /**
@@ -37,6 +38,14 @@ import { newRowId } from './row-id';
  * Every field is optional and nothing here blocks a save — the server
  * validates shape (ADR 0001) and its per-field messages render under the
  * fields they name, keyed by the same dotted paths the fields write to.
+ *
+ * Two collections carry a panel the specs cannot express (issue #345): a
+ * claim's form shows what its collateral covers, and a property's form
+ * lists the liens on it and can open the claims section on a new claim
+ * already pointed at the property. That hand-off is `onOpenCollection` —
+ * the intake screen owns which section is showing, so the editor asks it —
+ * and `initialForm` is how the receiving editor starts on the form instead
+ * of the list. Both panels are read-only over server-derived figures.
  */
 
 type Body = Record<string, unknown>;
@@ -134,15 +143,26 @@ function needsDebtors(spec: CollectionSpec): boolean {
 export interface CollectionEditorProps {
   readonly caseId: string;
   readonly spec: CollectionSpec;
+  /** Start on a new record's form with this body, rather than on the list. */
+  readonly initialForm?: Body | undefined;
+  /** Open another collection's section on a new record with this body. */
+  readonly onOpenCollection?: ((collection: CaseCollection, body: Body) => void) | undefined;
 }
 
-export function CollectionEditor({ caseId, spec }: CollectionEditorProps) {
+export function CollectionEditor({
+  caseId,
+  spec,
+  initialForm,
+  onOpenCollection,
+}: CollectionEditorProps) {
   const theme = useTheme();
   const { call } = useApi();
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [rows, setRows] = useState<readonly Row[]>([]);
-  const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  const [mode, setMode] = useState<Mode>(
+    initialForm === undefined ? { kind: 'list' } : { kind: 'form', id: null, body: initialForm },
+  );
   const [status, setStatus] = useState<string>('');
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
@@ -352,6 +372,16 @@ export function CollectionEditor({ caseId, spec }: CollectionEditorProps) {
               onChange={(next) => setMode({ ...mode, body: next })}
             />
           ))}
+          {spec.collection === 'claims' ? (
+            <ClaimCollateralPanel caseId={caseId} claimId={mode.id} />
+          ) : null}
+          {spec.collection === 'assets' ? (
+            <AssetLiensPanel
+              caseId={caseId}
+              assetId={mode.id}
+              onAddSecuredClaim={(body) => onOpenCollection?.('claims', body)}
+            />
+          ) : null}
           <View style={styles.rowActions}>
             <Button size="lg" disabled={saving} onPress={() => void persist(mode)}>
               {mode.id === null ? `Save ${spec.recordName}` : 'Save changes'}

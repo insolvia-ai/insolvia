@@ -22,6 +22,11 @@ and says why:
 
 This module inherits that property. If a figure here is wrong, the filed form
 is wrong in the same way, which is a real bug and not a display discrepancy.
+The lien figures (issue #345) are the same shape of promise: `core/liens.py`
+is what B106D's Column B prints from, and it is reported here whole rather
+than as a total because no form sums it — the per-claim deficiency and the
+per-asset secured total ARE the figures, and a sum of them would be the one
+number in the system no schedule states.
 
 WHAT IS DELIBERATELY ABSENT: an activity feed. The obvious source is the access
 log, and it is unreadable by design — `infra/modules/case_store` grants this
@@ -43,6 +48,7 @@ from .form_projections.b106ef import (
     nonpriority_unsecured_total,
     priority_unsecured_total,
 )
+from .liens import LienFigures, derive_liens
 from .packet_assembly import (
     CaseData,
     PacketProblem,
@@ -78,6 +84,9 @@ class CaseSummary:
     totals: CaseTotals
     #: Empty means this case could assemble its packet today.
     problems: tuple[PacketProblem, ...]
+    #: What each secured claim is secured by and what each asset carries —
+    #: `core/liens.py`'s figures, the ones B106D's Column B prints from.
+    liens: LienFigures
 
     @property
     def ready_to_file(self) -> bool:
@@ -117,4 +126,5 @@ def summarise(data: CaseData) -> CaseSummary:
             liabilities=secured + priority + nonpriority,
         ),
         problems=completeness_problems(data),
+        liens=derive_liens(case_file),
     )

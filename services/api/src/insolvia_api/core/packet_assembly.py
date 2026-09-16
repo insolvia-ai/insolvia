@@ -325,6 +325,9 @@ def _reference_problems(data: CaseData) -> list[PacketProblem]:
         ref = claim.body.creditor_id
         if ref is not None and ref not in creditor_ids:
             dangle("claims", claim.id, "creditor_id", "creditor")
+        ref = claim.body.asset_id
+        if ref is not None and ref not in asset_ids:
+            dangle("claims", claim.id, "asset_id", "property (asset)")
     for exemption in data.exemptions:
         ref = exemption.body.asset_id
         if ref is not None and ref not in asset_ids:
