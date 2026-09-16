@@ -29,6 +29,7 @@ import {
   ApiValidationException,
   BUSINESS_TYPES,
   CASE_COLLECTIONS,
+  EXEMPTION_SETS,
   CLAIM_CLASSES,
   CONTRACT_LEASE_INTENTIONS,
   DEBT_CHARACTERS,
@@ -1051,6 +1052,64 @@ describe('updateCase', () => {
 
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
     expect(body).toEqual({ status: 'ready_to_file' });
+  });
+
+  test('sends the 106C election as exemption_set, and maps it back as exemptionSet', async () => {
+    // Issue #346: the election is a case-level field, written by this PATCH
+    // and echoed by `case_json` under its camelCase name.
+    const stub = stubFetch(() =>
+      jsonResponse({ ...UPDATED_CASE, exemptionSet: 'state_and_federal_nonbankruptcy' }, 200),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateCase(CASE_ID, {
+      exemptionSet: 'state_and_federal_nonbankruptcy',
+    });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({ exemption_set: 'state_and_federal_nonbankruptcy' });
+    expect(updated.exemptionSet).toBe('state_and_federal_nonbankruptcy');
+  });
+
+  test('a case with no election yet leaves exemptionSet absent, not null', async () => {
+    const stub = stubFetch(() => jsonResponse(UPDATED_CASE, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateCase(CASE_ID, { status: 'ready_to_file' });
+
+    expect('exemptionSet' in updated).toBe(false);
+  });
+
+  test('maps the opt-out refusal — a 400 keyed exemption_set — to ApiValidationException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: {
+            exemption_set:
+              'FL has opted out of the federal § 522(d) exemptions (Fla. Stat. § 222.20); the state scheme is the only answer.',
+          },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(client.updateCase(CASE_ID, { exemptionSet: 'federal' })),
+    );
+
+    expect(error.statusCode).toBe(400);
+    expect(Object.keys(error.fields)).toEqual(['exemption_set']);
   });
 
   test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
@@ -4963,6 +5022,221 @@ describe('getCaseLiens', () => {
     });
 
     await expect(client.getCaseLiens(ENTITY_CASE_ID)).rejects.toBeInstanceOf(ApiException);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The Schedule C workbench (issue #346). Pinned against routes/
+// exemption_analysis.py and core/exemption_analysis.py's `analysis_json`,
+// and against insolvia_core.cases.EXEMPTION_SETS.
+// ---------------------------------------------------------------------------
+
+describe('getCaseExemptionAnalysis', () => {
+  test('the election enum mirrors insolvia_core.cases.EXEMPTION_SETS, member for member', () => {
+    expect(EXEMPTION_SETS).toEqual(['state_and_federal_nonbankruptcy', 'federal']);
+  });
+
+  /** The literal `analysis_json` for a Florida house behind a first mortgage
+   * with one $1,000 personal-property claim on it, the table cut to two
+   * entries and one federal cap. Copied from the route, not inferred. */
+  const ANALYSIS = {
+    asOf: '2026-12-01',
+    asOfSource: 'expected_filing_date',
+    election: {
+      stored: null,
+      effective: 'state_and_federal_nonbankruptcy',
+      state: 'FL',
+      optedOut: true,
+      optOutCitation: 'Fla. Stat. § 222.20',
+      options: [
+        {
+          value: 'state_and_federal_nonbankruptcy',
+          schemeId: 'fl',
+          name: 'Florida exemptions (Fla. Const. art. X, § 4; Fla. Stat. ch. 222)',
+        },
+      ],
+    },
+    entries: [
+      {
+        entryId: 'fl-homestead',
+        category: 'homestead',
+        description: 'Homestead: residence of the owner or owner’s family — unlimited value',
+        citation: 'Fla. Const. art. X, § 4(a)(1); Fla. Stat. §§ 222.01-222.02',
+        unlimited: true,
+        limit: null,
+        perItemAmount: null,
+        carryover: null,
+        claimed: '0.00',
+        available: null,
+        notes: 'Value-unlimited but acreage-limited.',
+      },
+      {
+        entryId: 'fl-personal-property',
+        category: 'personal_property',
+        description: 'Personal property of any kind',
+        citation: 'Fla. Const. art. X, § 4(a)(2)',
+        unlimited: false,
+        limit: '1000.00',
+        perItemAmount: null,
+        carryover: null,
+        claimed: '1000.00',
+        available: '0.00',
+        notes: '',
+      },
+    ],
+    limits: [
+      {
+        limitId: 'us-homestead-1215-day-cap',
+        citation: '11 U.S.C. § 522(p)',
+        description:
+          'Cap on the homestead interest a debtor may exempt in property acquired within 1,215 days before filing',
+        amount: '214000.00',
+      },
+    ],
+    lookbacks: {
+      section522o: '2016-12-01',
+      section522p: '2023-08-04',
+      section522q: '2021-12-01',
+      domicilePeriodStart: '2024-12-01',
+    },
+    assets: [
+      {
+        assetId: 'a-house',
+        description: '12 Byron Court',
+        category: 'real_property',
+        currentValue: '300000.00',
+        liens: '250000.00',
+        netEquity: '50000.00',
+        claimed: '1000.00',
+        unexempt: '49000.00',
+        homesteadCap: null,
+        capApplied: false,
+        claims: [
+          {
+            exemptionId: 'e-1',
+            statuteCitation: 'Fla. Const. art. X, § 4(a)(2)',
+            amount: '1000.00',
+            claimsFullFmv: false,
+            acquiredWithin1215Days: null,
+            claimed: '1000.00',
+            knownStatute: true,
+          },
+        ],
+        suggestions: { 'fl-homestead': '49000.00', 'fl-personal-property': '0.00' },
+      },
+    ],
+    warnings: [],
+    problems: [],
+  };
+
+  test('GETs /v1/cases/{caseId}/exemption-analysis and maps the whole body', async () => {
+    const stub = stubFetch(() => jsonResponse(ANALYSIS, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const analysis = await client.getCaseExemptionAnalysis(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/exemption-analysis`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+
+    expect(analysis).toEqual(ANALYSIS);
+  });
+
+  test('an unlimited statute and an unvalued asset decode as null, never zero', async () => {
+    const unvalued = {
+      ...ANALYSIS,
+      assets: [
+        {
+          ...ANALYSIS.assets[0],
+          currentValue: null,
+          netEquity: null,
+          unexempt: null,
+          claims: [],
+          suggestions: {},
+        },
+      ],
+    };
+    const stub = stubFetch(() => jsonResponse(unvalued, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const analysis = await client.getCaseExemptionAnalysis(ENTITY_CASE_ID);
+
+    expect(analysis.entries[0]?.limit).toBeNull();
+    expect(analysis.entries[0]?.available).toBeNull();
+    expect(analysis.assets[0]?.netEquity).toBeNull();
+    expect(analysis.assets[0]?.suggestions).toEqual({});
+  });
+
+  test('a state that allows the election comes back with no effective scheme and a problem', async () => {
+    const undecided = {
+      ...ANALYSIS,
+      election: {
+        stored: null,
+        effective: null,
+        state: 'TX',
+        optedOut: false,
+        optOutCitation: null,
+        options: [
+          { value: 'state_and_federal_nonbankruptcy', schemeId: 'tx', name: 'Texas exemptions' },
+          { value: 'federal', schemeId: 'us-522d', name: 'Federal bankruptcy exemptions' },
+        ],
+      },
+      entries: [],
+      problems: [
+        'Choose the exemption scheme: TX lets the debtor claim the state scheme or the federal § 522(d) list (106C line 1).',
+      ],
+    };
+    const stub = stubFetch(() => jsonResponse(undecided, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const analysis = await client.getCaseExemptionAnalysis(ENTITY_CASE_ID);
+
+    expect(analysis.election.effective).toBeNull();
+    expect(analysis.election.options.map((option) => option.value)).toEqual([
+      'state_and_federal_nonbankruptcy',
+      'federal',
+    ]);
+    expect(analysis.entries).toEqual([]);
+    expect(analysis.problems).toHaveLength(1);
+  });
+
+  test('an election value outside the enum is a malformed response', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ ...ANALYSIS, election: { ...ANALYSIS.election, effective: 'best' } }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.getCaseExemptionAnalysis(ENTITY_CASE_ID)));
+
+    expect(error.message).toContain('field "effective"');
+  });
+
+  test('maps a 404 {"error","message"} body to a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'NotFoundError', message: 'case not found' }, 404),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(await rejection(client.getCaseExemptionAnalysis(ENTITY_CASE_ID)));
+
+    expect(error.statusCode).toBe(404);
   });
 });
 

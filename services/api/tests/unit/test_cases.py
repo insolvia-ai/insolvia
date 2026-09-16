@@ -32,7 +32,9 @@ from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_core.access import Accessor, may_see_case
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.cases import (
@@ -179,6 +181,10 @@ def client(store, access_log, firms):
             case_store=store,
             access_log=access_log,
             firm_store=firms,
+            # The exemption election's opt-out check (issue #346) reads
+            # Debtor 1's state and the petition's filing date.
+            debtor_store=MemoryDebtorStore(),
+            case_entity_store=MemoryCaseEntityStore(),
         )
     )
     return app.test_client()
@@ -705,6 +711,88 @@ def test_update_of_a_missing_case_is_404(client):
     assert response.status_code == 404
 
 
+# ── The exemption election (issue #346) ─────────────────────────
+
+
+def put_debtor_1_in(client, case_id, state):
+    response = client.put(
+        f"/v1/cases/{case_id}/debtors/debtor_1",
+        json={
+            "residence_address": {"state": state},
+            "provenance": {"residence_address.state": {"source": "staff_typed"}},
+        },
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+
+
+def test_a_case_starts_with_no_election(client):
+    created = open_case(client)
+    assert "exemptionSet" not in created
+
+
+def test_the_election_is_stored_and_echoed(client):
+    created = open_case(client)
+    updated = client.patch(
+        f"/v1/cases/{created['id']}",
+        json={"exemption_set": "state_and_federal_nonbankruptcy"},
+        headers=auth(ALICE),
+    )
+    assert updated.status_code == 200
+    assert updated.get_json()["exemptionSet"] == "state_and_federal_nonbankruptcy"
+    fetched = client.get(f"/v1/cases/{created['id']}", headers=auth(ALICE))
+    assert fetched.get_json()["exemptionSet"] == "state_and_federal_nonbankruptcy"
+
+
+def test_the_election_must_be_one_of_the_two_106c_answers(client):
+    created = open_case(client)
+    response = client.patch(
+        f"/v1/cases/{created['id']}",
+        json={"exemption_set": "whatever_is_best"},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+    assert "exemption_set" in response.get_json()["fields"]
+
+
+def test_an_opt_out_state_refuses_the_federal_election(client):
+    # Florida has opted out (Fla. Stat. § 222.20): the registry knows, and
+    # the write is refused so the case record never carries the answer.
+    created = open_case(client)
+    put_debtor_1_in(client, created["id"], "FL")
+    response = client.patch(
+        f"/v1/cases/{created['id']}",
+        json={"exemption_set": "federal"},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+    assert "opted out" in response.get_json()["fields"]["exemption_set"]
+
+
+def test_an_election_state_accepts_the_federal_election(client):
+    created = open_case(client)
+    put_debtor_1_in(client, created["id"], "TX")
+    response = client.patch(
+        f"/v1/cases/{created['id']}",
+        json={"exemption_set": "federal"},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["exemptionSet"] == "federal"
+
+
+def test_a_case_with_no_debtor_state_yet_accepts_either_election(client):
+    # The analysis reports the missing state on read; the write is not the
+    # place to refuse a fact the case cannot yet judge.
+    created = open_case(client)
+    response = client.patch(
+        f"/v1/cases/{created['id']}",
+        json={"exemption_set": "federal"},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200
+
+
 # ── The access log ──────────────────────────────────────────────
 
 
@@ -790,6 +878,21 @@ def test_case_item_round_trips(client, store):
     case_id = open_case(client)["id"]
     original = store.cases[case_id]
     assert case_from_item(case_item(original)) == original
+
+
+def test_case_item_round_trips_the_election(client, store):
+    case_id = open_case(client)["id"]
+    client.patch(
+        f"/v1/cases/{case_id}",
+        json={"exemption_set": "state_and_federal_nonbankruptcy"},
+        headers=auth(ALICE),
+    )
+    elected = store.cases[case_id]
+    item = case_item(elected)
+    assert item["exemptionSet"] == "state_and_federal_nonbankruptcy"
+    assert case_from_item(item) == elected
+    # Absent, not null, on a row written before the election existed.
+    assert "exemptionSet" not in case_item(store.cases[open_case(client)["id"]])
 
 
 def test_case_item_carries_the_by_firm_keys(client, store):

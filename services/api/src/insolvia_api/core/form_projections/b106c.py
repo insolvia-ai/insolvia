@@ -8,9 +8,9 @@ exemptions registry (core/exemptions.py):
   forces the answer (§ 522(b)(3), the "state and federal nonbankruptcy"
   box), so the projection derives it from the debtor's state via
   `schemes_for_state`. Where the state allows the federal election the
-  choice is the debtor's own fact; the model assigns it to
-  `case.exemption_set`, which code has not grown yet, so the box stays
-  blank until it does.
+  choice is the debtor's own fact, `case.exemption_set` (issue #346, set
+  through `PATCH /v1/cases/<id>`), and the box stays blank until it is
+  made — the completeness gate's question, not this projection's.
 - **Line 3** — the § 522(q) homestead-cap question. The cap is a registry
   figure (`us-homestead-misconduct-cap`), never a constant in code; the
   claimed homestead is the exemptions on real-property assets, a full-FMV
@@ -54,22 +54,32 @@ def _as_of(case_file: CaseFile) -> date:
     return date.fromisoformat(case_file.case.created_at[:10])
 
 
+_ELECTION_EXPORTS = {
+    "state_and_federal_nonbankruptcy": "state and federal",
+    "federal": "federal",
+}
+
+
 def _exemption_set_export(case_file: CaseFile) -> str | None:
-    """Line 1's export where the opt-out rule forces it; None otherwise."""
+    """Line 1's export: forced by the opt-out rule where the law forces it,
+    the case's own election otherwise, and None while neither says."""
     debtor1 = case_file.debtor("debtor_1")
     state = debtor1.residence_address.state if debtor1 is not None else None
-    if not state:
-        return None
-    try:
-        schemes = schemes_for_state(state, _as_of(case_file))
-    except (KeyError, LookupError):
-        # Outside the launch set, or before the series' baseline — the
-        # completeness gate surfaces "unsupported state"; nothing to force.
-        return None
-    if len(schemes) == 1:
-        # Opted out: § 522(b)(3) is the only box the law allows.
-        return "state and federal"
-    return None
+    if state:
+        try:
+            schemes = schemes_for_state(state, _as_of(case_file))
+        except (KeyError, LookupError):
+            # Outside the launch set, or before the series' baseline — the
+            # completeness gate surfaces "unsupported state"; nothing to
+            # force, so the stored election (if any) is what prints.
+            schemes = ()
+        if len(schemes) == 1:
+            # Opted out: § 522(b)(3) is the only box the law allows,
+            # whatever the case record says (the PATCH route refuses the
+            # other answer, so the two agree in practice).
+            return "state and federal"
+    election = case_file.case.exemption_set
+    return _ELECTION_EXPORTS.get(election) if election is not None else None
 
 
 def _claimed_amount(exemption: ExemptionBody, case_file: CaseFile) -> Decimal:

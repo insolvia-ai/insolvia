@@ -22,6 +22,8 @@ import {
 import type {
   AddFirmUserRequest,
   Address,
+  AssetExemptionClaim,
+  AssetExemptionFigures,
   AssetLiens,
   CandidateOrigin,
   CandidateStatus,
@@ -38,6 +40,13 @@ import type {
   CaseSummary,
   CaseTotals,
   ClaimLien,
+  ExemptionAnalysis,
+  ExemptionElection,
+  ExemptionElectionOption,
+  ExemptionEntryAvailability,
+  ExemptionLookbacks,
+  ExemptionSet,
+  StatutoryLimitFigure,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -982,6 +991,30 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/cases/{caseId}/exemption-analysis` — the Schedule C workbench's
+   * read (issue #346): the statutes this case may claim under given its
+   * election and expected filing date, what it has claimed against each, and
+   * every asset's value − liens − claimed, all computed server-side.
+   *
+   * NOT `/exemptions`: that URL is the exemption records' own collection
+   * route ({@link listCaseEntities} with `'exemptions'`), which the panel
+   * still uses to add and remove claims. Fetch this beside an asset, and
+   * **never add the figures up in a screen** (ADR 0001).
+   *
+   * Always 200 with `problems` for what could not resolve. Like
+   * {@link getCase}, a 404 means the case is unknown *or* not the caller's.
+   */
+  async getCaseExemptionAnalysis(caseId: string): Promise<ExemptionAnalysis> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/exemption-analysis`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return exemptionAnalysisFromJson(decoded);
+  }
+
+  /**
    * `GET /v1/cases/{caseId}/standards` — the published IRS National and
    * Local Standards for the case's own jurisdiction and household (issue
    * #348), for display beside Schedule J's health-care and transportation
@@ -1690,6 +1723,24 @@ function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
   throw malformedField(response, key, 'one of "intake" | "ready_to_file" | "filed"');
 }
 
+function requireExemptionSet(response: DecodedResponse, key: string): ExemptionSet {
+  const value = response.json[key];
+  if (value === 'state_and_federal_nonbankruptcy' || value === 'federal') {
+    return value;
+  }
+  throw malformedField(response, key, 'one of "state_and_federal_nonbankruptcy" | "federal"');
+}
+
+/** {@link requireExemptionSet}, but absent is allowed — the pre-election case. */
+function optionalExemptionSet(response: DecodedResponse, key: string): ExemptionSet | undefined {
+  return response.json[key] === undefined ? undefined : requireExemptionSet(response, key);
+}
+
+/** {@link requireExemptionSet}, but JSON `null` is allowed and stays `null`. */
+function requireNullableExemptionSet(response: DecodedResponse, key: string): ExemptionSet | null {
+  return response.json[key] === null ? null : requireExemptionSet(response, key);
+}
+
 /**
  * Decodes a {@link Case} from a response body: `{"id", "chapter", "district",
  * "status", "createdAt", "updatedAt"}`. Shared by every `/v1/cases` endpoint
@@ -1701,6 +1752,8 @@ function caseFromJson(response: DecodedResponse): Case {
   // mirroring `case_json` in core/cases.py — so both stay optional here.
   const formRevisions = optionalStringRecord(response, 'formRevisions');
   const constantsSetId = optionalString(response, 'constantsSetId');
+  // Likewise absent until the 106C election is made (issue #346).
+  const exemptionSet = optionalExemptionSet(response, 'exemptionSet');
   return {
     id: requireString(response, 'id'),
     createdBy: requireString(response, 'createdBy'),
@@ -1711,6 +1764,7 @@ function caseFromJson(response: DecodedResponse): Case {
     updatedAt: requireString(response, 'updatedAt'),
     ...(formRevisions === undefined ? {} : { formRevisions }),
     ...(constantsSetId === undefined ? {} : { constantsSetId }),
+    ...(exemptionSet === undefined ? {} : { exemptionSet }),
   };
 }
 
@@ -2514,6 +2568,136 @@ function caseLiensFromJson(response: DecodedResponse): CaseLiens {
   };
 }
 
+// ── The Schedule C workbench (issue #346) — `analysis_json`'s exact shape.
+// Money stays a string (the `caseTotalsFromJson` argument); an unknown
+// figure is JSON null and stays null, because the panel labels every box
+// and needs to know WHICH one is missing (the standards route's rule).
+
+function exemptionElectionOptionFromJson(response: DecodedResponse): ExemptionElectionOption {
+  return {
+    value: requireExemptionSet(response, 'value'),
+    schemeId: requireString(response, 'schemeId'),
+    name: requireString(response, 'name'),
+  };
+}
+
+function exemptionElectionFromJson(response: DecodedResponse): ExemptionElection {
+  return {
+    stored: requireNullableExemptionSet(response, 'stored'),
+    effective: requireNullableExemptionSet(response, 'effective'),
+    state: requireNullableString(response, 'state'),
+    optedOut: requireNullableBoolean(response, 'optedOut'),
+    optOutCitation: requireNullableString(response, 'optOutCitation'),
+    options: requireArrayOf(
+      response,
+      'options',
+      'ExemptionElectionOption',
+      exemptionElectionOptionFromJson,
+    ),
+  };
+}
+
+function exemptionEntryFromJson(response: DecodedResponse): ExemptionEntryAvailability {
+  return {
+    entryId: requireString(response, 'entryId'),
+    category: requireString(response, 'category'),
+    description: requireString(response, 'description'),
+    citation: requireString(response, 'citation'),
+    unlimited: requireBoolean(response, 'unlimited'),
+    limit: requireNullableString(response, 'limit'),
+    perItemAmount: requireNullableString(response, 'perItemAmount'),
+    carryover: requireNullableString(response, 'carryover'),
+    claimed: requireString(response, 'claimed'),
+    available: requireNullableString(response, 'available'),
+    notes: requireString(response, 'notes'),
+  };
+}
+
+function statutoryLimitFigureFromJson(response: DecodedResponse): StatutoryLimitFigure {
+  return {
+    limitId: requireString(response, 'limitId'),
+    citation: requireString(response, 'citation'),
+    description: requireString(response, 'description'),
+    amount: requireString(response, 'amount'),
+  };
+}
+
+function exemptionLookbacksFromJson(response: DecodedResponse): ExemptionLookbacks {
+  return {
+    section522o: requireString(response, 'section522o'),
+    section522p: requireString(response, 'section522p'),
+    section522q: requireString(response, 'section522q'),
+    domicilePeriodStart: requireString(response, 'domicilePeriodStart'),
+  };
+}
+
+function assetExemptionClaimFromJson(response: DecodedResponse): AssetExemptionClaim {
+  return {
+    exemptionId: requireString(response, 'exemptionId'),
+    statuteCitation: requireNullableString(response, 'statuteCitation'),
+    amount: requireNullableString(response, 'amount'),
+    claimsFullFmv: requireNullableBoolean(response, 'claimsFullFmv'),
+    acquiredWithin1215Days: requireNullableBoolean(response, 'acquiredWithin1215Days'),
+    claimed: requireString(response, 'claimed'),
+    knownStatute: requireBoolean(response, 'knownStatute'),
+  };
+}
+
+function assetExemptionFiguresFromJson(response: DecodedResponse): AssetExemptionFigures {
+  const suggestions = childObject(response, 'suggestions');
+  const built: Record<string, string> = {};
+  for (const key of Object.keys(suggestions.json)) {
+    built[key] = requireString(suggestions, key);
+  }
+  return {
+    assetId: requireString(response, 'assetId'),
+    description: requireNullableString(response, 'description'),
+    category: requireNullableString(response, 'category'),
+    currentValue: requireNullableString(response, 'currentValue'),
+    liens: requireString(response, 'liens'),
+    netEquity: requireNullableString(response, 'netEquity'),
+    claimed: requireString(response, 'claimed'),
+    unexempt: requireNullableString(response, 'unexempt'),
+    homesteadCap: requireNullableString(response, 'homesteadCap'),
+    capApplied: requireBoolean(response, 'capApplied'),
+    claims: requireArrayOf(response, 'claims', 'AssetExemptionClaim', assetExemptionClaimFromJson),
+    suggestions: built,
+  };
+}
+
+function exemptionAnalysisFromJson(response: DecodedResponse): ExemptionAnalysis {
+  const source = requireString(response, 'asOfSource');
+  if (source !== 'expected_filing_date' && source !== 'today') {
+    throw malformedField(response, 'asOfSource', "'expected_filing_date' | 'today'");
+  }
+  return {
+    asOf: requireString(response, 'asOf'),
+    asOfSource: source,
+    election: exemptionElectionFromJson(childObject(response, 'election')),
+    entries: requireArrayOf(
+      response,
+      'entries',
+      'ExemptionEntryAvailability',
+      exemptionEntryFromJson,
+    ),
+    limits: requireArrayOf(
+      response,
+      'limits',
+      'StatutoryLimitFigure',
+      statutoryLimitFigureFromJson,
+    ),
+    lookbacks: exemptionLookbacksFromJson(childObject(response, 'lookbacks')),
+    assets: requireArrayOf(
+      response,
+      'assets',
+      'AssetExemptionFigures',
+      assetExemptionFiguresFromJson,
+    ),
+    warnings: requireStringArray(response, 'warnings'),
+    problems: requireStringArray(response, 'problems'),
+  };
+}
+
 function nationalStandardsFiguresFromJson(response: DecodedResponse): NationalStandardsFigures {
   return {
     releaseId: requireString(response, 'releaseId'),
@@ -2776,6 +2960,22 @@ function requireBoolean(response: DecodedResponse, key: string): boolean {
   const value = response.json[key];
   if (typeof value !== 'boolean') {
     throw malformedField(response, key, 'boolean');
+  }
+  return value;
+}
+
+/**
+ * Like {@link requireBoolean}, but JSON `null` is allowed and stays `null` —
+ * an unanswered yes/no on a record (`claims_full_fmv` before the election is
+ * made), mirrored rather than defaulted to `false`.
+ */
+function requireNullableBoolean(response: DecodedResponse, key: string): boolean | null {
+  const value = response.json[key];
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== 'boolean') {
+    throw malformedField(response, key, 'boolean-or-null');
   }
   return value;
 }
