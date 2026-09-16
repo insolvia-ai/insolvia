@@ -144,6 +144,22 @@ describe('the filing spine', () => {
     expect(stage(fresh({ packets: 2, readyToFile: true }), 'packet').state).toBe('done');
   });
 
+  it('sends a petition problem to the petition screen, not intake', () => {
+    // `petitions`/`prior_cases`/`related_cases` moved off the intake screen
+    // (issue #342) — a blocker naming one of them must not link back to a
+    // screen that no longer collects the field, and must not read as an
+    // intake problem either.
+    const stages = filingStages(
+      fresh({ problems: [problem('petitions', 'Fee handling is missing.')] }),
+    );
+
+    expect(stages.find((s) => s.key === 'intake')?.state).not.toBe('blocked');
+    const petition = stages.find((s) => s.key === 'petition');
+    expect(petition?.state).toBe('blocked');
+    expect(petition?.segment).toBe('petition');
+    expect(petition?.note).toBe('Fee handling is missing.');
+  });
+
   it('adds a stage for assets or income ONLY once the gate complains about one', () => {
     // Every Chapter 7 has assets and income, but a spine that listed them from
     // the start would put two permanent grey rows on a case whose intake has

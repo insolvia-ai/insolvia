@@ -125,6 +125,16 @@ class PetitionBody:
     estimated_creditors: str | None = None
     estimated_assets: str | None = None
     estimated_liabilities: str | None = None
+    # NOT a B101 line — the form has no such box. Added for issue #342: the
+    # petition screen computes two statutory dates from it (the §109(h)
+    # 180-day pre-filing counseling window and the §727(a)(8)/§1328(f) 8-year
+    # prior-case lookback), and nothing else in the case model holds a filing
+    # date before the case is actually filed (`case.filed_at` is the real
+    # one, set only once it happens). A calendar fact, not an instant, so it
+    # is a `form_date` like every other date here — never a deadline the
+    # system enforces, only a planning figure the attorney supplies and can
+    # revise as intake continues.
+    expected_filing_date: str | None = None
 
 
 def _hazardous_property(
@@ -195,6 +205,9 @@ def parse_petition(payload: Mapping[str, object]) -> PetitionBody:
             ESTIMATED_DOLLAR_BANDS,
             "estimated_liabilities",
             errors,
+        ),
+        expected_filing_date=form_date(
+            payload.get("expected_filing_date"), "expected_filing_date", errors
         ),
     )
     if errors:

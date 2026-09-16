@@ -52,7 +52,10 @@ export interface StageInput {
  * something, somewhere, was wrong.
  */
 const STAGE_SOURCES: Readonly<Record<string, readonly string[]>> = {
-  intake: ['debtors', 'petitions', 'case', 'prior_cases', 'related_cases'],
+  intake: ['debtors', 'case'],
+  // B101's own screen (issue #342), not intake: a problem here would have
+  // sent someone to a screen that no longer collects the field it names.
+  petition: ['petitions', 'prior_cases', 'related_cases'],
   creditors: ['creditors', 'claims', 'codebtors'],
   assets: ['assets', 'exemptions'],
   income: ['employments', 'income_summaries', 'pay_period_records', 'expenses', 'households'],
@@ -101,6 +104,7 @@ export function filingStages(input: StageInput): readonly Stage[] {
 
   const named = debtors.filter((debtor) => debtor.name !== undefined);
   const intakeBlockers = blockers(problems, 'intake');
+  const petitionBlockers = blockers(problems, 'petition');
   const creditorBlockers = blockers(problems, 'creditors');
   const assetBlockers = blockers(problems, 'assets');
   const incomeBlockers = blockers(problems, 'income');
@@ -185,6 +189,16 @@ export function filingStages(input: StageInput): readonly Stage[] {
 
   // Only shown once the gate has actually complained about them — before that
   // they are noise on a case nobody has started.
+  if (petitionBlockers.length > 0) {
+    stages.push({
+      key: 'petition',
+      label: 'Petition (B101)',
+      segment: 'petition',
+      state: 'blocked',
+      note: petitionBlockers[0]?.message ?? 'Something is missing.',
+      meta: 'blocked',
+    });
+  }
   if (assetBlockers.length > 0) {
     stages.push({
       key: 'assets',
