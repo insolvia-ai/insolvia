@@ -50,6 +50,7 @@ from .form_projections.b106ef import (
 )
 from .form_projections.b106i import monthly_income_line_12
 from .form_projections.b106j import monthly_expenses_line_22c
+from .form_projections.shared import CaseFile, amount
 from .liens import LienFigures, derive_liens
 from .packet_assembly import (
     CaseData,
@@ -73,6 +74,14 @@ class CaseTotals:
     real_estate: Decimal
     personal_property: Decimal
     assets: Decimal
+    #: The plain sum of the case's `exemption_claims` amounts — NOT the
+    #: exemption law's arithmetic (the homestead cap, the full-FMV election
+    #: against § 522(q)). Issue #346 owns that; this is deliberately just a
+    #: sum, per the totals rail's spec (issue 13.3 / #344).
+    total_exempt: Decimal
+    #: `assets` minus `total_exempt`, not floored — an over-claimed
+    #: exemption is a fact worth a negative number showing, not hiding.
+    total_non_exempt: Decimal
     secured: Decimal
     priority_unsecured: Decimal
     nonpriority_unsecured: Decimal
@@ -103,6 +112,21 @@ class CaseSummary:
         return not self.problems
 
 
+def _exempt_total(case_file: CaseFile) -> Decimal:
+    """The plain sum of every `exemption_claims.amount` on the case.
+
+    Deliberately not the exemption law's arithmetic: a `claims_full_fmv`
+    election has no stored dollar figure to sum (it resolves against the
+    asset's value and the statutory cap, which is issue #346's job, not
+    this module's), so it contributes nothing here rather than being
+    estimated. `amount(None)` is `Decimal("0")`, the same convention every
+    other total in this file already uses for an absent figure.
+    """
+    return sum(
+        (amount(exemption.amount) for exemption in case_file.exemptions), Decimal("0")
+    )
+
+
 def summarise(data: CaseData) -> CaseSummary:
     """The summary of one already-loaded case.
 
@@ -121,6 +145,8 @@ def summarise(data: CaseData) -> CaseSummary:
 
     real_estate = real_estate_total(case_file)
     personal_property = personal_property_total(case_file)
+    assets = real_estate + personal_property
+    total_exempt = _exempt_total(case_file)
     secured = secured_total(case_file)
     priority = priority_unsecured_total(case_file)
     nonpriority = nonpriority_unsecured_total(case_file)
@@ -131,7 +157,9 @@ def summarise(data: CaseData) -> CaseSummary:
         totals=CaseTotals(
             real_estate=real_estate,
             personal_property=personal_property,
-            assets=real_estate + personal_property,
+            assets=assets,
+            total_exempt=total_exempt,
+            total_non_exempt=assets - total_exempt,
             secured=secured,
             priority_unsecured=priority,
             nonpriority_unsecured=nonpriority,

@@ -190,6 +190,17 @@ def add_asset(client, case_id, **fields):
     return response.get_json()["id"]
 
 
+def add_exemption(client, case_id, **fields):
+    body = {**fields}
+    response = client.post(
+        f"/v1/cases/{case_id}/exemptions",
+        json={**body, "provenance": dict.fromkeys(body, TYPED)},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
 def summary(client, case_id, subject=ALICE):
     return client.get(f"/v1/cases/{case_id}/summary", headers=auth(subject))
 
@@ -276,6 +287,8 @@ def test_an_empty_case_totals_zero_rather_than_omitting_the_figures(client):
         "realEstate": "0",
         "personalProperty": "0",
         "assets": "0",
+        "totalExempt": "0",
+        "totalNonExempt": "0",
         "secured": "0",
         "priorityUnsecured": "0",
         "nonpriorityUnsecured": "0",
@@ -341,6 +354,66 @@ def test_liabilities_is_the_sum_of_the_three_it_reports(client):
 
     assert totals["priorityUnsecured"] == "50.00"
     assert totals["liabilities"] == "150.00"
+
+
+# ── Exempt / non-exempt totals (issue 13.3 / #344) ──────────────
+
+
+def test_total_exempt_is_the_plain_sum_of_exemption_amounts(client):
+    # NOT the exemption law's arithmetic (the homestead cap, the full-FMV
+    # election) — issue #346 owns that. This is deliberately just a sum.
+    case_id = open_case(client)
+    asset_id = add_asset(
+        client, case_id, value_entire="9000.00", value_portion_owned="9000.00"
+    )
+    add_exemption(client, case_id, asset_id=asset_id, amount="1000.00")
+    add_exemption(client, case_id, asset_id=asset_id, amount="2500.00")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["totalExempt"] == "3500.00"
+
+
+def test_an_election_with_no_typed_amount_contributes_nothing(client):
+    # `claims_full_fmv` has no stored dollar figure to sum; the plain-sum
+    # rule means it is 0 here, not an estimate against the asset's value.
+    case_id = open_case(client)
+    asset_id = add_asset(
+        client, case_id, value_entire="265000.00", value_portion_owned="265000.00"
+    )
+    add_exemption(client, case_id, asset_id=asset_id, claims_full_fmv=True)
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["totalExempt"] == "0"
+
+
+def test_total_non_exempt_is_property_minus_exempt(client):
+    case_id = open_case(client)
+    asset_id = add_asset(
+        client, case_id, value_entire="9000.00", value_portion_owned="9000.00"
+    )
+    add_exemption(client, case_id, asset_id=asset_id, amount="3500.00")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["assets"] == "9000.00"
+    assert totals["totalExempt"] == "3500.00"
+    assert totals["totalNonExempt"] == "5500.00"
+
+
+def test_total_non_exempt_is_not_floored_at_zero(client):
+    # An exemption claimed larger than the property is a fact worth a
+    # negative figure showing, not hiding behind a floor.
+    case_id = open_case(client)
+    asset_id = add_asset(
+        client, case_id, value_entire="1000.00", value_portion_owned="1000.00"
+    )
+    add_exemption(client, case_id, asset_id=asset_id, amount="1500.00")
+
+    totals = summary(client, case_id).get_json()["totals"]
+
+    assert totals["totalNonExempt"] == "-500.00"
 
 
 # ── The lien figures (issue #345) ───────────────────────────────

@@ -10,6 +10,7 @@ import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { AssetsEditor } from './assets';
 import { CollectionEditor } from './collection-editor';
 import { COLLECTION_SPECS } from './collections';
 import { isCommunityPropertyState } from './community-property';
@@ -295,7 +296,18 @@ export function Intake() {
             : ''}
       </Text>
 
-      {spec !== undefined ? (
+      {spec === undefined ? null : spec.collection === 'assets' ? (
+        // The category-driven Schedule A/B screen (issue 13.3 / #344) — its
+        // own component, not `CollectionEditor`, because its field set
+        // changes with the category. `key` remounts it on a section change
+        // for the same reason `CollectionEditor` below does.
+        <AssetsEditor
+          key={spec.collection}
+          caseId={caseId}
+          initialForm={handoff?.collection === spec.collection ? handoff.body : undefined}
+          onOpenCollection={openCollection}
+        />
+      ) : (
         // `key` remounts the editor on a section change so one section's list,
         // form and errors cannot leak into another's.
         <CollectionEditor
@@ -303,9 +315,8 @@ export function Intake() {
           caseId={caseId}
           spec={spec}
           initialForm={handoff?.collection === spec.collection ? handoff.body : undefined}
-          onOpenCollection={openCollection}
         />
-      ) : null}
+      )}
 
       {section === 'debtor' && load.kind === 'ready' ? (
         // The design system's Tabs, not a hand-rolled one. A `Text` with

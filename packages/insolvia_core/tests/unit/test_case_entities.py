@@ -9,6 +9,7 @@ going untested.
 from __future__ import annotations
 
 import pytest
+from insolvia_core.assets import parse_asset
 from insolvia_core.case_collections import COLLECTIONS, RESERVED_SK_NAMESPACES
 from insolvia_core.case_entities import (
     create_entity,
@@ -58,6 +59,11 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
         "value_portion_owned": "9000.00",
         "ownership_interest": "debtor_1",
         "community_property": False,
+        "year": 2016,
+        "make": "Example Motors",
+        "model": "Sedan LX",
+        "mileage": 90000,
+        "includes_personal_information": False,
     },
     "employments": {
         "debtor_id": "d-1",
@@ -474,3 +480,46 @@ def test_a_contract_lease_statement_of_intention_flag_is_a_boolean() -> None:
     with pytest.raises(FieldValidationError) as failure:
         parse_contract_lease({"list_on_statement_of_intention": "yes"})
     assert "list_on_statement_of_intention" in failure.value.fields
+
+
+# ── Assets: the structured vehicle fields and the PII flag (issue #344) ────
+
+
+def test_a_vehicle_year_and_mileage_parse_as_whole_numbers() -> None:
+    body = parse_asset({"category": "vehicle", "year": 2016, "mileage": 92000})
+    assert (body.year, body.mileage) == (2016, 92000)
+
+
+@pytest.mark.parametrize("year", [-1, 2101, "2016", 2016.0, True])
+def test_a_vehicle_year_outside_the_sane_range_is_refused(year: object) -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_asset({"year": year})
+    assert "year" in failure.value.fields
+
+
+@pytest.mark.parametrize("mileage", [-1, 1_000_000, "92000", 92000.0, True])
+def test_a_vehicle_mileage_outside_the_sane_range_is_refused(mileage: object) -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_asset({"mileage": mileage})
+    assert "mileage" in failure.value.fields
+
+
+def test_vehicle_make_and_model_are_single_line_text() -> None:
+    body = parse_asset({"make": "Honda", "model": "Civic LX"})
+    assert (body.make, body.model) == ("Honda", "Civic LX")
+    with pytest.raises(FieldValidationError) as failure:
+        parse_asset({"make": "Honda\nCivic"})
+    assert "make" in failure.value.fields
+
+
+def test_the_pii_flag_is_a_boolean_not_a_string() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_asset({"includes_personal_information": "yes"})
+    assert "includes_personal_information" in failure.value.fields
+    body = parse_asset(
+        {
+            "category": "customer_lists_and_intangibles",
+            "includes_personal_information": True,
+        }
+    )
+    assert body.includes_personal_information is True

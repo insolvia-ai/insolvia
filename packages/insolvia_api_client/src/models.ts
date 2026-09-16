@@ -2171,8 +2171,22 @@ export interface AssetBody {
   readonly ownership_interest?: DebtorAttribution | undefined;
   readonly ownership_interest_description?: string | undefined;
   readonly community_property?: boolean | undefined;
-  /** Category-specific free text: make/model/year, institution, percentage. */
+  /** Category-specific free text: institution and account type, percentage
+   * ownership for an entity interest, and a vehicle's "Other information"
+   * box once its own year/make/model/mileage boxes are filled. */
   readonly detail?: string | undefined;
+  /**
+   * Both vehicle categories only (issue 13.3 / #344) — 106A/B Part 2 prints
+   * these as their own boxes. `mileage` has no box on the
+   * `watercraft_aircraft_or_recreational_vehicle` row and the server simply
+   * never fills it there; it is not that the field is refused.
+   */
+  readonly year?: number | undefined;
+  readonly make?: string | undefined;
+  readonly model?: string | undefined;
+  readonly mileage?: number | undefined;
+  /** `customer_lists_and_intangibles` only — line 43's § 101(41A) question. */
+  readonly includes_personal_information?: boolean | undefined;
 }
 
 /** 106I Part 1: where a debtor works. */
@@ -2756,6 +2770,16 @@ export interface CaseTotals {
   readonly personalProperty: string;
   /** `realEstate` + `personalProperty`. */
   readonly assets: string;
+  /**
+   * The plain sum of the case's exemption claim amounts — NOT the exemption
+   * law's arithmetic (the homestead cap, a "100% of fair market value"
+   * election). Issue #346 owns that; this is deliberately just a sum.
+   */
+  readonly totalExempt: string;
+  /** `assets` minus `totalExempt`, not floored at zero — an exemption
+   * claimed larger than the property is a fact worth a negative figure
+   * showing, not hiding. */
+  readonly totalNonExempt: string;
   readonly secured: string;
   readonly priorityUnsecured: string;
   readonly nonpriorityUnsecured: string;
