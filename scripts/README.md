@@ -11,6 +11,7 @@ Two layers — a shared base plus thin per-package scripts:
 |---|---|---|
 | `scripts/dev-setup.sh` | Shared base (all packages) | Terraform, tflint, AWS CLI, jq, Node.js (>= 24), Watchman, Python 3.12 (+ Docker check), **and the agent skills in `.agents/skills/`** — installed from `skills-lock.json`, not committed (see below) |
 | `scripts/dev-skills.sh` | Agent skills (all checkouts, **worktrees included**) | Makes the skills in `skills-lock.json` present in THIS checkout — both halves: the files under `.agents/skills/` and the `.claude/skills/<name>` symlinks that are what actually make an agent see them. In a **git worktree** it symlinks them from the primary checkout (offline, instant, and it leaves `skills-lock.json` alone); elsewhere, or when the primary has nothing to link, it installs from the network. `--link` never touches the network, `--install` forces a fresh install, `--check` reports. Called by `dev-setup.sh` and by the `SessionStart` hook, so a new worktree repairs itself |
+| `scripts/dev-env-files.sh` | Per-machine `.env` files (**worktrees**) | Makes the four gitignored env files `dev-aws-setup.sh` writes (`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`) present in THIS checkout. In a **git worktree** it symlinks them from the primary checkout — a link, not a copy, so a re-provision in the primary is seen at once; in the primary it only reports. The list is read from the anchored `/<path>/.env` lines in `.gitignore`, which is where a new one is declared. `--link` (default) never overwrites a real file, `--check` reports. Run by the `SessionStart` hook, so a new worktree repairs itself |
 | `scripts/dev-up.sh` | Whole system | Brings the API, mailer, app and marketing site up together in one terminal by delegating to each area's own `dev-up.sh`; prefixed logs, and one Ctrl-C that runs every `dev-down.sh`. Takes no arguments — to run one part, run that part's own script |
 | `scripts/dev-down.sh` | Whole system | Stops everything `dev-up.sh` starts — containers included — for when Ctrl-C never got the chance: a closed terminal, a killed process, or a stack started from **another checkout** (ports and compose project names are machine-global, so one machine runs one stack). Delegates to each area's `dev-down.sh`; idempotent, and also what `dev-up.sh`'s own Ctrl-C trap runs |
 | `scripts/github-packages-auth.sh` | Shared base (npm consumers) | Ensures a `read:packages` token is available as `NODE_AUTH_TOKEN` so `npm ci` can install `@insolvia-ai/design-system` from GitHub Packages |
@@ -74,6 +75,20 @@ repairs itself at the start of the first session in it. To do it by hand:
 
 ```bash
 ./scripts/dev-skills.sh --link
+```
+
+**The per-machine `.env` files are lost the same way**, and repaired the same
+way. `dev-aws-setup.sh` writes this machine's dev-AWS wiring into four
+gitignored files (`services/{api,admin,mcp}/.env`, `apps/insolvia_app/.env`),
+and a worktree starts with none of them. The failure is quieter than the
+skills one: the app's dev server boots with no Cognito domain and shows
+"Sign-in is not configured", and `dev-up.sh` refuses to start the API. The
+same `SessionStart` hook runs `dev-env-files.sh --link`, which symlinks each
+file from the primary checkout — a link, not a copy, so a re-provision there
+is seen here at once. By hand:
+
+```bash
+./scripts/dev-env-files.sh --link
 ```
 
 Three things to know:
