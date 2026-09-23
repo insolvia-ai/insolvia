@@ -223,7 +223,11 @@ export function filingStages(input: StageInput): readonly Stage[] {
   stages.push({
     key: 'packet',
     label: 'Filing packet',
-    segment: 'packet',
+    // Points at the forms hub, not `/packet` itself (issue 13.2 / #343): a
+    // preparer following this row wants to see which forms still need work,
+    // one at a time — assembling the whole packet is the rail's own link,
+    // reached once every row here clears.
+    segment: 'forms',
     ...(packets !== null && packets > 0
       ? {
           state: 'done' as const,

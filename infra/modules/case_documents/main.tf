@@ -294,6 +294,36 @@ resource "aws_s3_bucket_lifecycle_configuration" "documents" {
     }
   }
 
+  # ── Form previews (issue 13.2 / #343) ─────────────────────────
+  # A single-form PDF the forms hub renders synchronously in the API request
+  # (core/forms_hub.py) — not a Document row, not a Packet row, and nothing
+  # here ever lists it back: the client fetches the short-lived URL the
+  # route just minted and shows the PDF, once. NOTHING CLEARS THIS OBJECT
+  # THE WAY THE UPLOAD-CONFIRM ROUTE CLEARS THE TAG ABOVE, because there is
+  # no second step to clear it — a preview render is one request, complete
+  # the moment it returns the URL. So the object is reaped on a plain key
+  # prefix instead of a tag: every preview lives under `form-previews/`, a
+  # top-level prefix of its own precisely so ONE rule can filter on it
+  # without a tag and without touching the packet worker's narrower grant.
+  #
+  # Seven days, not one: a packet re-render is disposable the moment the next
+  # one exists, but a preview is the thing a preparer is actively looking at
+  # while fixing a form the hub flagged — a short TTL here would expire a URL
+  # still open in a browser tab, not merely an abandoned one. Configurable
+  # because it is a judgement call about how long "still looking at it" is,
+  # not a security boundary; every environment gets the same default because
+  # none of them has a different answer for what that means yet.
+  rule {
+    id     = "expire-form-previews"
+    status = "Enabled"
+    filter {
+      prefix = "form-previews/"
+    }
+    expiration {
+      days = var.form_preview_ttl_days
+    }
+  }
+
   # Ordering: S3 rejects a lifecycle configuration on a bucket whose versioning
   # is still settling.
   depends_on = [aws_s3_bucket_versioning.documents]

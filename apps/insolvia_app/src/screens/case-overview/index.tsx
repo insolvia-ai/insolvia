@@ -220,7 +220,12 @@ export function CaseOverview() {
           >
             <View style={styles.spine}>
               {stages.map((stage, index) => (
-                <StageRow key={stage.key} stage={stage} last={index === stages.length - 1} />
+                <StageRow
+                  key={stage.key}
+                  stage={stage}
+                  last={index === stages.length - 1}
+                  caseId={caseId}
+                />
               ))}
             </View>
           </Section>
@@ -368,9 +373,10 @@ function Section({ title, meta, children }: { title: string; meta?: string; chil
  * column, and the sentence underneath — because colour alone is not a status.
  * A reader who cannot use the hue still gets "blocked" and the reason.
  */
-function StageRow({ stage, last }: { stage: Stage; last: boolean }) {
+function StageRow({ stage, last, caseId }: { stage: Stage; last: boolean; caseId: string }) {
   const theme = useTheme();
   const tone = stageTone(stage.state, theme.colors);
+  const labelColor = { color: stage.state === 'idle' ? theme.colors.muted : theme.colors.ink };
 
   return (
     <View style={styles.stage}>
@@ -385,17 +391,30 @@ function StageRow({ stage, last }: { stage: Stage; last: boolean }) {
       </View>
 
       <View style={styles.stageBody}>
-        <Text
-          style={[
-            styles.stageLabel,
-            {
-              color: stage.state === 'idle' ? theme.colors.muted : theme.colors.ink,
-              fontFamily: theme.typography.body,
-            },
-          ]}
-        >
-          {stage.label}
-        </Text>
+        {/* Only the filing-packet row links out today (issue 13.2 / #343),
+            to the forms hub its `segment` now names — the other stages'
+            `segment` is read by nothing yet, which is a separate, larger
+            change (every row becoming a real `<a href>`, cases/index.tsx's
+            own reason for using `Link` over a pressable) this issue does not
+            ask for. */}
+        {stage.key === 'packet' && stage.segment !== undefined ? (
+          <Link
+            href={`/cases/${caseId}/${stage.segment}`}
+            aria-label={`${stage.label} — go to the forms hub`}
+            style={[
+              styles.stageLabel,
+              styles.stageLabelLink,
+              labelColor,
+              { fontFamily: theme.typography.body },
+            ]}
+          >
+            {stage.label}
+          </Link>
+        ) : (
+          <Text style={[styles.stageLabel, labelColor, { fontFamily: theme.typography.body }]}>
+            {stage.label}
+          </Text>
+        )}
         <Text
           style={[
             styles.stageNote,
@@ -644,6 +663,9 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.label,
     fontWeight: '600',
     lineHeight: fontSizes.label * 1.5,
+  },
+  stageLabelLink: {
+    textDecorationLine: 'underline',
   },
   stageLine: {
     bottom: 0,
