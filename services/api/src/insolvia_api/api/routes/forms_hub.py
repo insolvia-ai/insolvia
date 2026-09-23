@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access_log import record_access
 from insolvia_core.documents import expiry_timestamp
@@ -51,6 +51,10 @@ from insolvia_core.ports import (
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
+from insolvia_api.core.form_overlay import (
+    output_options_json,
+    parse_output_options_query,
+)
 from insolvia_api.core.forms_hub import (
     FormSummary,
     form_metric_json,
@@ -182,8 +186,15 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
     if series_id not in packet_form_series(data):
         raise NotFoundError("form not found")
 
-    today = datetime.now(UTC).date()
-    outcome = render_form_preview(data, series_id, as_of=today)
+    # Output options (issue 13.11): the query-string spelling of the same
+    # OutputOptions packet assembly's job body carries. `allow_forms=False`
+    # inside parse_output_options_query — this route already names one form.
+    options = parse_output_options_query(request.args)
+
+    now = datetime.now(UTC)
+    outcome = render_form_preview(
+        data, series_id, as_of=now.date(), options=options, printed_at=now
+    )
 
     if isinstance(outcome, tuple):
         problems: tuple[PacketProblem, ...] = outcome
@@ -193,7 +204,15 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
             "form preview blocked",
             extra={"case_id": case.id, "series": series_id, "problems": len(problems)},
         )
-        return jsonify({"problems": [problem_json(p) for p in problems]}), 200
+        return (
+            jsonify(
+                {
+                    "problems": [problem_json(p) for p in problems],
+                    "options": output_options_json(options),
+                }
+            ),
+            200,
+        )
 
     content = outcome
     storage_ref = form_preview_object_key(case.id, new_preview_id())
@@ -211,6 +230,7 @@ def form_preview_route(case_id: str, form: str) -> ResponseReturnValue:
                 "method": "GET",
                 "expiresAt": expiry_timestamp(DOWNLOAD_URL_TTL_SECONDS),
                 "problems": [],
+                "options": output_options_json(options),
             }
         ),
         200,

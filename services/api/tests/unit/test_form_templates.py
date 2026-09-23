@@ -278,6 +278,7 @@ def _write_release(root: Path, **overrides: object) -> Path:
         "title": "Test form",
         "revision": "01/26",
         "effective_date": "2026-01-01",
+        "signature_pages": [],
         "parts": [],
         "fields": [
             {
@@ -422,6 +423,11 @@ def test_a_wellformed_release_loads(tmp_path: Path) -> None:
             "unknown PDF field",
             id="claim-resolves-nowhere",
         ),
+        pytest.param(
+            {"spec": {"signature_pages": [1]}},
+            "signature_pages",
+            id="signature-pages-mismatch",
+        ),
     ],
 )
 def test_malformed_releases_are_refused(
@@ -430,6 +436,59 @@ def test_malformed_releases_are_refused(
     _write_release(tmp_path, **overrides)
     with pytest.raises(ValueError, match=problem):
         load_form_registry(tmp_path)
+
+
+def test_signature_pages_carries_through_the_loader(tmp_path: Path) -> None:
+    """A form with a signature-type field records the pages its widget lands
+    on — core/form_overlay.py's signature-page selection (issue 13.11) reads
+    exactly this, never re-deriving it from the fields itself."""
+    release_dir = _write_release(
+        tmp_path,
+        acroform={
+            "fields": [
+                {"name": "Debtor name", "kind": "text", "pages": [1]},
+                {
+                    "name": "Chapter",
+                    "kind": "radio",
+                    "pages": [1],
+                    "states": ["7", "13"],
+                },
+                {"name": "Debtor sig", "kind": "text", "pages": [2]},
+                {"name": "Button.Print", "kind": "pushbutton", "pages": [1]},
+            ]
+        },
+        spec={
+            "signature_pages": [2],
+            "fields": [
+                {
+                    "id": "debtor_name",
+                    "label": "Name",
+                    "type": "text",
+                    "maps_to": {"entity": "debtor", "attribute": "name"},
+                    "pdf": {"names": ["Debtor name"]},
+                },
+                {
+                    "id": "chapter",
+                    "label": "Chapter",
+                    "type": "radio",
+                    "options": [{"value": "7"}, {"value": "13"}],
+                    "maps_to": {"entity": "case", "attribute": "chapter"},
+                    "pdf": {"names": ["Chapter"]},
+                },
+                {
+                    "id": "debtor_signature",
+                    "label": "Signature of Debtor 1",
+                    "type": "signature",
+                    "maps_to": {"unmapped": "wet-signature line"},
+                    "pdf": {"names": ["Debtor sig"]},
+                },
+            ],
+        },
+    )
+    registry = load_form_registry(tmp_path)
+    (release,) = registry["form/b900"]
+    assert release.signature_pages == (2,)
+    assert release_dir.exists()
 
 
 def test_radio_options_must_match_the_pdf_states(tmp_path: Path) -> None:

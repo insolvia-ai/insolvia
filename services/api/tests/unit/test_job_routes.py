@@ -342,6 +342,93 @@ def test_extraction_idempotency_is_per_document(access_log, job_store, job_queue
     assert len(job_store.list_for_case(case_id)) == 2
 
 
+# ── Output-options accepts (packet assembly, issue 13.11) ──────
+
+
+def accept_packet_assembly(client, case_id, options=None, subject=ALICE):
+    body: dict = {"kind": "packet_assembly"}
+    if options is not None:
+        body["options"] = options
+    return client.post(f"/v1/cases/{case_id}/jobs", json=body, headers=auth(subject))
+
+
+def test_packet_assembly_with_no_options_stores_the_plain_defaults(client, job_store):
+    # An options-scoped kind always gets a canonical options object, even
+    # when the client sent none — "the plain filing set" is itself a fact
+    # worth recording, not an absence.
+    case_id = open_case(client)
+    body = accept_packet_assembly(client, case_id).get_json()
+    assert body["options"] == {
+        "draftWatermark": False,
+        "printDate": False,
+        "signaturePages": "all",
+        "signElectronically": False,
+    }
+    assert job_store.get(case_id, body["id"]).options == body["options"]
+
+
+def test_packet_assembly_options_are_canonicalised_and_stored(client, job_store):
+    case_id = open_case(client)
+    body = accept_packet_assembly(
+        client, case_id, options={"draftWatermark": True}
+    ).get_json()
+    # Every key present, defaults filled in — never the client's partial body.
+    assert body["options"] == {
+        "draftWatermark": True,
+        "printDate": False,
+        "signaturePages": "all",
+        "signElectronically": False,
+    }
+    assert job_store.get(case_id, body["id"]).options == body["options"]
+
+
+def test_an_unknown_form_in_the_subset_is_rejected(client):
+    case_id = open_case(client)
+    response = accept_packet_assembly(
+        client, case_id, options={"forms": ["b101", "not-a-real-form"]}
+    )
+    assert response.status_code == 400
+
+
+def test_a_malformed_options_shape_is_rejected_per_field(client):
+    case_id = open_case(client)
+    response = accept_packet_assembly(
+        client, case_id, options={"signaturePages": "sideways"}
+    )
+    assert response.status_code == 400
+    assert "signaturePages" in response.get_json()["fields"]
+
+
+def test_options_on_a_kind_that_does_not_take_them_is_rejected(client):
+    case_id = open_case(client)
+    response = client.post(
+        f"/v1/cases/{case_id}/jobs",
+        json={"kind": "echo", "options": {"draftWatermark": True}},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+
+
+def test_idempotency_is_scoped_per_options(client, job_store):
+    # A plain filing-set assembly and a draft assembly in flight at once are
+    # two jobs, not a duplicate — the same argument the document-scoped
+    # kinds' per-document idempotency makes.
+    case_id = open_case(client)
+    plain = accept_packet_assembly(client, case_id).get_json()
+    draft = accept_packet_assembly(
+        client, case_id, options={"draftWatermark": True}
+    ).get_json()
+    repeat_plain = accept_packet_assembly(client, case_id).get_json()
+    repeat_draft = accept_packet_assembly(
+        client, case_id, options={"draftWatermark": True}
+    ).get_json()
+
+    assert plain["id"] != draft["id"]
+    assert repeat_plain["id"] == plain["id"]
+    assert repeat_draft["id"] == draft["id"]
+    assert len(job_store.list_for_case(case_id)) == 2
+
+
 def test_a_repeat_accept_returns_the_active_job_not_a_duplicate(
     client, job_store, job_queue
 ):

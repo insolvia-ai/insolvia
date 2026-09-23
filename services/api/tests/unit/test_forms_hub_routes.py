@@ -9,6 +9,7 @@ fake; this repo is public.
 
 from __future__ import annotations
 
+import io
 import time
 
 import jwt
@@ -27,6 +28,7 @@ from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.firms import Firm, FirmUser, default_permissions
+from pypdf import PdfReader
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -318,3 +320,58 @@ def test_the_preview_is_access_logged(client, stores):
         e.action == "form_preview.render" and e.case_id == case_id
         for e in stores["access_log"].events
     )
+
+
+# ── Output options (issue 13.11) ─────────────────────────────────
+
+
+def test_no_query_params_echo_the_default_options(client):
+    case_id = open_case(client)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b101/preview", headers=auth(ALICE)
+    )
+    assert response.get_json()["options"] == {
+        "draftWatermark": False,
+        "printDate": False,
+        "signaturePages": "all",
+        "signElectronically": False,
+    }
+
+
+def test_query_params_are_validated_and_echoed_back(client, stores):
+    case_id = open_case(client)
+    add_debtor_1(client, case_id)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b106g/preview?draftWatermark=true&printDate=true",
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["options"] == {
+        "draftWatermark": True,
+        "printDate": True,
+        "signaturePages": "all",
+        "signElectronically": False,
+    }
+    ((_, content),) = stores["blobs"].contents.items()
+    assert "DRAFT" in PdfReader(io.BytesIO(content)).pages[0].extract_text()
+
+
+def test_an_invalid_signature_pages_query_value_is_a_400(client):
+    case_id = open_case(client)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b101/preview?signaturePages=sideways",
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+
+
+def test_a_forms_query_param_is_refused_on_the_preview_route(client):
+    # The preview already names one form in the URL — a subset selection
+    # belongs to packet assembly, not here.
+    case_id = open_case(client)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b101/preview?forms=b101",
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400

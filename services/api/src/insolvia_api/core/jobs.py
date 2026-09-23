@@ -103,6 +103,17 @@ class Job:
     # bytes from the store, so nothing case-shaped arrives by request body —
     # the rule parse_job_acceptance states survives intact.
     document_id: str | None = None
+    # The output options (issue 13.11) an OPTIONS_SCOPED_KINDS kind was
+    # accepted with — the packet-assembly job's `core.form_overlay
+    # .OutputOptions`, ALREADY VALIDATED and canonicalised (every key
+    # present, defaults filled in) by the route before `new_job` stamped it,
+    # stored here as the plain JSON shape `output_options_json` produces
+    # rather than that class itself: this module stays dependency-free of
+    # form_overlay (and the pypdf chain behind it), exactly as it stays free
+    # of Flask and boto3. The worker re-parses it with
+    # `form_overlay.parse_output_options`, which is a re-validation of
+    # already-good data, not a new decision.
+    options: dict[str, Any] | None = None
     attempts: int = 0
     failure: JobFailure | None = None
     result: dict[str, Any] | None = None
@@ -164,19 +175,31 @@ KINDS = (*WORKERS, "packet_assembly", "petition_review", "document_extraction")
 # identifier nothing will read.
 DOCUMENT_SCOPED_KINDS = frozenset({"document_extraction"})
 
+# The kinds that take output options (issue 13.11, core/form_overlay.py):
+# packet assembly today. `options` is accepted (and, like documentId, refused
+# for every other kind) exactly for these — the SHAPE is validated by the
+# route (which owns form_overlay's dependency chain, kept out of this
+# module); this layer only decides whether the key belongs on this kind.
+OPTIONS_SCOPED_KINDS = frozenset({"packet_assembly"})
+
 
 # ── Validation and identity ─────────────────────────────────────
 
 
-def parse_job_acceptance(payload: Mapping[str, object]) -> tuple[str, str | None]:
+def parse_job_acceptance(
+    payload: Mapping[str, object],
+) -> tuple[str, str | None, dict[str, object] | None]:
     """Validate POST /v1/cases/<id>/jobs. Unknown keys are ignored.
 
-    `kind` always; `documentId` exactly when the kind is document-scoped.
-    There is still no client-supplied payload: `documentId` is an identifier
-    naming which stored record to work on — the worker reads the record and
-    the bytes from the store, so no case data arrives by request body. The
-    route must resolve it against the case before enqueueing, exactly as it
-    resolves the case itself.
+    `kind` always; `documentId` exactly when the kind is document-scoped;
+    `options` (a JSON object, structurally — its FIELDS are the route's
+    business via `form_overlay.parse_output_options`) exactly when the kind
+    is options-scoped. There is still no client-supplied payload beyond that:
+    `documentId` is an identifier naming which stored record to work on — the
+    worker reads the record and the bytes from the store — and `options` is
+    output shaping, not case data; neither reaches a store write here. The
+    route must resolve `documentId` against the case before enqueueing,
+    exactly as it resolves the case itself.
     """
     kind = payload.get("kind")
     if not isinstance(kind, str) or kind not in KINDS:
@@ -189,20 +212,41 @@ def parse_job_acceptance(payload: Mapping[str, object]) -> tuple[str, str | None
             raise FieldValidationError(
                 {"documentId": "This kind works on one document; name it."}
             )
-        return kind, document_id.strip()
-    if document_id is not None:
+        document_id = document_id.strip()
+    elif document_id is not None:
         raise FieldValidationError(
             {"documentId": "This kind does not take a documentId."}
         )
-    return kind, None
+    else:
+        document_id = None
+
+    raw_options = payload.get("options")
+    if kind in OPTIONS_SCOPED_KINDS:
+        if raw_options is not None and not isinstance(raw_options, dict):
+            raise FieldValidationError({"options": "options must be a JSON object."})
+        options = dict(raw_options) if isinstance(raw_options, dict) else None
+    elif raw_options is not None:
+        raise FieldValidationError({"options": "This kind does not take options."})
+    else:
+        options = None
+
+    return kind, document_id, options
 
 
 def new_job(
-    kind: str, *, case_id: str, created_by: str, document_id: str | None = None
+    kind: str,
+    *,
+    case_id: str,
+    created_by: str,
+    document_id: str | None = None,
+    options: dict[str, Any] | None = None,
 ) -> Job:
     """A freshly accepted job. Both scoping fields come from the caller's
     resolved accessor and the route's case lookup, never the request body —
-    and `document_id` only after the route resolved it against the case."""
+    `document_id` only after the route resolved it against the case, and
+    `options` only after the route validated and canonicalised it with
+    `form_overlay.parse_output_options` (so every stored options object has
+    every key, defaults filled in — never the client's partial payload)."""
     now = _timestamp()
     return Job(
         id=str(uuid.uuid4()),
@@ -213,23 +257,32 @@ def new_job(
         created_at=now,
         updated_at=now,
         document_id=document_id,
+        options=options,
     )
 
 
 def find_active(
-    jobs: tuple[Job, ...], kind: str, *, document_id: str | None = None
+    jobs: tuple[Job, ...],
+    kind: str,
+    *,
+    document_id: str | None = None,
+    options: dict[str, Any] | None = None,
 ) -> Job | None:
     """The queued-or-running job of this kind, if any — the accept endpoint's
     idempotency rule. One active job per (case, kind) — per (case, kind,
     document) for the document-scoped kinds, because extracting two different
-    uploads concurrently is two jobs, not a duplicate. A client that cannot
-    tell whether its first request landed re-POSTs and gets the same job back
-    rather than a duplicate pipeline run."""
+    uploads concurrently is two jobs, not a duplicate; per (case, kind,
+    options) for the options-scoped kinds, for the same reason — a draft
+    assembly already in flight must not swallow a filing-set request that
+    lands while it runs, and vice versa. A client that cannot tell whether
+    its first request landed re-POSTs and gets the same job back rather than
+    a duplicate pipeline run."""
     for job in jobs:
         if (
             job.kind == kind
             and job.status in ACTIVE_STATUSES
             and job.document_id == document_id
+            and job.options == options
         ):
             return job
     return None
@@ -299,6 +352,8 @@ def job_item(job: Job) -> dict[str, Any]:
     }
     if job.document_id is not None:
         item["documentId"] = job.document_id
+    if job.options is not None:
+        item["options"] = job.options
     if job.failure is not None:
         item["failure"] = {
             "category": job.failure.category,
@@ -325,6 +380,8 @@ def job_from_item(item: Mapping[str, Any]) -> Job:
         raw_result = item.get("result")
         result = dict(raw_result) if isinstance(raw_result, Mapping) else None
         raw_document_id = item.get("documentId")
+        raw_options = item.get("options")
+        options = dict(raw_options) if isinstance(raw_options, Mapping) else None
         return Job(
             id=str(item["id"]),
             case_id=str(item["caseId"]),
@@ -334,6 +391,7 @@ def job_from_item(item: Mapping[str, Any]) -> Job:
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
             document_id=str(raw_document_id) if raw_document_id is not None else None,
+            options=options,
             attempts=int(item["attempts"]),
             failure=failure,
             result=result,
@@ -359,6 +417,8 @@ def job_json(job: Job) -> dict[str, object]:
     }
     if job.document_id is not None:
         body["documentId"] = job.document_id
+    if job.options is not None:
+        body["options"] = job.options
     if job.failure is not None:
         body["failure"] = {
             "category": job.failure.category,

@@ -4,6 +4,9 @@
  "title": "Statement About Your Social Security Numbers",
  "revision": "12/15",
  "effective_date": "2015-12-01",
+ "signature_pages": [
+  1
+ ],
  "parts": [
   {"number": 1, "title": "Tell the Court About Yourself and Your Spouse if Your Spouse is Filing With You"},
   {"number": 2, "title": "Tell the Court About all of Your Social Security or Federal Individual Taxpayer Identification Numbers"},

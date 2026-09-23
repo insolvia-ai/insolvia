@@ -96,6 +96,13 @@ over — and requires every box name to be unique and every page to exist.
   "official_number": "106I",
   "revision": "12/15",          // must match the dump
   "effective_date": "2015-12-01",
+  "signature_pages": [7, 8],    // 1-based PDF pages carrying a "signature"-type
+                                 // field's widget — [] when the form has none.
+                                 // check.py derives the same set from the
+                                 // fields below and refuses a mismatch, so
+                                 // this stays data the forms engine (13.11's
+                                 // signature-page selection) can trust without
+                                 // re-deriving it from every field's widgets.
   "parts": [ {"number": 1, "title": "…"} ],
   "fields": [
     {

@@ -10,15 +10,17 @@ the closest a unit suite gets to the issue's own definition of done.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import zipfile
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
+from insolvia_api.core.form_overlay import OutputOptions
 from insolvia_api.core.form_templates import form_revisions_as_of
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
@@ -64,6 +66,7 @@ from insolvia_core.petitions import (
     SOLE_PROPRIETORSHIP,
 )
 from insolvia_core.sofa import SOFA_ENTRY
+from pypdf import PdfReader
 
 from tests.unit.test_form_projections import REFERENCE_CASE, reference_case_file
 
@@ -371,6 +374,126 @@ def test_the_zip_carries_fixed_timestamps():
     archive = zipfile.ZipFile(io.BytesIO(packet_zip(outcome.parts)))
     assert all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist())
     assert archive.namelist() == [name for name, _ in outcome.parts]
+
+
+# ── Output options (issue 13.11) ─────────────────────────────────
+
+
+# Pinned exactly as core/form_fill.py's own goldens pin a sha256 (this
+# module's docstring, "byte-exact"): computed from assemble()'s output BEFORE
+# core/form_overlay.py existed, and re-verified against the base commit this
+# feature branched from — most recently #383 (B108/B121/B2010/B2030 joining
+# the Chapter 7 packet), which changed the plain set's own form list and
+# order, so the golden moved with it. A change to that hash means the plain,
+# unwatermarked render moved — which issue 13.11 promises never happens.
+PLAIN_PACKET_SHA256 = "a65c29236ad1f91123aa5ecad60e8113ccfa3f8a876ce2cd7ae430facf6fdb45"
+
+
+def test_output_options_default_to_the_plain_filing_set():
+    """assemble() with NO options at all, and assemble() with an explicit
+    OutputOptions() (every option off), must produce the exact same bytes —
+    the default IS the plain filing set, not an approximation of it."""
+    without_options = assemble(reference_case_data(), as_of=TODAY)
+    with_default_options = assemble(
+        reference_case_data(), as_of=TODAY, options=OutputOptions()
+    )
+    assert isinstance(without_options, AssembledPacket)
+    assert isinstance(with_default_options, AssembledPacket)
+    assert packet_zip(without_options.parts) == packet_zip(with_default_options.parts)
+
+
+def test_the_plain_packet_bytes_are_unchanged_by_output_options():
+    """The done-when of issue 13.11: the unwatermarked packet's bytes must be
+    unchanged. Renders the SAME reference case and compares the plain bytes
+    to the pinned golden above — the same case, with no options requested,
+    still produces exactly what it always did."""
+    outcome = assemble(reference_case_data(), as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    assert hashlib.sha256(packet_zip(outcome.parts)).hexdigest() == PLAIN_PACKET_SHA256
+
+
+def test_a_draft_watermark_changes_the_bytes_but_not_the_form_set():
+    plain = assemble(reference_case_data(), as_of=TODAY)
+    draft = assemble(
+        reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(draft_watermark=True, print_date=True),
+        printed_at=datetime(2026, 9, 3, 14, 30, tzinfo=UTC),
+    )
+    assert isinstance(plain, AssembledPacket)
+    assert isinstance(draft, AssembledPacket)
+    assert packet_zip(plain.parts) != packet_zip(draft.parts)
+    # Same forms, same order, same pins — only the pages themselves differ.
+    assert [name for name, _ in plain.parts] == [name for name, _ in draft.parts]
+    assert plain.form_revisions == draft.form_revisions
+    b101 = next(content for name, content in draft.parts if name == "01-b101.pdf")
+    text = PdfReader(io.BytesIO(b101)).pages[0].extract_text()
+    assert "DRAFT" in text
+    assert "Printed 2026-09-03 14:30 UTC" in text
+
+
+def test_signature_pages_only_narrows_every_form_to_its_signature_block():
+    outcome = assemble(
+        reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(signature_pages="only"),
+    )
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    # A form with no signature line of its own (every schedule) drops out
+    # entirely; B101 keeps only its three signature pages (7, 8, 9).
+    assert "01-b101.pdf" in names
+    assert not any("b106ab" in name for name in names)
+    assert not any("b106j" in name for name in names)
+    assert names[-1] == MATRIX_FILE_NAME  # plain text, untouched by page selection
+    b101 = next(content for name, content in outcome.parts if name == "01-b101.pdf")
+    assert len(PdfReader(io.BytesIO(b101)).pages) == 3
+
+
+def test_sign_electronically_fills_the_debtor_signature_line():
+    outcome = assemble(
+        reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(sign_electronically=True, print_date=True),
+        printed_at=datetime(2026, 9, 3, 14, 30, tzinfo=UTC),
+    )
+    assert isinstance(outcome, AssembledPacket)
+    b101 = next(content for name, content in outcome.parts if name == "01-b101.pdf")
+    fields = PdfReader(io.BytesIO(b101)).get_fields()
+    assert fields is not None
+    # Ada Quinn Lovelace — the reference case's Debtor 1 (test_form_projections).
+    assert fields["Debtor1.signature"].value == "/s/ Ada Quinn Lovelace"
+    assert fields["Executed on"].value == "09/03/2026"
+    # The attorney's own signature line is left wet — this feature signs on
+    # a DEBTOR's behalf, never an attorney's.
+    assert fields["Attorney.Sig"].value in (None, "")
+
+
+def test_a_subset_of_forms_renders_only_those_forms():
+    outcome = assemble(
+        reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(forms=("b101", "b106i")),
+    )
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    assert names == ["01-b101.pdf", "10-b106i.pdf", MATRIX_FILE_NAME]
+    # The pin map is unaffected by a print selection — it always pins the
+    # whole set the case actually files.
+    assert outcome.form_revisions == form_revisions_as_of(TODAY)
+
+
+def test_an_unfiled_form_named_in_the_subset_is_a_problem():
+    # The reference case keeps no separate household for Debtor 2, so J-2
+    # is not part of this case's own set — naming it is a stale selection,
+    # not a silent no-op.
+    outcome = assemble(
+        reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(forms=("b106j2",)),
+    )
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(p.source == "form/b106j2" for p in outcome)
 
 
 # ── The worker, end to end on the memory adapters ───────────────

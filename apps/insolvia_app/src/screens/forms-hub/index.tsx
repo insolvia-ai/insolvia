@@ -8,6 +8,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import {
+  DEFAULT_OUTPUT_OPTIONS,
+  OutputOptionsPanel,
+  outputOptionsRequestFrom,
+  type OutputOptionsValue,
+} from '@/components/output-options-panel';
 import { openDownload } from '@/screens/documents/browser';
 // NOT an assets/exemptions/means-test screen edit — `formatMoney` is a
 // read-only import of a helper those screens already export and share
@@ -116,6 +122,12 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
   const [busySeries, setBusySeries] = useState<string | null>(null);
   const [activity, setActivity] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  // Output options (issue 13.11): one panel for the whole screen, applied to
+  // whichever row's "Preview" is next pressed — the same options a preview
+  // renders with are exactly what a subsequent packet assembly would use for
+  // that form, so one shared control is truer to the pipeline than a
+  // per-row copy of the same four settings.
+  const [options, setOptions] = useState<OutputOptionsValue>(DEFAULT_OUTPUT_OPTIONS);
 
   const load = useCallback(async () => {
     try {
@@ -137,7 +149,9 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
     setActivity('');
     setBusySeries(form.series);
     try {
-      const result = await call((client) => client.getCaseFormPreview(caseId, form.form));
+      const result = await call((client) =>
+        client.getCaseFormPreview(caseId, form.form, outputOptionsRequestFrom(options)),
+      );
       if (result.ok) {
         if (result.value.problems.length > 0) {
           setActionError(
@@ -177,6 +191,8 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
         totals, and a PDF preview of exactly what would print — without assembling the whole filing
         packet.
       </Text>
+
+      <OutputOptionsPanel value={options} onChange={setOptions} disabled={busySeries !== null} />
 
       <Text aria-live="polite" style={[styles.status, muted]}>
         {activity}

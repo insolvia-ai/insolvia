@@ -4,6 +4,7 @@ object key — mirroring test_documents.py for the sibling record."""
 from __future__ import annotations
 
 import pytest
+from insolvia_api.core.form_overlay import OutputOptions
 from insolvia_api.core.packets import (
     PACKET_CONTENT_TYPE,
     PACKET_FILE_NAME,
@@ -86,3 +87,40 @@ def test_list_order_is_creation_order_with_id_tiebreak():
     second = make_packet()
     ordered = sorted([second, first], key=list_order)
     assert ordered[0].created_at <= ordered[1].created_at
+
+
+# ── Output options (issue 13.11) ─────────────────────────────────
+
+
+def test_a_packet_with_no_options_argument_is_the_plain_filing_set():
+    packet = make_packet()
+    assert packet.options == OutputOptions()
+
+
+def test_options_round_trip_through_the_stored_item():
+    packet = make_packet(
+        options=OutputOptions(draft_watermark=True, forms=("b101", "b106i"))
+    )
+    item = packet_item(packet)
+    assert item["options"] == {
+        "draftWatermark": True,
+        "printDate": False,
+        "signaturePages": "all",
+        "signElectronically": False,
+        "forms": ["b101", "b106i"],
+    }
+    assert packet_from_item(item) == packet
+
+
+def test_a_packet_written_before_issue_13_11_reads_as_the_plain_filing_set():
+    # No "options" key at all — every packet this service ever wrote before
+    # this feature existed. Loading it must not fail, and must read as
+    # exactly the filing set it always was.
+    item = packet_item(make_packet())
+    del item["options"]
+    assert packet_from_item(item).options == OutputOptions()
+
+
+def test_the_json_shape_always_carries_options():
+    body = packet_json(make_packet(options=OutputOptions(signature_pages="only")))
+    assert body["options"]["signaturePages"] == "only"

@@ -7,6 +7,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import {
+  DEFAULT_OUTPUT_OPTIONS,
+  OutputOptionsPanel,
+  outputOptionsRequestFrom,
+  type FormsSubsetOption,
+  type OutputOptionsValue,
+} from '@/components/output-options-panel';
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -196,6 +203,22 @@ function describeSource(source: string): string {
   return labels[source] ?? source.replace(/_/g, ' ');
 }
 
+/**
+ * A short label for a non-default packet's options (issue 13.11) — "so a
+ * draft is distinguishable from a filing set after the fact" applied to the
+ * list row, not just the stored record. `null` for the plain filing set,
+ * which the row's absence of a badge already says.
+ */
+function describePacketOptions(options: Packet['options']): string | null {
+  const labels: string[] = [];
+  if (options.draftWatermark) labels.push('Draft');
+  if (options.signaturePages === 'only') labels.push('Signature pages only');
+  if (options.signaturePages === 'omit') labels.push('Signature pages omitted');
+  if (options.signElectronically) labels.push('/s/ signed');
+  if (options.forms !== undefined) labels.push('Partial set');
+  return labels.length > 0 ? labels.join(' · ') : null;
+}
+
 function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -242,6 +265,15 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   const [activity, setActivity] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Output options (issue 13.11): a draft watermark, the printed date,
+  // signature-page selection, `/s/` electronic signatures, and — via
+  // `formOptions`/`selectedForms` — a chosen subset of the case's own filed
+  // forms. `formOptions` is loaded alongside the packet list so the subset
+  // checklist can name real forms rather than a hard-coded guess.
+  const [options, setOptions] = useState<OutputOptionsValue>(DEFAULT_OUTPUT_OPTIONS);
+  const [formOptions, setFormOptions] = useState<readonly FormsSubsetOption[]>([]);
+  const [selectedForms, setSelectedForms] = useState<readonly string[] | undefined>(undefined);
+
   const load = useCallback(async () => {
     try {
       const result = await call((client) => client.listCasePackets(caseId));
@@ -253,9 +285,33 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     }
   }, [call, caseId]);
 
+  // The forms-subset checklist's own load, kept independent of the packet
+  // list's: a case whose forms hub is momentarily unreachable must not take
+  // the packet list down with it — it just means "print a subset" offers no
+  // subset this load, and the plain "Assemble packet" button still works.
+  const loadFormOptions = useCallback(async () => {
+    try {
+      const result = await call((client) => client.listCaseForms(caseId));
+      if (result.ok) {
+        setFormOptions(
+          result.value.map((form) => ({
+            value: form.form,
+            label: form.officialNumber !== '' ? form.officialNumber : form.title,
+          })),
+        );
+      }
+    } catch {
+      // No subset checklist this load; the plain assemble path is unaffected.
+    }
+  }, [call, caseId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadFormOptions();
+  }, [loadFormOptions]);
 
   const settle = useCallback(
     (job: Job) => {
@@ -324,7 +380,20 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     setActionError(null);
     setActivity('Assembling the filing packet…');
     try {
-      const result = await call((client) => client.acceptCaseJob(caseId, 'packet_assembly'));
+      const outputOptions = {
+        ...outputOptionsRequestFrom(options),
+        ...(selectedForms === undefined ? {} : { forms: selectedForms }),
+      };
+      // Omitted entirely — not sent as `{}` — when nothing was asked for, so
+      // the plain "Assemble packet" press still sends exactly `{kind}`, the
+      // same body it always has.
+      const result = await call((client) =>
+        client.acceptCaseJob(
+          caseId,
+          'packet_assembly',
+          Object.keys(outputOptions).length > 0 ? { outputOptions } : undefined,
+        ),
+      );
       if (result.ok) {
         // 202 either way: a fresh job, or the one already in flight — the
         // API's one-active-job rule makes re-pressing the button safe.
@@ -452,6 +521,17 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
         what to fix rather than producing a partial packet.
       </Text>
 
+      <OutputOptionsPanel
+        value={options}
+        onChange={setOptions}
+        disabled={assembly.phase === 'running'}
+        forms={
+          formOptions.length > 0
+            ? { options: formOptions, selected: selectedForms, onChange: setSelectedForms }
+            : undefined
+        }
+      />
+
       {/* One always-present live region per urgency — the documents screen's
           rule, for the documents screen's reason. */}
       <Text aria-live="polite" style={[styles.status, muted]}>
@@ -498,28 +578,38 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           </Text>
         ) : (
           <View role="list" style={styles.list}>
-            {list.packets.map((entry) => (
-              <View role="listitem" key={entry.id} style={styles.row}>
-                <Text style={[styles.rowTitle, ink]}>{entry.fileName}</Text>
-                <Text style={[styles.body, muted]}>
-                  Assembled {entry.createdAt.slice(0, 10)} · {formatSize(entry.byteSize)} ·{' '}
-                  {entry.creditorCount} creditors on the matrix
-                </Text>
-                <View style={styles.actions}>
-                  <Button
-                    size="lg"
-                    intent="secondary"
-                    disabled={busyId === entry.id}
-                    onPress={() => {
-                      void download(entry);
-                    }}
-                    aria-label={`Download the packet assembled ${entry.createdAt.slice(0, 10)}`}
-                  >
-                    {busyId === entry.id ? 'Preparing…' : 'Download'}
-                  </Button>
+            {list.packets.map((entry) => {
+              const optionsLabel = describePacketOptions(entry.options);
+              return (
+                <View role="listitem" key={entry.id} style={styles.row}>
+                  <View style={styles.rowHeader}>
+                    <Text style={[styles.rowTitle, ink]}>{entry.fileName}</Text>
+                    {optionsLabel !== null ? (
+                      <Badge intent="neutral" size="sm">
+                        {optionsLabel}
+                      </Badge>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.body, muted]}>
+                    Assembled {entry.createdAt.slice(0, 10)} · {formatSize(entry.byteSize)} ·{' '}
+                    {entry.creditorCount} creditors on the matrix
+                  </Text>
+                  <View style={styles.actions}>
+                    <Button
+                      size="lg"
+                      intent="secondary"
+                      disabled={busyId === entry.id}
+                      onPress={() => {
+                        void download(entry);
+                      }}
+                      aria-label={`Download the packet assembled ${entry.createdAt.slice(0, 10)}`}
+                    >
+                      {busyId === entry.id ? 'Preparing…' : 'Download'}
+                    </Button>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )
       ) : (
@@ -626,6 +716,12 @@ const styles = StyleSheet.create({
   },
   row: {
     gap: spacing.xs / 2,
+  },
+  rowHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   rowTitle: {
     fontSize: fontSizes.body,

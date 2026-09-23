@@ -10,12 +10,15 @@ import {
   MARITAL_FILING_STATUSES,
   MEANS_TEST_OUTCOMES,
   PRESUMPTION_EXEMPTIONS,
+  SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
+  formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
+  outputOptionsRequestToJson,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
   updateFirmRequestToJson,
@@ -85,6 +88,7 @@ import type {
   FirmUserStatus,
   FormMetric,
   FormPreview,
+  FormPreviewOptions,
   HealthStatus,
   Job,
   JobFailure,
@@ -98,6 +102,8 @@ import type {
   NationalStandardsFigures,
   NoticeParty,
   OtherName,
+  OutputOptions,
+  OutputOptionsRequest,
   Packet,
   PacketDownload,
   PermissionLevel,
@@ -421,24 +427,42 @@ export class InsolviaApiClient {
    * safe and never starts a duplicate run. Poll {@link getCaseJob} until the
    * status settles.
    *
-   * Throws {@link ApiValidationException} on a 400 (message keyed `kind`);
-   * a plain {@link ApiException} with 404 when the case is unknown *or* not
-   * the caller's (see {@link getCase}), and with 503 in the brief deploy
-   * window where this environment's pipeline is not up yet — retry later.
+   * `outputOptions` (issue 13.11) is the `packet_assembly` kind's own field —
+   * a "Draft" watermark, the top-margin date/time, signature-page selection,
+   * `/s/` electronic signatures, and a chosen subset of forms. Omitted
+   * entirely means the plain filing set, exactly as every packet before this
+   * option existed; every other kind refuses it, the `documentId` rule's own
+   * shape.
+   *
+   * Throws {@link ApiValidationException} on a 400 (message keyed `kind`,
+   * `documentId`, or an `outputOptions` field such as `signaturePages` or an
+   * unfiled `forms` entry); a plain {@link ApiException} with 404 when the
+   * case is unknown *or* not the caller's (see {@link getCase}), and with 503
+   * in the brief deploy window where this environment's pipeline is not up
+   * yet — retry later.
    */
   async acceptCaseJob(
     caseId: string,
     kind: JobKind,
-    options?: { readonly documentId?: string },
+    options?: { readonly documentId?: string; readonly outputOptions?: OutputOptionsRequest },
   ): Promise<Job> {
     const headers = await this.#protectedHeaders();
     const documentId = options?.documentId;
+    const outputOptions = options?.outputOptions;
     const response = await this.#fetch(this.#jobsUrl(caseId), {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      // `documentId` exactly when given: the document-scoped kinds
-      // (document_extraction) require it, every other kind refuses it.
-      body: JSON.stringify(documentId === undefined ? { kind } : { kind, documentId }),
+      // `documentId` exactly when given (the document-scoped kinds require
+      // it, every other kind refuses it); `options` exactly when given (only
+      // `packet_assembly` accepts it) — never a client-shaped payload
+      // otherwise, the same "identifiers/options only" rule the server pins.
+      body: JSON.stringify({
+        kind,
+        ...(documentId === undefined ? {} : { documentId }),
+        ...(outputOptions === undefined
+          ? {}
+          : { options: outputOptionsRequestToJson(outputOptions) }),
+      }),
     });
     const decoded = await decodeExpected(response, 202);
     return jobFromJson(decoded);
@@ -1158,13 +1182,21 @@ export class InsolviaApiClient {
    * showing right now — B106J-2 with no separate household, B122A-2 below
    * the median) is a 404: the same not-part-of-this-case reading a foreign
    * packet id gets.
+   *
+   * `options` (issue 13.11) is the query-string spelling of the same output
+   * options {@link acceptCaseJob}'s `outputOptions` carries, minus `forms` —
+   * this route already names one form — via {@link formPreviewQuery}. Omitted
+   * entirely renders the plain bytes, exactly as before this option existed.
    */
-  async getCaseFormPreview(caseId: string, form: string): Promise<FormPreview> {
+  async getCaseFormPreview(
+    caseId: string,
+    form: string,
+    options: FormPreviewOptions = {},
+  ): Promise<FormPreview> {
     const headers = await this.#protectedHeaders();
-    const response = await this.#fetch(
-      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/forms/${encodeURIComponent(form)}/preview`,
-      { method: 'GET', headers },
-    );
+    const query = formPreviewQuery(options).toString();
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/forms/${encodeURIComponent(form)}/preview${query === '' ? '' : `?${query}`}`;
+    const response = await this.#fetch(url, { method: 'GET', headers });
     const decoded = await decodeExpected(response, 200);
     return formPreviewFromJson(decoded);
   }
@@ -1883,10 +1915,27 @@ function requireJobStatus(response: DecodedResponse, key: string): JobStatus {
 }
 
 /**
+ * Decodes an {@link OutputOptions} from a nested `options` object — issue
+ * 13.11's wire shape (`output_options_json`), every field required except
+ * `forms` (absent, never an empty array, when every filed form was included).
+ */
+function outputOptionsFromJson(response: DecodedResponse): OutputOptions {
+  return definedMembers<OutputOptions>({
+    draftWatermark: requireBoolean(response, 'draftWatermark'),
+    printDate: requireBoolean(response, 'printDate'),
+    signaturePages: requireChoice(response, 'signaturePages', SIGNATURE_PAGES_MODES),
+    signElectronically: requireBoolean(response, 'signElectronically'),
+    forms: optionalStringArray(response, 'forms'),
+  });
+}
+
+/**
  * Decodes a {@link Job} from a response body. Shared by both
  * `/v1/cases/{caseId}/jobs` endpoints. `failure` and `result` are absent
  * unless set (never `null`) — mirroring `job_json` in
- * services/api/src/insolvia_api/core/jobs.py — so both stay optional here.
+ * services/api/src/insolvia_api/core/jobs.py — so both stay optional here;
+ * `options` (issue 13.11) is likewise absent except on the options-scoped
+ * kinds (`packet_assembly`).
  */
 function jobFromJson(response: DecodedResponse): Job {
   let failure: JobFailure | undefined;
@@ -1902,6 +1951,7 @@ function jobFromJson(response: DecodedResponse): Job {
     result = childObject(response, 'result').json;
   }
   const documentId = optionalString(response, 'documentId');
+  const options = optionalObject(response, 'options');
   const job: Job = {
     id: requireString(response, 'id'),
     kind: requireJobKind(response, 'kind'),
@@ -1911,6 +1961,7 @@ function jobFromJson(response: DecodedResponse): Job {
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
     ...(documentId === undefined ? {} : { documentId }),
+    ...(options === undefined ? {} : { options: outputOptionsFromJson(options) }),
     ...(failure === undefined ? {} : { failure }),
     ...(result === undefined ? {} : { result }),
   };
@@ -2176,6 +2227,7 @@ function packetFromJson(response: DecodedResponse): Packet {
     creditorCount: requireNumber(response, 'creditorCount'),
     createdBy: requireString(response, 'createdBy'),
     createdAt: requireString(response, 'createdAt'),
+    options: outputOptionsFromJson(childObject(response, 'options')),
   };
 }
 
@@ -2219,6 +2271,7 @@ function formPreviewFromJson(response: DecodedResponse): FormPreview {
     url: optionalString(response, 'url'),
     method: optionalString(response, 'method'),
     expiresAt: optionalString(response, 'expiresAt'),
+    options: outputOptionsFromJson(childObject(response, 'options')),
   });
 }
 

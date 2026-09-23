@@ -195,6 +195,16 @@ class FormRelease:
     # A flat release's drawing positions, keyed by box name; empty on a
     # fillable form, and `widgets` is empty on a flat one — never both.
     boxes: Mapping[str, OverlayBox]
+    # 1-based PDF pages carrying a "signature"-type field's widget, curated in
+    # spec.json and cross-checked there against every signature field's own
+    # widget pages (forms/scripts/check.py) — empty for a form with no
+    # signature line of its own, and for a flat release, where a "signature"
+    # field claims an overlay box rather than a widget (see OverlayBox above):
+    # the derivation below only counts real AcroForm widgets, so a printed
+    # signature line on a flat form never contributes a page here.
+    # core/form_overlay.py's signature-page selection (issue 13.11) is the
+    # one reader; nothing else in the fill path touches it.
+    signature_pages: tuple[int, ...] = ()
 
     @property
     def is_flat(self) -> bool:
@@ -620,6 +630,39 @@ def _load_release(release_dir: Traversable, series_id: str) -> FormRelease:
             f"field: {uncovered[:5]}",
         )
 
+    # signature_pages is curated data (forms/README.md's spec shape), but the
+    # loader re-derives the same set from the fields it just parsed — exactly
+    # the "re-validates what the fill engine's correctness depends on" rule
+    # this function's own docstring states — and refuses a stale list rather
+    # than letting signature-page selection (core/form_overlay.py) trust one.
+    raw_signature_pages = spec.get("signature_pages")
+    if not isinstance(raw_signature_pages, list) or not all(
+        isinstance(p, int) and p > 0 for p in raw_signature_pages
+    ):
+        raise _fail(where, "signature_pages must be a list of positive integers")
+    signature_pages = tuple(raw_signature_pages)
+    if signature_pages != tuple(sorted(set(signature_pages))):
+        raise _fail(where, "signature_pages must be sorted, strictly increasing")
+    # Only a real AcroForm widget's own pages count — a flat release's
+    # "signature" field claims an overlay box (its name is in `boxes`, not
+    # `widgets`), which is a printed mark, not a fillable line, so it is
+    # excluded here exactly as forms/scripts/check.py excludes it (its own
+    # overlay branch never touches `actual_sig_pages`).
+    actual_signature_pages = {
+        page
+        for field in fields
+        if field.type == "signature"
+        for name in field.pdf_names
+        if name in widgets
+        for page in widgets[name].pages
+    }
+    if set(signature_pages) != actual_signature_pages:
+        raise _fail(
+            where,
+            f"signature_pages {list(signature_pages)} != pages carrying a "
+            f"signature-type field's widget {sorted(actual_signature_pages)}",
+        )
+
     return FormRelease(
         series_id=series_id,
         effective_date=effective,
@@ -635,6 +678,7 @@ def _load_release(release_dir: Traversable, series_id: str) -> FormRelease:
         fields=tuple(fields),
         widgets=widgets,
         boxes=boxes,
+        signature_pages=signature_pages,
     )
 
 

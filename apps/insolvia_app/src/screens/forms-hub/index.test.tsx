@@ -44,9 +44,18 @@ interface ApiStub {
 
 type Answer = () => Response | Promise<Response>;
 
+/** The plain filing set — `output_options_json(OutputOptions())`'s shape. */
+const DEFAULT_OPTIONS = {
+  draftWatermark: false,
+  printDate: false,
+  signaturePages: 'all',
+  signElectronically: false,
+};
+
 function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Promise<Response> {
   const method = init?.method ?? 'GET';
-  if (url.includes('/forms/') && url.endsWith('/preview')) {
+  // A query string (issue 13.11's output options) may follow `/preview`.
+  if (url.includes('/forms/') && url.includes('/preview')) {
     return (
       stub.preview ??
       (() =>
@@ -55,6 +64,7 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Pro
           method: 'GET',
           expiresAt: '2026-09-03T10:05:00.123Z',
           problems: [],
+          options: DEFAULT_OPTIONS,
         }))
     )();
   }
@@ -203,12 +213,43 @@ describe('the forms hub screen', () => {
     ]);
   });
 
+  // ── Output options (issue 13.11) ──────────────────────────────
+
+  it('sends the selected output options as the preview’s query string', async () => {
+    const fetchMock = signedIn({
+      list: () =>
+        jsonResponse(200, {
+          forms: [
+            formRow({
+              series: 'form/b106g',
+              form: 'b106g',
+              title: 'Schedule G: Executory Contracts and Unexpired Leases',
+              officialNumber: 'B 106G',
+            }),
+          ],
+        }),
+    });
+    await screen.findByText(/Schedule G/);
+
+    await userEvent.press(screen.getByRole('checkbox', { name: '"Draft" watermark' }));
+    await userEvent.press(
+      screen.getByRole('button', {
+        name: 'Preview Schedule G: Executory Contracts and Unexpired Leases as a PDF',
+      }),
+    );
+    await screen.findByText('Opened Schedule G: Executory Contracts and Unexpired Leases.');
+
+    const previewCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/preview'));
+    expect(String(previewCall?.[0])).toContain('draftWatermark=true');
+  });
+
   it('says why a form could not render when the preview itself is blocked', async () => {
     signedIn({
       list: () => jsonResponse(200, { forms: [formRow()] }),
       preview: () =>
         jsonResponse(200, {
           problems: [{ source: 'debtors', message: 'The case has no Debtor 1 record.' }],
+          options: DEFAULT_OPTIONS,
         }),
     });
     await screen.findByText(/Voluntary Petition/);

@@ -19,8 +19,11 @@ from insolvia_core.ports import AccessLog, CaseStore
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
 from insolvia_api.core.extraction import EXTRACTABLE_DOCUMENT_KINDS
+from insolvia_api.core.form_overlay import output_options_json, parse_output_options
+from insolvia_api.core.form_templates import form_series_ids
 from insolvia_api.core.jobs import (
     DOCUMENT_SCOPED_KINDS,
+    OPTIONS_SCOPED_KINDS,
     JobFailure,
     fail,
     find_active,
@@ -95,7 +98,7 @@ def accept_job_route(case_id: str) -> ResponseReturnValue:
     queue: JobQueue = deps.job_queue
 
     case_store, job_store, access_log = _stores()
-    kind, document_id = parse_job_acceptance(_json_body())
+    kind, document_id, raw_options = parse_job_acceptance(_json_body())
     accessor = current_accessor()
 
     case = case_store.get(case_id, accessor=accessor)
@@ -119,8 +122,26 @@ def accept_job_route(case_id: str) -> ResponseReturnValue:
                 "extraction reads: " + ", ".join(EXTRACTABLE_DOCUMENT_KINDS)
             )
 
+    options: dict[str, object] | None = None
+    if kind in OPTIONS_SCOPED_KINDS:
+        # Validated AND canonicalised here (issue 13.11): the stored job
+        # always carries the full shape, defaults filled in, never the
+        # client's partial payload — parse_output_options is the one place
+        # that decides what a well-formed options object is. `forms` is
+        # checked against the whole form registry now (a fast, case-free
+        # "does this form exist at all" — a typo is a 400); whether THIS
+        # case actually files it is data-dependent and is the worker's own
+        # gate, reported as a packet problem like any other.
+        parsed = parse_output_options(raw_options, allow_forms=True)
+        if parsed.forms is not None:
+            known = {series.removeprefix("form/") for series in form_series_ids()}
+            unknown = sorted(set(parsed.forms) - known)
+            if unknown:
+                raise ValidationError(f"unknown form(s): {', '.join(unknown)}")
+        options = output_options_json(parsed)
+
     existing = find_active(
-        job_store.list_for_case(case.id), kind, document_id=document_id
+        job_store.list_for_case(case.id), kind, document_id=document_id, options=options
     )
     if existing is not None:
         # The no-op repeat is not access-logged: the first accept was, and a
@@ -129,7 +150,11 @@ def accept_job_route(case_id: str) -> ResponseReturnValue:
         return jsonify(job_json(existing)), 202
 
     job = new_job(
-        kind, case_id=case.id, created_by=accessor.subject, document_id=document_id
+        kind,
+        case_id=case.id,
+        created_by=accessor.subject,
+        document_id=document_id,
+        options=options,
     )
     job_store.create(job)
     try:

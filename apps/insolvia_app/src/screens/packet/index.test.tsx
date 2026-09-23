@@ -41,6 +41,12 @@ function packet(overrides: Record<string, unknown> = {}) {
     creditorCount: 6,
     createdBy: '00000000-0000-4000-8000-0000000000a1',
     createdAt: '2026-09-03T10:00:00.123Z',
+    options: {
+      draftWatermark: false,
+      printDate: false,
+      signaturePages: 'all',
+      signElectronically: false,
+    },
     ...overrides,
   };
 }
@@ -68,6 +74,8 @@ interface ApiStub {
   status?: Answer;
   /** `GET .../packets/<id>/url`. */
   url?: Answer;
+  /** `GET .../forms` — the output-options panel's forms-subset checklist. */
+  forms?: Answer;
 }
 
 type Answer = () => Response | Promise<Response>;
@@ -93,6 +101,9 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Pro
   }
   if (url.endsWith('/packets')) {
     return (stub.list ?? (() => jsonResponse(200, { packets: [] })))();
+  }
+  if (url.endsWith('/forms')) {
+    return (stub.forms ?? (() => jsonResponse(200, { forms: [] })))();
   }
   // The case LAYOUT's two reads, which every screen under /cases/[caseId] now
   // mounts above it. They come before the throw and after the branches above,
@@ -208,6 +219,93 @@ describe('the filing packet screen', () => {
     );
     expect(accepts).toHaveLength(1);
     expect(JSON.parse(String(accepts[0]?.[1]?.body))).toEqual({ kind: 'packet_assembly' });
+  });
+
+  // ── Output options (issue 13.11) ──────────────────────────────
+
+  it('sends only the options actually changed on the accept body', async () => {
+    const fetchMock = signedIn({
+      list: () => jsonResponse(200, { packets: [] }),
+      accept: () => jsonResponse(202, job()),
+    });
+    await screen.findByText(/No packet has been assembled yet/);
+
+    await userEvent.press(screen.getByRole('checkbox', { name: '"Draft" watermark' }));
+    await userEvent.press(screen.getByRole('radio', { name: 'Signature pages only' }));
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Assemble the Chapter 7 filing packet for this case' }),
+    );
+
+    const accepts = fetchMock.mock.calls.filter(
+      ([url, init]) => init?.method === 'POST' && String(url).endsWith('/jobs'),
+    );
+    expect(JSON.parse(String(accepts[0]?.[1]?.body))).toEqual({
+      kind: 'packet_assembly',
+      options: { draftWatermark: true, signaturePages: 'only' },
+    });
+  });
+
+  it('offers a forms-subset checklist and sends the unchecked-out set', async () => {
+    const fetchMock = signedIn({
+      list: () => jsonResponse(200, { packets: [] }),
+      forms: () =>
+        jsonResponse(200, {
+          forms: [
+            {
+              series: 'form/b101',
+              form: 'b101',
+              title: 'Petition',
+              officialNumber: 'B 101',
+              problems: [],
+            },
+            {
+              series: 'form/b106ab',
+              form: 'b106ab',
+              title: 'Schedule A/B',
+              officialNumber: 'B 106A/B',
+              problems: [],
+            },
+          ],
+        }),
+      accept: () => jsonResponse(202, job()),
+    });
+    await screen.findByText(/No packet has been assembled yet/);
+    await screen.findByRole('checkbox', { name: 'B 106A/B' });
+
+    await userEvent.press(screen.getByRole('checkbox', { name: 'B 106A/B' }));
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Assemble the Chapter 7 filing packet for this case' }),
+    );
+
+    const accepts = fetchMock.mock.calls.filter(
+      ([url, init]) => init?.method === 'POST' && String(url).endsWith('/jobs'),
+    );
+    expect(JSON.parse(String(accepts[0]?.[1]?.body))).toEqual({
+      kind: 'packet_assembly',
+      options: { forms: ['b101'] },
+    });
+  });
+
+  it('shows a non-default packet’s options as a badge on its row', async () => {
+    signedIn({
+      list: () =>
+        jsonResponse(200, {
+          packets: [
+            packet({
+              options: {
+                draftWatermark: true,
+                printDate: false,
+                signaturePages: 'all',
+                signElectronically: false,
+              },
+            }),
+          ],
+        }),
+    });
+
+    await screen.findByText('chapter7-packet.zip');
+
+    expect(screen.getByText('Draft')).toBeTruthy();
   });
 
   it('renders the whole fix list when the completeness gate refuses', async () => {
