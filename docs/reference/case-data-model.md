@@ -43,16 +43,16 @@ outside the case store; see below.
 |---|---|---|
 | `case` | root | B101 header, chapter, venue district |
 | `petition` | one | B101 Pt.2–6 case-level answers |
-| `debtor` | 1–2, plus an optional non-filing spouse | B101 Pt.1, 106I |
+| `debtor` | 1–2, plus an optional non-filing spouse | B101 Pt.1, 106I, B121 |
 | `prior_case` | many | B101 line 9 |
 | `related_case` | many | B101 line 10 |
 | `sole_proprietorship` | many | B101 line 12 |
-| `filing_professional` | 0–2 | B101 Pt.7 |
+| `filing_professional` | 0–2 | B101 Pt.7, B2030 (the attorney's compensation disclosure) |
 | `creditor` | many, deduplicated | Creditor matrix |
-| `claim` | many, references a `creditor` | 106D, 106E/F |
+| `claim` | many, references a `creditor` | 106D, 106E/F, B108 Pt.1 |
 | `asset` | many | 106A/B |
 | `exemption` | many, references an `asset` | 106C |
-| `contract_lease` | many | 106G |
+| `contract_lease` | many | 106G, B108 Pt.2 |
 | `codebtor` | many | 106H Pt.2 |
 | `community_household_member` | many | 106H line 2, B107 Q3 |
 | `employment` | many | 106I Pt.1 |
@@ -151,7 +151,11 @@ replaces it. Empty tables made that free; it would not have been.
 phone, email, bar number **and** bar state, signature date) or a bankruptcy
 petition preparer (→ Form 119). It is not `created_by`, and it is not the
 firm: the person who signs the petition, the person who opened the record, and
-the tenant that owns it are three different facts.
+the tenant that owns it are three different facts. It also carries the
+attorney's § 329(a) compensation disclosure (→ B2030): the fee agreed and
+received, who paid and who will pay, whether it is shared outside the firm,
+and the services covered or excluded — facts about this engagement, so they
+live with the signer rather than on the petition. The balance due is derived.
 
 ### Value types
 

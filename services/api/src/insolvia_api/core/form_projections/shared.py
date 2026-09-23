@@ -39,7 +39,7 @@ from insolvia_core.petitions import (
 )
 from insolvia_core.sofa import SofaEntryBody
 
-from ..form_fill import FieldFill, Option, Text
+from ..form_fill import FieldFill, Option, Text, helvetica_width
 from ..form_templates import FormRelease
 
 FieldValues = dict[str, "FieldFill | dict[str, FieldFill]"]
@@ -153,6 +153,32 @@ def wrap_lines(
     for word in words:
         candidate = f"{current} {word}".strip()
         if len(candidate) <= width or not current:
+            current = candidate
+        else:
+            rows_out.append(current)
+            current = word
+    if current:
+        rows_out.append(current)
+    if len(rows_out) > lines:
+        problems.append(
+            f"{where}: text needs {len(rows_out)} lines; the form prints {lines}"
+        )
+        return rows_out[:lines]
+    return rows_out
+
+
+def wrap_width(
+    value: str, *, points: float, lines: int, where: str, problems: list[str]
+) -> list[str]:
+    """`wrap_lines` for a flat release's overlay rows: the measure is the
+    row's width in POINTS under the font the engine draws with, so a line
+    that fits here is a line the engine will accept. Overflow is an error."""
+    words = value.split()
+    rows_out: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if helvetica_width(candidate) <= points or not current:
             current = candidate
         else:
             rows_out.append(current)

@@ -1,11 +1,14 @@
 # `forms/` — official-form field specs
 
 The machine-readable field inventory of the Chapter 7 individual filing set —
-B101, B106 Summary + Declaration, Schedules A/B–J (J-2 included), B107 — that
-the forms engine ([issue 9.3](https://github.com/insolvia-ai/insolvia/issues/93))
-fills from and the intake map (8.1) refines against. Produced for
+B101, B106 Summary + Declaration, Schedules A/B–J (J-2 included), B107, B108,
+B121, the B122A means-test pair, and the two Director's Forms the packet files
+with them (B2010, B2030) — that the forms engine
+([issue 9.3](https://github.com/insolvia-ai/insolvia/issues/93)) fills from and
+the intake map (8.1) refines against. Produced for
 [issue 9.2](https://github.com/insolvia-ai/insolvia/issues/92) by desk research
-against uscourts.gov.
+against uscourts.gov; the last four joined under
+[issue 13.10](https://github.com/insolvia-ai/insolvia/issues/351).
 
 Two layers per form, deliberately:
 
@@ -40,8 +43,12 @@ missing fields" an executable property, not a one-time review.
 | B106J | Schedule J: Your Expenses | 12/15 | 2015-12-01 |
 | B106J-2 | Schedule J-2: Expenses for Separate Household of Debtor 2 | 12/15 | 2015-12-01 |
 | B107 | Statement of Financial Affairs | **04/25** | 2025-04-01 |
+| B108 | Statement of Intention for Individuals Filing Under Chapter 7 | 12/15 | 2015-12-01 |
+| B121 | Statement About Your Social Security Numbers | 12/15 | 2015-12-01 |
 | B122A-1 | Chapter 7 Statement of Your Current Monthly Income | 12/19 | 2019-12-01 |
 | B122A-2 | Chapter 7 Means Test Calculation | **04/25** | 2025-04-01 |
+| B2010 | Notice Required by 11 U.S.C. § 342(b) (Director's Form) | 12/20 | 2020-12-01 |
+| B2030 | Disclosure of Compensation of Attorney for Debtor (Director's Form) | **12/25** | 2025-12-01 |
 
 B106C and B107 carry the April 2025 dollar-amount adjustments (§ 104 three-year
 cycle: the $214,000 homestead question, B107's $8,575 payment floor — next
@@ -51,6 +58,35 @@ owns which revision is current and when it is checked; the effective-date model
 (issue 9.1) owns how revisions are versioned — each spec records its own
 `revision` and `effective_date` so that model can adopt these files as its
 first form-version data.
+
+B2030's 12/25 revision was approved by the Advisory Committee on Bankruptcy
+Rules in September 2025 and took effect 2025-12-01 (uscourts.gov's
+"Pending or Recent Changes" page); the form's own page still shows the 2015
+date on which B2030 first replaced B203, so for a Director's Form the PDF
+footer and the recent-changes page are the revision's authority, not the
+page's "Effective on" line.
+
+## Flat forms: the two Director's Forms have no AcroForm
+
+B2010 and B2030 are published as flat PDFs — a Word document distilled, with
+no fillable field at all — so there is no widget to claim and the two-layer
+scheme above bends in one place:
+
+- `acroform/<form>.json` records an empty `fields` list (the dump is still
+  the ground truth: it says the PDF cannot be filled).
+- `specs/<form>.json` claims **`overlay` boxes** instead of widget names:
+  `{"overlay": [{"name", "page", "x", "y", "w", "h"?}]}`, a position in PDF
+  user space (points, origin bottom-left; `y` is the baseline for text and
+  the bottom edge for a checkbox, which also carries `h`) measured from the
+  PDF's own text and image operators. The fill engine draws the value —
+  Helvetica text on the baseline, an X across the box — into a content stream
+  appended to the page, leaving the official page streams byte-identical.
+- B2010 is a notice with nothing to print at all: an empty `fields` list on
+  both sides, and the packet ships the court's bytes verbatim.
+
+`scripts/check.py` allows overlay claims only on a form whose dump has no
+fillable widget — a fillable form is filled through its widgets, never painted
+over — and requires every box name to be unique and every page to exist.
 
 ## The spec shape
 

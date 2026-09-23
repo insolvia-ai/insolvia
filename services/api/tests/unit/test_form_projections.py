@@ -22,9 +22,17 @@ import os
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from typing import cast
 
 import pytest
-from insolvia_api.core.form_fill import Check, Option, Text, WidgetStates, fill_form
+from insolvia_api.core.form_fill import (
+    Check,
+    Option,
+    Text,
+    WidgetStates,
+    fill_form,
+    helvetica_width,
+)
 from insolvia_api.core.form_projections import (
     CaseFile,
     FormProjectionError,
@@ -615,6 +623,27 @@ def _contract_leases() -> tuple[tuple[str, ContractLeaseBody], ...]:
                 description="Two-year wireless service agreement, 14 months remaining",
             ),
         ),
+        (
+            "cl-rav4",
+            # The one Schedule G row that is ALSO a Statement of Intention
+            # item (issue #351): an unexpired personal-property lease the
+            # preparer flagged for B108 Part 2, to be assumed.
+            ContractLeaseBody(
+                counterparty_name="Sunshine Auto Leasing LLC",
+                counterparty_address=Address(
+                    line1="500 Lease Lane",
+                    city="Orlando",
+                    state="FL",
+                    postal_code="32801",
+                ),
+                description=(
+                    "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's "
+                    "interest: lessee"
+                ),
+                intention="assume",
+                list_on_statement_of_intention=True,
+            ),
+        ),
     )
 
 
@@ -1191,6 +1220,26 @@ def reference_case_file() -> CaseFile:
                 bar_number="112233",
                 bar_state="FL",
                 signature_date="2026-08-31",
+                # B2030 (issue #351): a flat fee, partly paid by the debtor
+                # with the balance coming from a relative; nothing shared.
+                compensation_agreed="1500.00",
+                compensation_received="1000.00",
+                compensation_source_paid="debtor",
+                compensation_source_to_be_paid="other",
+                compensation_source_to_be_paid_other=(
+                    "Margaret Lovelace, Debtor 1's mother"
+                ),
+                compensation_shared=False,
+                services_other=(
+                    "Negotiation of the reaffirmation agreement with Gulf Coast "
+                    "Loan Servicing and the redemption of the Honda Civic."
+                ),
+                services_excluded=(
+                    "Representation in any adversary proceeding, appeal, or "
+                    "non-bankruptcy matter; motions to avoid liens; and defense "
+                    "of any motion to dismiss under section 707(b). Each is "
+                    "billed separately under a written agreement."
+                ),
             ),
         ),
         employments=(
@@ -1271,8 +1320,12 @@ def reference_case_file() -> CaseFile:
         "form/b106j2",
         "form/b106sum",
         "form/b107",
+        "form/b108",
+        "form/b121",
         "form/b122a1",
         "form/b122a2",
+        "form/b2010",
+        "form/b2030",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
@@ -1923,6 +1976,195 @@ def test_b106g_contracts_take_one_printed_row_each() -> None:
     assert row(values, release, "line_2_contract_description", 1) == Text(
         "Two-year wireless service agreement, 14 months remaining"
     )
+
+
+# --- B108 ---------------------------------------------------------------------
+
+
+def b108_values() -> tuple[object, dict[str, object]]:
+    release = latest_form("form/b108")
+    return release, dict(project(release, reference_case_file()))
+
+
+def test_b108_part_1_rows_the_secured_claims_with_their_intentions() -> None:
+    """One row per Schedule D claim: the creditor resolves by id, the
+    collateral through the lien arithmetic (typed override on the
+    mortgage, the asset's description on the car loan), and the intention
+    box is the claim's own answer spelled through the spec."""
+    release, values = b108_values()
+    assert row(values, release, "line_1_creditor_name", 0) == Text(
+        "Gulf Coast Home Loans"
+    )
+    assert row(values, release, "line_1_property_description", 0) == Text(
+        "12 Byron Court, Tampa, FL 33601"
+    )
+    assert row(values, release, "line_1_intention", 0) == Option(
+        "retain and reaffirmation"
+    )
+    assert row(values, release, "line_1_property_description", 1) == Text(
+        "2016 Honda Civic LX"
+    )
+    assert row(values, release, "line_1_intention", 1) == Option("retain and redeem")
+    # Both collateral assets carry a Schedule C claim, so both answer Yes.
+    assert row(values, release, "line_1_claimed_exempt", 0) == Option("yes")
+    assert row(values, release, "line_1_claimed_exempt", 1) == Option("yes")
+    # No third secured claim: row three stays blank on every column.
+    assert "check1 1c" not in cast("dict[str, object]", values["line_1_intention"])
+    assert "line_1_intention_explanation_line1" not in values
+
+
+def test_b108_part_2_prints_only_the_leases_flagged_for_the_statement() -> None:
+    release, values = b108_values()
+    assert row(values, release, "line_2_lessor_name", 0) == Text(
+        "Sunshine Auto Leasing LLC"
+    )
+    assert row(values, release, "line_2_assumed", 0) == Option("yes")
+    # The storage unit and the wireless contract are Schedule G rows only.
+    assert len(cast("dict[str, object]", values["line_2_lessor_name"])) == 1
+    assert values["debtor1_signature_date"] == Text("08/30/2026")
+
+
+def test_b108_retain_other_wraps_its_explanation_onto_the_two_lines() -> None:
+    base = reference_case_file()
+    claims = tuple(
+        (
+            claim_id,
+            replace(
+                body,
+                intention="retain_other",
+                intention_explanation="Keep paying under the current terms",
+            )
+            if claim_id == "claim-auto"
+            else body,
+        )
+        for claim_id, body in base.claims
+    )
+    release = latest_form("form/b108")
+    values = dict(project(release, replace(base, claims=claims)))
+    assert row(values, release, "line_1_intention", 1) == Option("retain and explain")
+    # The first printed line holds about ten characters, the second the rest.
+    assert row(values, release, "line_1_intention_explanation_line1", 1) == Text("Keep")
+    assert row(values, release, "line_1_intention_explanation_line2", 1) == Text(
+        "paying under the current terms"
+    )
+
+
+def test_b108_an_explanation_past_the_two_lines_is_an_error() -> None:
+    base = reference_case_file()
+    claims = tuple(
+        (
+            claim_id,
+            replace(body, intention="retain_other", intention_explanation="x " * 40)
+            if claim_id == "claim-auto"
+            else body,
+        )
+        for claim_id, body in base.claims
+    )
+    with pytest.raises(FormProjectionError, match="does not fit the two printed"):
+        project(latest_form("form/b108"), replace(base, claims=claims))
+
+
+def test_b108_claimed_exempt_answers_no_without_a_schedule_c_claim() -> None:
+    base = reference_case_file()
+    release = latest_form("form/b108")
+    values = dict(project(release, replace(base, exemptions=())))
+    assert row(values, release, "line_1_claimed_exempt", 0) == Option("no")
+
+
+# --- B121 ---------------------------------------------------------------------
+
+
+def test_b121_prints_names_and_dates_and_leaves_the_numbers_blank() -> None:
+    """The full tax identifier is the one fact the store cannot hold yet
+    (parse_debtor refuses it), so lines 2-3 stay blank — and the "do not
+    have" boxes are never inferred from that blank."""
+    release = latest_form("form/b121")
+    values = dict(project(release, reference_case_file()))
+    assert values["line_1_debtor1_first_name"] == Text("Ada")
+    assert values["line_1_debtor1_middle_name"] == Text("Quinn")
+    assert values["line_1_debtor1_last_name"] == Text("Lovelace")
+    assert values["line_1_debtor2_first_name"] == Text("Ben")
+    assert "line_1_debtor2_middle_name" not in values
+    assert values["debtor1_signature_date"] == Text("08/30/2026")
+    assert values["debtor2_signature_date"] == Text("08/30/2026")
+    for field_id in (
+        "line_2_debtor1_ssn",
+        "line_2_debtor1_no_ssn",
+        "line_3_debtor1_itin",
+        "line_3_debtor1_no_itin",
+    ):
+        assert field_id not in values
+
+
+# --- B2010 / B2030 ------------------------------------------------------------
+
+
+def test_b2010_projects_nothing_and_ships_the_notice_verbatim() -> None:
+    release = latest_form("form/b2010")
+    assert project(release, reference_case_file()) == {}
+    assert fill_form(release, {}) == release.template_pdf
+
+
+def b2030_values() -> tuple[object, dict[str, object]]:
+    release = latest_form("form/b2030")
+    return release, dict(project(release, reference_case_file()))
+
+
+def test_b2030_prints_the_fee_and_derives_the_balance() -> None:
+    _release, values = b2030_values()
+    assert values["line_1_fee_agreed"] == Text("1,500.00")
+    assert values["line_1_fee_received"] == Text("1,000.00")
+    assert values["line_1_balance_due"] == Text("500.00")
+    assert values["line_2_source_paid_debtor"] == Check()
+    assert "line_2_source_paid_other" not in values
+    assert values["line_3_source_to_be_paid_other"] == Check()
+    assert values["line_3_source_to_be_paid_other_specify"] == Text(
+        "Margaret Lovelace, Debtor 1's mother"
+    )
+    assert values["line_4_not_shared"] == Check()
+    assert "line_4_shared" not in values
+    assert values["certification.date"] == Text("08/31/2026")
+    assert values["certification.firm_name"] == Text("Counsel & Counsel PA")
+    assert values["caption.chapter"] == Text("7")
+
+
+def test_b2030_splits_the_district_around_the_printed_blanks() -> None:
+    release, values = b2030_values()
+    assert row(values, release, "caption.district", 0) == Text("Middle")
+    assert row(values, release, "caption.district", 1) == Text("Florida")
+    assert values["caption.debtor1_name"] == Text("Ada Quinn Lovelace")
+    assert values["caption.debtor2_name"] == Text("Ben Lovelace Jr.")
+
+
+def test_b2030_wraps_the_narratives_by_helvetica_width() -> None:
+    _release, values = b2030_values()
+    excluded = cast("dict[str, object]", values["line_6_excluded_services"])
+    assert len(excluded) == 3
+    assert all(
+        helvetica_width(cast("Text", line).value) <= 460 for line in excluded.values()
+    )
+    assert "services_excluded.1" in excluded
+
+
+def test_b2030_received_above_agreed_is_an_error() -> None:
+    base = reference_case_file()
+    attorney = replace(base.filing_professionals[0], compensation_received="2000.00")
+    with pytest.raises(FormProjectionError, match="exceeds the amount agreed"):
+        project(
+            latest_form("form/b2030"), replace(base, filing_professionals=(attorney,))
+        )
+
+
+def test_b2030_without_an_attorney_prints_only_the_caption() -> None:
+    base = reference_case_file()
+    release = latest_form("form/b2030")
+    values = dict(project(release, replace(base, filing_professionals=())))
+    assert set(values) == {
+        "caption.district",
+        "caption.debtor1_name",
+        "caption.debtor2_name",
+        "caption.chapter",
+    }
 
 
 def test_b106h_schedule_boxes_derive_from_what_the_links_resolve_to() -> None:

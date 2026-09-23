@@ -81,9 +81,18 @@ Read, in order:
 
 Write down: which forms change, effective when, and whether any of them is in
 our supported set (the Chapter 7 individual set —
-[#92](https://github.com/insolvia-ai/insolvia/issues/92) owns the list: B101,
-B106A–J + Summary + Declaration, B107). A cycle that touches none of ours still
-gets a cycle-log entry saying so — that is the walk.
+[`forms/README.md`](../../forms/README.md) owns the list: B101, B106A–J +
+Summary + Declaration, B107, B108, B121, B122A-1/A-2, and the two Director's
+Forms B2010 and B2030, added under
+[#351](https://github.com/insolvia-ai/insolvia/issues/351)). A cycle that
+touches none of ours still gets a cycle-log entry saying so — that is the walk.
+
+**Director's Forms revise off the December 1 rhythm.** They need only Advisory
+Committee approval, and their form pages on uscourts.gov are not reliably
+updated: B2030's page still says "effective December 1, 2015" while the PDF it
+links prints 12/25 and the recent-changes page lists it under December 1, 2025.
+For B2010 and B2030, trust the PDF footer and the recent-changes page, and
+check both at every checkpoint, not only in November.
 
 ### 2 · Fetch: download each amended form and pin its identity
 

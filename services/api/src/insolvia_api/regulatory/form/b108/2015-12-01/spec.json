@@ -1,0 +1,192 @@
+{
+ "form": "b108",
+ "official_number": "108",
+ "title": "Statement of Intention for Individuals Filing Under Chapter 7",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "List Your Creditors Who Have Secured Claims"},
+  {"number": 2, "title": "List Your Unexpired Personal Property Leases"},
+  {"number": 3, "title": "Sign Below"}
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; one field with widgets on both pages, so the page-2 header repeats page 1"},
+   "pdf": {"names": ["Debtor 1"]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor 2"]}
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number"]}
+  },
+  {
+   "id": "caption.amended_filing",
+   "part": null,
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {"entity": "case", "attribute": "is_amended"},
+   "pdf": {"names": ["Check if this is an"]}
+  },
+  {
+   "id": "line_1_creditor_name",
+   "part": 1,
+   "line": "1",
+   "label": "Creditor's name",
+   "type": "text",
+   "repeats": {"group": "claim", "count": 4, "continuation": "four rows (1a–1d) on page 1; the instruction is to attach a separate sheet for more"},
+   "maps_to": {"entity": "claim", "attribute": "creditor_id", "notes": "class=secured, in Schedule D order; the creditor record's name"},
+   "pdf": {"names": ["Creditors Name 1a", "Creditors Name 1b", "Creditors Name 1c", "Creditors Name 1d"]},
+   "notes": "explicit names rather than a pattern: the dump lists some of this form's rows out of order (check2 1b before 1a, Explain2 1b before 1a), so every repeated field here spells its row order"
+  },
+  {
+   "id": "line_1_property_description",
+   "part": 1,
+   "line": "1",
+   "label": "Description of property securing debt",
+   "type": "text",
+   "repeats": {"group": "claim", "count": 4},
+   "maps_to": {"derived": "the claim's collateral: its typed collateral_description, else the linked asset's description (the same resolution Schedule D prints)"},
+   "pdf": {"names": ["PropertyDescription 1a", "PropertyDescription 1b", "PropertyDescription 1c", "PropertyDescription 1d"]}
+  },
+  {
+   "id": "line_1_intention",
+   "part": 1,
+   "line": "1",
+   "label": "What do you intend to do with the property that secures a debt?",
+   "type": "radio",
+   "repeats": {"group": "claim", "count": 4},
+   "options": [
+    {"value": "surrender", "label": "Surrender the property.", "maps_to_value": "surrender"},
+    {"value": "retain and redeem", "label": "Retain the property and redeem it.", "maps_to_value": "retain_redeem"},
+    {"value": "retain and reaffirmation", "label": "Retain the property and enter into a Reaffirmation Agreement.", "maps_to_value": "retain_reaffirm"},
+    {"value": "retain and explain", "label": "Retain the property and [explain]:", "maps_to_value": "retain_other"}
+   ],
+   "maps_to": {"entity": "claim", "attribute": "intention"},
+   "pdf": {"names": ["check1 1a", "check1 1b", "check1 1c", "check1 1d"]},
+   "notes": "one exclusive group per row, declared as a checkbox field with four export states"
+  },
+  {
+   "id": "line_1_intention_explanation_line1",
+   "part": 1,
+   "line": "1",
+   "label": "Retain the property and [explain]: ______ (first, short line)",
+   "type": "text",
+   "repeats": {"group": "claim", "count": 4},
+   "maps_to": {"entity": "claim", "attribute": "intention_explanation", "notes": "the first printed line is only ~50 points wide (x 430–480), so it holds a word or two; the projection wraps the explanation across this line and the next"},
+   "pdf": {"names": ["Explain1 1a", "Explain1 1b", "Explain1 1c", "Explain1 1d"]}
+  },
+  {
+   "id": "line_1_intention_explanation_line2",
+   "part": 1,
+   "line": "1",
+   "label": "Retain the property and [explain]: ______ (second line)",
+   "type": "text",
+   "repeats": {"group": "claim", "count": 4},
+   "maps_to": {"entity": "claim", "attribute": "intention_explanation", "notes": "the second printed line (x 311–480)"},
+   "pdf": {"names": ["Explain2 1a", "Explain2 1b", "Explain2 1c", "Explain2 1d"]}
+  },
+  {
+   "id": "line_1_claimed_exempt",
+   "part": 1,
+   "line": "1",
+   "label": "Did you claim the property as exempt on Schedule C?",
+   "type": "radio",
+   "repeats": {"group": "claim", "count": 4},
+   "options": [
+    {"value": "no", "label": "No"},
+    {"value": "yes", "label": "Yes"}
+   ],
+   "maps_to": {"derived": "whether an exemption record names the asset this claim is secured by"},
+   "pdf": {"names": ["check2 1a", "check2 1b", "check2 1c", "check2 1d"]}
+  },
+  {
+   "id": "line_2_lessor_name",
+   "part": 2,
+   "line": "2",
+   "label": "Lessor's name",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 7, "continuation": "seven rows (2a–2g) on page 2; attach a separate sheet for more"},
+   "maps_to": {"entity": "contract_lease", "attribute": "counterparty_name", "notes": "rows flagged list_on_statement_of_intention, in Schedule G order"},
+   "pdf": {"names": ["Lessors Name 2a", "Lessors Name 2b", "Lessors Name 2c", "Lessors Name 2d", "Lessors Name 2e", "Lessors Name 2f", "Lessors Name 2g"]}
+  },
+  {
+   "id": "line_2_property_description",
+   "part": 2,
+   "line": "2",
+   "label": "Description of leased property",
+   "type": "text",
+   "repeats": {"group": "contract_lease", "count": 7},
+   "maps_to": {"entity": "contract_lease", "attribute": "description"},
+   "pdf": {"names": ["PropertyDescription 2a", "PropertyDescription 2b", "PropertyDescription 2c", "PropertyDescription 2d", "PropertyDescription 2e", "PropertyDescription 2f", "PropertyDescription 2g"]}
+  },
+  {
+   "id": "line_2_assumed",
+   "part": 2,
+   "line": "2",
+   "label": "Will the lease be assumed?",
+   "type": "radio",
+   "repeats": {"group": "contract_lease", "count": 7},
+   "options": [
+    {"value": "no", "label": "No", "maps_to_value": "reject"},
+    {"value": "yes", "label": "Yes", "maps_to_value": "assume"}
+   ],
+   "maps_to": {"entity": "contract_lease", "attribute": "intention"},
+   "pdf": {"names": ["check2a", "check2b", "check2c", "check2d", "check2e", "check2f", "check2g"]}
+  },
+  {
+   "id": "debtor1_signature",
+   "part": 3,
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {"unmapped": "wet-signature line, never machine-filled"},
+   "pdf": {"names": ["Signature of Debtor 1"]}
+  },
+  {
+   "id": "debtor2_signature",
+   "part": 3,
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {"unmapped": "wet-signature line, never machine-filled"},
+   "pdf": {"names": ["Signature of Debtor 2"]}
+  },
+  {
+   "id": "debtor1_signature_date",
+   "part": 3,
+   "label": "Debtor 1 — Date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_1"},
+   "pdf": {"names": ["Date signed Debtor 1"]}
+  },
+  {
+   "id": "debtor2_signature_date",
+   "part": 3,
+   "label": "Debtor 2 — Date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Date signed Debtor 2"]}
+  }
+ ]
+}

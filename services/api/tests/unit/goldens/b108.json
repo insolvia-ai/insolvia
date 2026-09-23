@@ -1,0 +1,239 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": "S3.0 caption.case_number"
+  },
+  "Check if this is an": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Creditors Name 1a": {
+   "value": "S5.0 line_1_creditor_name"
+  },
+  "Creditors Name 1b": {
+   "value": "S5.1 line_1_creditor_name"
+  },
+  "Creditors Name 1c": {
+   "value": "S5.2 line_1_creditor_name"
+  },
+  "Creditors Name 1d": {
+   "value": "S5.3 line_1_creditor_name"
+  },
+  "Date signed Debtor 1": {
+   "value": "01/17/2026"
+  },
+  "Date signed Debtor 2": {
+   "value": "01/18/2026"
+  },
+  "Debtor 1": {
+   "value": "S0.0 caption.debtor1_name"
+  },
+  "Debtor 2": {
+   "value": "S1.0 caption.debtor2_name"
+  },
+  "Explain1 1a": {
+   "value": "S8.0 line_1_intention_explanation_line1"
+  },
+  "Explain1 1b": {
+   "value": "S8.1 line_1_intention_explanation_line1"
+  },
+  "Explain1 1c": {
+   "value": "S8.2 line_1_intention_explanation_line1"
+  },
+  "Explain1 1d": {
+   "value": "S8.3 line_1_intention_explanation_line1"
+  },
+  "Explain2 1a": {
+   "value": "S9.0 line_1_intention_explanation_line2"
+  },
+  "Explain2 1b": {
+   "value": "S9.1 line_1_intention_explanation_line2"
+  },
+  "Explain2 1c": {
+   "value": "S9.2 line_1_intention_explanation_line2"
+  },
+  "Explain2 1d": {
+   "value": "S9.3 line_1_intention_explanation_line2"
+  },
+  "Lessors Name 2a": {
+   "value": "S11.0 line_2_lessor_name"
+  },
+  "Lessors Name 2b": {
+   "value": "S11.1 line_2_lessor_name"
+  },
+  "Lessors Name 2c": {
+   "value": "S11.2 line_2_lessor_name"
+  },
+  "Lessors Name 2d": {
+   "value": "S11.3 line_2_lessor_name"
+  },
+  "Lessors Name 2e": {
+   "value": "S11.4 line_2_lessor_name"
+  },
+  "Lessors Name 2f": {
+   "value": "S11.5 line_2_lessor_name"
+  },
+  "Lessors Name 2g": {
+   "value": "S11.6 line_2_lessor_name"
+  },
+  "PropertyDescription 1a": {
+   "value": "S6.0 line_1_property_description"
+  },
+  "PropertyDescription 1b": {
+   "value": "S6.1 line_1_property_description"
+  },
+  "PropertyDescription 1c": {
+   "value": "S6.2 line_1_property_description"
+  },
+  "PropertyDescription 1d": {
+   "value": "S6.3 line_1_property_description"
+  },
+  "PropertyDescription 2a": {
+   "value": "S12.0 line_2_property_description"
+  },
+  "PropertyDescription 2b": {
+   "value": "S12.1 line_2_property_description"
+  },
+  "PropertyDescription 2c": {
+   "value": "S12.2 line_2_property_description"
+  },
+  "PropertyDescription 2d": {
+   "value": "S12.3 line_2_property_description"
+  },
+  "PropertyDescription 2e": {
+   "value": "S12.4 line_2_property_description"
+  },
+  "PropertyDescription 2f": {
+   "value": "S12.5 line_2_property_description"
+  },
+  "PropertyDescription 2g": {
+   "value": "S12.6 line_2_property_description"
+  },
+  "Signature of Debtor 1": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Signature of Debtor 2": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "check1 1a": {
+   "value": "/surrender",
+   "widget_states": [
+    "/surrender",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check1 1b": {
+   "value": "/retain and explain",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/retain and explain"
+   ]
+  },
+  "check1 1c": {
+   "value": "/retain and reaffirmation",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/retain and reaffirmation",
+    "/Off"
+   ]
+  },
+  "check1 1d": {
+   "value": "/retain and redeem",
+   "widget_states": [
+    "/Off",
+    "/retain and redeem",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2 1a": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2 1b": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2 1c": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2 1d": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2b": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2c": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2d": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2e": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2f": {
+   "value": "/no",
+   "widget_states": [
+    "/no",
+    "/Off"
+   ]
+  },
+  "check2g": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  }
+ },
+ "release": "form/b108@2015-12-01",
+ "sha256": "7da0a8be81f9a1b593791976e8518e241b9be8640ccf9c04d0580c57c945e590"
+}

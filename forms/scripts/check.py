@@ -19,6 +19,14 @@ What is enforced, and why:
 4. Vocabulary — `maps_to.entity` must name an entity from
    docs/reference/case-data-model.md. The list below mirrors that document's
    "Core entities" table; when the model gains or loses an entity, update both.
+5. Flat forms — a Director's Form published with NO AcroForm (B2010, B2030)
+   has nothing to claim, so its spec fields claim `overlay` boxes instead:
+   page positions, measured from the PDF's own operators, that the fill
+   engine draws text (or an X) onto. A box name is unique per form, its page
+   exists, and a checkbox box carries a height. Overlay claims are allowed
+   ONLY on a form whose dump has no fillable widget — a fillable form is
+   filled through its widgets, never painted over — and a flat form with
+   nothing to print at all (B2010 is a notice) may declare no fields.
 """
 
 from __future__ import annotations
@@ -86,6 +94,11 @@ REQUIRED_SPEC_KEYS = {
 REQUIRED_FIELD_KEYS = {"id", "label", "type", "maps_to", "pdf"}
 OPTIONAL_FIELD_KEYS = {"part", "line", "options", "repeats", "notes"}
 MAPPING_KEYS = {"entity", "derived", "unmapped", "constant"}
+# One overlay box: where on which page the engine draws a value (PDF user
+# space, points, origin bottom-left; `y` is the baseline for text and the
+# bottom edge for a checkbox). `h` is required for a checkbox and forbidden
+# otherwise — text is drawn at a baseline, an X is drawn across a box.
+OVERLAY_BOX_KEYS = {"name", "page", "x", "y", "w", "h"}
 
 errors: list[str] = []
 
@@ -119,6 +132,7 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
 
     pdf_fields = {f["name"]: f for f in dump["fields"] if f["kind"] != "pushbutton"}
     claimed: dict[str, str] = {}  # pdf field name -> spec field id
+    overlay_boxes: dict[str, str] = {}  # overlay box name -> spec field id (flat forms)
     ids: set[str] = set()
     mapped = 0
 
@@ -167,10 +181,45 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
             if not isinstance(maps_to[next(iter(mkeys))], str) or not maps_to[next(iter(mkeys))]:
                 err(form, f"{fid}: maps_to.{next(iter(mkeys))} must be a non-empty reason/description")
 
-        # resolve pdf claims: exact names and/or a regex over dump names
+        # resolve pdf claims: exact names and/or a regex over dump names —
+        # or, on a flat form, overlay boxes (rule 5 above)
         pdf = field["pdf"]
-        if not isinstance(pdf, dict) or not (set(pdf.keys()) <= {"names", "pattern"}) or not pdf:
-            err(form, f"{fid}: pdf must be {{names: [...]}} and/or {{pattern: ...}}")
+        if not isinstance(pdf, dict) or not pdf or not (
+            set(pdf.keys()) <= {"names", "pattern"} or set(pdf.keys()) == {"overlay"}
+        ):
+            err(form, f"{fid}: pdf must be {{names: [...]}} and/or {{pattern: ...}}, or {{overlay: [...]}}")
+            continue
+        if "overlay" in pdf:
+            if pdf_fields:
+                err(form, f"{fid}: overlay boxes are only for a form the PDF cannot fill; this one has widgets")
+            if ftype == "radio":
+                err(form, f"{fid}: a flat form has no export states — model the choice as checkbox boxes")
+            boxes = pdf["overlay"]
+            if not isinstance(boxes, list) or not boxes:
+                err(form, f"{fid}: overlay must be a non-empty list of boxes")
+                continue
+            for box in boxes:
+                if not isinstance(box, dict) or not {"name", "page", "x", "y", "w"} <= set(box.keys()):
+                    err(form, f"{fid}: overlay box needs name, page, x, y, w: {box}")
+                    continue
+                if set(box.keys()) - OVERLAY_BOX_KEYS:
+                    err(form, f"{fid}: overlay box has unknown keys: {sorted(set(box.keys()) - OVERLAY_BOX_KEYS)}")
+                name = box["name"]
+                if not isinstance(name, str) or not name:
+                    err(form, f"{fid}: overlay box name must be a non-empty string")
+                    continue
+                if name in overlay_boxes:
+                    err(form, f"overlay box {name!r} claimed by both {overlay_boxes[name]} and {fid}")
+                overlay_boxes[name] = fid
+                if not isinstance(box["page"], int) or not 1 <= box["page"] <= dump.get("pages", 0):
+                    err(form, f"{fid}: overlay box {name!r} page {box['page']!r} is not a page of the PDF")
+                for key in ("x", "y", "w", "h"):
+                    if key in box and (isinstance(box[key], bool) or not isinstance(box[key], (int, float)) or box[key] < 0):
+                        err(form, f"{fid}: overlay box {name!r} {key} must be a non-negative number")
+                if (ftype == "checkbox") != ("h" in box):
+                    err(form, f"{fid}: overlay box {name!r} carries h only when the field is a checkbox")
+            if "options" in field:
+                err(form, f"{fid}: options only belong on radio/checkbox widget fields")
             continue
         matched: list[str] = []
         for name in pdf.get("names", []):
@@ -219,8 +268,10 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
     uncovered = sorted(set(pdf_fields) - set(claimed))
     if uncovered:
         err(form, f"{len(uncovered)} official PDF fields not covered by any spec field: {uncovered[:8]}{' …' if len(uncovered) > 8 else ''}")
+    if not pdf_fields and not overlay_boxes and spec["fields"]:
+        err(form, "a flat form's fields must claim overlay boxes")
 
-    return (len(spec["fields"]), len(claimed), mapped)
+    return (len(spec["fields"]), len(claimed) + len(overlay_boxes), mapped)
 
 
 def main() -> int:

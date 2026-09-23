@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b2030",
+  "effective_date": "2025-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/document/directors-form-2030.pdf",
+    "published": null,
+    "sha256": "b1acd2fa61bac496001be594da521d2fbb96af88ca0e81ce45926f06f1fb5d53"
+  },
+  "notes": "Director's Form 2030, Disclosure of Compensation of Attorney for Debtor, printed revision 12/25 — approved by the Advisory Committee on Bankruptcy Rules at its September 2025 meeting and listed by uscourts.gov under 'New and Amended Official Forms, Effective December 1, 2025' (the form's own page still shows the 2015 date on which B2030 first replaced B203; the footer and the recent-changes page are the revision's authority). Current as of ingestion, 2026-09-23. template.pdf is the official PDF vendored verbatim from uscourts.gov, fetched twice with identical digests (sha256 above; the loader re-hashes it). A FLAT release: the PDF is a Word document distilled with no AcroForm, so spec.json claims overlay boxes measured from the page's own text and image operators, and the fill engine draws onto an appended content stream, leaving the official page streams untouched. spec.json and acroform.json are copied from forms/ at ingestion; tests/test_form_templates.py refuses drift while this is the current revision."
+}

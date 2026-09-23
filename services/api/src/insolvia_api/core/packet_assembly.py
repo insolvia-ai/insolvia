@@ -3,9 +3,9 @@ render, and the pipeline worker that runs both (issue #96).
 
 The milestone's definition of done: intake data in, a complete, filed-ready
 Chapter 7 packet out. This module is the end of that pipe, and it is a
-PIPELINE WORKER, not an endpoint (ADR 0015/0018): rendering thirteen official
-PDFs takes longer than a request should, so the API accepts a `packet_assembly`
-job (api/routes/jobs.py) and this worker runs it.
+PIPELINE WORKER, not an endpoint (ADR 0015/0018): rendering up to nineteen
+official PDFs takes longer than a request should, so the API accepts a
+`packet_assembly` job (api/routes/jobs.py) and this worker runs it.
 
 Three stages, in a fixed order:
 
@@ -136,11 +136,16 @@ logger = logging.getLogger(__name__)
 PACKET_ASSEMBLY_KIND: Final = "packet_assembly"
 
 # The individual Chapter 7 set, in filing order — the order the clerk's
-# checklist reads and the order the zip lists. The B122A pair closes the
-# set (issue #102): the CMI statement always files; the calculation only
-# for an above-median debtor (packet_form_series makes that call).
+# checklist reads and the order the zip lists. B121 follows the petition
+# (it is submitted separately from the public file, but with it); B108 and
+# the two Director's Forms follow the statement of affairs (issue #351:
+# B108 files only when a secured claim or a flagged lease exists, B2030
+# only when an attorney is on the case — packet_form_series decides). The
+# B122A pair closes the set (issue #102): the CMI statement always files;
+# the calculation only for an above-median debtor.
 PACKET_FORM_SERIES: Final = (
     "form/b101",
+    "form/b121",
     "form/b106sum",
     "form/b106ab",
     "form/b106c",
@@ -153,6 +158,9 @@ PACKET_FORM_SERIES: Final = (
     "form/b106j2",
     "form/b106dec",
     "form/b107",
+    "form/b108",
+    "form/b2010",
+    "form/b2030",
     "form/b122a1",
     "form/b122a2",
 )
@@ -453,10 +461,69 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
     return problems
 
 
+def _statement_problems(data: CaseData) -> list[PacketProblem]:
+    """What B108 and B2030 need answered before they can print (issue #351).
+
+    A B108 row without its intention box, or a B2030 without its amounts,
+    is a signed statement with its one question blank — so each is a gate,
+    named per record like every other problem. B121 and B2010 gate nothing:
+    the notice has no field, and the tax identifier B121 exists to print is
+    not storable yet (its projection says why), which is not a fix a
+    preparer can make from the intake screens.
+    """
+    problems: list[PacketProblem] = []
+    for claim in data.claims:
+        if claim.body.claim_class == "secured" and claim.body.intention is None:
+            problems.append(
+                PacketProblem(
+                    source="claims",
+                    item_id=claim.id,
+                    field="intention",
+                    message="Say what the debtor intends to do with this collateral"
+                    " (surrender, redeem, reaffirm, or other) — the Statement of"
+                    " Intention (B108) prints one answer per secured claim.",
+                )
+            )
+    for lease in data.contract_leases:
+        if lease.body.list_on_statement_of_intention and lease.body.intention is None:
+            problems.append(
+                PacketProblem(
+                    source="contract_leases",
+                    item_id=lease.id,
+                    field="intention",
+                    message="Say whether this lease will be assumed or rejected —"
+                    " it is flagged for the Statement of Intention (B108), which"
+                    " prints one answer per listed lease.",
+                )
+            )
+    for professional in data.filing_professionals:
+        if professional.body.role != "attorney":
+            continue
+        for field_name, label in (
+            ("compensation_agreed", "the fee agreed for legal services"),
+            ("compensation_received", "the amount received before filing"),
+            ("compensation_source_paid", "who paid the compensation"),
+            ("compensation_source_to_be_paid", "who will pay the balance"),
+            ("compensation_shared", "whether the fee is shared outside the firm"),
+        ):
+            if getattr(professional.body, field_name) is None:
+                problems.append(
+                    PacketProblem(
+                        source="filing_professionals",
+                        item_id=professional.id,
+                        field=field_name,
+                        message=f"The attorney's compensation disclosure (B2030)"
+                        f" needs {label}.",
+                    )
+                )
+    return problems
+
+
 def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
     """Every structural reason the case cannot assemble, before a single
     projection runs. Deterministic order: case, debtors, cardinality,
-    references — so the same case always reports the same list."""
+    references, the statements' own answers — so the same case always
+    reports the same list."""
     problems: list[PacketProblem] = []
     if data.case.chapter != 7:
         problems.append(
@@ -490,6 +557,7 @@ def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
         )
     problems.extend(_cardinality_problems(data))
     problems.extend(_reference_problems(data))
+    problems.extend(_statement_problems(data))
     return tuple(problems)
 
 
@@ -501,8 +569,11 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     nothing to say is filed at all", and an all-blank J-2 in front of a clerk
     is a question, not a filing. B122A-2 files only when the debtor is not
     determinately below the median (B122A-1 line 14; `files_b122a2` argues
-    the indeterminate case). Everything else is unconditional for an
-    individual Chapter 7.
+    the indeterminate case). B108 files only when it has a row — a secured
+    claim, or a lease flagged for it — because § 521(a)(2) asks for it only
+    then; B2030 only when an attorney signs, because it is the attorney's
+    own disclosure. Everything else is unconditional for an individual
+    Chapter 7.
     """
     has_separate = any(
         e.body.which_household == "debtor_2_separate" for e in data.households
@@ -512,6 +583,13 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
         skipped.add("form/b106j2")
     if not files_b122a2(to_case_file(data)):
         skipped.add("form/b122a2")
+    has_statement_row = any(
+        e.body.claim_class == "secured" for e in data.claims
+    ) or any(e.body.list_on_statement_of_intention for e in data.contract_leases)
+    if not has_statement_row:
+        skipped.add("form/b108")
+    if not any(e.body.role == "attorney" for e in data.filing_professionals):
+        skipped.add("form/b2030")
     return tuple(series for series in PACKET_FORM_SERIES if series not in skipped)
 
 

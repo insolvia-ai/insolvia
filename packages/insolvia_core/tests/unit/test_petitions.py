@@ -97,3 +97,51 @@ def test_filing_professional_role_and_bar_state() -> None:
     with pytest.raises(FieldValidationError) as excinfo:
         parse_filing_professional({"role": "notary", "bar_state": "Florida"})
     assert set(excinfo.value.fields) == {"role", "bar_state"}
+
+
+def test_filing_professional_compensation_fields_parse() -> None:
+    """B2030's facts (issue #351): two money amounts, two closed sources
+    with their `other` names, the sharing answer, and two narratives."""
+    body = parse_filing_professional(
+        {
+            "role": "attorney",
+            "compensation_agreed": "1500",
+            "compensation_received": "1000.5",
+            "compensation_source_paid": "debtor",
+            "compensation_source_to_be_paid": "other",
+            "compensation_source_to_be_paid_other": "A relative",
+            "compensation_shared": False,
+            "services_other": "Reaffirmation negotiations.",
+            "services_excluded": "Adversary proceedings.",
+        }
+    )
+    assert body.compensation_agreed == "1500.00"
+    assert body.compensation_received == "1000.50"
+    assert body.compensation_source_paid == "debtor"
+    assert body.compensation_source_to_be_paid == "other"
+    assert body.compensation_source_to_be_paid_other == "A relative"
+    assert body.compensation_shared is False
+    assert body.services_excluded == "Adversary proceedings."
+    # Absent everywhere by default — the disclosure is progressive too.
+    assert parse_filing_professional({}).compensation_agreed is None
+
+
+@pytest.mark.parametrize(
+    ("payload", "bad_field"),
+    [
+        ({"compensation_agreed": 1500}, "compensation_agreed"),
+        ({"compensation_received": "-1"}, "compensation_received"),
+        ({"compensation_source_paid": "trustee"}, "compensation_source_paid"),
+        (
+            {"compensation_source_to_be_paid": "Debtor"},
+            "compensation_source_to_be_paid",
+        ),
+        ({"compensation_shared": "no"}, "compensation_shared"),
+    ],
+)
+def test_filing_professional_compensation_fields_are_validated(
+    payload: dict[str, object], bad_field: str
+) -> None:
+    with pytest.raises(FieldValidationError) as excinfo:
+        parse_filing_professional(payload)
+    assert set(excinfo.value.fields) == {bad_field}

@@ -41,6 +41,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import cast
@@ -54,10 +55,12 @@ from insolvia_api.core.form_fill import (
     Text,
     WidgetStates,
     fill_form,
+    helvetica_width,
 )
 from insolvia_api.core.form_templates import (
     FieldSpec,
     FormRelease,
+    OverlayBox,
     Widget,
     latest_form,
 )
@@ -80,9 +83,17 @@ FORM_SERIES = (
     "form/b106j2",
     "form/b106sum",
     "form/b107",
+    "form/b108",
+    "form/b121",
     "form/b122a1",
     "form/b122a2",
+    "form/b2010",
+    "form/b2030",
 )
+
+# The two flat releases (no AcroForm): B2010 draws nothing and ships the
+# court's bytes verbatim; B2030 draws overlay boxes.
+FLAT_SERIES = ("form/b2010", "form/b2030")
 
 
 # --- synthetic full-coverage values -------------------------------------------
@@ -129,20 +140,34 @@ def _instance_fill(field: FieldSpec, widget: Widget, i: int, j: int) -> FieldFil
     return Text(_text_value(field, widget, i, j))
 
 
+def _box_fill(field: FieldSpec, box: OverlayBox, i: int, j: int) -> FieldFill:
+    """A synthetic value for an overlay box: an X for a checkbox, else text
+    trimmed to what the box's width holds (the engine refuses overflow)."""
+    if field.type == "checkbox":
+        return Check()
+    value = _text_value(field, Widget(name=box.name, kind="text", pages=()), i, j)
+    while value and helvetica_width(value) > box.w:
+        value = value[:-1]
+    return Text(value)
+
+
 def synthetic_values(
     release: FormRelease,
 ) -> dict[str, FieldFill | dict[str, FieldFill]]:
     """One value for every logical field — full coverage, varied by design."""
     values: dict[str, FieldFill | dict[str, FieldFill]] = {}
+
+    def one(field: FieldSpec, name: str, i: int, j: int) -> FieldFill:
+        if name in release.boxes:
+            return _box_fill(field, release.boxes[name], i, j)
+        return _instance_fill(field, release.widgets[name], i, j)
+
     for i, field in enumerate(release.fields):
         if len(field.pdf_names) == 1:
-            values[field.id] = _instance_fill(
-                field, release.widgets[field.pdf_names[0]], i, 0
-            )
+            values[field.id] = one(field, field.pdf_names[0], i, 0)
         else:
             values[field.id] = {
-                name: _instance_fill(field, release.widgets[name], i, j)
-                for j, name in enumerate(field.pdf_names)
+                name: one(field, name, i, j) for j, name in enumerate(field.pdf_names)
             }
     return values
 
@@ -162,9 +187,45 @@ def _qualified_name(annotation: DictionaryObject) -> str | None:
     return ".".join(reversed(parts)) if parts else None
 
 
+_OVERLAY_MARKER = b"% insolvia-overlay\n"
+_OVERLAY_BOX_RE = re.compile(
+    rb"% box:(?P<name>\S+)(?P<check> check)?\n"
+    rb"(?:BT /Helv [\d.]+ Tf 1 0 0 1 [\d.]+ [\d.]+ Tm "
+    rb"\((?P<text>(?:[^()\\]|\\.)*)\) Tj ET)?"
+)
+
+
+def _unescape_literal(raw: bytes) -> str:
+    """Undo the engine's PDF-literal escaping: `\\(`, `\\)`, `\\\\`, `\\ooo`."""
+
+    def one(match: re.Match[bytes]) -> bytes:
+        body = match.group(1)
+        if body.isdigit():
+            return bytes([int(body, 8)])
+        return body
+
+    return re.sub(rb"\\([0-7]{3}|.)", one, raw).decode("cp1252")
+
+
+def _page_streams(page: DictionaryObject) -> tuple[list[bytes], bytes | None]:
+    """A page's content streams: the official ones, and the engine's overlay
+    (the last stream, when it carries the marker) separated out."""
+    contents = page.get_object()["/Contents"].get_object()
+    parts = (
+        [part.get_object().get_data() for part in contents]
+        if isinstance(contents, ArrayObject)
+        else [contents.get_data()]
+    )
+    if parts and parts[-1].startswith(_OVERLAY_MARKER):
+        return parts[:-1], parts[-1]
+    return parts, None
+
+
 def read_form(release: FormRelease, data: bytes) -> dict[str, dict[str, object]]:
     """Every fillable field of the output: /V, plus per-widget appearance
-    states for buttons, in the order widgets appear walking the pages."""
+    states for buttons, in the order widgets appear walking the pages. On a
+    flat release, every overlay box: the text drawn, or "X" for a ticked
+    checkbox, read back out of the appended overlay stream."""
     reader = PdfReader(io.BytesIO(data))
     raw = reader.get_fields() or {}
     out: dict[str, dict[str, object]] = {}
@@ -184,16 +245,27 @@ def read_form(release: FormRelease, data: bytes) -> dict[str, dict[str, object]]
             states = cast("list[str]", out[name].setdefault("widget_states", []))
             appearance = annotation.get("/AS")
             states.append("/Off" if appearance is None else str(appearance))
+    for name in release.boxes:
+        out[name] = {"value": None}
+    for page in reader.pages:
+        _official, overlay = _page_streams(page)
+        if overlay is None:
+            continue
+        for match in _OVERLAY_BOX_RE.finditer(overlay):
+            name = match.group("name").decode("ascii")
+            if match.group("check"):
+                out[name] = {"value": "X"}
+            elif match.group("text") is not None:
+                out[name] = {"value": _unescape_literal(match.group("text"))}
     return out
 
 
 def _content_streams(reader: PdfReader) -> Iterator[bytes]:
+    """Each page's OFFICIAL content, the engine's overlay stream excluded —
+    what must stay byte-identical to the template."""
     for page in reader.pages:
-        contents = page.get_object()["/Contents"].get_object()
-        if isinstance(contents, ArrayObject):
-            yield b"".join(part.get_object().get_data() for part in contents)
-        else:
-            yield contents.get_data()
+        official, _overlay = _page_streams(page)
+        yield b"".join(official)
 
 
 def _sha256(data: bytes) -> str:
@@ -416,3 +488,82 @@ def test_every_problem_is_reported_at_once() -> None:
             },
         )
     assert len(excinfo.value.problems) == 2
+
+
+# --- flat releases: the overlay -----------------------------------------------
+
+
+def test_a_flat_notice_with_nothing_to_draw_is_the_template_verbatim() -> None:
+    """B2010 has no field at all: the packet files the court's own bytes."""
+    release = latest_form("form/b2010")
+    assert fill_form(release, {}) == release.template_pdf
+
+
+def test_the_overlay_draws_text_and_ticks_into_an_appended_stream() -> None:
+    """B2030's values land in ONE stream appended after the official page
+    content, named box by box, so the goldens read them back like widgets."""
+    release = latest_form("form/b2030")
+    data = fill_form(
+        release,
+        {
+            "line_1_fee_agreed": Text("1,500.00"),
+            "line_2_source_paid_debtor": Check(),
+            "certification.firm_name": Text("Counsel & Counsel (PA)"),
+        },
+    )
+    fields = read_form(release, data)
+    assert fields["fee.agreed"] == {"value": "1,500.00"}
+    assert fields["source_paid.debtor"] == {"value": "X"}
+    assert fields["certification.firm_name"] == {"value": "Counsel & Counsel (PA)"}
+    assert fields["fee.received"] == {"value": None}
+    filled = PdfReader(io.BytesIO(data))
+    page_one_official, overlay = _page_streams(filled.pages[0])
+    template = PdfReader(io.BytesIO(release.template_pdf))
+    assert page_one_official == _page_streams(template.pages[0])[0]
+    assert overlay is not None
+    assert overlay.startswith(_OVERLAY_MARKER)
+    assert b"/Helv" in overlay
+    # Page two carries the firm name; page one's overlay does not.
+    assert b"certification.firm_name" not in overlay
+    assert b"certification.firm_name" in (_page_streams(filled.pages[1])[1] or b"")
+    # Helvetica is declared on each drawn page, nothing embedded.
+    fonts = filled.pages[0]["/Resources"]["/Font"]
+    assert fonts["/Helv"]["/BaseFont"] == "/Helvetica"
+
+
+@pytest.mark.parametrize(
+    ("values", "problem"),
+    [
+        pytest.param(
+            {"line_1_fee_agreed": Text("1,500,000,000,000.00")},
+            "points wide",
+            id="text-wider-than-its-printed-space",
+        ),
+        pytest.param(
+            {"line_1_fee_agreed": Check()},
+            "Check on a money field",
+            id="check-on-a-text-box",
+        ),
+        pytest.param(
+            {"line_2_source_paid_debtor": Text("yes")},
+            "Text on a checkbox field",
+            id="text-on-a-checkbox-box",
+        ),
+        pytest.param(
+            {"line_2_source_paid_debtor": Option("On")},
+            "takes Text or Check",
+            id="option-on-a-flat-form",
+        ),
+        pytest.param(
+            {"certification.firm_name": Text("Counsel ☃ Counsel")},
+            "cannot draw",
+            id="character-helvetica-lacks",
+        ),
+    ],
+)
+def test_overlay_values_that_cannot_land_are_refused(
+    values: dict[str, FieldFill], problem: str
+) -> None:
+    release = latest_form("form/b2030")
+    with pytest.raises(FormFillError, match=problem):
+        fill_form(release, values)

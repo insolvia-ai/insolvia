@@ -1,0 +1,239 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check if this is an": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Creditors Name 1a": {
+   "value": "Gulf Coast Home Loans"
+  },
+  "Creditors Name 1b": {
+   "value": "Drive Away Financial LLC"
+  },
+  "Creditors Name 1c": {
+   "value": null
+  },
+  "Creditors Name 1d": {
+   "value": null
+  },
+  "Date signed Debtor 1": {
+   "value": "08/30/2026"
+  },
+  "Date signed Debtor 2": {
+   "value": "08/30/2026"
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Explain1 1a": {
+   "value": null
+  },
+  "Explain1 1b": {
+   "value": null
+  },
+  "Explain1 1c": {
+   "value": null
+  },
+  "Explain1 1d": {
+   "value": null
+  },
+  "Explain2 1a": {
+   "value": null
+  },
+  "Explain2 1b": {
+   "value": null
+  },
+  "Explain2 1c": {
+   "value": null
+  },
+  "Explain2 1d": {
+   "value": null
+  },
+  "Lessors Name 2a": {
+   "value": "Sunshine Auto Leasing LLC"
+  },
+  "Lessors Name 2b": {
+   "value": null
+  },
+  "Lessors Name 2c": {
+   "value": null
+  },
+  "Lessors Name 2d": {
+   "value": null
+  },
+  "Lessors Name 2e": {
+   "value": null
+  },
+  "Lessors Name 2f": {
+   "value": null
+  },
+  "Lessors Name 2g": {
+   "value": null
+  },
+  "PropertyDescription 1a": {
+   "value": "12 Byron Court, Tampa, FL 33601"
+  },
+  "PropertyDescription 1b": {
+   "value": "2016 Honda Civic LX"
+  },
+  "PropertyDescription 1c": {
+   "value": null
+  },
+  "PropertyDescription 1d": {
+   "value": null
+  },
+  "PropertyDescription 2a": {
+   "value": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee"
+  },
+  "PropertyDescription 2b": {
+   "value": null
+  },
+  "PropertyDescription 2c": {
+   "value": null
+  },
+  "PropertyDescription 2d": {
+   "value": null
+  },
+  "PropertyDescription 2e": {
+   "value": null
+  },
+  "PropertyDescription 2f": {
+   "value": null
+  },
+  "PropertyDescription 2g": {
+   "value": null
+  },
+  "Signature of Debtor 1": {
+   "value": null
+  },
+  "Signature of Debtor 2": {
+   "value": null
+  },
+  "check1 1a": {
+   "value": "/retain and reaffirmation",
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/retain and reaffirmation",
+    "/Off"
+   ]
+  },
+  "check1 1b": {
+   "value": "/retain and redeem",
+   "widget_states": [
+    "/Off",
+    "/retain and redeem",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check1 1c": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check1 1d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off",
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2 1a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2 1b": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2 1c": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2 1d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2a": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check2b": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2c": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2e": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2f": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check2g": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  }
+ },
+ "release": "form/b108@2015-12-01",
+ "sha256": "817d2263d2f50f61189a9c9e6892ab7edea6c6d592cb757faacf1c7204bde24b"
+}

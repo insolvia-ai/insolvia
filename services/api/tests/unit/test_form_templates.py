@@ -69,8 +69,12 @@ def test_the_registry_holds_the_expected_series() -> None:
         "form/b106j2",
         "form/b106sum",
         "form/b107",
+        "form/b108",
+        "form/b121",
         "form/b122a1",
         "form/b122a2",
+        "form/b2010",
+        "form/b2030",
     )
 
 
@@ -85,9 +89,30 @@ def test_every_template_is_the_official_pdf(release: FormRelease) -> None:
 def test_every_fillable_widget_is_claimed_exactly_once(
     release: FormRelease,
 ) -> None:
+    """On a fillable form the claim set is the widgets; on a flat one it is
+    the overlay boxes — and a release is one or the other, never both."""
     fillable = {n for n, w in release.widgets.items() if w.kind != "pushbutton"}
+    assert not (fillable and release.boxes)
     claimed = [n for f in release.fields for n in f.pdf_names]
-    assert sorted(claimed) == sorted(fillable)
+    assert sorted(claimed) == sorted(fillable | set(release.boxes))
+
+
+def test_the_two_directors_forms_are_flat_releases() -> None:
+    """B2010 and B2030 are published with no AcroForm (issue #351): the
+    notice declares nothing to draw, the disclosure draws overlay boxes."""
+    notice = latest_form("form/b2010")
+    assert notice.is_flat
+    assert notice.fields == ()
+    assert notice.boxes == {}
+    disclosure = latest_form("form/b2030")
+    assert disclosure.is_flat
+    assert disclosure.widgets == {}
+    assert disclosure.field("line_1_fee_agreed").pdf_names == ("fee.agreed",)
+    box = disclosure.boxes["source_paid.debtor"]
+    assert box.is_check
+    assert (box.page, box.h) == (1, 13.44)
+    assert not disclosure.boxes["fee.agreed"].is_check
+    assert not latest_form("form/b108").is_flat
 
 
 @pytest.mark.parametrize("release", _release_params())
@@ -195,8 +220,12 @@ def test_form_revisions_as_of_is_the_case_pin_map() -> None:
         "form/b106j2": "2015-12-01",
         "form/b106sum": "2015-12-01",
         "form/b107": "2025-04-01",
+        "form/b108": "2015-12-01",
+        "form/b121": "2015-12-01",
         "form/b122a1": "2019-12-01",
         "form/b122a2": "2025-04-01",
+        "form/b2010": "2020-12-01",
+        "form/b2030": "2025-12-01",
     }
     # And every pin round-trips through get_form, which is what makes a
     # filed case reproducible forever.
@@ -231,6 +260,7 @@ def _write_release(root: Path, **overrides: object) -> Path:
         "revision": "01/26",
         "effective_date": "2026-01-01",
         "source": {"pdf_sha256": TEMPLATE_SHA},
+        "pages": 1,
         "fields": [
             {"name": "Debtor name", "kind": "text", "pages": [1]},
             {
@@ -415,4 +445,110 @@ def test_a_release_missing_its_template_is_refused(tmp_path: Path) -> None:
     release = _write_release(tmp_path)
     (release / "template.pdf").unlink()
     with pytest.raises(ValueError, match=r"template\.pdf missing"):
+        load_form_registry(tmp_path)
+
+
+# --- flat releases (no AcroForm) --------------------------------------------
+
+
+def _flat_spec_fields() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "fee",
+            "label": "Fee",
+            "type": "money",
+            "maps_to": {"derived": "x"},
+            "pdf": {"overlay": [{"name": "fee", "page": 1, "x": 10, "y": 20, "w": 50}]},
+        },
+        {
+            "id": "paid",
+            "label": "Paid",
+            "type": "checkbox",
+            "maps_to": {"derived": "x"},
+            "pdf": {
+                "overlay": [
+                    {"name": "paid", "page": 1, "x": 10, "y": 40, "w": 12, "h": 12}
+                ]
+            },
+        },
+    ]
+
+
+def test_a_flat_release_loads_its_overlay_boxes(tmp_path: Path) -> None:
+    _write_release(
+        tmp_path, acroform={"fields": []}, spec={"fields": _flat_spec_fields()}
+    )
+    (release,) = load_form_registry(tmp_path)["form/b900"]
+    assert release.is_flat
+    assert release.field("fee").pdf_names == ("fee",)
+    assert release.boxes["paid"].is_check
+    assert release.boxes["paid"].h == 12.0
+
+
+def test_a_flat_notice_may_declare_no_fields(tmp_path: Path) -> None:
+    _write_release(tmp_path, acroform={"fields": []}, spec={"fields": []})
+    (release,) = load_form_registry(tmp_path)["form/b900"]
+    assert release.is_flat
+    assert release.fields == ()
+
+
+@pytest.mark.parametrize(
+    ("acroform", "spec_fields", "problem"),
+    [
+        pytest.param(
+            {},
+            _flat_spec_fields(),
+            "overlay boxes on a form that has widgets",
+            id="overlay-on-a-fillable-form",
+        ),
+        pytest.param(
+            {"fields": []},
+            [
+                {
+                    **_flat_spec_fields()[0],
+                    "pdf": {
+                        "overlay": [{"name": "fee", "page": 2, "x": 1, "y": 1, "w": 1}]
+                    },
+                }
+            ],
+            "page is not on the PDF",
+            id="box-off-the-page",
+        ),
+        pytest.param(
+            {"fields": []},
+            [
+                {
+                    **_flat_spec_fields()[0],
+                    "pdf": {
+                        "overlay": [
+                            {"name": "fee", "page": 1, "x": 1, "y": 1, "w": 1, "h": 1}
+                        ]
+                    },
+                }
+            ],
+            "carries h exactly when",
+            id="height-on-a-text-box",
+        ),
+        pytest.param(
+            {"fields": []},
+            [*_flat_spec_fields(), {**_flat_spec_fields()[0], "id": "fee2"}],
+            "claimed twice",
+            id="duplicate-box-name",
+        ),
+    ],
+)
+def test_malformed_flat_releases_are_refused(
+    tmp_path: Path,
+    acroform: dict[str, object],
+    spec_fields: list[dict[str, object]],
+    problem: str,
+) -> None:
+    _write_release(tmp_path, acroform=acroform, spec={"fields": spec_fields})
+    with pytest.raises(ValueError, match=problem):
+        load_form_registry(tmp_path)
+
+
+def test_a_fillable_form_with_no_fields_is_refused(tmp_path: Path) -> None:
+    _write_release(tmp_path, spec={"fields": []})
+    with pytest.raises(ValueError, match="spec fields empty on a form that has"):
         load_form_registry(tmp_path)

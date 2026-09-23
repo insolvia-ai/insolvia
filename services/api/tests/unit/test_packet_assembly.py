@@ -309,8 +309,19 @@ def test_the_reference_case_assembles_the_full_set():
     # One shared household in the reference case, so J-2 has nothing to say
     # and stays out; every other form of the set files, plus the matrix.
     assert len(names) == len(PACKET_FORM_SERIES) - 1 + 1
+    # Nineteen series (issue #351 added B108, B121, B2010 and B2030):
+    # eighteen forms for this case, then the matrix.
+    assert len(PACKET_FORM_SERIES) == 19
+    assert len(names) == 19
     assert names[0] == "01-b101.pdf"
-    assert "form/b106j2" not in packet_form_series(reference_case_data())
+    assert names[1] == "02-b121.pdf"
+    # The zip entries are the filed series, numbered in filing order.
+    filed = packet_form_series(reference_case_data())
+    assert [name.split("-", 1)[1] for name in names[:-1]] == [
+        f"{series.removeprefix('form/')}.pdf" for series in filed
+    ]
+    assert {"form/b108", "form/b121", "form/b2010", "form/b2030"} <= set(filed)
+    assert "form/b106j2" not in filed
     assert names[-1] == MATRIX_FILE_NAME
     # The pin map still records the WHOLE set, J-2 included — a household
     # added before re-assembly must not find a hole.
@@ -551,6 +562,84 @@ def test_the_reference_case_files_the_means_test_pair():
     data = reference_case_data()
     series = packet_form_series(data)
     assert series[-2:] == ("form/b122a1", "form/b122a2")
+
+
+def test_b108_stays_out_without_a_secured_claim_or_a_flagged_lease():
+    """§ 521(a)(2) asks for the statement only when it has a row."""
+    data = reference_case_data()
+    unsecured_only = tuple(c for c in data.claims if c.body.claim_class != "secured")
+    unflagged = tuple(
+        replace(e, body=replace(e.body, list_on_statement_of_intention=None))
+        for e in data.contract_leases
+    )
+    without = replace(
+        data,
+        claims=unsecured_only,
+        contract_leases=unflagged,
+        # The codebtor on the car loan would dangle without its claim.
+        codebtors=tuple(
+            c for c in data.codebtors if "claim-auto" not in c.body.claim_ids
+        ),
+    )
+    assert "form/b108" not in packet_form_series(without)
+    assert "form/b108" in packet_form_series(data)
+    # A flagged lease alone is enough.
+    assert "form/b108" in packet_form_series(
+        replace(without, contract_leases=data.contract_leases)
+    )
+
+
+def test_b2030_files_only_when_an_attorney_is_on_the_case():
+    data = reference_case_data()
+    assert "form/b2030" in packet_form_series(data)
+    pro_se = replace(data, filing_professionals=())
+    assert "form/b2030" not in packet_form_series(pro_se)
+    assert completeness_problems(pro_se) == ()
+
+
+def test_a_secured_claim_without_an_intention_is_refused():
+    data = reference_case_data()
+    claims = tuple(
+        replace(c, body=replace(c.body, intention=None)) if c.id == "claim-auto" else c
+        for c in data.claims
+    )
+    problems = completeness_problems(replace(data, claims=claims))
+    assert [(p.source, p.item_id, p.field) for p in problems] == [
+        ("claims", "claim-auto", "intention")
+    ]
+
+
+def test_a_flagged_lease_without_an_answer_is_refused():
+    data = reference_case_data()
+    leases = tuple(
+        replace(e, body=replace(e.body, intention=None)) if e.id == "cl-rav4" else e
+        for e in data.contract_leases
+    )
+    problems = completeness_problems(replace(data, contract_leases=leases))
+    assert [(p.source, p.item_id, p.field) for p in problems] == [
+        ("contract_leases", "cl-rav4", "intention")
+    ]
+
+
+def test_an_attorney_without_the_compensation_answers_is_refused():
+    data = reference_case_data()
+    attorney = data.filing_professionals[0]
+    blank = replace(
+        attorney,
+        body=replace(
+            attorney.body,
+            compensation_agreed=None,
+            compensation_source_to_be_paid=None,
+            compensation_shared=None,
+        ),
+    )
+    problems = completeness_problems(replace(data, filing_professionals=(blank,)))
+    assert [(p.source, p.field) for p in problems] == [
+        ("filing_professionals", "compensation_agreed"),
+        ("filing_professionals", "compensation_source_to_be_paid"),
+        ("filing_professionals", "compensation_shared"),
+    ]
+    assert all(p.item_id == attorney.id for p in problems)
 
 
 def test_a_duplicate_means_test_input_is_refused():
