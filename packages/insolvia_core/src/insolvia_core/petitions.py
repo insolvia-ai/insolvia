@@ -39,6 +39,7 @@ from .fields import (
     boolean,
     choice,
     form_date,
+    money,
     narrative,
     parse_address,
     parse_name,
@@ -101,6 +102,10 @@ ESTIMATED_DOLLAR_BANDS: Final = (
 # Part 7's two signer kinds. An attorney signs the petition; a bankruptcy
 # petition preparer (a non-attorney paid to help) triggers Form 119.
 FILING_PROFESSIONAL_ROLES: Final = ("attorney", "bankruptcy_petition_preparer")
+
+# B2030 items 2 and 3 — who paid, and who will pay, the attorney's fee.
+# `other` carries the name in the matching `_other` narrative.
+COMPENSATION_SOURCES: Final = ("debtor", "other")
 
 
 @dataclass(frozen=True)
@@ -321,7 +326,16 @@ class FilingProfessionalBody:
     """B101 Part 7: the attorney block (printed name, firm, address, phone,
     email, bar number AND bar state, signature date) or a bankruptcy petition
     preparer. The name is four discrete parts like every person name — the
-    form prints one line, and composing it is the projection's job."""
+    form prints one line, and composing it is the projection's job.
+
+    The `compensation_*` and `services_*` fields are B2030's (issue #351),
+    the attorney's § 329(a) disclosure, and belong on this record because
+    they are facts about THIS engagement — the fee the signing attorney
+    agreed, received, and will be paid — not about the petition or the
+    case. Only an attorney files B2030; a preparer's fee is Form 119's.
+    The balance due is not stored: it is the difference of the two amounts,
+    and the model refuses to store arithmetic.
+    """
 
     role: str | None = None
     name: PersonName = field(default_factory=PersonName)
@@ -332,6 +346,22 @@ class FilingProfessionalBody:
     bar_number: str | None = None
     bar_state: str | None = None
     signature_date: str | None = None
+    # B2030 item 1: agreed for legal services, and received before filing.
+    compensation_agreed: str | None = None
+    compensation_received: str | None = None
+    # B2030 items 2-3: the source paid / to be paid, one of
+    # COMPENSATION_SOURCES, with `other` named in the `_other` text.
+    compensation_source_paid: str | None = None
+    compensation_source_paid_other: str | None = None
+    compensation_source_to_be_paid: str | None = None
+    compensation_source_to_be_paid_other: str | None = None
+    # B2030 item 4: shared with someone outside the firm (True) or not
+    # (False); None is the question unanswered, which ticks neither box.
+    compensation_shared: bool | None = None
+    # B2030 items 5e and 6: the other services the fee covers, and the ones
+    # it excludes — narratives the projection wraps across the printed lines.
+    services_other: str | None = None
+    services_excluded: str | None = None
 
 
 def parse_filing_professional(payload: Mapping[str, object]) -> FilingProfessionalBody:
@@ -347,6 +377,43 @@ def parse_filing_professional(payload: Mapping[str, object]) -> FilingProfession
         bar_state=text(payload.get("bar_state"), "bar_state", errors, limit=2),
         signature_date=form_date(
             payload.get("signature_date"), "signature_date", errors
+        ),
+        compensation_agreed=money(
+            payload.get("compensation_agreed"), "compensation_agreed", errors
+        ),
+        compensation_received=money(
+            payload.get("compensation_received"), "compensation_received", errors
+        ),
+        compensation_source_paid=choice(
+            payload.get("compensation_source_paid"),
+            COMPENSATION_SOURCES,
+            "compensation_source_paid",
+            errors,
+        ),
+        compensation_source_paid_other=text(
+            payload.get("compensation_source_paid_other"),
+            "compensation_source_paid_other",
+            errors,
+        ),
+        compensation_source_to_be_paid=choice(
+            payload.get("compensation_source_to_be_paid"),
+            COMPENSATION_SOURCES,
+            "compensation_source_to_be_paid",
+            errors,
+        ),
+        compensation_source_to_be_paid_other=text(
+            payload.get("compensation_source_to_be_paid_other"),
+            "compensation_source_to_be_paid_other",
+            errors,
+        ),
+        compensation_shared=boolean(
+            payload.get("compensation_shared"), "compensation_shared", errors
+        ),
+        services_other=narrative(
+            payload.get("services_other"), "services_other", errors
+        ),
+        services_excluded=narrative(
+            payload.get("services_excluded"), "services_excluded", errors
         ),
     )
     if errors:

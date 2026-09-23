@@ -2763,7 +2763,25 @@ export interface FilingProfessionalBody {
   readonly bar_number?: string | undefined;
   readonly bar_state?: string | undefined;
   readonly signature_date?: FormDate | undefined;
+  /**
+   * B2030, the attorney's compensation disclosure (issue #351): the fee
+   * agreed and received (money strings), who paid / will pay, whether the
+   * fee is shared outside the firm, and the services covered or excluded.
+   * The balance due is derived by the forms engine, never stored.
+   */
+  readonly compensation_agreed?: Money | undefined;
+  readonly compensation_received?: Money | undefined;
+  readonly compensation_source_paid?: CompensationSource | undefined;
+  readonly compensation_source_paid_other?: string | undefined;
+  readonly compensation_source_to_be_paid?: CompensationSource | undefined;
+  readonly compensation_source_to_be_paid_other?: string | undefined;
+  readonly compensation_shared?: boolean | undefined;
+  readonly services_other?: string | undefined;
+  readonly services_excluded?: string | undefined;
 }
+
+/** B2030 items 2 and 3: who paid, and who will pay, the attorney's fee. */
+export type CompensationSource = 'debtor' | 'other';
 
 /**
  * The URL segment and listing key of each generic collection, and the body
