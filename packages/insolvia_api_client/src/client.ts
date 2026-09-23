@@ -6,6 +6,10 @@ import {
   FILING_ROLES,
   PROVENANCE_SOURCES,
   VENUE_BASES,
+  INCOME_COLUMNS,
+  MARITAL_FILING_STATUSES,
+  MEANS_TEST_OUTCOMES,
+  PRESUMPTION_EXEMPTIONS,
   addFirmUserRequestToJson,
   caseEntityRequestToJson,
   createCaseRequestToJson,
@@ -34,6 +38,7 @@ import type {
   CaseEntity,
   CaseEntityRequest,
   CaseLiens,
+  CaseMeansTest,
   CaseProblem,
   CaseStandards,
   CaseStatus,
@@ -47,6 +52,15 @@ import type {
   ExemptionLookbacks,
   ExemptionSet,
   StatutoryLimitFigure,
+  CmiColumn,
+  CmiEntry,
+  CmiGap,
+  CmiLine,
+  CmiTrace,
+  HouseholdFigure,
+  MeansTestLine,
+  MedianComparison,
+  PresumptionExemption,
   CreateCaseRequest,
   CreateDocumentRequest,
   CreateDocumentResult,
@@ -1034,6 +1048,28 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return caseStandardsFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/means-test` — the § 707(b) trace for the case
+   * as of its expected filing date (issue #349): CMI by line and column
+   * with the window used, the median comparison, and for an above-median
+   * debtor the B122A-2 lines and the presumption result, every figure
+   * naming where it came from. Run by the same code path the packet's
+   * B122A-1/A-2 use, so the screen and the forms never disagree.
+   *
+   * Always resolves to 200; read {@link CaseMeansTest.problems} when
+   * `outcome` is `undetermined`. Like {@link getCaseSummary}, a 404 means
+   * the case is unknown *or* not the caller's.
+   */
+  async getCaseMeansTest(caseId: string): Promise<CaseMeansTest> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/means-test`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseMeansTestFromJson(decoded);
   }
 
   /**
@@ -2735,6 +2771,171 @@ function caseStandardsFromJson(response: DecodedResponse): CaseStandards {
     jurisdictionSource: requireNullableString(response, 'jurisdictionSource'),
     nationalStandards: nationalStandardsFiguresFromJson(childObject(response, 'nationalStandards')),
     localStandards: localStandardsFiguresFromJson(childObject(response, 'localStandards')),
+    problems: requireStringArray(response, 'problems'),
+  };
+}
+
+// --- the means-test trace (issue #349) ---------------------------------------
+// `means_test_json` in services/api/src/insolvia_api/core/means_test_trace.py
+// is the shape; money is STRINGS throughout, for the reason `caseTotalsFromJson`
+// gives.
+
+function cmiEntryFromJson(response: DecodedResponse): CmiEntry {
+  return {
+    receivedOn: requireString(response, 'receivedOn'),
+    amount: requireString(response, 'amount'),
+    description: requireString(response, 'description'),
+  };
+}
+
+function cmiLineFromJson(response: DecodedResponse): CmiLine {
+  return definedMembers<CmiLine>({
+    category: requireString(response, 'category'),
+    label: requireString(response, 'label'),
+    totalReceived: requireString(response, 'totalReceived'),
+    monthlyAverage: requireString(response, 'monthlyAverage'),
+    citation: requireString(response, 'citation'),
+    note: requireString(response, 'note'),
+    entries: requireArrayOf(response, 'entries', 'CmiEntry', cmiEntryFromJson),
+    grossMonthlyAverage: optionalString(response, 'grossMonthlyAverage'),
+    expensesMonthlyAverage: optionalString(response, 'expensesMonthlyAverage'),
+  });
+}
+
+function cmiColumnFromJson(response: DecodedResponse): CmiColumn {
+  return {
+    column: requireChoice(response, 'column', INCOME_COLUMNS),
+    lines: requireArrayOf(response, 'lines', 'CmiLine', cmiLineFromJson),
+    excluded: requireArrayOf(response, 'excluded', 'CmiLine', cmiLineFromJson),
+    monthlyTotal: requireString(response, 'monthlyTotal'),
+  };
+}
+
+function cmiGapFromJson(response: DecodedResponse): CmiGap {
+  return {
+    employer: requireString(response, 'employer'),
+    months: requireStringArray(response, 'months'),
+  };
+}
+
+function cmiTraceFromJson(response: DecodedResponse): CmiTrace {
+  const window = childObject(response, 'window');
+  return {
+    window: {
+      filingDate: requireString(window, 'filingDate'),
+      start: requireString(window, 'start'),
+      end: requireString(window, 'end'),
+      months: requireStringArray(window, 'months'),
+    },
+    columns: requireArrayOf(response, 'columns', 'CmiColumn', cmiColumnFromJson),
+    combinedMonthlyTotal: requireString(response, 'combinedMonthlyTotal'),
+    annualized: requireString(response, 'annualized'),
+    gaps: requireArrayOf(response, 'gaps', 'CmiGap', cmiGapFromJson),
+    problems: requireStringArray(response, 'problems'),
+  };
+}
+
+function medianComparisonFromJson(response: DecodedResponse): MedianComparison {
+  return {
+    state: requireString(response, 'state'),
+    householdSize: requireNumber(response, 'householdSize'),
+    monthlyCmi: requireString(response, 'monthlyCmi'),
+    annualizedCmi: requireString(response, 'annualizedCmi'),
+    annualMedian: requireString(response, 'annualMedian'),
+    aboveMedian: requireBoolean(response, 'aboveMedian'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function meansTestLineFromJson(response: DecodedResponse): MeansTestLine {
+  return {
+    line: requireString(response, 'line'),
+    label: requireString(response, 'label'),
+    amount: requireString(response, 'amount'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function householdFigureFromJson(response: DecodedResponse): HouseholdFigure {
+  return {
+    value: requireNullableNumber(response, 'value'),
+    source: requireNullableString(response, 'source'),
+  };
+}
+
+/**
+ * A nested object the API sends as JSON `null` when it has no answer yet —
+ * the means test's `comparison`. `null` stays `null`; absence is still a
+ * contract violation.
+ */
+function nullableObject(response: DecodedResponse, key: string): DecodedResponse | null {
+  if (response.json[key] === null) {
+    return null;
+  }
+  return childObject(response, key);
+}
+
+function requireNullableChoice<T extends string>(
+  response: DecodedResponse,
+  key: string,
+  allowed: readonly T[],
+): T | null {
+  if (response.json[key] === null) {
+    return null;
+  }
+  return requireChoice(response, key, allowed);
+}
+
+function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
+  const jurisdiction = childObject(response, 'jurisdiction');
+  const marital = childObject(response, 'maritalFilingStatus');
+  const household = childObject(response, 'household');
+  const exemptions = childObject(response, 'exemptions');
+  const debt = childObject(response, 'debt');
+  const comparison = nullableObject(response, 'comparison');
+  return {
+    asOf: requireString(response, 'asOf'),
+    asOfSource: requireString(response, 'asOfSource'),
+    releaseIds: requireStringRecord(response, 'releaseIds'),
+    jurisdiction: {
+      state: requireNullableString(jurisdiction, 'state'),
+      county: requireNullableString(jurisdiction, 'county'),
+      district: requireString(jurisdiction, 'district'),
+    },
+    maritalFilingStatus: {
+      value: requireNullableChoice(marital, 'value', MARITAL_FILING_STATUSES),
+      source: requireString(marital, 'source'),
+    },
+    household: {
+      peopleUnder65: requireNullableNumber(household, 'peopleUnder65'),
+      people65OrOlder: requireNullableNumber(household, 'people65OrOlder'),
+      medianHouseholdSize: householdFigureFromJson(childObject(household, 'medianHouseholdSize')),
+      irsFamilySize: householdFigureFromJson(childObject(household, 'irsFamilySize')),
+      irsHousingFamilySize: householdFigureFromJson(childObject(household, 'irsHousingFamilySize')),
+      childrenUnder18: requireNumber(household, 'childrenUnder18'),
+    },
+    exemptions: {
+      nonConsumerDebts: requireBoolean(exemptions, 'nonConsumerDebts'),
+      disabledVeteran: requireBoolean(exemptions, 'disabledVeteran'),
+      reservistNationalGuard: requireBoolean(exemptions, 'reservistNationalGuard'),
+      applied: requireNullableChoice(exemptions, 'applied', PRESUMPTION_EXEMPTIONS),
+      rule: requireNullableString(exemptions, 'rule'),
+      available: requireStringArray(exemptions, 'available').map((flag, index) => {
+        if (!PRESUMPTION_EXEMPTIONS.includes(flag as PresumptionExemption)) {
+          throw malformedField(exemptions, `available[${index}]`, 'a presumption exemption');
+        }
+        return flag as PresumptionExemption;
+      }),
+    },
+    cmi: cmiTraceFromJson(childObject(response, 'cmi')),
+    debt: {
+      priorityTotal: requireString(debt, 'priorityTotal'),
+      nonpriorityUnsecuredTotal: requireString(debt, 'nonpriorityUnsecuredTotal'),
+    },
+    comparison: comparison === null ? null : medianComparisonFromJson(comparison),
+    outcome: requireChoice(response, 'outcome', MEANS_TEST_OUTCOMES),
+    determinedBy: requireNullableString(response, 'determinedBy'),
+    lines: requireArrayOf(response, 'lines', 'MeansTestLine', meansTestLineFromJson),
     problems: requireStringArray(response, 'problems'),
   };
 }

@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,11 @@ from insolvia_api.core.form_projections import (
     format_money,
     project,
 )
+from insolvia_api.core.form_projections.b122a1 import (
+    marital_filing_status,
+    means_test_as_of,
+)
+from insolvia_api.core.form_projections.b122a2 import files_b122a2
 from insolvia_api.core.form_templates import get_form, latest_form
 from insolvia_core.assets import AssetBody
 from insolvia_core.cases import Case
@@ -50,6 +56,7 @@ from insolvia_core.income import (
     PayPeriodRecordBody,
 )
 from insolvia_core.means_test_inputs import (
+    IncomeLineOverride,
     MeansTestInputBody,
     OtherSecuredPayment,
 )
@@ -2382,3 +2389,87 @@ def test_b122a2_surfaces_the_engines_refusals_through_the_gate() -> None:
     without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
     with pytest.raises(FormProjectionError, match="household composition"):
         project(latest_form("form/b122a2"), without_inputs)
+
+
+# --- B122A-1 / B122A-2: issue #349's inputs ------------------------------------
+
+
+def _with_inputs(case_file: CaseFile, **changes: object) -> CaseFile:
+    inputs = replace(case_file.means_test_inputs[0], **changes)
+    return CaseFile(**{**case_file.__dict__, "means_test_inputs": (inputs,)})
+
+
+def test_b122a1_takes_its_window_from_the_expected_filing_date() -> None:
+    case_file = reference_case_file()
+    assert case_file.petition is not None
+    # The reference case's paychecks run February-July 2026; planning to
+    # file in April moves the window back to October-March, where only two
+    # of them land.
+    planned = CaseFile(
+        **{
+            **case_file.__dict__,
+            "petition": replace(case_file.petition, expected_filing_date="2026-04-15"),
+        }
+    )
+    assert means_test_as_of(planned) == (
+        date(2026, 4, 15),
+        "petition.expected_filing_date",
+    )
+    assert means_test_as_of(case_file) == (date(2026, 8, 1), "case.created_at")
+    values = project(latest_form("form/b122a1"), planned)
+    wages = values["wages"]
+    assert isinstance(wages, dict)
+    assert wages["Debto1.Quest2.0"] == Text("2,466.67")  # two 7,400 checks / 6
+
+
+def test_b122a1_line_1_takes_the_entered_marital_status_first() -> None:
+    separated = _with_inputs(
+        reference_case_file(), marital_filing_status="married_not_filing_separated"
+    )
+    values = project(latest_form("form/b122a1"), separated)
+    assert values["marital_filing_status"] == Option("Married but not filing")
+    assert values["married_not_filing_household"] == Option("separately")
+
+
+def test_b122a1_line_1_falls_back_to_the_debtor_records() -> None:
+    status, source = marital_filing_status(reference_case_file())
+    assert status == "married_filing_jointly"
+    assert "debtor_2" in source
+
+
+@pytest.mark.parametrize(
+    ("flag", "box"),
+    [
+        ("non_consumer_debts", "No Abuse"),
+        ("disabled_veteran", "No Abuse"),
+        ("reservist_national_guard", "Does not apply"),
+    ],
+)
+def test_b122a1_an_exemption_checks_the_supplements_box(flag: str, box: str) -> None:
+    exempt = _with_inputs(reference_case_file(), **{flag: True})
+    values = project(latest_form("form/b122a1"), exempt)
+    assert values["caption.presumption_box"] == Option(box)
+    assert "median_comparison" not in values
+
+
+def test_b122a2_is_not_filed_by_an_exempt_debtor() -> None:
+    exempt = _with_inputs(reference_case_file(), reservist_national_guard=True)
+    assert not files_b122a2(exempt)
+    with pytest.raises(FormProjectionError, match="exempt"):
+        project(latest_form("form/b122a2"), exempt)
+
+
+def test_b122a1_prints_an_overridden_line_as_entered() -> None:
+    overridden = _with_inputs(
+        reference_case_file(),
+        income_overrides=(
+            IncomeLineOverride(
+                id="ov-1", column="A", category="wages", monthly_amount="8000.00"
+            ),
+        ),
+    )
+    values = project(latest_form("form/b122a1"), overridden)
+    wages = values["wages"]
+    assert isinstance(wages, dict)
+    assert wages["Debto1.Quest2.0"] == Text("8,000.00")
+    assert values["total_cmi"] == Text("9,300.00")  # 8,000 + Ben's 1,300
