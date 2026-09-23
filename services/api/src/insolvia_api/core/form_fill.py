@@ -33,6 +33,16 @@ Deliberate properties:
 - **A field the values omit stays untouched** — progressive fill is allowed;
   completeness ("every field this chapter's filing requires") is a separate
   pre-filing gate per case-data-model.md, not this module's concern.
+- **A flat release is drawn, not filled** (issue #351). B2010 and B2030 are
+  published with no AcroForm, so their specs claim overlay boxes
+  (core/form_templates.OverlayBox) and this engine draws each value — text
+  on a baseline in Helvetica, or an X across a printed checkbox — into ONE
+  content stream appended to the page. The court's own page streams are
+  never edited, which keeps the goldens' "official pages untouched" claim
+  true for these forms too; the overlay is a separate stream that begins
+  with a `% insolvia-overlay` marker and names every box it draws, so the
+  goldens read it back field by field exactly as they read widgets. A flat
+  release with nothing to draw ships the court's bytes verbatim.
 
 This is a LIBRARY, callable from pipeline workers (ADR 0015): no Flask, no
 endpoint, no I/O beyond the bytes it is handed. Packet assembly (9.6) calls
@@ -47,9 +57,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pypdf import PdfWriter
-from pypdf.generic import DictionaryObject, NameObject, PdfObject
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    NameObject,
+    PdfObject,
+    StreamObject,
+)
 
-from .form_templates import FieldSpec, FormRelease, Widget
+from .form_templates import FieldSpec, FormRelease, OverlayBox, Widget
 
 
 class FormFillError(ValueError):
@@ -125,6 +141,210 @@ _TEXT_TYPES = frozenset(
         "signature",
     }
 )
+
+
+# --- overlay drawing (flat releases) ------------------------------------------
+
+# The one font the overlay draws with: Helvetica, a standard-14 font every
+# PDF reader carries, so nothing is embedded and the output stays small and
+# deterministic. Values are written in WinAnsiEncoding (cp1252).
+OVERLAY_FONT_SIZE = 10.0
+_OVERLAY_MARKER = b"% insolvia-overlay\n"
+_OVERLAY_FONT_KEY = "/Helv"
+
+# Helvetica's advance widths for ASCII 32-126, per the Adobe AFM (1/1000 em).
+# Used only to refuse a value wider than its printed space — the reader's own
+# metrics render it, these just have to agree closely enough to catch the
+# overflow, which for a standard-14 font they do exactly.
+_HELVETICA_AFM = (
+    "278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 "  # space-/
+    "556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 "  # 0-?
+    "1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 "  # @-O
+    "667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 "  # P-_
+    "333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 "  # `-o
+    "556 556 333 500 278 556 500 722 500 500 500 334 260 334 584"  # p-~
+)
+_HELVETICA_WIDTHS = dict(
+    zip(range(32, 127), map(int, _HELVETICA_AFM.split()), strict=True)
+)
+
+
+def helvetica_width(value: str, size: float = OVERLAY_FONT_SIZE) -> float:
+    """The width, in points, `value` takes in Helvetica at `size` — the
+    same estimate the projection layer wraps narratives against."""
+    return sum(_HELVETICA_WIDTHS.get(ord(ch), 556) for ch in value) / 1000 * size
+
+
+def _pdf_literal(value: str) -> bytes:
+    """`value` as a PDF literal string in WinAnsiEncoding, escaped."""
+    out = bytearray(b"(")
+    for byte in value.encode("cp1252"):
+        if byte in b"\\()":
+            out += b"\\" + bytes([byte])
+        elif 32 <= byte < 127:
+            out.append(byte)
+        else:
+            out += f"\\{byte:03o}".encode("ascii")
+    out += b")"
+    return bytes(out)
+
+
+def _check_box_text(
+    box: OverlayBox, fill: Text, where: str, problems: list[str]
+) -> None:
+    if not fill.value:
+        problems.append(f"{where}: empty value — omit the field to leave it blank")
+        return
+    if "\n" in fill.value or "\r" in fill.value:
+        problems.append(f"{where}: value contains a line break")
+    try:
+        fill.value.encode("cp1252")
+    except UnicodeEncodeError:
+        problems.append(
+            f"{where}: {fill.value!r} has a character Helvetica cannot draw"
+        )
+        return
+    width = helvetica_width(fill.value)
+    if width > box.w + 0.01:
+        problems.append(
+            f"{where}: {fill.value!r} is {width:.0f} points wide; the printed "
+            f"space is {box.w:.0f}"
+        )
+
+
+def _validate_box(
+    spec: FieldSpec, box: OverlayBox, fill: FieldFill, problems: list[str]
+) -> None:
+    where = f"{spec.id} -> {box.name!r}"
+    if isinstance(fill, Text):
+        if spec.type not in _TEXT_TYPES:
+            problems.append(f"{where}: Text on a {spec.type} field")
+        else:
+            _check_box_text(box, fill, where, problems)
+    elif isinstance(fill, Check):
+        if not box.is_check:
+            problems.append(f"{where}: Check on a {spec.type} field")
+    else:
+        problems.append(
+            f"{where}: an overlay box takes Text or Check — a flat form has no "
+            "export states to select"
+        )
+
+
+def _fmt(value: float) -> bytes:
+    return f"{value:.2f}".encode("ascii")
+
+
+def _overlay_stream(draws: list[tuple[OverlayBox, FieldFill]]) -> bytes:
+    """The content stream for one page: the marker, then one named block
+    per box, in box-name order so the bytes never depend on dict order."""
+    lines = [_OVERLAY_MARKER]
+    for box, fill in sorted(draws, key=lambda pair: pair[0].name):
+        tag = box.name.encode("ascii")
+        if isinstance(fill, Check):
+            if not fill.on:
+                continue
+            assert box.h is not None  # validated: Check lands on a checkbox box
+            inset = 2.5
+            x1, y1 = box.x + inset, box.y + inset
+            x2, y2 = box.x + box.w - inset, box.y + box.h - inset
+            lines.append(
+                b"% box:" + tag + b" check\n"
+                b"q 0 G 1 w "
+                + _fmt(x1)
+                + b" "
+                + _fmt(y1)
+                + b" m "
+                + _fmt(x2)
+                + b" "
+                + _fmt(y2)
+                + b" l S "
+                + _fmt(x1)
+                + b" "
+                + _fmt(y2)
+                + b" m "
+                + _fmt(x2)
+                + b" "
+                + _fmt(y1)
+                + b" l S Q\n"
+            )
+        else:
+            assert isinstance(fill, Text)  # validated: boxes take Text or Check
+            lines.append(
+                b"% box:" + tag + b"\n"
+                b"BT "
+                + _OVERLAY_FONT_KEY.encode("ascii")
+                + b" "
+                + _fmt(OVERLAY_FONT_SIZE)
+                + b" Tf 1 0 0 1 "
+                + _fmt(box.x)
+                + b" "
+                + _fmt(box.y)
+                + b" Tm "
+                + _pdf_literal(fill.value)
+                + b" Tj ET\n"
+            )
+    return b"".join(lines)
+
+
+def _ensure_overlay_font(page: DictionaryObject) -> None:
+    """Declare Helvetica under /Helv in the page's font resources (a
+    standard-14 font needs no embedding), leaving any existing entry alone."""
+    resources_raw = page.get("/Resources")
+    if resources_raw is None:
+        resources = DictionaryObject()
+        page[NameObject("/Resources")] = resources
+    else:
+        resources_obj = resources_raw.get_object()
+        assert isinstance(resources_obj, DictionaryObject)  # PDF spec: a dict
+        resources = resources_obj
+    fonts_raw = resources.get("/Font")
+    if fonts_raw is None:
+        fonts = DictionaryObject()
+        resources[NameObject("/Font")] = fonts
+    else:
+        fonts_obj = fonts_raw.get_object()
+        assert isinstance(fonts_obj, DictionaryObject)  # PDF spec: a dict
+        fonts = fonts_obj
+    if _OVERLAY_FONT_KEY in fonts:
+        return
+    font = DictionaryObject()
+    font[NameObject("/Type")] = NameObject("/Font")
+    font[NameObject("/Subtype")] = NameObject("/Type1")
+    font[NameObject("/BaseFont")] = NameObject("/Helvetica")
+    font[NameObject("/Encoding")] = NameObject("/WinAnsiEncoding")
+    fonts[NameObject(_OVERLAY_FONT_KEY)] = font
+
+
+def _apply_overlay(
+    writer: PdfWriter, draws: Mapping[str, tuple[OverlayBox, FieldFill]]
+) -> None:
+    """Append one overlay stream per drawn page. The page's existing
+    /Contents — a stream or an array of them — is kept as-is ahead of it."""
+    by_page: dict[int, list[tuple[OverlayBox, FieldFill]]] = {}
+    for box, fill in draws.values():
+        by_page.setdefault(box.page, []).append((box, fill))
+    for page_number in sorted(by_page):
+        page = writer.pages[page_number - 1]
+        _ensure_overlay_font(page)
+        stream = StreamObject()
+        stream.set_data(_overlay_stream(by_page[page_number]))
+        # pypdf exposes no public way to register a new indirect object; its
+        # own page-merging code goes through this same method.
+        appended = writer._add_object(stream)
+        parts = ArrayObject()
+        existing = page.raw_get("/Contents") if "/Contents" in page else None
+        if existing is not None:
+            resolved = existing.get_object()
+            if isinstance(resolved, ArrayObject):
+                parts.extend(resolved)
+            else:
+                parts.append(existing)
+        parts.append(appended)
+        page[NameObject("/Contents")] = parts
+
+
+# --- widget validation ---------------------------------------------------------
 
 
 def _check_text(widget: Widget, fill: Text, where: str, problems: list[str]) -> None:
@@ -215,7 +435,10 @@ def _per_widget(
                 continue
             entries = {spec.pdf_names[0]: fill}
         for name, one in entries.items():
-            _validate_one(spec, release.widgets[name], one, problems)
+            if name in release.boxes:
+                _validate_box(spec, release.boxes[name], one, problems)
+            else:
+                _validate_one(spec, release.widgets[name], one, problems)
             flat[name] = (spec, one)
     if problems:
         raise FormFillError(sorted(problems))
@@ -352,8 +575,11 @@ def fill_form(release: FormRelease, values: FieldValues) -> bytes:
 
     field_updates: dict[str, str] = {}
     appearance_targets: dict[str, WidgetStates] = {}
+    draws: dict[str, tuple[OverlayBox, FieldFill]] = {}
     for name, (_spec, fill) in flat.items():
-        if isinstance(fill, Text):
+        if name in release.boxes:
+            draws[name] = (release.boxes[name], fill)
+        elif isinstance(fill, Text):
             field_updates[name] = fill.value
         elif isinstance(fill, Check):
             if fill.on:
@@ -363,11 +589,18 @@ def fill_form(release: FormRelease, values: FieldValues) -> bytes:
         elif isinstance(fill, WidgetStates):
             appearance_targets[name] = fill
 
+    if release.is_flat and not draws:
+        # A notice with nothing to draw: the court's own bytes, untouched —
+        # nothing to re-serialise, and the output IS the vendored template.
+        return release.template_pdf
+
     writer = PdfWriter(clone_from=io.BytesIO(release.template_pdf))
     if field_updates:
         _apply_field_updates(writer, field_updates)
     if appearance_targets:
         _apply_widget_states(writer, appearance_targets)
+    if draws:
+        _apply_overlay(writer, draws)
 
     out = io.BytesIO()
     writer.write(out)

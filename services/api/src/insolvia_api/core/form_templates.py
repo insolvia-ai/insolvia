@@ -33,6 +33,20 @@ re-checked by that script again, and a template the engine cannot trust is a
 mis-filled court form. Vocabulary rules (entity names, mapping shapes) remain
 check.py's job; this loader owns the widget-level contract only.
 
+FLAT RELEASES (issue #351). Two Director's Forms the Chapter 7 packet files —
+B2010, the § 342(b) notice, and B2030, the attorney's compensation
+disclosure — are published by uscourts.gov with NO AcroForm at all, so there
+is no widget to claim. Their dumps carry an empty field list, and their specs
+claim `overlay` boxes instead: a page position (PDF user space, points,
+origin bottom-left) measured from the PDF's own text and image operators,
+onto which the fill engine draws the value in an APPENDED content stream —
+the official page streams stay byte-identical, exactly as they do for a
+widget fill. An overlay box has the same standing here as a widget: it is
+named, claimed exactly once, and addressed by name through `pdf_names`, so
+the projection layer's row helpers work unchanged. A flat release with no
+fields at all (B2010 is a notice with nothing to print) is allowed, and the
+engine ships the court's bytes verbatim for it.
+
 Resolution follows effective-dating.md exactly, as core/exemptions.py's does
 (the first registry consumer; the mechanics are deliberately parallel):
 `resolve` picks the release effective on the case's filing date, `get` returns
@@ -108,6 +122,27 @@ class Widget:
 
 
 @dataclass(frozen=True)
+class OverlayBox:
+    """One drawing position on a FLAT release (a PDF with no AcroForm).
+
+    `x`/`y` are PDF user-space points from the page's bottom-left: for a
+    text box `y` is the BASELINE the value is drawn on and `w` the width the
+    value must fit within; for a checkbox box (`h` set) the four numbers are
+    the printed square an X is drawn across. `page` is 1-based."""
+
+    name: str
+    page: int
+    x: float
+    y: float
+    w: float
+    h: float | None = None
+
+    @property
+    def is_check(self) -> bool:
+        return self.h is not None
+
+
+@dataclass(frozen=True)
 class OptionSpec:
     """One radio option: the PDF's exact export state, and the canonical
     enum value the projection layer maps it from (None where the spec
@@ -127,7 +162,8 @@ class FieldSpec:
     (dump order otherwise — see `_pattern_order` for why the dump cannot be
     trusted). A field claiming several PDF fields is a repetition (two
     debtor columns, table rows); the fill engine addresses those instances
-    by PDF name."""
+    by PDF name. On a flat release the names are OVERLAY BOX names
+    (`FormRelease.boxes`), in the spec's order, and everything above holds."""
 
     id: str
     type: str
@@ -156,6 +192,15 @@ class FormRelease:
     template_pdf: bytes
     fields: tuple[FieldSpec, ...]
     widgets: Mapping[str, Widget]
+    # A flat release's drawing positions, keyed by box name; empty on a
+    # fillable form, and `widgets` is empty on a flat one — never both.
+    boxes: Mapping[str, OverlayBox]
+
+    @property
+    def is_flat(self) -> bool:
+        """No AcroForm: the engine draws overlay boxes (or, with none to
+        draw, ships the template verbatim) instead of setting widgets."""
+        return not self.widgets
 
     @property
     def release_id(self) -> str:
@@ -202,8 +247,10 @@ def _str_field(data: Mapping[str, object], key: str, where: str) -> str:
 
 def _widgets(dump: Mapping[str, object], where: str) -> dict[str, Widget]:
     raw_fields = dump.get("fields")
-    if not isinstance(raw_fields, list) or not raw_fields:
-        raise _fail(where, "acroform.json fields missing or empty")
+    if not isinstance(raw_fields, list):
+        raise _fail(where, "acroform.json fields missing")
+    # An EMPTY list is a flat release (no AcroForm) — the spec then claims
+    # overlay boxes, or nothing at all for a notice.
     widgets: dict[str, Widget] = {}
     for raw in raw_fields:
         if not isinstance(raw, dict):
@@ -308,11 +355,66 @@ def _options(raw: object, where: str, fid: str) -> tuple[OptionSpec, ...]:
     return tuple(parsed)
 
 
+def _number(value: object, where: str, what: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise _fail(where, f"{what} must be a non-negative number")
+    return float(value)
+
+
+def _overlay_boxes(
+    raw: object,
+    where: str,
+    fid: str,
+    ftype: str,
+    page_count: int,
+    boxes: dict[str, OverlayBox],
+) -> tuple[str, ...]:
+    """Parse a flat release's `overlay` claim into `boxes`, returning the
+    box names in the spec's order — the field's `pdf_names`."""
+    if not isinstance(raw, list) or not raw:
+        raise _fail(where, f"{fid}: overlay must be a non-empty list of boxes")
+    if ftype == "radio":
+        raise _fail(where, f"{fid}: a flat form has no export states for a radio")
+    names: list[str] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise _fail(where, f"{fid}: overlay box is not an object")
+        name = _str_field(item, "name", where)
+        if name in boxes:
+            raise _fail(where, f"overlay box {name!r} claimed twice")
+        page = item.get("page")
+        if not isinstance(page, int) or not 1 <= page <= page_count:
+            raise _fail(where, f"{fid}: overlay box {name!r} page is not on the PDF")
+        height = item.get("h")
+        if (ftype == "checkbox") != (height is not None):
+            raise _fail(
+                where,
+                f"{fid}: overlay box {name!r} carries h exactly when the field "
+                "is a checkbox",
+            )
+        boxes[name] = OverlayBox(
+            name=name,
+            page=page,
+            x=_number(item.get("x"), where, f"{fid}: overlay box {name!r} x"),
+            y=_number(item.get("y"), where, f"{fid}: overlay box {name!r} y"),
+            w=_number(item.get("w"), where, f"{fid}: overlay box {name!r} w"),
+            h=(
+                _number(height, where, f"{fid}: overlay box {name!r} h")
+                if height is not None
+                else None
+            ),
+        )
+        names.append(name)
+    return tuple(names)
+
+
 def _field(
     raw: object,
     where: str,
     widgets: Mapping[str, Widget],
     dump_order: Mapping[str, int],
+    boxes: dict[str, OverlayBox],
+    page_count: int,
 ) -> FieldSpec:
     if not isinstance(raw, dict):
         raise _fail(where, "spec field is not an object")
@@ -331,10 +433,29 @@ def _field(
     notes = raw.get("notes", "")
     if not isinstance(notes, str):
         raise _fail(where, f"{fid}: notes must be a string")
+    label = _str_field(raw, "label", where)
 
     pdf = raw.get("pdf")
     if not isinstance(pdf, dict) or not pdf:
         raise _fail(where, f"{fid}: pdf claim block missing")
+    if "overlay" in pdf:
+        # A flat release: the claim is a set of drawing positions, allowed
+        # only where there is no widget to claim instead.
+        if widgets:
+            raise _fail(where, f"{fid}: overlay boxes on a form that has widgets")
+        if set(pdf) != {"overlay"}:
+            raise _fail(where, f"{fid}: overlay cannot be mixed with names/pattern")
+        return FieldSpec(
+            id=fid,
+            type=ftype,
+            label=label,
+            pdf_names=_overlay_boxes(
+                pdf["overlay"], where, fid, ftype, page_count, boxes
+            ),
+            part=part,
+            line=line,
+            notes=notes,
+        )
     claimed: list[str] = []
     names = pdf.get("names", [])
     if not isinstance(names, list):
@@ -386,7 +507,7 @@ def _field(
     return FieldSpec(
         id=fid,
         type=ftype,
-        label=_str_field(raw, "label", where),
+        label=label,
         pdf_names=claimed_ordered,
         part=part,
         line=line,
@@ -445,6 +566,9 @@ def _load_release(release_dir: Traversable, series_id: str) -> FormRelease:
         )
     widgets = _widgets(dump, where)
     dump_order = {name: i for i, name in enumerate(widgets)}
+    page_count = dump.get("pages")
+    if not isinstance(page_count, int) or page_count < 1:
+        raise _fail(where, "acroform.json pages missing")
 
     spec = _load_json(release_dir.joinpath("spec.json"), where)
     form = _str_field(spec, "form", where)
@@ -460,13 +584,18 @@ def _load_release(release_dir: Traversable, series_id: str) -> FormRelease:
             raise _fail(where, f"{doc_name} effective_date disagrees with the path")
 
     raw_fields = spec.get("fields")
-    if not isinstance(raw_fields, list) or not raw_fields:
-        raise _fail(where, "spec fields missing or empty")
+    if not isinstance(raw_fields, list):
+        raise _fail(where, "spec fields missing")
+    if not raw_fields and widgets:
+        # Only a flat notice (B2010) prints nothing; a fillable form with no
+        # fields would be a template the engine can never fill.
+        raise _fail(where, "spec fields empty on a form that has widgets")
     fields: list[FieldSpec] = []
     seen: set[str] = set()
     claimed_by: dict[str, str] = {}
+    boxes: dict[str, OverlayBox] = {}
     for raw in raw_fields:
-        parsed = _field(raw, where, widgets, dump_order)
+        parsed = _field(raw, where, widgets, dump_order, boxes, page_count)
         if parsed.id in seen:
             raise _fail(where, f"duplicate field id {parsed.id}")
         seen.add(parsed.id)
@@ -505,6 +634,7 @@ def _load_release(release_dir: Traversable, series_id: str) -> FormRelease:
         template_pdf=template_pdf,
         fields=tuple(fields),
         widgets=widgets,
+        boxes=boxes,
     )
 
 

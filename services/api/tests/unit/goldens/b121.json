@@ -1,0 +1,90 @@
+{
+ "fields": {
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number1": {
+   "value": "S1.0 caption.case_number"
+  },
+  "Check Box1": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check Box2": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check Box3": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Check Box4": {
+   "value": "/On",
+   "widget_states": [
+    "/On"
+   ]
+  },
+  "Debtor1.First name": {
+   "value": "S2.0 line_1_debtor1_first_name"
+  },
+  "Debtor1.Last name": {
+   "value": "S4.0 line_1_debtor1_last_name"
+  },
+  "Debtor1.Middle name": {
+   "value": "S3.0 line_1_debtor1_middle_name"
+  },
+  "Debtor1.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor1a.ITINNum": {
+   "value": "1234"
+  },
+  "Debtor1a.SSNum": {
+   "value": "1234"
+  },
+  "Debtor1b.ITINNum": {
+   "value": "1235"
+  },
+  "Debtor1b.SSNum": {
+   "value": "1235"
+  },
+  "Debtor2.Executed on": {
+   "value": "01/20/2026"
+  },
+  "Debtor2.First name": {
+   "value": "S5.0 line_1_debtor2_first_name"
+  },
+  "Debtor2.Last name": {
+   "value": "S7.0 line_1_debtor2_last_name"
+  },
+  "Debtor2.Middle name_2": {
+   "value": "S6.0 line_1_debtor2_middle_name"
+  },
+  "Debtor2.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "Debtor2a ITINNum": {
+   "value": "1234"
+  },
+  "Debtor2a SSNum": {
+   "value": "1234"
+  },
+  "Debtor2b ITINNum": {
+   "value": "1235"
+  },
+  "Debtor2b SSNum": {
+   "value": "1235"
+  },
+  "Executed on": {
+   "value": "01/18/2026"
+  }
+ },
+ "release": "form/b121@2015-12-01",
+ "sha256": "c5da036a0d69c8dff868878eac72f9b1cf67c241f4750658a1dcb99e38d2572c"
+}

@@ -23,6 +23,11 @@ before editing anything here.
   cross-schedule copy, or an existence question, map it `derived` — do not
   invent a stored attribute for it. case-data-model.md's "Derived values are
   computed, never stored" owns the reasoning.
+- **A flat form (no AcroForm — B2010, B2030) claims `overlay` boxes, never
+  hand-added widgets.** The template stays the court's bytes verbatim; the
+  engine draws onto an appended stream. Boxes are measured from the PDF's
+  own operators and are allowed only where the dump has no fillable widget.
+  [`README.md`](README.md) "Flat forms" owns the shape.
 - **A new form revision is a new dump + spec update together**, with
   `revision`/`effective_date` bumped in both — the checker refuses a mismatch.
   Which revision is *current* is the regulatory source register's fact; how

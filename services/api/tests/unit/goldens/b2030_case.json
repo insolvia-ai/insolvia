@@ -1,0 +1,150 @@
+{
+ "fields": {
+  "case_number": {
+   "value": null
+  },
+  "certification.date": {
+   "value": "08/31/2026"
+  },
+  "certification.firm_name": {
+   "value": "Counsel & Counsel PA"
+  },
+  "certification.signature": {
+   "value": null
+  },
+  "chapter": {
+   "value": "7"
+  },
+  "debtor.1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "debtor.2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "district.1": {
+   "value": "Middle"
+  },
+  "district.2": {
+   "value": "Florida"
+  },
+  "fee.agreed": {
+   "value": "1,500.00"
+  },
+  "fee.balance_due": {
+   "value": "500.00"
+  },
+  "fee.received": {
+   "value": "1,000.00"
+  },
+  "services_excluded.1": {
+   "value": "Representation in any adversary proceeding, appeal, or non-bankruptcy matter; motions to avoid liens;"
+  },
+  "services_excluded.10": {
+   "value": null
+  },
+  "services_excluded.11": {
+   "value": null
+  },
+  "services_excluded.12": {
+   "value": null
+  },
+  "services_excluded.13": {
+   "value": null
+  },
+  "services_excluded.14": {
+   "value": null
+  },
+  "services_excluded.15": {
+   "value": null
+  },
+  "services_excluded.16": {
+   "value": null
+  },
+  "services_excluded.2": {
+   "value": "and defense of any motion to dismiss under section 707(b). Each is billed separately under a written"
+  },
+  "services_excluded.3": {
+   "value": "agreement."
+  },
+  "services_excluded.4": {
+   "value": null
+  },
+  "services_excluded.5": {
+   "value": null
+  },
+  "services_excluded.6": {
+   "value": null
+  },
+  "services_excluded.7": {
+   "value": null
+  },
+  "services_excluded.8": {
+   "value": null
+  },
+  "services_excluded.9": {
+   "value": null
+  },
+  "services_other.1": {
+   "value": "Negotiation of the reaffirmation agreement with Gulf Coast Loan Servicing and the redemption of"
+  },
+  "services_other.10": {
+   "value": null
+  },
+  "services_other.11": {
+   "value": null
+  },
+  "services_other.12": {
+   "value": null
+  },
+  "services_other.2": {
+   "value": "the Honda Civic."
+  },
+  "services_other.3": {
+   "value": null
+  },
+  "services_other.4": {
+   "value": null
+  },
+  "services_other.5": {
+   "value": null
+  },
+  "services_other.6": {
+   "value": null
+  },
+  "services_other.7": {
+   "value": null
+  },
+  "services_other.8": {
+   "value": null
+  },
+  "services_other.9": {
+   "value": null
+  },
+  "sharing.agreed": {
+   "value": null
+  },
+  "sharing.none": {
+   "value": "X"
+  },
+  "source_paid.debtor": {
+   "value": "X"
+  },
+  "source_paid.other": {
+   "value": null
+  },
+  "source_paid.specify": {
+   "value": null
+  },
+  "source_to_be_paid.debtor": {
+   "value": null
+  },
+  "source_to_be_paid.other": {
+   "value": "X"
+  },
+  "source_to_be_paid.specify": {
+   "value": "Margaret Lovelace, Debtor 1's mother"
+  }
+ },
+ "release": "form/b2030@2025-12-01",
+ "sha256": "48b4105a03ac4e9bd7dbcfabbb44bc10e9a34d61f6c7effba8a7f602f0ced850"
+}

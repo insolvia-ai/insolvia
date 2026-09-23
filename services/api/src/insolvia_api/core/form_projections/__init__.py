@@ -36,12 +36,18 @@ Three rules the mappings follow:
   line 19's fourth-bracket export is missing a digit that line 20's has).
 
 Blanks every mapping leaves deliberately, each until its owner lands: tax
-identifiers (encrypted storage with audited reads is its own work), the
+identifiers (encrypted storage with audited reads is its own work — B121,
+the form that exists to print the full number, waits on it too), the
 amended-filing caption (no `case.is_amended` yet), wet-signature lines
 (never machine-filled), the court's case number, and pagination plus row
 numbering and cross-schedule line references ("Schedule D, line __"), which
 the specs assign to packet assembly (9.6) — the packet decides page and row
 placement across continuation sheets, so the projection cannot know them.
+
+Two of the mappings target FLAT releases (issue #351): B2030's values land
+on overlay boxes the engine draws rather than widgets it sets, and B2010
+projects nothing at all — a notice with no field. Both are registered like
+every other so a revision bump still has to bring its own mapping.
 """
 
 from __future__ import annotations
@@ -63,8 +69,12 @@ from .b106j import project_b106j_1215
 from .b106j2 import project_b106j2_1215
 from .b106sum import project_b106sum_1215
 from .b107 import project_b107_0425
+from .b108 import project_b108_1215
+from .b121 import project_b121_1215
 from .b122a1 import project_b122a1_1219
 from .b122a2 import project_b122a2_0425
+from .b2010 import project_b2010_1220
+from .b2030 import project_b2030_1225
 from .shared import (
     CaseFile,
     FieldValues,
@@ -73,6 +83,7 @@ from .shared import (
     format_money,
     full_name,
     wrap_lines,
+    wrap_width,
 )
 
 __all__ = [
@@ -86,6 +97,7 @@ __all__ = [
     "full_name",
     "project",
     "wrap_lines",
+    "wrap_width",
 ]
 
 Projector = Callable[[FormRelease, CaseFile], FieldValues]
@@ -104,8 +116,12 @@ PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b106j2", "2015-12-01"): project_b106j2_1215,
     ("form/b106sum", "2015-12-01"): project_b106sum_1215,
     ("form/b107", "2025-04-01"): project_b107_0425,
+    ("form/b108", "2015-12-01"): project_b108_1215,
+    ("form/b121", "2015-12-01"): project_b121_1215,
     ("form/b122a1", "2019-12-01"): project_b122a1_1219,
     ("form/b122a2", "2025-04-01"): project_b122a2_0425,
+    ("form/b2010", "2020-12-01"): project_b2010_1220,
+    ("form/b2030", "2025-12-01"): project_b2030_1225,
 }
 
 

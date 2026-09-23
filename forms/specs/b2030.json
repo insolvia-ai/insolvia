@@ -1,0 +1,244 @@
+{
+ "form": "b2030",
+ "official_number": "2030",
+ "title": "Disclosure of Compensation of Attorney for Debtor",
+ "revision": "12/25",
+ "effective_date": "2025-12-01",
+ "parts": [
+  {"number": 1, "title": "Compensation paid or agreed (§ 329(a), Rule 2016(b))"},
+  {"number": 2, "title": "The source of the compensation paid to me was"},
+  {"number": 3, "title": "The source of compensation to be paid to me is"},
+  {"number": 4, "title": "Sharing of compensation"},
+  {"number": 5, "title": "Services the fee covers"},
+  {"number": 6, "title": "Services the fee does not include"},
+  {"number": 7, "title": "Certification"}
+ ],
+ "notes": "A Director's Form published FLAT: the 12/25 revision (approved by the Advisory Committee on Bankruptcy Rules, September 2025; effective 2025-12-01) is a Word document distilled to PDF with no AcroForm at all, so every field here claims an `overlay` box — a page position measured from the PDF's own text and image operators (the checkboxes are image XObjects at the coordinates recorded) — that the fill engine draws onto an appended content stream, leaving the official page streams untouched. Coordinates are PDF user space: points, origin bottom-left; `y` is the text baseline for a text box and the bottom edge for a checkbox.",
+ "fields": [
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court — __ District Of __",
+   "type": "text",
+   "maps_to": {"entity": "case", "attribute": "district", "notes": "the stored name (e.g. `Middle District of Florida`) is split around `District of` onto the two printed blanks; a name with no prefix (`District of Columbia`) leaves the first blank empty"},
+   "pdf": {"overlay": [
+    {"name": "district.1", "page": 1, "x": 192.0, "y": 673.0, "w": 78.0},
+    {"name": "district.2", "page": 1, "x": 327.0, "y": 673.0, "w": 78.0}
+   ]},
+   "notes": "the underscores run x 190–272 and x 325–408 on baseline 670.9 at 11 pt"
+  },
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "In re — Debtor (Debtor 1)",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; the empty line under `In re`"},
+   "pdf": {"overlay": [{"name": "debtor.1", "page": 1, "x": 100.0, "y": 624.6, "w": 245.0}]}
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "In re — Debtor (Debtor 2, joint case)",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2; the next line, left of `Case No.`"},
+   "pdf": {"overlay": [{"name": "debtor.2", "page": 1, "x": 100.0, "y": 613.1, "w": 245.0}]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case No.",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"overlay": [{"name": "case_number", "page": 1, "x": 396.0, "y": 615.5, "w": 92.0}]},
+   "notes": "underscores x 394–489, baseline 613.1"
+  },
+  {
+   "id": "caption.chapter",
+   "part": null,
+   "label": "Chapter",
+   "type": "text",
+   "maps_to": {"entity": "case", "attribute": "chapter"},
+   "pdf": {"overlay": [{"name": "chapter", "page": 1, "x": 391.0, "y": 592.5, "w": 96.0}]},
+   "notes": "underscores x 389–489, baseline 590.2"
+  },
+  {
+   "id": "line_1_fee_agreed",
+   "part": 1,
+   "line": "1",
+   "label": "For legal services, I have agreed to accept $",
+   "type": "money",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_agreed", "notes": "role=attorney"},
+   "pdf": {"overlay": [{"name": "fee.agreed", "page": 1, "x": 412.0, "y": 489.0, "w": 68.0}]},
+   "notes": "the `$` prints at x 405.2; the blank runs x 410–480 on baseline 486.7"
+  },
+  {
+   "id": "line_1_fee_received",
+   "part": 1,
+   "line": "1",
+   "label": "Prior to the filing of this statement I have received $",
+   "type": "money",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_received", "notes": "role=attorney"},
+   "pdf": {"overlay": [{"name": "fee.received", "page": 1, "x": 413.0, "y": 466.0, "w": 68.0}]}
+  },
+  {
+   "id": "line_1_balance_due",
+   "part": 1,
+   "line": "1",
+   "label": "Balance Due $",
+   "type": "money",
+   "maps_to": {"derived": "compensation_agreed minus compensation_received"},
+   "pdf": {"overlay": [{"name": "fee.balance_due", "page": 1, "x": 416.0, "y": 443.0, "w": 67.0}]}
+  },
+  {
+   "id": "line_2_source_paid_debtor",
+   "part": 2,
+   "line": "2",
+   "label": "The source of the compensation paid to me was: Debtor",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_paid", "notes": "value=debtor; the Debtor/Other pair is exclusive, drawn as two boxes because the flat form has no button group"},
+   "pdf": {"overlay": [{"name": "source_paid.debtor", "page": 1, "x": 102.72, "y": 390.72, "w": 15.12, "h": 13.44}]},
+   "notes": "the printed box is image XObject /Im1 placed by `15.12 0 0 13.44 102.72 390.72 cm`"
+  },
+  {
+   "id": "line_2_source_paid_other",
+   "part": 2,
+   "line": "2",
+   "label": "The source of the compensation paid to me was: Other (specify)",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_paid", "notes": "value=other"},
+   "pdf": {"overlay": [{"name": "source_paid.other", "page": 1, "x": 210.72, "y": 390.72, "w": 15.12, "h": 13.44}]}
+  },
+  {
+   "id": "line_2_source_paid_other_specify",
+   "part": 2,
+   "line": "2",
+   "label": "Other (specify) — who paid",
+   "type": "text",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_paid_other"},
+   "pdf": {"overlay": [{"name": "source_paid.specify", "page": 1, "x": 300.0, "y": 393.0, "w": 240.0}]}
+  },
+  {
+   "id": "line_3_source_to_be_paid_debtor",
+   "part": 3,
+   "line": "3",
+   "label": "The source of compensation to be paid to me is: Debtor",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_to_be_paid", "notes": "value=debtor"},
+   "pdf": {"overlay": [{"name": "source_to_be_paid.debtor", "page": 1, "x": 102.72, "y": 341.04, "w": 15.12, "h": 13.44}]}
+  },
+  {
+   "id": "line_3_source_to_be_paid_other",
+   "part": 3,
+   "line": "3",
+   "label": "The source of compensation to be paid to me is: Other (specify)",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_to_be_paid", "notes": "value=other"},
+   "pdf": {"overlay": [{"name": "source_to_be_paid.other", "page": 1, "x": 210.72, "y": 341.04, "w": 15.12, "h": 13.44}]}
+  },
+  {
+   "id": "line_3_source_to_be_paid_other_specify",
+   "part": 3,
+   "line": "3",
+   "label": "Other (specify) — who will pay",
+   "type": "text",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_source_to_be_paid_other"},
+   "pdf": {"overlay": [{"name": "source_to_be_paid.specify", "page": 1, "x": 300.0, "y": 343.3, "w": 240.0}]}
+  },
+  {
+   "id": "line_4_not_shared",
+   "part": 4,
+   "line": "4",
+   "label": "I have not agreed to share the above-disclosed compensation with any other person unless they are members and associates of my law firm.",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_shared", "notes": "value=false"},
+   "pdf": {"overlay": [{"name": "sharing.none", "page": 1, "x": 102.72, "y": 314.4, "w": 15.12, "h": 13.44}]}
+  },
+  {
+   "id": "line_4_shared",
+   "part": 4,
+   "line": "4",
+   "label": "I have agreed to share the above-disclosed compensation with a other person or persons who are not members or associates of my law firm. A copy of the agreement, together with a list of the names of the people sharing in the compensation, is attached.",
+   "type": "checkbox",
+   "maps_to": {"entity": "filing_professional", "attribute": "compensation_shared", "notes": "value=true; the agreement and the list are an attachment the packet does not generate"},
+   "pdf": {"overlay": [{"name": "sharing.agreed", "page": 1, "x": 102.72, "y": 276.24, "w": 15.12, "h": 13.44}]}
+  },
+  {
+   "id": "line_5e_other_services",
+   "part": 5,
+   "line": "5e",
+   "label": "e. [List other services that counsel has agreed to provide]",
+   "type": "text",
+   "repeats": {"group": "filing_professional", "count": 12, "continuation": "the twelve blank lines under 5e on page 2; the projection wraps the narrative across them"},
+   "maps_to": {"entity": "filing_professional", "attribute": "services_other"},
+   "pdf": {"overlay": [
+    {"name": "services_other.1", "page": 2, "x": 103.0, "y": 688.9, "w": 440.0},
+    {"name": "services_other.2", "page": 2, "x": 103.0, "y": 677.4, "w": 440.0},
+    {"name": "services_other.3", "page": 2, "x": 103.0, "y": 665.9, "w": 440.0},
+    {"name": "services_other.4", "page": 2, "x": 103.0, "y": 654.4, "w": 440.0},
+    {"name": "services_other.5", "page": 2, "x": 103.0, "y": 642.9, "w": 440.0},
+    {"name": "services_other.6", "page": 2, "x": 103.0, "y": 631.4, "w": 440.0},
+    {"name": "services_other.7", "page": 2, "x": 103.0, "y": 619.9, "w": 440.0},
+    {"name": "services_other.8", "page": 2, "x": 103.0, "y": 608.4, "w": 440.0},
+    {"name": "services_other.9", "page": 2, "x": 103.0, "y": 596.9, "w": 440.0},
+    {"name": "services_other.10", "page": 2, "x": 103.0, "y": 585.4, "w": 440.0},
+    {"name": "services_other.11", "page": 2, "x": 103.0, "y": 573.9, "w": 440.0},
+    {"name": "services_other.12", "page": 2, "x": 103.0, "y": 562.4, "w": 440.0}
+   ]},
+   "notes": "the form's blank lines step 11.49 pt from the `e.` line at baseline 700.4"
+  },
+  {
+   "id": "line_6_excluded_services",
+   "part": 6,
+   "line": "6",
+   "label": "By agreement with the debtor(s), the above-disclosed fee does not include the following services:",
+   "type": "text",
+   "repeats": {"group": "filing_professional", "count": 16, "continuation": "the blank lines under item 6 on page 2, above the certification box"},
+   "maps_to": {"entity": "filing_professional", "attribute": "services_excluded"},
+   "pdf": {"overlay": [
+    {"name": "services_excluded.1", "page": 2, "x": 85.0, "y": 505.0, "w": 460.0},
+    {"name": "services_excluded.2", "page": 2, "x": 85.0, "y": 493.5, "w": 460.0},
+    {"name": "services_excluded.3", "page": 2, "x": 85.0, "y": 482.0, "w": 460.0},
+    {"name": "services_excluded.4", "page": 2, "x": 85.0, "y": 470.5, "w": 460.0},
+    {"name": "services_excluded.5", "page": 2, "x": 85.0, "y": 459.0, "w": 460.0},
+    {"name": "services_excluded.6", "page": 2, "x": 85.0, "y": 447.5, "w": 460.0},
+    {"name": "services_excluded.7", "page": 2, "x": 85.0, "y": 436.0, "w": 460.0},
+    {"name": "services_excluded.8", "page": 2, "x": 85.0, "y": 424.5, "w": 460.0},
+    {"name": "services_excluded.9", "page": 2, "x": 85.0, "y": 413.0, "w": 460.0},
+    {"name": "services_excluded.10", "page": 2, "x": 85.0, "y": 401.5, "w": 460.0},
+    {"name": "services_excluded.11", "page": 2, "x": 85.0, "y": 390.0, "w": 460.0},
+    {"name": "services_excluded.12", "page": 2, "x": 85.0, "y": 378.5, "w": 460.0},
+    {"name": "services_excluded.13", "page": 2, "x": 85.0, "y": 367.0, "w": 460.0},
+    {"name": "services_excluded.14", "page": 2, "x": 85.0, "y": 355.5, "w": 460.0},
+    {"name": "services_excluded.15", "page": 2, "x": 85.0, "y": 344.0, "w": 460.0},
+    {"name": "services_excluded.16", "page": 2, "x": 85.0, "y": 332.5, "w": 460.0}
+   ]}
+  },
+  {
+   "id": "certification.date",
+   "part": 7,
+   "label": "Date",
+   "type": "date",
+   "maps_to": {"entity": "filing_professional", "attribute": "signature_date", "notes": "role=attorney"},
+   "pdf": {"overlay": [{"name": "certification.date", "page": 2, "x": 108.0, "y": 211.0, "w": 96.0}]},
+   "notes": "the underscores run x 107–206 on baseline 208.7 at 9 pt"
+  },
+  {
+   "id": "certification.attorney_signature",
+   "part": 7,
+   "label": "Signature of Attorney",
+   "type": "signature",
+   "maps_to": {"unmapped": "a signature line; filing_professional records who signs, not a signature image"},
+   "pdf": {"overlay": [{"name": "certification.signature", "page": 2, "x": 244.0, "y": 210.0, "w": 205.0}]},
+   "notes": "the rule is drawn at y 207.3 from x 242 to 451"
+  },
+  {
+   "id": "certification.firm_name",
+   "part": 7,
+   "label": "Name of law firm",
+   "type": "text",
+   "maps_to": {"entity": "filing_professional", "attribute": "firm_name", "notes": "role=attorney"},
+   "pdf": {"overlay": [{"name": "certification.firm_name", "page": 2, "x": 244.0, "y": 179.0, "w": 205.0}]},
+   "notes": "the rule is drawn at y 176.3 from x 242 to 451"
+  }
+ ]
+}

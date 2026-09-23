@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b2010",
+  "effective_date": "2020-12-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b2010.pdf",
+    "published": null,
+    "sha256": "f9eca5d116dcffc95b9b9a5dd409378f20f96aceb418ec7170a5994950ae0538"
+  },
+  "notes": "Director's Form 2010, Notice Required by 11 U.S.C. § 342(b) for Individuals Filing for Bankruptcy, printed revision 12/20 (current as of ingestion, 2026-09-23; the form page states effective December 1, 2020). template.pdf is the official PDF vendored verbatim from uscourts.gov, fetched twice with identical digests (sha256 above; the loader re-hashes it). A FLAT release: the PDF has no AcroForm and the notice carries no caption or signature block (the debtor's acknowledgement and the attorney's delivery certification are both on B101 Part 7), so the spec declares no fields and the packet ships the court's bytes unchanged. spec.json and acroform.json are copied from forms/ at ingestion; tests/test_form_templates.py refuses drift while this is the current revision."
+}

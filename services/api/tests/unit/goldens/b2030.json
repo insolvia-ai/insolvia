@@ -1,0 +1,150 @@
+{
+ "fields": {
+  "case_number": {
+   "value": "S3.0 caption.case_n"
+  },
+  "certification.date": {
+   "value": "01/19/2026"
+  },
+  "certification.firm_name": {
+   "value": "S20.0 certification.firm_name"
+  },
+  "certification.signature": {
+   "value": "Ada Q Lovelace 1"
+  },
+  "chapter": {
+   "value": "S4.0 caption.chapter"
+  },
+  "debtor.1": {
+   "value": "S1.0 caption.debtor1_name"
+  },
+  "debtor.2": {
+   "value": "S2.0 caption.debtor2_name"
+  },
+  "district.1": {
+   "value": "S0.0 caption.distr"
+  },
+  "district.2": {
+   "value": "S0.1 caption.distr"
+  },
+  "fee.agreed": {
+   "value": "1,254.56"
+  },
+  "fee.balance_due": {
+   "value": "1,274.56"
+  },
+  "fee.received": {
+   "value": "1,264.56"
+  },
+  "services_excluded.1": {
+   "value": "S17.0 line_6_excluded_services"
+  },
+  "services_excluded.10": {
+   "value": "S17.9 line_6_excluded_services"
+  },
+  "services_excluded.11": {
+   "value": "S17.10 line_6_excluded_services"
+  },
+  "services_excluded.12": {
+   "value": "S17.11 line_6_excluded_services"
+  },
+  "services_excluded.13": {
+   "value": "S17.12 line_6_excluded_services"
+  },
+  "services_excluded.14": {
+   "value": "S17.13 line_6_excluded_services"
+  },
+  "services_excluded.15": {
+   "value": "S17.14 line_6_excluded_services"
+  },
+  "services_excluded.16": {
+   "value": "S17.15 line_6_excluded_services"
+  },
+  "services_excluded.2": {
+   "value": "S17.1 line_6_excluded_services"
+  },
+  "services_excluded.3": {
+   "value": "S17.2 line_6_excluded_services"
+  },
+  "services_excluded.4": {
+   "value": "S17.3 line_6_excluded_services"
+  },
+  "services_excluded.5": {
+   "value": "S17.4 line_6_excluded_services"
+  },
+  "services_excluded.6": {
+   "value": "S17.5 line_6_excluded_services"
+  },
+  "services_excluded.7": {
+   "value": "S17.6 line_6_excluded_services"
+  },
+  "services_excluded.8": {
+   "value": "S17.7 line_6_excluded_services"
+  },
+  "services_excluded.9": {
+   "value": "S17.8 line_6_excluded_services"
+  },
+  "services_other.1": {
+   "value": "S16.0 line_5e_other_services"
+  },
+  "services_other.10": {
+   "value": "S16.9 line_5e_other_services"
+  },
+  "services_other.11": {
+   "value": "S16.10 line_5e_other_services"
+  },
+  "services_other.12": {
+   "value": "S16.11 line_5e_other_services"
+  },
+  "services_other.2": {
+   "value": "S16.1 line_5e_other_services"
+  },
+  "services_other.3": {
+   "value": "S16.2 line_5e_other_services"
+  },
+  "services_other.4": {
+   "value": "S16.3 line_5e_other_services"
+  },
+  "services_other.5": {
+   "value": "S16.4 line_5e_other_services"
+  },
+  "services_other.6": {
+   "value": "S16.5 line_5e_other_services"
+  },
+  "services_other.7": {
+   "value": "S16.6 line_5e_other_services"
+  },
+  "services_other.8": {
+   "value": "S16.7 line_5e_other_services"
+  },
+  "services_other.9": {
+   "value": "S16.8 line_5e_other_services"
+  },
+  "sharing.agreed": {
+   "value": "X"
+  },
+  "sharing.none": {
+   "value": "X"
+  },
+  "source_paid.debtor": {
+   "value": "X"
+  },
+  "source_paid.other": {
+   "value": "X"
+  },
+  "source_paid.specify": {
+   "value": "S10.0 line_2_source_paid_other_specify"
+  },
+  "source_to_be_paid.debtor": {
+   "value": "X"
+  },
+  "source_to_be_paid.other": {
+   "value": "X"
+  },
+  "source_to_be_paid.specify": {
+   "value": "S13.0 line_3_source_to_be_paid_other_specify"
+  }
+ },
+ "release": "form/b2030@2025-12-01",
+ "sha256": "46534d0a5464334be80da8ef6d70e5cfbbdf02765b574dd8e4eebc47931b624b"
+}

@@ -1,0 +1,192 @@
+{
+ "form": "b121",
+ "official_number": "121",
+ "title": "Statement About Your Social Security Numbers",
+ "revision": "12/15",
+ "effective_date": "2015-12-01",
+ "parts": [
+  {"number": 1, "title": "Tell the Court About Yourself and Your Spouse if Your Spouse is Filing With You"},
+  {"number": 2, "title": "Tell the Court About all of Your Social Security or Federal Individual Taxpayer Identification Numbers"},
+  {"number": 3, "title": "Sign Below"}
+ ],
+ "fields": [
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {"entity": "case", "attribute": "district"},
+   "pdf": {"names": ["Bankruptcy District Information"]}
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
+   "pdf": {"names": ["Case number1"]}
+  },
+  {
+   "id": "line_1_debtor1_first_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 1 — Your name — First name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; the given name"},
+   "pdf": {"names": ["Debtor1.First name"]}
+  },
+  {
+   "id": "line_1_debtor1_middle_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 1 — Your name — Middle name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; the middle name"},
+   "pdf": {"names": ["Debtor1.Middle name"]}
+  },
+  {
+   "id": "line_1_debtor1_last_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 1 — Your name — Last name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; the surname (the form has no suffix box)"},
+   "pdf": {"names": ["Debtor1.Last name"]}
+  },
+  {
+   "id": "line_1_debtor2_first_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 2 (Only If Spouse Is Filing) — Your name — First name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2; the given name"},
+   "pdf": {"names": ["Debtor2.First name"]}
+  },
+  {
+   "id": "line_1_debtor2_middle_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 2 — Your name — Middle name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2; the middle name — the widget is misnamed `Debtor2.Middle name_2`"},
+   "pdf": {"names": ["Debtor2.Middle name_2"]}
+  },
+  {
+   "id": "line_1_debtor2_last_name",
+   "part": 1,
+   "line": "1",
+   "label": "For Debtor 2 — Your name — Last name",
+   "type": "text",
+   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2; the surname"},
+   "pdf": {"names": ["Debtor2.Last name"]}
+  },
+  {
+   "id": "line_2_debtor1_ssn",
+   "part": 2,
+   "line": "2",
+   "label": "For Debtor 1 — All Social Security Numbers you have used",
+   "type": "ssn_itin",
+   "repeats": {"group": "debtor", "count": 2, "continuation": "two rows per debtor; the form asks for every number ever used"},
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_1; kind=ssn; the FULL number (000-00-0000, the box caps at 11 characters) — this form is the one filing that prints it, and it is submitted separately from the public case file. The model stores one tax id per debtor; a second number ever used is not modelled, so row 2 stays blank"},
+   "pdf": {"names": ["Debtor1a.SSNum", "Debtor1b.SSNum"]}
+  },
+  {
+   "id": "line_2_debtor1_no_ssn",
+   "part": 2,
+   "line": "2",
+   "label": "For Debtor 1 — You do not have a Social Security number.",
+   "type": "checkbox",
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_1; the explicit absence of an SSN — distinct from a number not yet entered, so it is never inferred from a blank"},
+   "pdf": {"names": ["Check Box1"]}
+  },
+  {
+   "id": "line_2_debtor2_ssn",
+   "part": 2,
+   "line": "2",
+   "label": "For Debtor 2 — All Social Security Numbers you have used",
+   "type": "ssn_itin",
+   "repeats": {"group": "debtor", "count": 2},
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_2; kind=ssn; full number, as for Debtor 1"},
+   "pdf": {"names": ["Debtor2a SSNum", "Debtor2b SSNum"]}
+  },
+  {
+   "id": "line_2_debtor2_no_ssn",
+   "part": 2,
+   "line": "2",
+   "label": "For Debtor 2 — You do not have a Social Security number.",
+   "type": "checkbox",
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_2; the explicit absence of an SSN"},
+   "pdf": {"names": ["Check Box2"]}
+  },
+  {
+   "id": "line_3_debtor1_itin",
+   "part": 2,
+   "line": "3",
+   "label": "For Debtor 1 — All federal Individual Taxpayer Identification Numbers (ITIN) you have used",
+   "type": "ssn_itin",
+   "repeats": {"group": "debtor", "count": 2},
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_1; kind=itin; the box caps at 10 characters and the leading 9 is pre-printed, so the value is the number after it"},
+   "pdf": {"names": ["Debtor1a.ITINNum", "Debtor1b.ITINNum"]}
+  },
+  {
+   "id": "line_3_debtor1_no_itin",
+   "part": 2,
+   "line": "3",
+   "label": "For Debtor 1 — You do not have an ITIN.",
+   "type": "checkbox",
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_1; the explicit absence of an ITIN"},
+   "pdf": {"names": ["Check Box3"]}
+  },
+  {
+   "id": "line_3_debtor2_itin",
+   "part": 2,
+   "line": "3",
+   "label": "For Debtor 2 — All federal Individual Taxpayer Identification Numbers (ITIN) you have used",
+   "type": "ssn_itin",
+   "repeats": {"group": "debtor", "count": 2},
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_2; kind=itin"},
+   "pdf": {"names": ["Debtor2a ITINNum", "Debtor2b ITINNum"]}
+  },
+  {
+   "id": "line_3_debtor2_no_itin",
+   "part": 2,
+   "line": "3",
+   "label": "For Debtor 2 — You do not have an ITIN.",
+   "type": "checkbox",
+   "maps_to": {"entity": "debtor", "attribute": "tax_id", "notes": "filing_role=debtor_2; the explicit absence of an ITIN"},
+   "pdf": {"names": ["Check Box4"]}
+  },
+  {
+   "id": "debtor1_signature",
+   "part": 3,
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {"unmapped": "wet-signature line, never machine-filled"},
+   "pdf": {"names": ["Debtor1.signature"]}
+  },
+  {
+   "id": "debtor1_signature_date",
+   "part": 3,
+   "label": "Debtor 1 — Date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_1; the widget is named `Executed on` with no debtor prefix"},
+   "pdf": {"names": ["Executed on"]}
+  },
+  {
+   "id": "debtor2_signature",
+   "part": 3,
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {"unmapped": "wet-signature line, never machine-filled"},
+   "pdf": {"names": ["Debtor2.signature"]}
+  },
+  {
+   "id": "debtor2_signature_date",
+   "part": 3,
+   "label": "Debtor 2 — Date (MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {"entity": "debtor", "attribute": "signed_at", "notes": "filing_role=debtor_2"},
+   "pdf": {"names": ["Debtor2.Executed on"]}
+  }
+ ]
+}
