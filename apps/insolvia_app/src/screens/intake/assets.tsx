@@ -30,6 +30,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 import { bodyOf, getAt, setAt } from './collection-editor';
 import type { ChoiceOption } from './collections';
 import { labelize } from './collections';
+import { AssetExemptionsPanel } from './exemptions';
 import { AssetLiensPanel, formatMoney } from './liens';
 
 /**
@@ -699,6 +700,10 @@ function AssetForm({
       ) : null}
 
       <AssetLiensPanel caseId={caseId} assetId={assetId} onAddSecuredClaim={onAddSecuredClaim} />
+
+      {/* The Schedule C workbench (#346): the same read-only-figures pattern as
+          the liens panel, plus the claim entry it exists for. */}
+      <AssetExemptionsPanel caseId={caseId} assetId={assetId} />
 
       <View style={styles.rowActions}>
         <Button size="lg" disabled={saving} onPress={onSave}>

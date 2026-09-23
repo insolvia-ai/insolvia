@@ -554,6 +554,20 @@ export type CaseChapter = 7 | 11 | 12 | 13;
 export type CaseStatus = 'intake' | 'ready_to_file' | 'filed';
 
 /**
+ * 106C line 1 — which § 522(b) set the debtor claims (issue #346). Mirrors
+ * `insolvia_core.cases.EXEMPTION_SETS`, member for member, and is exported
+ * as a VALUE because the app renders it as a picker. `federal` is
+ * § 522(b)(2), the § 522(d) list; `state_and_federal_nonbankruptcy` is
+ * § 522(b)(3), the domicile state's scheme plus the federal non-bankruptcy
+ * exemptions. Whether `federal` may be stored at all is the state's opt-out
+ * rule — the API refuses it for an opted-out state with a 400 keyed
+ * `exemption_set`, and {@link ExemptionAnalysis.election} says which options
+ * the case actually has.
+ */
+export const EXEMPTION_SETS = ['state_and_federal_nonbankruptcy', 'federal'] as const;
+export type ExemptionSet = (typeof EXEMPTION_SETS)[number];
+
+/**
  * A case, as returned by every `/v1/cases` endpoint:
  * `{"id", "createdBy", "chapter", "district", "status", "createdAt",
  * "updatedAt"}`.
@@ -598,6 +612,13 @@ export interface Case {
    * always absent.
    */
   readonly constantsSetId?: string;
+  /**
+   * 106C line 1's election (issue #346). **Absent until chosen** through
+   * {@link UpdateCaseChanges.exemptionSet}; in an opt-out state the law
+   * forces the answer whether or not one is stored, and
+   * {@link ExemptionAnalysis.election.effective} is what was actually used.
+   */
+  readonly exemptionSet?: ExemptionSet;
 }
 
 /** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
@@ -672,6 +693,12 @@ export interface UpdateCaseChanges {
   readonly district?: string | undefined;
   /** A new status, or omit to leave it unchanged. */
   readonly status?: CaseStatus | undefined;
+  /**
+   * The 106C line 1 election, or omit to leave it unchanged (issue #346).
+   * Sent as `exemption_set`. A 400 keyed `exemption_set` means the debtor's
+   * state has opted out of the federal list.
+   */
+  readonly exemptionSet?: ExemptionSet | undefined;
 }
 
 /**
@@ -691,6 +718,9 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   }
   if (changes.status !== undefined) {
     json.status = changes.status;
+  }
+  if (changes.exemptionSet !== undefined) {
+    json.exemption_set = changes.exemptionSet;
   }
   return json;
 }
@@ -2920,6 +2950,132 @@ export interface CaseStandards {
   readonly jurisdictionSource: string | null;
   readonly nationalStandards: NationalStandardsFigures;
   readonly localStandards: LocalStandardsFigures;
+  readonly problems: readonly string[];
+}
+
+// ── The Schedule C workbench (issue #346) — mirrored from
+// core/exemption_analysis.py's `analysis_json` ──────────────────────────
+
+/** One answer the case may store for 106C line 1, and the scheme it means. */
+export interface ExemptionElectionOption {
+  readonly value: ExemptionSet;
+  readonly schemeId: string;
+  readonly name: string;
+}
+
+/**
+ * 106C line 1 as the server resolved it. `stored` is the case record's
+ * answer; `effective` is what the analysis used — the same where the law
+ * allows it, the state scheme where the state has opted out, and `null`
+ * where a choice is still owed (then `entries` is empty and `problems` says
+ * so). `optedOut` is `null` when the state is unknown or unsupported.
+ */
+export interface ExemptionElection {
+  readonly stored: ExemptionSet | null;
+  readonly effective: ExemptionSet | null;
+  readonly state: string | null;
+  readonly optedOut: boolean | null;
+  readonly optOutCitation: string | null;
+  readonly options: readonly ExemptionElectionOption[];
+}
+
+/**
+ * One claimable statute under the effective scheme, and what this case has
+ * left under it. **Every money member is a decimal STRING.** `limit` and
+ * `available` are `null` where the registry states no flat cap (an
+ * unlimited homestead, a "reasonably necessary for support" entry).
+ * `carryover` is the part of a wildcard's limit that is unused homestead
+ * carried over. Over-claiming shows as `available: "0.00"`, never an error.
+ */
+export interface ExemptionEntryAvailability {
+  readonly entryId: string;
+  readonly category: string;
+  readonly description: string;
+  /** The registry's citation — what a claim's `statute_citation` should carry. */
+  readonly citation: string;
+  readonly unlimited: boolean;
+  readonly limit: string | null;
+  readonly perItemAmount: string | null;
+  readonly carryover: string | null;
+  readonly claimed: string;
+  readonly available: string | null;
+  readonly notes: string;
+}
+
+/** A federal § 522 cap in force on the resolution date — not itself claimable. */
+export interface StatutoryLimitFigure {
+  readonly limitId: string;
+  readonly citation: string;
+  readonly description: string;
+  readonly amount: string;
+}
+
+/**
+ * The § 522 lookback windows as calendar dates (`YYYY-MM-DD`), computed
+ * from the resolution date: (o) ten years, (p) 1,215 days, (q) five years,
+ * and the § 522(b)(3)(A) 730-day domicile period.
+ */
+export interface ExemptionLookbacks {
+  readonly section522o: string;
+  readonly section522p: string;
+  readonly section522q: string;
+  readonly domicilePeriodStart: string;
+}
+
+/** One exemption record on an asset, and what the server counts it as. */
+export interface AssetExemptionClaim {
+  readonly exemptionId: string;
+  readonly statuteCitation: string | null;
+  readonly amount: string | null;
+  readonly claimsFullFmv: boolean | null;
+  readonly acquiredWithin1215Days: boolean | null;
+  readonly claimed: string;
+  /** False when the citation is not in the effective scheme's table. */
+  readonly knownStatute: boolean;
+}
+
+/**
+ * One asset's equity and what the claims on it cover. `currentValue`,
+ * `netEquity` and `unexempt` are `null` while the asset has no value typed;
+ * `homesteadCap` is the § 522(p) cap where it binds this asset and
+ * `capApplied` says the claims exceeded it. `suggestions` is the default
+ * amount for a NEW claim under each entry id — the lesser of the unexempt
+ * equity and the statute's remaining room — so the screen never subtracts.
+ */
+export interface AssetExemptionFigures {
+  readonly assetId: string;
+  readonly description: string | null;
+  readonly category: string | null;
+  readonly currentValue: string | null;
+  readonly liens: string;
+  readonly netEquity: string | null;
+  readonly claimed: string;
+  readonly unexempt: string | null;
+  readonly homesteadCap: string | null;
+  readonly capApplied: boolean;
+  readonly claims: readonly AssetExemptionClaim[];
+  readonly suggestions: Readonly<Record<string, string>>;
+}
+
+/**
+ * `GET /v1/cases/{caseId}/exemption-analysis` — the Schedule C workbench's
+ * read (issue #346): the registry table this case may claim under, drawn
+ * down by its own claims, and every asset's value − liens − claimed.
+ *
+ * Always 200. `problems` lists what stopped a figure resolving (no debtor
+ * state, an unsupported state, no election yet); `warnings` what to check
+ * before claiming (the § 522(b)(3)(A) domicile rule, a claim citing a
+ * statute outside the scheme). Nothing here is recomputed in a screen.
+ */
+export interface ExemptionAnalysis {
+  readonly asOf: string;
+  readonly asOfSource: 'expected_filing_date' | 'today';
+  readonly election: ExemptionElection;
+  readonly entries: readonly ExemptionEntryAvailability[];
+  readonly limits: readonly StatutoryLimitFigure[];
+  readonly lookbacks: ExemptionLookbacks;
+  readonly assets: readonly AssetExemptionFigures[];
+  readonly warnings: readonly string[];
   readonly problems: readonly string[];
 }
 

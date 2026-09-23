@@ -24,6 +24,9 @@ from insolvia_api.api.routes.creditor_matrix import (
 )
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
+from insolvia_api.api.routes.exemption_analysis import (
+    blueprint as exemption_analysis_blueprint,
+)
 from insolvia_api.api.routes.extraction_review import (
     blueprint as extraction_review_blueprint,
 )
@@ -59,6 +62,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(liens_blueprint)
     # /v1/cases/<id>/standards — a static segment, same argument as /summary.
     app.register_blueprint(standards_blueprint)
+    # /v1/cases/<id>/exemption-analysis — likewise; NOT /exemptions, which is
+    # the exemption records' own collection route (the module says why).
+    app.register_blueprint(exemption_analysis_blueprint)
     app.register_blueprint(firm_blueprint)
     # /v1/firm/creditors — a static segment under the same firm-scoped
     # namespace as firm_blueprint, registered as its own module for the same
