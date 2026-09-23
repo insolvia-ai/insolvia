@@ -37,6 +37,7 @@ import type {
   CaseCollection,
   CaseEntity,
   CaseEntityRequest,
+  CaseForm,
   CaseLiens,
   CaseMeansTest,
   CaseProblem,
@@ -82,6 +83,8 @@ import type {
   FirmStatus,
   FirmUser,
   FirmUserStatus,
+  FormMetric,
+  FormPreview,
   HealthStatus,
   Job,
   JobFailure,
@@ -1119,6 +1122,54 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/cases/{caseId}/forms` — the forms hub (issue 13.2 / #343): every
+   * form this case's chapter and pin require, each with its item count or
+   * dollar total (where the hub defines one) and the completeness problems
+   * that belong to it, grouped per form rather than flattened.
+   *
+   * Built entirely from the same gate {@link getCaseSummary} and
+   * {@link acceptCaseJob}'s `packet_assembly` kind run — a form listed here
+   * with no problems is a form the packet would actually include. Like
+   * {@link getCase}, a 404 means the case is unknown *or* not the caller's.
+   */
+  async listCaseForms(caseId: string): Promise<readonly CaseForm[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/forms`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'forms', 'CaseForm', caseFormFromJson);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/forms/{form}/preview` — render exactly one form
+   * through the same fill engine `packet_assembly` uses, and mint a
+   * short-lived URL to the PDF.
+   *
+   * Always 200: the outcome is either the URL ({@link FormPreview.problems}
+   * empty) or every reason the form could not render yet ({@link
+   * FormPreview.url} absent) — never both, and never a partial form, the
+   * creditor-matrix route's own contract applied to one form.
+   *
+   * `form` is the SHORT key ({@link CaseForm.form}, e.g. `'b106ab'`), not the
+   * `'form/…'` series id {@link CaseForm.series} carries. A form this case
+   * does not currently file (an unknown key, or one `listCaseForms` is not
+   * showing right now — B106J-2 with no separate household, B122A-2 below
+   * the median) is a 404: the same not-part-of-this-case reading a foreign
+   * packet id gets.
+   */
+  async getCaseFormPreview(caseId: string, form: string): Promise<FormPreview> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/forms/${encodeURIComponent(form)}/preview`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return formPreviewFromJson(decoded);
+  }
+
+  /**
    * The base URL of one collection. `collection` is a union of URL-safe
    * literals, encoded anyway — the same rule {@link putDebtor} states about
    * its role segment.
@@ -2126,6 +2177,49 @@ function packetFromJson(response: DecodedResponse): Packet {
     createdBy: requireString(response, 'createdBy'),
     createdAt: requireString(response, 'createdAt'),
   };
+}
+
+/**
+ * Decodes a {@link FormMetric} — `form_metric_json`'s exact shape, every
+ * field required (the server omits the whole member rather than sending a
+ * partial one — see {@link caseFormFromJson}).
+ */
+function formMetricFromJson(response: DecodedResponse): FormMetric {
+  const kind = requireString(response, 'kind');
+  if (kind !== 'count' && kind !== 'total') {
+    throw malformedField(response, 'kind', "'count' | 'total'");
+  }
+  return { kind, value: requireString(response, 'value') };
+}
+
+/**
+ * Decodes a {@link CaseForm} — one row of `GET /v1/cases/{caseId}/forms`.
+ * `metric` is absent, never null, for a form the hub defines no metric for.
+ */
+function caseFormFromJson(response: DecodedResponse): CaseForm {
+  const metric = optionalObject(response, 'metric');
+  return definedMembers<CaseForm>({
+    series: requireString(response, 'series'),
+    form: requireString(response, 'form'),
+    title: requireString(response, 'title'),
+    officialNumber: requireString(response, 'officialNumber'),
+    metric: metric === undefined ? undefined : formMetricFromJson(metric),
+    problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
+  });
+}
+
+/**
+ * Decodes a {@link FormPreview} — the creditor-matrix route's own
+ * 200-either-way shape: `url`/`method`/`expiresAt` are absent, never null,
+ * exactly when `problems` is non-empty.
+ */
+function formPreviewFromJson(response: DecodedResponse): FormPreview {
+  return definedMembers<FormPreview>({
+    problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
+    url: optionalString(response, 'url'),
+    method: optionalString(response, 'method'),
+    expiresAt: optionalString(response, 'expiresAt'),
+  });
 }
 
 /** An array field whose every element must decode as a {@link Packet}. */

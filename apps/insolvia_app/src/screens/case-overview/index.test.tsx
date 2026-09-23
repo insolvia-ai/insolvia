@@ -364,6 +364,20 @@ describe('the case rail', () => {
     expect(router.getPathname()).toBe(`/cases/${CASE_ID}/documents`);
   });
 
+  it('the "Filing packet" stage on the spine opens the forms hub, not the packet screen', async () => {
+    // Issue 13.2 / #343: a preparer following the spine's own filing-packet
+    // row wants to see which forms still need work, one at a time — not the
+    // assemble-the-whole-set screen the RAIL's own "Filing packet" link is.
+    const router = ready();
+    await screen.findByText('Filing readiness');
+
+    await userEvent.press(
+      screen.getByRole('link', { name: /Filing packet — go to the forms hub/ }),
+    );
+
+    expect(router.getPathname()).toBe(`/cases/${CASE_ID}/forms`);
+  });
+
   it('offers every section of a case in one place', async () => {
     ready();
     await screen.findByText('Filing readiness');
@@ -374,6 +388,7 @@ describe('the case rail', () => {
       'Documents',
       'Extraction review',
       'Creditor matrix',
+      'Forms',
       'Filing packet',
       'Team',
     ]) {

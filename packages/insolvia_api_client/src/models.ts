@@ -818,6 +818,66 @@ export interface Packet {
  */
 export type PacketDownload = DocumentDownload;
 
+// ── The forms hub (issue 13.2 / #343) — mirrors
+// services/api/src/insolvia_api/core/forms_hub.py and
+// api/routes/forms_hub.py ─────────────────────────────────────────────────
+
+/** Whether {@link FormMetric.value} counts entities or totals a dollar figure. */
+export type FormMetricKind = 'count' | 'total';
+
+/**
+ * One hub row's single number — `form_metric_json`'s exact shape.
+ *
+ * `value` is always a STRING, for the same reason {@link CaseTotals}' members
+ * are: a `'total'` is a decimal amount, and even a `'count'` is kept a string
+ * so the wire type does not change with the kind. Never parse and re-render
+ * it — show it as given.
+ */
+export interface FormMetric {
+  readonly kind: FormMetricKind;
+  readonly value: string;
+}
+
+/**
+ * One row of `GET /v1/cases/{caseId}/forms` — a form this case's chapter and
+ * pin require (the server's `packet_form_series`, never re-derived here),
+ * what it is called, its one metric where the hub defines one for it
+ * (Schedules A/B-H count the entities they print; I and J total a dollar
+ * figure; every other form carries none), and the slice of the completeness
+ * gate's problem list that belongs to it.
+ *
+ * `series` is the `form/<x>` id packet assembly also uses
+ * ({@link Packet.formRevisions}'s keys); `form` is the short key this same
+ * row's preview URL takes ({@link InsolviaApiClient.getCaseFormPreview}).
+ */
+export interface CaseForm {
+  readonly series: string;
+  readonly form: string;
+  readonly title: string;
+  readonly officialNumber: string;
+  /** Absent, never null, for a form the hub defines no metric for. */
+  readonly metric?: FormMetric;
+  /** Empty when this form has nothing blocking it. */
+  readonly problems: readonly CaseProblem[];
+}
+
+/**
+ * `GET /v1/cases/{caseId}/forms/{form}/preview` — the creditor-matrix
+ * route's own 200-either-way contract, applied to one form: a short-lived
+ * download URL (`problems` empty), or every reason it could not render yet
+ * (`problems` non-empty, the three URL members absent) — never both, and
+ * never a partial form.
+ *
+ * `url`/`method`/`expiresAt` are the same bearer capability
+ * {@link PacketDownload} carries; do not log or cache the URL.
+ */
+export interface FormPreview {
+  readonly problems: readonly CaseProblem[];
+  readonly url?: string;
+  readonly method?: string;
+  readonly expiresAt?: string;
+}
+
 /**
  * A pipeline job, as returned by both `/v1/cases/{caseId}/jobs` endpoints:
  * `{"id", "kind", "status", "createdBy", "attempts", "createdAt",

@@ -144,6 +144,13 @@ describe('the filing spine', () => {
     expect(stage(fresh({ packets: 2, readyToFile: true }), 'packet').state).toBe('done');
   });
 
+  it('points the filing-packet stage at the forms hub, not /packet', () => {
+    // Issue 13.2 / #343: this row is where a preparer checks which forms
+    // still need work, one at a time — assembling the whole set is the
+    // rail's own link.
+    expect(stage(fresh({ readyToFile: true }), 'packet').segment).toBe('forms');
+  });
+
   it('sends a petition problem to the petition screen, not intake', () => {
     // `petitions`/`prior_cases`/`related_cases` moved off the intake screen
     // (issue #342) — a blocker naming one of them must not link back to a

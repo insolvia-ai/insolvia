@@ -73,3 +73,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "form_preview_ttl_days" {
+  description = "How long a single-form preview PDF (core/forms_hub.py, form-previews/*) survives before the lifecycle rule reaps it. Not a security boundary — the download URL itself expires in minutes — just how long a stray render is worth keeping around after nobody asked for a fresh one."
+  type        = number
+  default     = 7
+}

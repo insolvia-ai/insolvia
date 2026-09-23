@@ -1486,6 +1486,111 @@ describe('the packet endpoints', () => {
 });
 
 // ---------------------------------------------------------------------------
+// The forms hub (issue 13.2 / #343). Pinned against
+// services/api/.../routes/forms_hub.py and core/forms_hub.py.
+// ---------------------------------------------------------------------------
+
+describe('the forms hub endpoints', () => {
+  const FORMS_CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+
+  /** The literal `_form_summary_json` shape for one blocked, metric-less row. */
+  const B101_ROW = {
+    series: 'form/b101',
+    form: 'b101',
+    title: 'Voluntary Petition for Individuals Filing for Bankruptcy',
+    officialNumber: 'B 101',
+    problems: [{ source: 'debtors', message: 'The case has no Debtor 1 record.' }],
+  };
+
+  /** A clean row that carries a count metric. */
+  const B106AB_ROW = {
+    series: 'form/b106ab',
+    form: 'b106ab',
+    title: 'Schedule A/B: Property',
+    officialNumber: 'B 106A/B',
+    metric: { kind: 'count', value: '3' },
+    problems: [],
+  };
+
+  /** A clean row that carries a dollar total. */
+  const B106I_ROW = {
+    series: 'form/b106i',
+    form: 'b106i',
+    title: 'Schedule I: Your Income',
+    officialNumber: 'B 106I',
+    metric: { kind: 'total', value: '2500.00' },
+    problems: [],
+  };
+
+  test('GETs /v1/cases/{caseId}/forms and maps every row verbatim', async () => {
+    const stub = stubFetch(() => jsonResponse({ forms: [B101_ROW, B106AB_ROW, B106I_ROW] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const forms = await client.listCaseForms(FORMS_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${FORMS_CASE_ID}/forms`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(forms).toEqual([B101_ROW, B106AB_ROW, B106I_ROW]);
+  });
+
+  test('a row with no metric omits the key, never sends null', async () => {
+    const stub = stubFetch(() => jsonResponse({ forms: [B101_ROW] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [row] = await client.listCaseForms(FORMS_CASE_ID);
+
+    expect(row !== undefined && 'metric' in row).toBe(false);
+  });
+
+  test('GETs /v1/cases/{caseId}/forms/{form}/preview with the form segment encoded', async () => {
+    const preview = {
+      url: 'https://bucket.s3.amazonaws.com/form-previews/x/y.pdf?signature=abc',
+      method: 'GET',
+      expiresAt: '2026-09-02T09:25:00.123Z',
+      problems: [],
+    };
+    const stub = stubFetch(() => jsonResponse(preview, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const minted = await client.getCaseFormPreview('id with spaces/slash', 'b106ab');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/id%20with%20spaces%2Fslash/forms/b106ab/preview`);
+    expect(minted).toEqual(preview);
+  });
+
+  test('a blocked preview carries problems and omits the url fields', async () => {
+    const blocked = {
+      problems: [{ source: 'form/b101', message: 'Something is missing.' }],
+    };
+    const stub = stubFetch(() => jsonResponse(blocked, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const preview = await client.getCaseFormPreview(FORMS_CASE_ID, 'b101');
+
+    expect(preview.problems).toEqual(blocked.problems);
+    expect('url' in preview).toBe(false);
+    expect('method' in preview).toBe(false);
+    expect('expiresAt' in preview).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Documents. Pinned against services/api/.../routes/documents.py and
 // core/documents.py: `document_json`'s eight fields, the `upload` block on the
 // 201, the 204 on delete, and the 409 that means the bytes never arrived.

@@ -92,6 +92,7 @@ const SECTIONS: readonly Section[] = [
     count: 'pendingReview',
   },
   { segment: 'creditor-matrix', label: 'Creditor matrix' },
+  { segment: 'forms', label: 'Forms' },
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
 ];
