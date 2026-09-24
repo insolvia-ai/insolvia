@@ -343,10 +343,14 @@ def test_the_upload_headers_are_the_ones_the_signature_demands(client):
     case_id = open_case(client)
     headers = upload(client, case_id).get_json()["upload"]["headers"]
     assert headers["Content-Type"] == "application/pdf"
-    # Without this the bucket policy's DenyEncryptionDowngrade refuses the PUT
-    # even with a valid signature.
-    assert headers["x-amz-server-side-encryption"] == "aws:kms"
-    # And without this the object is written UNTAGGED, which is worse than a
+    # NO encryption header. The route used to advertise
+    # `x-amz-server-side-encryption: aws:kms`, and every upload was refused:
+    # SSE-KMS with no key id means the AWS-managed key, which the bucket's
+    # DenyForeignEncryptionKey statement denies. A silent PUT lands on the
+    # bucket default, the case key. The adapter no longer signs it either
+    # (packages/insolvia_core, test_document_blobs.py pins that side).
+    assert "x-amz-server-side-encryption" not in headers
+    # Without this the object is written UNTAGGED, which is worse than a
     # refusal: the PUT succeeds, the bucket's expire-unconfirmed-uploads rule
     # has nothing to match, and an abandoned upload becomes bytes no lifecycle
     # rule and no code path in this service can ever reach.
@@ -365,11 +369,7 @@ def test_the_advertised_headers_are_exactly_the_signed_ones_the_client_can_set(
     something that quietly drifted."""
     case_id = open_case(client)
     headers = upload(client, case_id).get_json()["upload"]["headers"]
-    assert set(headers) == {
-        "Content-Type",
-        "x-amz-server-side-encryption",
-        "x-amz-tagging",
-    }
+    assert set(headers) == {"Content-Type", "x-amz-tagging"}
 
 
 def test_the_upload_is_tagged_unconfirmed_so_abandoned_bytes_are_reapable(

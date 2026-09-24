@@ -1754,7 +1754,6 @@ const UPLOAD_BLOCK = {
   method: 'PUT',
   headers: {
     'Content-Type': 'application/pdf',
-    'x-amz-server-side-encryption': 'aws:kms',
     'x-amz-tagging': 'upload=unconfirmed',
   },
   expiresAt: '2026-07-28T11:17:03.456Z',
@@ -1870,7 +1869,6 @@ describe('createDocument', () => {
 
     expect(created.upload.headers).toEqual({
       'Content-Type': 'application/pdf',
-      'x-amz-server-side-encryption': 'aws:kms',
       'x-amz-tagging': 'upload=unconfirmed',
       'x-amz-checksum-algorithm': 'CRC32',
     });
@@ -2390,7 +2388,6 @@ describe('uploadDocument', () => {
     expect(put).toBeDefined();
     expect(headerMap(put?.headers ?? new Headers())).toEqual({
       'content-type': 'application/pdf',
-      'x-amz-server-side-encryption': 'aws:kms',
       'x-amz-tagging': 'upload=unconfirmed',
     });
     expect(put?.headers.has('authorization')).toBe(false);
