@@ -100,6 +100,13 @@ NOTES: Final = "notes"
 # and because the generated deadlines are the one thing here a firm may
 # want everybody to SEE and only the case team to change.
 EVENTS: Final = "events"
+# Case tasks (issue #356 / 14.4) — the checklist a paralegal, an attorney and
+# a client work from. Separate from INTAKE for the same kind of reason
+# CREDITOR_LIBRARY is: a staff member who chases documents and completes
+# tasks assigned to them should not need intake access to do it, and a firm
+# that wants intake locked down while task work continues should be able to
+# say so without a second axis.
+TASKS: Final = "tasks"
 FEATURES: Final = (
     CASES,
     INTAKE,
@@ -108,6 +115,7 @@ FEATURES: Final = (
     CREDITOR_LIBRARY,
     NOTES,
     EVENTS,
+    TASKS,
     FIRM_ADMINISTRATION,
 )
 
@@ -302,6 +310,10 @@ def default_permissions(role: str) -> dict[str, str]:
             # Staff see the calendar — a deadline is exactly what they chase
             # documents against — but the case team owns what is on it.
             EVENTS: VIEW_ONLY,
+            # Staff chase paperwork and complete the tasks assigned to
+            # them — the same reasoning that gives them DOCUMENTS, not the
+            # narrower CASES/INTAKE treatment.
+            TASKS: ADD_EDIT,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -314,6 +326,7 @@ def default_permissions(role: str) -> dict[str, str]:
         # the docstring above) — both do case work, and a note is part of it.
         NOTES: ADD_EDIT,
         EVENTS: ADD_EDIT,
+        TASKS: ADD_EDIT,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two

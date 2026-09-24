@@ -1,6 +1,7 @@
 import { ApiValidationException, permits } from '@insolvia-ai/api-client';
 import type { FirmMembership } from '@insolvia-ai/api-client';
 import { Button, Field, Input } from '@insolvia-ai/design-system';
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -133,6 +134,23 @@ export function Account({ membership }: { membership: FirmMembership }) {
       </Text>
 
       {permits(membership.permissions.events, 'view_only') ? <CalendarFeed /> : null}
+
+      {/* Tasks assigned to you (issue #356 / 14.4) — a plain link for now;
+          the dashboard (issue #359) will fold this in later. */}
+      {permits(membership.permissions.tasks, 'view_only') ? (
+        <>
+          <Heading level={2}>Your tasks</Heading>
+          <Link
+            href="/my-tasks"
+            style={[
+              styles.body,
+              { color: theme.colors.primary, fontFamily: theme.typography.body },
+            ]}
+          >
+            See what’s assigned to you, across every case you can reach.
+          </Link>
+        </>
+      ) : null}
 
       {/* Collapsed, and last. It was on the home screen while the pipeline was
           the product; see the component for why it survives at all. */}

@@ -27,6 +27,7 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
@@ -91,6 +92,7 @@ def stores():
         "debtor_store": MemoryDebtorStore(),
         "entity_store": MemoryCaseEntityStore(),
         "blobs": MemoryDocumentBlobStore(),
+        "task_store": MemoryTaskStore(),
         "access_log": MemoryAccessLog(),
     }
 
@@ -130,6 +132,7 @@ def client(stores):
             tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=stores["entity_store"],
             document_blobs=stores["blobs"],
+            task_store=stores["task_store"],
         )
     )
     return app.test_client()
@@ -230,6 +233,44 @@ def test_forms_with_no_defined_metric_omit_the_key(client):
     body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
     by_series = {row["series"]: row for row in body["forms"]}
     assert "metric" not in by_series["form/b101"]
+
+
+# ── The forms-hub row's task count (issue #356 / 14.4) ────────────
+
+
+def test_open_task_count_is_zero_with_no_anchored_tasks(client):
+    case_id = open_case(client)
+    body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
+    assert all(row["openTaskCount"] == 0 for row in body["forms"])
+
+
+def test_open_task_count_counts_only_not_done_tasks_anchored_to_that_form(client):
+    case_id = open_case(client)
+    client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Get the vehicle payoff", "formSeries": "b106d"},
+        headers=auth(ALICE),
+    )
+    second = client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Confirm the lien", "formSeries": "b106d"},
+        headers=auth(ALICE),
+    ).get_json()
+    client.post(
+        f"/v1/cases/{case_id}/tasks",
+        json={"subject": "Unrelated to any form"},
+        headers=auth(ALICE),
+    )
+    # Completed — should not count.
+    client.patch(
+        f"/v1/cases/{case_id}/tasks/{second['id']}",
+        json={"done": True},
+        headers=auth(ALICE),
+    )
+
+    body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
+    by_series = {row["series"]: row for row in body["forms"]}
+    assert by_series["form/b106d"]["openTaskCount"] == 1
 
 
 def test_a_problem_names_where_the_fix_belongs(client):

@@ -45,6 +45,7 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
   { value: 'creditor_library', label: 'Creditor library' },
   { value: 'notes', label: 'Notes' },
   { value: 'events', label: 'Events and calendar' },
+  { value: 'tasks', label: 'Tasks' },
   { value: 'firm_administration', label: 'Firm administration' },
 ];
 

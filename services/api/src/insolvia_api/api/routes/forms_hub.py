@@ -48,6 +48,7 @@ from insolvia_core.ports import (
     CaseStore,
     DebtorStore,
     DocumentBlobStore,
+    TaskStore,
     TaxIdCipher,
     TaxIdStore,
 )
@@ -92,6 +93,7 @@ class _Stores:
     debtor_store: DebtorStore
     entity_store: CaseEntityStore
     blobs: DocumentBlobStore
+    task_store: TaskStore
     access_log: AccessLog
     tax_id_store: TaxIdStore
     tax_id_cipher: TaxIdCipher
@@ -104,32 +106,59 @@ def _stores() -> _Stores:
         or deps.debtor_store is None
         or deps.case_entity_store is None
         or deps.document_blobs is None
+        or deps.task_store is None
         or deps.access_log is None
         or deps.tax_id_store is None
         or deps.tax_id_cipher is None
     ):
         raise RuntimeError(
-            "case store, debtor store, entity store, blob store, access log,"
-            " tax-id store and tax-id cipher are not composed"
+            "case store, debtor store, entity store, blob store, task store,"
+            " access log, tax-id store and tax-id cipher are not composed"
         )
     return _Stores(
         case_store=deps.case_store,
         debtor_store=deps.debtor_store,
         entity_store=deps.case_entity_store,
         blobs=deps.document_blobs,
+        task_store=deps.task_store,
         access_log=deps.access_log,
         tax_id_store=deps.tax_id_store,
         tax_id_cipher=deps.tax_id_cipher,
     )
 
 
-def _form_summary_json(summary: FormSummary) -> dict[str, object]:
+def _open_task_counts(task_store: TaskStore, case_id: str) -> dict[str, int]:
+    """Open (not-done) tasks anchored to each form series, by the SAME short
+    form key `FormSummary.form` carries (issue #356 / 14.4's `formSeries`
+    field is deliberately spelled to match it — see core/tasks.py). A task
+    anchored to a series this case does not currently file, or to a key
+    nobody defined, simply never matches a row here — the same "storage
+    validates shape, not the set of real forms" rule `core/tasks.py`'s module
+    docstring states for that field.
+    """
+    counts: dict[str, int] = {}
+    for task in task_store.list_for_case(case_id):
+        if task.form_series is None or task.done:
+            continue
+        counts[task.form_series] = counts.get(task.form_series, 0) + 1
+    return counts
+
+
+def _form_summary_json(
+    summary: FormSummary, *, open_task_count: int
+) -> dict[str, object]:
     body: dict[str, object] = {
         "series": summary.series,
         "form": summary.form,
         "title": summary.title,
         "officialNumber": summary.official_number,
         "problems": [problem_json(p) for p in summary.problems],
+        # Present even at zero — a client asking "does this row have a task
+        # count" gets one answer rather than treating absence as its own
+        # falsy state, the same reasoning `metric` does NOT follow only
+        # because a metric genuinely has no meaning for some forms (B101, the
+        # declaration) where a task count always does.
+        "openTaskCount": open_task_count,
     }
     if summary.metric is not None:
         body["metric"] = form_metric_json(summary.metric)
@@ -167,7 +196,18 @@ def list_case_forms_route(case_id: str) -> ResponseReturnValue:
         case, debtor_store=stores.debtor_store, entity_store=stores.entity_store
     )
     summaries = forms_hub(data, as_of=datetime.now(UTC).date())
-    return jsonify({"forms": [_form_summary_json(s) for s in summaries]}), 200
+    task_counts = _open_task_counts(stores.task_store, case_id)
+    return (
+        jsonify(
+            {
+                "forms": [
+                    _form_summary_json(s, open_task_count=task_counts.get(s.form, 0))
+                    for s in summaries
+                ]
+            }
+        ),
+        200,
+    )
 
 
 @blueprint.get("/v1/cases/<case_id>/forms/<form>/preview")

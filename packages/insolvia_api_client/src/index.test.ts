@@ -1604,6 +1604,7 @@ describe('the forms hub endpoints', () => {
     title: 'Voluntary Petition for Individuals Filing for Bankruptcy',
     officialNumber: 'B 101',
     problems: [{ source: 'debtors', message: 'The case has no Debtor 1 record.' }],
+    openTaskCount: 0,
   };
 
   /** A clean row that carries a count metric. */
@@ -1614,6 +1615,7 @@ describe('the forms hub endpoints', () => {
     officialNumber: 'B 106A/B',
     metric: { kind: 'count', value: '3' },
     problems: [],
+    openTaskCount: 0,
   };
 
   /** A clean row that carries a dollar total. */
@@ -1624,6 +1626,7 @@ describe('the forms hub endpoints', () => {
     officialNumber: 'B 106I',
     metric: { kind: 'total', value: '2500.00' },
     problems: [],
+    openTaskCount: 2,
   };
 
   test('GETs /v1/cases/{caseId}/forms and maps every row verbatim', async () => {
@@ -3441,6 +3444,7 @@ describe('the firm block on /v1/me', () => {
     creditor_library: 'hidden',
     notes: 'hidden',
     events: 'hidden',
+    tasks: 'add_edit',
     firm_administration: 'add_edit',
   };
 
@@ -3923,6 +3927,7 @@ describe('the firm user endpoints', () => {
       creditor_library: 'add_edit',
       notes: 'add_edit',
       events: 'hidden',
+      tasks: 'hidden',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -4278,6 +4283,200 @@ describe('case assignment', () => {
     await expect(client.unassignCase(CASE_ID, SUBJECT_ID)).resolves.toBeUndefined();
     expect(stub.lastRequest().method).toBe('DELETE');
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/assignees/${SUBJECT_ID}`);
+  });
+});
+
+// Tasks (issue #356 / 14.4), pinned against
+// services/api/src/insolvia_api/api/routes/tasks.py and
+// packages/insolvia_core/src/insolvia_core/tasks.py.
+describe('tasks', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const TASK_ID = '00000000-0000-4000-8000-0000000000ta';
+  const ASSIGNEE = 'b0b00000-0000-4000-8000-00000000b0b0';
+
+  /** The literal `task_json` shape for a fully-populated, not-done task. */
+  const TASK = {
+    id: TASK_ID,
+    caseId: CASE_ID,
+    subject: 'Get the vehicle payoff',
+    description: 'Call the lender listed on the credit report.',
+    dueDate: '2026-10-01',
+    assigneeSubject: ASSIGNEE,
+    formSeries: 'b106d',
+    done: false,
+    overdue: false,
+    createdAt: '2026-09-01T00:00:00.000000Z',
+    updatedAt: '2026-09-01T00:00:00.000000Z',
+    createdBy: 'a11c0000-0000-4000-8000-00000000a11c',
+  };
+
+  /** A bare task — every optional member absent, never null. */
+  const BARE_TASK = {
+    id: TASK_ID,
+    caseId: CASE_ID,
+    subject: 'Follow up',
+    done: false,
+    overdue: false,
+    createdAt: '2026-09-01T00:00:00.000000Z',
+    updatedAt: '2026-09-01T00:00:00.000000Z',
+    createdBy: 'a11c0000-0000-4000-8000-00000000a11c',
+  };
+
+  test('POSTs a task with only subject required, and maps the created record', async () => {
+    const stub = stubFetch(() => jsonResponse(BARE_TASK, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.createTask(CASE_ID, { subject: 'Follow up' });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({ subject: 'Follow up' });
+    expect(task).toEqual(BARE_TASK);
+    expect('description' in task).toBe(false);
+    expect('completedAt' in task).toBe(false);
+  });
+
+  test('POSTs every optional field when supplied', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.createTask(CASE_ID, {
+      subject: 'Get the vehicle payoff',
+      description: 'Call the lender listed on the credit report.',
+      dueDate: '2026-10-01',
+      assigneeSubject: ASSIGNEE,
+      formSeries: 'b106d',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      subject: 'Get the vehicle payoff',
+      description: 'Call the lender listed on the credit report.',
+      dueDate: '2026-10-01',
+      assigneeSubject: ASSIGNEE,
+      formSeries: 'b106d',
+    });
+  });
+
+  test('GETs every task of a case', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK, BARE_TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listTasks(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks`);
+    expect(tasks).toEqual([TASK, BARE_TASK]);
+  });
+
+  test('GETs one task, with both path segments encoded', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.getTask('case/with slash', 'task id');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/case%2Fwith%20slash/tasks/task%20id`);
+    expect(task).toEqual(TASK);
+  });
+
+  test('PATCHes only the fields the caller actually names', async () => {
+    const stub = stubFetch(() => jsonResponse(TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateTask(CASE_ID, TASK_ID, { subject: 'Renamed' });
+
+    expect(stub.lastRequest().method).toBe('PATCH');
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ subject: 'Renamed' });
+  });
+
+  test('PATCH sends an explicit null to clear a nullable field, distinct from omitting it', async () => {
+    const stub = stubFetch(() => jsonResponse(BARE_TASK, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    // Only dueDate is named — description/assigneeSubject/formSeries are
+    // absent from the request object entirely and must not appear in the
+    // JSON body at all, the same "leave unchanged" contract the server reads.
+    await client.updateTask(CASE_ID, TASK_ID, { dueDate: null });
+
+    const body = JSON.parse(stub.lastRequest().body);
+    expect(body).toEqual({ dueDate: null });
+    expect('description' in body).toBe(false);
+    expect('assigneeSubject' in body).toBe(false);
+  });
+
+  test('PATCH completes a task with `done: true`', async () => {
+    const completed = {
+      ...TASK,
+      done: true,
+      overdue: false,
+      completedAt: '2026-09-05T00:00:00.000000Z',
+    };
+    const stub = stubFetch(() => jsonResponse(completed, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.updateTask(CASE_ID, TASK_ID, { done: true });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ done: true });
+    expect(task.done).toBe(true);
+    expect(task.completedAt).toBe('2026-09-05T00:00:00.000000Z');
+  });
+
+  test('DELETEs a task', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.deleteTask(CASE_ID, TASK_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/tasks/${TASK_ID}`);
+  });
+
+  test('GETs /v1/me/tasks — assigned to the caller across reachable cases', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listMyTasks();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks`);
+    expect(tasks).toEqual([TASK]);
+  });
+
+  test('an overdue task decodes overdue: true verbatim', async () => {
+    const overdue = { ...TASK, dueDate: '2000-01-01', overdue: true };
+    const stub = stubFetch(() => jsonResponse(overdue, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const task = await client.getTask(CASE_ID, TASK_ID);
+    expect(task.overdue).toBe(true);
   });
 });
 

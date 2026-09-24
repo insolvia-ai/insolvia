@@ -18,6 +18,7 @@ import {
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
+  createTaskRequestToJson,
   formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
@@ -28,6 +29,7 @@ import {
   updateFirmRequestToJson,
   updateFirmUserRequestToJson,
   updateMeRequestToJson,
+  updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 import type {
@@ -126,10 +128,13 @@ import type {
   ReviewCandidateRequest,
   ReviewedCandidate,
   TaxIdView,
+  Task,
+  CreateTaskRequest,
   UpdateCaseChanges,
   UpdateFirmRequest,
   UpdateFirmUserRequest,
   UpdateMeRequest,
+  UpdateTaskRequest,
   UploadDocumentOptions,
   Venue,
   WaitlistConfirmation,
@@ -1795,6 +1800,108 @@ export class InsolviaApiClient {
     });
     await expectNoContent(response, 204);
   }
+
+  /** `/v1/cases/{caseId}/tasks`, with the id encoded exactly once. */
+  #tasksUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/tasks`;
+  }
+
+  /** `/v1/cases/{caseId}/tasks/{taskId}`. */
+  #taskUrl(caseId: string, taskId: string): string {
+    return `${this.#tasksUrl(caseId)}/${encodeURIComponent(taskId)}`;
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/tasks` — add one task to a case (issue #356 /
+   * 14.4). Only {@link CreateTaskRequest.subject} is required.
+   *
+   * Throws {@link ApiValidationException} on a 400 — a missing `subject`, or
+   * an `assigneeSubject` naming somebody outside the caller's firm (checked
+   * against the same roster {@link listFirmUsers} reads). A plain
+   * {@link ApiException} (404) when the case is unknown or not the caller's.
+   */
+  async createTask(caseId: string, request: CreateTaskRequest): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#tasksUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(createTaskRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return taskFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/tasks` — every task of one case, in the order
+   * they were added (a schedule's own order, not a worklist's — see
+   * {@link listMyTasks} for the one that sorts by due date).
+   */
+  async listTasks(caseId: string): Promise<readonly Task[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#tasksUrl(caseId), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'tasks', 'Task', taskFromJson);
+  }
+
+  /** `GET /v1/cases/{caseId}/tasks/{taskId}` — one task. 404 if it, its case, or the case's firm is not the caller's. */
+  async getTask(caseId: string, taskId: string): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return taskFromJson(decoded);
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/tasks/{taskId}` — edit, reassign, complete or
+   * reopen a task; see {@link UpdateTaskRequest} for the three-state rule a
+   * `null` vs. an omitted key follows.
+   *
+   * Throws {@link ApiValidationException} on a 400 — an empty request body,
+   * or `assigneeSubject` naming somebody outside the caller's firm.
+   */
+  async updateTask(caseId: string, taskId: string, request: UpdateTaskRequest): Promise<Task> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateTaskRequestToJson(request)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return taskFromJson(decoded);
+  }
+
+  /** `DELETE /v1/cases/{caseId}/tasks/{taskId}` — remove a task. Answers 204 with no body. */
+  async deleteTask(caseId: string, taskId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#taskUrl(caseId, taskId), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/me/tasks` — every task assigned to the caller, across every
+   * case in their firm they can reach, sorted soonest-due-first (undated
+   * tasks last).
+   *
+   * **Never leaks a task from a case outside the caller's reach** — the
+   * server walks the same reachable-case listing `listCases` uses
+   * (`api/routes/tasks.py`'s module docstring owns the argument), so this is
+   * safe to call before the caller has opened any particular case.
+   */
+  async listMyTasks(): Promise<readonly Task[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/tasks`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'tasks', 'Task', taskFromJson);
+  }
 }
 
 /**
@@ -2496,6 +2603,29 @@ function uploadFromJson(response: DecodedResponse): DocumentUpload {
   };
 }
 
+/**
+ * Decodes a {@link Task} — `task_json`'s exact shape. The optional string
+ * members are absent, never null, exactly when unset on the record; `done`
+ * and `overdue` are always present.
+ */
+function taskFromJson(response: DecodedResponse): Task {
+  return definedMembers<Task>({
+    id: requireString(response, 'id'),
+    caseId: requireString(response, 'caseId'),
+    subject: requireString(response, 'subject'),
+    description: optionalString(response, 'description'),
+    dueDate: optionalString(response, 'dueDate'),
+    assigneeSubject: optionalString(response, 'assigneeSubject'),
+    formSeries: optionalString(response, 'formSeries'),
+    done: requireBoolean(response, 'done'),
+    overdue: requireBoolean(response, 'overdue'),
+    completedAt: optionalString(response, 'completedAt'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    createdBy: requireString(response, 'createdBy'),
+  });
+}
+
 /** {@link requireCaseArray} for documents — per-element, checked, not cast. */
 function requireDocumentArray(response: DecodedResponse, key: string): readonly Document[] {
   const value = response.json[key];
@@ -2562,6 +2692,7 @@ function caseFormFromJson(response: DecodedResponse): CaseForm {
     officialNumber: requireString(response, 'officialNumber'),
     metric: metric === undefined ? undefined : formMetricFromJson(metric),
     problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
+    openTaskCount: requireNumber(response, 'openTaskCount'),
   });
 }
 
@@ -3501,6 +3632,7 @@ const FIRM_FEATURES = [
   'creditor_library',
   'notes',
   'events',
+  'tasks',
   'firm_administration',
 ] as const;
 
