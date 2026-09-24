@@ -276,6 +276,74 @@ describe('the firm screen', () => {
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ name: 'Example, LLP' });
   });
 
+  it('saves the case defaults and letterhead as their own PATCH, with both halves of the court', async () => {
+    // Issue #360. A separate button from the rename, so each PATCH sends
+    // exactly what its button names.
+    const fetchMock = signedIn(
+      {
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+        '/v1/courts': () =>
+          jsonResponse(200, {
+            releaseId: 'courts/us-bankruptcy@2026-09-24',
+            effectiveDate: '2026-09-24',
+            districts: [
+              {
+                code: 'flmb',
+                courtId: 'FLMBK',
+                name: 'Middle District of Florida',
+                state: 'FL',
+                circuit: 11,
+                website: 'https://www.flmb.uscourts.gov/',
+                divisions: [
+                  {
+                    code: 'tampa',
+                    name: 'Tampa Division',
+                    officeCode: '8',
+                    officeCodeVerified: true,
+                    courthouse: null,
+                    counties: [{ name: 'Hillsborough', fips: '12057' }],
+                  },
+                ],
+                caseUpload: { status: 'unverified', verifiedAt: null },
+              },
+            ],
+          }),
+      },
+      () =>
+        jsonResponse(200, {
+          ...FIRM_RECORD,
+          defaultCourt: 'flmb',
+          defaultDivision: 'tampa',
+          defaultChapter: 13,
+          letterhead: { name: 'Example & Partners, P.A.', phone: '813-555-0100' },
+        }),
+    );
+    await screen.findByDisplayValue('Example & Partners');
+
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole('combobox', { name: 'Default court' }));
+    await user.press(await screen.findByRole('option', { name: 'Middle District of Florida' }));
+    await user.press(screen.getByRole('combobox', { name: 'Default division' }));
+    await user.press(await screen.findByRole('option', { name: 'Tampa Division' }));
+    await user.press(screen.getByRole('combobox', { name: 'Default chapter' }));
+    await user.press(await screen.findByRole('option', { name: 'Chapter 13' }));
+    await user.type(screen.getByLabelText('Letterhead name'), 'Example & Partners, P.A.');
+    await user.type(screen.getByLabelText('Letterhead phone'), '813-555-0100');
+    await user.press(screen.getByRole('button', { name: 'Save case defaults' }));
+
+    expect(await screen.findByText('Your firm’s case defaults are saved.')).toBeTruthy();
+    const patch = fetchMock.mock.calls.find(
+      ([url, init]) => url.endsWith('/v1/firm') && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 13,
+      letterhead: { name: 'Example & Partners, P.A.', phone: '813-555-0100' },
+    });
+  });
+
   it('shows the record read-only to a viewer, with no rename control', async () => {
     signedIn({
       '/v1/me': () =>

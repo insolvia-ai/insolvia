@@ -125,7 +125,9 @@ def client():
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDFL"}, headers=auth(subject)
+        "/v1/cases",
+        json={"chapter": 7, "court": "flnb", "division": "tallahassee"},
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
@@ -188,12 +190,14 @@ def test_a_mailable_creditor_list_produces_the_file(client):
     add_creditor(client, case_id)
     response = get_matrix(client, case_id)
     assert response.status_code == 200
+    # The case is in N.D. Fla. (`flnb`), whose verified instructions put a
+    # comma after the city — the registry's format reaching the file (#360).
     assert response.get_json() == {
         "fileName": "creditor-matrix.txt",
         "creditorCount": 1,
         "duplicatesOmitted": 0,
         "problems": [],
-        "content": "Example Bank\r\nPO Box 15168\r\nWilmington DE 19850\r\n",
+        "content": "Example Bank\r\nPO Box 15168\r\nWilmington, DE 19850\r\n",
     }
 
 

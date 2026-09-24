@@ -1,0 +1,667 @@
+{
+  "code": "txwb",
+  "court_id": "TXWBK",
+  "name": "Western District of Texas",
+  "state": "TX",
+  "circuit": 5,
+  "website": "http://www.txwb.uscourts.gov",
+  "divisions": [
+    {
+      "code": "austin",
+      "name": "Austin Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Austin",
+          "line1": "903 San Jacinto",
+          "line2": "Ste 322",
+          "city": "Austin",
+          "state": "TX",
+          "postal_code": "78701"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Bastrop",
+          "fips": "48021"
+        },
+        {
+          "name": "Blanco",
+          "fips": "48031"
+        },
+        {
+          "name": "Burleson",
+          "fips": "48051"
+        },
+        {
+          "name": "Burnet",
+          "fips": "48053"
+        },
+        {
+          "name": "Caldwell",
+          "fips": "48055"
+        },
+        {
+          "name": "Gillespie",
+          "fips": "48171"
+        },
+        {
+          "name": "Hays",
+          "fips": "48209"
+        },
+        {
+          "name": "Kimble",
+          "fips": "48267"
+        },
+        {
+          "name": "Lampasas",
+          "fips": "48281"
+        },
+        {
+          "name": "Lee",
+          "fips": "48287"
+        },
+        {
+          "name": "Llano",
+          "fips": "48299"
+        },
+        {
+          "name": "Mason",
+          "fips": "48319"
+        },
+        {
+          "name": "McCulloch",
+          "fips": "48307"
+        },
+        {
+          "name": "San Saba",
+          "fips": "48411"
+        },
+        {
+          "name": "Travis",
+          "fips": "48453"
+        },
+        {
+          "name": "Washington",
+          "fips": "48477"
+        },
+        {
+          "name": "Williamson",
+          "fips": "48491"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "waco",
+      "name": "Waco Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Waco",
+          "line1": "800 Franklin Ave",
+          "line2": "Ste 140",
+          "city": "Waco",
+          "state": "TX",
+          "postal_code": "76701"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Bell",
+          "fips": "48027"
+        },
+        {
+          "name": "Bosque",
+          "fips": "48035"
+        },
+        {
+          "name": "Coryell",
+          "fips": "48099"
+        },
+        {
+          "name": "Falls",
+          "fips": "48145"
+        },
+        {
+          "name": "Freestone",
+          "fips": "48161"
+        },
+        {
+          "name": "Hamilton",
+          "fips": "48193"
+        },
+        {
+          "name": "Hill",
+          "fips": "48217"
+        },
+        {
+          "name": "Leon",
+          "fips": "48289"
+        },
+        {
+          "name": "Limestone",
+          "fips": "48293"
+        },
+        {
+          "name": "McLennan",
+          "fips": "48309"
+        },
+        {
+          "name": "Milam",
+          "fips": "48331"
+        },
+        {
+          "name": "Robertson",
+          "fips": "48395"
+        },
+        {
+          "name": "Somervell",
+          "fips": "48425"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "el-paso",
+      "name": "El Paso Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, El Paso",
+          "line1": "511 E. San Antonio Ave.",
+          "line2": "Suite 444",
+          "city": "El Paso",
+          "state": "TX",
+          "postal_code": "79901"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "El Paso",
+          "fips": "48141"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "san-antonio",
+      "name": "San Antonio Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Western District of Texas",
+          "line1": "615 E. Houston St",
+          "line2": "Rm 597",
+          "city": "San Antonio",
+          "state": "TX",
+          "postal_code": "78205"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Atascosa",
+          "fips": "48013"
+        },
+        {
+          "name": "Bandera",
+          "fips": "48019"
+        },
+        {
+          "name": "Bexar",
+          "fips": "48029"
+        },
+        {
+          "name": "Comal",
+          "fips": "48091"
+        },
+        {
+          "name": "Dimmit",
+          "fips": "48127"
+        },
+        {
+          "name": "Frio",
+          "fips": "48163"
+        },
+        {
+          "name": "Gonzales",
+          "fips": "48177"
+        },
+        {
+          "name": "Guadalupe",
+          "fips": "48187"
+        },
+        {
+          "name": "Karnes",
+          "fips": "48255"
+        },
+        {
+          "name": "Kendall",
+          "fips": "48259"
+        },
+        {
+          "name": "Kerr",
+          "fips": "48265"
+        },
+        {
+          "name": "Medina",
+          "fips": "48325"
+        },
+        {
+          "name": "Real",
+          "fips": "48385"
+        },
+        {
+          "name": "Wilson",
+          "fips": "48493"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "del-rio",
+      "name": "Del Rio Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists offices at San Antonio, Austin, El Paso, Waco and Midland only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Edwards",
+          "fips": "48137"
+        },
+        {
+          "name": "Kinney",
+          "fips": "48271"
+        },
+        {
+          "name": "Maverick",
+          "fips": "48323"
+        },
+        {
+          "name": "Terrell",
+          "fips": "48443"
+        },
+        {
+          "name": "Uvalde",
+          "fips": "48463"
+        },
+        {
+          "name": "Val Verde",
+          "fips": "48465"
+        },
+        {
+          "name": "Zavala",
+          "fips": "48507"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "pecos",
+      "name": "Pecos Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists offices at San Antonio, Austin, El Paso, Waco and Midland only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Brewster",
+          "fips": "48043"
+        },
+        {
+          "name": "Culberson",
+          "fips": "48109"
+        },
+        {
+          "name": "Jeff Davis",
+          "fips": "48243"
+        },
+        {
+          "name": "Hudspeth",
+          "fips": "48229"
+        },
+        {
+          "name": "Loving",
+          "fips": "48301"
+        },
+        {
+          "name": "Pecos",
+          "fips": "48371"
+        },
+        {
+          "name": "Presidio",
+          "fips": "48377"
+        },
+        {
+          "name": "Reeves",
+          "fips": "48389"
+        },
+        {
+          "name": "Ward",
+          "fips": "48475"
+        },
+        {
+          "name": "Winkler",
+          "fips": "48495"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "midland-odessa",
+      "name": "Midland-Odessa Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists 'Midland (unstaffed Office)' with the San Antonio clerk's address; no Midland courthouse address was read."
+      },
+      "counties": [
+        {
+          "name": "Andrews",
+          "fips": "48003"
+        },
+        {
+          "name": "Crane",
+          "fips": "48103"
+        },
+        {
+          "name": "Ector",
+          "fips": "48135"
+        },
+        {
+          "name": "Martin",
+          "fips": "48317"
+        },
+        {
+          "name": "Midland",
+          "fips": "48329"
+        },
+        {
+          "name": "Upton",
+          "fips": "48461"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.txwb.uscourts.gov",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": null,
+      "status": "unverified",
+      "source": "S32",
+      "verified_at": null,
+      "note": "ADR 0024 records an ecf-train database for TXWB [S32]; the Attorney Training Prerequisites page read today lists the eight training modules at www2.txwb.uscourts.gov/atty-train/ and no separate training database URL."
+    },
+    "help_desk": {
+      "value": "TXWB_ECF-REGISTRAR@txwb.uscourts.gov; 210-472-6720 ext. 240",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.9",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.9'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": 52428800,
+      "status": "unverified",
+      "source": "S8",
+      "verified_at": null,
+      "note": "50 MB per the Administrative Policies and Procedures for Electronic Filing (eff. 2025-02-03) as read for ADR 0024 [S8]; not re-read today. The PACER lookup [S34] carries merge_doc_size '500' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'Each address line may contain no more than 40 characters including blanks.'"
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'The name and address of each creditor must be five (5) lines or less.'"
+    },
+    "blank_lines_between": {
+      "value": 1,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'Each creditor must be separated by at least one blank line.'"
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "No fixed block size is stated."
+    },
+    "name_line_chars": {
+      "value": 50,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'The \"name\" line may contain no more than 50 characters including blanks.'"
+    },
+    "comma_after_city": {
+      "value": true,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'There must be a comma placed immediately after the city name. (ex. Midland, TX)'"
+    },
+    "case_number_header_when_separate": {
+      "value": false,
+      "status": "verified",
+      "source": "S47",
+      "verified_at": "2026-09-24",
+      "note": "'Do not include page numbers, headers, footers, etc.'"
+    },
+    "certification_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S47",
+      "verified_at": null,
+      "note": "The specifications say nothing about a certification."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "declaration_for_electronic_filing",
+        "title": "Declaration for Electronic Filing (Exhibits B-1/B-2), filed as its own docket event",
+        "wet_ink_required": true,
+        "retention": null,
+        "own_docket_event": true,
+        "form_url": null
+      },
+      "status": "unverified",
+      "source": "S8",
+      "verified_at": null,
+      "note": "ADR 0024 [S8]: TXWB's 2025 procedures file the declaration as its own event; not re-read today."
+    },
+    "ssn_statement": {
+      "value": "not_filed",
+      "status": "unverified",
+      "source": "S8",
+      "verified_at": null,
+      "note": "ADR 0024 [S8]: in TXWB the SSN statement (B121) is not filed — the full SSN goes on the opening screen or in debtor.txt; not re-read today."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "ADR 0024 [S8]: TXWB's procedures assume Case Upload; the court's required field set has not been verified in a training-database session."
+  },
+  "registration": {
+    "training_required": {
+      "value": true,
+      "status": "verified",
+      "source": "S32",
+      "verified_at": "2026-09-24",
+      "note": "'THE TRAINING MODULES MUST BE COMPLETED PRIOR TO THE ONE ON ONE TRAINING' — eight modules, then one-on-one training, before filing access."
+    },
+    "notes": "Eight training modules at www2.txwb.uscourts.gov/atty-train/ then one-on-one training [S32]; filing agents need their own PACER account linked by the attorney (ADR 0024 [S8])."
+  },
+  "sources": [
+    {
+      "id": "S8",
+      "title": "TXWB, Administrative Policies and Procedures for Electronic Filing (eff. 2025-02-03; carried from ADR 0024, not re-read)",
+      "url": "https://www.txwb.uscourts.gov/sites/txwb/files/2-3-2025%20-%20Electronic%20Filing%20Procedures.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S32",
+      "title": "TXWB, Attorney Training Prerequisites",
+      "url": "https://www.txwb.uscourts.gov/attorney-training-prerequisites",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 124 — Texas (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/124",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S47",
+      "title": "TXWB, List of Creditors Specifications",
+      "url": "https://www.txwb.uscourts.gov/list-creditors-specifications",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 124(d)'s seven divisions [S41]; the statute's 'Zavalla' is the Census 'Zavala' (48507). Office codes, the fee rule, the text-searchable/flatten rules were not found on the pages read and are stored unverified; the PDF cap, the declaration and the B121 handling are carried from ADR 0024's reading of the 2025 procedures [S8]."
+}

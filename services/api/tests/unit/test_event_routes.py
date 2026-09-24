@@ -159,7 +159,7 @@ def client(firms, events):
 def open_case(client, subject=ADMIN, chapter=7) -> str:
     response = client.post(
         "/v1/cases",
-        json={"chapter": chapter, "district": "NDCA"},
+        json={"chapter": chapter, "court": "flmb", "division": "tampa"},
         headers=auth(subject),
     )
     assert response.status_code == 201

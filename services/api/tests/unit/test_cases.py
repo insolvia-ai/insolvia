@@ -78,6 +78,10 @@ CAROL = "00000000-0000-4000-8000-0000000ca201"
 # In no firm at all: signed up, never provisioned.
 FRANK = "00000000-0000-4000-8000-00000000f4a2"
 
+# A registry reference (issue #360): the court and division a request names.
+TAMPA = {"chapter": 7, "court": "flmb", "division": "tampa"}
+ORLANDO = {"court": "flmb", "division": "orlando"}
+
 _PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _PUBLIC_KEY = _PRIVATE_KEY.public_key()
 
@@ -194,10 +198,10 @@ def client(store, access_log, firms):
     return app.test_client()
 
 
-def open_case(client, subject=ALICE, *, chapter=7, district="NDCA"):
+def open_case(client, subject=ALICE, *, chapter=7, court="flmb", division="tampa"):
     response = client.post(
         "/v1/cases",
-        json={"chapter": chapter, "district": district},
+        json={"chapter": chapter, "court": court, "division": division},
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -238,9 +242,7 @@ def test_a_signed_in_user_with_no_firm_is_403_not_401(client, method, path):
     """THE NEW FAILURE STATE. Their token is fine and signing in again will not
     help, so 401 would send them round a loop. It is a fact about their own
     account, so it is not hidden behind a 404 either."""
-    response = getattr(client, method)(
-        path, json={"chapter": 7, "district": "NDCA"}, headers=auth(FRANK)
-    )
+    response = getattr(client, method)(path, json=TAMPA, headers=auth(FRANK))
     assert response.status_code == 403
     assert response.get_json()["error"] == "ForbiddenError"
 
@@ -273,12 +275,7 @@ def test_staff_cannot_open_a_matter_by_default(client):
     """A consequence of core/firms.default_permissions worth pinning at this
     level: staff get view_only on the case record, so POST /v1/cases is a 403
     for them until an admin grants add_edit. Reading is unaffected."""
-    assert (
-        client.post(
-            "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(GREG)
-        ).status_code
-        == 403
-    )
+    assert client.post("/v1/cases", json=TAMPA, headers=auth(GREG)).status_code == 403
     assert client.get("/v1/cases", headers=auth(GREG)).status_code == 200
 
 
@@ -290,13 +287,13 @@ def test_view_only_can_read_but_not_write(client, firms):
     )
     case_id = open_case(client, ALICE)["id"]
     assert client.get(f"/v1/cases/{case_id}", headers=auth(DANA)).status_code == 200
-    refused = client.patch(
-        f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(DANA)
-    )
+    refused = client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(DANA))
     assert refused.status_code == 403
     assert (
         client.post(
-            "/v1/cases", json={"chapter": 7, "district": "X"}, headers=auth(DANA)
+            "/v1/cases",
+            json={"chapter": 7, "court": "x", "division": "y"},
+            headers=auth(DANA),
         ).status_code
         == 403
     )
@@ -308,7 +305,10 @@ def test_view_only_can_read_but_not_write(client, firms):
 def test_create_returns_the_case(client):
     body = open_case(client)
     assert body["chapter"] == 7
-    assert body["district"] == "NDCA"
+    assert body["court"] == "flmb"
+    assert body["division"] == "tampa"
+    # The printed name is DERIVED from the reference, never typed.
+    assert body["district"] == "Middle District of Florida"
     assert body["status"] == "intake"
     assert body["id"]
     assert body["createdAt"] == body["updatedAt"]
@@ -326,7 +326,7 @@ def test_create_never_returns_the_firm(client):
 def test_create_ignores_a_firm_supplied_by_the_client(client, store):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "NDCA", "firmId": FIRM_B, "createdBy": CAROL},
+        json={**TAMPA, "firmId": FIRM_B, "createdBy": CAROL},
         headers=auth(ALICE),
     )
     assert response.status_code == 201
@@ -350,7 +350,7 @@ def test_creating_a_case_links_its_creator(client, store):
 def test_create_starts_at_intake_even_if_asked_otherwise(client):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "NDCA", "status": "filed"},
+        json={**TAMPA, "status": "filed"},
         headers=auth(ALICE),
     )
     assert response.get_json()["status"] == "intake"
@@ -359,13 +359,22 @@ def test_create_starts_at_intake_even_if_asked_otherwise(client):
 @pytest.mark.parametrize(
     ("payload", "field"),
     [
-        ({"district": "NDCA"}, "chapter"),
-        ({"chapter": 9, "district": "NDCA"}, "chapter"),
-        ({"chapter": "7", "district": "NDCA"}, "chapter"),
-        ({"chapter": True, "district": "NDCA"}, "chapter"),
-        ({"chapter": 7}, "district"),
-        ({"chapter": 7, "district": "   "}, "district"),
-        ({"chapter": 7, "district": "x" * 65}, "district"),
+        ({"court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": 9, "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": "7", "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": True, "court": "flmb", "division": "tampa"}, "chapter"),
+        ({"chapter": 7}, "court"),
+        ({"chapter": 7, "court": "   ", "division": "tampa"}, "court"),
+        # A court the registry does not know is refused by name (#360).
+        ({"chapter": 7, "court": "nyeb", "division": "brooklyn"}, "court"),
+        ({"chapter": 7, "court": "flmb"}, "division"),
+        # A division of a DIFFERENT court is not this court's.
+        ({"chapter": 7, "court": "flmb", "division": "miami"}, "division"),
+        # The free-text district is refused, not silently ignored.
+        (
+            {"chapter": 7, "court": "flmb", "division": "tampa", "district": "NDCA"},
+            "district",
+        ),
     ],
 )
 def test_create_rejects_bad_input(client, payload, field):
@@ -430,11 +439,9 @@ def test_another_firms_case_is_invisible_to_its_admin(client):
 
 def test_another_firms_case_cannot_be_updated(client, store):
     case_id = open_case(client, ALICE)["id"]
-    response = client.patch(
-        f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(CAROL)
-    )
+    response = client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(CAROL))
     assert response.status_code == 404
-    assert store.cases[case_id].district == "NDCA"
+    assert store.cases[case_id].division == "tampa"
 
 
 def test_a_foreign_case_is_indistinguishable_from_a_missing_one(client):
@@ -595,8 +602,8 @@ def test_both_listings_order_identically(store, firms):
 
 
 def test_list_returns_the_firms_cases_over_http(client):
-    first = open_case(client, ALICE, district="NDCA")
-    second = open_case(client, DANA, district="CACD")
+    first = open_case(client, ALICE)
+    second = open_case(client, DANA, division="orlando")
     ids = {
         case["id"]
         for case in client.get("/v1/cases", headers=auth(ALICE)).get_json()["cases"]
@@ -660,11 +667,12 @@ def test_list_rejects_a_forged_cursor(client):
 
 
 def test_update_changes_only_what_was_sent(client):
-    created = open_case(client, chapter=7, district="NDCA")
+    created = open_case(client, chapter=7)
     updated = client.patch(
-        f"/v1/cases/{created['id']}", json={"district": "CACD"}, headers=auth(ALICE)
+        f"/v1/cases/{created['id']}", json=ORLANDO, headers=auth(ALICE)
     ).get_json()
-    assert updated["district"] == "CACD"
+    assert updated["division"] == "orlando"
+    assert updated["district"] == "Middle District of Florida"
     assert updated["chapter"] == 7
     assert updated["status"] == "intake"
 
@@ -709,9 +717,7 @@ def test_update_rejects_an_unknown_status(client):
 
 
 def test_update_of_a_missing_case_is_404(client):
-    response = client.patch(
-        "/v1/cases/nope", json={"district": "CACD"}, headers=auth(ALICE)
-    )
+    response = client.patch("/v1/cases/nope", json=ORLANDO, headers=auth(ALICE))
     assert response.status_code == 404
 
 
@@ -851,7 +857,7 @@ def test_an_in_firm_refusal_is_also_recorded_as_denied(client, access_log):
 
 def test_a_refused_update_is_recorded_as_denied(client, access_log):
     case_id = open_case(client, ALICE)["id"]
-    client.patch(f"/v1/cases/{case_id}", json={"district": "CACD"}, headers=auth(CAROL))
+    client.patch(f"/v1/cases/{case_id}", json=ORLANDO, headers=auth(CAROL))
     assert access_log.events[-1].outcome == "denied"
 
 

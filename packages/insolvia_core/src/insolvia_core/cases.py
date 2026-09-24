@@ -16,12 +16,12 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import re
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
+from insolvia_core import courts
 from insolvia_core.errors import FieldValidationError, ValidationError
 
 # The chapters an individual debtor can file under. 9 and 15 are municipal and
@@ -45,11 +45,25 @@ STATUSES = ("intake", "ready_to_file", "filed")
 # split.
 EXEMPTION_SETS = ("state_and_federal_nonbankruptcy", "federal")
 
-# A bankruptcy court district identifier. Kept loose on purpose: the
-# authoritative list belongs to the forms/e-filing work, which will have the
-# CM/ECF court codes, and inventing a half-list here would be a constraint the
-# next person has to unpick rather than a validation anyone wanted.
-_DISTRICT_RE = re.compile(r"^[A-Za-z0-9 .\-/]{2,64}$")
+# THE COURT IS A REFERENCE INTO THE REGISTRY (issue #360). `district` was
+# free text — kept loose on purpose while the authoritative court list
+# belonged to the e-filing work — and that work (ADR 0024) delivered the
+# list as the `courts/us-bankruptcy` series in `insolvia_core.courts`. A case
+# now names its court by the registry's CM/ECF code and its division by the
+# division's code, and a write naming a pair the registry does not know is
+# refused: every downstream consumer — the matrix's district variance, local
+# forms, venue on B101, the deadline rules — wants a court it can look up,
+# not a string it has to guess at.
+#
+# `district` SURVIVES AS THE PRINTED NAME. Twenty-odd readers — every form's
+# caption, the Chapter 13 multiplier lookup, B2030's split caption, the AI
+# review — consume the district as the name the B101 dropdown prints
+# ("Middle District of Florida"), and the registry's `name` is exactly that
+# spelling. So the reference is the source of truth and `district` is
+# written FROM it on every write, never typed by a client. On a row written
+# before the registry existed, `district` holds whatever free text was
+# typed and `court`/`division` are None: such a case still reads, still
+# prints, and is asked to pick a court the next time its record is edited.
 
 MAX_LIST_LIMIT = 100
 DEFAULT_LIST_LIMIT = 50
@@ -74,10 +88,18 @@ class Case:
     firm_id: str
     created_by: str
     chapter: int
+    # The printed district name — see the module comment above `MAX_LIST_LIMIT`
+    # for why this is a string beside the reference rather than the reference
+    # itself.
     district: str
     status: str
     created_at: str
     updated_at: str
+    # The registry reference (`insolvia_core.courts`): the court's CM/ECF
+    # code and the division's code. None on a row written before the registry
+    # existed — the one legal way for a stored case to lack them.
+    court: str | None = None
+    division: str | None = None
     # THE PINS (docs/reference/effective-dating.md, "Float, then pin").
     # None until packet assembly runs: a floating case resolves every
     # regulatory series as of today, and nothing is recorded. Packet assembly
@@ -135,21 +157,31 @@ class CaseAssignment:
 
 
 @dataclass(frozen=True)
+class CourtReference:
+    """A validated `{court, division}` pair — the registry knows it, and
+    `district` is the name the registry prints for it."""
+
+    court: str
+    division: str
+    district: str
+
+
+@dataclass(frozen=True)
 class CaseDraft:
     """A validated creation request, before server-generated identity."""
 
     chapter: int
-    district: str
+    court: CourtReference
 
 
 @dataclass(frozen=True)
 class CaseChanges:
     """A validated PATCH body. None means "leave unchanged" — which is why
-    these are Optional rather than defaulted: a client that omits `district`
+    these are Optional rather than defaulted: a client that omits `court`
     must not silently blank it."""
 
     chapter: int | None = None
-    district: str | None = None
+    court: CourtReference | None = None
     status: str | None = None
     exemption_set: str | None = None
     # The two dates are the one place "None means unchanged" is not enough:
@@ -219,15 +251,49 @@ def _parse_chapter(value: object, errors: dict[str, str]) -> int | None:
     return value
 
 
-def _parse_district(value: object, errors: dict[str, str]) -> str | None:
-    if not isinstance(value, str) or not value.strip():
-        errors["district"] = "A filing district is required."
+def _parse_court(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> CourtReference | None:
+    """The `court` + `division` pair, validated against the registry.
+
+    THE PAIR TRAVELS TOGETHER. A division only means something inside its
+    court, so a PATCH carrying one without the other is refused rather than
+    guessed at — and the message lands on the half that is missing, so the
+    client can put it next to the right control.
+
+    A free-text `district` in the body is refused by name (not ignored):
+    every client that sent one was writing the field this reference
+    replaces, and a silent 400 keyed to a control the screen no longer has
+    would be undiagnosable. The registry's message says what to send.
+    """
+    court = payload.get("court")
+    division = payload.get("division")
+    if not isinstance(court, str) or not court.strip():
+        errors["court"] = "Choose the bankruptcy court this case will be filed in."
         return None
-    district = value.strip()
-    if not _DISTRICT_RE.match(district):
-        errors["district"] = "That doesn't look like a district identifier."
+    if not isinstance(division, str) or not division.strip():
+        errors["division"] = "Choose the court's division."
         return None
-    return district
+    found = courts.division(court.strip(), division.strip())
+    if found is None:
+        if courts.district(court.strip()) is None:
+            errors["court"] = "That court is not in the registry."
+        else:
+            errors["division"] = "That division is not one of this court's."
+        return None
+    record, chosen = found
+    return CourtReference(court=record.code, division=chosen.code, district=record.name)
+
+
+def _refuse_typed_district(
+    payload: Mapping[str, object], errors: dict[str, str]
+) -> None:
+    if "district" in payload:
+        errors["district"] = (
+            "The district is no longer typed — send `court` and `division`"
+            " from the court registry (GET /v1/courts) and the district name"
+            " is derived."
+        )
 
 
 def _parse_status(value: object, errors: dict[str, str]) -> str | None:
@@ -274,18 +340,19 @@ def parse_case_creation(payload: Mapping[str, object]) -> CaseDraft:
     """
     errors: dict[str, str] = {}
     chapter = _parse_chapter(payload.get("chapter"), errors)
-    district = _parse_district(payload.get("district"), errors)
+    _refuse_typed_district(payload, errors)
+    court = _parse_court(payload, errors)
     # The None checks are redundant with `errors` but they are what narrows
     # the types, and a redundant guard beats an assert that a future -O strips.
-    if errors or chapter is None or district is None:
+    if errors or chapter is None or court is None:
         raise FieldValidationError(errors)
-    return CaseDraft(chapter=chapter, district=district)
+    return CaseDraft(chapter=chapter, court=court)
 
 
 def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
     """Validate PATCH /v1/cases/<id>.
 
-    Only supplied keys are validated, so a caller changing the district alone
+    Only supplied keys are validated, so a caller changing the court alone
     is not forced to resend the chapter. An empty body is rejected rather than
     treated as a no-op — it is far more likely to be a client bug than an
     intent, and a silent 200 would hide it.
@@ -297,10 +364,11 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
         chapter = _parse_chapter(payload["chapter"], errors)
         if chapter is not None:
             changes["chapter"] = chapter
-    if "district" in payload:
-        district = _parse_district(payload["district"], errors)
-        if district is not None:
-            changes["district"] = district
+    _refuse_typed_district(payload, errors)
+    if "court" in payload or "division" in payload:
+        court = _parse_court(payload, errors)
+        if court is not None:
+            changes["court"] = court
     if "status" in payload:
         status = _parse_status(payload["status"], errors)
         if status is not None:
@@ -373,10 +441,12 @@ def create_case(
         firm_id=firm_id,
         created_by=created_by,
         chapter=draft.chapter,
-        district=draft.district,
+        district=draft.court.district,
         status="intake",
         created_at=now,
         updated_at=now,
+        court=draft.court.court,
+        division=draft.court.division,
     )
     return case, assign_case(case, subject=created_by, assigned_by=created_by)
 
@@ -395,12 +465,15 @@ def assign_case(case: Case, *, subject: str, assigned_by: str) -> CaseAssignment
 
 
 def apply_changes(case: Case, changes: CaseChanges) -> Case:
-    """A new Case with the supplied changes applied and updated_at refreshed."""
+    """A new Case with the supplied changes applied and updated_at refreshed.
+
+    A court change writes all three of `court`, `division` and `district`
+    in one step — the printed name is derived from the reference and must
+    never be left describing the previous court."""
     updates: dict[str, object] = {
         field: value
         for field, value in (
             ("chapter", changes.chapter),
-            ("district", changes.district),
             ("status", changes.status),
             ("exemption_set", changes.exemption_set),
             ("filed_at", changes.filed_at),
@@ -412,6 +485,10 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
         updates["filed_at"] = None
     if changes.clear_meeting_341_at:
         updates["meeting_341_at"] = None
+    if changes.court is not None:
+        updates["court"] = changes.court.court
+        updates["division"] = changes.court.division
+        updates["district"] = changes.court.district
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
@@ -490,6 +567,13 @@ def case_item(case: Case) -> dict[str, object]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    # The registry reference is stored only when present — a row written
+    # before the registry existed carries the typed district alone, and the
+    # absent-means-absent rule keeps it readable as exactly what it was.
+    if case.court is not None:
+        item["court"] = case.court
+    if case.division is not None:
+        item["division"] = case.division
     if case.form_revisions is not None:
         item["formRevisions"] = dict(case.form_revisions)
     if case.constants_set_id is not None:
@@ -526,6 +610,8 @@ def case_from_item(item: Mapping[str, object]) -> Case:
         raw_exemption_set = item.get("exemptionSet")
         raw_filed_at = item.get("filedAt")
         raw_meeting_341_at = item.get("meeting341At")
+        raw_court = item.get("court")
+        raw_division = item.get("division")
         chapter = item["chapter"]
         if not isinstance(chapter, (int, str)):
             raise ValueError(f"chapter is {chapter!r}")
@@ -538,6 +624,9 @@ def case_from_item(item: Mapping[str, object]) -> Case:
             status=str(item["status"]),
             created_at=str(item["createdAt"]),
             updated_at=str(item["updatedAt"]),
+            # Tolerated-absent, deliberately: the legacy row IS a real state.
+            court=str(raw_court) if raw_court is not None else None,
+            division=str(raw_division) if raw_division is not None else None,
             form_revisions=form_revisions,
             constants_set_id=str(raw_constants) if raw_constants is not None else None,
             exemption_set=(
@@ -620,6 +709,12 @@ def case_json(case: Case) -> dict[str, object]:
         "createdAt": case.created_at,
         "updatedAt": case.updated_at,
     }
+    # The registry reference, absent on a row written before it existed —
+    # which is how a client learns the case still needs a court chosen.
+    if case.court is not None:
+        body["court"] = case.court
+    if case.division is not None:
+        body["division"] = case.division
     # Present only once packet assembly has pinned the case — absent, not
     # null, before that (the failure/result rule in core/jobs.job_json). The
     # client renders which printed revisions the packet used; it never sends

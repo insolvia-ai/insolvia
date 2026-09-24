@@ -7,12 +7,14 @@ import type {
   Address,
   FilingProfessionalBody,
   FilingProfessionalRole,
+  FirmColleague,
   PersonName,
 } from '@insolvia-ai/api-client';
 import { Button, DateInput, Field, Input, Select } from '@insolvia-ai/design-system';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useMe } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { Heading } from '@/components/heading';
 import { labelize } from '@/screens/intake/collections';
@@ -32,6 +34,15 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * keystrokes), and like it the whole record is sent on every save — the
  * generic entity endpoints are PUT, not PATCH (invariant 1: every populated
  * field needs provenance, checked against a complete record).
+ *
+ * "USE FIRM DEFAULT" (issue #360). An attorney's bar number, bar state and
+ * firm lines do not change from case to case, so the firm keeps them: each
+ * attorney's `signatureBlock` on their firm-user row (the directory carries
+ * it) and the firm's `letterhead` for the firm lines a block leaves blank.
+ * The button copies the chosen attorney's block onto THIS form — it does not
+ * save. The preparer still reads every line and presses save, and the record
+ * goes up with `staff_typed` provenance like anything else they confirmed:
+ * a prefill is a suggestion, and the person who confirms it is the source.
  */
 
 const ROLE_OPTIONS = FILING_PROFESSIONAL_ROLES.map((value) => ({ value, label: labelize(value) }));
@@ -49,6 +60,8 @@ interface StoredRecord {
 export function SignerSection({ caseId }: { caseId: string }) {
   const theme = useTheme();
   const { call } = useApi();
+  const me = useMe();
+  const principal = me.kind === 'ready' ? me.principal : undefined;
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [records, setRecords] = useState<Partial<Record<FilingProfessionalRole, StoredRecord>>>({});
@@ -57,6 +70,63 @@ export function SignerSection({ caseId }: { caseId: string }) {
   const [status, setStatus] = useState('');
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
+  // The colleagues whose rows carry a signature block — the firm's attorneys,
+  // in practice. Loaded separately from the record: a directory this screen
+  // could not fetch costs the prefill button, never the form.
+  const [attorneys, setAttorneys] = useState<readonly FirmColleague[]>([]);
+  const [prefillFrom, setPrefillFrom] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await call((client) => client.listFirmDirectory());
+        if (!result.ok || cancelled) return;
+        const withBlocks = result.value.filter((person) => person.signatureBlock !== null);
+        setAttorneys(withBlocks);
+      } catch {
+        // No directory, no prefill offer — the form itself is unaffected.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call]);
+
+  // Default the picker to the signed-in person when they are an option —
+  // the common case is the attorney preparing their own petition.
+  useEffect(() => {
+    if (prefillFrom !== null || attorneys.length === 0) return;
+    const self = attorneys.find((person) => person.subject === principal?.subject);
+    setPrefillFrom((self ?? attorneys[0]!).subject);
+  }, [attorneys, prefillFrom, principal]);
+
+  const useFirmDefault = () => {
+    const person = attorneys.find((candidate) => candidate.subject === prefillFrom);
+    const block = person?.signatureBlock;
+    if (person === undefined || block === null || block === undefined) return;
+    const letterhead = principal?.firm?.letterhead ?? null;
+    const address = block.address ?? letterhead?.address;
+    setRole('attorney');
+    setBody((current) => ({
+      ...current,
+      role: 'attorney',
+      name: {
+        ...(person.firstName ? { given: person.firstName } : {}),
+        ...(person.lastName ? { surname: person.lastName } : {}),
+      },
+      ...defined('firm_name', block.firm_name ?? letterhead?.name),
+      ...(address === undefined ? {} : { address }),
+      ...defined('phone', block.phone ?? letterhead?.phone),
+      ...defined('email', block.email ?? letterhead?.email),
+      ...defined('bar_number', block.bar_number),
+      ...defined('bar_state', block.bar_state),
+    }));
+    setErrors({});
+    setStatus(
+      `Prefilled from ${person.displayName}’s signature block — check every line, then save.`,
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +248,30 @@ export function SignerSection({ caseId }: { caseId: string }) {
 
       {load.kind !== 'ready' ? null : (
         <View style={styles.form}>
+          {attorneys.length === 0 ? (
+            <Text style={[styles.help, muted]}>
+              No attorney at your firm has a signature block yet — add yours on your account page
+              and this block prefills from it.
+            </Text>
+          ) : (
+            <View style={styles.prefill}>
+              <Field.Root>
+                <Field.Label>Prefill from</Field.Label>
+                <Select
+                  options={attorneys.map((person) => ({
+                    value: person.subject,
+                    label: person.displayName,
+                  }))}
+                  value={prefillFrom}
+                  onValueChange={setPrefillFrom}
+                />
+              </Field.Root>
+              <Button size="lg" intent="secondary" onPress={useFirmDefault}>
+                Use firm default
+              </Button>
+            </View>
+          )}
+
           <Field.Root>
             <Field.Label>Role</Field.Label>
             <Select
@@ -300,6 +394,12 @@ export function SignerSection({ caseId }: { caseId: string }) {
   );
 }
 
+/** `{ [key]: value }` when the value is set, `{}` when it is not — so a
+ * prefill never writes an explicit `undefined` the save would carry. */
+function defined<K extends string>(key: K, value: string | undefined): Partial<Record<K, string>> {
+  return value === undefined ? {} : ({ [key]: value } as Record<K, string>);
+}
+
 function addressLabel(part: 'line1' | 'line2' | 'city' | 'state' | 'postal_code'): string {
   switch (part) {
     case 'line1':
@@ -351,6 +451,7 @@ function TextField({
 const styles = StyleSheet.create({
   form: { gap: spacing.md },
   help: { fontSize: fontSizes.label },
+  prefill: { gap: spacing.sm },
   section: { gap: spacing.md },
   status: { fontSize: fontSizes.label },
 });

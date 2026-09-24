@@ -29,7 +29,11 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 # The py.typed marker is what lets a consumer's strict mypy see these types.
-insolvia_core = ["py.typed"]
+# The court registry (`courts.py`, ADR 0014's `courts/us-bankruptcy` series)
+# ships INSIDE the wheel: every consumer installs this package non-editable
+# by path, so a data file this list misses is a loader that works in this
+# package's own tests and raises FileNotFoundError in every service.
+insolvia_core = ["py.typed", "regulatory/**/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

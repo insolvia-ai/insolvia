@@ -7,7 +7,7 @@ Two kinds of file, one loader
 |---|---|---|
 | `dev.json` | Who exists on a developer's machine — the dev account's firm — and which fixture case it holds | `scripts/dev-aws-seed.sh`, by hand, after `dev-aws-setup.sh` |
 | `staging.json` | Who exists in staging — three people across two firms, so cross-tenant isolation is testable — and which fixture case they hold | `.github/actions/seed-staging`, on every staging deploy, before the API's integration tier and the browser suite |
-| `fixtures/<version>/cases.json` | What each fixture case contains: chapter and district, debtors, collection items, documents — in the API's own request-body shapes | the loader, when an environment fixture names one of its cases |
+| `fixtures/<version>/cases.json` | What each fixture case contains: chapter, court and division (a reference into the court registry, `insolvia_core.courts`), debtors, collection items, documents — in the API's own request-body shapes | the loader, when an environment fixture names one of its cases |
 | `fixtures/<version>/manifest.json` | Every sample document's size and sha256 | the loader, to verify a copy landed as published |
 | `fixtures/<version>/objects/` | The sample documents themselves — small, synthetic, committed | `scripts/dev-fixture.sh publish`, which copies them into the shared fixture bucket the loader reads from |
 

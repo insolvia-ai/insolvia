@@ -40,7 +40,8 @@
     {
       "handle": "chapter-7-sample",
       "chapter": 7,
-      "district": "NDCA",
+      "court": "flmb",
+      "division": "tampa",
       "debtors": {
         "debtor_1": {
           "name": {

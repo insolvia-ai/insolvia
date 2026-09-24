@@ -48,8 +48,8 @@ API — which is what makes the API's calls run under ITS role, not yours.
 
 Cases cannot be deleted through the API, so a spec that opened one per run
 would fill a table nobody prunes. The suite keeps ONE scratch case per
-environment, found by district (`SCRATCH_DISTRICT`) and opened only when
-absent. Everything else it creates — debtors are replaced in place, documents
+environment, found by its court and division (`SCRATCH_COURT`) and opened only
+when absent. Everything else it creates — debtors are replaced in place, documents
 are deleted — lives inside that case, and every deletion runs in teardown
 however the test ended.
 """
@@ -74,9 +74,15 @@ HERE = Path(__file__).resolve().parent
 GATE = "INSOLVIA_INTEGRATION"
 TARGETS = ("dev", "staging")
 
-#: The district the suite's scratch case carries — a value no real case would,
-#: which is what lets a later run find it again rather than opening another.
-SCRATCH_DISTRICT = "INTEGRATION-SCRATCH"
+#: The court and division the suite's scratch case carries. `district` used to
+#: be free text and the marker was a string no real case would carry; a case
+#: now names a registry reference (issue #360), so the marker is a launch
+#: division the fixture case (`flmb`/`tampa`, seeds/fixtures/v1) does NOT use
+#: — which is what lets a later run find the scratch case rather than open
+#: another. The suite's own writes never change it.
+SCRATCH_COURT = {"court": "flnb", "division": "gainesville"}
+#: The name the registry prints for that court — what `district` reads back as.
+SCRATCH_DISTRICT = "Northern District of Florida"
 
 #: What `/health` reports per target. The local compose stack runs the API as
 #: `local`; there is no `dev` environment name on the API side.
@@ -298,8 +304,9 @@ def admin(as_user) -> Api:
 def scratch_case(admin: Api) -> dict[str, Any]:
     """ONE case per environment for the suite to work in, opened on demand.
 
-    Found by its district on later runs rather than re-opened: cases have no
-    delete route, and a fresh row per run is a table nobody prunes.
+    Found by its court and division on later runs rather than re-opened:
+    cases have no delete route, and a fresh row per run is a table nobody
+    prunes.
     """
     cursor: str | None = None
     while True:
@@ -308,9 +315,12 @@ def scratch_case(admin: Api) -> dict[str, Any]:
             params["cursor"] = cursor
         page = admin.get("/v1/cases", **params)
         for case in page.get("cases") or []:
-            if case.get("district") == SCRATCH_DISTRICT:
+            if (
+                case.get("court") == SCRATCH_COURT["court"]
+                and case.get("division") == SCRATCH_COURT["division"]
+            ):
                 return dict(case)
         cursor = page.get("nextCursor")
         if not cursor:
             break
-    return dict(admin.post("/v1/cases", {"chapter": 7, "district": SCRATCH_DISTRICT}))
+    return dict(admin.post("/v1/cases", {"chapter": 7, **SCRATCH_COURT}))

@@ -174,7 +174,9 @@ def client(firms, cases, directory, access_log):
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(subject)
+        "/v1/cases",
+        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
@@ -232,7 +234,82 @@ def test_an_admin_reads_the_firms_record_without_provenance(client):
         "status": "active",
         "createdAt": "2026-01-01T00:00:00.000Z",
         "updatedAt": "2026-01-01T00:00:00.000Z",
+        # The firm defaults (issue #360): explicit nulls until set.
+        "defaultCourt": None,
+        "defaultDivision": None,
+        "defaultChapter": None,
+        "letterhead": None,
     }
+
+
+# ── Firm defaults and letterhead (issue #360) ──────────────────────
+
+
+def test_firm_defaults_are_written_and_reach_every_member(client):
+    body = client.patch(
+        "/v1/firm",
+        json={
+            "defaultCourt": "flmb",
+            "defaultDivision": "tampa",
+            "defaultChapter": 7,
+            "letterhead": {
+                "name": "Example & Partners, P.A.",
+                "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"},
+                "phone": "813-555-0100",
+            },
+        },
+        headers=auth(ALICE),
+    ).get_json()
+    assert body["defaultCourt"] == "flmb"
+    assert body["defaultDivision"] == "tampa"
+    assert body["defaultChapter"] == 7
+    assert body["letterhead"]["address"]["city"] == "Tampa"
+    # A paralegal cannot read /v1/firm, but the create form they use needs the
+    # defaults — so they ride on the firm block of /v1/me.
+    me = client.get("/v1/me", headers=auth(BOB)).get_json()
+    assert me["firm"]["defaultCourt"] == "flmb"
+    assert me["firm"]["defaultDivision"] == "tampa"
+    assert me["firm"]["defaultChapter"] == 7
+    assert me["firm"]["letterhead"]["name"] == "Example & Partners, P.A."
+
+
+def test_a_default_court_the_registry_does_not_know_is_refused(client):
+    response = client.patch(
+        "/v1/firm",
+        json={"defaultCourt": "nyeb", "defaultDivision": "brooklyn"},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+    assert "defaultCourt" in response.get_json()["fields"]
+
+
+def test_a_signature_block_is_self_service_and_visible_to_the_firm(client):
+    block = {
+        "bar_number": "0123456",
+        "bar_state": "FL",
+        "firm_name": "Example & Partners",
+        "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"},
+        "phone": "813-555-0100",
+        "email": "alice@example.test",
+    }
+    me = client.patch("/v1/me", json={"signatureBlock": block}, headers=auth(ALICE))
+    assert me.status_code == 200
+    assert me.get_json()["firm"]["signatureBlock"] == block
+    # Every colleague sees it in the directory — the petition screen's "use
+    # firm default" is case work, and a bar number is printed on every filing.
+    people = client.get("/v1/firm/directory", headers=auth(BOB)).get_json()["people"]
+    alice = next(p for p in people if p["subject"] == ALICE)
+    assert alice["signatureBlock"] == block
+    bob = next(p for p in people if p["subject"] == BOB)
+    assert bob["signatureBlock"] is None
+    # An administrator may set a colleague's too.
+    admin_set = client.patch(
+        f"/v1/firm/users/{BOB}",
+        json={"signatureBlock": {"bar_number": "7654321", "bar_state": "FL"}},
+        headers=auth(ALICE),
+    )
+    assert admin_set.status_code == 200
+    assert admin_set.get_json()["signatureBlock"]["bar_number"] == "7654321"
 
 
 def test_the_record_is_the_callers_firm(client):
@@ -310,7 +387,17 @@ def test_the_directory_withholds_everything_administrative(client):
     string — and the exact-set assertion is what keeps that from being a door:
     adding a field here has to be a deliberate edit to this line."""
     person = client.get("/v1/firm/directory", headers=auth(BOB)).get_json()["people"][0]
-    assert set(person) == {"subject", "firstName", "lastName", "displayName", "role"}
+    # `signatureBlock` is the one deliberate addition (issue #360) — see
+    # firm_user_summary_json for why a bar number passes the test the email
+    # and the permission map fail.
+    assert set(person) == {
+        "subject",
+        "firstName",
+        "lastName",
+        "displayName",
+        "role",
+        "signatureBlock",
+    }
 
 
 def test_the_directory_is_firm_scoped(client):

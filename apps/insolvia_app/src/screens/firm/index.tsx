@@ -1,11 +1,15 @@
 import { ApiException, ApiValidationException, permits } from '@insolvia-ai/api-client';
 import type {
   AddFirmUserRequest,
+  Address,
+  CaseChapter,
+  CourtRegistry,
   Firm as FirmRecord,
   FirmFeature,
   FirmMembership,
   FirmRole,
   FirmUser,
+  Letterhead,
   PermissionLevel,
   UpdateFirmUserRequest,
 } from '@insolvia-ai/api-client';
@@ -17,6 +21,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
+import { CourtPicker } from '@/screens/cases';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
@@ -311,6 +316,11 @@ function FirmDetails({
               {saving ? 'Saving…' : 'Save firm name'}
             </Button>
           </View>
+          <CaseDefaults
+            record={state.record}
+            onSaved={(record) => setState({ kind: 'ready', record })}
+            onNotice={onNotice}
+          />
         </>
       ) : (
         <Text style={[styles.body, muted]}>
@@ -318,6 +328,216 @@ function FirmDetails({
           job.
         </Text>
       )}
+    </View>
+  );
+}
+
+const CHAPTER_OPTIONS = [
+  { value: '7', label: 'Chapter 7' },
+  { value: '13', label: 'Chapter 13' },
+  { value: '11', label: 'Chapter 11' },
+  { value: '12', label: 'Chapter 12' },
+];
+
+const LETTERHEAD_ADDRESS = [
+  ['line1', 'Street'],
+  ['line2', 'Apartment, suite or unit'],
+  ['city', 'City'],
+  ['state', 'State'],
+  ['postal_code', 'ZIP code'],
+] as const;
+
+type RegistryState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly registry: CourtRegistry }
+  | { readonly kind: 'error' };
+
+/**
+ * The firm's case defaults and letterhead (issue #360): the court, division
+ * and chapter a new case starts with, and the firm lines a signer block
+ * falls back to. Its own form and its own save, separate from the rename,
+ * so each PATCH sends exactly the fields its button names — and a firm
+ * whose defaults are unset stays unset until somebody chooses.
+ *
+ * The court pickers come from the case screen's `CourtPicker`, reading the
+ * same `GET /v1/courts` the create form reads; a registry that will not load
+ * costs the pickers, not the letterhead.
+ */
+function CaseDefaults({
+  record,
+  onSaved,
+  onNotice,
+}: {
+  record: FirmRecord;
+  onSaved: (record: FirmRecord) => void;
+  onNotice: (notice: FirmNotice | null) => void;
+}) {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [courts, setCourts] = useState<RegistryState>({ kind: 'loading' });
+  const [court, setCourt] = useState<string | null>(record.defaultCourt);
+  const [division, setDivision] = useState<string | null>(record.defaultDivision);
+  const [chapter, setChapter] = useState<string | null>(
+    record.defaultChapter === null ? null : String(record.defaultChapter),
+  );
+  const [letterhead, setLetterhead] = useState<Letterhead>(record.letterhead ?? {});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await call((client) => client.listCourts());
+        if (!cancelled && result.ok) setCourts({ kind: 'ready', registry: result.value });
+      } catch {
+        if (!cancelled) setCourts({ kind: 'error' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call]);
+
+  const setPart = (key: 'name' | 'phone' | 'email', value: string) =>
+    setLetterhead((current) => ({ ...current, [key]: value === '' ? undefined : value }));
+  const setAddress = (key: keyof Address, value: string) =>
+    setLetterhead((current) => ({
+      ...current,
+      address: { ...current.address, [key]: value === '' ? undefined : value },
+    }));
+
+  const save = async () => {
+    setSaving(true);
+    setFieldErrors({});
+    onNotice(null);
+    try {
+      const address = Object.fromEntries(
+        Object.entries(letterhead.address ?? {}).filter(([, v]) => v !== undefined),
+      ) as Address;
+      const filled: Letterhead = {
+        ...Object.fromEntries(
+          Object.entries(letterhead).filter(([k, v]) => k !== 'address' && v !== undefined),
+        ),
+        ...(Object.keys(address).length > 0 ? { address } : {}),
+      };
+      const result = await call((client) =>
+        client.updateFirm({
+          // Both halves of the reference travel together — null clears both.
+          defaultCourt: court,
+          defaultDivision: court === null ? null : division,
+          defaultChapter: chapter === null ? null : (Number(chapter) as CaseChapter),
+          letterhead: Object.keys(filled).length > 0 ? filled : null,
+        }),
+      );
+      if (result.ok) {
+        onSaved(result.value);
+        onNotice({ tone: 'saved', message: 'Your firm’s case defaults are saved.' });
+      }
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        setFieldErrors(cause.fields);
+      } else {
+        onNotice({ tone: 'error', message: 'Could not save the case defaults. Please try again.' });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  const error = (path: string) => fieldErrors[path];
+
+  return (
+    <View style={styles.form}>
+      <Heading level={3}>Case defaults and letterhead</Heading>
+      <Text style={[styles.body, muted]}>
+        What a new case starts with. The preparer can change any of these on the case itself.
+      </Text>
+      {courts.kind === 'ready' ? (
+        <CourtPicker
+          registry={courts.registry}
+          court={court}
+          division={division}
+          onCourtChange={(next) => {
+            setCourt(next);
+            setDivision(null);
+          }}
+          onDivisionChange={setDivision}
+          errors={fieldErrors}
+          courtLabel="Default court"
+          divisionLabel="Default division"
+          courtField="defaultCourt"
+          divisionField="defaultDivision"
+        />
+      ) : (
+        <Text aria-live="polite" style={[styles.body, muted]}>
+          {courts.kind === 'loading'
+            ? 'Loading the court registry…'
+            : 'The court registry is unavailable, so the default court cannot be set right now.'}
+        </Text>
+      )}
+      <Field.Root name="defaultChapter" invalid={Boolean(error('defaultChapter'))}>
+        <Field.Label>Default chapter</Field.Label>
+        <Select
+          options={CHAPTER_OPTIONS}
+          value={chapter}
+          onValueChange={setChapter}
+          placeholder="No default"
+        />
+        {error('defaultChapter') ? (
+          <Field.Error match>{error('defaultChapter')}</Field.Error>
+        ) : null}
+      </Field.Root>
+      <Field.Root name="letterhead.name" invalid={Boolean(error('letterhead.name'))}>
+        <Field.Label>Letterhead name</Field.Label>
+        <Input value={letterhead.name ?? ''} onValueChange={(v) => setPart('name', v)} />
+        <Field.Description>
+          The firm name as it prints on filings and letters, when it differs from the name above.
+        </Field.Description>
+        {error('letterhead.name') ? (
+          <Field.Error match>{error('letterhead.name')}</Field.Error>
+        ) : null}
+      </Field.Root>
+      {LETTERHEAD_ADDRESS.map(([part, label]) => (
+        <Field.Root
+          key={part}
+          name={`letterhead.address.${part}`}
+          invalid={Boolean(error(`letterhead.address.${part}`))}
+        >
+          <Field.Label>{`Letterhead address — ${label}`}</Field.Label>
+          <Input
+            value={letterhead.address?.[part] ?? ''}
+            onValueChange={(v) => setAddress(part, v)}
+          />
+          {error(`letterhead.address.${part}`) ? (
+            <Field.Error match>{error(`letterhead.address.${part}`)}</Field.Error>
+          ) : null}
+        </Field.Root>
+      ))}
+      <Field.Root name="letterhead.phone" invalid={Boolean(error('letterhead.phone'))}>
+        <Field.Label>Letterhead phone</Field.Label>
+        <Input value={letterhead.phone ?? ''} onValueChange={(v) => setPart('phone', v)} />
+        {error('letterhead.phone') ? (
+          <Field.Error match>{error('letterhead.phone')}</Field.Error>
+        ) : null}
+      </Field.Root>
+      <Field.Root name="letterhead.email" invalid={Boolean(error('letterhead.email'))}>
+        <Field.Label>Letterhead email</Field.Label>
+        <Input
+          value={letterhead.email ?? ''}
+          onValueChange={(v) => setPart('email', v)}
+          type="email"
+        />
+        {error('letterhead.email') ? (
+          <Field.Error match>{error('letterhead.email')}</Field.Error>
+        ) : null}
+      </Field.Root>
+      <View style={styles.actions}>
+        <Button size="lg" onPress={() => void save()} disabled={saving}>
+          {saving ? 'Saving…' : 'Save case defaults'}
+        </Button>
+      </View>
     </View>
   );
 }

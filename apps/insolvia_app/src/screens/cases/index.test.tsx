@@ -25,11 +25,101 @@ const CASE = {
   // resolves it, and a case list that rendered this raw would show a UUID.
   createdBy: '00000000-0000-4000-8000-00000000a11c',
   chapter: 7,
-  district: 'NDCA',
+  // The printed name, derived on the server from the pair below (#360).
+  district: 'Middle District of Florida',
+  court: 'flmb',
+  division: 'tampa',
   status: 'intake',
   createdAt: '2026-08-04T10:00:00.000000Z',
   updatedAt: '2026-08-04T10:00:00.000000Z',
 };
+
+/** A two-court slice of `GET /v1/courts`, in the API's wire shape. */
+const COURTS = {
+  releaseId: 'courts/us-bankruptcy@2026-09-24',
+  effectiveDate: '2026-09-24',
+  districts: [
+    {
+      code: 'flmb',
+      courtId: 'FLMBK',
+      name: 'Middle District of Florida',
+      state: 'FL',
+      circuit: 11,
+      website: 'https://www.flmb.uscourts.gov/',
+      divisions: [
+        {
+          code: 'tampa',
+          name: 'Tampa Division',
+          officeCode: '8',
+          officeCodeVerified: true,
+          courthouse: null,
+          counties: [{ name: 'Hillsborough', fips: '12057' }],
+        },
+        {
+          code: 'orlando',
+          name: 'Orlando Division',
+          officeCode: '6',
+          officeCodeVerified: true,
+          courthouse: null,
+          counties: [{ name: 'Orange', fips: '12095' }],
+        },
+      ],
+      caseUpload: { status: 'unverified', verifiedAt: null },
+    },
+    {
+      code: 'txsb',
+      courtId: 'TXSBK',
+      name: 'Southern District of Texas',
+      state: 'TX',
+      circuit: 5,
+      website: 'https://www.txs.uscourts.gov/',
+      divisions: [
+        {
+          code: 'houston',
+          name: 'Houston Division',
+          officeCode: null,
+          officeCodeVerified: false,
+          courthouse: null,
+          counties: [{ name: 'Harris', fips: '48201' }],
+        },
+      ],
+      caseUpload: { status: 'unverified', verifiedAt: null },
+    },
+  ],
+};
+
+/** A `/v1/me` body whose firm has set its defaults (#360). */
+function memberWithDefaults() {
+  return {
+    subject: CASE.createdBy,
+    username: null,
+    clientId: 'exampleappclientid000000',
+    scopes: [],
+    expiresAt: null,
+    firm: {
+      id: '00000000-0000-4000-8000-00000000f18a',
+      name: 'Example & Partners',
+      role: 'attorney',
+      firstName: 'Alice',
+      lastName: 'Attorney',
+      displayName: 'Alice Attorney',
+      isAdmin: true,
+      accessAllCases: true,
+      permissions: { cases: 'add_edit' },
+      defaultCourt: 'txsb',
+      defaultDivision: 'houston',
+      defaultChapter: 13,
+      letterhead: null,
+      signatureBlock: null,
+    },
+  };
+}
+
+/** Picks an option in one of the registry `Select`s by its accessible names. */
+async function choose(control: string, option: string) {
+  await userEvent.press(screen.getByRole('combobox', { name: control }));
+  await userEvent.press(await screen.findByRole('option', { name: option }));
+}
 
 /**
  * `/cases` — the screen that closes issue 8.3's loop.
@@ -54,7 +144,13 @@ describe('the cases screen', () => {
    * request body is exactly what one of these tests needs to assert.
    */
   function signedIn(handlers: Readonly<Record<string, () => Response>>) {
-    const route = routeFetch({ '/oauth2/token': tokenEndpointResponse, ...handlers });
+    // The registry LAST: a test's own `/v1/courts` (say, a failing one) wins,
+    // and `/v1/cases` is matched by substring so it must not swallow it.
+    const route = routeFetch({
+      '/oauth2/token': tokenEndpointResponse,
+      ...handlers,
+      ...('/v1/courts' in handlers ? {} : { '/v1/courts': () => jsonResponse(200, COURTS) }),
+    });
     const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     renderRouter('src/app', { initialUrl: '/cases' });
@@ -76,7 +172,7 @@ describe('the cases screen', () => {
   it('lists the cases the API returns', async () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
-    expect(await screen.findByText(/Chapter 7 · NDCA/)).toBeTruthy();
+    expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
   });
 
   it('says so plainly when there are none', async () => {
@@ -108,14 +204,15 @@ describe('the cases screen', () => {
     }
   });
 
-  it('sends the chosen chapter and district to the API', async () => {
+  it('sends the chosen chapter, court and division to the API — never a district string', async () => {
     const fetchMock = signedIn({
       '/v1/cases': () => jsonResponse(200, { cases: [] }),
     });
     await screen.findByText(/No cases yet/);
 
     await userEvent.press(screen.getByRole('radio', { name: /Chapter 13/ }));
-    await userEvent.type(screen.getByLabelText('Filing district'), 'CACD');
+    await choose('Court', 'Middle District of Florida');
+    await choose('Division', 'Orlando Division');
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
     await waitFor(() => {
@@ -125,7 +222,49 @@ describe('the cases screen', () => {
         ([url, init]) => url.includes('/v1/cases') && init?.method === 'POST',
       );
       expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.[1]?.body))).toEqual({ chapter: 13, district: 'CACD' });
+      expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+        chapter: 13,
+        court: 'flmb',
+        division: 'orlando',
+      });
+    });
+  });
+
+  it('offers only the chosen court’s divisions, and clears the division when the court changes', async () => {
+    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
+    await screen.findByText(/No cases yet/);
+
+    await choose('Court', 'Southern District of Texas');
+    await userEvent.press(screen.getByRole('combobox', { name: 'Division' }));
+    expect(await screen.findByRole('option', { name: 'Houston Division' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Tampa Division' })).toBeNull();
+    await userEvent.press(screen.getByRole('option', { name: 'Houston Division' }));
+
+    // A division belongs to its court: picking another court starts over.
+    await choose('Court', 'Middle District of Florida');
+    expect(screen.queryByText('Houston Division')).toBeNull();
+  });
+
+  it('preselects the firm’s default court, division and chapter', async () => {
+    const fetchMock = signedIn({
+      '/v1/me': () => jsonResponse(200, memberWithDefaults()),
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+    // The defaults have arrived once the trigger shows the division's name.
+    await screen.findByText('Houston Division');
+
+    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) => url.includes('/v1/cases') && init?.method === 'POST',
+      );
+      expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+        chapter: 13,
+        court: 'txsb',
+        division: 'houston',
+      });
     });
   });
 
@@ -141,16 +280,27 @@ describe('the cases screen', () => {
           ? jsonResponse(200, { cases: [] })
           : jsonResponse(400, {
               error: 'ValidationError',
-              fields: { district: "That doesn't look like a district identifier." },
+              fields: { court: 'Choose the bankruptcy court this case will be filed in.' },
             });
       },
     });
     await screen.findByText(/No cases yet/);
 
-    await userEvent.type(screen.getByLabelText('Filing district'), '!!');
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
-    expect(await screen.findByText(/doesn't look like a district identifier/)).toBeTruthy();
+    expect(await screen.findByText(/Choose the bankruptcy court/)).toBeTruthy();
+  });
+
+  it('cannot open a case while the court registry is unavailable', async () => {
+    signedIn({
+      '/v1/courts': () => jsonResponse(500, { error: 'InternalError' }),
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+
+    const message = await screen.findByText(/Could not load the court registry/);
+    expect(message.props['aria-live']).toBe('assertive');
+    expect(screen.getByRole('button', { name: 'Open case' })).toBeDisabled();
   });
 
   it('reloads the list after opening a case', async () => {
@@ -166,10 +316,11 @@ describe('the cases screen', () => {
     });
     await screen.findByText(/No cases yet/);
 
-    await userEvent.type(screen.getByLabelText('Filing district'), 'NDCA');
+    await choose('Court', 'Middle District of Florida');
+    await choose('Division', 'Tampa Division');
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
-    expect(await screen.findByText(/Chapter 7 · NDCA/)).toBeTruthy();
+    expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
   });
 
   it('reports a failed load without pretending the list is empty', async () => {
@@ -198,7 +349,7 @@ describe('the cases screen', () => {
     // leaf asserts `table`/`row`/`cell` through a web-only prop that the native
     // testing renderer does not surface as a role, and the claim here is about
     // links anyway.
-    await screen.findByText('Chapter 7 · NDCA');
+    await screen.findByText('Chapter 7 · Middle District of Florida');
 
     const links = screen.getAllByRole('link').filter((node) => {
       const href: unknown = node.props.href;
@@ -214,7 +365,7 @@ describe('the cases screen', () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
     const link = await screen.findByLabelText(
-      `Chapter 7 case in NDCA, opened 2026-08-04 by ${CASE.createdBy}`,
+      `Chapter 7 case in Middle District of Florida, opened 2026-08-04 by ${CASE.createdBy}`,
     );
     // WCAG 2.5.3: the visible text is where the accessible name starts.
     expect(link.props.href).toBe(`/cases/${CASE.id}`);

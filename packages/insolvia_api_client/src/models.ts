@@ -153,6 +153,45 @@ export interface FirmMembership {
    * {@link permits} rather than comparing strings.
    */
   readonly permissions: Readonly<Record<FirmFeature, PermissionLevel>>;
+  /**
+   * The firm's defaults for a new case and its letterhead (issue #360), on
+   * the ONE route every member may read — the create form prefills from
+   * them, and a paralegal who cannot read `/v1/firm` still opens cases.
+   */
+  readonly defaultCourt: string | null;
+  readonly defaultDivision: string | null;
+  readonly defaultChapter: CaseChapter | null;
+  readonly letterhead: Letterhead | null;
+  /** The caller's own standing signature block, or `null` when none is set. */
+  readonly signatureBlock: SignatureBlock | null;
+}
+
+/**
+ * What the firm prints at the top of a letter and on the signer block's firm
+ * lines (issue #360). Snake_case inside, like every case-domain body: the
+ * address IS the case domain's {@link Address}, and the block is copied onto
+ * a {@link FilingProfessionalBody} by key.
+ */
+export interface Letterhead {
+  readonly name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
+}
+
+/**
+ * An attorney's standing signature block (issue #360) — exactly the
+ * {@link FilingProfessionalBody} keys that do not change from case to case,
+ * so the petition screen's "use firm default" spreads it onto the record
+ * without a mapping. The name is not here: it is the firm user's own.
+ */
+export interface SignatureBlock {
+  readonly bar_number?: string | undefined;
+  readonly bar_state?: string | undefined;
+  readonly firm_name?: string | undefined;
+  readonly address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly email?: string | undefined;
 }
 
 /** Weakest to strongest. `permits` compares by position. */
@@ -190,6 +229,12 @@ export function permits(held: PermissionLevel, required: PermissionLevel): boole
 export interface UpdateMeRequest {
   readonly firstName?: string;
   readonly lastName?: string;
+  /**
+   * Your own signature block (issue #360) — a bar number is the attorney's
+   * own fact, so it is self-service like the name. `null` clears it;
+   * omitted leaves it alone.
+   */
+  readonly signatureBlock?: SignatureBlock | null;
 }
 
 /**
@@ -203,6 +248,8 @@ export function updateMeRequestToJson(request: UpdateMeRequest): Record<string, 
   const body: Record<string, unknown> = {};
   if (request.firstName !== undefined) body.firstName = request.firstName;
   if (request.lastName !== undefined) body.lastName = request.lastName;
+  // `null` IS sent: it is the clear instruction, distinct from "leave alone".
+  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
   return body;
 }
 
@@ -231,10 +278,21 @@ export interface Firm {
   readonly createdAt: string;
   /** Last write to the record, verbatim. */
   readonly updatedAt: string;
+  /** The firm's defaults for a new case (issue #360): explicit `null` until set. */
+  readonly defaultCourt: string | null;
+  readonly defaultDivision: string | null;
+  readonly defaultChapter: CaseChapter | null;
+  /** The firm's letterhead, or `null` until set. */
+  readonly letterhead: Letterhead | null;
 }
 
 /**
- * The `PATCH /v1/firm` request body — the name, and nothing else.
+ * The `PATCH /v1/firm` request body — the name, the defaults and the
+ * letterhead (issue #360), each optional; an empty body is a 400.
+ *
+ * `defaultCourt` and `defaultDivision` are read as a PAIR by the server:
+ * send both codes to set, both `null` to clear. `null` on any default
+ * clears it; omitted leaves it alone.
  *
  * **`status` is absent on purpose and never joins.** Suspend/reactivate is
  * Insolvia's own operation, on the admin portal: a firm suspending itself
@@ -243,12 +301,68 @@ export interface Firm {
  * everywhere.
  */
 export interface UpdateFirmRequest {
-  readonly name: string;
+  readonly name?: string;
+  readonly defaultCourt?: string | null;
+  readonly defaultDivision?: string | null;
+  readonly defaultChapter?: CaseChapter | null;
+  readonly letterhead?: Letterhead | null;
 }
 
-/** The `PATCH /v1/firm` body. */
+/** The `PATCH /v1/firm` body, absent fields omitted; `null` is sent as the clear instruction. */
 export function updateFirmRequestToJson(request: UpdateFirmRequest): Record<string, unknown> {
-  return { name: request.name };
+  const body: Record<string, unknown> = {};
+  if (request.name !== undefined) body.name = request.name;
+  if (request.defaultCourt !== undefined) body.defaultCourt = request.defaultCourt;
+  if (request.defaultDivision !== undefined) body.defaultDivision = request.defaultDivision;
+  if (request.defaultChapter !== undefined) body.defaultChapter = request.defaultChapter;
+  if (request.letterhead !== undefined) body.letterhead = request.letterhead;
+  return body;
+}
+
+/**
+ * The court registry — `GET /v1/courts` (issue #360): the districts and
+ * divisions a case may name, from the `courts/us-bankruptcy` series the API
+ * ships (ADR 0014, ADR 0024). Read-only; every member of a firm may read it.
+ */
+export interface CourtRegistry {
+  /** The release served, e.g. `courts/us-bankruptcy@2026-09-24`. */
+  readonly releaseId: string;
+  readonly effectiveDate: string;
+  readonly districts: readonly CourtDistrict[];
+}
+
+export interface CourtDistrict {
+  /** The CM/ECF code — what {@link Case.court} stores. */
+  readonly code: string;
+  /** The PACER court id (`FLMBK`), or `null` where the lookup did not carry one. */
+  readonly courtId: string | null;
+  /** The printed name — what {@link Case.district} is derived as. */
+  readonly name: string;
+  readonly state: string;
+  readonly circuit: number;
+  readonly website: string;
+  readonly divisions: readonly CourtDivision[];
+  /** Whether the court's Case Upload facility has been proven for our packages. */
+  readonly caseUpload: { readonly status: string; readonly verifiedAt: string | null };
+}
+
+export interface CourtDivision {
+  /** What {@link Case.division} stores. */
+  readonly code: string;
+  readonly name: string;
+  /** The digit before the colon in the case number, or `null` where unverified. */
+  readonly officeCode: string | null;
+  readonly officeCodeVerified: boolean;
+  readonly courthouse: {
+    readonly name: string;
+    readonly line1: string;
+    readonly line2: string | null;
+    readonly city: string;
+    readonly state: string;
+    readonly postal_code: string;
+  } | null;
+  /** The counties whose debtors file here, by FIPS-5 code. */
+  readonly counties: readonly { readonly name: string; readonly fips: string }[];
 }
 
 /**
@@ -269,6 +383,12 @@ export interface FirmColleague {
   readonly displayName: string;
   /** Their job title. */
   readonly role: FirmRole;
+  /**
+   * Their standing signature block, or `null` (issue #360) — the one field
+   * beyond identity every colleague may see, because the petition screen's
+   * "use firm default" is case work and a bar number is on every filing.
+   */
+  readonly signatureBlock: SignatureBlock | null;
 }
 
 /**
@@ -304,6 +424,8 @@ export interface FirmUser {
   readonly createdAt: string;
   /** The server's UTC last-update timestamp, verbatim. */
   readonly updatedAt: string;
+  /** Their standing signature block, or `null` (issue #360). */
+  readonly signatureBlock: SignatureBlock | null;
 }
 
 /**
@@ -368,6 +490,8 @@ export interface UpdateFirmUserRequest {
   readonly accessAllCases?: boolean;
   readonly permissions?: Readonly<Record<FirmFeature, PermissionLevel>>;
   readonly status?: FirmUserStatus;
+  /** A colleague's signature block (issue #360); `null` clears it. */
+  readonly signatureBlock?: SignatureBlock | null;
 }
 
 /** The `PATCH /v1/firm/users/{subject}` body, absent fields omitted. */
@@ -382,6 +506,7 @@ export function updateFirmUserRequestToJson(
   if (request.accessAllCases !== undefined) body.accessAllCases = request.accessAllCases;
   if (request.permissions !== undefined) body.permissions = request.permissions;
   if (request.status !== undefined) body.status = request.status;
+  if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
   return body;
 }
 
@@ -702,8 +827,18 @@ export interface Case {
   readonly createdBy: string;
   /** The bankruptcy chapter. */
   readonly chapter: CaseChapter;
-  /** The filing district. */
+  /**
+   * The filing district's printed name (`"Middle District of Florida"`) —
+   * DERIVED by the server from {@link court} (issue #360), never sent. On a
+   * case written before the court registry existed it is whatever free text
+   * was typed, and {@link court} is absent: that is how a client learns the
+   * case still needs a court chosen.
+   */
   readonly district: string;
+  /** The court's CM/ECF code (`"flmb"`) — a reference into {@link CourtRegistry}. Absent on a pre-registry case. */
+  readonly court?: string;
+  /** The division's code within the court (`"tampa"`). Absent with {@link court}. */
+  readonly division?: string;
   /** Where the case sits in the filing workflow. */
   readonly status: CaseStatus;
   /** The server's UTC creation timestamp, kept verbatim as the wire string. */
@@ -745,19 +880,27 @@ export interface Case {
   readonly meeting341At?: string;
 }
 
-/** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
+/**
+ * The `POST /v1/cases` request body: `{"chapter", "court", "division"}`, all
+ * required. `court` and `division` are codes from {@link CourtRegistry}
+ * (issue #360); the server refuses a pair it does not know with a 400 keyed
+ * `court` or `division`, and refuses a typed `district` by name.
+ */
 export interface CreateCaseRequest {
   /** The bankruptcy chapter. */
   readonly chapter: CaseChapter;
-  /** The filing district. */
-  readonly district: string;
+  /** The court's CM/ECF code, from {@link CourtDistrict.code}. */
+  readonly court: string;
+  /** The division's code, from {@link CourtDivision.code}. */
+  readonly division: string;
 }
 
-/** The `POST /v1/cases` request body, verbatim — both fields are required. */
+/** The `POST /v1/cases` request body, verbatim — every field is required. */
 export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
   return {
     chapter: request.chapter,
-    district: request.district,
+    court: request.court,
+    division: request.division,
   };
 }
 
@@ -806,15 +949,19 @@ export interface ListCasesResult {
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body: any subset of `{"chapter",
- * "district", "status"}`. An omitted key means "leave unchanged" — the client
+ * "court" + "division", "status"}`. An omitted key means "leave unchanged" — the client
  * must not send keys the caller did not supply, so {@link updateCaseChangesToJson}
  * omits them rather than sending `null`.
  */
 export interface UpdateCaseChanges {
   /** A new chapter, or omit to leave it unchanged. */
   readonly chapter?: CaseChapter | undefined;
-  /** A new district, or omit to leave it unchanged. */
-  readonly district?: string | undefined;
+  /**
+   * A new court and division, or omit both to leave them unchanged. THE PAIR
+   * TRAVELS TOGETHER: the server refuses one without the other, so this is
+   * one field rather than two that could be sent apart.
+   */
+  readonly court?: { readonly court: string; readonly division: string } | undefined;
   /** A new status, or omit to leave it unchanged. */
   readonly status?: CaseStatus | undefined;
   /**
@@ -847,8 +994,9 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.chapter !== undefined) {
     json.chapter = changes.chapter;
   }
-  if (changes.district !== undefined) {
-    json.district = changes.district;
+  if (changes.court !== undefined) {
+    json.court = changes.court.court;
+    json.division = changes.court.division;
   }
   if (changes.status !== undefined) {
     json.status = changes.status;

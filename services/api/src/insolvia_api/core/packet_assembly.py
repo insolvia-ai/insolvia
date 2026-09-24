@@ -104,6 +104,7 @@ from insolvia_core.tax_ids import read_tax_id
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import (
     MATRIX_FILE_NAME,
+    format_for_court,
     generate_creditor_matrix,
 )
 from insolvia_api.core.form_fill import FormFillError, fill_form
@@ -705,7 +706,7 @@ def assemble(
     """
     problems = list(completeness_problems(data))
 
-    matrix = generate_creditor_matrix(data.creditors)
+    matrix = generate_creditor_matrix(data.creditors, format_for_court(data.case.court))
     problems.extend(
         PacketProblem(
             source="creditors",

@@ -20,6 +20,7 @@ from insolvia_api.api.routes.calendar import blueprint as calendar_blueprint
 from insolvia_api.api.routes.case_entities import blueprint as case_entities_blueprint
 from insolvia_api.api.routes.case_summary import blueprint as case_summary_blueprint
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
+from insolvia_api.api.routes.courts import blueprint as courts_blueprint
 from insolvia_api.api.routes.creditor_matrix import (
     blueprint as creditor_matrix_blueprint,
 )
@@ -74,6 +75,8 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/cases/<id>/means-test — the same static-segment argument again.
     app.register_blueprint(means_test_blueprint)
     app.register_blueprint(firm_blueprint)
+    # The court registry (issue #360): read-only, every member.
+    app.register_blueprint(courts_blueprint)
     # /v1/firm/creditors — a static segment under the same firm-scoped
     # namespace as firm_blueprint, registered as its own module for the same
     # reason case_entities is its own module rather than a growing firm.py.

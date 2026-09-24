@@ -1,5 +1,5 @@
 import { ApiValidationException, permits } from '@insolvia-ai/api-client';
-import type { FirmMembership } from '@insolvia-ai/api-client';
+import type { Address, FirmMembership, SignatureBlock } from '@insolvia-ai/api-client';
 import { Button, Field, Input } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useState } from 'react';
@@ -105,6 +105,15 @@ export function Account({ membership }: { membership: FirmMembership }) {
             {saving ? 'Saving…' : 'Save name'}
           </Button>
         </View>
+
+        <SignatureBlockForm
+          initial={membership.signatureBlock}
+          onSaved={(principal) => {
+            adopt(principal);
+            setNotice({ tone: 'saved', message: 'Your signature block is saved.' });
+          }}
+          onFailed={(message) => setNotice({ tone: 'error', message })}
+        />
 
         {/* One live region for the whole screen, same rule as the firm screen. */}
         {notice === null ? null : (
@@ -249,6 +258,137 @@ function CalendarFeed() {
           {notice.message}
         </Text>
       )}
+    </View>
+  );
+}
+
+const ADDRESS_PARTS = [
+  ['line1', 'Street'],
+  ['line2', 'Apartment, suite or unit'],
+  ['city', 'City'],
+  ['state', 'State'],
+  ['postal_code', 'ZIP code'],
+] as const;
+
+/**
+ * Your standing signature block (issue #360): the B101 Part 7 lines that do
+ * not change from case to case — bar number and state, and the firm lines.
+ * Self-service on `PATCH /v1/me` like the name, because a bar number is the
+ * attorney's own fact; the petition screen's "use firm default" copies it
+ * onto a case. Every field is optional, and the whole block is sent on save
+ * (the server prunes blanks), or `null` when every field is blank — which is
+ * how a block is cleared.
+ */
+function SignatureBlockForm({
+  initial,
+  onSaved,
+  onFailed,
+}: {
+  initial: SignatureBlock | null;
+  onSaved: (principal: Parameters<ReturnType<typeof useMeActions>['adopt']>[0]) => void;
+  onFailed: (message: string) => void;
+}) {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [block, setBlock] = useState<SignatureBlock>(initial ?? {});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const setPart = (key: keyof SignatureBlock, value: string) =>
+    setBlock((current) => ({ ...current, [key]: value === '' ? undefined : value }));
+  const setAddress = (key: keyof Address, value: string) =>
+    setBlock((current) => ({
+      ...current,
+      address: { ...current.address, [key]: value === '' ? undefined : value },
+    }));
+
+  const save = async () => {
+    setSaving(true);
+    setFieldErrors({});
+    try {
+      const address = Object.fromEntries(
+        Object.entries(block.address ?? {}).filter(([, v]) => v !== undefined),
+      ) as Address;
+      const filled: SignatureBlock = {
+        ...Object.fromEntries(
+          Object.entries(block).filter(([k, v]) => k !== 'address' && v !== undefined),
+        ),
+        ...(Object.keys(address).length > 0 ? { address } : {}),
+      };
+      const signatureBlock = Object.keys(filled).length > 0 ? filled : null;
+      const result = await call((client) => client.updateMe({ signatureBlock }));
+      if (result.ok) {
+        setBlock(result.value.firm?.signatureBlock ?? {});
+        onSaved(result.value);
+      }
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        // Keyed `signatureBlock.<field>` by the server; the same paths the
+        // fields below are named by.
+        setFieldErrors(cause.fields);
+      } else {
+        onFailed('Could not save your signature block. Please try again.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  const error = (path: string) => fieldErrors[`signatureBlock.${path}`];
+
+  return (
+    <View style={styles.form}>
+      <Heading level={2}>Signature block</Heading>
+      <Text style={[styles.body, muted]}>
+        The lines B101 Part 7 prints for you that do not change from case to case. The petition
+        screen’s “Use firm default” copies them onto a case for you to check and save.
+      </Text>
+      <Field.Root name="bar_number" invalid={Boolean(error('bar_number'))}>
+        <Field.Label>Bar number</Field.Label>
+        <Input value={block.bar_number ?? ''} onValueChange={(v) => setPart('bar_number', v)} />
+        {error('bar_number') ? <Field.Error match>{error('bar_number')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="bar_state" invalid={Boolean(error('bar_state'))}>
+        <Field.Label>Bar state</Field.Label>
+        <Input
+          value={block.bar_state ?? ''}
+          onValueChange={(v) => setPart('bar_state', v)}
+          autoCapitalize="characters"
+        />
+        <Field.Description>Two letters, like FL.</Field.Description>
+        {error('bar_state') ? <Field.Error match>{error('bar_state')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="firm_name" invalid={Boolean(error('firm_name'))}>
+        <Field.Label>Firm name on filings</Field.Label>
+        <Input value={block.firm_name ?? ''} onValueChange={(v) => setPart('firm_name', v)} />
+        <Field.Description>Leave blank to use the firm’s letterhead.</Field.Description>
+        {error('firm_name') ? <Field.Error match>{error('firm_name')}</Field.Error> : null}
+      </Field.Root>
+      {ADDRESS_PARTS.map(([part, label]) => (
+        <Field.Root key={part} name={part} invalid={Boolean(error(`address.${part}`))}>
+          <Field.Label>{`Address — ${label}`}</Field.Label>
+          <Input value={block.address?.[part] ?? ''} onValueChange={(v) => setAddress(part, v)} />
+          {error(`address.${part}`) ? (
+            <Field.Error match>{error(`address.${part}`)}</Field.Error>
+          ) : null}
+        </Field.Root>
+      ))}
+      <Field.Root name="phone" invalid={Boolean(error('phone'))}>
+        <Field.Label>Phone on filings</Field.Label>
+        <Input value={block.phone ?? ''} onValueChange={(v) => setPart('phone', v)} />
+        {error('phone') ? <Field.Error match>{error('phone')}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name="email" invalid={Boolean(error('email'))}>
+        <Field.Label>Email on filings</Field.Label>
+        <Input value={block.email ?? ''} onValueChange={(v) => setPart('email', v)} type="email" />
+        {error('email') ? <Field.Error match>{error('email')}</Field.Error> : null}
+      </Field.Root>
+      <View style={styles.actions}>
+        <Button size="lg" onPress={() => void save()} disabled={saving}>
+          {saving ? 'Saving…' : 'Save signature block'}
+        </Button>
+      </View>
     </View>
   );
 }

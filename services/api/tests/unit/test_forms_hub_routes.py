@@ -144,7 +144,7 @@ def open_case(client, subject=ALICE):
     # only a full name like the reference case's is one of them.
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "district": "Middle District of Florida"},
+        json={"chapter": 7, "court": "flmb", "division": "tampa"},
         headers=auth(subject),
     )
     assert response.status_code == 201
