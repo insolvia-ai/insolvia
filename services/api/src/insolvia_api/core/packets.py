@@ -30,12 +30,19 @@ from __future__ import annotations
 import re
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Final
 
 from insolvia_core.cases import partition_key
 from insolvia_core.errors import ValidationError
+
+from .form_overlay import (
+    DEFAULT_OUTPUT_OPTIONS,
+    SIGNATURE_PAGES_MODES,
+    OutputOptions,
+    output_options_json,
+)
 
 # The download name a browser saves the packet under. One name for every
 # packet on purpose: the object key carries the identity (two server-minted
@@ -65,6 +72,11 @@ class Packet:
     is deterministic to the byte (core/form_fill.py), so the digest is what
     lets anyone prove a downloaded packet is the one this record describes.
     `created_by` is the firm user whose job accept produced it.
+    `options` is the output options (issue 13.11) this packet was rendered
+    with — a plain `OutputOptions()` for the ordinary filing set, something
+    else for a draft, a signature-pages-only print, or a `/s/` set. Recording
+    it here (never re-derived) is what makes a draft distinguishable from a
+    filing set after the fact, the issue's own done-when.
     """
 
     id: str
@@ -80,6 +92,7 @@ class Packet:
     creditor_count: int
     created_by: str
     created_at: str
+    options: OutputOptions = field(default_factory=lambda: DEFAULT_OUTPUT_OPTIONS)
 
 
 def _timestamp() -> str:
@@ -112,10 +125,13 @@ def new_packet(
     constants_set_id: str,
     creditor_count: int,
     created_by: str,
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
 ) -> Packet:
     """Stamp an assembled packet with server-generated identity and its
     storage location. Every argument is a fact the worker just established;
-    nothing here comes from a request body."""
+    nothing here comes from a request body — `options` is the ONE exception,
+    and even that arrived as a validated job-acceptance field long before
+    this worker ran, never read from a request here."""
     packet_id = str(uuid.uuid4())
     return Packet(
         id=packet_id,
@@ -133,6 +149,7 @@ def new_packet(
         creditor_count=creditor_count,
         created_by=created_by,
         created_at=_timestamp(),
+        options=options,
     )
 
 
@@ -171,7 +188,38 @@ def packet_item(packet: Packet) -> dict[str, object]:
         "creditorCount": packet.creditor_count,
         "createdBy": packet.created_by,
         "createdAt": packet.created_at,
+        "options": output_options_json(packet.options),
     }
+
+
+def _options_from_item(raw: object) -> OutputOptions:
+    """Inverse of `output_options_json`, the stored-item's own tolerant
+    style (a malformed shape is a ValueError the caller's try/except already
+    catches) rather than `form_overlay.parse_output_options`'s
+    request-validation one (FieldValidationError, per-field messages meant
+    for a client). Absent entirely — every packet this service wrote before
+    issue 13.11 — reads as the plain filing set, exactly what those packets
+    always were."""
+    if raw is None:
+        return OutputOptions()
+    if not isinstance(raw, Mapping):
+        raise ValueError("options is not a map")
+    signature_pages = raw.get("signaturePages", "all")
+    if signature_pages not in SIGNATURE_PAGES_MODES:
+        raise ValueError(f"options.signaturePages {signature_pages!r} is invalid")
+    raw_forms = raw.get("forms")
+    forms = (
+        tuple(str(f) for f in raw_forms)
+        if isinstance(raw_forms, list) and raw_forms
+        else None
+    )
+    return OutputOptions(
+        draft_watermark=bool(raw.get("draftWatermark", False)),
+        print_date=bool(raw.get("printDate", False)),
+        signature_pages=signature_pages,
+        sign_electronically=bool(raw.get("signElectronically", False)),
+        forms=forms,
+    )
 
 
 def packet_from_item(item: Mapping[str, object]) -> Packet:
@@ -203,6 +251,7 @@ def packet_from_item(item: Mapping[str, object]) -> Packet:
             creditor_count=int(creditor_count),
             created_by=str(item["createdBy"]),
             created_at=str(item["createdAt"]),
+            options=_options_from_item(item.get("options")),
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored packet item is malformed: {error}") from error
@@ -215,7 +264,9 @@ def packet_json(packet: Packet) -> dict[str, object]:
     is this service's business, and a client can only depend on a layout it
     can see. `createdBy` is present so the firm directory resolves it to a
     name; `sha256` is present because it is the one thing a reviewer can
-    check a downloaded file against.
+    check a downloaded file against. `options` is issue 13.11's own
+    done-when: a client tells a draft from a filing set after the fact by
+    reading this, never by re-deriving it from the bytes.
     """
     return {
         "id": packet.id,
@@ -230,4 +281,5 @@ def packet_json(packet: Packet) -> dict[str, object]:
         "creditorCount": packet.creditor_count,
         "createdBy": packet.created_by,
         "createdAt": packet.created_at,
+        "options": output_options_json(packet.options),
     }

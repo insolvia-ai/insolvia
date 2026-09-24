@@ -28,7 +28,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Final, Literal
 
 from insolvia_core.cases import Case
@@ -36,6 +36,12 @@ from insolvia_core.errors import ValidationError
 
 from .case_summary import summarise
 from .form_fill import FormFillError, fill_form
+from .form_overlay import (
+    DEFAULT_OUTPUT_OPTIONS,
+    OutputOptions,
+    apply_output_stamps,
+    apply_signature_options,
+)
 from .form_projections import CaseFile, FormProjectionError, project
 from .form_projections.shared import claims_of
 from .form_templates import FormRelease, get_form, resolve_form
@@ -234,7 +240,12 @@ def form_metric_json(metric: FormMetric) -> dict[str, str]:
 
 
 def render_form_preview(
-    data: CaseData, series_id: str, *, as_of: date
+    data: CaseData,
+    series_id: str,
+    *,
+    as_of: date,
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
+    printed_at: datetime | None = None,
 ) -> bytes | tuple[PacketProblem, ...]:
     """Render exactly ONE form through the packet's own pipeline — the same
     structural gate, the same projection, the same fill engine `assemble`
@@ -242,9 +253,20 @@ def render_form_preview(
     what the packet would produce, or refused with the reasons why. Never a
     partial render, the packet's own rule applied to one form.
 
+    `options` (issue 13.11) is the SAME `core.form_overlay.OutputOptions`
+    packet assembly reads, applied the same way: `apply_signature_options`
+    before `fill_form` (a real field value, untouched fill engine), then
+    `apply_output_stamps` after (the watermark/date overlay and
+    signature-page selection). The plain default keeps this function's
+    output exactly what it always was. `options.forms` is meaningless here —
+    the route refuses it (`form_overlay.parse_output_options(allow_forms=
+    False)`) — this already renders one named form.
+
     Returns the filled PDF's bytes, or every problem found (never both,
-    matching `assemble`'s contract). The caller (the route) turns an unknown
-    or unfiled-by-this-case `series_id` into a 404 by checking
+    matching `assemble`'s contract) — including the case where the requested
+    signature-page mode leaves nothing to show (`apply_output_stamps`
+    returning `None`). The caller (the route) turns an unknown or
+    unfiled-by-this-case `series_id` into a 404 by checking
     `packet_form_series` itself — this function assumes it is one of them.
     """
     problems = list(group_problems(data).get(series_id, ()))
@@ -267,13 +289,34 @@ def render_form_preview(
             for message in error.problems
         )
 
+    signed_values = apply_signature_options(
+        release, values, case_file=case_file, options=options, today=as_of
+    )
     try:
-        return fill_form(release, values)
+        rendered = fill_form(release, signed_values)
     except FormFillError as error:
         return tuple(
             PacketProblem(source=series_id, item_id=None, field="", message=message)
             for message in error.problems
         )
+
+    stamped = apply_output_stamps(
+        rendered,
+        release,
+        options=options,
+        printed_at=printed_at if printed_at is not None else datetime.now(UTC),
+    )
+    if stamped is None:
+        return (
+            PacketProblem(
+                source=series_id,
+                item_id=None,
+                field="",
+                message="This form has no signature lines, so there is "
+                "nothing to show with signature pages only.",
+            ),
+        )
+    return stamped
 
 
 # ── Where a rendered preview's bytes live ────────────────────────────────

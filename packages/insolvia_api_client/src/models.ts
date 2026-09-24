@@ -757,6 +757,116 @@ export interface JobFailure {
 }
 
 // ---------------------------------------------------------------------------
+// Output options (issue 13.11) — mirrors
+// services/api/src/insolvia_api/core/form_overlay.py (`OutputOptions`,
+// `output_options_json`, `parse_output_options`). Shared by packet assembly
+// ({@link InsolviaApiClient.acceptCaseJob}'s `packet_assembly` kind, recorded
+// on the resulting {@link Packet}) and the single-form preview
+// ({@link InsolviaApiClient.getCaseFormPreview}, echoed on {@link FormPreview}).
+// ---------------------------------------------------------------------------
+
+/**
+ * Which pages of a rendered form to keep: every page (`'all'`), only the
+ * pages carrying a signature line (`'only'` — a signing-meeting print), or
+ * every page EXCEPT those (`'omit'`). A form with no signature line of its
+ * own contributes nothing under `'only'`; a form that is entirely a
+ * signature block (B106Dec) contributes nothing under `'omit'`.
+ */
+export type SignaturePagesMode = 'all' | 'only' | 'omit';
+
+export const SIGNATURE_PAGES_MODES: readonly SignaturePagesMode[] = ['all', 'only', 'omit'];
+
+/**
+ * The output options an already-produced {@link Packet} or {@link FormPreview}
+ * was rendered with — `output_options_json`'s exact shape, every field
+ * present so "the plain filing set" is itself a recorded fact, not an
+ * absence. `forms` is absent, never an empty array, when every form the case
+ * files was included (only {@link Packet.options} ever carries it — a
+ * preview already names its one form).
+ */
+export interface OutputOptions {
+  /** A "DRAFT" watermark on every page. */
+  readonly draftWatermark: boolean;
+  /** Today's date and time in the top margin of every page. */
+  readonly printDate: boolean;
+  readonly signaturePages: SignaturePagesMode;
+  /**
+   * `/s/ <name>` filled onto each debtor's own signature line (never the
+   * attorney's). Combined with `printDate`, the paired date line is also
+   * filled with today's date; without it, that date stays wet.
+   */
+  readonly signElectronically: boolean;
+  /** The short form keys rendered, when a subset was requested. */
+  readonly forms?: readonly string[];
+}
+
+/**
+ * The request-side shape: every field optional and, per this package's
+ * omit-when-absent rule, left out of the wire body/query entirely rather
+ * than sent as `false`/`"all"` — the server fills in exactly the same
+ * defaults {@link OutputOptions} states explicitly once rendered.
+ */
+export interface OutputOptionsRequest {
+  readonly draftWatermark?: boolean;
+  readonly printDate?: boolean;
+  readonly signaturePages?: SignaturePagesMode;
+  readonly signElectronically?: boolean;
+  /** Packet assembly only — {@link InsolviaApiClient.getCaseFormPreview} already names one form. */
+  readonly forms?: readonly string[];
+}
+
+/**
+ * {@link OutputOptionsRequest} without `forms` — what
+ * {@link InsolviaApiClient.getCaseFormPreview} takes, so naming a forms
+ * subset on a route that already names one form in its URL is a type error,
+ * not just a 400 from the server.
+ */
+export type FormPreviewOptions = Omit<OutputOptionsRequest, 'forms'>;
+
+/** {@link OutputOptionsRequest}, as the `packet_assembly` job body's `options` member. */
+export function outputOptionsRequestToJson(options: OutputOptionsRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options.draftWatermark !== undefined) {
+    body.draftWatermark = options.draftWatermark;
+  }
+  if (options.printDate !== undefined) {
+    body.printDate = options.printDate;
+  }
+  if (options.signaturePages !== undefined) {
+    body.signaturePages = options.signaturePages;
+  }
+  if (options.signElectronically !== undefined) {
+    body.signElectronically = options.signElectronically;
+  }
+  if (options.forms !== undefined) {
+    body.forms = [...options.forms];
+  }
+  return body;
+}
+
+/**
+ * {@link FormPreviewOptions} rendered as `URLSearchParams` — the preview
+ * route's query-string spelling of the same options, absent fields omitted
+ * entirely exactly as {@link listCasesQuery} does.
+ */
+export function formPreviewQuery(options: FormPreviewOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.draftWatermark !== undefined) {
+    params.set('draftWatermark', String(options.draftWatermark));
+  }
+  if (options.printDate !== undefined) {
+    params.set('printDate', String(options.printDate));
+  }
+  if (options.signaturePages !== undefined) {
+    params.set('signaturePages', options.signaturePages);
+  }
+  if (options.signElectronically !== undefined) {
+    params.set('signElectronically', String(options.signElectronically));
+  }
+  return params;
+}
+
+// ---------------------------------------------------------------------------
 // Assembled packets — mirrors services/api/src/insolvia_api/core/packets.py
 // (`packet_json`) and api/routes/packets.py (issue #96).
 // ---------------------------------------------------------------------------
@@ -809,6 +919,13 @@ export interface Packet {
    */
   readonly createdBy: string;
   readonly createdAt: string;
+  /**
+   * The output options (issue 13.11) this packet was rendered with — a plain
+   * `{draftWatermark: false, printDate: false, signaturePages: 'all',
+   * signElectronically: false}` for the ordinary filing set. What tells a
+   * draft apart from a filing set after the fact.
+   */
+  readonly options: OutputOptions;
 }
 
 /**
@@ -876,6 +993,8 @@ export interface FormPreview {
   readonly url?: string;
   readonly method?: string;
   readonly expiresAt?: string;
+  /** The output options (issue 13.11) this render was requested with — echoed either way, blocked or rendered. */
+  readonly options: OutputOptions;
 }
 
 /**
@@ -903,6 +1022,12 @@ export interface Job {
   readonly updatedAt: string;
   /** Present only on the document-scoped kinds (`document_extraction`). */
   readonly documentId?: string;
+  /**
+   * Present only on the options-scoped kinds (`packet_assembly`, issue
+   * 13.11) — always the full, canonicalised shape once present, defaults
+   * filled in, never the caller's partial request.
+   */
+  readonly options?: OutputOptions;
   /** Present only when `status` is `'failed'`. */
   readonly failure?: JobFailure;
   /** Present only when `status` is `'succeeded'`. Shape is per-kind. */

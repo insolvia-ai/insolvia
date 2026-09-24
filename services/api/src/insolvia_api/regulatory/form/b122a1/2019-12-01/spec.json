@@ -4,7 +4,10 @@
  "title": "Chapter 7 Statement of Your Current Monthly Income",
  "revision": "12/19",
  "effective_date": "2019-12-01",
- "notes": "The CMI statement (issue #102): every income line is a projection of the § 101(10A) derivation (core/cmi.py) over the case's dated income history — the one place the model deliberately refuses to mirror the form (case-data-model.md). Known defects of the official PDF, verified by widget geometry: Debtor 2's line-4 box is named Debto2.Quest2.2; line 12a's copy box has no widget; line 10's two source boxes are ordinary distinct fields (suffixes 1/2) despite their prose-length names.",
+ "signature_pages": [
+  3
+ ],
+ "notes": "The CMI statement (issue #102): every income line is a projection of the \u00a7 101(10A) derivation (core/cmi.py) over the case's dated income history \u2014 the one place the model deliberately refuses to mirror the form (case-data-model.md). Known defects of the official PDF, verified by widget geometry: Debtor 2's line-4 box is named Debto2.Quest2.2; line 12a's copy box has no widget; line 10's two source boxes are ordinary distinct fields (suffixes 1/2) despite their prose-length names.",
  "parts": [
   {
    "number": 1,
@@ -22,7 +25,7 @@
  "fields": [
   {
    "id": "caption.debtor1_name",
-   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
    "type": "text",
    "maps_to": {
     "entity": "debtor",
@@ -37,7 +40,7 @@
   },
   {
    "id": "caption.debtor2_name",
-   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
    "type": "text",
    "maps_to": {
     "entity": "debtor",
@@ -174,7 +177,7 @@
     },
     {
      "value": "separately",
-     "label": "Living separately or are legally separated (declaration under § 707(b)(7)(B))"
+     "label": "Living separately or are legally separated (declaration under \u00a7 707(b)(7)(B))"
     }
    ]
   },
@@ -183,7 +186,7 @@
    "label": "Your gross wages, salary, tips, bonuses, overtime, and commissions (before all payroll deductions)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -199,7 +202,7 @@
    "label": "Alimony and maintenance payments",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -215,7 +218,7 @@
    "label": "All amounts from any source which are regularly paid for household expenses of you or your dependents",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -229,10 +232,10 @@
   },
   {
    "id": "business_gross",
-   "label": "Business, profession, or farm — gross receipts (before all deductions)",
+   "label": "Business, profession, or farm \u2014 gross receipts (before all deductions)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -245,10 +248,10 @@
   },
   {
    "id": "business_expenses",
-   "label": "Business, profession, or farm — ordinary and necessary operating expenses",
+   "label": "Business, profession, or farm \u2014 ordinary and necessary operating expenses",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -264,7 +267,7 @@
    "label": "Net monthly income from a business, profession, or farm (copied into the column)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -277,10 +280,10 @@
   },
   {
    "id": "rental_gross",
-   "label": "Rental and other real property — gross receipts (before all deductions)",
+   "label": "Rental and other real property \u2014 gross receipts (before all deductions)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -293,10 +296,10 @@
   },
   {
    "id": "rental_expenses",
-   "label": "Rental and other real property — ordinary and necessary operating expenses",
+   "label": "Rental and other real property \u2014 ordinary and necessary operating expenses",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -312,7 +315,7 @@
    "label": "Net monthly income from rental or other real property (copied into the column)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -328,7 +331,7 @@
    "label": "Interest, dividends, and royalties",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -344,7 +347,7 @@
    "label": "Unemployment compensation",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -357,10 +360,10 @@
   },
   {
    "id": "ssa_contention",
-   "label": "Amounts contended to be benefits under the Social Security Act — for you / for your spouse",
+   "label": "Amounts contended to be benefits under the Social Security Act \u2014 for you / for your spouse",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -370,14 +373,14 @@
    },
    "part": 1,
    "line": "8",
-   "notes": "not part of any column total: the § 101(10A)(B)(ii) exclusion, shown rather than counted (other_income_record category social_security_act_benefit)"
+   "notes": "not part of any column total: the \u00a7 101(10A)(B)(ii) exclusion, shown rather than counted (other_income_record category social_security_act_benefit)"
   },
   {
    "id": "pension",
    "label": "Pension or retirement income",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -390,10 +393,10 @@
   },
   {
    "id": "other_income_1",
-   "label": "Income from all other sources not listed above — first row",
+   "label": "Income from all other sources not listed above \u2014 first row",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -406,10 +409,10 @@
   },
   {
    "id": "other_income_2",
-   "label": "Income from all other sources not listed above — second row",
+   "label": "Income from all other sources not listed above \u2014 second row",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -425,7 +428,7 @@
    "label": "Total amounts from separate pages, if any",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -438,10 +441,10 @@
   },
   {
    "id": "other_income_source_1",
-   "label": "Line 10, first row — specify the source",
+   "label": "Line 10, first row \u2014 specify the source",
    "type": "text",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -453,10 +456,10 @@
   },
   {
    "id": "other_income_source_2",
-   "label": "Line 10, second row — specify the source",
+   "label": "Line 10, second row \u2014 specify the source",
    "type": "text",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -471,7 +474,7 @@
    "label": "Total current monthly income for the column (add lines 2 through 10)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -487,7 +490,7 @@
    "label": "Total current monthly income (Column A plus Column B)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
    },
    "pdf": {
     "names": [
@@ -502,7 +505,7 @@
    "label": "12b. Your annual income for this part of the form (line 11 x 12)",
    "type": "money",
    "maps_to": {
-    "derived": "line 11 multiplied by 12 — § 707(b)(7)'s comparison figure"
+    "derived": "line 11 multiplied by 12 \u2014 \u00a7 707(b)(7)'s comparison figure"
    },
    "pdf": {
     "names": [
@@ -511,14 +514,14 @@
    },
    "part": 2,
    "line": "12",
-   "notes": "line 12a's 'Copy line 11 here' box carries no widget in the official PDF — the printed box cannot be filled; 12b is the one that lands."
+   "notes": "line 12a's 'Copy line 11 here' box carries no widget in the official PDF \u2014 the printed box cannot be filled; 12b is the one that lands."
   },
   {
    "id": "median_state",
    "label": "13. The state in which you live",
    "type": "state",
    "maps_to": {
-    "derived": "debtor 1's residence address state — the same fact 106C's scheme election reads"
+    "derived": "debtor 1's residence address state \u2014 the same fact 106C's scheme election reads"
    },
    "pdf": {
     "names": [
@@ -535,7 +538,7 @@
    "maps_to": {
     "entity": "means_test_input",
     "attribute": "people_under_65",
-    "notes": "the sum of people_under_65 and people_65_or_older — one entered household composition feeds line 13 here and line 5 of Form 122A-2"
+    "notes": "the sum of people_under_65 and people_65_or_older \u2014 one entered household composition feeds line 13 here and line 5 of Form 122A-2"
    },
    "pdf": {
     "names": [
@@ -565,7 +568,7 @@
    "label": "14. How do the lines compare?",
    "type": "radio",
    "maps_to": {
-    "derived": "the § 707(b)(7) comparison (core/means_test.py): 12b <= 13 checks 14a (no presumption; do not file 122A-2), 12b > 13 checks 14b (fill out Form 122A-2)"
+    "derived": "the \u00a7 707(b)(7) comparison (core/means_test.py): 12b <= 13 checks 14a (no presumption; do not file 122A-2), 12b > 13 checks 14b (fill out Form 122A-2)"
    },
    "pdf": {
     "names": [

@@ -106,6 +106,13 @@ from insolvia_api.core.creditor_matrix import (
     generate_creditor_matrix,
 )
 from insolvia_api.core.form_fill import FormFillError, fill_form
+from insolvia_api.core.form_overlay import (
+    DEFAULT_OUTPUT_OPTIONS,
+    OutputOptions,
+    apply_output_stamps,
+    apply_signature_options,
+    parse_output_options,
+)
 from insolvia_api.core.form_projections import (
     CaseFile,
     FieldValues,
@@ -617,7 +624,11 @@ class AssembledPacket:
 
 
 def assemble(
-    data: CaseData, *, as_of: date
+    data: CaseData,
+    *,
+    as_of: date,
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
+    printed_at: datetime | None = None,
 ) -> AssembledPacket | tuple[PacketProblem, ...]:
     """The whole gate-then-render, pure over its inputs.
 
@@ -626,6 +637,16 @@ def assemble(
     gate's structural checks, the matrix's list, each projection's refusals
     and each fill's are all collected before anything is given up on, so one
     run reports the whole fix list.
+
+    `options` (issue 13.11) is a plain `OutputOptions()` for the ordinary
+    filing set — every step below is then exactly what it always was, and
+    the output is byte-identical to a caller that never passed `options` at
+    all. It touches ONLY the render loop at the bottom: the completeness
+    gate, the creditor matrix, and every form's resolution/projection still
+    run over the WHOLE case regardless of `options.forms` — a subset
+    selection changes what gets PRINTED, not what "complete" means, so a
+    packet is exactly as provably complete when printing one form as when
+    printing all of them.
     """
     problems = list(completeness_problems(data))
 
@@ -684,18 +705,58 @@ def assemble(
     if problems:
         return tuple(problems)
 
+    # A requested subset (options.forms, short keys) narrows WHICH resolved
+    # forms get rendered — everything above still ran for the whole case. A
+    # key naming a form this case does not currently file (typo, or a stale
+    # selection from before a household/median fact changed) is a problem
+    # like any other, not a silent drop: the preparer picked it on purpose.
+    render_series_ids = series_ids
+    if options.forms is not None:
+        requested = {f"form/{key}" for key in options.forms}
+        problems.extend(
+            PacketProblem(
+                source=series_id,
+                item_id=None,
+                field="",
+                message="This case does not currently file this form, so it "
+                "cannot be included in a selected print.",
+            )
+            for series_id in sorted(requested - set(series_ids))
+        )
+        if problems:
+            return tuple(problems)
+        render_series_ids = tuple(s for s in series_ids if s in requested)
+
+    printed_at = printed_at if printed_at is not None else datetime.now(UTC)
     parts: list[tuple[str, bytes]] = []
     for position, series_id in enumerate(series_ids, start=1):
+        if series_id not in render_series_ids:
+            continue
         release = releases[series_id]
+        values = apply_signature_options(
+            release,
+            projected[series_id],
+            case_file=case_file,
+            options=options,
+            today=as_of,
+        )
         try:
-            rendered = fill_form(release, projected[series_id])
+            rendered = fill_form(release, values)
         except FormFillError as error:
             problems.extend(
                 PacketProblem(source=series_id, item_id=None, field="", message=message)
                 for message in error.problems
             )
             continue
-        parts.append((f"{position:02d}-{release.form}.pdf", rendered))
+        stamped = apply_output_stamps(
+            rendered, release, options=options, printed_at=printed_at
+        )
+        if stamped is None:
+            # Nothing of this form survives the requested signature-page
+            # mode (e.g. "only" on a form with no signature line) — it
+            # simply contributes nothing to this print, not a problem.
+            continue
+        parts.append((f"{position:02d}-{release.form}.pdf", stamped))
     if problems:
         return tuple(problems)
 
@@ -749,7 +810,11 @@ class PacketAssemblyDeps:
 
 
 def run_packet_assembly(
-    job: Job, deps: PacketAssemblyDeps, *, today: date | None = None
+    job: Job,
+    deps: PacketAssemblyDeps,
+    *,
+    today: date | None = None,
+    printed_at: datetime | None = None,
 ) -> dict[str, Any]:
     """The worker: Job in, JSON-shaped result out (core/jobs.py's contract).
 
@@ -763,6 +828,12 @@ def run_packet_assembly(
     JobError (-> job `failed`) is reserved for states a fix-and-retry can
     change: the case vanished, or changed under the assembly. Anything else
     raising is infrastructure and takes the run_job retry path.
+
+    `job.options` (issue 13.11) was already validated and canonicalised by
+    the accept route (`api.routes.jobs`) before this job was ever queued —
+    re-parsing it here with `parse_output_options` is a re-validation of
+    known-good data, the same trust level `parse_job_message` gives the rest
+    of the envelope, not a new decision.
     """
     case = deps.case_store.read_for_worker(job.case_id)
     if case is None:
@@ -783,7 +854,12 @@ def run_packet_assembly(
         case, debtor_store=deps.debtor_store, entity_store=deps.entity_store
     )
     as_of = today if today is not None else datetime.now(UTC).date()
-    outcome = assemble(data, as_of=as_of)
+    options = (
+        parse_output_options(job.options, allow_forms=True)
+        if job.options is not None
+        else DEFAULT_OUTPUT_OPTIONS
+    )
+    outcome = assemble(data, as_of=as_of, options=options, printed_at=printed_at)
 
     if not isinstance(outcome, AssembledPacket):
         logger.info(
@@ -806,6 +882,7 @@ def run_packet_assembly(
         constants_set_id=outcome.constants_set_id,
         creditor_count=outcome.creditor_count,
         created_by=job.created_by,
+        options=options,
     )
     # Bytes first, record second: an object with no record is invisible and
     # harmless (nothing lists the bucket); a record with no object would be a

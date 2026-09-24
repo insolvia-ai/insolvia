@@ -89,7 +89,7 @@ FIELD_TYPES = {
 
 REQUIRED_SPEC_KEYS = {
     "form", "official_number", "title", "revision", "effective_date",
-    "parts", "fields",
+    "signature_pages", "parts", "fields",
 }
 REQUIRED_FIELD_KEYS = {"id", "label", "type", "maps_to", "pdf"}
 OPTIONAL_FIELD_KEYS = {"part", "line", "options", "repeats", "notes"}
@@ -130,11 +130,21 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
     if spec["effective_date"] != dump["effective_date"]:
         err(form, "effective_date disagrees with the dump")
 
+    sig_pages = spec["signature_pages"]
+    if not isinstance(sig_pages, list) or not all(
+        isinstance(p, int) and p > 0 for p in sig_pages
+    ):
+        err(form, "signature_pages must be a list of positive integers")
+        sig_pages = []
+    elif sig_pages != sorted(set(sig_pages)):
+        err(form, "signature_pages must be sorted, strictly increasing page numbers")
+
     pdf_fields = {f["name"]: f for f in dump["fields"] if f["kind"] != "pushbutton"}
     claimed: dict[str, str] = {}  # pdf field name -> spec field id
     overlay_boxes: dict[str, str] = {}  # overlay box name -> spec field id (flat forms)
     ids: set[str] = set()
     mapped = 0
+    actual_sig_pages: set[int] = set()
 
     part_numbers = set()
     for part in spec["parts"]:
@@ -238,6 +248,10 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
                 err(form, f"pdf field {name!r} claimed by both {claimed[name]} and {fid}")
             claimed[name] = fid
 
+        if ftype == "signature":
+            for n in matched:
+                actual_sig_pages.update(pdf_fields[n].get("pages", []))
+
         # type <-> widget kind agreement, and radio option/state agreement
         kinds = {pdf_fields[n]["kind"] for n in matched if n in pdf_fields}
         if ftype in ("checkbox", "radio"):
@@ -270,6 +284,15 @@ def check_form(spec_path: Path) -> tuple[int, int, int]:
         err(form, f"{len(uncovered)} official PDF fields not covered by any spec field: {uncovered[:8]}{' …' if len(uncovered) > 8 else ''}")
     if not pdf_fields and not overlay_boxes and spec["fields"]:
         err(form, "a flat form's fields must claim overlay boxes")
+
+    if sorted(set(sig_pages)) != sorted(actual_sig_pages):
+        err(
+            form,
+            f"signature_pages {sig_pages} != pages carrying a signature-type "
+            f"field {sorted(actual_sig_pages)} — the forms engine's "
+            "signature-page selection (issue 13.11) trusts this list, so it "
+            "must exactly match every 'signature' field's own widget pages",
+        )
 
     return (len(spec["fields"]), len(claimed) + len(overlay_boxes), mapped)
 

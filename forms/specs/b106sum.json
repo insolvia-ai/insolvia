@@ -4,52 +4,101 @@
  "title": "A Summary of Your Assets and Liabilities and Certain Statistical Information",
  "revision": "12/15",
  "effective_date": "2015-12-01",
+ "signature_pages": [],
  "parts": [
-  {"number": 1, "title": "Summarize Your Assets"},
-  {"number": 2, "title": "Summarize Your Liabilities"},
-  {"number": 3, "title": "Summarize Your Income and Expenses"},
-  {"number": 4, "title": "Answer These Questions for Administrative and Statistical Records"}
+  {
+   "number": 1,
+   "title": "Summarize Your Assets"
+  },
+  {
+   "number": 2,
+   "title": "Summarize Your Liabilities"
+  },
+  {
+   "number": 3,
+   "title": "Summarize Your Income and Expenses"
+  },
+  {
+   "number": 4,
+   "title": "Answer These Questions for Administrative and Statistical Records"
+  }
  ],
  "fields": [
   {
    "id": "caption.debtor1_name",
    "part": null,
-   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
    "type": "text",
-   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1; the PDF has one combined field, rendered from the four name parts"},
-   "pdf": {"names": ["Debtor 1"]}
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1; the PDF has one combined field, rendered from the four name parts"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   }
   },
   {
    "id": "caption.debtor2_name",
    "part": null,
-   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
    "type": "text",
-   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
-   "pdf": {"names": ["Debtor 2"]}
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
   },
   {
    "id": "caption.district",
    "part": null,
    "label": "United States Bankruptcy Court for the __ District of __",
    "type": "district",
-   "maps_to": {"entity": "case", "attribute": "district"},
-   "pdf": {"names": ["Bankruptcy District Information"]}
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
   },
   {
    "id": "caption.case_number",
    "part": null,
    "label": "Case number (If known)",
    "type": "text",
-   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
-   "pdf": {"names": ["Case number"]}
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   }
   },
   {
    "id": "caption.amended_filing",
    "part": null,
    "label": "Check if this is an amended filing",
    "type": "checkbox",
-   "maps_to": {"entity": "case", "attribute": "is_amended"},
-   "pdf": {"names": ["Check if this is an"]}
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is an"
+    ]
+   }
   },
   {
    "id": "line_1a_total_real_estate",
@@ -57,8 +106,14 @@
    "line": "1a",
    "label": "Copy line 55, Total real estate, from Schedule A/B",
    "type": "money",
-   "maps_to": {"derived": "B106A/B line 55"},
-   "pdf": {"names": ["1a"]}
+   "maps_to": {
+    "derived": "B106A/B line 55"
+   },
+   "pdf": {
+    "names": [
+     "1a"
+    ]
+   }
   },
   {
    "id": "line_1b_total_personal_property",
@@ -66,8 +121,14 @@
    "line": "1b",
    "label": "Copy line 62, Total personal property, from Schedule A/B",
    "type": "money",
-   "maps_to": {"derived": "B106A/B line 62"},
-   "pdf": {"names": ["1b"]}
+   "maps_to": {
+    "derived": "B106A/B line 62"
+   },
+   "pdf": {
+    "names": [
+     "1b"
+    ]
+   }
   },
   {
    "id": "line_1c_total_property",
@@ -75,8 +136,14 @@
    "line": "1c",
    "label": "Copy line 63, Total of all property on Schedule A/B",
    "type": "money",
-   "maps_to": {"derived": "B106A/B line 63"},
-   "pdf": {"names": ["1c"]}
+   "maps_to": {
+    "derived": "B106A/B line 63"
+   },
+   "pdf": {
+    "names": [
+     "1c"
+    ]
+   }
   },
   {
    "id": "line_2_secured_claims_total",
@@ -84,8 +151,14 @@
    "line": "2",
    "label": "Copy the total you listed in Column A, Amount of claim, at the bottom of the last page of Part 1 of Schedule D",
    "type": "money",
-   "maps_to": {"derived": "B106D Part 1 Column A total"},
-   "pdf": {"names": ["2"]}
+   "maps_to": {
+    "derived": "B106D Part 1 Column A total"
+   },
+   "pdf": {
+    "names": [
+     "2"
+    ]
+   }
   },
   {
    "id": "line_3a_priority_unsecured_total",
@@ -93,8 +166,14 @@
    "line": "3a",
    "label": "Copy the total claims from Part 1 (priority unsecured claims) from line 6e of Schedule E/F",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6e"},
-   "pdf": {"names": ["3a"]}
+   "maps_to": {
+    "derived": "B106E/F line 6e"
+   },
+   "pdf": {
+    "names": [
+     "3a"
+    ]
+   }
   },
   {
    "id": "line_3b_nonpriority_unsecured_total",
@@ -102,8 +181,14 @@
    "line": "3b",
    "label": "Copy the total claims from Part 2 (nonpriority unsecured claims) from line 6j of Schedule E/F",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6j"},
-   "pdf": {"names": ["3b"]}
+   "maps_to": {
+    "derived": "B106E/F line 6j"
+   },
+   "pdf": {
+    "names": [
+     "3b"
+    ]
+   }
   },
   {
    "id": "line_3_total_liabilities",
@@ -111,8 +196,14 @@
    "line": "3 (total)",
    "label": "Your total liabilities",
    "type": "money",
-   "maps_to": {"derived": "line 2 + line 3a + line 3b"},
-   "pdf": {"names": ["3c"]}
+   "maps_to": {
+    "derived": "line 2 + line 3a + line 3b"
+   },
+   "pdf": {
+    "names": [
+     "3c"
+    ]
+   }
   },
   {
    "id": "line_4_combined_monthly_income",
@@ -120,8 +211,14 @@
    "line": "4",
    "label": "Copy your combined monthly income from line 12 of Schedule I",
    "type": "money",
-   "maps_to": {"derived": "B106I line 12"},
-   "pdf": {"names": ["4"]}
+   "maps_to": {
+    "derived": "B106I line 12"
+   },
+   "pdf": {
+    "names": [
+     "4"
+    ]
+   }
   },
   {
    "id": "line_5_monthly_expenses",
@@ -129,8 +226,14 @@
    "line": "5",
    "label": "Copy your monthly expenses from line 22c of Schedule J",
    "type": "money",
-   "maps_to": {"derived": "B106J line 22c"},
-   "pdf": {"names": ["5"]}
+   "maps_to": {
+    "derived": "B106J line 22c"
+   },
+   "pdf": {
+    "names": [
+     "5"
+    ]
+   }
   },
   {
    "id": "line_6_filing_under_7_11_13",
@@ -139,11 +242,23 @@
    "label": "Are you filing for bankruptcy under Chapters 7, 11, or 13?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No. You have nothing to report on this part of the form."},
-    {"value": "yes", "label": "Yes"}
+    {
+     "value": "no",
+     "label": "No. You have nothing to report on this part of the form."
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
    ],
-   "maps_to": {"derived": "case.chapter in {7, 11, 13}"},
-   "pdf": {"names": ["check6"]}
+   "maps_to": {
+    "derived": "case.chapter in {7, 11, 13}"
+   },
+   "pdf": {
+    "names": [
+     "check6"
+    ]
+   }
   },
   {
    "id": "line_7_kind_of_debt",
@@ -152,11 +267,25 @@
    "label": "What kind of debt do you have?",
    "type": "radio",
    "options": [
-    {"value": "consumer", "label": "Your debts are primarily consumer debts (11 U.S.C. § 101(8)); fill out lines 8–9g", "maps_to_value": "consumer"},
-    {"value": "not consumer", "label": "Your debts are not primarily consumer debts; nothing to report on this part"}
+    {
+     "value": "consumer",
+     "label": "Your debts are primarily consumer debts (11 U.S.C. \u00a7 101(8)); fill out lines 8\u20139g",
+     "maps_to_value": "consumer"
+    },
+    {
+     "value": "not consumer",
+     "label": "Your debts are not primarily consumer debts; nothing to report on this part"
+    }
    ],
-   "maps_to": {"entity": "petition", "attribute": "debt_character"},
-   "pdf": {"names": ["check7"]}
+   "maps_to": {
+    "entity": "petition",
+    "attribute": "debt_character"
+   },
+   "pdf": {
+    "names": [
+     "check7"
+    ]
+   }
   },
   {
    "id": "line_8_current_monthly_income",
@@ -164,8 +293,14 @@
    "line": "8",
    "label": "From the Statement of Your Current Monthly Income: copy your total current monthly income from Official Form 122A-1 line 11; OR Form 122B line 11; OR Form 122C-1 line 14",
    "type": "money",
-   "maps_to": {"derived": "cross-form projection from the means-test forms (122A-1/122B/122C-1); the means-test milestone owns the figure"},
-   "pdf": {"names": ["8"]},
+   "maps_to": {
+    "derived": "cross-form projection from the means-test forms (122A-1/122B/122C-1); the means-test milestone owns the figure"
+   },
+   "pdf": {
+    "names": [
+     "8"
+    ]
+   },
    "notes": "Only filled when line 7 = consumer."
   },
   {
@@ -174,8 +309,14 @@
    "line": "9a",
    "label": "Domestic support obligations (Copy line 6a.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6a"},
-   "pdf": {"names": ["9a"]}
+   "maps_to": {
+    "derived": "B106E/F line 6a"
+   },
+   "pdf": {
+    "names": [
+     "9a"
+    ]
+   }
   },
   {
    "id": "line_9b_taxes_government",
@@ -183,8 +324,14 @@
    "line": "9b",
    "label": "Taxes and certain other debts you owe the government (Copy line 6b.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6b"},
-   "pdf": {"names": ["9b"]}
+   "maps_to": {
+    "derived": "B106E/F line 6b"
+   },
+   "pdf": {
+    "names": [
+     "9b"
+    ]
+   }
   },
   {
    "id": "line_9c_intoxicated_injury",
@@ -192,8 +339,14 @@
    "line": "9c",
    "label": "Claims for death or personal injury while you were intoxicated (Copy line 6c.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6c"},
-   "pdf": {"names": ["9c"]}
+   "maps_to": {
+    "derived": "B106E/F line 6c"
+   },
+   "pdf": {
+    "names": [
+     "9c"
+    ]
+   }
   },
   {
    "id": "line_9d_student_loans",
@@ -201,8 +354,14 @@
    "line": "9d",
    "label": "Student loans (Copy line 6f.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6f"},
-   "pdf": {"names": ["9d"]}
+   "maps_to": {
+    "derived": "B106E/F line 6f"
+   },
+   "pdf": {
+    "names": [
+     "9d"
+    ]
+   }
   },
   {
    "id": "line_9e_separation_divorce",
@@ -210,8 +369,14 @@
    "line": "9e",
    "label": "Obligations arising out of a separation agreement or divorce that you did not report as priority claims (Copy line 6g.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6g"},
-   "pdf": {"names": ["9e"]}
+   "maps_to": {
+    "derived": "B106E/F line 6g"
+   },
+   "pdf": {
+    "names": [
+     "9e"
+    ]
+   }
   },
   {
    "id": "line_9f_pension_profit_sharing",
@@ -219,8 +384,14 @@
    "line": "9f",
    "label": "Debts to pension or profit-sharing plans, and other similar debts (Copy line 6h.)",
    "type": "money",
-   "maps_to": {"derived": "B106E/F line 6h"},
-   "pdf": {"names": ["9f"]}
+   "maps_to": {
+    "derived": "B106E/F line 6h"
+   },
+   "pdf": {
+    "names": [
+     "9f"
+    ]
+   }
   },
   {
    "id": "line_9g_total",
@@ -228,8 +399,14 @@
    "line": "9g",
    "label": "Total. Add lines 9a through 9f.",
    "type": "money",
-   "maps_to": {"derived": "sum of lines 9a–9f"},
-   "pdf": {"names": ["9g"]}
+   "maps_to": {
+    "derived": "sum of lines 9a\u20139f"
+   },
+   "pdf": {
+    "names": [
+     "9g"
+    ]
+   }
   }
  ]
 }

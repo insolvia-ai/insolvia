@@ -53,7 +53,7 @@ def make_job(**overrides) -> Job:
 
 
 def test_a_registered_kind_is_accepted() -> None:
-    assert parse_job_acceptance({"kind": "echo"}) == ("echo", None)
+    assert parse_job_acceptance({"kind": "echo"}) == ("echo", None, None)
 
 
 @pytest.mark.parametrize(
@@ -69,6 +69,10 @@ def test_a_registered_kind_is_accepted() -> None:
         {"kind": "document_extraction", "documentId": 7},
         # And the inverse: a documentId decorating a kind nothing reads it on.
         {"kind": "echo", "documentId": "doc-1"},
+        # options on a kind that does not take them, and a malformed shape on
+        # one that does.
+        {"kind": "echo", "options": {"draftWatermark": True}},
+        {"kind": "packet_assembly", "options": "not-an-object"},
     ],
 )
 def test_anything_but_a_registered_kind_is_rejected(payload) -> None:
@@ -76,10 +80,23 @@ def test_anything_but_a_registered_kind_is_rejected(payload) -> None:
         parse_job_acceptance(payload)
 
 
+def test_an_options_scoped_kind_accepts_and_returns_its_options() -> None:
+    assert parse_job_acceptance(
+        {"kind": "packet_assembly", "options": {"draftWatermark": True}}
+    ) == ("packet_assembly", None, {"draftWatermark": True})
+    # options are optional even for an options-scoped kind — the plain
+    # filing set is the default, applied by the route, not this function.
+    assert parse_job_acceptance({"kind": "packet_assembly"}) == (
+        "packet_assembly",
+        None,
+        None,
+    )
+
+
 def test_a_document_scoped_kind_requires_and_returns_its_document() -> None:
     assert parse_job_acceptance(
         {"kind": "document_extraction", "documentId": "doc-1"}
-    ) == ("document_extraction", "doc-1")
+    ) == ("document_extraction", "doc-1", None)
 
 
 def test_every_pure_worker_is_an_acceptable_kind() -> None:
@@ -156,12 +173,39 @@ def test_find_active_scopes_document_kinds_per_document() -> None:
     assert find_active((extraction,), "document_extraction") is None
 
 
+def test_find_active_scopes_options_kinds_per_options() -> None:
+    # A draft assembly in flight must not swallow a filing-set request (or
+    # vice versa) — the idempotency key is (case, kind, options) too.
+    draft = make_job(kind="packet_assembly", options={"draftWatermark": True})
+    assert (
+        find_active((draft,), "packet_assembly", options={"draftWatermark": True})
+        is draft
+    )
+    assert find_active((draft,), "packet_assembly", options=None) is None
+    assert (
+        find_active((draft,), "packet_assembly", options={"draftWatermark": False})
+        is None
+    )
+
+
 # ── Stored item shape ───────────────────────────────────────────
 
 
 def test_job_item_round_trips() -> None:
     job = complete(start_attempt(make_job()), {"echo": "ok"})
     assert job_from_item(job_item(job)) == job
+
+
+def test_job_item_round_trips_options() -> None:
+    job = make_job(kind="packet_assembly", options={"draftWatermark": True})
+    assert job_from_item(job_item(job)) == job
+    assert job_item(job)["options"] == {"draftWatermark": True}
+
+
+def test_job_json_carries_options_only_when_set() -> None:
+    assert "options" not in job_json(make_job())
+    with_options = make_job(options={"draftWatermark": True})
+    assert job_json(with_options)["options"] == {"draftWatermark": True}
 
 
 def test_job_item_round_trips_a_failure() -> None:

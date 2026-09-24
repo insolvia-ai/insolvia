@@ -4,42 +4,78 @@
  "title": "Schedule J: Your Expenses",
  "revision": "12/15",
  "effective_date": "2015-12-01",
+ "signature_pages": [],
  "parts": [
-  {"number": 1, "title": "Describe Your Household"},
-  {"number": 2, "title": "Estimate Your Ongoing Monthly Expenses"}
+  {
+   "number": 1,
+   "title": "Describe Your Household"
+  },
+  {
+   "number": 2,
+   "title": "Estimate Your Ongoing Monthly Expenses"
+  }
  ],
  "fields": [
   {
    "id": "caption.debtor1_name",
    "part": null,
-   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
    "type": "text",
-   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_1"},
-   "pdf": {"names": ["Debtor 1"]}
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   }
   },
   {
    "id": "caption.debtor2_name",
    "part": null,
-   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
    "type": "text",
-   "maps_to": {"entity": "debtor", "attribute": "name", "notes": "filing_role=debtor_2"},
-   "pdf": {"names": ["Debtor 2"]}
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
   },
   {
    "id": "caption.district",
    "part": null,
    "label": "United States Bankruptcy Court for the __ District of __",
    "type": "district",
-   "maps_to": {"entity": "case", "attribute": "district"},
-   "pdf": {"names": ["Bankruptcy District Information"]}
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
   },
   {
    "id": "caption.case_number",
    "part": null,
    "label": "Case number (If known)",
    "type": "text",
-   "maps_to": {"unmapped": "court-assigned case number; the case data model has no attribute for it yet"},
-   "pdf": {"names": ["Case number"]}
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   }
   },
   {
    "id": "caption.amended_or_supplement",
@@ -47,19 +83,41 @@
    "label": "Check if this is: an amended filing / a supplement showing postpetition chapter 13 expenses",
    "type": "radio",
    "options": [
-    {"value": "amended", "label": "An amended filing", "maps_to_value": "case.is_amended"},
-    {"value": "supplemental", "label": "A supplement showing postpetition chapter 13 expenses as of the following date"}
+    {
+     "value": "amended",
+     "label": "An amended filing",
+     "maps_to_value": "case.is_amended"
+    },
+    {
+     "value": "supplemental",
+     "label": "A supplement showing postpetition chapter 13 expenses as of the following date"
+    }
    ],
-   "maps_to": {"entity": "case", "attribute": "is_amended", "notes": "the supplemental state pairs with case.ch13_supplement_date"},
-   "pdf": {"names": ["Check 1"]}
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended",
+    "notes": "the supplemental state pairs with case.ch13_supplement_date"
+   },
+   "pdf": {
+    "names": [
+     "Check 1"
+    ]
+   }
   },
   {
    "id": "caption.supplement_date",
    "part": null,
    "label": "Postpetition chapter 13 expenses as of the following date (MM/DD/YYYY)",
    "type": "date",
-   "maps_to": {"entity": "case", "attribute": "ch13_supplement_date"},
-   "pdf": {"names": ["Supplemental income date"]}
+   "maps_to": {
+    "entity": "case",
+    "attribute": "ch13_supplement_date"
+   },
+   "pdf": {
+    "names": [
+     "Supplemental income date"
+    ]
+   }
   },
   {
    "id": "line_1_joint_case",
@@ -68,11 +126,23 @@
    "label": "Is this a joint case?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No. Go to line 2."},
-    {"value": "yes", "label": "Yes"}
+    {
+     "value": "no",
+     "label": "No. Go to line 2."
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
    ],
-   "maps_to": {"derived": "a debtor with filing_role=debtor_2 exists on the case"},
-   "pdf": {"names": ["check1"]}
+   "maps_to": {
+    "derived": "a debtor with filing_role=debtor_2 exists on the case"
+   },
+   "pdf": {
+    "names": [
+     "check1"
+    ]
+   }
   },
   {
    "id": "line_1_debtor2_separate_household",
@@ -81,11 +151,25 @@
    "label": "Yes. Does Debtor 2 live in a separate household?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No"},
-    {"value": "yes", "label": "Yes. Debtor 2 must file Official Form 106J-2."}
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Debtor 2 must file Official Form 106J-2."
+    }
    ],
-   "maps_to": {"entity": "household", "attribute": "separate_household", "notes": "yes is what makes the second household row (and B106J-2) exist"},
-   "pdf": {"names": ["check1a"]},
+   "maps_to": {
+    "entity": "household",
+    "attribute": "separate_household",
+    "notes": "yes is what makes the second household row (and B106J-2) exist"
+   },
+   "pdf": {
+    "names": [
+     "check1a"
+    ]
+   },
    "notes": "Only answered when line 1 = yes."
   },
   {
@@ -95,11 +179,23 @@
    "label": "Do you have dependents? (Do not list Debtor 1 and Debtor 2. Do not state the dependents' names.)",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No"},
-    {"value": "yes", "label": "Yes. Fill out this information for each dependent"}
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Fill out this information for each dependent"
+    }
    ],
-   "maps_to": {"derived": "at least one dependent record exists for the household"},
-   "pdf": {"names": ["check2"]}
+   "maps_to": {
+    "derived": "at least one dependent record exists for the household"
+   },
+   "pdf": {
+    "names": [
+     "check2"
+    ]
+   }
   },
   {
    "id": "line_2_dependent_relationship",
@@ -107,9 +203,18 @@
    "line": "2",
    "label": "Dependent's relationship to Debtor 1 or Debtor 2",
    "type": "text",
-   "repeats": {"group": "dependent", "count": 5, "continuation": "the form ships five rows (2a–2e); more dependents go on an attached sheet"},
-   "maps_to": {"entity": "dependent", "attribute": "relationship"},
-   "pdf": {"pattern": "Dependant Relation 2[a-e]"}
+   "repeats": {
+    "group": "dependent",
+    "count": 5,
+    "continuation": "the form ships five rows (2a\u20132e); more dependents go on an attached sheet"
+   },
+   "maps_to": {
+    "entity": "dependent",
+    "attribute": "relationship"
+   },
+   "pdf": {
+    "pattern": "Dependant Relation 2[a-e]"
+   }
   },
   {
    "id": "line_2_dependent_age",
@@ -117,9 +222,17 @@
    "line": "2",
    "label": "Dependent's age",
    "type": "integer",
-   "repeats": {"group": "dependent", "count": 5},
-   "maps_to": {"entity": "dependent", "attribute": "age"},
-   "pdf": {"pattern": "Dependant age 2[a-e]"}
+   "repeats": {
+    "group": "dependent",
+    "count": 5
+   },
+   "maps_to": {
+    "entity": "dependent",
+    "attribute": "age"
+   },
+   "pdf": {
+    "pattern": "Dependant age 2[a-e]"
+   }
   },
   {
    "id": "line_2_dependent_lives_with_you",
@@ -128,12 +241,26 @@
    "label": "Does dependent live with you?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No"},
-    {"value": "yes", "label": "Yes"}
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
    ],
-   "repeats": {"group": "dependent", "count": 5},
-   "maps_to": {"entity": "dependent", "attribute": "lives_with_debtor"},
-   "pdf": {"pattern": "check2[a-e]"}
+   "repeats": {
+    "group": "dependent",
+    "count": 5
+   },
+   "maps_to": {
+    "entity": "dependent",
+    "attribute": "lives_with_debtor"
+   },
+   "pdf": {
+    "pattern": "check2[a-e]"
+   }
   },
   {
    "id": "line_3_expenses_include_others",
@@ -142,11 +269,24 @@
    "label": "Do your expenses include expenses of people other than yourself and your dependents?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No"},
-    {"value": "yes", "label": "Yes"}
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
    ],
-   "maps_to": {"entity": "household", "attribute": "expenses_include_others"},
-   "pdf": {"names": ["check3"]}
+   "maps_to": {
+    "entity": "household",
+    "attribute": "expenses_include_others"
+   },
+   "pdf": {
+    "names": [
+     "check3"
+    ]
+   }
   },
   {
    "id": "line_4_rent_or_home_ownership",
@@ -154,8 +294,16 @@
    "line": "4",
    "label": "The rental or home ownership expenses for your residence (first mortgage payments and any rent for the ground or lot)",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=rent_or_home_ownership"},
-   "pdf": {"names": ["4"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=rent_or_home_ownership"
+   },
+   "pdf": {
+    "names": [
+     "4"
+    ]
+   }
   },
   {
    "id": "line_4a_real_estate_taxes",
@@ -163,8 +311,16 @@
    "line": "4a",
    "label": "If not included in line 4: Real estate taxes",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=real_estate_taxes"},
-   "pdf": {"names": ["4a"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=real_estate_taxes"
+   },
+   "pdf": {
+    "names": [
+     "4a"
+    ]
+   }
   },
   {
    "id": "line_4b_property_insurance",
@@ -172,8 +328,16 @@
    "line": "4b",
    "label": "If not included in line 4: Property, homeowner's, or renter's insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=property_insurance"},
-   "pdf": {"names": ["4b"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=property_insurance"
+   },
+   "pdf": {
+    "names": [
+     "4b"
+    ]
+   }
   },
   {
    "id": "line_4c_home_maintenance",
@@ -181,8 +345,16 @@
    "line": "4c",
    "label": "If not included in line 4: Home maintenance, repair, and upkeep expenses",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=home_maintenance"},
-   "pdf": {"names": ["4c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=home_maintenance"
+   },
+   "pdf": {
+    "names": [
+     "4c"
+    ]
+   }
   },
   {
    "id": "line_4d_hoa_dues",
@@ -190,8 +362,16 @@
    "line": "4d",
    "label": "If not included in line 4: Homeowner's association or condominium dues",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=hoa_dues"},
-   "pdf": {"names": ["4d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=hoa_dues"
+   },
+   "pdf": {
+    "names": [
+     "4d"
+    ]
+   }
   },
   {
    "id": "line_5_additional_mortgage",
@@ -199,8 +379,16 @@
    "line": "5",
    "label": "Additional mortgage payments for your residence, such as home equity loans",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=additional_mortgage"},
-   "pdf": {"names": ["5"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=additional_mortgage"
+   },
+   "pdf": {
+    "names": [
+     "5"
+    ]
+   }
   },
   {
    "id": "line_6a_electricity_heat_gas",
@@ -208,8 +396,16 @@
    "line": "6a",
    "label": "Utilities: Electricity, heat, natural gas",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=utilities_electricity_heat_gas"},
-   "pdf": {"names": ["6a"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=utilities_electricity_heat_gas"
+   },
+   "pdf": {
+    "names": [
+     "6a"
+    ]
+   }
   },
   {
    "id": "line_6b_water_sewer_garbage",
@@ -217,8 +413,16 @@
    "line": "6b",
    "label": "Utilities: Water, sewer, garbage collection",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=utilities_water_sewer_garbage"},
-   "pdf": {"names": ["6b"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=utilities_water_sewer_garbage"
+   },
+   "pdf": {
+    "names": [
+     "6b"
+    ]
+   }
   },
   {
    "id": "line_6c_telecom",
@@ -226,8 +430,16 @@
    "line": "6c",
    "label": "Utilities: Telephone, cell phone, Internet, satellite, and cable services",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=utilities_telecom"},
-   "pdf": {"names": ["6c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=utilities_telecom"
+   },
+   "pdf": {
+    "names": [
+     "6c"
+    ]
+   }
   },
   {
    "id": "line_6d_utilities_other",
@@ -235,8 +447,16 @@
    "line": "6d",
    "label": "Utilities: Other",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=utilities_other"},
-   "pdf": {"names": ["6d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=utilities_other"
+   },
+   "pdf": {
+    "names": [
+     "6d"
+    ]
+   }
   },
   {
    "id": "line_6d_utilities_other_specify",
@@ -244,8 +464,16 @@
    "line": "6d",
    "label": "Utilities: Other. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=utilities_other"},
-   "pdf": {"names": ["Other 6d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=utilities_other"
+   },
+   "pdf": {
+    "names": [
+     "Other 6d"
+    ]
+   }
   },
   {
    "id": "line_7_food_housekeeping",
@@ -253,8 +481,16 @@
    "line": "7",
    "label": "Food and housekeeping supplies",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=food_housekeeping"},
-   "pdf": {"names": ["7"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=food_housekeeping"
+   },
+   "pdf": {
+    "names": [
+     "7"
+    ]
+   }
   },
   {
    "id": "line_8_childcare_education",
@@ -262,8 +498,16 @@
    "line": "8",
    "label": "Childcare and children's education costs",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=childcare_education"},
-   "pdf": {"names": ["8"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=childcare_education"
+   },
+   "pdf": {
+    "names": [
+     "8"
+    ]
+   }
   },
   {
    "id": "line_9_clothing_laundry",
@@ -271,8 +515,16 @@
    "line": "9",
    "label": "Clothing, laundry, and dry cleaning",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=clothing_laundry"},
-   "pdf": {"names": ["9"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=clothing_laundry"
+   },
+   "pdf": {
+    "names": [
+     "9"
+    ]
+   }
   },
   {
    "id": "line_10_personal_care",
@@ -280,8 +532,16 @@
    "line": "10",
    "label": "Personal care products and services",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=personal_care"},
-   "pdf": {"names": ["10"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=personal_care"
+   },
+   "pdf": {
+    "names": [
+     "10"
+    ]
+   }
   },
   {
    "id": "line_11_medical_dental",
@@ -289,8 +549,16 @@
    "line": "11",
    "label": "Medical and dental expenses",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=medical_dental"},
-   "pdf": {"names": ["11"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=medical_dental"
+   },
+   "pdf": {
+    "names": [
+     "11"
+    ]
+   }
   },
   {
    "id": "line_12_transportation",
@@ -298,8 +566,16 @@
    "line": "12",
    "label": "Transportation (gas, maintenance, bus or train fare; not car payments)",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=transportation"},
-   "pdf": {"names": ["12"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=transportation"
+   },
+   "pdf": {
+    "names": [
+     "12"
+    ]
+   }
   },
   {
    "id": "line_13_entertainment",
@@ -307,8 +583,16 @@
    "line": "13",
    "label": "Entertainment, clubs, recreation, newspapers, magazines, and books",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=entertainment"},
-   "pdf": {"names": ["13"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=entertainment"
+   },
+   "pdf": {
+    "names": [
+     "13"
+    ]
+   }
   },
   {
    "id": "line_14_charitable",
@@ -316,8 +600,16 @@
    "line": "14",
    "label": "Charitable contributions and religious donations",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=charitable"},
-   "pdf": {"names": ["14"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=charitable"
+   },
+   "pdf": {
+    "names": [
+     "14"
+    ]
+   }
   },
   {
    "id": "line_15a_life_insurance",
@@ -325,8 +617,16 @@
    "line": "15a",
    "label": "Insurance: Life insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=insurance_life"},
-   "pdf": {"names": ["15a"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=insurance_life"
+   },
+   "pdf": {
+    "names": [
+     "15a"
+    ]
+   }
   },
   {
    "id": "line_15b_health_insurance",
@@ -334,8 +634,16 @@
    "line": "15b",
    "label": "Insurance: Health insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=insurance_health"},
-   "pdf": {"names": ["15b"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=insurance_health"
+   },
+   "pdf": {
+    "names": [
+     "15b"
+    ]
+   }
   },
   {
    "id": "line_15c_vehicle_insurance",
@@ -343,8 +651,16 @@
    "line": "15c",
    "label": "Insurance: Vehicle insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=insurance_vehicle"},
-   "pdf": {"names": ["15c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=insurance_vehicle"
+   },
+   "pdf": {
+    "names": [
+     "15c"
+    ]
+   }
   },
   {
    "id": "line_15d_other_insurance",
@@ -352,8 +668,16 @@
    "line": "15d",
    "label": "Insurance: Other insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=insurance_other"},
-   "pdf": {"names": ["15d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=insurance_other"
+   },
+   "pdf": {
+    "names": [
+     "15d"
+    ]
+   }
   },
   {
    "id": "line_15d_other_insurance_specify",
@@ -361,8 +685,16 @@
    "line": "15d",
    "label": "Insurance: Other insurance. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=insurance_other"},
-   "pdf": {"names": ["Other 15d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=insurance_other"
+   },
+   "pdf": {
+    "names": [
+     "Other 15d"
+    ]
+   }
   },
   {
    "id": "line_16_taxes",
@@ -370,8 +702,16 @@
    "line": "16",
    "label": "Taxes (not deducted from pay or included in lines 4 or 20)",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=taxes"},
-   "pdf": {"names": ["16"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=taxes"
+   },
+   "pdf": {
+    "names": [
+     "16"
+    ]
+   }
   },
   {
    "id": "line_16_taxes_specify",
@@ -379,8 +719,16 @@
    "line": "16",
    "label": "Taxes. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=taxes"},
-   "pdf": {"names": ["Other 16"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=taxes"
+   },
+   "pdf": {
+    "names": [
+     "Other 16"
+    ]
+   }
   },
   {
    "id": "line_17a_car_payment_vehicle1",
@@ -388,8 +736,16 @@
    "line": "17a",
    "label": "Installment or lease payments: Car payments for Vehicle 1",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=installment_vehicle_1"},
-   "pdf": {"names": ["17a"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=installment_vehicle_1"
+   },
+   "pdf": {
+    "names": [
+     "17a"
+    ]
+   }
   },
   {
    "id": "line_17b_car_payment_vehicle2",
@@ -397,8 +753,16 @@
    "line": "17b",
    "label": "Installment or lease payments: Car payments for Vehicle 2",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=installment_vehicle_2"},
-   "pdf": {"names": ["17b"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=installment_vehicle_2"
+   },
+   "pdf": {
+    "names": [
+     "17b"
+    ]
+   }
   },
   {
    "id": "line_17c_installment_other_1",
@@ -406,8 +770,16 @@
    "line": "17c",
    "label": "Installment or lease payments: Other",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=installment_other"},
-   "pdf": {"names": ["17c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=installment_other"
+   },
+   "pdf": {
+    "names": [
+     "17c"
+    ]
+   }
   },
   {
    "id": "line_17c_installment_other_1_specify",
@@ -415,8 +787,16 @@
    "line": "17c",
    "label": "Installment or lease payments: Other. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=installment_other"},
-   "pdf": {"names": ["Other 17c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=installment_other"
+   },
+   "pdf": {
+    "names": [
+     "Other 17c"
+    ]
+   }
   },
   {
    "id": "line_17d_installment_other_2",
@@ -424,8 +804,16 @@
    "line": "17d",
    "label": "Installment or lease payments: Other (second row)",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=installment_other; second row of the same category"},
-   "pdf": {"names": ["17d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=installment_other; second row of the same category"
+   },
+   "pdf": {
+    "names": [
+     "17d"
+    ]
+   }
   },
   {
    "id": "line_17d_installment_other_2_specify",
@@ -433,8 +821,16 @@
    "line": "17d",
    "label": "Installment or lease payments: Other (second row). Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=installment_other; second row of the same category"},
-   "pdf": {"names": ["Other 17d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=installment_other; second row of the same category"
+   },
+   "pdf": {
+    "names": [
+     "Other 17d"
+    ]
+   }
   },
   {
    "id": "line_18_alimony_support",
@@ -442,8 +838,16 @@
    "line": "18",
    "label": "Your payments of alimony, maintenance, and support that you did not report as deducted from your pay on line 5, Schedule I",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=alimony_maintenance_support"},
-   "pdf": {"names": ["18"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=alimony_maintenance_support"
+   },
+   "pdf": {
+    "names": [
+     "18"
+    ]
+   }
   },
   {
    "id": "line_19_support_others",
@@ -451,8 +855,16 @@
    "line": "19",
    "label": "Other payments you make to support others who do not live with you",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=support_others"},
-   "pdf": {"names": ["19"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=support_others"
+   },
+   "pdf": {
+    "names": [
+     "19"
+    ]
+   }
   },
   {
    "id": "line_19_support_others_specify",
@@ -460,8 +872,16 @@
    "line": "19",
    "label": "Other payments to support others. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=support_others"},
-   "pdf": {"names": ["Other 19"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=support_others"
+   },
+   "pdf": {
+    "names": [
+     "Other 19"
+    ]
+   }
   },
   {
    "id": "line_20a_other_mortgages",
@@ -469,8 +889,16 @@
    "line": "20a",
    "label": "Other real property expenses: Mortgages on other property",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other_property_mortgages"},
-   "pdf": {"names": ["20a"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other_property_mortgages"
+   },
+   "pdf": {
+    "names": [
+     "20a"
+    ]
+   }
   },
   {
    "id": "line_20b_other_real_estate_taxes",
@@ -478,8 +906,16 @@
    "line": "20b",
    "label": "Other real property expenses: Real estate taxes",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other_property_taxes"},
-   "pdf": {"names": ["20b"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other_property_taxes"
+   },
+   "pdf": {
+    "names": [
+     "20b"
+    ]
+   }
   },
   {
    "id": "line_20c_other_property_insurance",
@@ -487,8 +923,16 @@
    "line": "20c",
    "label": "Other real property expenses: Property, homeowner's, or renter's insurance",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other_property_insurance"},
-   "pdf": {"names": ["20c"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other_property_insurance"
+   },
+   "pdf": {
+    "names": [
+     "20c"
+    ]
+   }
   },
   {
    "id": "line_20d_other_property_maintenance",
@@ -496,8 +940,16 @@
    "line": "20d",
    "label": "Other real property expenses: Maintenance, repair, and upkeep expenses",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other_property_maintenance"},
-   "pdf": {"names": ["20d"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other_property_maintenance"
+   },
+   "pdf": {
+    "names": [
+     "20d"
+    ]
+   }
   },
   {
    "id": "line_20e_other_property_hoa",
@@ -505,8 +957,16 @@
    "line": "20e",
    "label": "Other real property expenses: Homeowner's association or condominium dues",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other_property_hoa"},
-   "pdf": {"names": ["20e"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other_property_hoa"
+   },
+   "pdf": {
+    "names": [
+     "20e"
+    ]
+   }
   },
   {
    "id": "line_21_other",
@@ -514,8 +974,16 @@
    "line": "21",
    "label": "Other",
    "type": "money",
-   "maps_to": {"entity": "expense", "attribute": "amount", "notes": "category=other"},
-   "pdf": {"names": ["21"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "amount",
+    "notes": "category=other"
+   },
+   "pdf": {
+    "names": [
+     "21"
+    ]
+   }
   },
   {
    "id": "line_21_other_specify",
@@ -523,8 +991,16 @@
    "line": "21",
    "label": "Other. Specify:",
    "type": "text",
-   "maps_to": {"entity": "expense", "attribute": "specify_text", "notes": "category=other"},
-   "pdf": {"names": ["Other 21"]}
+   "maps_to": {
+    "entity": "expense",
+    "attribute": "specify_text",
+    "notes": "category=other"
+   },
+   "pdf": {
+    "names": [
+     "Other 21"
+    ]
+   }
   },
   {
    "id": "line_22a_total_expenses",
@@ -532,8 +1008,14 @@
    "line": "22a",
    "label": "Add lines 4 through 21",
    "type": "money",
-   "maps_to": {"derived": "sum of lines 4–21"},
-   "pdf": {"names": ["22a"]}
+   "maps_to": {
+    "derived": "sum of lines 4\u201321"
+   },
+   "pdf": {
+    "names": [
+     "22a"
+    ]
+   }
   },
   {
    "id": "line_22b_debtor2_expenses",
@@ -541,8 +1023,14 @@
    "line": "22b",
    "label": "Copy line 22 (monthly expenses for Debtor 2), if any, from Official Form 106J-2",
    "type": "money",
-   "maps_to": {"derived": "B106J-2 line 22 carry-forward"},
-   "pdf": {"names": ["22b"]}
+   "maps_to": {
+    "derived": "B106J-2 line 22 carry-forward"
+   },
+   "pdf": {
+    "names": [
+     "22b"
+    ]
+   }
   },
   {
    "id": "line_22c_monthly_expenses",
@@ -550,8 +1038,14 @@
    "line": "22c",
    "label": "Add line 22a and 22b. The result is your monthly expenses.",
    "type": "money",
-   "maps_to": {"derived": "line 22a + line 22b; copied to B106Sum line 5"},
-   "pdf": {"names": ["22c"]}
+   "maps_to": {
+    "derived": "line 22a + line 22b; copied to B106Sum line 5"
+   },
+   "pdf": {
+    "names": [
+     "22c"
+    ]
+   }
   },
   {
    "id": "line_23a_combined_monthly_income",
@@ -559,8 +1053,14 @@
    "line": "23a",
    "label": "Copy line 12 (your combined monthly income) from Schedule I",
    "type": "money",
-   "maps_to": {"derived": "B106I line 12"},
-   "pdf": {"names": ["23a"]}
+   "maps_to": {
+    "derived": "B106I line 12"
+   },
+   "pdf": {
+    "names": [
+     "23a"
+    ]
+   }
   },
   {
    "id": "line_23b_monthly_expenses",
@@ -568,8 +1068,14 @@
    "line": "23b",
    "label": "Copy your monthly expenses from line 22c above",
    "type": "money",
-   "maps_to": {"derived": "line 22c"},
-   "pdf": {"names": ["23b"]}
+   "maps_to": {
+    "derived": "line 22c"
+   },
+   "pdf": {
+    "names": [
+     "23b"
+    ]
+   }
   },
   {
    "id": "line_23c_net_income",
@@ -577,8 +1083,14 @@
    "line": "23c",
    "label": "Subtract your monthly expenses from your monthly income. The result is your monthly net income.",
    "type": "money",
-   "maps_to": {"derived": "line 23a − line 23b"},
-   "pdf": {"names": ["23c"]}
+   "maps_to": {
+    "derived": "line 23a \u2212 line 23b"
+   },
+   "pdf": {
+    "names": [
+     "23c"
+    ]
+   }
   },
   {
    "id": "line_24_change_expected",
@@ -587,11 +1099,24 @@
    "label": "Do you expect an increase or decrease in your expenses within the year after you file this form?",
    "type": "radio",
    "options": [
-    {"value": "no", "label": "No"},
-    {"value": "yes", "label": "Yes. Explain here:"}
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes. Explain here:"
+    }
    ],
-   "maps_to": {"entity": "household", "attribute": "change_expected"},
-   "pdf": {"names": ["check24"]}
+   "maps_to": {
+    "entity": "household",
+    "attribute": "change_expected"
+   },
+   "pdf": {
+    "names": [
+     "check24"
+    ]
+   }
   },
   {
    "id": "line_24_change_explanation",
@@ -599,8 +1124,15 @@
    "line": "24",
    "label": "Yes. Explain here:",
    "type": "text",
-   "maps_to": {"entity": "household", "attribute": "change_explanation"},
-   "pdf": {"names": ["Other 24"]}
+   "maps_to": {
+    "entity": "household",
+    "attribute": "change_explanation"
+   },
+   "pdf": {
+    "names": [
+     "Other 24"
+    ]
+   }
   }
  ]
 }

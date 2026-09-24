@@ -9,11 +9,13 @@ successfully" test has to build on.
 
 from __future__ import annotations
 
+import io
 from dataclasses import replace
 from datetime import date
 
 import pytest
 from insolvia_api.core.case_summary import summarise
+from insolvia_api.core.form_overlay import OutputOptions
 from insolvia_api.core.form_projections.shared import claims_of
 from insolvia_api.core.forms_hub import (
     FORM_PROBLEM_SOURCES,
@@ -30,6 +32,7 @@ from insolvia_api.core.packet_assembly import (
 )
 from insolvia_core.errors import ValidationError
 from insolvia_core.expenses import HOUSEHOLD, HouseholdBody
+from pypdf import PdfReader
 
 from tests.unit.test_packet_assembly import CASE_ID, TODAY, _entity, reference_case_data
 
@@ -261,6 +264,53 @@ def test_an_unresolvable_release_is_reported_as_a_problem_not_raised():
     outcome = render_form_preview(data, "form/b101", as_of=date(1990, 1, 1))
     assert isinstance(outcome, tuple)
     assert any(p.source == "form/b101" for p in outcome)
+
+
+# ── render_form_preview: output options (issue 13.11) ────────────
+
+
+def test_default_options_render_exactly_the_plain_bytes():
+    data = reference_case_data()
+    plain = render_form_preview(data, "form/b106g", as_of=TODAY)
+    with_default_options = render_form_preview(
+        data, "form/b106g", as_of=TODAY, options=OutputOptions()
+    )
+    assert plain == with_default_options
+
+
+def test_a_draft_watermark_is_visible_in_the_rendered_bytes():
+    data = reference_case_data()
+    outcome = render_form_preview(
+        data, "form/b101", as_of=TODAY, options=OutputOptions(draft_watermark=True)
+    )
+    assert isinstance(outcome, bytes)
+    assert "DRAFT" in PdfReader(io.BytesIO(outcome)).pages[0].extract_text()
+
+
+def test_signature_pages_only_on_a_form_with_none_is_a_problem():
+    data = reference_case_data()
+    outcome = render_form_preview(
+        data,
+        "form/b106g",  # Schedule G has no signature line of its own
+        as_of=TODAY,
+        options=OutputOptions(signature_pages="only"),
+    )
+    assert isinstance(outcome, tuple)
+    assert any(p.source == "form/b106g" for p in outcome)
+
+
+def test_sign_electronically_fills_the_debtor_signature_field():
+    data = reference_case_data()
+    outcome = render_form_preview(
+        data,
+        "form/b101",
+        as_of=TODAY,
+        options=OutputOptions(sign_electronically=True),
+    )
+    assert isinstance(outcome, bytes)
+    fields = PdfReader(io.BytesIO(outcome)).get_fields()
+    assert fields is not None
+    assert fields["Debtor1.signature"].value == "/s/ Ada Quinn Lovelace"
 
 
 # ── form_preview_object_key ──────────────────────────────────────

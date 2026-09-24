@@ -4,7 +4,10 @@
  "title": "Chapter 7 Means Test Calculation",
  "revision": "04/25",
  "effective_date": "2025-04-01",
- "notes": "The § 707(b)(2) calculation (issue #102): every computed line is a projection of the means-test engine (core/means_test.py), the entered lines come from the case's means_test_input, and the statutory figures the 04/25 revision prints ($10,275 / $17,150 / $214.58) are code/dollar-amounts figures — both cadences pinned per effective-dating.md. Known defects, verified by widget geometry: most of the right-margin 'copy here' boxes carry no widgets (lines 3, 25, 33e, 34, 36, 38, 39c, 39d, 41b), line 39b has no widget at all, three shared widgets each fill two printed boxes (line 4 = 39a, line 9b's total = 33a, lines 13b/13e's totals = 33b/33c), and nearly every amount box on pages 5-9 is named undefined_NN — the geometry, not the name, is the identity.",
+ "signature_pages": [
+  9
+ ],
+ "notes": "The \u00a7 707(b)(2) calculation (issue #102): every computed line is a projection of the means-test engine (core/means_test.py), the entered lines come from the case's means_test_input, and the statutory figures the 04/25 revision prints ($10,275 / $17,150 / $214.58) are code/dollar-amounts figures \u2014 both cadences pinned per effective-dating.md. Known defects, verified by widget geometry: most of the right-margin 'copy here' boxes carry no widgets (lines 3, 25, 33e, 34, 36, 38, 39c, 39d, 41b), line 39b has no widget at all, three shared widgets each fill two printed boxes (line 4 = 39a, line 9b's total = 33a, lines 13b/13e's totals = 33b/33c), and nearly every amount box on pages 5-9 is named undefined_NN \u2014 the geometry, not the name, is the identity.",
  "parts": [
   {
    "number": 1,
@@ -30,7 +33,7 @@
  "fields": [
   {
    "id": "caption.debtor1_name",
-   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
    "type": "text",
    "maps_to": {
     "entity": "debtor",
@@ -45,7 +48,7 @@
   },
   {
    "id": "caption.debtor2_name",
-   "label": "Debtor 2 (Spouse, if filing) — First Name, Middle Name, Last Name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
    "type": "text",
    "maps_to": {
     "entity": "debtor",
@@ -129,7 +132,7 @@
    "label": "Copy your total current monthly income (Form 122A-1 line 11)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -144,7 +147,7 @@
    "label": "Did you fill out Column B in Part 1 of Form 122A-1?",
    "type": "radio",
    "maps_to": {
-    "derived": "whether the § 101(10A) derivation produced a Column B"
+    "derived": "whether the \u00a7 101(10A) derivation produced a Column B"
    },
    "pdf": {
     "names": [
@@ -216,7 +219,7 @@
   },
   {
    "id": "marital_adjustment_purpose",
-   "label": "Line 3 — state each purpose for which the income was used (three printed rows)",
+   "label": "Line 3 \u2014 state each purpose for which the income was used (three printed rows)",
    "type": "text",
    "maps_to": {
     "entity": "means_test_input",
@@ -235,7 +238,7 @@
   },
   {
    "id": "marital_adjustment_amount",
-   "label": "Line 3 — the amount subtracted from your spouse's income (three printed rows)",
+   "label": "Line 3 \u2014 the amount subtracted from your spouse's income (three printed rows)",
    "type": "money",
    "maps_to": {
     "entity": "means_test_input",
@@ -257,7 +260,7 @@
    "label": "Line 3 total",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -266,14 +269,14 @@
    },
    "part": 1,
    "line": "3",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "adjusted_cmi",
    "label": "Adjust your current monthly income (line 1 minus line 3)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -306,7 +309,7 @@
    "label": "Food, clothing, and other items (IRS National Standards)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -321,7 +324,7 @@
    "label": "Out-of-pocket health care allowance per person under 65",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -352,7 +355,7 @@
    "label": "Subtotal: line 7a x line 7b",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -367,7 +370,7 @@
    "label": "Out-of-pocket health care allowance per person 65 or older",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -398,7 +401,7 @@
    "label": "Subtotal: line 7d x line 7e",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -413,7 +416,7 @@
    "label": "Out-of-pocket health care allowance: line 7c plus line 7f",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -425,10 +428,10 @@
   },
   {
    "id": "housing_operating",
-   "label": "Housing and utilities — insurance and operating expenses (IRS Local Standards)",
+   "label": "Housing and utilities \u2014 insurance and operating expenses (IRS Local Standards)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -440,10 +443,10 @@
   },
   {
    "id": "housing_mortgage_rent_standard",
-   "label": "Housing and utilities — mortgage or rent expense per the IRS Local Standards",
+   "label": "Housing and utilities \u2014 mortgage or rent expense per the IRS Local Standards",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -452,11 +455,11 @@
    },
    "part": 2,
    "line": "9a",
-   "notes": "the PDF names line 9a's box Quest9 and line 8's box Quest8; the tooltips are swapped relative to the printed labels — geometry decides"
+   "notes": "the PDF names line 9a's box Quest9 and line 8's box Quest8; the tooltips are swapped relative to the printed labels \u2014 geometry decides"
   },
   {
    "id": "home_debt_creditor_name",
-   "label": "Line 9b — name of each creditor secured by your home (three printed rows)",
+   "label": "Line 9b \u2014 name of each creditor secured by your home (three printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the itemized mortgage rows are not modelled; the entered home_secured_monthly_total lands in the total box"
@@ -473,7 +476,7 @@
   },
   {
    "id": "home_debt_monthly",
-   "label": "Line 9b — average monthly payment per home creditor (three printed rows)",
+   "label": "Line 9b \u2014 average monthly payment per home creditor (three printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "the itemized mortgage rows are not modelled; the entered home_secured_monthly_total lands in the total box"
@@ -510,7 +513,7 @@
    "label": "Net mortgage or rent expense (9a minus 9b, not below zero)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -538,7 +541,7 @@
   },
   {
    "id": "housing_adjustment_explanation",
-   "label": "Line 10 — explain why (two printed rows)",
+   "label": "Line 10 \u2014 explain why (two printed rows)",
    "type": "text",
    "maps_to": {
     "entity": "means_test_input",
@@ -591,7 +594,7 @@
    "label": "Vehicle operation expense (IRS Local Standards)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -603,7 +606,7 @@
   },
   {
    "id": "vehicle_1_description",
-   "label": "Line 13 — describe Vehicle 1 (two printed rows)",
+   "label": "Line 13 \u2014 describe Vehicle 1 (two printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the vehicle's identity is not modelled for the means test; the asset record holds descriptions but no per-vehicle claim order"
@@ -622,7 +625,7 @@
    "label": "Ownership or leasing costs using IRS Local Standard (Vehicle 1)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -634,7 +637,7 @@
   },
   {
    "id": "vehicle_1_creditor_name",
-   "label": "Line 13b — name of each creditor for Vehicle 1 (two printed rows)",
+   "label": "Line 13b \u2014 name of each creditor for Vehicle 1 (two printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the itemized vehicle-loan rows are not modelled; the entered vehicle_1_loan_monthly lands in the total box"
@@ -650,7 +653,7 @@
   },
   {
    "id": "vehicle_1_loan_rows",
-   "label": "Line 13b — average monthly payment per creditor (two printed rows)",
+   "label": "Line 13b \u2014 average monthly payment per creditor (two printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "the itemized vehicle-loan rows are not modelled; the entered vehicle_1_loan_monthly lands in the total box"
@@ -686,7 +689,7 @@
    "label": "Net Vehicle 1 ownership or lease expense (13a minus 13b, not below zero)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -698,7 +701,7 @@
   },
   {
    "id": "vehicle_2_description",
-   "label": "Line 13 — describe Vehicle 2 (two printed rows)",
+   "label": "Line 13 \u2014 describe Vehicle 2 (two printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the vehicle's identity is not modelled for the means test; the asset record holds descriptions but no per-vehicle claim order"
@@ -717,7 +720,7 @@
    "label": "Ownership or leasing costs using IRS Local Standard (Vehicle 2)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -729,7 +732,7 @@
   },
   {
    "id": "vehicle_2_creditor_name",
-   "label": "Line 13e — name of each creditor for Vehicle 2 (two printed rows)",
+   "label": "Line 13e \u2014 name of each creditor for Vehicle 2 (two printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the itemized vehicle-loan rows are not modelled; the entered vehicle_2_loan_monthly lands in the total box"
@@ -745,7 +748,7 @@
   },
   {
    "id": "vehicle_2_loan_rows",
-   "label": "Line 13e — average monthly payment per creditor (two printed rows)",
+   "label": "Line 13e \u2014 average monthly payment per creditor (two printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "the itemized vehicle-loan rows are not modelled; the entered vehicle_2_loan_monthly lands in the total box"
@@ -781,7 +784,7 @@
    "label": "Net Vehicle 2 ownership or lease expense (13d minus 13e, not below zero)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -796,7 +799,7 @@
    "label": "Public transportation expense (IRS Local Standards)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -955,7 +958,7 @@
    "label": "Add all of the expenses allowed under the IRS expense allowances",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1015,10 +1018,10 @@
   },
   {
    "id": "health_insurance_total",
-   "label": "Health insurance, disability insurance, and HSA — total",
+   "label": "Health insurance, disability insurance, and HSA \u2014 total",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1027,7 +1030,7 @@
    },
    "part": 2,
    "line": "25",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "health_insurance_actual",
@@ -1056,7 +1059,7 @@
   },
   {
    "id": "health_insurance_actual_amount",
-   "label": "Line 25 — how much do you actually spend?",
+   "label": "Line 25 \u2014 how much do you actually spend?",
    "type": "money",
    "maps_to": {
     "unmapped": "the actual-spend follow-up is not modelled; the entered figures ARE the claimed monthly expenses"
@@ -1119,7 +1122,7 @@
   },
   {
    "id": "education_under_18",
-   "label": "Education expenses for dependent children who are younger than 18 (capped per child by § 707(b)(2)(A)(ii)(IV))",
+   "label": "Education expenses for dependent children who are younger than 18 (capped per child by \u00a7 707(b)(2)(A)(ii)(IV))",
    "type": "money",
    "maps_to": {
     "entity": "means_test_input",
@@ -1170,7 +1173,7 @@
    "label": "Add all of the additional expense deductions",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1182,7 +1185,7 @@
   },
   {
    "id": "other_secured_creditor",
-   "label": "Line 33d — name of each creditor for other secured debt (three printed rows)",
+   "label": "Line 33d \u2014 name of each creditor for other secured debt (three printed rows)",
    "type": "text",
    "maps_to": {
     "entity": "means_test_input",
@@ -1201,7 +1204,7 @@
   },
   {
    "id": "other_secured_property",
-   "label": "Line 33d — identify property that secures the debt (three printed rows)",
+   "label": "Line 33d \u2014 identify property that secures the debt (three printed rows)",
    "type": "text",
    "maps_to": {
     "entity": "means_test_input",
@@ -1220,7 +1223,7 @@
   },
   {
    "id": "other_secured_taxes_insurance_1",
-   "label": "Line 33d row 1 — does payment include taxes or insurance?",
+   "label": "Line 33d row 1 \u2014 does payment include taxes or insurance?",
    "type": "radio",
    "maps_to": {
     "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
@@ -1245,7 +1248,7 @@
   },
   {
    "id": "other_secured_taxes_insurance_2",
-   "label": "Line 33d row 2 — does payment include taxes or insurance?",
+   "label": "Line 33d row 2 \u2014 does payment include taxes or insurance?",
    "type": "radio",
    "maps_to": {
     "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
@@ -1270,7 +1273,7 @@
   },
   {
    "id": "other_secured_taxes_insurance_3",
-   "label": "Line 33d row 3 — does payment include taxes or insurance?",
+   "label": "Line 33d row 3 \u2014 does payment include taxes or insurance?",
    "type": "radio",
    "maps_to": {
     "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
@@ -1295,7 +1298,7 @@
   },
   {
    "id": "other_secured_monthly",
-   "label": "Line 33d — average monthly payment per row (three printed rows)",
+   "label": "Line 33d \u2014 average monthly payment per row (three printed rows)",
    "type": "money",
    "maps_to": {
     "entity": "means_test_input",
@@ -1317,7 +1320,7 @@
    "label": "Total average monthly payment (lines 33a through 33d)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1326,7 +1329,7 @@
    },
    "part": 2,
    "line": "33e",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "cure_claimed",
@@ -1355,7 +1358,7 @@
   },
   {
    "id": "cure_creditor",
-   "label": "Line 34 — name of the creditor (three printed rows)",
+   "label": "Line 34 \u2014 name of the creditor (three printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
@@ -1372,7 +1375,7 @@
   },
   {
    "id": "cure_property",
-   "label": "Line 34 — identify property that secures the debt (three printed rows)",
+   "label": "Line 34 \u2014 identify property that secures the debt (three printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
@@ -1389,7 +1392,7 @@
   },
   {
    "id": "cure_total_rows",
-   "label": "Line 34 — total cure amount per row (three printed rows)",
+   "label": "Line 34 \u2014 total cure amount per row (three printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
@@ -1406,7 +1409,7 @@
   },
   {
    "id": "cure_monthly_rows",
-   "label": "Line 34 — monthly cure amount per row (÷ 60; three printed rows)",
+   "label": "Line 34 \u2014 monthly cure amount per row (\u00f7 60; three printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
@@ -1423,10 +1426,10 @@
   },
   {
    "id": "cure_monthly_total",
-   "label": "Line 34 total — the monthly cure amount",
+   "label": "Line 34 total \u2014 the monthly cure amount",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1435,7 +1438,7 @@
    },
    "part": 2,
    "line": "34",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "priority_claims_owed",
@@ -1467,7 +1470,7 @@
    "label": "Total amount of all priority claims",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1482,7 +1485,7 @@
    "label": "Priority claims divided by 60",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1494,7 +1497,7 @@
   },
   {
    "id": "ch13_eligible",
-   "label": "Are you eligible to file a case under Chapter 13? 11 U.S.C. § 109(e)",
+   "label": "Are you eligible to file a case under Chapter 13? 11 U.S.C. \u00a7 109(e)",
    "type": "radio",
    "maps_to": {
     "entity": "means_test_input",
@@ -1554,7 +1557,7 @@
    "label": "Average monthly administrative expense if you were filing under Chapter 13",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1563,14 +1566,14 @@
    },
    "part": 2,
    "line": "36",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "debt_payment_total",
    "label": "Add all of the deductions for debt payment (lines 33e through 36)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1585,7 +1588,7 @@
    "label": "Copy line 24 (IRS expense allowances)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1600,7 +1603,7 @@
    "label": "Copy line 32 (additional expense deductions)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1615,7 +1618,7 @@
    "label": "Copy line 37 (deductions for debt payment)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1630,7 +1633,7 @@
    "label": "Total deductions",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1639,14 +1642,14 @@
    },
    "part": 2,
    "line": "38",
-   "notes": "the right-margin 'Copy total here' box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the right-margin 'Copy total here' box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "monthly_disposable_income",
    "label": "Monthly disposable income (line 39a minus line 39b)",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1662,7 +1665,7 @@
    "label": "Total: line 39c multiplied by 60",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1671,14 +1674,14 @@
    },
    "part": 3,
    "line": "39d",
-   "notes": "the small right-margin copy box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the small right-margin copy box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "presumption_thresholds",
    "label": "Find out whether there is a presumption of abuse (check the box that applies)",
    "type": "radio",
    "maps_to": {
-    "derived": "the § 707(b)(2)(A)(i) thresholds from code/dollar-amounts: below the floor checks the first box, above the ceiling the second, in between the third (go to line 41)"
+    "derived": "the \u00a7 707(b)(2)(A)(i) thresholds from code/dollar-amounts: below the floor checks the first box, above the ceiling the second, in between the third (go to line 41)"
    },
    "pdf": {
     "names": [
@@ -1690,17 +1693,17 @@
    "options": [
     {
      "value": "1",
-     "label": "Line 39d is less than $10,275 — no presumption of abuse",
+     "label": "Line 39d is less than $10,275 \u2014 no presumption of abuse",
      "maps_to_value": "no_presumption"
     },
     {
      "value": "2",
-     "label": "Line 39d is more than $17,150 — presumption of abuse",
+     "label": "Line 39d is more than $17,150 \u2014 presumption of abuse",
      "maps_to_value": "presumption_of_abuse"
     },
     {
      "value": "On",
-     "label": "Line 39d is at least $10,275 but not more than $17,150 — go to line 41",
+     "label": "Line 39d is at least $10,275 but not more than $17,150 \u2014 go to line 41",
      "maps_to_value": "unsecured_ratio"
     }
    ]
@@ -1710,7 +1713,7 @@
    "label": "Total nonpriority unsecured debt",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1722,10 +1725,10 @@
   },
   {
    "id": "nonpriority_unsecured_quarter",
-   "label": "25% of your total nonpriority unsecured debt (11 U.S.C. § 707(b)(2)(A)(i)(I))",
+   "label": "25% of your total nonpriority unsecured debt (11 U.S.C. \u00a7 707(b)(2)(A)(i)(I))",
    "type": "money",
    "maps_to": {
-    "derived": "computed by the § 707(b) means-test engine (core/means_test.py)"
+    "derived": "computed by the \u00a7 707(b) means-test engine (core/means_test.py)"
    },
    "pdf": {
     "names": [
@@ -1734,7 +1737,7 @@
    },
    "part": 3,
    "line": "41b",
-   "notes": "the small right-margin copy box carries no widget — verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
+   "notes": "the small right-margin copy box carries no widget \u2014 verified by widget geometry against the official PDF; the printed 'copy here' box on this line carries no widget and cannot be filled"
   },
   {
    "id": "unsecured_ratio_determination",
@@ -1753,19 +1756,19 @@
    "options": [
     {
      "value": "No",
-     "label": "Line 39d is less than line 41b — no presumption of abuse",
+     "label": "Line 39d is less than line 41b \u2014 no presumption of abuse",
      "maps_to_value": "no_presumption"
     },
     {
      "value": "Yes",
-     "label": "Line 39d is equal to or more than line 41b — presumption of abuse",
+     "label": "Line 39d is equal to or more than line 41b \u2014 presumption of abuse",
      "maps_to_value": "presumption_of_abuse"
     }
    ]
   },
   {
    "id": "special_circumstances",
-   "label": "Do you have any special circumstances that justify additional expenses or adjustments? 11 U.S.C. § 707(b)(2)(B)",
+   "label": "Do you have any special circumstances that justify additional expenses or adjustments? 11 U.S.C. \u00a7 707(b)(2)(B)",
    "type": "radio",
    "maps_to": {
     "unmapped": "special circumstances are a legal argument the attorney makes, not a stored fact; the boxes stay blank"
@@ -1790,7 +1793,7 @@
   },
   {
    "id": "special_circumstances_explanation",
-   "label": "Line 43 — give a detailed explanation of the special circumstances (four printed rows)",
+   "label": "Line 43 \u2014 give a detailed explanation of the special circumstances (four printed rows)",
    "type": "text",
    "maps_to": {
     "unmapped": "special circumstances are a legal argument the attorney makes, not a stored fact; the boxes stay blank"
@@ -1808,7 +1811,7 @@
   },
   {
    "id": "special_circumstances_amount",
-   "label": "Line 43 — average monthly expense or income adjustment (four printed rows)",
+   "label": "Line 43 \u2014 average monthly expense or income adjustment (four printed rows)",
    "type": "money",
    "maps_to": {
     "unmapped": "special circumstances are a legal argument the attorney makes, not a stored fact; the boxes stay blank"
