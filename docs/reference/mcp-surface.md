@@ -177,8 +177,12 @@ Three deliberate absences:
 
 - **No tool returns a full tax identifier.** Records serialize with last-four
   only, the default representation the data model mandates. The audited
-  full-value read exists for the e-filing path and is *not a tool* — there is
-  no argument an agent can pass to receive an SSN.
+  full-value read (`insolvia_core.tax_ids.read_tax_id`, issue 13.12) exists
+  for the forms that print the number and for the e-filing path and is *not
+  a tool* — there is no argument an agent can pass to receive an SSN, and
+  the MCP role holds no KMS grant under the tax-id encryption context, so
+  it could not open the envelope even if one were added
+  (`infra/modules/case_store`).
 - **No document bytes.** `document` records (metadata) are readable through
   the record tools; upload and download stay in the app, where the two-step
   presigned flow and its human live. A harness that needs to hand us a PMS

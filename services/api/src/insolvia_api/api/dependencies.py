@@ -14,6 +14,8 @@ from insolvia_core.ports import (
     DocumentStore,
     FirmStore,
     JwksProvider,
+    TaxIdCipher,
+    TaxIdStore,
     UserDirectory,
 )
 
@@ -69,6 +71,16 @@ class ApiDependencies:
     # lives in its case's partition (SK=DEBTOR#<role>), so there is no
     # second table, no new environment variable, and nothing to provision.
     debtor_store: DebtorStore | None = None
+    # The debtor's tax identifier (issue 13.12 / #382): the sealed items
+    # share the case table (same partition as the debtor — "nothing to
+    # provision" again), and the cipher wraps their data keys under the
+    # case KEY, whose alias is derived from that same table name
+    # (adapters/aws/tax_id_cipher.case_key_alias), so neither needs a
+    # configuration value of its own. Two ports rather than one because
+    # they are two pieces of infrastructure with two IAM grants: a row in
+    # DynamoDB, and GenerateDataKey/Decrypt on KMS.
+    tax_id_store: TaxIdStore | None = None
+    tax_id_cipher: TaxIdCipher | None = None
     # The generic case collections (issue #249) — same table, same partition,
     # same "nothing to provision" argument as the debtor store above.
     case_entity_store: CaseEntityStore | None = None

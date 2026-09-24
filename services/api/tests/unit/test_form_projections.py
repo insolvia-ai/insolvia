@@ -97,6 +97,7 @@ from insolvia_core.sofa import (
     SofaEntryBody,
     StorageUnit,
 )
+from insolvia_core.tax_ids import TaxIdRef
 
 from tests.unit.test_form_fill import read_form
 
@@ -148,7 +149,22 @@ def _debtor_1() -> Debtor:
         venue=Venue(basis="lived_longest_180_days"),
         credit_counseling=CreditCounseling(status="completed_with_certificate"),
         signed_at="2026-08-30",
+        # The record carries the kind, the last four and the sealed item's
+        # reference; the digits themselves are in `reference_case_file()`'s
+        # `tax_ids`, the disclosed state (issue 13.12 / #382).
+        tax_id=TaxIdRef(kind="ssn", last_four="4321", ref=TAX_ID_REF_1),
     )
+
+
+# The reference case's tax identifiers, from the SSA's advertising block
+# (987-65-4320..4329) — numbers the Administration has said it will never
+# issue, the tax-id analogue of RFC 2606's `.test` (insolvia_core.tax_ids
+# owns that decision). Debtor 2's is read as an ITIN so the golden prints
+# BOTH B121 lines and both B101 boxes; there is no reserved ITIN block, so
+# that value is merely structurally valid and describes nobody.
+TAX_ID_REF_1 = "taxid-0001"
+TAX_ID_REF_2 = "taxid-0002"
+REFERENCE_TAX_IDS = {"debtor_1": "987654321", "debtor_2": "987654322"}
 
 
 def _debtor_2() -> Debtor:
@@ -178,6 +194,7 @@ def _debtor_2() -> Debtor:
             status="not_required", exemption_reason="disability"
         ),
         signed_at="2026-08-30",
+        tax_id=TaxIdRef(kind="itin", last_four="4322", ref=TAX_ID_REF_2),
     )
 
 
@@ -1151,6 +1168,9 @@ def reference_case_file() -> CaseFile:
     return CaseFile(
         case=REFERENCE_CASE,
         debtors=(_debtor_1(), _debtor_2()),
+        # The DISCLOSED state — what packet assembly hands the projections
+        # after the logged full-value read. The goldens print B121 from it.
+        tax_ids=REFERENCE_TAX_IDS,
         petition=PetitionBody(
             fee_handling="installments",
             # The family owns its homestead (Schedule A/B row one), so B101
@@ -2074,10 +2094,11 @@ def test_b108_claimed_exempt_answers_no_without_a_schedule_c_claim() -> None:
 # --- B121 ---------------------------------------------------------------------
 
 
-def test_b121_prints_names_and_dates_and_leaves_the_numbers_blank() -> None:
-    """The full tax identifier is the one fact the store cannot hold yet
-    (parse_debtor refuses it), so lines 2-3 stay blank — and the "do not
-    have" boxes are never inferred from that blank."""
+def test_b121_prints_names_dates_and_the_disclosed_numbers() -> None:
+    """Lines 2-3 print from the DISCLOSED digits by kind: Debtor 1's SSN on
+    line 2 with dashes, Debtor 2's ITIN on line 3 as the ten characters
+    after the pre-printed 9 — each on row one, row two ("all numbers you
+    have used") blank. The "do not have" boxes are never inferred."""
     release = latest_form("form/b121")
     values = dict(project(release, reference_case_file()))
     assert values["line_1_debtor1_first_name"] == Text("Ada")
@@ -2087,13 +2108,37 @@ def test_b121_prints_names_and_dates_and_leaves_the_numbers_blank() -> None:
     assert "line_1_debtor2_middle_name" not in values
     assert values["debtor1_signature_date"] == Text("08/30/2026")
     assert values["debtor2_signature_date"] == Text("08/30/2026")
+    assert values["line_2_debtor1_ssn"] == {"Debtor1a.SSNum": Text("987-65-4321")}
+    assert values["line_3_debtor2_itin"] == {"Debtor2a ITINNum": Text("87-65-4322")}
     for field_id in (
-        "line_2_debtor1_ssn",
-        "line_2_debtor1_no_ssn",
         "line_3_debtor1_itin",
+        "line_2_debtor2_ssn",
+        "line_2_debtor1_no_ssn",
         "line_3_debtor1_no_itin",
+        "line_2_debtor2_no_ssn",
+        "line_3_debtor2_no_itin",
     ):
         assert field_id not in values
+
+
+def test_b121_without_the_logged_read_prints_the_numbers_blank() -> None:
+    """A CaseFile built without `tax_ids` — every caller that never asked
+    for the full value — prints lines 2-3 blank rather than wrong. The
+    record's last four is not enough for this form and is never used."""
+    release = latest_form("form/b121")
+    values = dict(project(release, replace(reference_case_file(), tax_ids={})))
+    assert "line_2_debtor1_ssn" not in values
+    assert "line_3_debtor2_itin" not in values
+    assert values["line_1_debtor1_first_name"] == Text("Ada")
+
+
+def test_b101_prints_the_last_four_in_the_box_for_the_kind() -> None:
+    """Line 3 needs no disclosure: the last four ride the debtor record."""
+    values = b101_values()
+    assert values["line_3_debtor1_ssn_last4"] == Text("4321")
+    assert values["line_3_debtor2_itin_last4"] == Text("4322")
+    assert "line_3_debtor1_itin_last4" not in values
+    assert "line_3_debtor2_ssn_last4" not in values
 
 
 # --- B2010 / B2030 ------------------------------------------------------------

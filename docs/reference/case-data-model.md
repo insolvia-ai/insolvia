@@ -120,7 +120,7 @@ debtor {
   filing_role: debtor_1 | debtor_2 | non_filing_spouse
   name: { given, middle, surname, suffix }
   other_names_used: [ { id, given, middle, surname, business_name } ]  // 8-year lookback
-  tax_id: { kind: ssn | itin, value }                                  // encrypted; see below
+  tax_id: { kind: ssn | itin, last_four, ref }                         // the number is a sealed item; see below
   employer_ids: [ ein ]
   residence_address, mailing_address
   phone, mobile, email
@@ -177,6 +177,35 @@ the default representation and the full value behind an explicit read that
 writes an audit record. That audit log is not case data and does not live in
 the case store. Designing for last-four-only would have to be undone at the
 e-filing milestone.
+
+Built as issue 13.12 ([#382](https://github.com/insolvia-ai/insolvia/issues/382));
+`insolvia_core.tax_ids` owns the design and its docstring is the full
+argument. The shape it settled on:
+
+- **The debtor carries a reference, never the number**: `tax_id: {kind,
+  last_four, ref}`. The number is its own **sealed item**, `SK=TAXID#<ref>`,
+  envelope-encrypted under the environment's case KMS key — a fresh data key
+  per sealed value, the key returned KMS-wrapped and stored beside the
+  ciphertext — with an encryption context binding the **firm and the
+  reference** (`{purpose, firm_id, tax_id_ref}`), never the case.
+- **The ref, not the location, is the contract.** The item sits in the case's
+  partition today; ADR 0022 (a client is not a case) needs a client's later
+  matter to point at the *same* sealed identifier rather than copy it, so the
+  ref is an opaque generated id the ADR's backfill can re-parent, and the
+  firm-plus-ref context is what lets one ref serve two cases of one client
+  while refusing replay onto another firm or another identifier.
+- **Two reads.** The last four are on the plain record and travel with every
+  debtor read (screens, B101, the generic routes, the MCP record tools). The
+  full value is `tax_ids.read_tax_id`: it writes a `taxid.read` row — who,
+  which case, which debtor (`filing_role`), why (`purpose`: `b121`, or
+  `petition_review` for the review's byte-exact re-assembly) — and is called
+  by nothing that answers a client. B121 is the only form that prints it.
+- **Provenance is one entry, at `tax_id`.** The kind and the digits are one
+  identifier entered in one act, and the last-four echo a client sends to
+  keep a stored number carries no fact of its own.
+- **A fixture's number comes from the SSA's never-issued advertising block**
+  (987-65-4320..4329) — the tax-id analogue of the `.test` addresses, and
+  the one exception the shape rules make. There is no reserved ITIN block.
 
 ## Creditors and claims
 

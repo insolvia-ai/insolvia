@@ -10,6 +10,8 @@ from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from mangum import Mangum
 
@@ -120,6 +122,12 @@ app = create_app(
         # Same table as the case store, deliberately: a debtor is stored in
         # its case's partition, so this needs no configuration of its own.
         debtor_store=DynamoDbDebtorStore(config.case_table_name),
+        # The sealed tax ids (issue 13.12 / #382): items in the case table,
+        # data keys under the case KEY — whose alias is derived from the
+        # table's name (case_key_alias says why that is a derivation and not
+        # a coincidence), so this needs no environment variable either.
+        tax_id_store=DynamoDbTaxIdStore(config.case_table_name),
+        tax_id_cipher=KmsTaxIdCipher(case_key_alias(config.case_table_name)),
         # Likewise: the generic collections (issue #249) are child items of
         # their case's partition — no new table, no new environment variable.
         case_entity_store=DynamoDbCaseEntityStore(config.case_table_name),

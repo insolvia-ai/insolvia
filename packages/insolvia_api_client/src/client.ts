@@ -5,6 +5,7 @@ import {
   COUNSELING_STATUSES,
   FILING_ROLES,
   PROVENANCE_SOURCES,
+  TAX_ID_KINDS,
   VENUE_BASES,
   INCOME_COLUMNS,
   MARITAL_FILING_STATUSES,
@@ -114,6 +115,7 @@ import type {
   PutDebtorRequest,
   ReviewCandidateRequest,
   ReviewedCandidate,
+  TaxIdView,
   UpdateCaseChanges,
   UpdateFirmRequest,
   UpdateFirmUserRequest,
@@ -2562,7 +2564,25 @@ function debtorFromJson(response: DecodedResponse): Debtor {
     venue: optionalVenue(response, 'venue'),
     credit_counseling: optionalCreditCounseling(response, 'credit_counseling'),
     signed_at: optionalString(response, 'signed_at'),
+    tax_id: optionalTaxId(response, 'tax_id'),
   });
+}
+
+/**
+ * The last-four view (issue 13.12 / #382). Both members are REQUIRED once
+ * the object is present — a `tax_id` without a `last_four` is not a view the
+ * API ever sends, and a decoder that tolerated it would hand the screen a
+ * kind with nothing to show.
+ */
+function optionalTaxId(response: DecodedResponse, key: string): TaxIdView | undefined {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    return undefined;
+  }
+  return {
+    kind: requireChoice(nested, 'kind', TAX_ID_KINDS),
+    last_four: requireString(nested, 'last_four'),
+  };
 }
 
 /**

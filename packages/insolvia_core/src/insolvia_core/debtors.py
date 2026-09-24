@@ -26,7 +26,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from typing import Final
+from typing import Any, Final
 
 from insolvia_core.errors import FieldValidationError
 
@@ -48,6 +48,7 @@ from .provenance import (
     provenance_json,
     require_provenance,
 )
+from .tax_ids import TaxIdInput, TaxIdRef, parse_tax_id, tax_id_json
 
 __all__ = [
     "COUNSELING_EXEMPTIONS",
@@ -137,12 +138,23 @@ class Debtor:
     venue: Venue = field(default_factory=Venue)
     credit_counseling: CreditCounseling = field(default_factory=CreditCounseling)
     signed_at: str | None = None
+    # The REFERENCE to the sealed identifier, plus the two plain facts every
+    # view needs (kind, last four). Never the number: tax_ids.py owns the
+    # design, and `debtor_body` keeps this out of the stored body.
+    tax_id: TaxIdRef | None = None
     provenance: Mapping[str, ProvenanceEntry] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class DebtorDraft:
-    """A validated debtor body, before the server stamps identity on it."""
+    """A validated debtor body, before the server stamps identity on it.
+
+    `tax_id` here is the PARSED WRITE (`TaxIdInput`: the full digits being
+    entered, or the last four being kept), which is why a draft is not just a
+    Debtor without identity: the digits exist only in this object, in memory,
+    between the parse and `tax_ids.store_tax_id` sealing them. Nothing
+    serialises a draft.
+    """
 
     name: PersonName
     other_names_used: tuple[OtherName, ...]
@@ -155,6 +167,7 @@ class DebtorDraft:
     venue: Venue
     credit_counseling: CreditCounseling
     signed_at: str | None
+    tax_id: TaxIdInput | None
     provenance: Mapping[str, ProvenanceEntry]
 
 
@@ -263,7 +276,7 @@ def parse_filing_role(value: object) -> str:
 def parse_debtor(
     payload: Mapping[str, object], *, enforce_provenance: bool = True
 ) -> DebtorDraft:
-    """Validate a whole debtor body. Unknown keys are ignored; `tax_id` is not.
+    """Validate a whole debtor body. Unknown keys are ignored.
 
     WHOLE, not partial. The questionnaire PUTs the complete record on every
     autosave rather than PATCHing fields, and that is a consequence of
@@ -271,20 +284,16 @@ def parse_debtor(
     provenance" can only be checked against a complete record, so a partial
     write would have to merge against the stored copy first and then re-derive
     the rule — the same check, done somewhere it is easier to get wrong.
+
+    `tax_id` is parsed for SHAPE here (tax_ids.parse_tax_id — the SSN/ITIN
+    rules) and nothing more: the digits ride the draft to the route, which
+    seals them through `tax_ids.store_tax_id`. This function used to refuse a
+    tax id outright, because the store had no field-level encryption; that
+    refusal ended with issue 13.12 / #382.
     """
     errors: dict[str, str] = {}
 
-    # Explicitly rejected rather than ignored. The data model requires the full
-    # SSN/ITIN stored ENCRYPTED with only the last four ever served, and that
-    # needs field-level encryption this service does not have yet. Silently
-    # dropping it would be far worse than refusing it: the client would believe
-    # it had stored a tax id and the field would simply not be there.
-    if "tax_id" in payload and payload["tax_id"] is not None:
-        errors["tax_id"] = (
-            "Tax identifiers are not accepted yet — they need field-level "
-            "encryption, which is not built. Leave this out."
-        )
-
+    tax_id = parse_tax_id(payload.get("tax_id"), "tax_id", errors)
     name = parse_name(payload.get("name"), "name", errors)
     other_names_used = _parse_other_names(payload.get("other_names_used"), errors)
     employer_ids = _parse_employer_ids(payload.get("employer_ids"), errors)
@@ -322,6 +331,7 @@ def parse_debtor(
         venue=venue,
         credit_counseling=credit_counseling,
         signed_at=signed_at,
+        tax_id=tax_id,
         provenance=provenance,
     )
     # INVARIANT 1, against the record as it will be STORED rather than as it
@@ -334,14 +344,28 @@ def parse_debtor(
     # and because a FieldValidationError is a 400, listing ONE bad debtor
     # would fail the whole case's GET. Shape is still re-parsed on read; only
     # the invariant is skipped.
+    #
+    # THE TAX ID IS ONE FIELD FOR PROVENANCE: `tax_id`, never `tax_id.kind`
+    # and `tax_id.value`. The kind and the digits are one identifier, entered
+    # in one act, and the last-four echo a client sends to keep a stored
+    # number is not a fact of its own. `debtor_body` deliberately excludes
+    # the member (the digits must never enter a body), so it is added back
+    # here as a placeholder scalar solely so invariant 1 demands the entry.
+    # The api-client's `staffTypedProvenance` mirrors this exception.
     if enforce_provenance:
-        require_provenance(debtor_body(draft), provenance)
+        checked: dict[str, object] = debtor_body(draft)
+        if tax_id is not None:
+            checked["tax_id"] = "present"
+        require_provenance(checked, provenance)
     return draft
 
 
 def debtor_body(draft: DebtorDraft | Debtor) -> dict[str, object]:
     """The record's case data as plain nested values — what provenance paths
-    address, and what gets stored. Excludes identity and provenance itself."""
+    address, and what gets stored. Excludes identity, provenance itself, AND
+    the tax id: on a draft that member holds the digits, on a record it holds
+    the sealed item's reference, and neither belongs in a stored body or a
+    response. `debtor_json` and `debtor_item` add the view each needs."""
     body = asdict(draft)
     for key in (
         "id",
@@ -350,12 +374,29 @@ def debtor_body(draft: DebtorDraft | Debtor) -> dict[str, object]:
         "created_at",
         "updated_at",
         "provenance",
+        "tax_id",
     ):
         body.pop(key, None)
     return body
 
 
-def create_debtor(draft: DebtorDraft, *, case_id: str, filing_role: str) -> Debtor:
+def _record_fields(draft: DebtorDraft) -> dict[str, Any]:
+    """The draft's members that a Debtor takes verbatim — everything but the
+    parsed tax-id write, which the caller has already turned into a
+    reference (or None) through `tax_ids.store_tax_id`. `Any` because that
+    is what `vars()` answers and what the `**` spread below needs."""
+    fields: dict[str, Any] = vars(draft).copy()
+    fields.pop("tax_id")
+    return fields
+
+
+def create_debtor(
+    draft: DebtorDraft,
+    *,
+    case_id: str,
+    filing_role: str,
+    tax_id: TaxIdRef | None = None,
+) -> Debtor:
     now = _timestamp()
     return Debtor(
         id=str(uuid.uuid4()),
@@ -363,21 +404,30 @@ def create_debtor(draft: DebtorDraft, *, case_id: str, filing_role: str) -> Debt
         filing_role=filing_role,
         created_at=now,
         updated_at=now,
-        **vars(draft),
+        tax_id=tax_id,
+        **_record_fields(draft),
     )
 
 
-def replace_debtor(existing: Debtor, draft: DebtorDraft) -> Debtor:
+def replace_debtor(
+    existing: Debtor, draft: DebtorDraft, *, tax_id: TaxIdRef | None = None
+) -> Debtor:
     """A new Debtor with the draft's body, keeping the original id and
     created_at. The id is stable across saves because provenance paths on other
-    records may already reference it."""
+    records may already reference it.
+
+    `tax_id` is what the debtor will carry AFTER this save — the caller
+    resolves it from the draft's write and the existing reference through
+    `tax_ids.store_tax_id`; a draft that carries no tax id clears it here,
+    exactly as PUT semantics clear any other omitted field."""
     return Debtor(
         id=existing.id,
         case_id=existing.case_id,
         filing_role=existing.filing_role,
         created_at=existing.created_at,
         updated_at=_timestamp(),
-        **vars(draft),
+        tax_id=tax_id,
+        **_record_fields(draft),
     )
 
 
@@ -409,6 +459,12 @@ def debtor_json(debtor: Debtor) -> dict[str, object]:
     nulls: on a progressive intake most of the record is empty most of the
     time, and a body of nulls is mostly noise."""
     body = prune_body(debtor_body(debtor))
+    # The LAST-FOUR VIEW, and the only tax-id representation any response
+    # carries — the debtor routes, the generic collection routes' summaries,
+    # the MCP record tools all serialise through here. The full value has no
+    # wire shape at all (tax_ids.read_tax_id is not reachable from a route).
+    if debtor.tax_id is not None:
+        body["tax_id"] = tax_id_json(debtor.tax_id)
     return {
         "id": debtor.id,
         "case_id": debtor.case_id,
@@ -429,8 +485,13 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
 
     Carries no GSI keys: debtors are always reached through their case, never
     listed across cases, and the sparse by-owner index stays one entry per case.
+
+    `taxId` is its OWN attribute beside `body`, never inside it: the kind,
+    the last four, and the reference to the sealed item (SK=TAXID#<ref>, in
+    this partition today — tax_ids.py). The body is what a client sent and
+    what a client gets back; the reference is neither.
     """
-    return {
+    item: dict[str, object] = {
         "PK": partition_key(debtor.case_id),
         "SK": sort_key(debtor.filing_role),
         "id": debtor.id,
@@ -441,6 +502,26 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
         "body": prune_body(debtor_body(debtor)),
         "provenance": provenance_json(debtor.provenance),
     }
+    if debtor.tax_id is not None:
+        item["taxId"] = {
+            "kind": debtor.tax_id.kind,
+            "lastFour": debtor.tax_id.last_four,
+            "ref": debtor.tax_id.ref,
+        }
+    return item
+
+
+def _tax_id_from_item(value: object) -> TaxIdRef | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError("debtor item's taxId is not a map")
+    kind, last_four, ref = value.get("kind"), value.get("lastFour"), value.get("ref")
+    if not isinstance(kind, str) or not isinstance(last_four, str):
+        raise ValueError("debtor item's taxId is missing kind or lastFour")
+    if not isinstance(ref, str):
+        raise ValueError("debtor item's taxId is missing its ref")
+    return TaxIdRef(kind=kind, last_four=last_four, ref=ref)
 
 
 def debtor_from_item(item: Mapping[str, object]) -> Debtor:
@@ -467,5 +548,6 @@ def debtor_from_item(item: Mapping[str, object]) -> Debtor:
         filing_role=str(item.get("filingRole", "")),
         created_at=str(item.get("createdAt", "")),
         updated_at=str(item.get("updatedAt", "")),
-        **vars(draft),
+        tax_id=_tax_id_from_item(item.get("taxId")),
+        **_record_fields(draft),
     )

@@ -32,6 +32,8 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 
 from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
@@ -88,6 +90,10 @@ def main() -> None:
     entity_store = DynamoDbCaseEntityStore(config.case_table_name)
     packet_store = DynamoDbPacketStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+    # The same pair the worker Lambda composes, under this machine's own
+    # case key (the developer's IAM user reaches it by root delegation).
+    tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+    tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
     review_model = (
         AnthropicReviewModel(config.anthropic_api_key)
         if config.anthropic_api_key
@@ -109,6 +115,8 @@ def main() -> None:
                 packet_store=packet_store,
                 blobs=blobs,
                 access_log=access_log,
+                tax_id_store=tax_id_store,
+                tax_id_cipher=tax_id_cipher,
             )
         ),
         PETITION_REVIEW_KIND: petition_review_worker(
@@ -118,6 +126,8 @@ def main() -> None:
                 entity_store=entity_store,
                 packet_store=packet_store,
                 access_log=access_log,
+                tax_id_store=tax_id_store,
+                tax_id_cipher=tax_id_cipher,
                 model=review_model,
             )
         ),

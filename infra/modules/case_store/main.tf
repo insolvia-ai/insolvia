@@ -41,8 +41,23 @@ data "aws_region" "current" {}
 # skips its grant for the same reason.
 
 locals {
-  # insolvia-<env>-cases
+  # insolvia-<env>-cases — the TABLE's name AND the KEY's alias
+  # (`alias/${local.name}`, below). That they are one local is load-bearing:
+  # the tax-id ciphers (insolvia_core.adapters.aws.tax_id_cipher,
+  # `case_key_alias`) derive the key alias from the table name they are
+  # already configured with, in every environment including a developer's
+  # `insolvia-dev-<short-id>-cases`, so no environment carries a second
+  # configuration value for the key. Give the alias its own name and every
+  # seal starts failing with NotFoundException on the next deploy.
   name = "${var.project}-${var.environment}-cases"
+
+  # The tax-id envelope's encryption-context purpose (issue 13.12 / #382) —
+  # must equal insolvia_core.tax_ids.TAX_ID_PURPOSE. It is what lets the
+  # TaxIdKeyUse statements below grant GenerateDataKey/Decrypt DIRECTLY (no
+  # kms:ViaService fence) without opening the key to anything else the role
+  # might one day be asked to decrypt: a call that does not carry this
+  # context is denied, and a call that does is one this module designed.
+  tax_id_purpose = "debtor-tax-id"
 
   # Every KMS action the API role needs, and no more.
   #
@@ -426,6 +441,39 @@ resource "aws_iam_role_policy" "api_case_access" {
           }
         }
       },
+      {
+        # THE ONE DIRECT USE OF THE KEY (issue 13.12 / #382): the debtor's
+        # tax identifier is envelope-encrypted by the API itself — a data key
+        # generated under this key per sealed value, opened again only for
+        # the form that prints the number (B121) — so the DynamoDB fence
+        # above cannot cover it: DynamoDB is not the caller. FirmKeyUse's
+        # pattern is kept in spirit: the fence is the ENCRYPTION CONTEXT
+        # instead of the calling service. Both verbs require the context's
+        # `purpose` member to be the one insolvia_core.tax_ids stamps, so
+        # this statement authorises exactly the tax-id envelope and cannot be
+        # turned into a general Decrypt of anything else sealed under the
+        # key (a case document's data key carries no such context and stays
+        # behind the S3 fence in modules/case_documents).
+        #
+        # The API role holds BOTH verbs: it seals on the debtor PUT and opens
+        # for the single-form B121 preview. The worker's grant below holds
+        # Decrypt alone (it prints identifiers, it never enters one), and the
+        # MCP role holds neither — the last-four view is on the plain item,
+        # and "no tool returns a full tax identifier" is thereby an IAM fact
+        # as well as an application one (docs/reference/mcp-surface.md).
+        Sid    = "TaxIdKeyUse"
+        Effect = "Allow"
+        Action = [
+          "kms:GenerateDataKey",
+          "kms:Decrypt",
+        ]
+        Resource = aws_kms_key.case.arn
+        Condition = {
+          StringEquals = {
+            "kms:EncryptionContext:purpose" = local.tax_id_purpose
+          }
+        }
+      },
     ]
   })
 }
@@ -565,6 +613,23 @@ resource "aws_iam_role_policy" "worker_case_access" {
         Condition = {
           StringEquals = {
             "kms:ViaService" = "dynamodb.${data.aws_region.current.region}.amazonaws.com"
+          }
+        }
+      },
+      {
+        # The API's TaxIdKeyUse, NARROWED to Decrypt (issue 13.12 / #382):
+        # packet assembly opens each debtor's sealed identifier to print
+        # B121, and the review worker opens it to reproduce the packet's
+        # bytes — reads both, logged as `taxid.read` rows by the code that
+        # performs them. No GenerateDataKey: nothing in the worker enters a
+        # tax id, so nothing in the worker can seal one. Same context fence.
+        Sid      = "TaxIdKeyUse"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = aws_kms_key.case.arn
+        Condition = {
+          StringEquals = {
+            "kms:EncryptionContext:purpose" = local.tax_id_purpose
           }
         }
       },

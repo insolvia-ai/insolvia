@@ -10,8 +10,8 @@ does belongs in that form's module.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from insolvia_core.assets import AssetBody
@@ -70,10 +70,20 @@ class CaseFile:
     from codebtors, households from expenses, employments from pay-period
     records) carry `(id, body)` pairs so a reference resolves without a
     store; the rest are bare bodies.
+
+    `tax_ids` is the ONE thing here a store did not simply hand over: the
+    debtors' full tax identifiers, by filing role, produced by the logged
+    full-value read (insolvia_core.tax_ids.read_tax_id) that packet
+    assembly and the single-form preview perform when — and only when —
+    B121 is being rendered. Empty otherwise, and every debtor read still
+    carries its last four on the record for B101. Keeping the digits in
+    this map rather than on the Debtor is what keeps `Debtor` serialisable
+    everywhere else without a second thought.
     """
 
     case: Case
     debtors: tuple[Debtor, ...] = ()
+    tax_ids: Mapping[str, str] = field(default_factory=dict)
     petition: PetitionBody | None = None
     prior_cases: tuple[PriorCaseBody, ...] = ()
     related_cases: tuple[RelatedCaseBody, ...] = ()

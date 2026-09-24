@@ -37,6 +37,8 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
@@ -184,6 +186,8 @@ def client(store, access_log, firms):
             # The exemption election's opt-out check (issue #346) reads
             # Debtor 1's state and the petition's filing date.
             debtor_store=MemoryDebtorStore(),
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
         )
     )

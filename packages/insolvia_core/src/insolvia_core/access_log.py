@@ -53,6 +53,15 @@ from datetime import UTC, datetime
 # not a case write — candidates live outside the case — but it is machinery
 # aimed at one, and folding it into case.read would make "an agent queued
 # twenty records for review" indistinguishable from opening the case.
+#
+# taxid.read (issue 13.12 / #382) is the row docs/reference/case-data-model.md
+# promised the moment tax identifiers were stored: "the full value behind an
+# explicit read that writes an audit record". It is the ONLY action that
+# carries the two extra members below — which debtor (`filing_role`) and why
+# (`purpose`: the form being printed) — because "someone opened the case" and
+# "someone decrypted the debtor's Social Security number to print B121" are
+# the two disclosures this table most needs to keep apart. Written by exactly
+# one function, insolvia_core.tax_ids.read_tax_id, and never by a route.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -64,6 +73,7 @@ ACTIONS = (
     "job.accept",
     "candidate.propose",
     "candidate.withdraw",
+    "taxid.read",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -92,10 +102,22 @@ class AccessEvent:
     outcome: str
     recorded_at: str
     event_id: str
+    # Only `taxid.read` sets these (see ACTIONS): the debtor whose identifier
+    # was opened, and the form it was opened for. Absent on every other row,
+    # and absent means absent — the item omits them rather than storing a
+    # null, so the log's older rows and the new ones read the same.
+    filing_role: str | None = None
+    purpose: str | None = None
 
 
 def record_access(
-    *, case_id: str, principal: str, action: str, outcome: str = "allowed"
+    *,
+    case_id: str,
+    principal: str,
+    action: str,
+    outcome: str = "allowed",
+    filing_role: str | None = None,
+    purpose: str | None = None,
 ) -> AccessEvent:
     recorded_at = (
         datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -107,6 +129,8 @@ def record_access(
         outcome=outcome,
         recorded_at=recorded_at,
         event_id=str(uuid.uuid4()),
+        filing_role=filing_role,
+        purpose=purpose,
     )
 
 
@@ -116,9 +140,10 @@ def access_item(event: AccessEvent) -> dict[str, str]:
     PK  CASE#<case_id>                 keyed by case, because "who saw this
     SK  <recordedAt>#<eventId>         file" is the question actually asked
 
-    No expiry attribute — see the note above.
+    No expiry attribute — see the note above. `filingRole` and `purpose`
+    appear only on the rows that carry them (a `taxid.read`).
     """
-    return {
+    item = {
         "PK": f"CASE#{event.case_id}",
         "SK": f"{event.recorded_at}#{event.event_id}",
         "eventId": event.event_id,
@@ -128,3 +153,8 @@ def access_item(event: AccessEvent) -> dict[str, str]:
         "outcome": event.outcome,
         "recordedAt": event.recorded_at,
     }
+    if event.filing_role is not None:
+        item["filingRole"] = event.filing_role
+    if event.purpose is not None:
+        item["purpose"] = event.purpose
+    return item

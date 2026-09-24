@@ -10,6 +10,11 @@ requires-python = ">=3.12"
 dependencies = [
   "boto3>=1.34",
   "PyJWT[crypto]>=2.8",
+  # Already pulled in by PyJWT[crypto] for RS256; named directly because
+  # adapters/envelope.py imports it by name for the tax-id envelope
+  # (issue 13.12 / #382), and a dependency reached only transitively is one
+  # an upstream extra can drop without warning.
+  "cryptography>=42",
 ]
 
 [build-system]

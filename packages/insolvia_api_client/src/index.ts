@@ -66,6 +66,7 @@ export {
   COUNSELING_STATUSES,
   FILING_ROLES,
   PROVENANCE_SOURCES,
+  TAX_ID_KINDS,
   VENUE_BASES,
 } from './models.ts';
 // The case-collection enums (issue #249), values for the same reason: each is
@@ -266,6 +267,9 @@ export type {
   PermissionLevel,
   ProvenanceSource,
   PutDebtorRequest,
+  TaxIdEntry,
+  TaxIdKind,
+  TaxIdView,
   UpdateCaseChanges,
   UpdateFirmRequest,
   UpdateFirmUserRequest,

@@ -41,6 +41,8 @@ from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStor
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.assets import ASSET
 from insolvia_core.case_entities import CaseEntity
 from insolvia_core.cases import assign_case
@@ -66,6 +68,7 @@ from insolvia_core.petitions import (
     SOLE_PROPRIETORSHIP,
 )
 from insolvia_core.sofa import SOFA_ENTRY
+from insolvia_core.tax_ids import TaxIdInput, store_tax_id
 from pypdf import PdfReader
 
 from tests.unit.test_form_projections import REFERENCE_CASE, reference_case_file
@@ -110,6 +113,10 @@ def reference_case_data() -> CaseData:
     return CaseData(
         case=case,
         debtors=tuple(replace(d, case_id=CASE_ID) for d in case_file.debtors),
+        # The disclosed state, like the file: `assemble()` called directly on
+        # this prints B121's numbers; `build_deps` below seals the same
+        # digits so the WORKER path reaches them through the logged read.
+        tax_ids=case_file.tax_ids,
         petitions=wrap_bodies(PETITION, (case_file.petition,), "petition"),
         prior_cases=wrap_bodies(PRIOR_CASE, case_file.prior_cases, "prior"),
         related_cases=wrap_bodies(RELATED_CASE, case_file.related_cases, "related"),
@@ -386,7 +393,10 @@ def test_the_zip_carries_fixed_timestamps():
 # the Chapter 7 packet), which changed the plain set's own form list and
 # order, so the golden moved with it. A change to that hash means the plain,
 # unwatermarked render moved — which issue 13.11 promises never happens.
-PLAIN_PACKET_SHA256 = "a65c29236ad1f91123aa5ecad60e8113ccfa3f8a876ce2cd7ae430facf6fdb45"
+# Re-pinned once by issue 13.12 / #382: the reference case gained its two
+# tax identifiers, so B121 (part 02) prints lines 2-3 and B101 (part 01) its
+# line 3 boxes — the same deliberate move as a goldens regeneration.
+PLAIN_PACKET_SHA256 = "84ad06545a2d578da16ce25bc38b382d3a3b391bb83a8bd404f8999e540bba74"
 
 
 def test_output_options_default_to_the_plain_filing_set():
@@ -533,6 +543,23 @@ def build_deps(data: CaseData):
     ):
         for entity in getattr(data, field_name):
             entity_store.create(entity)
+    # The reference tax ids, sealed the way the debtor route seals them —
+    # under the case's firm and each debtor's ref — so the worker's logged
+    # read (not the fixture's `tax_ids`) is what puts the number on B121.
+    tax_id_store = MemoryTaxIdStore()
+    tax_id_cipher = LocalTaxIdCipher()
+    for debtor in data.debtors:
+        digits = data.tax_ids.get(debtor.filing_role)
+        if debtor.tax_id is None or digits is None:
+            continue
+        store_tax_id(
+            TaxIdInput(kind=debtor.tax_id.kind, value=digits),
+            existing=debtor.tax_id,
+            firm_id=data.case.firm_id,
+            case_id=data.case.id,
+            cipher=tax_id_cipher,
+            store=tax_id_store,
+        )
     return PacketAssemblyDeps(
         case_store=case_store,
         debtor_store=debtor_store,
@@ -540,6 +567,8 @@ def build_deps(data: CaseData):
         packet_store=MemoryPacketStore(case_store),
         blobs=MemoryDocumentBlobStore(),
         access_log=MemoryAccessLog(),
+        tax_id_store=tax_id_store,
+        tax_id_cipher=tax_id_cipher,
     )
 
 
@@ -580,6 +609,41 @@ def test_the_worker_stores_the_packet_and_pins_the_case_together():
         e.action == "packet.assemble" and e.principal == "subject-1"
         for e in deps.access_log.events
     )
+
+
+def test_the_worker_performs_the_logged_read_for_b121_only():
+    """B121's number reaches the packet through the audited full-value read
+    (issue 13.12 / #382): one `taxid.read` row per debtor, naming the
+    preparer, the debtor and the form — and the printed B121 carries the
+    disclosed digits, never the fixture's."""
+    deps = build_deps(reference_case_data())
+    run_packet_assembly(accept_job(), deps, today=TODAY)
+
+    reads = [e for e in deps.access_log.events if e.action == "taxid.read"]
+    assert [(e.principal, e.filing_role, e.purpose) for e in reads] == [
+        ("subject-1", "debtor_1", "b121"),
+        ("subject-1", "debtor_2", "b121"),
+    ]
+    stored = deps.packet_store.list_for_case(CASE_ID)[0]
+    content = deps.blobs.contents[stored.storage_ref]
+    b121 = zipfile.ZipFile(io.BytesIO(content)).read("02-b121.pdf")
+    fields = PdfReader(io.BytesIO(b121)).get_fields()
+    assert fields is not None
+    assert fields["Debtor1a.SSNum"].value == "987-65-4321"
+    assert fields["Debtor2a ITINNum"].value == "87-65-4322"
+
+
+def test_a_subset_without_b121_never_opens_an_envelope():
+    deps = build_deps(reference_case_data())
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"forms": ["b101"]},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    assert not any(e.action == "taxid.read" for e in deps.access_log.events)
 
 
 def test_reassembly_repins_and_keeps_the_old_packet():

@@ -27,6 +27,8 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
@@ -131,6 +133,8 @@ def client(access_log, firms):
             firm_store=firms,
             access_log=access_log,
             debtor_store=MemoryDebtorStore(),
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
         )
     )
     return app.test_client()
@@ -248,10 +252,101 @@ def test_an_unconfirmed_extraction_is_rejected(client):
     assert "provenance.name.given" in response.get_json()["fields"]
 
 
-def test_a_tax_id_is_refused_with_a_reason(client):
-    response = put(client, open_case(client), tax_id={"kind": "ssn", "value": "x"})
+# ── The tax id (issue 13.12 / #382) ─────────────────────────────
+# 987-65-4321 is from the SSA's never-issued advertising block — the fixture
+# value insolvia_core.tax_ids accepts on purpose. This repo is public.
+
+TAX_ID = {"kind": "ssn", "value": "987-65-4321"}
+TAX_ID_PROVENANCE = {"tax_id": TYPED}
+
+
+def test_a_tax_id_is_stored_and_only_its_last_four_ever_comes_back(client):
+    case_id = open_case(client)
+    saved = put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    assert saved.status_code == 201
+    assert saved.get_json()["tax_id"] == {"kind": "ssn", "last_four": "4321"}
+    listed = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(ALICE))
+    (debtor,) = listed.get_json()["debtors"]
+    assert debtor["tax_id"] == {"kind": "ssn", "last_four": "4321"}
+    # Neither the digits nor the sealed item's reference reach any response.
+    for body in (saved.get_json(), listed.get_json()):
+        assert "987654321" not in str(body)
+        assert "987-65-4321" not in str(body)
+    assert set(saved.get_json()["tax_id"]) == {"kind", "last_four"}
+    assert set(debtor["tax_id"]) == {"kind", "last_four"}
+
+
+def test_the_digits_are_sealed_not_stored(client):
+    case_id = open_case(client)
+    put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    deps: ApiDependencies = client.application.extensions["insolvia_api_dependencies"]
+    debtor = deps.debtor_store.get(case_id, filing_role="debtor_1")  # type: ignore[union-attr]
+    assert debtor is not None
+    assert debtor.tax_id is not None
+    sealed = deps.tax_id_store.get(case_id, debtor.tax_id.ref)  # type: ignore[union-attr]
+    assert sealed is not None
+    assert "987654321" not in str(sealed)
+    assert sealed.firm_id == FIRM_A
+
+
+def test_a_tax_id_needs_provenance_at_the_one_path(client):
+    response = put(client, open_case(client), tax_id=TAX_ID)
     assert response.status_code == 400
-    assert "encryption" in response.get_json()["fields"]["tax_id"]
+    assert "provenance.tax_id" in response.get_json()["fields"]
+
+
+def test_a_malformed_tax_id_is_refused_with_its_path(client):
+    response = put(
+        client,
+        open_case(client),
+        tax_id={"kind": "ssn", "value": "000-00-0000"},
+        provenance=TAX_ID_PROVENANCE,
+    )
+    assert response.status_code == 400
+    assert "tax_id.value" in response.get_json()["fields"]
+
+
+def test_echoing_the_last_four_keeps_the_stored_number(client):
+    # The autosave sends the whole record and only ever holds the view.
+    case_id = open_case(client)
+    put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    kept = put(
+        client,
+        case_id,
+        name={"given": "Ada"},
+        tax_id={"kind": "ssn", "last_four": "4321"},
+        provenance={"name.given": TYPED, **TAX_ID_PROVENANCE},
+    )
+    assert kept.status_code == 200
+    assert kept.get_json()["tax_id"] == {"kind": "ssn", "last_four": "4321"}
+
+
+def test_an_echo_that_does_not_match_is_a_400(client):
+    case_id = open_case(client)
+    put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    response = put(
+        client,
+        case_id,
+        tax_id={"kind": "ssn", "last_four": "9999"},
+        provenance=TAX_ID_PROVENANCE,
+    )
+    assert response.status_code == 400
+    assert "tax_id" in response.get_json()["fields"]
+
+
+def test_leaving_the_tax_id_out_clears_it(client):
+    case_id = open_case(client)
+    put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    cleared = put(client, case_id)
+    assert cleared.status_code == 200
+    assert "tax_id" not in cleared.get_json()
+
+
+def test_saving_a_tax_id_never_performs_the_full_value_read(client, access_log):
+    case_id = open_case(client)
+    put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
+    client.get(f"/v1/cases/{case_id}/debtors", headers=auth(ALICE))
+    assert not any(event.action == "taxid.read" for event in access_log.events)
 
 
 # ── Reading ─────────────────────────────────────────────────────

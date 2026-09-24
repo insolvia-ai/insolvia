@@ -14,6 +14,7 @@ from insolvia_core.debtors import (
     FILING_ROLES,
     Debtor,
     create_debtor,
+    debtor_body,
     debtor_from_item,
     debtor_item,
     debtor_json,
@@ -25,6 +26,7 @@ from insolvia_core.debtors import (
 )
 from insolvia_core.errors import FieldValidationError
 from insolvia_core.provenance import ADDRESSABLE_ID_RE
+from insolvia_core.tax_ids import TaxIdInput, TaxIdRef
 
 TYPED = {"source": "staff_typed"}
 
@@ -141,13 +143,72 @@ class TestOtherNames:
 
 
 class TestTaxId:
-    def test_is_refused_rather_than_ignored(self) -> None:
-        # Silently dropping it is the dangerous option: the client would
-        # believe a tax id had been stored when the field simply is not there.
+    """The parse half only — sealing, the item and the logged read are
+    test_tax_ids.py's. The number below is from the SSA's never-issued
+    advertising block (tax_ids.py says why that is the fixture value)."""
+
+    def test_is_accepted_with_provenance_at_the_one_path(self) -> None:
+        # ONE provenance entry for the whole identifier — `tax_id`, never
+        # `tax_id.kind` / `tax_id.value`.
+        result = draft(
+            tax_id={"kind": "ssn", "value": "987-65-4321"},
+            provenance={"tax_id": TYPED},
+        )
+        assert result.tax_id == TaxIdInput(kind="ssn", value="987654321")
+
+    def test_needs_provenance_like_any_populated_field(self) -> None:
+        with pytest.raises(FieldValidationError) as caught:
+            draft(tax_id={"kind": "ssn", "value": "987-65-4321"})
+        assert "provenance.tax_id" in caught.value.fields
+
+    def test_a_malformed_number_is_refused_with_its_path(self) -> None:
         with pytest.raises(FieldValidationError) as caught:
             draft(tax_id={"kind": "ssn", "value": "000-00-0000"})
-        assert "tax_id" in caught.value.fields
-        assert "encryption" in caught.value.fields["tax_id"]
+        assert "tax_id.value" in caught.value.fields
+
+    def test_the_digits_never_enter_the_body(self) -> None:
+        # The draft holds them (it must — the route seals them from it);
+        # the body provenance addresses and the stores write does not.
+        result = draft(
+            tax_id={"kind": "ssn", "value": "987-65-4321"},
+            provenance={"tax_id": TYPED},
+        )
+        assert "tax_id" not in debtor_body(result)
+
+    def test_the_record_carries_a_reference_and_serves_the_last_four(self) -> None:
+        ref = TaxIdRef(kind="ssn", last_four="4321", ref="ref-0001")
+        debtor = create_debtor(
+            draft(), case_id="c1", filing_role="debtor_1", tax_id=ref
+        )
+        assert debtor.tax_id == ref
+        assert debtor_json(debtor)["tax_id"] == {"kind": "ssn", "last_four": "4321"}
+        assert "ref-0001" not in str(debtor_json(debtor))
+        assert "tax_id" not in debtor_item(debtor)["body"]
+        assert debtor_item(debtor)["taxId"] == {
+            "kind": "ssn",
+            "lastFour": "4321",
+            "ref": "ref-0001",
+        }
+
+    def test_the_reference_survives_the_item_round_trip(self) -> None:
+        ref = TaxIdRef(kind="itin", last_four="4329", ref="ref-0002")
+        debtor = create_debtor(
+            draft(), case_id="c1", filing_role="debtor_1", tax_id=ref
+        )
+        assert debtor_from_item(debtor_item(debtor)).tax_id == ref
+
+    def test_a_record_without_one_serialises_without_the_member(self) -> None:
+        debtor = create_debtor(draft(), case_id="c1", filing_role="debtor_1")
+        assert "tax_id" not in debtor_json(debtor)
+        assert "taxId" not in debtor_item(debtor)
+
+    def test_replacing_takes_the_resolved_reference(self) -> None:
+        ref = TaxIdRef(kind="ssn", last_four="4321", ref="ref-0001")
+        first = create_debtor(draft(), case_id="c1", filing_role="debtor_1", tax_id=ref)
+        cleared = replace_debtor(first, draft())
+        assert cleared.tax_id is None
+        kept = replace_debtor(first, draft(), tax_id=ref)
+        assert kept.tax_id == ref
 
     def test_an_explicit_null_is_not_an_error(self) -> None:
         draft(tax_id=None)

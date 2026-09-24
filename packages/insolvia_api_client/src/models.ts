@@ -1455,6 +1455,53 @@ export const COUNSELING_EXEMPTIONS = ['incapacity', 'disability', 'active_duty']
 export type CounselingExemption = (typeof COUNSELING_EXEMPTIONS)[number];
 
 /**
+ * The two kinds of tax identifier a debtor may have (issue 13.12 / #382),
+ * mirroring `insolvia_core.tax_ids.TAX_ID_KINDS`. The API decides which one a
+ * number can be by its shape — an ITIN begins with 9 and an SSN never does —
+ * and refuses a value that claims the wrong kind, so the picker here is the
+ * person's statement, not a hint.
+ */
+export const TAX_ID_KINDS = ['ssn', 'itin'] as const;
+
+/** Social Security number or ITIN. See {@link TAX_ID_KINDS}. */
+export type TaxIdKind = (typeof TAX_ID_KINDS)[number];
+
+/**
+ * The tax identifier as EVERY read returns it: the kind and the last four
+ * digits, nothing more. The full number is stored encrypted and has no wire
+ * shape at all — no endpoint returns it, and the MCP tools cannot either
+ * (docs/reference/mcp-surface.md). The one form that prints it, B121, reads
+ * it server-side through an audited read.
+ */
+export interface TaxIdView {
+  readonly kind: TaxIdKind;
+  /** Exactly four digits. */
+  readonly last_four: string;
+}
+
+/**
+ * The tax identifier as a write carries it — ONE of two shapes:
+ *
+ * - `{ kind, value }`: a number being entered, nine digits with or without
+ *   dashes. The API validates the shape (SSN vs ITIN rules) and seals it.
+ * - `{ kind, last_four }`: the {@link TaxIdView} a read returned, echoed
+ *   back to mean "keep what is stored". A PUT replaces the whole record
+ *   ({@link PutDebtorRequest}) and a client only ever holds the last four,
+ *   so this is how a save that did not touch the number carries it across.
+ *   The API refuses an echo that does not match what it holds.
+ *
+ * Both members present is refused; neither present is refused. Leaving
+ * `tax_id` off the request altogether clears the stored number. A client
+ * that holds both — a number on file and one being typed — sends the
+ * typed one; {@link putDebtorRequestToJson} applies that rule.
+ */
+export interface TaxIdEntry {
+  readonly kind: TaxIdKind;
+  readonly value?: string | undefined;
+  readonly last_four?: string | undefined;
+}
+
+/**
  * Who supplied a value.
  *
  * `imported` sits with `ai_extracted` rather than with `staff_typed`: machine-
@@ -1626,6 +1673,14 @@ export interface DebtorBody {
    * `@insolvia-ai/design-system` emits exactly this.
    */
   readonly signed_at?: string | undefined;
+  /**
+   * The SSN or ITIN (issue 13.12 / #382): a {@link TaxIdEntry} on the way
+   * in, a {@link TaxIdView} on the way out ({@link Debtor} narrows it). Its
+   * provenance is ONE entry at the path `tax_id` — the kind and the digits
+   * are one identifier entered in one act — which {@link staffTypedProvenance}
+   * handles as the one exception to its walk.
+   */
+  readonly tax_id?: TaxIdEntry | undefined;
 }
 
 /**
@@ -1640,11 +1695,11 @@ export interface DebtorBody {
  * afterwards. The questionnaire holds the whole record client-side anyway, so
  * autosave sends it.
  *
- * **There is no `tax_id`.** The API rejects one explicitly with a 400 rather
- * than ignoring it: the SSN/ITIN has to be stored encrypted with only the last
- * four ever served, and that encryption is not built. Refusing it is the
- * honest failure — silently dropping it would leave the client believing a tax
- * id had been stored.
+ * **`tax_id` follows the same rule with one wrinkle.** The record is whole,
+ * but the client never holds the whole number after a save — only its last
+ * four — so a save that did not touch it echoes the {@link TaxIdView} it was
+ * given and the API keeps the stored number ({@link TaxIdEntry}). Leaving it
+ * out clears it, exactly as for any other field.
  */
 export interface PutDebtorRequest extends DebtorBody {
   /**
@@ -1668,6 +1723,8 @@ export interface PutDebtorRequest extends DebtorBody {
 export interface Debtor extends DebtorBody {
   /** The server-generated debtor id, stable across saves. */
   readonly id: string;
+  /** The last-four view — never the number. See {@link TaxIdView}. */
+  readonly tax_id?: TaxIdView | undefined;
   /** The case this debtor belongs to. */
   readonly case_id: string;
   /** Which debtor of the case this is. */
@@ -1715,9 +1772,31 @@ export function putDebtorRequestToJson(request: PutDebtorRequest): Record<string
       venue: venueToJson(request.venue),
       credit_counseling: creditCounselingToJson(request.credit_counseling),
       signed_at: request.signed_at,
+      tax_id: taxIdToJson(request.tax_id),
       provenance: provenanceToJson(request.provenance),
     },
   );
+}
+
+/**
+ * {@link TaxIdEntry} on the wire: the typed number wins over the on-file
+ * echo when a caller holds both (a questionnaire that loaded `last_four` and
+ * then had a new number typed into it), and an entry with neither — a kind
+ * chosen and nothing typed — is omitted rather than sent for the API to
+ * refuse. Exported for {@link staffTypedProvenance}'s one exception, which
+ * has to agree with this about when a tax id counts as populated.
+ */
+export function taxIdToJson(taxId: TaxIdEntry | undefined): Record<string, unknown> | undefined {
+  if (taxId === undefined) {
+    return undefined;
+  }
+  if (taxId.value !== undefined && taxId.value !== '') {
+    return { kind: taxId.kind, value: taxId.value };
+  }
+  if (taxId.last_four !== undefined && taxId.last_four !== '') {
+    return { kind: taxId.kind, last_four: taxId.last_four };
+  }
+  return undefined;
 }
 
 /**
@@ -1956,7 +2035,28 @@ function caseDataOf(body: DebtorBodyLike): unknown {
   if (!isPlainObject(body)) {
     return body;
   }
-  return Object.fromEntries(Object.entries(body).filter(([key]) => !NOT_CASE_DATA.includes(key)));
+  const caseData = Object.fromEntries(
+    Object.entries(body).filter(([key]) => !NOT_CASE_DATA.includes(key)),
+  );
+  // THE ONE EXCEPTION TO THE WALK, mirrored from `parse_debtor` server-side:
+  // the tax id is ONE field for provenance — the path `tax_id`, never
+  // `tax_id.kind` and `tax_id.value` — because the kind and the digits are
+  // one identifier entered in one act, and the last-four echo a client sends
+  // to keep a stored number is not a fact of its own. Walking the object
+  // would mint two paths the API then refuses as unattributed. It counts as
+  // populated exactly when `taxIdToJson` would send it, so the map and the
+  // body cannot disagree.
+  if ('tax_id' in caseData) {
+    const sent = isPlainObject(caseData.tax_id)
+      ? taxIdToJson(caseData.tax_id as unknown as TaxIdEntry)
+      : undefined;
+    if (sent === undefined) {
+      delete caseData.tax_id;
+    } else {
+      caseData.tax_id = 'present';
+    }
+  }
+  return caseData;
 }
 
 /** A field path segment. Note the lower-case start: `SSN` and `legalName` are not names. */

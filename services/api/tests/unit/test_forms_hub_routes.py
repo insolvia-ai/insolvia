@@ -27,6 +27,8 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from pypdf import PdfReader
 
@@ -124,6 +126,8 @@ def client(stores):
             firm_store=firms,
             access_log=stores["access_log"],
             debtor_store=stores["debtor_store"],
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=stores["entity_store"],
             document_blobs=stores["blobs"],
         )
@@ -320,6 +324,64 @@ def test_the_preview_is_access_logged(client, stores):
         e.action == "form_preview.render" and e.case_id == case_id
         for e in stores["access_log"].events
     )
+
+
+# ── The tax id's full-value read (issue 13.12 / #382) ────────────
+# 987-65-4321 is from the SSA's never-issued advertising block.
+
+
+def add_debtor_1_with_a_tax_id(client, case_id):
+    response = client.put(
+        f"/v1/cases/{case_id}/debtors/debtor_1",
+        json={
+            "name": {"given": "Ada"},
+            "tax_id": {"kind": "ssn", "value": "987-65-4321"},
+            "provenance": {"name.given": TYPED, "tax_id": TYPED},
+        },
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 201
+
+
+def test_previewing_b121_performs_the_logged_read_against_the_caller(client, stores):
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b121/preview", headers=auth(ALICE)
+    )
+    assert response.status_code == 200
+    assert response.get_json()["problems"] == []
+    reads = [e for e in stores["access_log"].events if e.action == "taxid.read"]
+    assert [(e.principal, e.case_id, e.filing_role, e.purpose) for e in reads] == [
+        (ALICE, case_id, "debtor_1", "b121")
+    ]
+    # The number is on the rendered form — and nowhere in the response.
+    ((_, content),) = stores["blobs"].contents.items()
+    fields = PdfReader(io.BytesIO(content)).get_fields()
+    assert fields is not None
+    assert fields["Debtor1a.SSNum"].value == "987-65-4321"
+    assert "987" not in str(response.get_json())
+
+
+def test_previewing_any_other_form_never_opens_the_envelope(client, stores):
+    # B106G renders on a bare case (B101 waits on a petition record); the
+    # point is the log, not the form: no `taxid.read` for anything but B121.
+    # B101's last-four-from-the-record path is pinned by the projection tests.
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    response = client.get(
+        f"/v1/cases/{case_id}/forms/b106g/preview", headers=auth(ALICE)
+    )
+    assert response.status_code == 200
+    assert response.get_json()["problems"] == []
+    assert not any(e.action == "taxid.read" for e in stores["access_log"].events)
+
+
+def test_the_hub_listing_never_opens_the_envelope(client, stores):
+    case_id = open_case(client)
+    add_debtor_1_with_a_tax_id(client, case_id)
+    client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE))
+    assert not any(e.action == "taxid.read" for e in stores["access_log"].events)
 
 
 # ── Output options (issue 13.11) ─────────────────────────────────

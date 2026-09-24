@@ -92,7 +92,7 @@
   ],
   "cases": [
     {
-      "fixture": "v1",
+      "fixture": "v2",
       "case": "chapter-7-sample",
       "firm": "Insolvia E2E",
       "openedBy": "admin"
