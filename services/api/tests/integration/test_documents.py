@@ -83,7 +83,7 @@ def test_an_upload_round_trips_through_the_bucket(
     # 2. Complete: HeadObject under the API's own role, tag cleared, row stored.
     completed = admin.post(
         f"/v1/cases/{case_id}/documents/{record['id']}/complete", expect=200
-    )
+    )["document"]
     assert completed["status"] == "stored"
     assert completed["byteSize"] == len(BODY), (
         "the stored size is what S3 counted, not what the client claimed — a "
