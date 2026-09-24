@@ -49,7 +49,6 @@ def test_an_upload_url_binds_every_term_the_server_decided(blobs):
     # S3 enforces rather than a number the client volunteered.
     assert "content-length" in signed
     assert "content-type" in signed
-    assert "x-amz-server-side-encryption" in signed
     # The tag is what makes an abandoned upload reapable: the capability
     # outlives its row, so an object can land under a key nothing names, and
     # with no s3:ListBucket the bucket's expire-unconfirmed-uploads lifecycle
@@ -57,6 +56,73 @@ def test_an_upload_url_binds_every_term_the_server_decided(blobs):
     # documented, so a client cannot drop the header and write an object that
     # nothing reaps.
     assert "x-amz-tagging" in signed
+
+
+def test_the_signed_headers_are_exactly_the_four_the_client_can_satisfy(blobs):
+    """The whole set, pinned, and the one that is NOT in it is the point.
+
+    THE INCIDENT: the adapter signed `x-amz-server-side-encryption: aws:kms`
+    without naming a key, and every presigned upload since the feature
+    shipped was refused with an explicit deny — S3 encrypts such a request
+    under the AWS-managed `aws/s3` key rather than the bucket default, and
+    the bucket's DenyForeignEncryptionKey statement refuses exactly that.
+    The first run of the integration tier against staging was what found
+    it. The module header in adapters/aws/document_blobs.py carries the
+    probe; this pins its conclusion so the header cannot quietly return.
+    """
+    url = blobs.upload_url(
+        KEY, content_type="application/pdf", byte_size=4096, expires_in=900
+    )
+    signed = query(url)["X-Amz-SignedHeaders"][0].split(";")
+    assert signed == ["content-length", "content-type", "host", "x-amz-tagging"]
+
+
+def test_the_presign_names_no_encryption_algorithm_and_no_key(blobs, monkeypatch):
+    """The parameters as the adapter hands them to botocore, not the URL that
+    comes out — because `ServerSideEncryption` alone (no key id) is the exact
+    combination the bucket refuses, and a URL-level check would have to know
+    how botocore spells it. Same incident as the test above."""
+    seen = {}
+
+    def capture(operation, **kwargs):
+        seen.update(operation=operation, params=kwargs["Params"])
+        return "https://example.invalid/"
+
+    monkeypatch.setattr(blobs.client, "generate_presigned_url", capture)
+    blobs.upload_url(
+        KEY, content_type="application/pdf", byte_size=4096, expires_in=900
+    )
+    assert seen["operation"] == "put_object"
+    assert "ServerSideEncryption" not in seen["params"]
+    assert "SSEKMSKeyId" not in seen["params"]
+    # And the bucket-default encryption is the ONLY route to the case key, so
+    # the four terms that ARE decided here are the whole parameter set.
+    assert set(seen["params"]) == {
+        "Bucket",
+        "Key",
+        "ContentType",
+        "ContentLength",
+        "Tagging",
+    }
+
+
+def test_a_direct_write_names_no_encryption_algorithm_either(blobs, monkeypatch):
+    """put_bytes — the packet worker's and the forms hub's write — carried the
+    same header and was refused with the same explicit deny (probed on the
+    dev bucket alongside the presign). Silence lands on the bucket default."""
+    calls = []
+    monkeypatch.setattr(
+        blobs.client, "put_object", lambda **kwargs: calls.append(kwargs)
+    )
+    blobs.put_bytes(KEY, content=b"%PDF-1.7", content_type="application/pdf")
+    assert calls == [
+        {
+            "Bucket": BUCKET,
+            "Key": KEY,
+            "Body": b"%PDF-1.7",
+            "ContentType": "application/pdf",
+        }
+    ]
 
 
 def test_the_upload_tag_is_the_one_the_lifecycle_rule_filters_on(blobs):

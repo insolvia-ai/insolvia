@@ -19,11 +19,12 @@ why.
 The second half is what a presigned URL actually is, because "the client talks
 to S3" describes it badly. It is a CAPABILITY THIS SERVER MINTS. The server
 chooses the bucket, the exact object key, the single HTTP verb, the expiry, the
-content type, the byte count and the encryption header, and signs that
-combination with its own credentials — after checking that the caller owns the
-case. What the client receives is not a credential and not authority to name
-anything: it is a ticket to one object, for one verb, for a few minutes, and it
-cannot be edited without invalidating the signature.
+content type, the byte count and the reaper's tag, and signs that combination
+with its own credentials — after checking that the caller owns the case. (The
+encryption mode is the bucket's decision, not the ticket's — see the header
+constants below.) What the client receives is not a credential and not
+authority to name anything: it is a ticket to one object, for one verb, for a
+few minutes, and it cannot be edited without invalidating the signature.
 
 The thing ADR 0001 refuses is a client holding standing authority over a data
 store — a Cognito identity pool, a broad IAM grant, anything the client can
@@ -127,30 +128,37 @@ UPLOAD_URL_TTL_SECONDS = 15 * 60
 DOWNLOAD_URL_TTL_SECONDS = 5 * 60
 
 # The headers the client MUST send with its PUT, because the adapter signs them
-# and S3 checks every one. Content-Type comes from the validated record;
-# `x-amz-server-side-encryption` is the header the bucket policy's
-# DenyEncryptionDowngrade statement is written against, so a PUT without it is
-# refused by the bucket even with a valid signature.
+# and S3 checks every one. Content-Type comes from the validated record.
 #
-# `x-amz-tagging` is signed for a different reason: it is what makes the bytes
-# reapable. The capability outlives the record that authorised it, so an object
-# can land under a key no row names, and the bucket's
-# `expire-unconfirmed-uploads` lifecycle rule finds it by this tag. The VALUE
-# comes from core/documents.py rather than being spelled again here — the
-# adapter signs that same constant, and a client told to send anything else
-# gets a SignatureDoesNotMatch it cannot interpret.
+# `x-amz-tagging` is signed because it is what makes the bytes reapable. The
+# capability outlives the record that authorised it, so an object can land
+# under a key no row names, and the bucket's `expire-unconfirmed-uploads`
+# lifecycle rule finds it by this tag. The VALUE comes from core/documents.py
+# rather than being spelled again here — the adapter signs that same constant,
+# and a client told to send anything else gets a SignatureDoesNotMatch it
+# cannot interpret.
+#
+# NO `x-amz-server-side-encryption`, and this block used to say the opposite:
+# that the bucket refused a PUT without it. The truth is the reverse. A PUT
+# that says nothing about encryption lands on the bucket's default — SSE-KMS
+# under the case key — and is accepted; a PUT that says `aws:kms` without a
+# key id is encrypted under the AWS-managed `aws/s3` key, which the bucket's
+# DenyForeignEncryptionKey statement refuses with an explicit deny. Every
+# upload the app ever attempted got that deny. The adapter no longer signs
+# the header (insolvia_core.adapters.aws.document_blobs owns the probe), and
+# S3 refuses a presigned PUT carrying any unsigned `x-amz-*` header — so a
+# client that sends it anyway gets AccessDenied, "headers present in the
+# request which were not signed", before the bucket policy is consulted.
 #
 # Content-Length is signed too and is deliberately absent from what we send
 # back: every HTTP client sets it from the body it is about to send, and
 # browsers refuse to let JavaScript set it at all. It is listed here in words
 # so nobody adds it in code.
 #
-# All three are in the bucket's CORS allowed-headers list. That is not a
+# Both are in the bucket's CORS allowed-headers list. That is not a
 # formality: `x-amz-*` headers are not CORS-safelisted, so a browser preflights
 # this PUT, and an allowed-header list missing one of them fails the request
 # before the signature is ever checked.
-SSE_HEADER = "x-amz-server-side-encryption"
-SSE_VALUE = "aws:kms"
 TAGGING_HEADER = "x-amz-tagging"
 
 
@@ -301,7 +309,6 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
                     "method": "PUT",
                     "headers": {
                         "Content-Type": document.content_type,
-                        SSE_HEADER: SSE_VALUE,
                         TAGGING_HEADER: UPLOAD_TAG,
                     },
                     "expiresAt": expiry_timestamp(UPLOAD_URL_TTL_SECONDS),

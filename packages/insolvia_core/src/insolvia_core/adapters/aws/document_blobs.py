@@ -15,17 +15,44 @@ logger = logging.getLogger(__name__)
 # Verified against botocore rather than reasoned about: with the default
 # configuration, `generate_presigned_url` in us-east-1 produced a legacy SigV2
 # URL whose query string was
-#   AWSAccessKeyId, Signature, Expires, content-type, x-amz-server-side-encryption
+#   AWSAccessKeyId, Signature, Expires, content-type
 # — note what is missing. The ContentLength parameter was DROPPED SILENTLY. The
 # URL still worked, still carried the content type, and would have accepted an
 # upload of any size at all, so nothing about the failure would have looked
 # like a failure; the size cap would simply not have existed.
 #
 # With s3v4 the same call signs
-#   content-length;content-type;host;x-amz-server-side-encryption
-# and every one of those becomes a term S3 checks. tests/test_document_blobs.py
-# asserts that list for exactly this reason. Virtual addressing is spelled out
-# alongside because path-style URLs are deprecated for new buckets.
+#   content-length;content-type;host;x-amz-tagging
+# and every one of those becomes a term S3 checks.
+# tests/unit/test_document_blobs.py asserts that list for exactly this reason.
+# Virtual addressing is spelled out alongside because path-style URLs are
+# deprecated for new buckets.
+#
+# NO ENCRYPTION HEADER IS SIGNED, AND NONE IS SENT, and the absence is the
+# fix for a bug that refused every upload since the feature shipped. The
+# adapter used to sign `x-amz-server-side-encryption: aws:kms` without naming
+# a key, on the reading that S3 would then fall through to the bucket's
+# default key. S3's actual rule is the opposite: a PUT that asks for SSE-KMS
+# without a key id is encrypted under the AWS-managed `aws/s3` key, NOT the
+# bucket default — and the bucket policy's DenyForeignEncryptionKey statement
+# (infra/modules/case_documents) sees `aws/s3` as the key id of such a request
+# and refuses it with an explicit deny. Probed against the dev bucket, with
+# exactly the headers the route sends:
+#
+#   x-amz-server-side-encryption: aws:kms signed, no key   → 403 explicit deny
+#   ...plus SSEKMSKeyId naming the case key, both signed   → 200
+#   no encryption header at all                            → 200, and
+#        HeadObject reports aws:kms under the CASE key
+#   either header added UNSIGNED to the fixed presign      → 403 AccessDenied,
+#        "headers present in the request which were not signed"
+#
+# The third shape is the one used, because it is the only one where this
+# service never has to know the key ARN: bucket default encryption supplies
+# it, DenyEncryptionDowngrade still refuses any explicit non-KMS algorithm,
+# and DenyForeignEncryptionKey still refuses any explicit foreign key. Naming
+# the key would work too, and would put a KMS ARN in every environment's API
+# configuration for nothing the bucket does not already do. The fourth shape
+# is why a client cannot re-add either header to the ticket it is given.
 _SIGNING = Config(signature_version="s3v4", s3={"addressing_style": "virtual"})
 
 
@@ -53,7 +80,7 @@ class S3DocumentBlobStore:
     def upload_url(
         self, storage_ref: str, *, content_type: str, byte_size: int, expires_in: int
     ) -> str:
-        """One PUT, one object, one size, one content type, one encryption mode.
+        """One PUT, one object, one size, one content type.
 
         Everything the server decided is a parameter here, and every parameter
         becomes a signed header the client must reproduce exactly or S3 refuses
@@ -65,13 +92,14 @@ class S3DocumentBlobStore:
           against MAX_BYTE_SIZE. This is what turns the cap from a claim the
           client made into a limit S3 enforces — the request must carry exactly
           this many bytes.
-        - `ServerSideEncryption` is the header the bucket policy's
-          DenyEncryptionDowngrade statement is written against. The KEY is not
-          named: S3 resolves the customer-managed key from the bucket's default
-          encryption, so this service never holds a key id and its KMS grant
-          stays fenced to `kms:ViaService = s3`. Naming a key would also have
-          to satisfy the bucket's DenyForeignEncryptionKey statement, which
-          exists precisely because a key id is a thing a policy has to fence.
+        - NOT `ServerSideEncryption`, and not `SSEKMSKeyId` either. The
+          module header owns the rule: SSE-KMS with no key id means the
+          AWS-managed key, which the bucket refuses, and the bucket's default
+          encryption already puts a silent PUT under the case key. So this
+          service never holds a key id and its KMS grant stays fenced to
+          `kms:ViaService = s3`. The encryption mode is the BUCKET's decision,
+          and the two deny statements in its policy are what stop a client
+          overriding it.
         - `Tagging` marks the object `upload=unconfirmed`, which is what makes
           the bytes REAPABLE. This capability outlives the record that
           authorised it and its payload is not signed, so it can be replayed
@@ -98,7 +126,6 @@ class S3DocumentBlobStore:
                     "Key": storage_ref,
                     "ContentType": content_type,
                     "ContentLength": byte_size,
-                    "ServerSideEncryption": "aws:kms",
                     "Tagging": UPLOAD_TAG,
                 },
                 ExpiresIn=expires_in,
@@ -198,19 +225,21 @@ class S3DocumentBlobStore:
         the WORKER role's grant (infra/modules/case_documents,
         worker_role_name), not a presigned capability.
 
-        `ServerSideEncryption` is stated for the same reason the presigned
-        PUT states it: the bucket policy's DenyEncryptionDowngrade statement
-        matches on the header, so an unencrypted-looking request is refused
-        rather than quietly falling back. No Tagging — this write and its
-        record land together (PacketStore.create), so the unconfirmed-upload
-        reaper has no business with these bytes.
+        No `ServerSideEncryption`, for the reason the module header gives:
+        this write used to state `aws:kms` with no key id, believing that
+        meant the bucket's key, and the bucket refused every packet and every
+        form preview with the same explicit deny the presigned upload got
+        (probed on the dev bucket: `put_object` with the header → AccessDenied;
+        without it → 200 under the case key). Silence is what lands on the
+        bucket default. No Tagging — this write and its record land together
+        (PacketStore.create), so the unconfirmed-upload reaper has no business
+        with these bytes.
         """
         self.client.put_object(
             Bucket=self.bucket_name,
             Key=storage_ref,
             Body=content,
             ContentType=content_type,
-            ServerSideEncryption="aws:kms",
         )
 
     def get_bytes(self, storage_ref: str) -> bytes | None:

@@ -1292,9 +1292,10 @@ export function createDocumentRequestToJson(
  * to one object, for a few minutes.
  *
  * **{@link headers} is passed through untouched and is not a fixed shape.**
- * The server chooses which headers it signs (today: `Content-Type`, the
- * server-side-encryption header, and the tag that makes an unconfirmed upload
- * reapable), and S3 checks every one. Modelling it as an interface with named
+ * The server chooses which headers it signs (today: `Content-Type` and the
+ * tag that makes an unconfirmed upload reapable — deliberately no encryption
+ * header, the bucket's default supplies that), and S3 checks every one.
+ * Modelling it as an interface with named
  * keys would mean a header added server-side was silently dropped by every
  * deployed client, turning every upload into a 403 that looks like a bug here.
  * Send this map verbatim, add nothing, and in particular never add an

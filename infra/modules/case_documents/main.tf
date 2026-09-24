@@ -115,12 +115,11 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
 # NOT a nicety, and not defence in depth: without this resource the feature
 # does not work for the only client that ships.
 #
-# A presigned PUT from the app carries `x-amz-server-side-encryption` (the
-# header DenyEncryptionDowngrade below is written against) and `x-amz-tagging`.
-# Neither is CORS-safelisted, so the browser will not send the PUT at all until
-# it has run an OPTIONS preflight — and S3 answers a preflight on a bucket with
-# no CORS configuration with 403. The signature is irrelevant at that point;
-# the request never leaves the browser. 100% of uploads fail.
+# A presigned PUT from the app carries `x-amz-tagging`, which is not
+# CORS-safelisted, so the browser will not send the PUT at all until it has run
+# an OPTIONS preflight — and S3 answers a preflight on a bucket with no CORS
+# configuration with 403. The signature is irrelevant at that point; the
+# request never leaves the browser. 100% of uploads fail.
 #
 # This is the same shape modules/mailer gives its own presigned-PUT bucket.
 #
@@ -145,8 +144,17 @@ resource "aws_s3_bucket_cors_configuration" "documents" {
     #
     #   content-type                  the allowlisted, normalised value
     #   content-length                the exact byte count the size cap binds
-    #   x-amz-server-side-encryption  what DenyEncryptionDowngrade requires
     #   x-amz-tagging                 what the unconfirmed-upload rule reaps on
+    #
+    # `x-amz-server-side-encryption` is NOT signed and NOT sent — the presign
+    # used to carry it, and every upload was refused, because `aws:kms` with no
+    # key id means the AWS-managed key rather than this bucket's default and
+    # DenyForeignEncryptionKey below denies exactly that (the probe is in
+    # packages/insolvia_core, adapters/aws/document_blobs.py). It stays in the
+    # list below all the same: it is harmless there, and a client that chooses
+    # to state the bucket's own mode should fail on S3's unsigned-header check
+    # (AccessDenied, naming the header), not on a preflight that hides which
+    # check refused it.
     #
     # `host` is signed too and is deliberately absent: it is a forbidden header
     # name, set by the browser and never offered in a preflight, so naming it
@@ -413,14 +421,28 @@ data "aws_iam_policy_document" "bucket" {
   # DenyCaseDataDecryption is scoped against. The deny that keeps the deploy
   # role from reading case data would simply not apply to that object.
   #
-  # NOT REACHABLE THROUGH A PRESIGNED URL, and saying so is the point of this
-  # comment: adapters/aws/document_blobs.py deliberately names no key, so the
-  # header is not in the signature and a client adding it invalidates the
-  # request before S3 evaluates any policy. This is hardening for the other
+  # THIS STATEMENT IS WHAT REFUSED EVERY PRESIGNED UPLOAD from the day the
+  # feature shipped until the first integration-tier run against staging, and
+  # the mechanism is worth stating because it is not what the earlier version
+  # of this comment believed. The presign signed `x-amz-server-side-encryption:
+  # aws:kms` and named no key, expecting the bucket default to fill it in. S3's
+  # rule is that SSE-KMS with no key id means the AWS-managed `aws/s3` key —
+  # so S3 evaluated THIS condition with `aws/s3` as the key id, which is not
+  # the case key, and denied. The statement did its job; the request was
+  # wrong. A PUT that names no algorithm at all lands on the bucket default
+  # (the case key) and passes both statements, which is what the adapter now
+  # sends. Probed against the dev bucket (adapters/aws/document_blobs.py).
+  #
+  # NOT REACHABLE THROUGH A PRESIGNED URL, still: neither encryption header
+  # is in the presign's signature now, and S3 refuses a presigned PUT that
+  # carries any unsigned `x-amz-*` header before it evaluates a policy —
+  # probed: AccessDenied, "There were headers present in the request which
+  # were not signed", naming the header. So a client cannot add a key id to
+  # the ticket the API mints. This statement is hardening for the other
   # principals the `"*"` statements above cover — every role in the account
   # that S3 will evaluate this policy for, including a future one nobody has
-  # written yet. That is the whole reason it is a bucket policy and not a note
-  # in the API's IAM grant.
+  # written yet. That is the whole reason it is a bucket policy and not a
+  # note in the API's IAM grant.
   #
   # Same `Null` pairing, for the same reason and it is just as load-bearing:
   # an ordinary upload names no key id, `StringNotEquals` is TRUE when the key
