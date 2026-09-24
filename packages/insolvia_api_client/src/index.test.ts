@@ -2758,8 +2758,7 @@ describe('putDebtor', () => {
             'name.given': 'Must be 200 characters or fewer.',
             'other_names_used[0].id': 'Must be letters, digits, hyphen or underscore.',
             'provenance.residence_address.city': 'This field has a value but no provenance.',
-            tax_id:
-              'Tax identifiers are not accepted yet — they need field-level encryption, which is not built. Leave this out.',
+            tax_id: 'The stored tax id does not match — enter the full number to replace it.',
           },
         },
         400,
@@ -2880,7 +2879,98 @@ describe('putDebtor', () => {
     await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', saved);
     expect(JSON.parse(stub.lastRequest().body)).toEqual(sent);
   });
+
+  // The tax id (issue 13.12 / #382). 987-65-4321 is from the SSA's
+  // never-issued advertising block — the fixture value the API accepts on
+  // purpose. This repo is public.
+
+  test('sends a typed number as {kind, value}, verbatim', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 201));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      tax_id: { kind: 'ssn', value: '987-65-4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+  });
+
+  test('echoes the last four as {kind, last_four} to keep the stored number', async () => {
+    // A questionnaire only ever holds the view after a save; sending it back
+    // is what "this save did not touch the number" looks like on the wire.
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', last_four: '4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+
+    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+      kind: 'ssn',
+      last_four: '4321',
+    });
+  });
+
+  test('a typed number wins over the on-file echo, and a bare kind is omitted', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      tax_id: { kind: 'ssn', value: '987654322', last_four: '4321' },
+      provenance: { tax_id: { source: 'staff_typed' } },
+    });
+    expect((JSON.parse(stub.lastRequest().body) as { tax_id: unknown }).tax_id).toEqual({
+      kind: 'ssn',
+      value: '987654322',
+    });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', { tax_id: { kind: 'itin' } });
+    expect('tax_id' in (JSON.parse(stub.lastRequest().body) as object)).toBe(false);
+  });
+
+  test('a decoded record with a tax id hands its view straight back', async () => {
+    const stub = stubFetch(() => jsonResponse(DEBTOR_WITH_TAX_ID, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', REQUEST);
+    expect(saved.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+
+    await client.putDebtor(DEBTOR_CASE_ID, 'debtor_1', {
+      ...saved,
+      provenance: staffTypedProvenance(saved),
+    });
+    const sent = JSON.parse(stub.lastRequest().body) as {
+      tax_id: unknown;
+      provenance: Record<string, unknown>;
+    };
+    expect(sent.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+    expect(sent.provenance.tax_id).toEqual({ source: 'staff_typed' });
+  });
 });
+
+/** {@link DEBTOR} with the last-four view the API adds once a number is stored. */
+const DEBTOR_WITH_TAX_ID = {
+  ...DEBTOR,
+  provenance: { ...DEBTOR.provenance, tax_id: { source: 'staff_typed' } },
+  tax_id: { kind: 'ssn', last_four: '4321' },
+};
 
 describe('listDebtors', () => {
   const SECOND_DEBTOR = {
@@ -2921,6 +3011,28 @@ describe('listDebtors', () => {
     });
 
     expect(await client.listDebtors(DEBTOR_CASE_ID)).toEqual([]);
+  });
+
+  test('maps the tax id as its last-four view, and refuses a view without one', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [DEBTOR_WITH_TAX_ID] }, 200));
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(DEBTOR_CASE_ID);
+    expect(debtor?.tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+
+    // The API never sends a number; a decoder that tolerated a view missing
+    // its last four would hand the screen a kind with nothing to show.
+    const broken = stubFetch(() =>
+      jsonResponse({ debtors: [{ ...DEBTOR_WITH_TAX_ID, tax_id: { kind: 'ssn' } }] }, 200),
+    );
+    const brokenClient = new InsolviaApiClient('http://localhost:8080', {
+      fetch: broken.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    await expect(brokenClient.listDebtors(DEBTOR_CASE_ID)).rejects.toThrow();
   });
 
   test('an empty record comes back with an empty provenance map and no body keys at all', async () => {
@@ -3106,6 +3218,20 @@ describe('staffTypedProvenance', () => {
 
   test('an element id is never itself a path — it is the address', () => {
     expect(paths({ aliases: [{ id: 'n1' }] })).toEqual([]);
+  });
+
+  test('the tax id is ONE path, whichever shape it takes', () => {
+    // Mirrors parse_debtor's one exception: the kind and the digits are one
+    // identifier entered in one act, and the last-four echo is not a fact of
+    // its own. Walking the object would mint `tax_id.kind` and
+    // `tax_id.value`, which the API refuses as unattributed.
+    expect(paths({ tax_id: { kind: 'ssn', value: '987-65-4321' } })).toEqual(['tax_id']);
+    expect(paths({ tax_id: { kind: 'ssn', last_four: '4321' } })).toEqual(['tax_id']);
+  });
+
+  test('a kind with nothing typed is not populated — it is not sent either', () => {
+    expect(paths({ tax_id: { kind: 'ssn' } })).toEqual([]);
+    expect(paths({ tax_id: { kind: 'ssn', value: '' } })).toEqual([]);
   });
 
   test('a key that is not a field name fails loudly, before any request', () => {

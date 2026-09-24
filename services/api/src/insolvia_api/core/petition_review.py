@@ -26,9 +26,18 @@ What the model is shown, exactly:
   assets, income, SOFA entries — which is what lets it notice a creditor
   with no schedule row.
 - **Nothing else.** No source documents (that cross-check arrives with
-  extraction, 8.7-8.9), no tax identifiers (the stores never hold a full
-  SSN/ITIN — `insolvia_core.debtors.parse_debtor` refuses them, claims carry
-  last-four only — and `scrub` below re-enforces that as defence in depth).
+  extraction, 8.7-8.9), and no tax identifiers. Since issue 13.12 / #382
+  the store DOES hold the full SSN/ITIN — sealed, behind the logged
+  full-value read — and this worker has to perform that read: the stored
+  packet's B121 carries the number, so reproducing the packet's bytes
+  (the hash check below) means projecting it too. What keeps the number
+  off the wire is structural again, one layer up: `form/b121` is dropped
+  from the review document WHOLESALE — the statement has nothing to review
+  but the identifier — and `scrub` re-enforces the rest as defence in
+  depth (debtor records carry last-four only; claims carry last-four only).
+  Each read is a `taxid.read` row with purpose `petition_review`, so the
+  trail shows this worker opening the envelope beside the preparer's
+  `petition.review`. ADR 0019's amendment records the change.
 
 The findings land on the JOB RESULT, read back through the ordinary job
 status endpoint. They are deliberately NOT case data: no store row, no
@@ -66,6 +75,7 @@ from insolvia_api.core.packet_assembly import (
     CaseData,
     PacketProblem,
     assemble,
+    disclose_tax_ids,
     packet_zip,
     problem_json,
     read_case_data,
@@ -79,6 +89,8 @@ if TYPE_CHECKING:
         CaseEntityStore,
         CaseStore,
         DebtorStore,
+        TaxIdCipher,
+        TaxIdStore,
     )
 
     from insolvia_api.core.form_projections import FieldValues
@@ -290,9 +302,16 @@ def parse_findings(raw: Mapping[str, Any]) -> tuple[ReviewFinding, ...]:
 # a stored free-text field, it still does not leave for the model API.
 _TAX_ID_PATTERN: Final = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 
-# Key names that would carry a tax identifier if the data model ever grows
-# one; dropped wholesale rather than pattern-matched.
+# Key names that carry a tax identifier — `tax_id` is the debtor record's
+# last-four view since 13.12 — or would if the model ever grew another;
+# dropped wholesale rather than pattern-matched.
 _TAX_ID_KEYS: Final = frozenset({"tax_id", "ssn", "itin", "social_security_number"})
+
+# The one form whose projected content IS the full identifier. Left out of
+# the review document entirely (see the module docstring): the review
+# re-assembles the packet with the number so the bytes hash, and this is
+# where the number stops.
+_FORMS_NOT_REVIEWED: Final = frozenset({"form/b121"})
 
 
 def scrub(value: Any) -> Any:
@@ -395,6 +414,7 @@ def review_document(data: CaseData, packet: AssembledPacket) -> str:
                 "fields": _rendered_form(values),
             }
             for series_id, values in packet.projections.items()
+            if series_id not in _FORMS_NOT_REVIEWED
         ],
         "creditor_matrix": matrix_text,
         "confirmed_records": {
@@ -433,6 +453,10 @@ class PetitionReviewDeps:
     entity_store: CaseEntityStore
     packet_store: PacketStore
     access_log: AccessLog
+    # For the byte-exact re-assembly only — see the module docstring on why
+    # the review must open the envelope and where the number then stops.
+    tax_id_store: TaxIdStore
+    tax_id_cipher: TaxIdCipher
     model: ReviewModel | None
 
 
@@ -494,6 +518,18 @@ def run_petition_review(
 
     data = read_case_data(
         case, debtor_store=deps.debtor_store, entity_store=deps.entity_store
+    )
+    # The stored packet printed B121 with the number, so reproducing its
+    # bytes needs the number too — a logged read per debtor, purpose
+    # `petition_review`, and the projection is dropped before the model
+    # sees anything (review_document).
+    data = disclose_tax_ids(
+        data,
+        principal=job.created_by,
+        purpose="petition_review",
+        tax_id_store=deps.tax_id_store,
+        tax_id_cipher=deps.tax_id_cipher,
+        access_log=deps.access_log,
     )
     as_of = today if today is not None else datetime.now(UTC).date()
     outcome = assemble(data, as_of=as_of)

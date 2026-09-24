@@ -50,7 +50,7 @@
   ],
   "cases": [
     {
-      "fixture": "v1",
+      "fixture": "v2",
       "case": "chapter-7-sample",
       "firm": "Dev Firm",
       "openedBy": "admin"

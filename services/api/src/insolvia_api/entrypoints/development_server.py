@@ -9,6 +9,8 @@ from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
@@ -18,6 +20,8 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
 from insolvia_core.ports import (
     AccessLog,
@@ -29,6 +33,8 @@ from insolvia_core.ports import (
     DocumentStore,
     FirmStore,
     JwksProvider,
+    TaxIdCipher,
+    TaxIdStore,
     UserDirectory,
 )
 
@@ -130,6 +136,8 @@ else:
     document_blobs = MemoryDocumentBlobStore()
 debtor_store: DebtorStore
 case_entity_store: CaseEntityStore
+tax_id_store: TaxIdStore
+tax_id_cipher: TaxIdCipher
 if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
@@ -137,11 +145,20 @@ if config.case_table_name and config.case_access_log_table_name:
     # The same table again: the generic collections (issue #249) are child
     # items of their case's partition, so the dev table already holds them.
     case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
+    # And the sealed tax ids (issue 13.12 / #382), under THIS MACHINE's real
+    # case key — the developer's own IAM user reaches it through the key
+    # policy's root delegation (infra/envs/dev), so a laptop seals and opens
+    # exactly as staging does. The alias is derived from the table name.
+    tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+    tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
 else:
     case_store = MemoryCaseStore()
     access_log = MemoryAccessLog()
     debtor_store = MemoryDebtorStore()
     case_entity_store = MemoryCaseEntityStore()
+    tax_id_store = MemoryTaxIdStore()
+    # The deterministic local key — never composed beside a real table.
+    tax_id_cipher = LocalTaxIdCipher()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -213,6 +230,8 @@ app = create_app(
         document_store=document_store,
         document_blobs=document_blobs,
         debtor_store=debtor_store,
+        tax_id_store=tax_id_store,
+        tax_id_cipher=tax_id_cipher,
         case_entity_store=case_entity_store,
         job_store=job_store,
         job_queue=job_queue,

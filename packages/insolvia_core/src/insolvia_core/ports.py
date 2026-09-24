@@ -10,6 +10,7 @@ composes stay in that service.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Protocol, TypeVar
 
 from insolvia_core.access import Accessor
@@ -21,6 +22,7 @@ from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.tax_ids import Envelope, SealedTaxId
 
 BodyT = TypeVar("BodyT")
 
@@ -602,6 +604,55 @@ class CaseEntityStore(Protocol):
         neither implementation gets this ordering for free). All of them: a
         caller cannot page, so an implementation that can truncate must not."""
         ...
+
+
+class TaxIdCipher(Protocol):
+    """Seals and opens one tax identifier under the case key
+    (insolvia_core.tax_ids owns the design — envelope encryption, a fresh
+    data key per sealed value, the encryption context binding the firm and
+    the reference).
+
+    THE KMS CALL IS THE ONLY THING THE TWO IMPLEMENTATIONS DIFFER IN.
+    adapters/aws wraps the data key with `kms:GenerateDataKey`/`kms:Decrypt`
+    under the environment's case key; adapters/memory wraps it under a fixed
+    local key. Everything else — the AES-GCM seal, the associated data, the
+    envelope shape — is one shared module both call, so a unit test against
+    the memory cipher exercises the real code path minus the network, and a
+    ciphertext sealed under a context cannot be opened under another in
+    either implementation.
+
+    Both methods take the SAME `context` the value was sealed with; an
+    implementation MUST refuse (raise) to open an envelope under a different
+    one rather than returning garbage or None — that refusal is the replay
+    protection.
+    """
+
+    def seal(self, plaintext: str, *, context: Mapping[str, str]) -> Envelope: ...
+
+    def open(self, envelope: Envelope, *, context: Mapping[str, str]) -> str: ...
+
+
+class TaxIdStore(Protocol):
+    """Persists the sealed tax-id items (insolvia_core.tax_ids).
+
+    `case_id` on both methods is WHERE THE ITEM LIVES TODAY — the case
+    partition — not what identifies it. The reference (`ref`) is the
+    identity; ADR 0022's backfill will re-parent these items under the
+    client they belong to, and only this port's callers will change.
+
+    Ownership is NOT a parameter, the rule every case-child store states:
+    the caller resolved the case through `CaseStore` first, and the
+    encryption context — not this store — is what refuses another firm's
+    read.
+    """
+
+    def put(self, case_id: str, sealed: SealedTaxId) -> None:
+        """Write the item whole, replacing any item under the same ref — a
+        re-entered number is a correction of the client's identifier and
+        must reach every matter that points at the ref."""
+        ...
+
+    def get(self, case_id: str, ref: str) -> SealedTaxId | None: ...
 
 
 class AccessLog(Protocol):

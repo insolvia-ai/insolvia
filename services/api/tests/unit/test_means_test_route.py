@@ -35,6 +35,8 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.cases import assign_case
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from insolvia_core.means_test_inputs import MEANS_TEST_INPUT, parse_means_test_input
@@ -133,6 +135,8 @@ class Harness:
                 firm_store=firms,
                 access_log=MemoryAccessLog(),
                 debtor_store=self.debtor_store,
+                tax_id_store=MemoryTaxIdStore(),
+                tax_id_cipher=LocalTaxIdCipher(),
                 case_entity_store=self.entity_store,
             )
         )

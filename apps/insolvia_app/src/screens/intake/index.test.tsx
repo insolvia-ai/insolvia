@@ -152,6 +152,99 @@ describe('the intake screen', () => {
     expect(aliases[0]?.id).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
+  describe('the tax id (issue 13.12 / #382)', () => {
+    // 987-65-4321 is from the SSA's never-issued advertising block — the
+    // fixture value the API accepts on purpose. This repo is public.
+    const withTaxId = {
+      ...SAVED,
+      tax_id: { kind: 'ssn', last_four: '4321' },
+      provenance: { ...SAVED.provenance, tax_id: { source: 'staff_typed' } },
+    };
+
+    it('collects the number masked, with a reveal toggle', async () => {
+      signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: noDebtors });
+
+      const number = await screen.findByLabelText('Number');
+      expect(number.props.secureTextEntry).toBe(true);
+      expect(screen.getByRole('button', { name: 'Show number' })).toBeTruthy();
+    });
+
+    it('sends a typed number in full, with one provenance entry for the whole field', async () => {
+      const fetchMock = signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () => jsonResponse(201, withTaxId),
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('combobox', { name: 'Kind of number' }));
+      await user.press(await screen.findByRole('option', { name: 'Social Security number' }));
+      await user.type(screen.getByLabelText('Number'), '987-65-4321');
+
+      await waitFor(() =>
+        expect(lastSave(fetchMock).tax_id).toEqual({ kind: 'ssn', value: '987-65-4321' }),
+      );
+      expect(lastSave(fetchMock).provenance).toEqual({ tax_id: { source: 'staff_typed' } });
+    });
+
+    it('shows only the last four once stored, and echoes it back on the next save', async () => {
+      // The screen never holds the number after a save; the echo is what
+      // tells the API to keep what it stored when something else changes.
+      const fetchMock = signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () => jsonResponse(200, withTaxId),
+        [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [withTaxId] }),
+      });
+
+      expect(await screen.findByText(/ending in 4321 is on file/)).toBeTruthy();
+      expect(screen.queryByDisplayValue('987-65-4321')).toBeNull();
+
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText('Middle name'), 'Q');
+
+      await waitFor(() =>
+        expect(lastSave(fetchMock).name).toEqual({
+          given: 'Ada',
+          middle: 'Q',
+          surname: 'Lovelace',
+        }),
+      );
+      expect(lastSave(fetchMock).tax_id).toEqual({ kind: 'ssn', last_four: '4321' });
+      expect(lastSave(fetchMock).provenance).toMatchObject({ tax_id: { source: 'staff_typed' } });
+    });
+
+    it('removes a stored number by leaving it out of the save', async () => {
+      const fetchMock = signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () => jsonResponse(200, SAVED),
+        [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [withTaxId] }),
+      });
+
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Remove the stored number' }));
+
+      await waitFor(() =>
+        expect(lastSave(fetchMock).name).toEqual({ given: 'Ada', surname: 'Lovelace' }),
+      );
+      expect('tax_id' in lastSave(fetchMock)).toBe(false);
+    });
+
+    it('puts a server message about the number on its field', async () => {
+      signedIn({
+        [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>
+          jsonResponse(400, {
+            error: 'validation failed',
+            fields: {
+              'tax_id.value': 'Not a Social Security number — no SSN begins with 000, 666 or 9.',
+            },
+          }),
+        [`/v1/cases/${CASE_ID}/debtors`]: noDebtors,
+      });
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('Number'), '900-12-3456');
+
+      expect(await screen.findByText(/no SSN begins with/)).toBeTruthy();
+    });
+  });
+
   it('says that changes save themselves, because there is no save button', async () => {
     signedIn({ [`/v1/cases/${CASE_ID}/debtors`]: noDebtors });
 

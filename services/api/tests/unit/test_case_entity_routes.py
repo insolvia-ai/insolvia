@@ -25,6 +25,8 @@ from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
@@ -119,6 +121,8 @@ def client(access_log):
             # Composed so the not-shadowed test below can prove the static
             # debtor route still answers, not because these tests need it.
             debtor_store=MemoryDebtorStore(),
+            tax_id_store=MemoryTaxIdStore(),
+            tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
         )
     )

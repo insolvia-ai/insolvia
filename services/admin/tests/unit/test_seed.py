@@ -490,6 +490,7 @@ def test_check_is_refused_against_prod_too(tmp_path: Path) -> None:
 # ── cases ───────────────────────────────────────────────────────────
 
 
+from insolvia_core.adapters.memory.access_log import MemoryAccessLog  # noqa: E402
 from insolvia_core.adapters.memory.case_entity_store import (  # noqa: E402
     MemoryCaseEntityStore,
 )
@@ -501,7 +502,10 @@ from insolvia_core.adapters.memory.document_blobs import (  # noqa: E402
 from insolvia_core.adapters.memory.document_store import (  # noqa: E402
     MemoryDocumentStore,
 )
+from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher  # noqa: E402
+from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore  # noqa: E402
 from insolvia_core.case_collections import COLLECTIONS  # noqa: E402
+from insolvia_core.tax_ids import read_tax_id  # noqa: E402
 
 DEV_CASE_TABLE = "insolvia-dev-0123456789ab-cases"
 DEV_BUCKET = "insolvia-dev-0123456789ab-case-documents-us-east-1"
@@ -552,6 +556,8 @@ class Env:
         self.documents = MemoryDocumentStore()
         self.blobs = MemoryDocumentBlobStore()
         self.objects = FakeFixtureObjects(self.blobs, {"v1/objects/stub.pdf": PDF})
+        self.tax_ids = MemoryTaxIdStore()
+        self.tax_id_cipher = LocalTaxIdCipher()
         self.accounts = FakeAccounts(known={})
         folder = tmp_path / "fixtures" / "v1"
         (folder / "objects").mkdir(parents=True)
@@ -581,7 +587,14 @@ class Env:
                             "debtors": {
                                 "debtor_1": {
                                     "name": {"given": "Sample"},
-                                    "provenance": {"name.given": TYPED},
+                                    # The SSA's never-issued advertising
+                                    # block — the fixture value the parser
+                                    # accepts on purpose (insolvia_core.tax_ids).
+                                    "tax_id": {"kind": "ssn", "value": "987-65-4321"},
+                                    "provenance": {
+                                        "name.given": TYPED,
+                                        "tax_id": TYPED,
+                                    },
                                 }
                             },
                             "collections": {
@@ -646,6 +659,8 @@ class Env:
             document_store=lambda _: self.documents,
             document_blobs=lambda _: self.blobs,
             fixture_objects=lambda _f, _t: self.objects,
+            tax_id_store=lambda _: self.tax_ids,
+            tax_id_cipher=lambda _: self.tax_id_cipher,
         )
 
     def load(self, *extra: str, table: str = DEV_TABLE) -> int:
@@ -697,6 +712,27 @@ def test_a_fixture_case_lands_with_its_debtor_items_and_documents(
     debtor = env.debtors.get(case.id, filing_role="debtor_1")
     assert debtor is not None
     assert debtor.name.given == "Sample"
+    # The fixture's tax id was SEALED the way the API seals one: the record
+    # carries the last four and a reference, the digits only open through
+    # the logged read under the firm the case landed in.
+    assert debtor.tax_id is not None
+    assert debtor.tax_id.last_four == "4321"
+    assert "987654321" not in str(env.tax_ids.items)
+    log = MemoryAccessLog()
+    assert (
+        read_tax_id(
+            debtor.tax_id,
+            firm_id=case.firm_id,
+            case_id=case.id,
+            filing_role="debtor_1",
+            principal="test",
+            purpose="test",
+            cipher=env.tax_id_cipher,
+            store=env.tax_ids,
+            access_log=log,
+        )
+        == "987654321"
+    )
     creditors = env.entities.list_for_case(case.id, COLLECTIONS["creditors"])
     assert [c.body.name for c in creditors] == ["Example Bank"]
     documents = env.documents.list_for_case(case.id)

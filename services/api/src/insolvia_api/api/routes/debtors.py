@@ -6,7 +6,10 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import record_access
+from insolvia_core.cases import Case
 from insolvia_core.debtors import (
+    Debtor,
+    DebtorDraft,
     create_debtor,
     debtor_json,
     parse_debtor,
@@ -15,7 +18,14 @@ from insolvia_core.debtors import (
 )
 from insolvia_core.errors import NotFoundError, ValidationError
 from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
-from insolvia_core.ports import AccessLog, CaseStore, DebtorStore
+from insolvia_core.ports import (
+    AccessLog,
+    CaseStore,
+    DebtorStore,
+    TaxIdCipher,
+    TaxIdStore,
+)
+from insolvia_core.tax_ids import TaxIdRef, store_tax_id
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
@@ -31,11 +41,26 @@ blueprint = Blueprint("debtors", __name__)
 MAX_REQUEST_BYTES = 256 * 1024
 
 
-def _stores() -> tuple[CaseStore, DebtorStore, AccessLog]:
+def _stores() -> tuple[CaseStore, DebtorStore, AccessLog, TaxIdStore, TaxIdCipher]:
     deps = dependencies()
-    if deps.case_store is None or deps.debtor_store is None or deps.access_log is None:
-        raise RuntimeError("case store, debtor store and access log are not composed")
-    return deps.case_store, deps.debtor_store, deps.access_log
+    if (
+        deps.case_store is None
+        or deps.debtor_store is None
+        or deps.access_log is None
+        or deps.tax_id_store is None
+        or deps.tax_id_cipher is None
+    ):
+        raise RuntimeError(
+            "case store, debtor store, access log, tax-id store and tax-id "
+            "cipher are not composed"
+        )
+    return (
+        deps.case_store,
+        deps.debtor_store,
+        deps.access_log,
+        deps.tax_id_store,
+        deps.tax_id_cipher,
+    )
 
 
 def _json_body() -> dict[str, object]:
@@ -47,7 +72,7 @@ def _json_body() -> dict[str, object]:
     return payload
 
 
-def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> None:
+def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Case:
     """Resolve the case first, and record the attempt either way.
 
     EVERY debtor route goes through here, because this is the only
@@ -63,8 +88,12 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
     `access_all_cases`, or linked to this matter). `CaseStore.get` applies the
     whole rule — core/access.may_see_case — so the change here is one argument
     and nothing else, which is exactly what it should have been.
+
+    Returns the case because the write path needs its `firm_id`: the tax
+    id's encryption context binds the FIRM (insolvia_core.tax_ids), and the
+    firm comes from the resolved case, never from the request.
     """
-    case_store, _, access_log = _stores()
+    case_store, _, access_log, _, _ = _stores()
     case = case_store.get(case_id, accessor=accessor)
     access_log.record(
         record_access(
@@ -78,6 +107,28 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
         # Identical to a case that does not exist — core/errors.py explains why
         # distinguishing them turns this into an id oracle.
         raise NotFoundError("case not found")
+    return case
+
+
+def _resolve_tax_id(
+    draft: DebtorDraft, stored: Debtor | None, case: Case
+) -> TaxIdRef | None:
+    """What the saved debtor will carry — the draft's write sealed, kept, or
+    cleared against the stored reference (tax_ids.store_tax_id owns the
+    rules). Runs AFTER the case is resolved, because sealing needs the
+    firm, and after the stored record is read, because keeping needs the
+    reference. A refused echo is a 400 like any other malformed field; the
+    case.update row already recorded above stands, because the case WAS
+    reached."""
+    _, _, _, tax_id_store, cipher = _stores()
+    return store_tax_id(
+        draft.tax_id,
+        existing=stored.tax_id if stored is not None else None,
+        firm_id=case.firm_id,
+        case_id=case.id,
+        cipher=cipher,
+        store=tax_id_store,
+    )
 
 
 def _log_saved(case_id: str, debtor_id: str, role: str) -> None:
@@ -106,8 +157,15 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     Idempotent: the same body twice leaves the same record, keeping the id and
     created_at of the first write because provenance paths elsewhere may
     already name that id.
+
+    The tax id (issue 13.12 / #382) rides the same PUT: the digits arrive in
+    the body, are sealed under the case key BEFORE the debtor row is written,
+    and only the last-four view and the sealed item's reference land on the
+    record — so the response, like every read, carries `tax_id: {kind,
+    last_four}` and nothing more. A client keeps a stored number across a
+    save by echoing that view; it clears it by leaving the member out.
     """
-    _, debtor_store, _ = _stores()
+    _, debtor_store, _, _, _ = _stores()
     accessor = current_accessor()
 
     # Body BEFORE ownership, which looks backwards and is deliberate. The body
@@ -119,7 +177,7 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     # alternative would be recording changes that never happened.
     role = parse_filing_role(filing_role)
     draft = parse_debtor(_json_body())
-    _reachable_case_or_404(accessor, case_id, "case.update")
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
 
     stored = debtor_store.get(case_id, filing_role=role)
     if stored is None:
@@ -128,12 +186,19 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
         # would erase the one the first had already returned to a client —
         # where provenance paths elsewhere may already name it. Autosave plus a
         # double submit is all it takes.
-        fresh = create_debtor(draft, case_id=case_id, filing_role=role)
+        fresh = create_debtor(
+            draft,
+            case_id=case_id,
+            filing_role=role,
+            tax_id=_resolve_tax_id(draft, None, case),
+        )
         if debtor_store.create(fresh):
             _log_saved(case_id, fresh.id, role)
             return jsonify(debtor_json(fresh)), 201
         # Lost the race. `fresh`'s id has not left this process, so dropping it
-        # costs nothing; the winner's record is the one to build on.
+        # costs nothing; the winner's record is the one to build on — and so
+        # is the winner's tax-id reference, which is why the tax id is
+        # resolved again below against what the winner stored.
         stored = debtor_store.get(case_id, filing_role=role)
 
     if stored is None:
@@ -143,7 +208,7 @@ def put_debtor_route(case_id: str, filing_role: str) -> ResponseReturnValue:
         # an UnboundLocalError in it.
         raise RuntimeError("debtor vanished between a refused create and a read")
 
-    debtor = replace_debtor(stored, draft)
+    debtor = replace_debtor(stored, draft, tax_id=_resolve_tax_id(draft, stored, case))
     debtor_store.put(debtor)
     _log_saved(case_id, debtor.id, role)
     return jsonify(debtor_json(debtor)), 200
@@ -159,7 +224,7 @@ def list_debtors_route(case_id: str) -> ResponseReturnValue:
     at all: this names one case, so "who saw this file" has an answer worth
     recording.
     """
-    _, debtor_store, _ = _stores()
+    _, debtor_store, _, _, _ = _stores()
     accessor = current_accessor()
 
     _reachable_case_or_404(accessor, case_id, "case.read")

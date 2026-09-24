@@ -48,7 +48,7 @@ import io
 import logging
 import zipfile
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Final
 
@@ -99,6 +99,7 @@ from insolvia_core.petitions import (
     SoleProprietorshipBody,
 )
 from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
+from insolvia_core.tax_ids import read_tax_id
 
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import (
@@ -133,6 +134,8 @@ if TYPE_CHECKING:
         CaseStore,
         DebtorStore,
         DocumentBlobStore,
+        TaxIdCipher,
+        TaxIdStore,
     )
 
     from insolvia_api.core.ports import PacketStore
@@ -212,10 +215,16 @@ class CaseData:
     """Everything assembly reads, as the stores hand it over — entities with
     their ids, in the collections' own listing order (creation order). The
     gate needs the wrappers (a problem names the record to fix); the
-    projections get the bodies via `to_case_file`."""
+    projections get the bodies via `to_case_file`.
+
+    `tax_ids` (filing role -> the full nine digits) is EMPTY as read — the
+    stores never hand over a full tax identifier — and is filled only by
+    `disclose_tax_ids`, the logged full-value read, on the one path that is
+    about to print B121. `to_case_file` carries it across verbatim."""
 
     case: Case
     debtors: tuple[Debtor, ...] = ()
+    tax_ids: Mapping[str, str] = field(default_factory=dict)
     petitions: tuple[CaseEntity[PetitionBody], ...] = ()
     prior_cases: tuple[CaseEntity[PriorCaseBody], ...] = ()
     related_cases: tuple[CaseEntity[RelatedCaseBody], ...] = ()
@@ -275,6 +284,48 @@ def read_case_data(
     )
 
 
+def disclose_tax_ids(
+    data: CaseData,
+    *,
+    principal: str,
+    purpose: str,
+    tax_id_store: TaxIdStore,
+    tax_id_cipher: TaxIdCipher,
+    access_log: AccessLog,
+) -> CaseData:
+    """The logged full-value read, for every debtor of the case that carries
+    a tax id — ONE `taxid.read` row per debtor, naming `principal` and
+    `purpose` (insolvia_core.tax_ids.read_tax_id) — returning the data with
+    `tax_ids` filled so B121 can print.
+
+    Called by exactly three things, each about to print B121 or reproduce
+    a packet that did: `run_packet_assembly` (unless the requested subset
+    leaves B121 out), the single-form preview for `b121`, and the review
+    worker's byte-exact re-assembly (core/petition_review.py — which then
+    drops B121 from what the model sees). Never by a route that answers a
+    client with case data, and never by the forms-hub listing, which prints
+    nothing.
+    """
+    disclosed: dict[str, str] = {}
+    for debtor in data.debtors:
+        if debtor.tax_id is None:
+            continue
+        digits = read_tax_id(
+            debtor.tax_id,
+            firm_id=data.case.firm_id,
+            case_id=data.case.id,
+            filing_role=debtor.filing_role,
+            principal=principal,
+            purpose=purpose,
+            cipher=tax_id_cipher,
+            store=tax_id_store,
+            access_log=access_log,
+        )
+        if digits is not None:
+            disclosed[debtor.filing_role] = digits
+    return replace(data, tax_ids=disclosed)
+
+
 def to_case_file(data: CaseData) -> CaseFile:
     """The projections' input: bodies in listing order, id-paired where other
     records reference them (form_projections/shared.CaseFile's contract).
@@ -285,6 +336,7 @@ def to_case_file(data: CaseData) -> CaseFile:
     return CaseFile(
         case=data.case,
         debtors=data.debtors,
+        tax_ids=data.tax_ids,
         petition=data.petitions[0].body if data.petitions else None,
         prior_cases=tuple(e.body for e in data.prior_cases),
         related_cases=tuple(e.body for e in data.related_cases),
@@ -474,9 +526,12 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
     A B108 row without its intention box, or a B2030 without its amounts,
     is a signed statement with its one question blank — so each is a gate,
     named per record like every other problem. B121 and B2010 gate nothing:
-    the notice has no field, and the tax identifier B121 exists to print is
-    not storable yet (its projection says why), which is not a fix a
-    preparer can make from the intake screens.
+    the notice has no field, and B121's "you do not have a Social Security
+    number / an ITIN" boxes are not modelled, so a debtor without a stored
+    tax id cannot be told apart from one who has none to give — a blank
+    line 2 is that debtor's honest statement, not a defect this gate can
+    name (issue 13.12 / #382 stored the number; modelling the absence is
+    still open).
     """
     problems: list[PacketProblem] = []
     for claim in data.claims:
@@ -807,6 +862,17 @@ class PacketAssemblyDeps:
     packet_store: PacketStore
     blobs: DocumentBlobStore
     access_log: AccessLog
+    # B121's number (issue 13.12 / #382): the sealed items and the cipher
+    # that opens them, under the worker role's Decrypt-only grant.
+    tax_id_store: TaxIdStore
+    tax_id_cipher: TaxIdCipher
+
+
+def prints_b121(options: OutputOptions) -> bool:
+    """Whether this render will put B121 on paper — the only reason to
+    perform the full-value read. A subset that leaves it out projects B121
+    blank and never opens an envelope."""
+    return options.forms is None or "b121" in options.forms
 
 
 def run_packet_assembly(
@@ -859,6 +925,17 @@ def run_packet_assembly(
         if job.options is not None
         else DEFAULT_OUTPUT_OPTIONS
     )
+    if prints_b121(options):
+        # The full tax identifier, for B121 alone — its own audit row per
+        # debtor, against the same preparer, beside the packet.assemble row.
+        data = disclose_tax_ids(
+            data,
+            principal=job.created_by,
+            purpose="b121",
+            tax_id_store=deps.tax_id_store,
+            tax_id_cipher=deps.tax_id_cipher,
+            access_log=deps.access_log,
+        )
     outcome = assemble(data, as_of=as_of, options=options, printed_at=printed_at)
 
     if not isinstance(outcome, AssembledPacket):

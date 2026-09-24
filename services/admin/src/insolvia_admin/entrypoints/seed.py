@@ -154,6 +154,8 @@ from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
 from insolvia_core.cases import assign_case, create_case, parse_case_creation
@@ -178,7 +180,10 @@ from insolvia_core.ports import (
     DocumentBlobStore,
     DocumentStore,
     FirmStore,
+    TaxIdCipher,
+    TaxIdStore,
 )
+from insolvia_core.tax_ids import store_tax_id
 
 # What infra/modules/* name a table, per environment: insolvia-<env>-<kind>,
 # environment SECOND (the insolvia-aws-naming skill). Dev carries the machine
@@ -398,6 +403,14 @@ class Dependencies:
     document_blobs: Callable[[str], DocumentBlobStore] = S3DocumentBlobStore
     # (fixture bucket, target document bucket or None)
     fixture_objects: Callable[[str, str | None], FixtureObjects] = S3FixtureObjects
+    # The debtor's tax id (issue 13.12 / #382): a fixture debtor's number is
+    # sealed exactly as the API seals one — same store, same cipher, same
+    # encryption context — under the target's case key, whose alias is
+    # derived from the case table's name. Both factories take that name.
+    tax_id_store: Callable[[str], TaxIdStore] = DynamoDbTaxIdStore
+    tax_id_cipher: Callable[[str], TaxIdCipher] = lambda table: KmsTaxIdCipher(
+        case_key_alias(table)
+    )
 
 
 def _require_seedable_table(table: str, *, kind: str) -> None:
@@ -549,6 +562,8 @@ class CaseStores:
     documents: DocumentStore
     blobs: DocumentBlobStore
     objects: FixtureObjects
+    tax_ids: TaxIdStore
+    tax_id_cipher: TaxIdCipher
 
 
 def derived_id(*parts: str) -> str:
@@ -670,8 +685,24 @@ def _seed_one_case(
         if check:
             print(f"    debtor {role}: missing")
         else:
+            # A fixture debtor's tax id is sealed the way the API seals one
+            # (issue 13.12 / #382): fresh ref, the firm bound in the
+            # context, the digits nowhere but the envelope. The fixture
+            # value is synthetic by the fixture's own rule — and the parser
+            # would have refused a real-looking one from the never-issued
+            # block insolvia_core.tax_ids reserves for exactly this.
+            tax_id = store_tax_id(
+                debtor_draft.tax_id,
+                existing=None,
+                firm_id=firm_id,
+                case_id=case_id,
+                cipher=stores.tax_id_cipher,
+                store=stores.tax_ids,
+            )
             stores.debtors.create(
-                create_debtor(debtor_draft, case_id=case_id, filing_role=role)
+                create_debtor(
+                    debtor_draft, case_id=case_id, filing_role=role, tax_id=tax_id
+                )
             )
             print(f"    debtor {role}: created")
 
@@ -871,6 +902,16 @@ def _strip(body: Mapping[str, object]) -> dict[str, object]:
     return {k: v for k, v in body.items() if k not in _SERVER_OWNED}
 
 
+def _without_tax_id(body: dict[str, object]) -> dict[str, object]:
+    """A captured debtor minus its tax id and that field's provenance entry
+    — see `capture` for why the view cannot be written back."""
+    stripped = {k: v for k, v in body.items() if k != "tax_id"}
+    provenance = stripped.get("provenance")
+    if isinstance(provenance, Mapping):
+        stripped["provenance"] = {k: v for k, v in provenance.items() if k != "tax_id"}
+    return stripped
+
+
 def capture(
     folder: Path,
     *,
@@ -918,8 +959,14 @@ def capture(
         "handle": handle,
         "chapter": case.chapter,
         "district": case.district,
+        # `tax_id` is DROPPED from a captured debtor, and its provenance
+        # entry with it: the API's own representation is the last-four view,
+        # which the loader cannot re-seal (the full digits are behind the
+        # audited read, which a fixture must never trigger). A captured
+        # fixture that needs one gets it typed in by hand, from the SSA's
+        # never-issued advertising block (insolvia_core.tax_ids).
         "debtors": {
-            debtor.filing_role: _strip(debtor_json(debtor))
+            debtor.filing_role: _without_tax_id(_strip(debtor_json(debtor)))
             for debtor in stores.debtors.list_for_case(case_id)
         },
         "collections": {},
@@ -1040,6 +1087,8 @@ def _case_stores(
         documents=deps.document_store(args.case_table),
         blobs=deps.document_blobs(bucket or ""),
         objects=deps.fixture_objects(fixture_bucket or "", bucket),
+        tax_ids=deps.tax_id_store(args.case_table),
+        tax_id_cipher=deps.tax_id_cipher(args.case_table),
     )
 
 

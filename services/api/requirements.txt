@@ -11,6 +11,10 @@ boto3==1.40.66
 # Pinned exact for the same reason boto3 is: local, CI, and Lambda must resolve
 # one version of the code that decides whether a request is authenticated.
 PyJWT[crypto]==2.13.0
+# Named directly as well as arriving through PyJWT[crypto]: insolvia_core's
+# tax-id envelope (adapters/envelope.py, issue 13.12 / #382) imports it by
+# name, and the pin keeps the cipher one version across local, CI and Lambda.
+cryptography==50.0.1
 # The forms fill engine (issue #93): AcroForm value + appearance writing over
 # the official form templates in core/form_fill.py. Pure Python, and pinned
 # exact for a sharper reason than the others: the golden tests pin the sha256

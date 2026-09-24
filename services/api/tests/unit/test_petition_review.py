@@ -56,6 +56,8 @@ def review_deps(assembly_deps, model):
         entity_store=assembly_deps.entity_store,
         packet_store=assembly_deps.packet_store,
         access_log=assembly_deps.access_log,
+        tax_id_store=assembly_deps.tax_id_store,
+        tax_id_cipher=assembly_deps.tax_id_cipher,
         model=model,
     )
 
@@ -152,6 +154,20 @@ def test_a_reviewed_packet_reports_findings_against_the_stored_packet():
         e.action == "petition.review" and e.principal == "subject-1"
         for e in deps.access_log.events
     )
+    # So is the full-value read the byte-exact re-assembly needs (issue
+    # 13.12 / #382) — its own rows, purpose `petition_review`, beside the
+    # `b121` rows the assembly wrote.
+    assert [
+        (e.filing_role, e.purpose)
+        for e in deps.access_log.events
+        if e.action == "taxid.read" and e.purpose == "petition_review"
+    ] == [("debtor_1", "petition_review"), ("debtor_2", "petition_review")]
+    # And the number stopped there: nothing shaped like one reached the
+    # model — the B121 projection is dropped wholesale before the scrub.
+    (document,) = model.documents
+    assert '"form/b121"' not in document
+    assert "987-65-4321" not in document
+    assert "87-65-4322" not in document
 
 
 def test_a_clean_review_carries_an_empty_findings_list():
@@ -191,10 +207,15 @@ def test_the_document_is_deterministic():
 
 
 def test_the_document_never_carries_a_tax_id_shape():
-    """Defence in depth over the stores' own refusal to hold one — nothing
-    shaped like an SSN/ITIN survives the scrub, whatever field it hid in."""
+    """The reference packet PRINTS both identifiers on B121 (the file is the
+    disclosed state); the document drops that form wholesale and the scrub
+    catches anything shaped like one elsewhere, including the debtor
+    record's last-four view."""
     document = review_document(reference_case_data(), assembled_reference())
+    assert '"form/b121"' not in document
     assert re.search(r"\b\d{3}-\d{2}-\d{4}\b", document) is None
+    assert "87-65-4322" not in document
+    assert '"tax_id"' not in document
 
 
 @pytest.mark.parametrize(

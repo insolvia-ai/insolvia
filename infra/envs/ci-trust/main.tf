@@ -1188,6 +1188,36 @@ data "aws_iam_policy_document" "github_seed_permissions" {
     }
   }
 
+  # The same key, DIRECTLY this time, for one purpose (issue 13.12 / #382):
+  # a fixture debtor's tax id is sealed by the loader exactly as the API
+  # seals one — a data key generated under the case key with the tax-id
+  # encryption context (insolvia_core.tax_ids) — and that call comes from
+  # the loader itself, not through DynamoDB, so neither ViaService fence
+  # covers it. Bounded the way modules/case_store's TaxIdKeyUse bounds the
+  # API's own: the context's `purpose` member must be the one the code
+  # stamps, so nothing else sealed under this key is reachable through it.
+  # GenerateDataKey ONLY — the loader writes identifiers and never reads
+  # one back (a captured fixture drops the tax id; the loader's docstring
+  # says why), so it never needs Decrypt. Same alias, same staging-only
+  # reasoning as the two statements around it.
+  statement {
+    sid       = "StagingCaseKeyForTaxIdSealing"
+    actions   = ["kms:GenerateDataKey"]
+    resources = ["*"]
+
+    condition {
+      test     = "ForAnyValue:StringEquals"
+      variable = "kms:ResourceAliases"
+      values   = ["alias/insolvia-staging-cases"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:EncryptionContext:purpose"
+      values   = ["debtor-tax-id"]
+    }
+  }
+
   # Staging's case-documents bucket, for the sample documents a seeded case
   # carries. PutObject is the server-side copy out of the fixture bucket;
   # GetObject is what HeadObject is authorised by (the loader confirms the

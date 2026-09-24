@@ -316,8 +316,22 @@ grants, deliberately disjoint:
 
 | Principal | Table | Key |
 |---|---|---|
-| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb` |
+| API Lambda role | Item-level reads and writes, **no `Scan`**, no control plane | `Decrypt`/`GenerateDataKey`, fenced to `kms:ViaService = dynamodb`; plus `GenerateDataKey`/`Decrypt` **directly**, fenced to `kms:EncryptionContext:purpose = debtor-tax-id` — the tax-id envelope (13.12), and the only direct use of the key |
+| Pipeline worker role | Item-level reads, no delete | The same DynamoDB-fenced pair; `Decrypt` alone under the tax-id context (it prints B121, it never enters an identifier) |
+| MCP service role | Item-level reads, candidate writes | The DynamoDB-fenced pair only — no tax-id context at all, so "no tool returns a full tax identifier" is an IAM fact |
+| Staging seed role (`ci-trust`) | Firm and case rows in staging | The DynamoDB- and S3-fenced pairs; `GenerateDataKey` alone under the tax-id context, to seal a fixture debtor's synthetic number — never `Decrypt` |
 | CI deploy role | Control plane only — create, update, tag, PITR | Manage the key; **explicitly denied** `Decrypt`, `GenerateDataKey*` and `ReEncrypt*` except where SSM or CloudTrail is the calling service |
+
+The tax-id statements are the one place a role touches the key without a
+`kms:ViaService` fence, and the encryption context is what replaces it: a
+call that does not carry `purpose = debtor-tax-id` is denied, and a call that
+does can only be the envelope `insolvia_core.tax_ids` designed
+(`infra/modules/case_store`, `TaxIdKeyUse`). The key's alias is derived by
+the ciphers from the case table's name — `alias/insolvia-<env>-cases` is the
+same `local.name` — so no environment carries a second configuration value
+for it, and `infra/envs/dev` needs nothing: the developer's own IAM user
+reaches the key through the key policy's root delegation, exactly as it
+reaches the table.
 
 The API role's key grant is easy to mistake for redundancy, because DynamoDB
 creates its own grant when the table is built. It is not: that grant covers

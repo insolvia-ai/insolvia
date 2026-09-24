@@ -32,12 +32,14 @@ src/insolvia_core/
 │   income.py · expenses.py · sofa.py    per-entity parse functions and bodies
 ├── fields.py          the shared field parsers those entities are built from
 ├── provenance.py      per-field provenance: parsing and the confirm-before-entry invariants
+├── tax_ids.py         the debtor's SSN/ITIN: shape rules, the sealed item, the logged full-value read
 ├── ports.py           FirmStore · UserDirectory · JwksProvider · CaseStore ·
 │                      DocumentStore · DocumentBlobStore · DebtorStore ·
-│                      CaseEntityStore · AccessLog
+│                      CaseEntityStore · AccessLog · TaxIdStore · TaxIdCipher
 └── adapters/
-    ├── aws/     DynamoDB stores · Cognito directory · JWKS fetcher · S3 blobs
-    └── memory/  in-memory stand-ins for tests and local dev servers
+    ├── envelope.py  the AES-GCM half of the tax-id envelope both ciphers share
+    ├── aws/     DynamoDB stores · Cognito directory · JWKS fetcher · S3 blobs · the KMS tax-id cipher
+    └── memory/  in-memory stand-ins for tests and local dev servers (a fixed-key tax-id cipher)
 ```
 
 ## Developing

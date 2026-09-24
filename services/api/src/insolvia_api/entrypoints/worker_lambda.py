@@ -24,6 +24,8 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 
 from insolvia_api.adapters.anthropic.extraction_model import AnthropicExtractionModel
 from insolvia_api.adapters.anthropic.review_model import AnthropicReviewModel
@@ -78,6 +80,11 @@ _debtor_store = DynamoDbDebtorStore(config.case_table_name)
 _entity_store = DynamoDbCaseEntityStore(config.case_table_name)
 _packet_store = DynamoDbPacketStore(config.case_table_name)
 _access_log = DynamoDbAccessLog(config.case_access_log_table_name)
+# B121's number (issue 13.12 / #382): the worker role holds Decrypt on the
+# case key for the tax-id encryption context and nothing more — it prints
+# identifiers, it never enters one (infra/modules/case_store, TaxIdKeyUse).
+_tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
+_tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
 # The AI review's model seam (issue #97, ADR 0019). Deliberately NOT
 # hard-required like the stores above: an environment without the key still
 # runs every other job kind, and a `petition_review` job fails
@@ -103,6 +110,8 @@ _workers = {
             packet_store=_packet_store,
             blobs=_blobs,
             access_log=_access_log,
+            tax_id_store=_tax_id_store,
+            tax_id_cipher=_tax_id_cipher,
         )
     ),
     PETITION_REVIEW_KIND: petition_review_worker(
@@ -112,6 +121,8 @@ _workers = {
             entity_store=_entity_store,
             packet_store=_packet_store,
             access_log=_access_log,
+            tax_id_store=_tax_id_store,
+            tax_id_cipher=_tax_id_cipher,
             model=_review_model,
         )
     ),
