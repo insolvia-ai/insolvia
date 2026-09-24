@@ -19,6 +19,7 @@ import {
   formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
+  noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
   updateCaseChangesToJson,
@@ -101,6 +102,8 @@ import type {
   ListCasesResult,
   LocalStandardsFigures,
   NationalStandardsFigures,
+  Note,
+  NoteRequest,
   NoticeParty,
   OtherName,
   OutputOptions,
@@ -958,6 +961,86 @@ export class InsolviaApiClient {
     const headers = await this.#protectedHeaders();
     const response = await this.#fetch(
       `${this.#collectionUrl(caseId, collection)}/${encodeURIComponent(entityId)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/notes` — add one note (issue 14.5 / #357), case-
+   * level or anchored to a form. The server stamps `authorSubject`/
+   * `authorName` from the caller's own token; {@link NoteRequest} carries
+   * neither, so there is nothing to send and nothing to spoof.
+   *
+   * A STATIC segment, not {@link addCaseEntity} — `note`s are not a
+   * {@link CaseCollection}; see the module comment above {@link NoteRequest}.
+   */
+  async addNote(caseId: string, note: NoteRequest): Promise<Note> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteRequestToJson(note)),
+      },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return noteFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/notes` — every note on the case, NEWEST FIRST
+   * (the server's own order — the opposite of {@link listCaseEntities}, which
+   * lists a schedule oldest first; a note is a running log, so the one just
+   * left belongs at the top). The wire body is `{"notes": [...]}`; this
+   * returns the array.
+   */
+  async listNotes(caseId: string): Promise<readonly Note[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireNoteArray(decoded, 'notes');
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/notes/{noteId}` — replace a note's text and form
+   * anchor, WHOLE, exactly as {@link putCaseEntity} replaces a collection
+   * record. Authorship never changes here, including when a firm admin edits
+   * a colleague's note — the server keeps the ORIGINAL author.
+   *
+   * A 403 means the caller is neither the note's author nor a firm admin —
+   * see {@link ApiException.statusCode} — distinct from the 403 a missing
+   * `notes` permission would answer, and from a 404, which this endpoint
+   * still uses for a note the caller cannot even see (unknown id, or another
+   * firm's case).
+   */
+  async putNote(caseId: string, noteId: string, note: NoteRequest): Promise<Note> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes/${encodeURIComponent(noteId)}`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteRequestToJson(note)),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return noteFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/notes/{noteId}` — remove a note. Same
+   * author-or-admin rule as {@link putNote}; 204 with no body, and a second
+   * delete of the same id answers 404.
+   */
+  async deleteNote(caseId: string, noteId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/notes/${encodeURIComponent(noteId)}`,
       { method: 'DELETE', headers },
     );
     await expectNoContent(response, 204);
@@ -2676,6 +2759,42 @@ function requireCaseEntityArray<C extends CaseCollection>(
   });
 }
 
+/** Decodes a {@link Note} from a response body — `note_json`'s exact shape
+ * (`insolvia_core.notes`). No `provenance` member: a note carries none. */
+function noteFromJson(response: DecodedResponse): Note {
+  return definedMembers<Note>({
+    id: requireString(response, 'id'),
+    case_id: requireString(response, 'case_id'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    author_subject: requireString(response, 'author_subject'),
+    author_name: requireString(response, 'author_name'),
+    text: optionalString(response, 'text'),
+    form_series: optionalString(response, 'form_series'),
+  });
+}
+
+/** The `{"notes": [...]}` envelope's array, checked per element — the same
+ * shape as {@link requireDebtorArray}. */
+function requireNoteArray(response: DecodedResponse, key: string): readonly Note[] {
+  const value = response.json[key];
+  if (!Array.isArray(value)) {
+    throw malformedField(response, key, 'Note[]');
+  }
+  return value.map((item, index) => {
+    const label = `${key}[${index}]`;
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw malformedField(response, label, 'object');
+    }
+    return noteFromJson({
+      statusCode: response.statusCode,
+      body: response.body,
+      json: item as JsonObject,
+      path: label,
+    });
+  });
+}
+
 /** One matrix problem: `{"creditorId"?, "field", "message"}` (issue #94). */
 function creditorMatrixProblemFromJson(response: DecodedResponse): CreditorMatrixProblem {
   return definedMembers<CreditorMatrixProblem>({
@@ -3160,6 +3279,7 @@ const FIRM_FEATURES = [
   'documents',
   'extraction_review',
   'creditor_library',
+  'notes',
   'firm_administration',
 ] as const;
 

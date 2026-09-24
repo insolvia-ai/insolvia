@@ -87,12 +87,19 @@ FIRM_ADMINISTRATION: Final = "firm_administration"
 # also handing them every case, or the reverse: full intake access with the
 # library left view_only while the firm settles on what belongs in it.
 CREDITOR_LIBRARY: Final = "creditor_library"
+# Free-text notes on a case, or on a form within it (issue 14.5 / #357) —
+# separate from INTAKE because a note is not case data (it never prints on a
+# form and carries no provenance, see core/notes.py) and a firm may want
+# staff to see the schedule intake without seeing what colleagues have
+# scribbled about it, or the reverse.
+NOTES: Final = "notes"
 FEATURES: Final = (
     CASES,
     INTAKE,
     DOCUMENTS,
     EXTRACTION_REVIEW,
     CREDITOR_LIBRARY,
+    NOTES,
     FIRM_ADMINISTRATION,
 )
 
@@ -280,6 +287,10 @@ def default_permissions(role: str) -> dict[str, str]:
             DOCUMENTS: ADD_EDIT,
             EXTRACTION_REVIEW: HIDDEN,
             CREDITOR_LIBRARY: VIEW_ONLY,
+            # Fail-closed default (issue 14.5 / #357): staff is not named as a
+            # default grantee, so this stays HIDDEN until an admin opts them
+            # in, the same way EXTRACTION_REVIEW arrived above.
+            NOTES: HIDDEN,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -288,6 +299,9 @@ def default_permissions(role: str) -> dict[str, str]:
         DOCUMENTS: ADD_EDIT,
         EXTRACTION_REVIEW: ADD_EDIT,
         CREDITOR_LIBRARY: ADD_EDIT,
+        # ATTORNEY AND PARALEGAL, same as every feature in this branch (see
+        # the docstring above) — both do case work, and a note is part of it.
+        NOTES: ADD_EDIT,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two

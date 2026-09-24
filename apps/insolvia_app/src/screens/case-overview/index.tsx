@@ -1,13 +1,14 @@
-import type { CaseSummary, FirmColleague, InsolviaApiClient } from '@insolvia-ai/api-client';
+import type { CaseSummary, FirmColleague, InsolviaApiClient, Note } from '@insolvia-ai/api-client';
 import { Badge, Button } from '@insolvia-ai/design-system';
 import { Link, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { caseTitle, chapterAndDistrict, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { NotesPanel } from '@/components/notes-panel';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
 import { filingStages, stagesComplete } from './stages';
@@ -105,6 +106,24 @@ export function CaseOverview() {
   // use, and for the same reason: a case that looks ready because its summary
   // failed to load is worse than one that says nothing.
   const [summary, setSummary] = useState<CaseSummary | null>(null);
+  const [notes, setNotes] = useState<readonly Note[]>([]);
+
+  // A SEPARATE effect and callback from the one below, rather than folded into
+  // `loadAll`: `NotesPanel` re-reads through this after every add, edit and
+  // delete, which the counts/summary/colleagues trio has no reason to redo.
+  const loadNotes = useCallback(async () => {
+    try {
+      const result = await call((client) => client.listNotes(caseId));
+      if (result.ok) setNotes(result.value);
+    } catch {
+      // A nicety next to the spine, the same trade every read below makes: the
+      // panel simply keeps showing whatever it last had.
+    }
+  }, [call, caseId]);
+
+  useEffect(() => {
+    void loadNotes();
+  }, [loadNotes]);
 
   useEffect(() => {
     // Guards the state writes against a case the user navigated away from
@@ -276,6 +295,11 @@ export function CaseOverview() {
               </View>
             </Section>
           ) : null}
+
+          {/* ── Notes (issue 14.5 / #357) ───────────────────────────────── */}
+          <Section title="Notes" meta={`${notes.length} on this case`}>
+            <NotesPanel caseId={caseId} notes={notes} onChanged={() => void loadNotes()} />
+          </Section>
         </View>
 
         {/* ── At a glance ─────────────────────────────────────────────── */}

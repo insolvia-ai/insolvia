@@ -1,4 +1,4 @@
-import type { CaseForm, CaseProblem } from '@insolvia-ai/api-client';
+import type { CaseForm, CaseProblem, Note } from '@insolvia-ai/api-client';
 import { Badge, Button } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { CaseColumn } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
+import { NotesPanel } from '@/components/notes-panel';
 import {
   DEFAULT_OUTPUT_OPTIONS,
   OutputOptionsPanel,
@@ -122,6 +123,15 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
   const [busySeries, setBusySeries] = useState<string | null>(null);
   const [activity, setActivity] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  // The case's whole note list (issue 14.5 / #357), read ONCE here rather
+  // than once per row: `NotesPanel` never fetches for itself (see its own
+  // docstring), and thirteen rows each calling listNotes for their own count
+  // would be thirteen requests for the answer one already gives.
+  const [notes, setNotes] = useState<readonly Note[]>([]);
+  // Which rows' note panels are open. A Set rather than one `string | null`
+  // — a preparer comparing two schedules' notes side by side should be able
+  // to expand both, the same way two browser tabs would let them.
+  const [expandedNotes, setExpandedNotes] = useState<ReadonlySet<string>>(new Set());
   // Output options (issue 13.11): one panel for the whole screen, applied to
   // whichever row's "Preview" is next pressed — the same options a preview
   // renders with are exactly what a subsequent packet assembly would use for
@@ -140,9 +150,33 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
     }
   }, [call, caseId]);
 
+  const loadNotes = useCallback(async () => {
+    try {
+      const result = await call((client) => client.listNotes(caseId));
+      if (result.ok) setNotes(result.value);
+    } catch {
+      // A row's note count and panel are a nicety next to the schedule
+      // itself; a failed read just leaves them showing what they last had,
+      // the same trade every other read on this screen makes.
+    }
+  }, [call, caseId]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadNotes();
+  }, [load, loadNotes]);
+
+  const toggleNotes = (series: string) => {
+    setExpandedNotes((current) => {
+      const next = new Set(current);
+      if (next.has(series)) {
+        next.delete(series);
+      } else {
+        next.add(series);
+      }
+      return next;
+    });
+  };
 
   const preview = async (form: CaseForm) => {
     setActionError(null);
@@ -211,6 +245,8 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
             const badge = statusBadge(form.problems);
             const metric = describeMetric(form.metric);
             const segment = OPEN_SEGMENT[form.series];
+            const formNotes = notes.filter((note) => note.form_series === form.series);
+            const notesOpen = expandedNotes.has(form.series);
             return (
               <View role="listitem" key={form.series} style={styles.row}>
                 <View style={styles.rowHeader}>
@@ -262,7 +298,30 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
                       Open
                     </Button>
                   ) : null}
+                  <Button
+                    size="lg"
+                    intent="secondary"
+                    onPress={() => {
+                      toggleNotes(form.series);
+                    }}
+                    aria-label={
+                      notesOpen ? `Hide notes for ${form.title}` : `Show notes for ${form.title}`
+                    }
+                  >
+                    {`Notes (${formNotes.length})`}
+                  </Button>
                 </View>
+
+                {notesOpen ? (
+                  <View style={styles.notes}>
+                    <NotesPanel
+                      caseId={caseId}
+                      notes={formNotes}
+                      formSeries={form.series}
+                      onChanged={() => void loadNotes()}
+                    />
+                  </View>
+                ) : null}
               </View>
             );
           })}
@@ -284,6 +343,9 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  notes: {
     marginTop: spacing.sm,
   },
   problemSource: {

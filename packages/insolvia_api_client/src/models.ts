@@ -86,6 +86,7 @@ export type FirmFeature =
   | 'documents'
   | 'extraction_review'
   | 'creditor_library'
+  | 'notes'
   | 'firm_administration';
 
 /**
@@ -3118,6 +3119,74 @@ export function caseEntityRequestToJson(
     json.provenance = provenance;
   }
   return json;
+}
+
+// ---------------------------------------------------------------------------
+// Notes (issue 14.5 / #357) — free-text notes on a case, or anchored to one
+// of its forms. Not a {@link CaseCollection}: `debtors` and `documents`
+// aren't either, for the same kind of reason — `core/notes.py` (the server)
+// says a note needs its own endpoints because the author is server-stamped
+// (never sent by the client, so it is not on {@link NoteRequest}) and a note
+// is editable only by its author or a firm admin, neither of which the
+// generic collection routes can express.
+//
+// SNAKE_CASE, like {@link Debtor} and unlike everything else in this file —
+// see that section's comment for why: the wire is mirrored, not smoothed.
+// `note_json` (`insolvia_core.notes`) emits `case_id`, `created_at`,
+// `author_subject` — and, unlike every {@link CaseEntity}, no `provenance`
+// key at all: a note is not case data printed on a form, so it carries none.
+// ---------------------------------------------------------------------------
+
+/** The client-supplied half of a note: everything but its server identity
+ * and its server-stamped author. Used for both create and edit — there is no
+ * partial update, the same PUT-replaces-whole rule {@link PutDebtorRequest}
+ * follows. */
+export interface NoteRequest {
+  readonly text?: string | undefined;
+  /**
+   * A form series id, exactly as {@link CaseForm.series} names it (e.g.
+   * `"form/b106g"`) — the form this note is anchored to, or absent for a
+   * case-level note.
+   */
+  readonly form_series?: string | undefined;
+}
+
+/**
+ * A note as every note endpoint returns it: server identity, the author
+ * snapshot captured at write, and whatever of {@link NoteRequest} is
+ * populated. Absent members are absent, never null — the same rule
+ * {@link Debtor} follows.
+ */
+export interface Note extends NoteRequest {
+  /** The server-generated note id, stable across edits. */
+  readonly id: string;
+  readonly case_id: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  /**
+   * The Cognito subject of whoever wrote this note, captured when it was
+   * created and unaffected by later edits — including an admin's, per
+   * {@link putNote}. Never the editor's.
+   */
+  readonly author_subject: string;
+  /** The author's display name, captured at the same moment as `author_subject`. */
+  readonly author_name: string;
+}
+
+/**
+ * The request body for `POST`/`PUT .../notes[...]`, with absent members
+ * omitted from the JSON entirely — the note counterpart of
+ * {@link putDebtorRequestToJson}. There is no `provenance` member to prune
+ * separately: a note carries none.
+ */
+export function noteRequestToJson(request: NoteRequest): Record<string, unknown> {
+  return assignDefined(
+    {},
+    {
+      text: request.text,
+      form_series: request.form_series,
+    },
+  );
 }
 
 /**
