@@ -98,6 +98,12 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
 # is deliberately absent from COLLECTIONS, so it is not reachable through the
 # generic `/v1/cases/<id>/<collection>` dispatch — see core/notes.py for why
 # (server-stamped authorship, per-record edit ownership, no provenance).
+#
+# EVENT is the tenant API's calendar rows (services/api core/events.py,
+# issue 14.6 / #358): a case's hand-made events and its generated deadlines,
+# in the case's partition like every other child item but NOT a generic
+# collection — they carry no provenance map, and the generated ones are
+# rewritten by the deadline engine rather than edited by hand.
 RESERVED_SK_NAMESPACES: Final = (
     "META",
     "ASSIGNEE",
@@ -107,4 +113,5 @@ RESERVED_SK_NAMESPACES: Final = (
     "PACKET",
     "CANDIDATE",
     "NOTE",
+    "EVENT",
 )

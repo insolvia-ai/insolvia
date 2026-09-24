@@ -173,6 +173,11 @@ export function AppShell({
   // enforces regardless.
   const showFirmLink =
     membership != null && permits(membership.permissions.firm_administration, 'view_only');
+  // The same courtesy for the calendar (issue 14.6 / #358): `events` at
+  // `view_only` shows the entry, and the screen's own fallback answers a
+  // colleague whose grant was withdrawn mid-session.
+  const showCalendarLink =
+    membership != null && permits(membership.permissions.events, 'view_only');
 
   const footerLink = [
     styles.footerLinkText,
@@ -182,11 +187,12 @@ export function AppShell({
   const primary: ReadonlyArray<{
     label: string;
     icon: IconName;
-    href: '/' | '/cases' | '/firm';
+    href: '/' | '/cases' | '/calendar' | '/firm';
     show: boolean;
   }> = [
     { label: 'Home', icon: 'home', href: '/', show: true },
     { label: 'Cases', icon: 'folder', href: '/cases', show: true },
+    { label: 'Calendar', icon: 'calendar', href: '/calendar', show: showCalendarLink },
     { label: 'Firm', icon: 'briefcase', href: '/firm', show: showFirmLink },
   ];
 

@@ -1,0 +1,11 @@
+{
+  "series_id": "code/legal-holidays",
+  "effective_date": "2021-06-17",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.law.cornell.edu/uscode/text/5/6103",
+    "published": "2021-06-17",
+    "sha256": null
+  },
+  "notes": "The federal legal public holidays 5 U.S.C. § 6103(a) names, which Fed. R. Bankr. P. 9006(a)(6)(A) adopts as the 'legal holidays' that roll a deadline forward — as DATE RULES (a fixed month/day, or the nth weekday of a month), not a list of dates, so the table is right in every year until Congress adds a holiday. Effective 2021-06-17, the day Pub. L. 117-17 added Juneteenth National Independence Day to § 6103(a); the eleven-holiday list has not changed since. The observance shifts (a Saturday holiday observed the Friday before, a Sunday holiday observed the Monday after) are carried with their own citations because Rule 9006(a)(6)(A) speaks of 'the day set aside by statute for OBSERVING' a holiday. DELIBERATELY NOT HERE: Rule 9006(a)(6)(B)'s one-off days declared by the President or Congress (Inauguration Day, a day of mourning) and (C)'s state holidays for the district — neither is a table, and a deadline landing on one is the preparer's to check; the engine's description says so. Verified against Cornell LII's text of § 6103 on 2026-09-24."
+}

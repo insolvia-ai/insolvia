@@ -15,6 +15,10 @@ from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
 from mangum import Mangum
 
+from insolvia_api.adapters.aws.event_store import (
+    DynamoDbCalendarTokenStore,
+    DynamoDbEventStore,
+)
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -142,6 +146,10 @@ app = create_app(
         # by the extraction worker and the MCP service — the API composes
         # this store to list and resolve them.
         candidate_store=DynamoDbCandidateStore(config.case_table_name),
+        # Events and the feed token (issue 14.6 / #358): the case table once
+        # more — the calendar query rides its existing by-firm index.
+        event_store=DynamoDbEventStore(config.case_table_name),
+        calendar_token_store=DynamoDbCalendarTokenStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

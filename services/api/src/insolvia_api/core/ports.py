@@ -13,6 +13,8 @@ from typing import Protocol
 
 from insolvia_core.cases import Case
 
+from insolvia_api.core.calendar_feed import CalendarToken
+from insolvia_api.core.events import Event, EventScope
 from insolvia_api.core.extraction import ExtractionModelResult, ExtractionRequest
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
@@ -111,6 +113,60 @@ class PacketStore(Protocol):
         reversed — the SK is a random uuid, so neither implementation gets
         the ordering for free). All of them: a caller cannot page."""
         ...
+
+
+class EventStore(Protocol):
+    """Persists calendar events (issue 14.6 / #358) — case-scoped ones as
+    child items of their case's partition, firm-scoped ones under the
+    firm's own partition in the same table, and both under one calendar
+    index (core/events.event_item).
+
+    Takes NO accessor and enforces nothing, the rule every sibling store
+    states: a case event is reached only through its case, which the route
+    resolves through `CaseStore` first; a firm event through the caller's
+    resolved firm; and the calendar query is firm-keyed and then filtered by
+    the route against the cases the caller may see. One authorisation path.
+    """
+
+    def create(self, event: Event) -> None:
+        """Store a new event. Ids are server-minted uuid4s; an existing
+        (scope, id) means the minting is broken — MUST raise."""
+        ...
+
+    def get(self, scope: EventScope, event_id: str) -> Event | None: ...
+
+    def put(self, event: Event) -> bool:
+        """Write `event` back over a row that still exists. False means it
+        is gone — an edit racing a delete must not resurrect it."""
+        ...
+
+    def delete(self, scope: EventScope, event_id: str) -> bool: ...
+
+    def list_for_scope(self, scope: EventScope) -> tuple[Event, ...]:
+        """Every event of one case (or the firm's own, case-less events), in
+        start order. All of them: the deadline engine reconciles against
+        this list, and a truncated one would duplicate a deadline."""
+        ...
+
+    def list_for_firm(
+        self, firm_id: str, *, starting_from: str, until: str
+    ) -> tuple[Event, ...]:
+        """Every event of the firm whose `sort_instant` lies in
+        [starting_from, until], case-scoped and firm-scoped alike, in start
+        order — the calendar's one read. The caller widens `starting_from`
+        by MAX_EVENT_SPAN_DAYS and filters on the end itself."""
+        ...
+
+
+class CalendarTokenStore(Protocol):
+    """Persists the per-user feed secret (core/calendar_feed.py): one row
+    per (firm, subject), replaced on rotation, removed on revocation."""
+
+    def put(self, token: CalendarToken) -> None: ...
+
+    def get(self, firm_id: str, subject: str) -> CalendarToken | None: ...
+
+    def delete(self, firm_id: str, subject: str) -> bool: ...
 
 
 class ReviewModel(Protocol):

@@ -1058,6 +1058,33 @@ describe('updateCase', () => {
     expect(body).toEqual({ status: 'ready_to_file' });
   });
 
+  test('sends the deadline anchors as filed_at / meeting_341_at, null meaning clear', async () => {
+    // Issue 14.6 / #358: the two dates the deadline engine counts from. An
+    // explicit null is the ONE null this PATCH sends on purpose — it clears
+    // the date and, server-side, the deadlines generated from it.
+    const stub = stubFetch(() =>
+      jsonResponse({ ...UPDATED_CASE, filedAt: '2026-03-02', meeting341At: '2026-04-07' }, 200),
+    );
+    const client = new InsolviaApiClient('http://localhost:8080', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const updated = await client.updateCase(CASE_ID, {
+      filedAt: '2026-03-02',
+      meeting341At: null,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      filed_at: '2026-03-02',
+      meeting_341_at: null,
+    });
+    expect(updated.filedAt).toBe('2026-03-02');
+    expect(updated.meeting341At).toBe('2026-04-07');
+    // And absent stays absent on a case that has neither.
+    expect('filedAt' in UPDATED_CASE).toBe(false);
+  });
+
   test('sends the 106C election as exemption_set, and maps it back as exemptionSet', async () => {
     // Issue #346: the election is a case-level field, written by this PATCH
     // and echoed by `case_json` under its camelCase name.
@@ -3413,6 +3440,7 @@ describe('the firm block on /v1/me', () => {
     extraction_review: 'add_edit',
     creditor_library: 'hidden',
     notes: 'hidden',
+    events: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -3894,6 +3922,7 @@ describe('the firm user endpoints', () => {
       extraction_review: 'add_edit',
       creditor_library: 'add_edit',
       notes: 'add_edit',
+      events: 'hidden',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -6253,5 +6282,243 @@ describe('the means-test input enums (issue #349)', () => {
       'disabled_veteran',
       'reservist_national_guard',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Events, the calendar and the ICS feed (issue 14.6 / #358). Snake_case on the
+// wire, like every case-domain body — the shapes are copied from
+// services/api/src/insolvia_api/core/events.py's `event_json` and the two
+// route modules that serve them.
+// ---------------------------------------------------------------------------
+
+describe('the event, calendar and feed endpoints', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const EVENT_ID = 'e0e00000-0000-4000-8000-00000000e0e0';
+  const HAND_MADE_JSON = {
+    id: EVENT_ID,
+    case_id: CASE_ID,
+    title: 'Hearing on the motion',
+    start: '2026-03-02',
+    end: '2026-03-02',
+    all_day: true,
+    location: 'Courtroom 4',
+    attendees: [SUBJECT],
+    generated: false,
+    dismissed: false,
+    created_by: SUBJECT,
+    created_at: '2026-02-01T09:15:00.123456Z',
+    updated_at: '2026-02-01T09:15:00.123456Z',
+  };
+  const GENERATED_JSON = {
+    id: 'd0d00000-0000-4000-8000-00000000d0d0',
+    case_id: CASE_ID,
+    title: 'Schedules, statements and other documents due',
+    description: 'Rule 1007(c)(1): ...',
+    start: '2026-03-16',
+    end: '2026-03-16',
+    all_day: true,
+    attendees: [],
+    generated: true,
+    rule_id: 'frbp-1007c1-schedules',
+    rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+    dismissed: true,
+    created_by: SUBJECT,
+    created_at: '2026-03-02T09:15:00.123456Z',
+    updated_at: '2026-03-03T09:15:00.123456Z',
+  };
+
+  function client(respond: () => Response) {
+    const stub = stubFetch(respond);
+    return {
+      stub,
+      client: new InsolviaApiClient(BASE_URL, {
+        fetch: stub.fetch,
+        accessToken: () => ACCESS_TOKEN,
+      }),
+    };
+  }
+
+  test('GETs /v1/cases/{id}/events and maps hand-made and generated events alike', async () => {
+    const { stub, client: api } = client(() =>
+      jsonResponse({ events: [HAND_MADE_JSON, GENERATED_JSON] }, 200),
+    );
+
+    const events = await api.listCaseEvents(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ id: EVENT_ID, generated: false, location: 'Courtroom 4' });
+    expect(events[0]?.rule_id).toBeUndefined();
+    expect(events[1]).toMatchObject({
+      generated: true,
+      dismissed: true,
+      rule_id: 'frbp-1007c1-schedules',
+      rule_citation: 'Fed. R. Bankr. P. 1007(c)(1)',
+    });
+  });
+
+  test('POSTs a draft with only the supplied keys, snake_case, and maps the 201', async () => {
+    const { stub, client: api } = client(() => jsonResponse(HAND_MADE_JSON, 201));
+
+    const created = await api.addCaseEvent(CASE_ID, {
+      title: 'Hearing on the motion',
+      start: '2026-03-02',
+      location: 'Courtroom 4',
+      attendees: [SUBJECT],
+    });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events`);
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      title: 'Hearing on the motion',
+      start: '2026-03-02',
+      location: 'Courtroom 4',
+      attendees: [SUBJECT],
+    });
+    expect(created.id).toBe(EVENT_ID);
+  });
+
+  test('PUTs a whole replacement, PATCHes a dismissal, and DELETEs', async () => {
+    const put = client(() => jsonResponse(HAND_MADE_JSON, 200));
+    await put.client.updateCaseEvent(CASE_ID, EVENT_ID, {
+      title: 'Moved',
+      start: '2026-03-03T19:00:00Z',
+      all_day: false,
+    });
+    expect(put.stub.lastRequest().method).toBe('PUT');
+    expect(put.stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/events/${EVENT_ID}`);
+    expect(JSON.parse(put.stub.lastRequest().body)).toEqual({
+      title: 'Moved',
+      start: '2026-03-03T19:00:00Z',
+      all_day: false,
+    });
+
+    const patch = client(() => jsonResponse({ ...GENERATED_JSON, dismissed: true }, 200));
+    const dismissed = await patch.client.dismissCaseEvent(CASE_ID, GENERATED_JSON.id, true);
+    expect(patch.stub.lastRequest().method).toBe('PATCH');
+    expect(JSON.parse(patch.stub.lastRequest().body)).toEqual({ dismissed: true });
+    expect(dismissed.dismissed).toBe(true);
+
+    const del = client(() => new Response(null, { status: 204 }));
+    await expect(del.client.removeCaseEvent(CASE_ID, EVENT_ID)).resolves.toBeUndefined();
+    expect(del.stub.lastRequest().method).toBe('DELETE');
+  });
+
+  test('a generated deadline refused on PUT surfaces as a plain 400 ApiException', async () => {
+    const { client: api } = client(() =>
+      jsonResponse(
+        { error: 'ValidationError', message: 'a generated deadline cannot be edited' },
+        400,
+      ),
+    );
+    const error = await api
+      .updateCaseEvent(CASE_ID, GENERATED_JSON.id, { title: 'x', start: '2026-01-01' })
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiValidationException);
+    expect((error as ApiException).statusCode).toBe(400);
+  });
+
+  test('the firm-scoped routes hit /v1/firm/events with no firm id anywhere', async () => {
+    const firmEvent = { ...HAND_MADE_JSON, case_id: undefined, title: 'Office closed' };
+    delete (firmEvent as Record<string, unknown>).case_id;
+    const list = client(() => jsonResponse({ events: [firmEvent] }, 200));
+    const events = await list.client.listFirmEvents();
+    expect(list.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events`);
+    expect(events[0]?.case_id).toBeUndefined();
+
+    const add = client(() => jsonResponse(firmEvent, 201));
+    await add.client.addFirmEvent({ title: 'Office closed', start: '2026-07-03' });
+    expect(add.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events`);
+
+    const update = client(() => jsonResponse(firmEvent, 200));
+    await update.client.updateFirmEvent(EVENT_ID, { title: 'Office closed', start: '2026-07-03' });
+    expect(update.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events/${EVENT_ID}`);
+
+    const dismiss = client(() => jsonResponse(firmEvent, 200));
+    await dismiss.client.dismissFirmEvent(EVENT_ID, false);
+    expect(dismiss.stub.lastRequest().method).toBe('PATCH');
+
+    const remove = client(() => new Response(null, { status: 204 }));
+    await remove.client.removeFirmEvent(EVENT_ID);
+    expect(remove.stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/events/${EVENT_ID}`);
+  });
+
+  test('GETs /v1/calendar with the window and the optional narrowings', async () => {
+    const { stub, client: api } = client(() =>
+      jsonResponse({ from: '2026-03-01', to: '2026-03-31', events: [GENERATED_JSON] }, 200),
+    );
+
+    const window = await api.getCalendar({
+      from: '2026-03-01',
+      to: '2026-03-31',
+      attendee: 'me',
+      caseId: CASE_ID,
+    });
+
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/calendar?from=2026-03-01&to=2026-03-31&attendee=me&case_id=${CASE_ID}`,
+    );
+    expect(window.from).toBe('2026-03-01');
+    expect(window.events[0]?.rule_id).toBe('frbp-1007c1-schedules');
+
+    const bare = client(() =>
+      jsonResponse({ from: '2026-03-01', to: '2026-03-31', events: [] }, 200),
+    );
+    await bare.client.getCalendar({ from: '2026-03-01', to: '2026-03-31' });
+    expect(bare.stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/calendar?from=2026-03-01&to=2026-03-31`,
+    );
+  });
+
+  test('mints the feed token and builds the absolute feed URL; revokes with DELETE', async () => {
+    const token = `${SUBJECT}.not-a-real-secret`;
+    const { stub, client: api } = client(() =>
+      jsonResponse({ token, feedPath: `/v1/me/calendar.ics?token=${token}` }, 201),
+    );
+
+    const minted = await api.mintCalendarToken();
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/calendar-token`);
+    expect(minted.token).toBe(token);
+    expect(minted.feedUrl).toBe(`${BASE_URL}/v1/me/calendar.ics?token=${token}`);
+
+    const revoke = client(() => new Response(null, { status: 204 }));
+    await expect(revoke.client.revokeCalendarToken()).resolves.toBeUndefined();
+    expect(revoke.stub.lastRequest().method).toBe('DELETE');
+    expect(revoke.stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/calendar-token`);
+  });
+
+  test('the `events` feature is part of the permission map, hidden when the server omits it', async () => {
+    const { client: api } = client(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: null,
+          firm: {
+            id: 'f18a0000-0000-4000-8000-00000000f18a',
+            name: 'Example & Partners',
+            role: 'attorney',
+            firstName: 'A',
+            lastName: 'B',
+            displayName: 'A B',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'add_edit', events: 'view_only' },
+          },
+        },
+        200,
+      ),
+    );
+    const me = await api.me();
+    expect(me.firm?.permissions.events).toBe('view_only');
+    expect(me.firm?.permissions.creditor_library).toBe('hidden');
   });
 });

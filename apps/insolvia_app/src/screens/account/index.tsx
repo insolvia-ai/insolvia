@@ -1,4 +1,4 @@
-import { ApiValidationException } from '@insolvia-ai/api-client';
+import { ApiValidationException, permits } from '@insolvia-ai/api-client';
 import type { FirmMembership } from '@insolvia-ai/api-client';
 import { Button, Field, Input } from '@insolvia-ai/design-system';
 import { useState } from 'react';
@@ -132,6 +132,8 @@ export function Account({ membership }: { membership: FirmMembership }) {
         Your email address is your sign-in name and can’t be changed from here.
       </Text>
 
+      {permits(membership.permissions.events, 'view_only') ? <CalendarFeed /> : null}
+
       {/* Collapsed, and last. It was on the home screen while the pipeline was
           the product; see the component for why it survives at all. */}
       <MePanel />
@@ -139,9 +141,113 @@ export function Account({ membership }: { membership: FirmMembership }) {
   );
 }
 
+/**
+ * The ICS feed (issue 14.6 / #358): one link a calendar application
+ * subscribes to, carrying every event and deadline this person may see.
+ *
+ * THE LINK IS SHOWN ONCE, when it is made. The server stores only a hash of
+ * the secret in it, so there is no "show me again" — there is "make a new
+ * one", which retires the old link wherever it was pasted. That is the
+ * revocation story, and it is why the copy here says so out loud.
+ */
+function CalendarFeed() {
+  const theme = useTheme();
+  const { call } = useApi();
+  const [feedUrl, setFeedUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+
+  const mint = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await call((client) => client.mintCalendarToken());
+      if (result.ok) {
+        setFeedUrl(result.value.feedUrl);
+        setNotice({
+          tone: 'saved',
+          message: 'Your feed link is ready. Any older link no longer works.',
+        });
+      }
+    } catch {
+      setNotice({ tone: 'error', message: 'Could not create a feed link. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await call((client) => client.revokeCalendarToken());
+      if (result.ok) {
+        setFeedUrl(null);
+        setNotice({ tone: 'saved', message: 'Your feed link is revoked.' });
+      }
+    } catch {
+      setNotice({ tone: 'error', message: 'Could not revoke the feed link. Please try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.feed}>
+      <Heading level={2}>Calendar feed</Heading>
+      <Text style={[styles.body, muted]}>
+        Subscribe your calendar application to a link that carries every event and deadline you can
+        see in Insolvia. The link is shown once; making a new one retires the old.
+      </Text>
+      {feedUrl === null ? null : (
+        <Text
+          selectable
+          accessibilityLabel="Calendar feed link"
+          style={[styles.feedUrl, { color: theme.colors.ink, fontFamily: theme.typography.mono }]}
+        >
+          {feedUrl}
+        </Text>
+      )}
+      <View style={styles.actions}>
+        <Button size="lg" onPress={() => void mint()} disabled={busy}>
+          {feedUrl === null ? 'Create feed link' : 'Make a new link'}
+        </Button>
+        <Button size="lg" intent="secondary" onPress={() => void revoke()} disabled={busy}>
+          Revoke feed link
+        </Button>
+      </View>
+      {notice === null ? null : (
+        <Text
+          aria-live="polite"
+          style={[
+            styles.notice,
+            {
+              color: notice.tone === 'error' ? theme.colors.danger : theme.colors.muted,
+              fontFamily: theme.typography.body,
+            },
+          ]}
+        >
+          {notice.message}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  feed: {
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  feedUrl: {
+    fontSize: fontSizes.caption,
+    lineHeight: fontSizes.caption * 1.5,
   },
   body: {
     fontSize: fontSizes.body,
