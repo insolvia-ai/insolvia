@@ -3412,6 +3412,7 @@ describe('the firm block on /v1/me', () => {
     documents: 'add_edit',
     extraction_review: 'add_edit',
     creditor_library: 'hidden',
+    notes: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -3892,6 +3893,7 @@ describe('the firm user endpoints', () => {
       documents: 'add_edit',
       extraction_review: 'add_edit',
       creditor_library: 'add_edit',
+      notes: 'add_edit',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -4520,6 +4522,144 @@ describe('getCaseEntity / putCaseEntity / deleteCaseEntity', () => {
 
     const error = asApiUnauthorizedException(
       await rejection(client.getCaseEntity(ENTITY_CASE_ID, 'creditors', ENTITY_ID)),
+    );
+    expect(stub.callCount()).toBe(0);
+    expect(error.source).toBe('client');
+  });
+});
+
+// Notes (issue 14.5 / #357). `note_json` never carries a `provenance` key —
+// unlike CREDITOR_RECORD above, so the contract below pins its absence, not
+// just its presence with a particular shape.
+const NOTE_RECORD = {
+  id: '3fbb3f0a-8e2e-4a3f-9f9e-9b6f6b2d5a1e',
+  case_id: ENTITY_CASE_ID,
+  created_at: '2026-09-01T10:00:00.123456Z',
+  updated_at: '2026-09-01T10:00:00.123456Z',
+  author_subject: '00000000-0000-4000-8000-00000000a11c',
+  author_name: 'Alice Attorney',
+  text: 'Called the client about the car loan.',
+  form_series: 'form/b106g',
+};
+
+describe('addNote', () => {
+  test('POSTs /v1/cases/{caseId}/notes and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(NOTE_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addNote(ENTITY_CASE_ID, {
+      text: 'Called the client about the car loan.',
+      form_series: 'form/b106g',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(JSON.parse(seen.body)).toEqual({
+      text: 'Called the client about the car loan.',
+      form_series: 'form/b106g',
+    });
+    // There is no author field on the request at all — nothing to omit,
+    // nothing to spoof. The server stamps it.
+    expect(Object.keys(JSON.parse(seen.body))).not.toContain('author_subject');
+    expect(saved).toEqual(NOTE_RECORD);
+  });
+
+  test('a case-level note omits form_series from the request', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...NOTE_RECORD, form_series: undefined }, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addNote(ENTITY_CASE_ID, { text: 'A case-level note.' });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ text: 'A case-level note.' });
+  });
+});
+
+describe('listNotes', () => {
+  test('GETs the case and unwraps the notes envelope', async () => {
+    const stub = stubFetch(() => jsonResponse({ notes: [NOTE_RECORD] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const listed = await client.listNotes(ENTITY_CASE_ID);
+
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes`);
+    expect(listed).toEqual([NOTE_RECORD]);
+  });
+});
+
+describe('putNote / deleteNote', () => {
+  test('PUTs the whole note and maps the 200', async () => {
+    const edited = { ...NOTE_RECORD, text: 'Corrected note.' };
+    const stub = stubFetch(() => jsonResponse(edited, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, {
+      text: 'Corrected note.',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes/${NOTE_RECORD.id}`);
+    expect(saved).toEqual(edited);
+    // Authorship is unaffected — the server keeps the stored author.
+    expect(saved.author_subject).toBe(NOTE_RECORD.author_subject);
+  });
+
+  test('a PUT/DELETE refused by the ownership rule surfaces the 403', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ForbiddenError',
+          message: 'only the author or a firm admin may change this note',
+        },
+        403,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, { text: 'x' })),
+    );
+    expect(error.statusCode).toBe(403);
+  });
+
+  test('DELETEs one note and resolves on the bodyless 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.deleteNote(ENTITY_CASE_ID, NOTE_RECORD.id)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/notes/${NOTE_RECORD.id}`,
+    );
+  });
+
+  test('no access token throws without calling fetch at all', async () => {
+    const stub = stubFetch(() => jsonResponse(NOTE_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, { fetch: stub.fetch });
+
+    const error = asApiUnauthorizedException(
+      await rejection(client.putNote(ENTITY_CASE_ID, NOTE_RECORD.id, { text: 'x' })),
     );
     expect(stub.callCount()).toBe(0);
     expect(error.source).toBe('client');

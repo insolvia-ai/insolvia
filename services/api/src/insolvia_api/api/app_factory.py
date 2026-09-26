@@ -40,6 +40,7 @@ from insolvia_api.api.routes.library_creditors import (
 from insolvia_api.api.routes.liens import blueprint as liens_blueprint
 from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
+from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
@@ -77,6 +78,11 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(documents_blueprint)
     app.register_blueprint(debtors_blueprint)
     app.register_blueprint(creditor_matrix_blueprint)
+    # /v1/cases/<id>/notes — same static-segment argument (issue 14.5 / #357),
+    # and it is its OWN module rather than a case_entities.COLLECTIONS entry:
+    # core/notes.py says why (server-stamped authorship, per-record edit
+    # ownership, no provenance).
+    app.register_blueprint(notes_blueprint)
     # AFTER debtors and documents in this list, though registration order does
     # not decide matching — Werkzeug ranks static URL segments above dynamic
     # ones, so /debtors and /documents always beat /<collection>.

@@ -319,3 +319,191 @@ describe('the forms hub screen', () => {
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 });
+
+// ── Notes on a form row (issue 14.5 / #357) ──────────────────────────
+//
+// A SEPARATE `signedIn`, method-aware, rather than an extension of `respond`
+// above: every other test in this file reads `/forms` once and asserts on
+// what came back, while this block needs `/v1/me` (for the `notes` feature
+// gate) and a stateful `/notes` list a POST can grow — reusing `ApiStub`
+// would widen every other test's setup for a concern only these touch.
+
+const ALICE = '00000000-0000-4000-8000-00000000a11c';
+
+function meBody(notesLevel: string = 'add_edit') {
+  return {
+    subject: ALICE,
+    username: null,
+    clientId: 'exampleappclientid000000',
+    scopes: [],
+    expiresAt: null,
+    firm: {
+      id: '00000000-0000-4000-8000-00000000f18a',
+      name: 'Example & Partners',
+      role: 'attorney',
+      firstName: 'Alice',
+      lastName: 'Attorney',
+      displayName: 'Alice Attorney',
+      isAdmin: false,
+      accessAllCases: true,
+      permissions: {
+        cases: 'add_edit',
+        intake: 'add_edit',
+        documents: 'add_edit',
+        extraction_review: 'hidden',
+        creditor_library: 'hidden',
+        notes: notesLevel,
+        firm_administration: 'hidden',
+      },
+    },
+  };
+}
+
+function noteRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'note-1',
+    case_id: CASE_ID,
+    created_at: '2026-09-01T10:00:00.000000Z',
+    updated_at: '2026-09-01T10:00:00.000000Z',
+    author_subject: ALICE,
+    author_name: 'Alice Attorney',
+    text: 'A note on this form.',
+    form_series: 'form/b106g',
+    ...overrides,
+  };
+}
+
+describe('notes on a form row (issue 14.5 / #357)', () => {
+  let browser: FakeBrowser;
+  let files: FakeFileBrowser;
+  const realFetch = globalThis.fetch;
+
+  const FORM = formRow({
+    series: 'form/b106g',
+    form: 'b106g',
+    title: 'Schedule G: Executory Contracts and Unexpired Leases',
+    officialNumber: 'B 106G',
+  });
+
+  /**
+   * `notes` starts as the given seed and grows with every POST, so a test
+   * can add one through the composer and then see the row's count and the
+   * panel's own list both reflect it — the same round trip a preparer drives.
+   */
+  function signedInWithNotes(seed: readonly Record<string, unknown>[], notesLevel = 'add_edit') {
+    const notes = [...seed];
+    let nextId = notes.length + 1;
+    const fetchMock = jest.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/oauth2/token')) return tokenEndpointResponse();
+      if (url.includes('/v1/me')) return jsonResponse(200, meBody(notesLevel));
+      if (url.endsWith('/forms')) return jsonResponse(200, { forms: [FORM] });
+      if (url.endsWith('/debtors')) return jsonResponse(200, { debtors: [] });
+      if (url.includes('/notes')) {
+        const method = init?.method ?? 'GET';
+        if (method === 'POST') {
+          const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+          const created = noteRecord({
+            id: `note-${String(nextId)}`,
+            text: body.text,
+            form_series: body.form_series,
+          });
+          nextId += 1;
+          notes.push(created);
+          return jsonResponse(201, created);
+        }
+        return jsonResponse(200, { notes: [...notes].reverse() });
+      }
+      if (url.endsWith(CASE_ID)) return jsonResponse(200, caseBody(CASE_ID));
+      throw new Error(`unexpected ${init?.method ?? 'GET'} ${url}`);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    renderRouter('src/app', { initialUrl: `/cases/${CASE_ID}/forms` });
+    return fetchMock;
+  }
+
+  beforeEach(() => {
+    mockAuthConfig = TEST_AUTH_CONFIG;
+    browser = installFakeBrowser();
+    files = installFakeFileBrowser();
+    writeRefreshToken('stored-refresh-token');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    files.restore();
+    browser.restore();
+    jest.clearAllMocks();
+  });
+
+  it('shows the row’s note count from the case’s whole note list', async () => {
+    signedInWithNotes([noteRecord(), noteRecord({ id: 'note-2', text: 'A second note.' })]);
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Show notes for Schedule G: Executory Contracts and Unexpired Leases',
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText('Notes (2)')).toBeTruthy();
+  });
+
+  it('expanding the row shows only that form’s notes, newest first', async () => {
+    signedInWithNotes([
+      noteRecord({ id: 'note-1', text: 'Older note.' }),
+      noteRecord({ id: 'note-2', text: 'Newer note.' }),
+    ]);
+    await screen.findByText('Notes (2)');
+
+    await userEvent.press(
+      screen.getByRole('button', {
+        name: 'Show notes for Schedule G: Executory Contracts and Unexpired Leases',
+      }),
+    );
+
+    await screen.findByText('Newer note.');
+    expect(screen.getByText('Older note.')).toBeTruthy();
+    // `role="listitem"` has no React Native accessibilityRole counterpart, so
+    // RNTL's role queries cannot see it here (only `queryAllByRole`, proving
+    // absence, works elsewhere in this file) — the rendered tree order is
+    // what's actually load-bearing for "newest first".
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('Newer note.')).toBeLessThan(tree.indexOf('Older note.'));
+  });
+
+  it('adding a note through the row’s composer anchors it to that form', async () => {
+    const fetchMock = signedInWithNotes([]);
+    await screen.findByText('Notes (0)');
+    await userEvent.press(
+      screen.getByRole('button', {
+        name: 'Show notes for Schedule G: Executory Contracts and Unexpired Leases',
+      }),
+    );
+    const field = await screen.findByLabelText('Add a note');
+    await userEvent.type(field, 'Check the lease term.');
+    await userEvent.press(screen.getByRole('button', { name: 'Add note' }));
+
+    await screen.findByText('Check the lease term.');
+    expect(screen.getByText('Notes (1)')).toBeTruthy();
+
+    const posted = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).endsWith('/notes') && (init as RequestInit | undefined)?.method === 'POST',
+    );
+    expect(posted).toBeDefined();
+    const body = JSON.parse(String((posted?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(body).toEqual({ text: 'Check the lease term.', form_series: 'form/b106g' });
+  });
+
+  it('hides the composer without the notes feature', async () => {
+    signedInWithNotes([noteRecord()], 'view_only');
+    await screen.findByText('Notes (1)');
+
+    await userEvent.press(
+      screen.getByRole('button', {
+        name: 'Show notes for Schedule G: Executory Contracts and Unexpired Leases',
+      }),
+    );
+
+    await screen.findByText('A note on this form.');
+    expect(screen.queryByLabelText('Add a note')).toBeNull();
+  });
+});

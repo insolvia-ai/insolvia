@@ -23,9 +23,12 @@ jest.mock('@/config/environment', () => ({
 const CASE_ID = '00000000-0000-4000-8000-0000000000c1';
 const ALICE = '00000000-0000-4000-8000-00000000a11c';
 
-function me(extractionReview: string = 'add_edit') {
+function me(
+  extractionReview: string = 'add_edit',
+  options: { readonly notes?: string; readonly isAdmin?: boolean; readonly subject?: string } = {},
+) {
   return {
-    subject: ALICE,
+    subject: options.subject ?? ALICE,
     username: null,
     clientId: 'exampleappclientid000000',
     scopes: [],
@@ -37,13 +40,15 @@ function me(extractionReview: string = 'add_edit') {
       firstName: 'Alice',
       lastName: 'Attorney',
       displayName: 'Alice Attorney',
-      isAdmin: false,
+      isAdmin: options.isAdmin ?? false,
       accessAllCases: true,
       permissions: {
         cases: 'add_edit',
         intake: 'add_edit',
         documents: 'add_edit',
         extraction_review: extractionReview,
+        creditor_library: 'hidden',
+        notes: options.notes ?? 'add_edit',
         firm_administration: 'hidden',
       },
     },
@@ -494,5 +499,126 @@ describe('the case overview’s readiness and totals', () => {
 
     expect(screen.queryByText('Ready to assemble')).toBeNull();
     expect(screen.getByText('checking…')).toBeTruthy();
+  });
+
+  // ── Notes (issue 14.5 / #357) ─────────────────────────────────
+
+  const BOB = '00000000-0000-4000-8000-00000000b0b0';
+
+  function noteRecord(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'note-1',
+      case_id: CASE_ID,
+      created_at: '2026-09-01T10:00:00.000000Z',
+      updated_at: '2026-09-01T10:00:00.000000Z',
+      author_subject: ALICE,
+      author_name: 'Alice Attorney',
+      text: 'A note.',
+      ...overrides,
+    };
+  }
+
+  /** This block's own `withSummary`, generalised to any handler map — the
+   * notes tests need a non-default `/v1/me` (a different permission level or
+   * `isAdmin`) that `withSummary` has no seam for. */
+  function withHandlers(handlers: Readonly<Record<string, () => Response>>) {
+    // The bare case fragment MUST be declared last — see `caseReads`'s own
+    // comment. `/v1/cases/<id>` is a prefix of `/v1/cases/<id>/notes`, so
+    // declaring it before `handlers` would answer every note request with
+    // the case body instead.
+    const route = routeFetch({
+      '/oauth2/token': tokenEndpointResponse,
+      '/v1/me': () => jsonResponse(200, me()),
+      '/v1/firm/directory': () => jsonResponse(200, DIRECTORY),
+      ...caseReads(),
+      ...handlers,
+      [`/v1/cases/${CASE_ID}`]: () => jsonResponse(200, caseBody(CASE_ID)),
+    });
+    globalThis.fetch = jest.fn((url: string, _init?: RequestInit) =>
+      route(url),
+    ) as unknown as typeof fetch;
+    renderRouter('src/app', { initialUrl: `/cases/${CASE_ID}` });
+  }
+
+  it('shows the whole-case note list, in the order the server sent it', async () => {
+    withHandlers({
+      [`/v1/cases/${CASE_ID}/notes`]: () =>
+        jsonResponse(200, {
+          notes: [
+            noteRecord({ id: 'note-2', text: 'Newer note.' }),
+            noteRecord({ id: 'note-1', text: 'Older note.' }),
+          ],
+        }),
+    });
+    await screen.findByText('Filing readiness');
+
+    await screen.findByText('Newer note.');
+    expect(screen.getByText('Older note.')).toBeTruthy();
+    expect(screen.getAllByText(/Alice Attorney ·/)).toHaveLength(2);
+  });
+
+  it('shows which form an anchored note concerns', async () => {
+    withHandlers({
+      [`/v1/cases/${CASE_ID}/notes`]: () =>
+        jsonResponse(200, { notes: [noteRecord({ form_series: 'form/b106g' })] }),
+    });
+    await screen.findByText('Filing readiness');
+
+    expect(await screen.findByText(/· B106G$/)).toBeTruthy();
+  });
+
+  it('hides the composer without the notes feature', async () => {
+    withHandlers({
+      '/v1/me': () => jsonResponse(200, me('add_edit', { notes: 'view_only' })),
+      [`/v1/cases/${CASE_ID}/notes`]: () =>
+        jsonResponse(200, { notes: [noteRecord({ text: 'Read-only note.' })] }),
+    });
+    await screen.findByText('Filing readiness');
+
+    await screen.findByText('Read-only note.');
+    expect(screen.queryByLabelText('Add a note')).toBeNull();
+  });
+
+  it('offers edit and delete on the caller’s own note, and not on a colleague’s', async () => {
+    withHandlers({
+      [`/v1/cases/${CASE_ID}/notes`]: () =>
+        jsonResponse(200, {
+          notes: [
+            noteRecord({ id: 'mine', text: 'My note.', author_subject: ALICE }),
+            noteRecord({
+              id: 'theirs',
+              text: 'Colleague’s note.',
+              author_subject: BOB,
+              author_name: 'Bob Paralegal',
+            }),
+          ],
+        }),
+    });
+    await screen.findByText('Filing readiness');
+    await screen.findByText('My note.');
+
+    expect(screen.getAllByLabelText('Edit note')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Delete note')).toHaveLength(1);
+  });
+
+  it('a firm admin may edit or delete any note, not only their own', async () => {
+    withHandlers({
+      '/v1/me': () => jsonResponse(200, me('add_edit', { isAdmin: true })),
+      [`/v1/cases/${CASE_ID}/notes`]: () =>
+        jsonResponse(200, {
+          notes: [
+            noteRecord({
+              id: 'theirs',
+              text: 'Colleague’s note.',
+              author_subject: BOB,
+              author_name: 'Bob Paralegal',
+            }),
+          ],
+        }),
+    });
+    await screen.findByText('Filing readiness');
+
+    expect(await screen.findAllByLabelText('Edit note')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Delete note')).toHaveLength(1);
   });
 });

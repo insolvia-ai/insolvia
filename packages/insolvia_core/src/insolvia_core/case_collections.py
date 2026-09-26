@@ -92,6 +92,12 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
 # but outside the case data proper — accepting one is what writes a real case
 # record. Registered here because this tuple is the one cross-service ledger
 # of who owns which SK prefix in that partition.
+#
+# NOTE (issue 14.5 / #357) is the same kind of exception as DEBTOR/DOCUMENT
+# above: it uses the CaseEntity/CaseEntityStore machinery (core/notes.py) but
+# is deliberately absent from COLLECTIONS, so it is not reachable through the
+# generic `/v1/cases/<id>/<collection>` dispatch — see core/notes.py for why
+# (server-stamped authorship, per-record edit ownership, no provenance).
 RESERVED_SK_NAMESPACES: Final = (
     "META",
     "ASSIGNEE",
@@ -100,4 +106,5 @@ RESERVED_SK_NAMESPACES: Final = (
     "JOB",
     "PACKET",
     "CANDIDATE",
+    "NOTE",
 )
