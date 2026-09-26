@@ -74,10 +74,15 @@ locals {
   # sender_name, sender_address, allowed_categories, allowed_message_classes,
   # allowed_role_arns, configuration_set, send_queue_url, status_queue_url,
   # kill_switch_parameter are exactly the keys that function reads.
+  #
+  # client_invitation (ADR 0023) is the context half of a client-portal
+  # invitation — which firm, what to do, where to sign in. It carries NO
+  # secret: the temporary password travels only in Cognito's own invitation
+  # mail. services/api/core/mail.py owns the copy.
   insolvia_api_service = {
     sender_name             = "Insolvia"
     sender_address          = var.sender_address
-    allowed_categories      = ["welcome", "email_verification", "password_reset"]
+    allowed_categories      = ["welcome", "email_verification", "password_reset", "client_invitation"]
     allowed_message_classes = ["transactional"]
     allowed_role_arns       = [local.caller_role_arn]
     configuration_set       = local.configuration_set

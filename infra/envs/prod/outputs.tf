@@ -77,6 +77,11 @@ output "auth_web_client_id" {
   value       = module.auth.web_client_id
 }
 
+output "auth_portal_client_id" {
+  description = "Production client portal app client ID (authorization-code + PKCE, ADR 0023) — disjoint from auth_web_client_id."
+  value       = module.auth.portal_client_id
+}
+
 output "auth_domain" {
   description = "Production hosted auth domain (Cognito-provided)."
   value       = module.auth.domain
