@@ -1388,6 +1388,7 @@ describe('the packet endpoints', () => {
       printDate: false,
       signaturePages: 'all',
       signElectronically: false,
+      amendedOnly: false,
     },
   };
 
@@ -1433,6 +1434,7 @@ describe('the packet endpoints', () => {
             printDate: false,
             signaturePages: 'all',
             signElectronically: false,
+            amendedOnly: false,
             forms: ['b101', 'b106ab'],
           },
         },
@@ -1459,8 +1461,47 @@ describe('the packet endpoints', () => {
       printDate: false,
       signaturePages: 'all',
       signElectronically: false,
+      amendedOnly: false,
       forms: ['b101', 'b106ab'],
     });
+  });
+
+  test('amendedOnly (issue #370) is sent and echoed like any other option', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          id: 'e7f6d5c4-3b2a-4190-8f7e-6d5c4b3a2918',
+          kind: 'packet_assembly',
+          status: 'queued',
+          createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+          attempts: 0,
+          createdAt: '2026-09-02T09:15:00.123Z',
+          updatedAt: '2026-09-02T09:15:00.123Z',
+          options: {
+            draftWatermark: false,
+            printDate: false,
+            signaturePages: 'all',
+            signElectronically: false,
+            amendedOnly: true,
+          },
+        },
+        202,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const accepted = await client.acceptCaseJob(PACKET_CASE_ID, 'packet_assembly', {
+      outputOptions: { amendedOnly: true },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      kind: 'packet_assembly',
+      options: { amendedOnly: true },
+    });
+    expect(accepted.options?.amendedOnly).toBe(true);
   });
 
   test('a job of a kind that does not take options never carries one', async () => {
@@ -1691,6 +1732,7 @@ describe('the forms hub endpoints', () => {
     printDate: false,
     signaturePages: 'all',
     signElectronically: false,
+    amendedOnly: false,
   };
 
   test('GETs /v1/cases/{caseId}/forms/{form}/preview with the form segment encoded', async () => {
@@ -1758,6 +1800,33 @@ describe('the forms hub endpoints', () => {
       `${BASE_URL}/v1/cases/${FORMS_CASE_ID}/forms/b101/preview?draftWatermark=true&signaturePages=only`,
     );
     expect(minted.options).toEqual(preview.options);
+  });
+
+  test('amendedOnly (issue #370) is sent as a query param, unlike forms', async () => {
+    // Unlike "forms", amendedOnly is NOT restricted to FormPreviewOptions'
+    // Omit — the preview route accepts it (form_overlay.parse_output_options
+    // is not gated by allow_forms for this key).
+    const preview = {
+      url: 'https://bucket.s3.amazonaws.com/form-previews/x/y.pdf?signature=abc',
+      method: 'GET',
+      expiresAt: '2026-09-02T09:25:00.123Z',
+      problems: [],
+      options: { ...DEFAULT_OPTIONS, amendedOnly: true },
+    };
+    const stub = stubFetch(() => jsonResponse(preview, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const minted = await client.getCaseFormPreview(FORMS_CASE_ID, 'b106d', {
+      amendedOnly: true,
+    });
+
+    expect(stub.lastRequest().url).toBe(
+      `${BASE_URL}/v1/cases/${FORMS_CASE_ID}/forms/b106d/preview?amendedOnly=true`,
+    );
+    expect(minted.options.amendedOnly).toBe(true);
   });
 
   test('no output options sends no query string at all', async () => {
@@ -4826,6 +4895,7 @@ const CREDITOR_RECORD = {
     name: { source: 'staff_typed' },
     'address.line1': { source: 'staff_typed' },
   },
+  amended: false,
   name: 'Example Bank',
   address: { line1: '1 Example Way' },
 };
@@ -4895,6 +4965,7 @@ describe('addCaseEntity', () => {
         'payload.recipient.name': { source: 'staff_typed' },
         'payload.value': { source: 'staff_typed' },
       },
+      amended: false,
       entry_type: 'gift',
       payload: { recipient: { name: 'Example Recipient' }, value: '700.00' },
     };
@@ -4919,6 +4990,60 @@ describe('addCaseEntity', () => {
       value: '700.00',
     });
     expect(saved).toEqual(RECORD);
+  });
+
+  // ── The amended flag (issue #370) ────────────────────────────
+
+  test('amended is sent only when the caller sets it', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDITOR_RECORD, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.addCaseEntity(ENTITY_CASE_ID, 'creditors', REQUEST);
+
+    expect(JSON.parse(stub.lastRequest().body)).not.toHaveProperty('amended');
+  });
+
+  test('amended: true is sent verbatim, like any other boolean', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...CREDITOR_RECORD, amended: true }, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const saved = await client.addCaseEntity(ENTITY_CASE_ID, 'creditors', {
+      ...REQUEST,
+      amended: true,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body).amended).toBe(true);
+    expect(saved.amended).toBe(true);
+  });
+
+  test('a 409 for setting amended before the case is filed becomes ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message:
+            "amended can only be set once the case is filed — this case's status is 'intake'.",
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiException(
+      await rejection(
+        client.addCaseEntity(ENTITY_CASE_ID, 'creditors', { ...REQUEST, amended: true }),
+      ),
+    );
+    expect(error.statusCode).toBe(409);
   });
 
   test('a 400 with fields becomes ApiValidationException keyed by field path', async () => {

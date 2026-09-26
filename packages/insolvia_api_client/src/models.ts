@@ -1223,6 +1223,15 @@ export interface OutputOptions {
   readonly signElectronically: boolean;
   /** The short form keys rendered, when a subset was requested. */
   readonly forms?: readonly string[];
+  /**
+   * Renders an AMENDMENT (issue #370): only the schedules carrying at
+   * least one item flagged `amended` (see {@link CaseEntity}), each
+   * printing only its amended items with its own "amended filing" caption
+   * ticked, B106Sum/B106Dec re-rendered alongside them, and a generated
+   * amendment cover sheet — never an official court form. It is also the
+   * one option that lets a FILED case's packet assembly run at all.
+   */
+  readonly amendedOnly: boolean;
 }
 
 /**
@@ -1238,6 +1247,8 @@ export interface OutputOptionsRequest {
   readonly signElectronically?: boolean;
   /** Packet assembly only — {@link InsolviaApiClient.getCaseFormPreview} already names one form. */
   readonly forms?: readonly string[];
+  /** See {@link OutputOptions.amendedOnly}. Refused server-side when combined with `forms`. */
+  readonly amendedOnly?: boolean;
 }
 
 /**
@@ -1266,6 +1277,9 @@ export function outputOptionsRequestToJson(options: OutputOptionsRequest): Recor
   if (options.forms !== undefined) {
     body.forms = [...options.forms];
   }
+  if (options.amendedOnly !== undefined) {
+    body.amendedOnly = options.amendedOnly;
+  }
   return body;
 }
 
@@ -1287,6 +1301,9 @@ export function formPreviewQuery(options: FormPreviewOptions): URLSearchParams {
   }
   if (options.signElectronically !== undefined) {
     params.set('signElectronically', String(options.signElectronically));
+  }
+  if (options.amendedOnly !== undefined) {
+    params.set('amendedOnly', String(options.amendedOnly));
   }
   return params;
 }
@@ -3523,9 +3540,16 @@ export const CASE_COLLECTIONS = [
  * plus its {@link ProvenanceMap}. Whole, not partial — the endpoints replace
  * the record, for the same invariant-1 reason {@link PutDebtorRequest}
  * states. Build the ordinary provenance with {@link staffTypedProvenance}.
+ *
+ * `amended` (issue #370) is a GENERIC entity attribute, not part of any one
+ * collection's own body — `core/case_entities.py`'s module explains why.
+ * Optional here and omitted when absent, per this package's own rule; the
+ * server refuses `true` with a 409 unless the case is `filed`, and a PUT
+ * that omits it keeps the stored flag rather than clearing it.
  */
 export type CaseEntityRequest<C extends CaseCollection> = CaseCollections[C] & {
   readonly provenance?: ProvenanceMap | undefined;
+  readonly amended?: boolean | undefined;
 };
 
 /**
@@ -3542,6 +3566,12 @@ export type CaseEntity<C extends CaseCollection> = CaseCollections[C] & {
   readonly updated_at: string;
   /** Always present — `{}` on a record with nothing in it. */
   readonly provenance: ProvenanceMap;
+  /**
+   * Whether this item has been amended since the case was filed (issue
+   * #370) — always present, like `provenance`, and `false` for every item
+   * on a case that has never been filed.
+   */
+  readonly amended: boolean;
 };
 
 /**

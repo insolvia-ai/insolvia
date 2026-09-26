@@ -2379,6 +2379,7 @@ function outputOptionsFromJson(response: DecodedResponse): OutputOptions {
     printDate: requireBoolean(response, 'printDate'),
     signaturePages: requireChoice(response, 'signaturePages', SIGNATURE_PAGES_MODES),
     signElectronically: requireBoolean(response, 'signElectronically'),
+    amendedOnly: requireBoolean(response, 'amendedOnly'),
     forms: optionalStringArray(response, 'forms'),
   });
 }
@@ -3103,13 +3104,14 @@ function requireDebtorArray(response: DecodedResponse, key: string): readonly De
 // to a checked read here.
 // ---------------------------------------------------------------------------
 
-/** The five members `entity_json` stamps; everything else is the body. */
+/** The six members `entity_json` stamps; everything else is the body. */
 const ENTITY_IDENTITY_KEYS: readonly string[] = [
   'id',
   'case_id',
   'created_at',
   'updated_at',
   'provenance',
+  'amended',
 ];
 
 /** Decodes a {@link CaseEntity} — `entity_json`'s exact shape. */
@@ -3127,6 +3129,7 @@ function caseEntityFromJson<C extends CaseCollection>(response: DecodedResponse)
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
     provenance: requireProvenanceMap(response, 'provenance'),
+    amended: requireBoolean(response, 'amended'),
   } as CaseEntity<C>;
 }
 
