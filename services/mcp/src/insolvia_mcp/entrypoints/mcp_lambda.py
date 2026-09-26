@@ -64,5 +64,10 @@ app = create_asgi_app(
 
 # lifespan="on": the streamable-HTTP app's lifespan runs the SDK's session
 # manager, and tool calls fail without it — "auto" would silently swallow a
-# lifespan failure and serve a broken endpoint.
+# lifespan failure and serve a broken endpoint. Mangum runs that lifespan
+# around EVERY invocation, not once per container, which is why the app
+# rebuilds its transport at each startup (api/server.py,
+# StreamableHttpApp) — the SDK forbids running one session manager
+# twice, and a warm container's second request used to 500 on exactly that.
+# tests/unit/test_lambda_handler.py invokes this object twice to hold it.
 handler = Mangum(app, lifespan="on")

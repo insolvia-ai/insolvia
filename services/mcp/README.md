@@ -84,7 +84,10 @@ layer over in-memory ports is the pyramid's base, and
 `tests/test_protocol.py` pins the MCP wire — JSON-RPC shape, the 401
 challenge, the static eight-tool listing, structuredContent, the
 `{error: {code}}` envelope — the way the api-client contract test pins the
-REST surface.
+REST surface. `tests/unit/test_lambda_handler.py` pins the warm-container
+path: the real Mangum handler invoked twice in one process, because Mangum
+runs the ASGI lifespan around every invocation and the SDK's session manager
+refuses to be run twice.
 
 CI gate: the `MCP service` job in `.github/workflows/mcp-pr.yml` (ruff, mypy
 `--strict`, pytest, and the Lambda image build from the repo root).
