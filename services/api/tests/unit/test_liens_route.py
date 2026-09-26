@@ -126,7 +126,9 @@ def client():
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDFL"}, headers=auth(subject)
+        "/v1/cases",
+        json={"chapter": 7, "court": "flnb", "division": "tallahassee"},
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]

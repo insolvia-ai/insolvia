@@ -33,12 +33,16 @@ THE COMMON FORMAT, which every instruction above shares:
 DISTRICT VARIANCE IS DATA, NOT CODE (the issue's own instruction). What varies
 between districts is a handful of numbers — S.D. Tex. wants fixed six-line
 blocks where everyone else wants up-to-five plus a separator — so the format
-is a value (`MatrixFormat`) and the known departures live in
-`DISTRICT_VARIANCES` beside their sources. Generation always uses
-`COMMON_FORMAT` today: `case.district` is deliberately free text (see
-core/cases.py — the authoritative court-code list belongs to the e-filing
-work), so there is nothing reliable to key a lookup on yet. When district
-codes arrive, wiring a variance in is a dictionary entry, not a new renderer.
+is a value (`MatrixFormat`), and since issue #360 the numbers come from the
+COURT REGISTRY (`insolvia_core.courts`, the `courts/us-bankruptcy` series):
+each district record carries its matrix knobs as sourced, dated facts, and
+`format_for_court` reads the VERIFIED ones into a `MatrixFormat`. A knob the
+court's pages did not confirm falls back to the common format — a matrix in
+the common format is accepted everywhere the instructions above were read,
+while a figure guessed from a stale page is a mis-addressed notice.
+`DISTRICT_VARIANCES` is now derived from the registry rather than written
+here, keyed by the court's CM/ECF code as `case.court` names it; a case from
+before the registry (no `court`) gets the common format.
 
 VIOLATIONS ARE REPORTED, NEVER REPAIRED. A 41-character creditor name could be
 truncated to fit, but a truncated line on the matrix is a mis-addressed
@@ -61,6 +65,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from insolvia_core import courts
 from insolvia_core.case_entities import CaseEntity
 from insolvia_core.creditors import CreditorBody
 
@@ -95,8 +100,12 @@ class MatrixFormat:
 
     `pad_to_lines` is the S.D. Tex. departure: entries there are fixed
     six-line blocks with blank lines inserted to fill, instead of variable
-    blocks with a separator. Every other knob is shared by all five published
-    instruction sets above.
+    blocks with a separator. `name_line_chars` and `comma_after_city` are
+    the two knobs ADR 0024's research added (W.D. Tex. allows a 50-character
+    name line and wants "Midland, TX"; N.D. Fla. wants the comma too).
+    `case_number_header_when_separate` (E.D. Tex.) is carried as data only —
+    it applies to a matrix filed separately AFTER the case has a number,
+    which is the filing-set PR's rendering, not this generator's.
     """
 
     max_line_chars: int = 40
@@ -106,29 +115,75 @@ class MatrixFormat:
     # this many lines, and `blank_lines_between` should be 0 — the padding IS
     # the separation.
     pad_to_lines: int | None = None
+    # A wider cap for the NAME line alone, where a court grants one.
+    name_line_chars: int | None = None
+    # "Tampa, FL 33602" rather than CI-3's "Tampa FL 33602".
+    comma_after_city: bool = False
+    case_number_header_when_separate: bool = False
 
 
 COMMON_FORMAT: Final = MatrixFormat()
 
-# The verified per-district departures from the common format, keyed by the
-# court's CM/ECF abbreviation. DATA, deliberately: generation does not read
-# this mapping yet, because case.district is free text with no authoritative
-# code list (core/cases.py). It exists so the e-filing milestone wires a
-# district in by adding a lookup, not a renderer — and so the next person
-# checking a district records what they found beside a source, not in a
-# comment three files away.
-DISTRICT_VARIANCES: Final[dict[str, MatrixFormat]] = {
-    # S.D. Tex.: "Addresses must be in a format of six lines for every entry
-    # ... Blank lines must be inserted to conform to the six-line format."
-    # https://www.txs.uscourts.gov/page/lists-creditors-matrix
-    "txsb": MatrixFormat(pad_to_lines=6, blank_lines_between=0),
-    # N.D. Tex. asks for at least two blank lines between listings (its
-    # instruction page covers the paper and electronic matrix together).
-    # https://www.txnb.uscourts.gov/creditor-matrix-instructions
-    "txnb": MatrixFormat(blank_lines_between=2),
-    # Verified identical to the common format: S.D. Fla. (CI-3), N.D. Fla.,
-    # N.D. Ga. — no entry needed; absence means COMMON_FORMAT.
-}
+
+def format_for_court(court_code: str | None) -> MatrixFormat:
+    """The format a case's court wants, from the registry's VERIFIED matrix
+    facts — each knob independently, falling back to the common format for
+    a knob the court's pages did not confirm, for a court the registry does
+    not know, and for a case written before the registry (`court` None).
+
+    Verified-only is the rule the module docstring gives: an unverified
+    figure is a guess, and the common format is what every instruction set
+    read for this module accepts.
+    """
+    if court_code is None:
+        return COMMON_FORMAT
+    record = courts.district(court_code)
+    if record is None:
+        return COMMON_FORMAT
+    rules = record.matrix
+
+    def number(fact: courts.Fact[int], default: int) -> int:
+        return fact.value if fact.verified and fact.value is not None else default
+
+    def flag(fact: courts.Fact[bool], default: bool) -> bool:
+        return fact.value if fact.verified and fact.value is not None else default
+
+    return MatrixFormat(
+        max_line_chars=number(rules.max_line_chars, COMMON_FORMAT.max_line_chars),
+        max_creditor_lines=number(
+            rules.max_creditor_lines, COMMON_FORMAT.max_creditor_lines
+        ),
+        blank_lines_between=number(
+            rules.blank_lines_between, COMMON_FORMAT.blank_lines_between
+        ),
+        # A verified null here is a verified "no fixed block size".
+        pad_to_lines=rules.pad_to_lines.value if rules.pad_to_lines.verified else None,
+        name_line_chars=(
+            rules.name_line_chars.value if rules.name_line_chars.verified else None
+        ),
+        comma_after_city=flag(rules.comma_after_city, COMMON_FORMAT.comma_after_city),
+        case_number_header_when_separate=flag(
+            rules.case_number_header_when_separate,
+            COMMON_FORMAT.case_number_header_when_separate,
+        ),
+    )
+
+
+def district_variances() -> dict[str, MatrixFormat]:
+    """The registry's departures from the common format, keyed by court
+    code — the table this module once hand-wrote, now read. A court whose
+    verified facts match the common format is recorded by ABSENCE, exactly
+    as before."""
+    return {
+        code: fmt
+        for code in courts.district_codes()
+        if (fmt := format_for_court(code)) != COMMON_FORMAT
+    }
+
+
+# Kept under its old name for the callers and tests that read it as a table;
+# the registry is its only author now.
+DISTRICT_VARIANCES: Final[dict[str, MatrixFormat]] = district_variances()
 
 
 @dataclass(frozen=True)
@@ -216,18 +271,24 @@ def _creditor_problems(entity: CaseEntity[CreditorBody]) -> list[MatrixProblem]:
     return problems
 
 
-def _block_lines(body: CreditorBody) -> tuple[tuple[str, str], ...]:
+def _block_lines(
+    body: CreditorBody, fmt: MatrixFormat = COMMON_FORMAT
+) -> tuple[tuple[str, str], ...]:
     """The lines a clean creditor prints, each paired with the field it came
     from so a length or character problem can name what to edit. The last
     line follows CI-3 rule (h) and its own sample matrix: city, state and ZIP
-    separated by single spaces, no comma."""
+    separated by single spaces, no comma — unless the court's format says
+    "Midland, TX" (`comma_after_city`)."""
     address = body.address
     lines: list[tuple[str, str]] = [("name", body.name or "")]
     if address.line1 is not None:
         lines.append(("address.line1", address.line1))
     if address.line2 is not None:
         lines.append(("address.line2", address.line2))
-    lines.append(("address", f"{address.city} {address.state} {address.postal_code}"))
+    separator = ", " if fmt.comma_after_city else " "
+    lines.append(
+        ("address", f"{address.city}{separator}{address.state} {address.postal_code}")
+    )
     return tuple(lines)
 
 
@@ -235,14 +296,20 @@ def _line_problems(
     entity: CaseEntity[CreditorBody], fmt: MatrixFormat
 ) -> list[MatrixProblem]:
     problems: list[MatrixProblem] = []
-    lines = _block_lines(entity.body)
+    lines = _block_lines(entity.body, fmt)
     for field, line in lines:
-        if len(line) > fmt.max_line_chars:
+        # The name line may be wider where the court grants it (W.D. Tex.).
+        limit = (
+            fmt.name_line_chars
+            if field == "name" and fmt.name_line_chars is not None
+            else fmt.max_line_chars
+        )
+        if len(line) > limit:
             problems.append(
                 MatrixProblem(
                     creditor_id=entity.id,
                     field=field,
-                    message=f"Exceeds {fmt.max_line_chars} characters — the"
+                    message=f"Exceeds {limit} characters — the"
                     " courts reject longer matrix lines, so shorten it"
                     " (abbreviate, or move detail to the second address"
                     " line).",
@@ -312,7 +379,7 @@ def generate_creditor_matrix(
         if line_problems:
             problems.extend(line_problems)
             continue
-        printable.append(tuple(line for _, line in _block_lines(entity.body)))
+        printable.append(tuple(line for _, line in _block_lines(entity.body, fmt)))
 
     if problems:
         return CreditorMatrix(

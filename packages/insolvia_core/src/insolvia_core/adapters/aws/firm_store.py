@@ -8,7 +8,6 @@ from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.firms import (
     Firm,
-    FirmItemValue,
     FirmUser,
     firm_from_item,
     firm_item,
@@ -33,37 +32,15 @@ SUBJECT_INDEX = "by-subject"
 _CONDITION_FAILED = "ConditionalCheckFailedException"
 
 
-def _to_attributes(item: dict[str, FirmItemValue]) -> dict[str, Any]:
-    """Item shape -> DynamoDB attribute values.
-
-    BOOL IS CHECKED FIRST, and it has to be: in Python `True` is an instance of
-    `int`, so an isinstance(int) branch above this one would store `isAdmin` as
-    the number 1. It would then come back from `firm_user_from_item` as `1 is
-    True` — False — and every admin in the system would quietly stop being one.
-    """
-    attributes: dict[str, Any] = {}
-    for key, value in item.items():
-        if isinstance(value, bool):
-            attributes[key] = {"BOOL": value}
-        elif isinstance(value, dict):
-            attributes[key] = {"M": {k: {"S": v} for k, v in value.items()}}
-        else:
-            attributes[key] = {"S": value}
-    return attributes
-
-
-def _from_attributes(item: dict[str, Any]) -> dict[str, FirmItemValue]:
-    plain: dict[str, FirmItemValue] = {}
-    for key, value in item.items():
-        if "BOOL" in value:
-            plain[key] = bool(value["BOOL"])
-        elif "M" in value:
-            plain[key] = {
-                k: v["S"] for k, v in value["M"].items() if isinstance(v.get("S"), str)
-            }
-        elif "S" in value:
-            plain[key] = value["S"]
-    return plain
+# One converter for every row in this table — the shared recursive one.
+# This file used to carry a three-branch converter of its own (S, BOOL and a
+# one-level M of strings), which was all a firm row held; the firm defaults
+# (issue #360) added an integer and two nested maps, and a second converter
+# that must agree with `dynamo.py` about a bool is a second converter that
+# will eventually disagree. BOOL IS STILL CHECKED BEFORE INT — in the shared
+# module, once, for the same reason its docstring gives.
+_to_attributes = to_attributes
+_from_attributes = from_attributes
 
 
 class DynamoDbFirmStore:

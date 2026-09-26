@@ -149,7 +149,9 @@ def client(access_log, job_store, job_queue):
 
 def open_case(client, subject=ALICE):
     response = client.post(
-        "/v1/cases", json={"chapter": 7, "district": "NDCA"}, headers=auth(subject)
+        "/v1/cases",
+        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]

@@ -78,7 +78,9 @@ unaddressable.
 case {
   id, firm_id, created_by
   chapter: 7 | 11 | 12 | 13
-  district, status: intake | ready_to_file | filed
+  court, division              // a reference into the court registry (below)
+  district                     // the printed name, DERIVED from the reference
+  status: intake | ready_to_file | filed
   filed_at, meeting_341_at            // form dates: the petition (the order for relief in a
                                        // voluntary case) and the FIRST date set for the §341
                                        // meeting — the anchors the deadline engine counts from
@@ -109,6 +111,21 @@ petition {
 `petition` is separate from `case` because it is the answers to one form,
 churned during intake and untouched afterwards, while `case` holds identity and
 lifecycle that everything else references.
+
+**The court is a reference, not a string** (issue #360). `court` is a
+district's CM/ECF code and `division` one of its divisions' codes, both
+validated on write against the `courts/us-bankruptcy` series in
+`insolvia_core.courts` — a release of the regulatory registry
+([ADR 0014](../adr/0014-the-repository-is-the-regulatory-release-registry.md))
+whose record shape [ADR 0024](../adr/0024-electronic-filing-path.md)
+specifies: identity, divisions with their CM/ECF office code and the FIPS
+counties they serve, the court's PDF and creditor-matrix rules, the signature
+instrument and B121 handling, Case Upload status, and a source with a date on
+every fact. `district` survives as the printed name the registry gives the
+court ("Middle District of Florida" — the B101 dropdown's own spelling),
+written from the reference on every write and never typed. A case written
+before the registry existed carries its typed `district` and no reference;
+it still reads and prints, and is asked for a court on its next edit.
 
 ## Identity, and why joint debtors are two records
 
@@ -631,6 +648,9 @@ A case belongs to a firm, and the entities that express that are:
 ```
 firm {
   id, name, status: active | suspended, created_at, updated_at
+  default_court, default_division   // a registry reference, for new cases (#360)
+  default_chapter
+  letterhead: { name, address, phone, email }
 }
 
 firm_user {                        // keyed (firm_id, subject) — no id of its own
@@ -642,6 +662,7 @@ firm_user {                        // keyed (firm_id, subject) — no id of its 
   access_all_cases: bool                    // every case, without per-case linking
   permissions: { <feature>: add_edit | view_only | hidden }
   status: active | disabled, created_at, updated_at
+  signature_block: { bar_number, bar_state, firm_name, address, phone, email }   // #360
 }
 
 case_assignment {                  // an item in the CASE's partition
@@ -670,6 +691,17 @@ axes on purpose. Collapsing role into access is the trap where "attorney"
 quietly comes to mean "can see everything"; collapsing `is_admin` into
 `access_all_cases` would mean the only way to see every matter is also to be
 able to change everyone's permissions.
+
+**The firm's defaults prefill; they never decide** (issue #360). A new case's
+create form preselects `default_court`/`default_division`/`default_chapter`,
+and the petition's signer block copies an attorney's `signature_block` (keyed
+exactly as `filing_professional` is, so the copy needs no mapping) with the
+`letterhead` filling the firm lines a block leaves blank — onto the form, not
+onto the record. The preparer saves, and the record carries `staff_typed`
+provenance like anything else they confirmed. A `signature_block` is the
+attorney's own fact and self-service on `PATCH /v1/me`; every colleague may
+read it from the directory, because the prefill is case work and a bar number
+is printed on every filing.
 
 The feature list is ours — `cases`, `intake`, `documents`,
 `extraction_review`, `creditor_library`, `events`, `firm_administration` — and the

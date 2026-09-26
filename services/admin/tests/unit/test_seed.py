@@ -583,7 +583,8 @@ class Env:
                         {
                             "handle": "sample",
                             "chapter": 7,
-                            "district": "NDCA",
+                            "court": "flmb",
+                            "division": "tampa",
                             "debtors": {
                                 "debtor_1": {
                                     "name": {"given": "Sample"},
@@ -708,7 +709,10 @@ def test_a_fixture_case_lands_with_its_debtor_items_and_documents(
     case = env.the_case()
     assert case is not None
     assert case.chapter == 7
-    assert case.district == "NDCA"
+    # A registry reference (#360): the fixture names the pair, the loader's
+    # parser — the API's own — derives the printed district from it.
+    assert (case.court, case.division) == ("flmb", "tampa")
+    assert case.district == "Middle District of Florida"
     debtor = env.debtors.get(case.id, filing_role="debtor_1")
     assert debtor is not None
     assert debtor.name.given == "Sample"

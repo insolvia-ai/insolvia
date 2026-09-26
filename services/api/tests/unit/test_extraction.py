@@ -166,7 +166,7 @@ PAY_STUB_RAW = {
 def build_deps(model=None):
     case_store = MemoryCaseStore()
     case, assignment = create_case(
-        parse_case_creation({"chapter": 7, "district": "Middle District of Florida"}),
+        parse_case_creation({"chapter": 7, "court": "flmb", "division": "tampa"}),
         firm_id=FIRM,
         created_by=ALICE,
     )

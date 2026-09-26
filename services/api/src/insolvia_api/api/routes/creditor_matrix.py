@@ -33,7 +33,11 @@ from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
-from insolvia_api.core.creditor_matrix import generate_creditor_matrix, matrix_json
+from insolvia_api.core.creditor_matrix import (
+    format_for_court,
+    generate_creditor_matrix,
+    matrix_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +84,9 @@ def creditor_matrix_route(case_id: str) -> ResponseReturnValue:
         raise NotFoundError("case not found")
 
     creditors = entity_store.list_for_case(case_id, CREDITOR)
-    matrix = generate_creditor_matrix(creditors)
+    # The court's own format (issue #360): the registry's verified knobs for
+    # the case's court, the common format for a case that predates it.
+    matrix = generate_creditor_matrix(creditors, format_for_court(case.court))
     # GLBA: the case id and whether a file was produced. Never a creditor
     # name, a count, or a problem message — even the number of creditors
     # leaks how large somebody's schedule is.

@@ -82,6 +82,9 @@ import type {
   DocumentDownload,
   DocumentStatus,
   DocumentUpload,
+  CourtDistrict,
+  CourtDivision,
+  CourtRegistry,
   ExtractionCandidate,
   FilingRole,
   Firm,
@@ -120,6 +123,7 @@ import type {
   Packet,
   PacketDownload,
   PermissionLevel,
+  Letterhead,
   PersonName,
   Principal,
   ProvenanceEntry,
@@ -130,6 +134,7 @@ import type {
   TaxIdView,
   Task,
   CreateTaskRequest,
+  SignatureBlock,
   UpdateCaseChanges,
   UpdateFirmRequest,
   UpdateFirmUserRequest,
@@ -1373,7 +1378,29 @@ export class InsolviaApiClient {
       lastName: requireString(element, 'lastName'),
       displayName: requireString(element, 'displayName'),
       role: requireFirmRole(element, 'role'),
+      signatureBlock: nullableSignatureBlock(element, 'signatureBlock'),
     }));
+  }
+
+  /**
+   * `GET /v1/courts` — the court registry (issue #360): the districts and
+   * divisions a case may name, resolved as of today. Authenticated, every
+   * member of a firm, no feature gate; a caller in no firm is a 403 like
+   * everywhere else. Read-only — the registry is committed data the API
+   * ships (ADR 0014), and this is the list the create form's pickers read.
+   */
+  async listCourts(): Promise<CourtRegistry> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/courts`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      releaseId: requireString(decoded, 'releaseId'),
+      effectiveDate: requireString(decoded, 'effectiveDate'),
+      districts: requireArrayOf(decoded, 'districts', 'CourtDistrict', courtDistrictFromJson),
+    };
   }
 
   /**
@@ -2262,11 +2289,17 @@ function caseFromJson(response: DecodedResponse): Case {
   // The deadline anchors (issue 14.6 / #358): absent until recorded.
   const filedAt = optionalString(response, 'filedAt');
   const meeting341At = optionalString(response, 'meeting341At');
+  // The registry reference is absent — never null — on a case written before
+  // the court registry existed (issue #360); `district` is always there.
+  const court = optionalString(response, 'court');
+  const division = optionalString(response, 'division');
   return {
     id: requireString(response, 'id'),
     createdBy: requireString(response, 'createdBy'),
     chapter: requireCaseChapter(response, 'chapter'),
     district: requireString(response, 'district'),
+    ...(court === undefined ? {} : { court }),
+    ...(division === undefined ? {} : { division }),
     status: requireCaseStatus(response, 'status'),
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
@@ -3694,6 +3727,126 @@ function firmFromJson(response: DecodedResponse): Firm {
     status: status as FirmStatus,
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    ...firmDefaultsFromJson(response),
+  };
+}
+
+/**
+ * The firm defaults every firm-shaped response carries (issue #360). The
+ * server sends explicit nulls; a key that is ABSENT also reads as null here,
+ * deliberately — these ride on the `/v1/me` firm block too, and a block from
+ * an API a step behind this client must not make sign-in fail over a
+ * default nobody has set. The dedicated contract tests pin the nulls.
+ */
+function firmDefaultsFromJson(response: DecodedResponse): {
+  defaultCourt: string | null;
+  defaultDivision: string | null;
+  defaultChapter: CaseChapter | null;
+  letterhead: Letterhead | null;
+} {
+  const chapter = response.json.defaultChapter;
+  if (
+    chapter !== undefined &&
+    chapter !== null &&
+    chapter !== 7 &&
+    chapter !== 11 &&
+    chapter !== 12 &&
+    chapter !== 13
+  ) {
+    throw malformedField(response, 'defaultChapter', 'one of 7 | 11 | 12 | 13 | null');
+  }
+  const letterhead = objectOrNone(response, 'letterhead');
+  return {
+    defaultCourt: requireNullableStringOrAbsent(response, 'defaultCourt'),
+    defaultDivision: requireNullableStringOrAbsent(response, 'defaultDivision'),
+    defaultChapter: (chapter as CaseChapter | null | undefined) ?? null,
+    letterhead:
+      letterhead === undefined
+        ? null
+        : definedMembers<Letterhead>({
+            name: optionalString(letterhead, 'name'),
+            address: libraryAddress(letterhead, 'address'),
+            phone: optionalString(letterhead, 'phone'),
+            email: optionalString(letterhead, 'email'),
+          }),
+  };
+}
+
+/**
+ * An object field the server sends as explicit `null` when unset, and which
+ * an older API may omit: `null` and absent both read as "none" here.
+ * `optionalObject` reads `null` as malformed (a missing OBJECT) and
+ * `nullableObject` reads absence as malformed — each the right strictness for
+ * its fields; the firm defaults, the signature block and a division's
+ * courthouse are the three whose contract is "object, null, or not yet sent".
+ */
+function objectOrNone(response: DecodedResponse, key: string): DecodedResponse | undefined {
+  return response.json[key] === null ? undefined : optionalObject(response, key);
+}
+
+/** A `signatureBlock` field: an object, `null`, or (tolerated) absent → `null`. */
+function nullableSignatureBlock(response: DecodedResponse, key: string): SignatureBlock | null {
+  const nested = objectOrNone(response, key);
+  if (nested === undefined) return null;
+  return definedMembers<SignatureBlock>({
+    bar_number: optionalString(nested, 'bar_number'),
+    bar_state: optionalString(nested, 'bar_state'),
+    firm_name: optionalString(nested, 'firm_name'),
+    address: libraryAddress(nested, 'address'),
+    phone: optionalString(nested, 'phone'),
+    email: optionalString(nested, 'email'),
+  });
+}
+
+function courtDistrictFromJson(response: DecodedResponse): CourtDistrict {
+  const caseUpload = optionalObject(response, 'caseUpload');
+  if (caseUpload === undefined) {
+    throw malformedField(response, 'caseUpload', 'object');
+  }
+  return {
+    code: requireString(response, 'code'),
+    courtId: requireNullableString(response, 'courtId'),
+    name: requireString(response, 'name'),
+    state: requireString(response, 'state'),
+    circuit: requireNumber(response, 'circuit'),
+    website: requireString(response, 'website'),
+    divisions: requireArrayOf(response, 'divisions', 'CourtDivision', courtDivisionFromJson),
+    caseUpload: {
+      status: requireString(caseUpload, 'status'),
+      verifiedAt: requireNullableString(caseUpload, 'verifiedAt'),
+    },
+  };
+}
+
+/** A string, `null`, or (tolerated) absent → `null`. See {@link firmDefaultsFromJson}. */
+function requireNullableStringOrAbsent(response: DecodedResponse, key: string): string | null {
+  const value = response.json[key];
+  if (value === undefined || value === null) return null;
+  return requireString(response, key);
+}
+
+function courtDivisionFromJson(response: DecodedResponse): CourtDivision {
+  const courthouse = objectOrNone(response, 'courthouse');
+  return {
+    code: requireString(response, 'code'),
+    name: requireString(response, 'name'),
+    officeCode: requireNullableString(response, 'officeCode'),
+    officeCodeVerified: requireBoolean(response, 'officeCodeVerified'),
+    courthouse:
+      courthouse === undefined
+        ? null
+        : {
+            name: requireString(courthouse, 'name'),
+            line1: requireString(courthouse, 'line1'),
+            line2: requireNullableString(courthouse, 'line2'),
+            city: requireString(courthouse, 'city'),
+            state: requireString(courthouse, 'state'),
+            postal_code: requireString(courthouse, 'postal_code'),
+          },
+    counties: requireArrayOf(response, 'counties', 'County', (county) => ({
+      name: requireString(county, 'name'),
+      fips: requireString(county, 'fips'),
+    })),
   };
 }
 
@@ -3768,6 +3921,7 @@ function firmUserFromJson(response: DecodedResponse): FirmUser {
     status: status as FirmUserStatus,
     createdAt: requireString(response, 'createdAt'),
     updatedAt: requireString(response, 'updatedAt'),
+    signatureBlock: nullableSignatureBlock(response, 'signatureBlock'),
   };
 }
 
@@ -3793,6 +3947,8 @@ function optionalFirmMembership(response: DecodedResponse): FirmMembership | und
     isAdmin: requireBoolean(nested, 'isAdmin'),
     accessAllCases: requireBoolean(nested, 'accessAllCases'),
     permissions: requirePermissions(nested, 'permissions'),
+    ...firmDefaultsFromJson(nested),
+    signatureBlock: nullableSignatureBlock(nested, 'signatureBlock'),
   };
 }
 

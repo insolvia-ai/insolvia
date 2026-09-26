@@ -695,13 +695,16 @@ describe('me', () => {
 
 describe('createCase', () => {
   // Pinned against the shape this package's contract requires of
-  // `POST /v1/cases`: request `{"chapter", "district"}`, 201 response is a
-  // full Case.
+  // `POST /v1/cases`: request `{"chapter", "court", "division"}` (issue
+  // #360 — a registry reference, never a typed district), 201 response is a
+  // full Case whose `district` is the name the registry prints.
   const CASE = {
     id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
     createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
     chapter: 7,
-    district: 'D. Del.',
+    district: 'Middle District of Florida',
+    court: 'flmb',
+    division: 'tampa',
     status: 'intake',
     createdAt: '2026-07-23T09:15:00.123Z',
     updatedAt: '2026-07-23T09:15:00.123Z',
@@ -714,24 +717,43 @@ describe('createCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const created = await client.createCase({ chapter: 7, district: 'D. Del.' });
+    const created = await client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' });
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('POST');
     expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/cases');
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(JSON.parse(seen.body)).toEqual({ chapter: 7, district: 'D. Del.' });
+    expect(JSON.parse(seen.body)).toEqual({ chapter: 7, court: 'flmb', division: 'tampa' });
 
     expect(created).toEqual({
       id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
       createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
       chapter: 7,
-      district: 'D. Del.',
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
       status: 'intake',
       createdAt: '2026-07-23T09:15:00.123Z',
       updatedAt: '2026-07-23T09:15:00.123Z',
     });
+  });
+
+  test('a case written before the court registry has NO court key — absent, not null', async () => {
+    // The legacy row: typed district, no reference. `'court' in case` is what
+    // a screen writes to decide whether to ask for one.
+    const { court: _court, division: _division, ...legacy } = CASE;
+    const stub = stubFetch(() => jsonResponse({ ...legacy, district: 'NDCA' }, 201));
+    const client = new InsolviaApiClient('https://staging-api.insolvia.ai', {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const created = await client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' });
+
+    expect(created.district).toBe('NDCA');
+    expect('court' in created).toBe(false);
+    expect('division' in created).toBe(false);
   });
 
   test('maps a 400 {"error","fields"} body to ApiValidationException', async () => {
@@ -747,7 +769,7 @@ describe('createCase', () => {
     });
 
     const error = asApiValidationException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
     );
 
     expect(error.statusCode).toBe(400);
@@ -767,7 +789,7 @@ describe('createCase', () => {
     });
 
     const error = asApiException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
     );
 
     expect(error.statusCode).toBe(400);
@@ -784,7 +806,7 @@ describe('createCase', () => {
     });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
     );
 
     expect(error.statusCode).toBe(401);
@@ -796,7 +818,7 @@ describe('createCase', () => {
     const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, district: 'D. Del.' })),
+      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
     );
 
     expect(stub.callCount()).toBe(0);
@@ -1022,6 +1044,7 @@ describe('updateCase', () => {
     const body = JSON.parse(seen.body) as Record<string, unknown>;
     expect(body).toEqual({ status: 'ready_to_file' });
     expect('chapter' in body).toBe(false);
+    expect('court' in body).toBe(false);
     expect('district' in body).toBe(false);
 
     expect(updated).toEqual(UPDATED_CASE);
@@ -1034,10 +1057,14 @@ describe('updateCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    await client.updateCase(CASE_ID, { chapter: 13, district: 'D. Del.' });
+    await client.updateCase(CASE_ID, {
+      chapter: 13,
+      court: { court: 'flmb', division: 'orlando' },
+    });
 
+    // The court pair is two wire keys, sent together and never apart.
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
-    expect(body).toEqual({ chapter: 13, district: 'D. Del.' });
+    expect(body).toEqual({ chapter: 13, court: 'flmb', division: 'orlando' });
     expect('status' in body).toBe(false);
   });
 
@@ -1051,7 +1078,7 @@ describe('updateCase', () => {
     await client.updateCase(CASE_ID, {
       status: 'ready_to_file',
       chapter: undefined,
-      district: undefined,
+      court: undefined,
     });
 
     const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
@@ -3489,6 +3516,13 @@ describe('the firm block on /v1/me', () => {
       isAdmin: true,
       accessAllCases: false,
       permissions: PERMISSIONS,
+      // The firm defaults and the caller's signature block (issue #360):
+      // null until set — and null too when an older API omits them.
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
+      letterhead: null,
+      signatureBlock: null,
     });
   });
 
@@ -3766,7 +3800,13 @@ describe('the firm record', () => {
     expect(seen.method).toBe('GET');
     expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
-    expect(firm).toEqual(FIRM_RECORD);
+    expect(firm).toEqual({
+      ...FIRM_RECORD,
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
+      letterhead: null,
+    });
   });
 
   test('PATCHes /v1/firm with exactly a name and maps the echoed record', async () => {
@@ -3782,10 +3822,93 @@ describe('the firm record', () => {
     expect(seen.method).toBe('PATCH');
     expect(seen.url).toBe(`${BASE_URL}/v1/firm`);
     expect(seen.headers.get('content-type')).toBe('application/json');
-    // The whole writable surface. `status` here would be the client offering
-    // a self-suspension the server's parser refuses to produce.
+    // A rename alone sends the name alone. `status` here would be the client
+    // offering a self-suspension the server's parser refuses to produce.
     expect(JSON.parse(seen.body)).toEqual({ name: 'Example, LLP' });
     expect(firm.name).toBe('Example, LLP');
+  });
+
+  // The firm defaults and letterhead (issue #360) — the literal
+  // firm_defaults_json shape: explicit nulls until set, and `null` in a
+  // PATCH is the clear instruction, sent as such.
+  const LETTERHEAD = {
+    name: 'Example & Partners, P.A.',
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    phone: '813-555-0100',
+    email: 'office@example.test',
+  };
+  const WITH_DEFAULTS = {
+    ...FIRM_RECORD,
+    defaultCourt: 'flmb',
+    defaultDivision: 'tampa',
+    defaultChapter: 7,
+    letterhead: LETTERHEAD,
+  };
+
+  test('GET /v1/firm maps the defaults as explicit nulls until set', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.getFirm();
+
+    expect(firm.defaultCourt).toBeNull();
+    expect(firm.defaultDivision).toBeNull();
+    expect(firm.defaultChapter).toBeNull();
+    expect(firm.letterhead).toBeNull();
+  });
+
+  test('PATCH /v1/firm sends the defaults under their exact wire names and maps them back', async () => {
+    const stub = stubFetch(() => jsonResponse(WITH_DEFAULTS, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const firm = await client.updateFirm({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 7,
+      letterhead: LETTERHEAD,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      defaultCourt: 'flmb',
+      defaultDivision: 'tampa',
+      defaultChapter: 7,
+      letterhead: LETTERHEAD,
+    });
+    expect(firm.defaultCourt).toBe('flmb');
+    expect(firm.defaultDivision).toBe('tampa');
+    expect(firm.defaultChapter).toBe(7);
+    expect(firm.letterhead).toEqual(LETTERHEAD);
+  });
+
+  test('PATCH /v1/firm sends null to CLEAR a default, and omits an unsupplied one', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_RECORD, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.updateFirm({ defaultCourt: null, defaultDivision: null });
+
+    const body = JSON.parse(stub.lastRequest().body) as Record<string, unknown>;
+    expect(body).toEqual({ defaultCourt: null, defaultDivision: null });
+    expect('defaultChapter' in body).toBe(false);
+    expect('name' in body).toBe(false);
+  });
+
+  test('a default chapter this version cannot rank is malformed, not guessed', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_RECORD, defaultChapter: 9 }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getFirm()).rejects.toThrow(ApiException);
   });
 
   test('a status this version cannot rank is malformed, not guessed', async () => {
@@ -3813,6 +3936,177 @@ describe('the firm record', () => {
     await failure.catch((caught: unknown) => {
       expect((caught as ApiValidationException).fields.name).toBe('A name is required.');
     });
+  });
+});
+
+describe('signature blocks (issue #360)', () => {
+  // The literal `signature_block_json` shape: a `filing_professional`-keyed
+  // object, or null. It rides on the directory, the admin list, and the
+  // /v1/me firm block; PATCH /v1/me and PATCH /v1/firm/users/{subject}
+  // both write it, with null as the clear instruction.
+  const BLOCK = {
+    bar_number: '0123456',
+    bar_state: 'FL',
+    firm_name: 'Example & Partners',
+    address: { line1: '1 Main St', city: 'Tampa', state: 'FL', postal_code: '33602' },
+    phone: '813-555-0100',
+    email: 'alice@example.test',
+  };
+
+  test('the directory carries each colleague’s block, null when unset', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          people: [
+            {
+              subject: 'a-1',
+              firstName: 'Alice',
+              lastName: 'Attorney',
+              displayName: 'Alice Attorney',
+              role: 'attorney',
+              signatureBlock: BLOCK,
+            },
+            {
+              subject: 'b-2',
+              firstName: 'Bob',
+              lastName: 'Paralegal',
+              displayName: 'Bob Paralegal',
+              role: 'paralegal',
+              signatureBlock: null,
+            },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const people = await client.listFirmDirectory();
+
+    expect(people[0]?.signatureBlock).toEqual(BLOCK);
+    expect(people[1]?.signatureBlock).toBeNull();
+  });
+
+  test('PATCH /v1/me sends the block under its wire name, and null to clear it', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          subject: SUBJECT,
+          username: USERNAME,
+          clientId: CLIENT_ID,
+          scopes: [],
+          expiresAt: 1893456000,
+          firm: {
+            id: 'f1a2b3c4-0000-4000-8000-000000000001',
+            name: 'Example & Partners',
+            role: 'attorney',
+            firstName: 'Alice',
+            lastName: 'Attorney',
+            displayName: 'Alice Attorney',
+            isAdmin: false,
+            accessAllCases: false,
+            permissions: { cases: 'add_edit' },
+            defaultCourt: 'flmb',
+            defaultDivision: 'tampa',
+            defaultChapter: 7,
+            letterhead: null,
+            signatureBlock: BLOCK,
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const me = await client.updateMe({ signatureBlock: BLOCK });
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ signatureBlock: BLOCK });
+    expect(me.firm?.signatureBlock).toEqual(BLOCK);
+    // The firm defaults ride on the same block, for the create form.
+    expect(me.firm?.defaultCourt).toBe('flmb');
+    expect(me.firm?.defaultDivision).toBe('tampa');
+    expect(me.firm?.defaultChapter).toBe(7);
+    expect(me.firm?.letterhead).toBeNull();
+
+    await client.updateMe({ signatureBlock: null });
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ signatureBlock: null });
+  });
+});
+
+describe('listCourts', () => {
+  // Pinned against api/routes/courts.py's `courts_json`: the registry's
+  // current release, districts with their divisions, counties by FIPS, and
+  // the Case Upload status per court.
+  const REGISTRY = {
+    releaseId: 'courts/us-bankruptcy@2026-09-24',
+    effectiveDate: '2026-09-24',
+    districts: [
+      {
+        code: 'flmb',
+        courtId: 'FLMBK',
+        name: 'Middle District of Florida',
+        state: 'FL',
+        circuit: 11,
+        website: 'https://www.flmb.uscourts.gov/',
+        divisions: [
+          {
+            code: 'tampa',
+            name: 'Tampa Division',
+            officeCode: '8',
+            officeCodeVerified: true,
+            courthouse: {
+              name: 'Sam M. Gibbons United States Courthouse',
+              line1: '801 N. Florida Avenue',
+              line2: 'Suite 555',
+              city: 'Tampa',
+              state: 'FL',
+              postal_code: '33602',
+            },
+            counties: [{ name: 'Hillsborough', fips: '12057' }],
+          },
+          {
+            code: 'fort-myers',
+            name: 'Fort Myers Division',
+            officeCode: null,
+            officeCodeVerified: false,
+            courthouse: null,
+            counties: [{ name: 'Lee', fips: '12071' }],
+          },
+        ],
+        caseUpload: { status: 'unverified', verifiedAt: null },
+      },
+    ],
+  };
+
+  test('GETs /v1/courts with a bearer token and maps the registry exactly', async () => {
+    const stub = stubFetch(() => jsonResponse(REGISTRY, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const registry = await client.listCourts();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/courts`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(registry).toEqual(REGISTRY);
+  });
+
+  test('a caller in no firm is refused with a 403', async () => {
+    const stub = stubFetch(() => jsonResponse({ error: 'Forbidden' }, 403));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.listCourts()).rejects.toThrow(ApiException);
   });
 });
 
@@ -3859,6 +4153,7 @@ describe('listFirmDirectory', () => {
         lastName: 'Attorney',
         displayName: 'Alice Attorney',
         role: 'attorney',
+        signatureBlock: null,
       },
       {
         subject: 'b-2',
@@ -3866,6 +4161,7 @@ describe('listFirmDirectory', () => {
         lastName: 'Paralegal',
         displayName: 'Bob Paralegal',
         role: 'paralegal',
+        signatureBlock: null,
       },
     ]);
   });
@@ -3898,11 +4194,15 @@ describe('listFirmDirectory', () => {
     const people = await client.listFirmDirectory();
 
     expect(people).toHaveLength(1);
+    // `signatureBlock` is the one deliberate widening (issue #360): the
+    // petition screen's "use firm default" is case work, and a bar number is
+    // printed on every filing the attorney signs.
     expect(Object.keys(people[0]!).sort()).toEqual([
       'displayName',
       'firstName',
       'lastName',
       'role',
+      'signatureBlock',
       'subject',
     ]);
   });
@@ -3945,7 +4245,7 @@ describe('the firm user endpoints', () => {
     const users = await client.listFirmUsers();
 
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/users`);
-    expect(users).toEqual([USER]);
+    expect(users).toEqual([{ ...USER, signatureBlock: null }]);
   });
 
   test('POSTs only the fields that were supplied — no undefined keys', async () => {

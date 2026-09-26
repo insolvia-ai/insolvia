@@ -1,0 +1,654 @@
+{
+  "code": "gamb",
+  "court_id": "GAMBK",
+  "name": "Middle District of Georgia",
+  "state": "GA",
+  "circuit": 11,
+  "website": "https://www.gamb.uscourts.gov",
+  "divisions": [
+    {
+      "code": "athens",
+      "name": "Athens Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Clarke",
+          "fips": "13059"
+        },
+        {
+          "name": "Elbert",
+          "fips": "13105"
+        },
+        {
+          "name": "Franklin",
+          "fips": "13119"
+        },
+        {
+          "name": "Greene",
+          "fips": "13133"
+        },
+        {
+          "name": "Hart",
+          "fips": "13147"
+        },
+        {
+          "name": "Madison",
+          "fips": "13195"
+        },
+        {
+          "name": "Morgan",
+          "fips": "13211"
+        },
+        {
+          "name": "Oconee",
+          "fips": "13219"
+        },
+        {
+          "name": "Oglethorpe",
+          "fips": "13221"
+        },
+        {
+          "name": "Walton",
+          "fips": "13297"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "macon",
+      "name": "Macon Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Middle District of Georgia",
+          "line1": "433 Cherry Street",
+          "line2": null,
+          "city": "Macon",
+          "state": "GA",
+          "postal_code": "31201"
+        },
+        "status": "verified",
+        "source": "S50",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Baldwin",
+          "fips": "13009"
+        },
+        {
+          "name": "Bibb",
+          "fips": "13021"
+        },
+        {
+          "name": "Bleckley",
+          "fips": "13023"
+        },
+        {
+          "name": "Butts",
+          "fips": "13035"
+        },
+        {
+          "name": "Crawford",
+          "fips": "13079"
+        },
+        {
+          "name": "Hancock",
+          "fips": "13141"
+        },
+        {
+          "name": "Houston",
+          "fips": "13153"
+        },
+        {
+          "name": "Jasper",
+          "fips": "13159"
+        },
+        {
+          "name": "Jones",
+          "fips": "13169"
+        },
+        {
+          "name": "Lamar",
+          "fips": "13171"
+        },
+        {
+          "name": "Monroe",
+          "fips": "13207"
+        },
+        {
+          "name": "Peach",
+          "fips": "13225"
+        },
+        {
+          "name": "Pulaski",
+          "fips": "13235"
+        },
+        {
+          "name": "Putnam",
+          "fips": "13237"
+        },
+        {
+          "name": "Twiggs",
+          "fips": "13289"
+        },
+        {
+          "name": "Upson",
+          "fips": "13293"
+        },
+        {
+          "name": "Washington",
+          "fips": "13303"
+        },
+        {
+          "name": "Wilkinson",
+          "fips": "13319"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "columbus",
+      "name": "Columbus Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Chattahoochee",
+          "fips": "13053"
+        },
+        {
+          "name": "Clay",
+          "fips": "13061"
+        },
+        {
+          "name": "Harris",
+          "fips": "13145"
+        },
+        {
+          "name": "Marion",
+          "fips": "13197"
+        },
+        {
+          "name": "Muscogee",
+          "fips": "13215"
+        },
+        {
+          "name": "Quitman",
+          "fips": "13239"
+        },
+        {
+          "name": "Randolph",
+          "fips": "13243"
+        },
+        {
+          "name": "Stewart",
+          "fips": "13259"
+        },
+        {
+          "name": "Talbot",
+          "fips": "13263"
+        },
+        {
+          "name": "Taylor",
+          "fips": "13269"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "americus",
+      "name": "Americus Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Ben Hill",
+          "fips": "13017"
+        },
+        {
+          "name": "Crisp",
+          "fips": "13081"
+        },
+        {
+          "name": "Dooly",
+          "fips": "13093"
+        },
+        {
+          "name": "Lee",
+          "fips": "13177"
+        },
+        {
+          "name": "Macon",
+          "fips": "13193"
+        },
+        {
+          "name": "Schley",
+          "fips": "13249"
+        },
+        {
+          "name": "Sumter",
+          "fips": "13261"
+        },
+        {
+          "name": "Terrell",
+          "fips": "13273"
+        },
+        {
+          "name": "Webster",
+          "fips": "13307"
+        },
+        {
+          "name": "Wilcox",
+          "fips": "13315"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "albany",
+      "name": "Albany Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Baker",
+          "fips": "13007"
+        },
+        {
+          "name": "Calhoun",
+          "fips": "13037"
+        },
+        {
+          "name": "Dougherty",
+          "fips": "13095"
+        },
+        {
+          "name": "Early",
+          "fips": "13099"
+        },
+        {
+          "name": "Miller",
+          "fips": "13201"
+        },
+        {
+          "name": "Mitchell",
+          "fips": "13205"
+        },
+        {
+          "name": "Turner",
+          "fips": "13287"
+        },
+        {
+          "name": "Worth",
+          "fips": "13321"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "valdosta",
+      "name": "Valdosta Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Berrien",
+          "fips": "13019"
+        },
+        {
+          "name": "Clinch",
+          "fips": "13065"
+        },
+        {
+          "name": "Cook",
+          "fips": "13075"
+        },
+        {
+          "name": "Echols",
+          "fips": "13101"
+        },
+        {
+          "name": "Irwin",
+          "fips": "13155"
+        },
+        {
+          "name": "Lanier",
+          "fips": "13173"
+        },
+        {
+          "name": "Lowndes",
+          "fips": "13185"
+        },
+        {
+          "name": "Tift",
+          "fips": "13277"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "thomasville",
+      "name": "Thomasville Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S50",
+        "verified_at": null,
+        "note": "The court's locations page names a Macon office and a Columbus office only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Brooks",
+          "fips": "13027"
+        },
+        {
+          "name": "Colquitt",
+          "fips": "13071"
+        },
+        {
+          "name": "Decatur",
+          "fips": "13087"
+        },
+        {
+          "name": "Grady",
+          "fips": "13131"
+        },
+        {
+          "name": "Seminole",
+          "fips": "13253"
+        },
+        {
+          "name": "Thomas",
+          "fips": "13275"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.gamb.uscourts.gov/cgi-bin/login.pl",
+      "status": "verified",
+      "source": "S51",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": "https://ecf-test.gamb.uscourts.gov/cgi-bin/login.pl",
+      "status": "verified",
+      "source": "S51",
+      "verified_at": "2026-09-24",
+      "note": "The registration page links a 'CM/ECF Test Login'; it is a test database, and whether it is the training environment was not stated."
+    },
+    "help_desk": {
+      "value": "gamb_nextgen@gamb.uscourts.gov; 478-752-3506",
+      "status": "verified",
+      "source": "S51",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.8.3",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.8 (Revision 1.8.3)'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": null,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "ADR 0024: 'not on pages read'; no GAMB page read today states a cap. The PACER lookup [S34] carries merge_doc_size '50' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "ADR 0024's row records only the departures (two blank lines; alphabetical); the common 40-character line is carried unverified. The Clerk's Instructions (Dec 2024) [S20] were not re-read today."
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "Carried from the common format, unverified — see max_line_chars."
+    },
+    "blank_lines_between": {
+      "value": 2,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "ADR 0024's row: 'two blank lines; alphabetical' [S13, S20]; not re-read today."
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "No fixed block size is recorded."
+    },
+    "name_line_chars": {
+      "value": null,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "No separate name-line width is recorded."
+    },
+    "comma_after_city": {
+      "value": null,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "Not recorded."
+    },
+    "case_number_header_when_separate": {
+      "value": null,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "Not recorded."
+    },
+    "certification_required": {
+      "value": true,
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "ADR 0024's row: 'signed matrix certification (LBR 1007-2)' [S20]; not re-read today."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "matrix_certification",
+        "title": "Signed matrix certification (LBR 1007-2)",
+        "wet_ink_required": null,
+        "retention": null,
+        "own_docket_event": null,
+        "form_url": null
+      },
+      "status": "unverified",
+      "source": "S20",
+      "verified_at": null,
+      "note": "ADR 0024's row [S20]; not re-read today."
+    },
+    "ssn_statement": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "Not proven against this court in a training-database session (ADR 0024, PR 5)."
+  },
+  "registration": {
+    "training_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S51",
+      "verified_at": null,
+      "note": "The registration page [S51] does not say whether training is required."
+    },
+    "notes": "Registration page [S51] links Macon and Columbus office directories and a 'Telephone Directory by Case Load Assignment' for county assignments (not read)."
+  },
+  "sources": [
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S20",
+      "title": "GAMB, Clerk's Instructions (Dec 2024) and CM/ECF Registration (carried from ADR 0024, not re-read)",
+      "url": "https://www.gamb.uscourts.gov/USCourts/sites/default/files/local_rules/CLERKS_INSTRUCTIONS.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 90 — Georgia (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/90",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S50",
+      "title": "GAMB, Court Locations (Macon office address)",
+      "url": "https://www.gamb.uscourts.gov/USCourts/court-info/court-locations",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S51",
+      "title": "GAMB, CM/ECF Registration (login, test login, help desk)",
+      "url": "https://www.gamb.uscourts.gov/USCourts/cmecf-registration",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 90(b)'s seven divisions [S41]. The bankruptcy court's own pages name only a Macon office and a Columbus office [S50, S51], so which statutory divisions each office opens cases for is UNVERIFIED — a case's division here is the statutory one, and the office is the training session's question. Nearly every rule fact is carried from ADR 0024's reading of the Clerk's Instructions [S20] and stored unverified; the court's locations page gives the Macon address."
+}

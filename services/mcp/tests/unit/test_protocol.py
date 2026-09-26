@@ -92,7 +92,7 @@ def _auth():
 
 def _seed_case(deps):
     case, assignment = create_case(
-        parse_case_creation({"chapter": 7, "district": "Middle District of Florida"}),
+        parse_case_creation({"chapter": 7, "court": "flmb", "division": "tampa"}),
         firm_id=FIRM_ID,
         created_by=SUBJECT,
     )

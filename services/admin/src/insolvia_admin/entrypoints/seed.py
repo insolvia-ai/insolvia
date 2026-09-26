@@ -661,8 +661,16 @@ def _seed_one_case(
         if check:
             print(f"  case '{handle}': missing")
         else:
+            # `court` + `division` are a registry reference (issue #360), so
+            # a fixture naming a court the registry does not know fails here
+            # with the API's own field error rather than seeding a case the
+            # service would refuse to write.
             draft = parse_case_creation(
-                {"chapter": spec.get("chapter"), "district": spec.get("district")}
+                {
+                    "chapter": spec.get("chapter"),
+                    "court": spec.get("court"),
+                    "division": spec.get("division"),
+                }
             )
             minted, _ = create_case(draft, firm_id=firm_id, created_by=created_by)
             case = replace(minted, id=case_id)

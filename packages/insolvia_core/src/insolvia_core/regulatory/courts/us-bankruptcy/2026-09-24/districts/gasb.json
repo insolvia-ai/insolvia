@@ -1,0 +1,581 @@
+{
+  "code": "gasb",
+  "court_id": "GASBK",
+  "name": "Southern District of Georgia",
+  "state": "GA",
+  "circuit": 11,
+  "website": "http://www.gasb.uscourts.gov",
+  "divisions": [
+    {
+      "code": "augusta",
+      "name": "Augusta Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "Federal Justice Center",
+          "line1": "600 James Brown Blvd",
+          "line2": null,
+          "city": "Augusta",
+          "state": "GA",
+          "postal_code": "30901"
+        },
+        "status": "verified",
+        "source": "S52",
+        "verified_at": "2026-09-24",
+        "note": "Also on the court-locations page [S52] and in the PACER lookup [S34]."
+      },
+      "counties": [
+        {
+          "name": "Burke",
+          "fips": "13033"
+        },
+        {
+          "name": "Columbia",
+          "fips": "13073"
+        },
+        {
+          "name": "Glascock",
+          "fips": "13125"
+        },
+        {
+          "name": "Jefferson",
+          "fips": "13163"
+        },
+        {
+          "name": "Lincoln",
+          "fips": "13181"
+        },
+        {
+          "name": "McDuffie",
+          "fips": "13189"
+        },
+        {
+          "name": "Richmond",
+          "fips": "13245"
+        },
+        {
+          "name": "Taliaferro",
+          "fips": "13265"
+        },
+        {
+          "name": "Warren",
+          "fips": "13301"
+        },
+        {
+          "name": "Wilkes",
+          "fips": "13317"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "dublin",
+      "name": "Dublin Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Dublin Division",
+          "line1": "100 North Franklin Str.",
+          "line2": null,
+          "city": "Dublin",
+          "state": "GA",
+          "postal_code": "31021"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Dodge",
+          "fips": "13091"
+        },
+        {
+          "name": "Johnson",
+          "fips": "13167"
+        },
+        {
+          "name": "Laurens",
+          "fips": "13175"
+        },
+        {
+          "name": "Montgomery",
+          "fips": "13209"
+        },
+        {
+          "name": "Telfair",
+          "fips": "13271"
+        },
+        {
+          "name": "Treutlen",
+          "fips": "13283"
+        },
+        {
+          "name": "Wheeler",
+          "fips": "13309"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "savannah",
+      "name": "Savannah Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Southern District of Georgia",
+          "line1": "Post Office Box 8347",
+          "line2": null,
+          "city": "Savannah",
+          "state": "GA",
+          "postal_code": "31412"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": "The PACER lookup gives the clerk's post-office box for Savannah, not a street address."
+      },
+      "counties": [
+        {
+          "name": "Bryan",
+          "fips": "13029"
+        },
+        {
+          "name": "Chatham",
+          "fips": "13051"
+        },
+        {
+          "name": "Effingham",
+          "fips": "13103"
+        },
+        {
+          "name": "Liberty",
+          "fips": "13179"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "waycross",
+      "name": "Waycross Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Waycross Division",
+          "line1": "601 Tebeau Str",
+          "line2": null,
+          "city": "Waycross",
+          "state": "GA",
+          "postal_code": "31501"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Atkinson",
+          "fips": "13003"
+        },
+        {
+          "name": "Bacon",
+          "fips": "13005"
+        },
+        {
+          "name": "Brantley",
+          "fips": "13025"
+        },
+        {
+          "name": "Charlton",
+          "fips": "13049"
+        },
+        {
+          "name": "Coffee",
+          "fips": "13069"
+        },
+        {
+          "name": "Pierce",
+          "fips": "13229"
+        },
+        {
+          "name": "Ware",
+          "fips": "13299"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "brunswick",
+      "name": "Brunswick Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Brunswick Division",
+          "line1": "801 Gloucester Str.",
+          "line2": null,
+          "city": "Brunswick",
+          "state": "GA",
+          "postal_code": "31520"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Appling",
+          "fips": "13001"
+        },
+        {
+          "name": "Camden",
+          "fips": "13039"
+        },
+        {
+          "name": "Glynn",
+          "fips": "13127"
+        },
+        {
+          "name": "Jeff Davis",
+          "fips": "13161"
+        },
+        {
+          "name": "Long",
+          "fips": "13183"
+        },
+        {
+          "name": "McIntosh",
+          "fips": "13191"
+        },
+        {
+          "name": "Wayne",
+          "fips": "13305"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "statesboro",
+      "name": "Statesboro Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Statesboro Division",
+          "line1": "52 N. Main Str.",
+          "line2": null,
+          "city": "Statesboro",
+          "state": "GA",
+          "postal_code": "30458"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Bulloch",
+          "fips": "13031"
+        },
+        {
+          "name": "Candler",
+          "fips": "13043"
+        },
+        {
+          "name": "Emanuel",
+          "fips": "13107"
+        },
+        {
+          "name": "Evans",
+          "fips": "13109"
+        },
+        {
+          "name": "Jenkins",
+          "fips": "13165"
+        },
+        {
+          "name": "Screven",
+          "fips": "13251"
+        },
+        {
+          "name": "Tattnall",
+          "fips": "13267"
+        },
+        {
+          "name": "Toombs",
+          "fips": "13279"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.gasb.uscourts.gov/",
+      "status": "verified",
+      "source": "S53",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": null,
+      "status": "unverified",
+      "source": "S53",
+      "verified_at": null,
+      "note": "No training database URL on the registration information page."
+    },
+    "help_desk": {
+      "value": "912-650-4100",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.9",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.9'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": 36700160,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "35 MB per the CM/ECF Manual for Attorney Users (Mar 2026) as read for ADR 0024 [S18]; not re-read today. The PACER lookup [S34] carries merge_doc_size '3' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "ADR 0024's row records no departure from the common format [S18, S21]; the common 40-character line is carried unverified."
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "Carried from the common format, unverified."
+    },
+    "blank_lines_between": {
+      "value": 1,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "Carried from the common format, unverified."
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "No fixed block size is recorded."
+    },
+    "name_line_chars": {
+      "value": null,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "No separate name-line width is recorded."
+    },
+    "comma_after_city": {
+      "value": null,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "Not recorded."
+    },
+    "case_number_header_when_separate": {
+      "value": null,
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "Not recorded."
+    },
+    "certification_required": {
+      "value": true,
+      "status": "unverified",
+      "source": "S21",
+      "verified_at": null,
+      "note": "ADR 0024's row: 'signed matrix certification' [S21]. The certification form's page read today [S54] links the PDF form and states no instructions."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "matrix_certification",
+        "title": "Certification of Creditor Mailing Matrix",
+        "wet_ink_required": null,
+        "retention": null,
+        "own_docket_event": null,
+        "form_url": "https://www.gasb.uscourts.gov/forms/certification-creditor-mailing-matrix"
+      },
+      "status": "unverified",
+      "source": "S21",
+      "verified_at": null,
+      "note": "ADR 0024's row [S21]; the form page [S54] was read today and carries only the PDF link."
+    },
+    "ssn_statement": {
+      "value": "own_event",
+      "status": "unverified",
+      "source": "S18",
+      "verified_at": null,
+      "note": "ADR 0024 [S18]: the SSN statement is its own event in GASB; not re-read today."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": {
+        "deadline": "Filing fees are due the same day (2016 administrative procedures)",
+        "note": "ADR 0024 [S13]; not re-read today."
+      },
+      "status": "unverified",
+      "source": "S13",
+      "verified_at": null,
+      "note": null
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "ADR 0024 [S18]: the March 2026 manual documents the Open BK Case flow; the court's required field set has not been verified in a training-database session."
+  },
+  "registration": {
+    "training_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S53",
+      "verified_at": null,
+      "note": "The registration information page [S53] does not say whether training is required; it links the Attorney Filer Terms and Conditions and the Mandatory Administrative Procedures (not read)."
+    },
+    "notes": "Registration through PACER after the terms and conditions [S53]."
+  },
+  "sources": [
+    {
+      "id": "S13",
+      "title": "GASB, CM/ECF Administrative Procedures (eff. 2016-12-01; carried from ADR 0024, not re-read)",
+      "url": "https://www.gasb.uscourts.gov/sites/gasb/files/AdminProcDec2016.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S18",
+      "title": "GASB, CM/ECF Manual for Attorney Users (Mar 2026; carried from ADR 0024, not re-read)",
+      "url": "https://www.gasb.uscourts.gov/sites/gasb/files/CMECF%20Manual%20for%20Attorney%20Users%20Mar%202026.2.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S21",
+      "title": "GASB, Certification of Creditor Mailing Matrix (carried from ADR 0024)",
+      "url": "https://www.gasb.uscourts.gov/forms/certification-creditor-mailing-matrix",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 90 — Georgia (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/90",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S52",
+      "title": "GASB, Court Locations (Augusta address)",
+      "url": "https://www.gasb.uscourts.gov/court-info/court-locations",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S53",
+      "title": "GASB, CM/ECF Registration Information",
+      "url": "https://www.gasb.uscourts.gov/cmecf-registration-information",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S54",
+      "title": "GASB, Certification of Creditor Mailing Matrix form page",
+      "url": "https://www.gasb.uscourts.gov/forms/certification-creditor-mailing-matrix",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 90(c)'s six divisions [S41]; the PACER lookup lists the same six offices with addresses [S34]. Office codes and the training requirement were not found; the PDF cap, matrix format, certification, B121 handling and fee rule are carried from ADR 0024's reading of the 2016 procedures and the March 2026 manual and stored unverified."
+}

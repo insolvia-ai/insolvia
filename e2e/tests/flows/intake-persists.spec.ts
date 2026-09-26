@@ -59,8 +59,12 @@ test.describe('staging intake', () => {
 
     if ((await caseLink.count()) === 0) {
       // First run against a fresh environment: open one. The chapter radio
-      // defaults to 7, so only the district needs an answer.
-      await page.getByRole('textbox', { name: 'Filing district' }).fill('NDCA');
+      // defaults to 7, so only the court and division need an answer — picked
+      // from the registry (`GET /v1/courts`, issue #360), never typed.
+      await page.getByRole('combobox', { name: 'Court' }).click();
+      await page.getByRole('option', { name: 'Middle District of Florida' }).click();
+      await page.getByRole('combobox', { name: 'Division' }).click();
+      await page.getByRole('option', { name: 'Tampa Division' }).click();
       await page.getByRole('button', { name: 'Open case' }).click();
     }
     await expect(

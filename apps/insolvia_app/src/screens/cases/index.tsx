@@ -1,11 +1,12 @@
 import { ApiValidationException } from '@insolvia-ai/api-client';
-import type { Case, CaseChapter, FirmColleague } from '@insolvia-ai/api-client';
-import { Badge, Button, Field, Input, RadioGroup, Table } from '@insolvia-ai/design-system';
+import type { Case, CaseChapter, CourtRegistry, FirmColleague } from '@insolvia-ai/api-client';
+import { Badge, Button, Field, RadioGroup, Select, Table } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
@@ -36,35 +37,81 @@ type ListState =
   | { readonly kind: 'ready'; readonly cases: readonly Case[] }
   | { readonly kind: 'error'; readonly message: string };
 
+type RegistryState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly registry: CourtRegistry }
+  | { readonly kind: 'error' };
+
 /**
  * The case list, and the form that opens one — the screen that closes issue
  * 8.3's loop: sign in, `POST /v1/cases`, `GET /v1/cases`, a case on screen.
  *
  * Deliberately not the intake questionnaire. This creates the case *record* —
- * chapter and district — and nothing else; the multi-step questionnaire that
- * fills a case is 8.5, and building a thin version of it here would be
- * something 8.5 has to unpick.
+ * chapter, court and division — and nothing else; the multi-step
+ * questionnaire that fills a case is 8.5, and building a thin version of it
+ * here would be something 8.5 has to unpick.
+ *
+ * THE COURT IS PICKED, NOT TYPED (issue #360). `GET /v1/courts` is the
+ * registry the server validates against, so the two `Select`s below offer
+ * exactly what it will accept, and the printed district name is derived on
+ * the server from the pair — the form never sends a district string. The
+ * firm's defaults (`/v1/me`'s firm block) preselect the court, division and
+ * chapter; the preparer changes any of them per case.
  *
  * Everything visual is ours: {@link AppShell}, {@link Heading}, and the design
- * system's `Button`, `Field`, `Input` and `RadioGroup` leaves. Chapter stays a
+ * system's `Button`, `Field`, `Select` and `RadioGroup` leaves. Chapter stays a
  * radio group even though the package has shipped `Select` since 0.4.0: with
  * four options a radio group is the better control regardless — every option is
- * visible and reachable without opening anything.
+ * visible and reachable without opening anything. The court list is ten
+ * districts with up to seven divisions each, which is a `Select`'s job.
  */
 export function Cases() {
   const theme = useTheme();
   const { call } = useApi();
+  const membership = useMembership();
 
   const [list, setList] = useState<ListState>({ kind: 'loading' });
   // Subject -> name, so `createdBy` renders as a colleague rather than a uuid.
   // Loaded once and separately from the cases: it fails independently, and a
   // directory this screen could not fetch should cost names, not the list.
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
+  const [courts, setCourts] = useState<RegistryState>({ kind: 'loading' });
   const [chapter, setChapter] = useState<CaseChapter>(7);
-  const [district, setDistrict] = useState('');
+  const [court, setCourt] = useState<string | null>(null);
+  const [division, setDivision] = useState<string | null>(null);
+  // The firm defaults are applied ONCE, when they first arrive — after that
+  // the form is the preparer's, and a membership refresh must not snap a
+  // half-filled form back to the defaults.
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (defaultsApplied || membership === undefined || membership === null) return;
+    setDefaultsApplied(true);
+    if (membership.defaultChapter !== null) setChapter(membership.defaultChapter);
+    if (membership.defaultCourt !== null) setCourt(membership.defaultCourt);
+    if (membership.defaultDivision !== null) setDivision(membership.defaultDivision);
+  }, [defaultsApplied, membership]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCourts = async () => {
+      try {
+        const result = await call((client) => client.listCourts());
+        if (result.ok && !cancelled) {
+          setCourts({ kind: 'ready', registry: result.value });
+        }
+      } catch {
+        if (!cancelled) setCourts({ kind: 'error' });
+      }
+    };
+    void loadCourts();
+    return () => {
+      cancelled = true;
+    };
+  }, [call]);
 
   const load = useCallback(async () => {
     try {
@@ -104,9 +151,13 @@ export function Cases() {
     setFieldErrors({});
     setFormError(null);
     try {
-      const result = await call((client) => client.createCase({ chapter, district }));
+      // The pair goes as chosen, empty when not — the server's per-field
+      // message ("Choose the bankruptcy court…") is the validation, not a
+      // second copy of the rule here (ADR 0001).
+      const result = await call((client) =>
+        client.createCase({ chapter, court: court ?? '', division: division ?? '' }),
+      );
       if (result.ok) {
-        setDistrict('');
         await load();
       }
     } catch (cause) {
@@ -180,25 +231,34 @@ export function Cases() {
           </Text>
         ) : null}
 
-        <Field.Root name="district" invalid={Boolean(fieldErrors.district)}>
-          <Field.Label>Filing district</Field.Label>
-          <Input
-            value={district}
-            onValueChange={setDistrict}
-            placeholder="e.g. NDCA"
-            autoCapitalize="characters"
-            autoCorrect={false}
+        {courts.kind === 'ready' ? (
+          <CourtPicker
+            registry={courts.registry}
+            court={court}
+            division={division}
+            onCourtChange={(next) => {
+              setCourt(next);
+              // A division belongs to its court; a new court starts with none.
+              setDivision(null);
+            }}
+            onDivisionChange={setDivision}
+            errors={fieldErrors}
           />
-          <Field.Description>
-            The bankruptcy court district this case will be filed in.
-          </Field.Description>
-          {fieldErrors.district ? <Field.Error match>{fieldErrors.district}</Field.Error> : null}
-        </Field.Root>
+        ) : (
+          <Text
+            aria-live={courts.kind === 'error' ? 'assertive' : 'polite'}
+            style={[styles.body, muted]}
+          >
+            {courts.kind === 'loading'
+              ? 'Loading the court registry…'
+              : 'Could not load the court registry — a case cannot be opened until it loads.'}
+          </Text>
+        )}
 
         <View style={styles.actions}>
           {/* size="lg" (48dp): the package's md is 40dp, under the 44dp
               WCAG 2.5.5 target-size floor this app enforces. */}
-          <Button size="lg" onPress={submit} disabled={submitting}>
+          <Button size="lg" onPress={submit} disabled={submitting || courts.kind !== 'ready'}>
             {submitting ? 'Opening…' : 'Open case'}
           </Button>
         </View>
@@ -228,6 +288,73 @@ export function Cases() {
         </Text>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * The court and division pickers, fed by the registry. Two `Select`s rather
+ * than one flattened list: a district has up to seven divisions and the
+ * court is the fact the preparer knows first — the division follows from the
+ * debtor's county, which the registry also carries and a later screen can
+ * use to suggest it.
+ */
+export function CourtPicker({
+  registry,
+  court,
+  division,
+  onCourtChange,
+  onDivisionChange,
+  errors,
+  courtLabel = 'Court',
+  divisionLabel = 'Division',
+  courtField = 'court',
+  divisionField = 'division',
+}: {
+  registry: CourtRegistry;
+  court: string | null;
+  division: string | null;
+  onCourtChange: (court: string) => void;
+  onDivisionChange: (division: string) => void;
+  errors: Readonly<Record<string, string>>;
+  courtLabel?: string;
+  divisionLabel?: string;
+  /** The error-map keys, which differ between a case (`court`) and a firm default (`defaultCourt`). */
+  courtField?: string;
+  divisionField?: string;
+}) {
+  const district = registry.districts.find((d) => d.code === court);
+  const courtOptions = registry.districts.map((d) => ({ value: d.code, label: d.name }));
+  const divisionOptions = (district?.divisions ?? []).map((d) => ({
+    value: d.code,
+    label: d.name,
+  }));
+  return (
+    <>
+      <Field.Root name={courtField} invalid={Boolean(errors[courtField])}>
+        <Field.Label>{courtLabel}</Field.Label>
+        <Select
+          options={courtOptions}
+          value={court}
+          onValueChange={onCourtChange}
+          placeholder="Choose a court"
+        />
+        <Field.Description>
+          The bankruptcy court this case will be filed in, from the court registry.
+        </Field.Description>
+        {errors[courtField] ? <Field.Error match>{errors[courtField]}</Field.Error> : null}
+      </Field.Root>
+      <Field.Root name={divisionField} invalid={Boolean(errors[divisionField])}>
+        <Field.Label>{divisionLabel}</Field.Label>
+        <Select
+          options={divisionOptions}
+          value={division}
+          onValueChange={onDivisionChange}
+          placeholder={district === undefined ? 'Choose a court first' : 'Choose a division'}
+          disabled={district === undefined}
+        />
+        {errors[divisionField] ? <Field.Error match>{errors[divisionField]}</Field.Error> : null}
+      </Field.Root>
+    </>
   );
 }
 

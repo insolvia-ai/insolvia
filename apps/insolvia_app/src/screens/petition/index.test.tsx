@@ -196,6 +196,86 @@ describe('the petition screen', () => {
     );
   });
 
+  it('prefills the signer block from a colleague’s firm signature block, and saves it as staff-typed', async () => {
+    // Issue #360: the directory carries each attorney's standing block; the
+    // button copies it onto the form and the preparer still saves — with the
+    // same provenance as anything they typed, because they confirmed it.
+    const fetchMock = signedIn(
+      baseRoutes([
+        {
+          method: 'GET',
+          fragment: '/v1/firm/directory',
+          respond: () =>
+            jsonResponse(200, {
+              people: [
+                {
+                  subject: '00000000-0000-4000-8000-00000000a11c',
+                  firstName: 'Alice',
+                  lastName: 'Attorney',
+                  displayName: 'Alice Attorney',
+                  role: 'attorney',
+                  signatureBlock: {
+                    bar_number: '0123456',
+                    bar_state: 'FL',
+                    firm_name: 'Example & Partners',
+                    address: { line1: '1 Main St', city: 'Tampa', state: 'FL' },
+                    phone: '813-555-0100',
+                    email: 'alice@example.test',
+                  },
+                },
+                {
+                  subject: '00000000-0000-4000-8000-00000000b0b0',
+                  firstName: 'Bob',
+                  lastName: 'Paralegal',
+                  displayName: 'Bob Paralegal',
+                  role: 'paralegal',
+                  signatureBlock: null,
+                },
+              ],
+            }),
+        },
+        {
+          method: 'POST',
+          fragment: `/v1/cases/${CASE_ID}/filing_professionals`,
+          respond: () =>
+            jsonResponse(201, {
+              id: 'fp-1',
+              case_id: CASE_ID,
+              created_at: '2026-09-01T10:00:00.000000Z',
+              updated_at: '2026-09-01T10:00:00.000000Z',
+              provenance: {},
+              role: 'attorney',
+              bar_number: '0123456',
+            }),
+        },
+      ]),
+    );
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: 'Who signs' });
+    // Only Alice has a block, so she is the one option and the default.
+    await screen.findByText('Alice Attorney');
+    await user.press(screen.getByRole('button', { name: 'Use firm default' }));
+
+    expect(screen.getByDisplayValue('0123456')).toBeTruthy();
+    expect(screen.getByDisplayValue('Example & Partners')).toBeTruthy();
+    expect(screen.getByDisplayValue('Tampa')).toBeTruthy();
+    expect(screen.getByText(/Prefilled from Alice Attorney/)).toBeTruthy();
+
+    await user.press(screen.getByRole('button', { name: 'Save signer' }));
+
+    await waitFor(() => {
+      const body = lastBody(fetchMock, 'POST', '/filing_professionals');
+      expect(body.bar_number).toBe('0123456');
+      expect(body.bar_state).toBe('FL');
+      expect(body.name).toEqual({ given: 'Alice', surname: 'Attorney' });
+      expect(body.address).toEqual({ line1: '1 Main St', city: 'Tampa', state: 'FL' });
+      expect((body.provenance as Record<string, unknown>).bar_number).toEqual({
+        source: 'staff_typed',
+      });
+    });
+  });
+
   it('derives the estimated-creditors band from the case’s own creditor count', async () => {
     signedIn(
       baseRoutes([

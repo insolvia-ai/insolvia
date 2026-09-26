@@ -18,6 +18,7 @@ from insolvia_core.firms import (
     INTAKE,
     LEVELS,
     VIEW_ONLY,
+    DefaultCourt,
     FirmUser,
     apply_firm_changes,
     apply_user_changes,
@@ -40,6 +41,7 @@ from insolvia_core.firms import (
     permission_for,
     permits,
     set_firm_status,
+    signature_block_json,
     split_legacy_name,
 )
 
@@ -667,4 +669,165 @@ def test_firm_summary_json_carries_no_provenance():
         created_by_email="operator@example.test",
     )
     payload = firm_summary_json(firm)
-    assert set(payload) == {"id", "name", "status", "createdAt", "updatedAt"}
+    # The firm defaults (issue #360) ride on every firm response, as explicit
+    # nulls when unset; provenance never does.
+    assert set(payload) == {
+        "id",
+        "name",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "defaultCourt",
+        "defaultDivision",
+        "defaultChapter",
+        "letterhead",
+    }
+    assert payload["defaultCourt"] is None
+    assert payload["letterhead"] is None
+
+
+# ── Firm defaults and signature blocks (issue #360) ────────────────
+
+
+def test_a_default_court_is_validated_against_the_registry():
+    changes = parse_firm_update({"defaultCourt": "flmb", "defaultDivision": "tampa"})
+    assert changes.default_court is not None
+    assert changes.default_court.value == DefaultCourt(court="flmb", division="tampa")
+
+
+@pytest.mark.parametrize(
+    ("payload", "field"),
+    [
+        ({"defaultCourt": "nyeb", "defaultDivision": "brooklyn"}, "defaultCourt"),
+        ({"defaultCourt": "flmb", "defaultDivision": "miami"}, "defaultDivision"),
+        ({"defaultCourt": "flmb"}, "defaultDivision"),
+        ({"defaultDivision": "tampa"}, "defaultCourt"),
+        ({"defaultChapter": 9}, "defaultChapter"),
+        ({"defaultChapter": "7"}, "defaultChapter"),
+        ({"letterhead": "Example & Partners"}, "letterhead"),
+        ({"letterhead": {"phone": "x" * 33}}, "letterhead.phone"),
+    ],
+)
+def test_a_bad_default_names_its_field(payload, field):
+    with pytest.raises(FieldValidationError) as caught:
+        parse_firm_update(payload)
+    assert field in caught.value.fields
+
+
+def test_defaults_are_applied_and_can_be_cleared():
+    firm = create_firm(parse_firm_creation({"name": "Example"}))
+    with_defaults = apply_firm_changes(
+        firm,
+        parse_firm_update(
+            {
+                "defaultCourt": "flmb",
+                "defaultDivision": "tampa",
+                "defaultChapter": 13,
+                "letterhead": {
+                    "name": "Example & Partners, P.A.",
+                    "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"},
+                    "phone": "813-555-0100",
+                },
+            }
+        ),
+    )
+    assert with_defaults.default_court == DefaultCourt(court="flmb", division="tampa")
+    assert with_defaults.default_chapter == 13
+    assert with_defaults.letterhead is not None
+    assert with_defaults.letterhead.address.city == "Tampa"
+    # A rename leaves every default alone: None means "leave unchanged".
+    renamed = apply_firm_changes(with_defaults, parse_firm_update({"name": "Ex"}))
+    assert renamed.default_court == with_defaults.default_court
+    # `null` clears — the one thing a bare None cannot express.
+    cleared = apply_firm_changes(
+        with_defaults,
+        parse_firm_update(
+            {"defaultCourt": None, "defaultDivision": None, "letterhead": None}
+        ),
+    )
+    assert cleared.default_court is None
+    assert cleared.letterhead is None
+    assert cleared.default_chapter == 13
+
+
+def test_a_firm_with_defaults_round_trips_through_the_item():
+    firm = apply_firm_changes(
+        create_firm(parse_firm_creation({"name": "Example"})),
+        parse_firm_update(
+            {
+                "defaultCourt": "flmb",
+                "defaultDivision": "tampa",
+                "defaultChapter": 7,
+                "letterhead": {"name": "Example", "email": "office@example.test"},
+            }
+        ),
+    )
+    assert firm_from_item(firm_item(firm)) == firm
+
+
+def test_a_firm_without_defaults_stores_none_of_them():
+    item = firm_item(create_firm(parse_firm_creation({"name": "Example"})))
+    assert not {
+        "defaultCourt",
+        "defaultDivision",
+        "defaultChapter",
+        "letterhead",
+    } & set(item)
+
+
+def test_a_signature_block_is_the_filing_professionals_shape():
+    changes = parse_self_update(
+        {
+            "signatureBlock": {
+                "bar_number": "0123456",
+                "bar_state": "FL",
+                "firm_name": "Example & Partners",
+                "address": {"line1": "1 Main St", "city": "Tampa", "state": "FL"},
+                "phone": "813-555-0100",
+                "email": "alice@example.test",
+            }
+        }
+    )
+    assert changes.signature_block is not None
+    block = changes.signature_block.value
+    assert block is not None
+    assert block.bar_number == "0123456"
+    updated = apply_user_changes(user(), changes)
+    assert updated.signature_block == block
+    assert firm_user_from_item(firm_user_item(updated)) == updated
+    # Keyed as a `filing_professional` body is, so the petition screen copies
+    # it onto the case without a mapping.
+    assert set(signature_block_json(updated) or {}) == {
+        "bar_number",
+        "bar_state",
+        "firm_name",
+        "address",
+        "phone",
+        "email",
+    }
+
+
+@pytest.mark.parametrize(
+    ("payload", "field"),
+    [
+        ({"signatureBlock": "0123456"}, "signatureBlock"),
+        ({"signatureBlock": {"bar_state": "FLA"}}, "signatureBlock.bar_state"),
+        ({"signatureBlock": {"bar_number": "x" * 33}}, "signatureBlock.bar_number"),
+    ],
+)
+def test_a_bad_signature_block_names_its_field(payload, field):
+    with pytest.raises(FieldValidationError) as caught:
+        parse_firm_user_update(payload)
+    assert field in caught.value.fields
+
+
+def test_a_signature_block_can_be_cleared_by_admin_or_self():
+    with_block = apply_user_changes(
+        user(), parse_firm_user_update({"signatureBlock": {"bar_number": "1"}})
+    )
+    assert with_block.signature_block is not None
+    cleared = apply_user_changes(
+        with_block, parse_self_update({"signatureBlock": None})
+    )
+    assert cleared.signature_block is None
+    assert "signatureBlock" not in firm_user_item(cleared)

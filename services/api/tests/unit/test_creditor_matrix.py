@@ -14,6 +14,7 @@ from insolvia_api.core.creditor_matrix import (
     DISTRICT_VARIANCES,
     CreditorMatrix,
     MatrixFormat,
+    format_for_court,
     generate_creditor_matrix,
     matrix_json,
 )
@@ -313,6 +314,49 @@ def test_the_variance_table_only_departs_from_the_common_format():
     for district, fmt in DISTRICT_VARIANCES.items():
         assert fmt != COMMON_FORMAT, district
         assert isinstance(fmt, MatrixFormat)
+
+
+# ── The format comes from the court registry (issue #360) ────────
+
+
+def test_the_variances_are_the_registrys_verified_departures():
+    # The two departures the table once hand-wrote, now read from the
+    # registry's verified facts — plus the ones the research added.
+    assert DISTRICT_VARIANCES["txsb"].pad_to_lines == 6
+    assert DISTRICT_VARIANCES["txsb"].blank_lines_between == 0
+    assert DISTRICT_VARIANCES["txnb"].blank_lines_between == 2
+    assert DISTRICT_VARIANCES["txeb"].blank_lines_between == 2
+    assert DISTRICT_VARIANCES["txeb"].case_number_header_when_separate is True
+    assert DISTRICT_VARIANCES["txwb"].name_line_chars == 50
+    assert DISTRICT_VARIANCES["txwb"].comma_after_city is True
+    assert DISTRICT_VARIANCES["flnb"].comma_after_city is True
+    # S.D. Fla. (CI-3) is the common format, so it is recorded by absence.
+    assert "flsb" not in DISTRICT_VARIANCES
+
+
+def test_an_unverified_knob_falls_back_to_the_common_format():
+    # M.D. Fla.'s only published widths are the pro se paper instructions
+    # (28 characters / 4 lines), stored unverified for the represented
+    # debtor's upload — so the generator keeps the common format there.
+    assert format_for_court("flmb").max_line_chars == 40
+    assert format_for_court("flmb").max_creditor_lines == 5
+
+
+def test_a_case_without_a_court_gets_the_common_format():
+    assert format_for_court(None) == COMMON_FORMAT
+    assert format_for_court("nyeb") == COMMON_FORMAT
+
+
+def test_the_western_texas_format_widens_the_name_line_and_adds_the_comma():
+    fmt = format_for_court("txwb")
+    name = "Consolidated Example Receivables Servicing LLC"  # 46 chars
+    assert len(name) > 40
+    matrix = generate_creditor_matrix([creditor(name)], fmt=fmt)
+    assert matrix.problems == ()
+    assert matrix.content == f"{name}\r\nPO Box 15168\r\nWilmington, DE 19850\r\n"
+    # An address line is still held to 40.
+    over = generate_creditor_matrix([creditor(line1="x" * 41)], fmt=fmt)
+    assert problem_fields(over) == {("creditor-1", "address.line1")}
 
 
 # ── The API representation ──────────────────────────────────────
