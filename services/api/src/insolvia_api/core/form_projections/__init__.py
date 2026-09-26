@@ -73,6 +73,8 @@ from .b108 import project_b108_1215
 from .b121 import project_b121_1215
 from .b122a1 import project_b122a1_1219
 from .b122a2 import project_b122a2_0425
+from .b122c1 import project_b122c1_1019
+from .b122c2 import project_b122c2_0425
 from .b2010 import project_b2010_1220
 from .b2030 import project_b2030_1225
 from .shared import (
@@ -120,6 +122,8 @@ PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b121", "2015-12-01"): project_b121_1215,
     ("form/b122a1", "2019-12-01"): project_b122a1_1219,
     ("form/b122a2", "2025-04-01"): project_b122a2_0425,
+    ("form/b122c1", "2019-10-01"): project_b122c1_1019,
+    ("form/b122c2", "2025-04-01"): project_b122c2_0425,
     ("form/b2010", "2020-12-01"): project_b2010_1220,
     ("form/b2030", "2025-12-01"): project_b2030_1225,
 }

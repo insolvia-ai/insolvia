@@ -1,0 +1,1868 @@
+{
+ "form": "b122c2",
+ "official_number": "122C-2",
+ "title": "Chapter 13 Calculation of Your Disposable Income",
+ "revision": "04/25",
+ "effective_date": "2025-04-01",
+ "signature_pages": [
+  8
+ ],
+ "notes": "The \u00a7 1325(b)(2)-(3) calculation (issue #365): lines 5-38 are the same means-test engine lines B122A-2 prints (core/means_test.py, the form's own 'line numbers 1-4 are not used'), lines 39-45 its Chapter 13 branch, the entered lines come from the case's means_test_input, and the statutory figure the 04/25 revision prints ($214.58 per child on line 29) is a code/dollar-amounts figure. Known defects, verified by widget geometry: nearly every amount box is named undefined_NN and the geometry is the identity; every right-margin 'Copy here' box shares the widget of the box it copies (one value, two printed boxes, always agreeing), as do 33a/33b (9b's and 13b's totals), line 38's three copy boxes (lines 24, 32, 37) and line 42 (line 38); line 33c's copy box is wired to 13e's FIRST ROW amount instead of its total (vehicle_2_loan_rows says how the projection compensates); line 34's third monthly box is named '60'; and line 11's export states are the line numbers each answer sends you to.",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Calculate Your Deductions from Your Income"
+  },
+  {
+   "number": 2,
+   "title": "Determine Your Disposable Income Under 11 U.S.C. \u00a7 1325(b)(2)"
+  },
+  {
+   "number": 3,
+   "title": "Change in Income or Expenses"
+  },
+  {
+   "number": 4,
+   "title": "Sign Below"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   },
+   "notes": "one field whose widget repeats in every page's header"
+  },
+  {
+   "id": "caption.debtor2_name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   },
+   "notes": "one field whose widget repeats in every page's header"
+  },
+  {
+   "id": "caption.amended",
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is an amended filing"
+    ]
+   }
+  },
+  {
+   "id": "household_size",
+   "label": "The number of people used in determining your deductions from income",
+   "type": "integer",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "people_under_65",
+    "notes": "people_under_65 + people_65_or_older (or the entered irs_family_size); the engine derives the figure"
+   },
+   "pdf": {
+    "names": [
+     "undefined"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "food_clothing_allowance",
+   "label": "Food, clothing, and other items (IRS National Standards)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_2"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "oop_health_under_65_rate",
+   "label": "Out-of-pocket health care allowance per person under 65",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "7a Outofpocket health care allowance per person"
+    ]
+   },
+   "part": 1,
+   "line": "7a"
+  },
+  {
+   "id": "oop_health_under_65_count",
+   "label": "Number of people who are under 65",
+   "type": "integer",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "people_under_65"
+   },
+   "pdf": {
+    "names": [
+     "X"
+    ]
+   },
+   "part": 1,
+   "line": "7b"
+  },
+  {
+   "id": "oop_health_under_65_subtotal",
+   "label": "Subtotal: line 7a x line 7b",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_3"
+    ]
+   },
+   "part": 1,
+   "line": "7c",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "oop_health_over_65_rate",
+   "label": "Out-of-pocket health care allowance per person 65 or older",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "7d Outofpocket health care allowance per person"
+    ]
+   },
+   "part": 1,
+   "line": "7d"
+  },
+  {
+   "id": "oop_health_over_65_count",
+   "label": "Number of people who are 65 or older",
+   "type": "integer",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "people_65_or_older"
+   },
+   "pdf": {
+    "names": [
+     "X_2"
+    ]
+   },
+   "part": 1,
+   "line": "7e"
+  },
+  {
+   "id": "oop_health_over_65_subtotal",
+   "label": "Subtotal: line 7d x line 7e",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_4"
+    ]
+   },
+   "part": 1,
+   "line": "7f",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "oop_health_total",
+   "label": "Out-of-pocket health care allowance: line 7c plus line 7f",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_5"
+    ]
+   },
+   "part": 1,
+   "line": "7g",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "housing_operating",
+   "label": "Housing and utilities \u2014 insurance and operating expenses (IRS Local Standards)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_13"
+    ]
+   },
+   "part": 1,
+   "line": "8"
+  },
+  {
+   "id": "housing_mortgage_rent_standard",
+   "label": "Housing and utilities \u2014 mortgage or rent expense per the IRS Local Standards",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_12"
+    ]
+   },
+   "part": 1,
+   "line": "9a",
+   "notes": "the PDF numbers line 9a's box undefined_12 and line 8's undefined_13, the reverse of the printed order \u2014 geometry decides"
+  },
+  {
+   "id": "home_debt_creditor_name",
+   "label": "Line 9b \u2014 name of each creditor secured by your home (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the itemized rows are not modelled; the entered total lands in the total box"
+   },
+   "pdf": {
+    "names": [
+     "1",
+     "2",
+     "undefined_9"
+    ]
+   },
+   "part": 1,
+   "line": "9b",
+   "notes": "the first two rows are named 1 and 2, the third undefined_9"
+  },
+  {
+   "id": "home_debt_monthly",
+   "label": "Line 9b \u2014 average monthly payment per home creditor (three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "the itemized rows are not modelled; the entered total lands in the total box"
+   },
+   "pdf": {
+    "names": [
+     "undefined_7",
+     "undefined_8",
+     "undefined_10"
+    ]
+   },
+   "part": 1,
+   "line": "9b"
+  },
+  {
+   "id": "home_debt_total",
+   "label": "Total average monthly payment for all debts secured by your home",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "home_secured_monthly_total"
+   },
+   "pdf": {
+    "names": [
+     "undefined_11"
+    ]
+   },
+   "part": 1,
+   "line": "9b",
+   "notes": "one field, three printed boxes: the PDF reuses this widget for the right-margin copy box and for line 33a on page 5, 'Copy line 9b here'"
+  },
+  {
+   "id": "net_mortgage_rent",
+   "label": "Net mortgage or rent expense (9a minus 9b, not below zero)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_14"
+    ]
+   },
+   "part": 1,
+   "line": "9c",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "housing_adjustment",
+   "label": "If you claim the U.S. Trustee Program's division of the IRS housing standard is incorrect: the additional amount",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "housing_adjustment_amount"
+   },
+   "pdf": {
+    "names": [
+     "undefined_16"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "housing_adjustment_explanation",
+   "label": "Line 10 \u2014 explain why (two printed rows)",
+   "type": "text",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "housing_adjustment_explanation"
+   },
+   "pdf": {
+    "names": [
+     "Explain why 1",
+     "Explain why 2"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "vehicle_count",
+   "label": "Check the number of vehicles for which you claim an ownership or operating expense",
+   "type": "radio",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "vehicle_count"
+   },
+   "pdf": {
+    "names": [
+     "check11"
+    ]
+   },
+   "part": 1,
+   "line": "11",
+   "options": [
+    {
+     "value": "14",
+     "label": "0. Go to line 14.",
+     "maps_to_value": "0"
+    },
+    {
+     "value": "12",
+     "label": "1. Go to line 12.",
+     "maps_to_value": "1"
+    },
+    {
+     "value": "On",
+     "label": "2 or more. Go to line 12.",
+     "maps_to_value": "2"
+    }
+   ],
+   "notes": "the export states are named after the line each answer sends you to; the third exports a bare 'On'"
+  },
+  {
+   "id": "vehicle_operating",
+   "label": "Vehicle operation expense (IRS Local Standards)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_17"
+    ]
+   },
+   "part": 1,
+   "line": "12"
+  },
+  {
+   "id": "vehicle_1_description",
+   "label": "Line 13 \u2014 describe Vehicle 1 (two printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the vehicle's identity is not modelled for the means test; the asset record holds descriptions but no per-vehicle claim order"
+   },
+   "pdf": {
+    "names": [
+     "Describe 1",
+     "Describe 2"
+    ]
+   },
+   "part": 1,
+   "line": "13"
+  },
+  {
+   "id": "vehicle_1_ownership_standard",
+   "label": "Ownership or leasing costs using IRS Local Standard (Vehicle 1)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_18"
+    ]
+   },
+   "part": 1,
+   "line": "13a"
+  },
+  {
+   "id": "vehicle_1_creditor_name",
+   "label": "Line 13b \u2014 name of each creditor for Vehicle 1 (two printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the itemized rows are not modelled; the entered total lands in the total box"
+   },
+   "pdf": {
+    "names": [
+     "undefined_19",
+     "undefined_19-1"
+    ]
+   },
+   "part": 1,
+   "line": "13b"
+  },
+  {
+   "id": "vehicle_1_loan_rows",
+   "label": "Line 13b \u2014 average monthly payment per creditor (two printed rows)",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "the itemized rows are not modelled; the entered total lands in the total box"
+   },
+   "pdf": {
+    "names": [
+     "undefined_20",
+     "undefined_20-1"
+    ]
+   },
+   "part": 1,
+   "line": "13b"
+  },
+  {
+   "id": "vehicle_1_loan_total",
+   "label": "Total average monthly payment for all debts secured by Vehicle 1",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "vehicle_1_loan_monthly"
+   },
+   "pdf": {
+    "names": [
+     "undefined_20-2"
+    ]
+   },
+   "part": 1,
+   "line": "13b",
+   "notes": "one field, three printed boxes: the PDF reuses this widget for the right-margin copy box and for line 33b on page 5"
+  },
+  {
+   "id": "vehicle_1_net",
+   "label": "Net Vehicle 1 ownership or lease expense (13a minus 13b, not below zero)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_21"
+    ]
+   },
+   "part": 1,
+   "line": "13c",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "vehicle_2_description",
+   "label": "Line 13 \u2014 describe Vehicle 2 (two printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the vehicle's identity is not modelled for the means test; the asset record holds descriptions but no per-vehicle claim order"
+   },
+   "pdf": {
+    "names": [
+     "Describe 1_2",
+     "Describe 2_2"
+    ]
+   },
+   "part": 1,
+   "line": "13"
+  },
+  {
+   "id": "vehicle_2_ownership_standard",
+   "label": "Ownership or leasing costs using IRS Local Standard (Vehicle 2)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_23"
+    ]
+   },
+   "part": 1,
+   "line": "13d"
+  },
+  {
+   "id": "vehicle_2_creditor_name",
+   "label": "Line 13e \u2014 name of each creditor for Vehicle 2 (two printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the itemized rows are not modelled; the entered total lands in the total box"
+   },
+   "pdf": {
+    "names": [
+     "undefined_24",
+     "undefined_24-1"
+    ]
+   },
+   "part": 1,
+   "line": "13e"
+  },
+  {
+   "id": "vehicle_2_loan_rows",
+   "label": "Line 13e \u2014 average monthly payment per creditor (two printed rows)",
+   "type": "money",
+   "maps_to": {
+    "derived": "row 1 prints line 13e's total (see notes); row 2 stays blank \u2014 the per-creditor rows are not modelled"
+   },
+   "pdf": {
+    "names": [
+     "undefined_25",
+     "undefined_25-1"
+    ]
+   },
+   "part": 1,
+   "line": "13e",
+   "notes": "DEFECT: the PDF wires line 33c's 'Copy line 13e here' box (page 5) to row 1's amount widget, undefined_25, instead of the total's. The projection lands line 13e's total in row 1 so that 33c prints it; with one vehicle creditor the row is right, with two the second row stays blank"
+  },
+  {
+   "id": "vehicle_2_loan_total",
+   "label": "Total average monthly payment for all debts secured by Vehicle 2",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "vehicle_2_loan_monthly"
+   },
+   "pdf": {
+    "names": [
+     "undefined_25-2"
+    ]
+   },
+   "part": 1,
+   "line": "13e",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "vehicle_2_net",
+   "label": "Net Vehicle 2 ownership or lease expense (13e minus 13d, not below zero)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_26"
+    ]
+   },
+   "part": 1,
+   "line": "13f",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "public_transportation",
+   "label": "Public transportation expense (IRS Local Standards)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_28"
+    ]
+   },
+   "part": 1,
+   "line": "14"
+  },
+  {
+   "id": "additional_public_transportation",
+   "label": "Additional public transportation expense",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "additional_public_transportation"
+   },
+   "pdf": {
+    "names": [
+     "undefined_29"
+    ]
+   },
+   "part": 1,
+   "line": "15"
+  },
+  {
+   "id": "taxes",
+   "label": "Taxes: the total monthly amount you actually pay",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "taxes"
+   },
+   "pdf": {
+    "names": [
+     "undefined_30"
+    ]
+   },
+   "part": 1,
+   "line": "16"
+  },
+  {
+   "id": "involuntary_deductions",
+   "label": "Involuntary deductions required by your job",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "involuntary_deductions"
+   },
+   "pdf": {
+    "names": [
+     "undefined_31"
+    ]
+   },
+   "part": 1,
+   "line": "17"
+  },
+  {
+   "id": "term_life_insurance",
+   "label": "Life insurance: term premiums for yourself",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "term_life_insurance"
+   },
+   "pdf": {
+    "names": [
+     "undefined_32"
+    ]
+   },
+   "part": 1,
+   "line": "18"
+  },
+  {
+   "id": "court_ordered_payments",
+   "label": "Court-ordered payments",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "court_ordered_payments"
+   },
+   "pdf": {
+    "names": [
+     "undefined_33"
+    ]
+   },
+   "part": 1,
+   "line": "19"
+  },
+  {
+   "id": "education_for_employment",
+   "label": "Education required as a condition for your job or for a mentally or physically challenged dependent child",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "education_for_employment_or_disability"
+   },
+   "pdf": {
+    "names": [
+     "undefined_34"
+    ]
+   },
+   "part": 1,
+   "line": "20"
+  },
+  {
+   "id": "childcare",
+   "label": "Childcare",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "childcare"
+   },
+   "pdf": {
+    "names": [
+     "undefined_35"
+    ]
+   },
+   "part": 1,
+   "line": "21"
+  },
+  {
+   "id": "additional_health_care",
+   "label": "Additional health care expenses, excluding insurance costs",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "healthcare_above_allowance"
+   },
+   "pdf": {
+    "names": [
+     "undefined_36"
+    ]
+   },
+   "part": 1,
+   "line": "22"
+  },
+  {
+   "id": "optional_telecom",
+   "label": "Optional telephones and telephone services",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "optional_telecom"
+   },
+   "pdf": {
+    "names": [
+     "undefined_37"
+    ]
+   },
+   "part": 1,
+   "line": "23"
+  },
+  {
+   "id": "irs_allowances_total",
+   "label": "Add all of the expenses allowed under the IRS expense allowances",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_38"
+    ]
+   },
+   "part": 1,
+   "line": "24",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 38's 'Copy line 24' box on page 6"
+  },
+  {
+   "id": "health_insurance",
+   "label": "Health insurance",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "health_insurance"
+   },
+   "pdf": {
+    "names": [
+     "undefined_39"
+    ]
+   },
+   "part": 1,
+   "line": "25"
+  },
+  {
+   "id": "disability_insurance",
+   "label": "Disability insurance",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "disability_insurance"
+   },
+   "pdf": {
+    "names": [
+     "undefined_40"
+    ]
+   },
+   "part": 1,
+   "line": "25"
+  },
+  {
+   "id": "health_savings_account",
+   "label": "Health savings account",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "health_savings_account"
+   },
+   "pdf": {
+    "names": [
+     "undefined_41"
+    ]
+   },
+   "part": 1,
+   "line": "25"
+  },
+  {
+   "id": "health_insurance_total",
+   "label": "Health insurance, disability insurance, and HSA \u2014 total",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_42"
+    ]
+   },
+   "part": 1,
+   "line": "25",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "health_insurance_actual",
+   "label": "Do you actually spend this total amount?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "the actual-spend follow-up is not modelled; the entered figures ARE the claimed monthly expenses"
+   },
+   "pdf": {
+    "names": [
+     "check25"
+    ]
+   },
+   "part": 1,
+   "line": "25",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "health_insurance_actual_amount",
+   "label": "Line 25 \u2014 how much do you actually spend?",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "the actual-spend follow-up is not modelled; the entered figures ARE the claimed monthly expenses"
+   },
+   "pdf": {
+    "names": [
+     "undefined_44"
+    ]
+   },
+   "part": 1,
+   "line": "25"
+  },
+  {
+   "id": "family_care",
+   "label": "Continuing contributions to the care of household or family members",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "family_care_contributions"
+   },
+   "pdf": {
+    "names": [
+     "undefined_45"
+    ]
+   },
+   "part": 1,
+   "line": "26"
+  },
+  {
+   "id": "family_violence",
+   "label": "Protection against family violence",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "family_violence_protection"
+   },
+   "pdf": {
+    "names": [
+     "undefined_46"
+    ]
+   },
+   "part": 1,
+   "line": "27"
+  },
+  {
+   "id": "home_energy",
+   "label": "Additional home energy costs",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "home_energy_excess"
+   },
+   "pdf": {
+    "names": [
+     "undefined_47"
+    ]
+   },
+   "part": 1,
+   "line": "28"
+  },
+  {
+   "id": "education_under_18",
+   "label": "Education expenses for dependent children who are younger than 18 (capped per child by \u00a7 707(b)(2)(A)(ii)(IV))",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "education_under_18"
+   },
+   "pdf": {
+    "names": [
+     "undefined_48"
+    ]
+   },
+   "part": 1,
+   "line": "29"
+  },
+  {
+   "id": "additional_food_clothing",
+   "label": "Additional food and clothing expense (up to 5% of the food and clothing allowances)",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "additional_food_clothing"
+   },
+   "pdf": {
+    "names": [
+     "undefined_49"
+    ]
+   },
+   "part": 1,
+   "line": "30"
+  },
+  {
+   "id": "charitable_contributions",
+   "label": "Continuing charitable contributions",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "charitable_contributions"
+   },
+   "pdf": {
+    "names": [
+     "undefined_60"
+    ]
+   },
+   "part": 1,
+   "line": "31"
+  },
+  {
+   "id": "additional_deductions_total",
+   "label": "Add all of the additional expense deductions",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_61"
+    ]
+   },
+   "part": 1,
+   "line": "32",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 38's 'Copy line 32' box on page 6"
+  },
+  {
+   "id": "other_secured_creditor",
+   "label": "Line 33d \u2014 name of each creditor for other secured debt (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "other_secured_payments",
+    "notes": "each row's creditor_name"
+   },
+   "pdf": {
+    "names": [
+     "33d",
+     "33e",
+     "33f"
+    ]
+   },
+   "part": 1,
+   "line": "33d",
+   "notes": "the three rows' creditor boxes are named 33d, 33e and 33f after the printed line letters, not the rows"
+  },
+  {
+   "id": "other_secured_property",
+   "label": "Line 33d \u2014 identify property that secures the debt (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "other_secured_payments",
+    "notes": "each row's property_description"
+   },
+   "pdf": {
+    "names": [
+     "undefined_53",
+     "undefined_55",
+     "undefined_57"
+    ]
+   },
+   "part": 1,
+   "line": "33d"
+  },
+  {
+   "id": "other_secured_taxes_insurance_1",
+   "label": "Line 33d row 1 \u2014 does payment include taxes or insurance?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
+   },
+   "pdf": {
+    "names": [
+     "check33d"
+    ]
+   },
+   "part": 1,
+   "line": "33d",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "other_secured_taxes_insurance_2",
+   "label": "Line 33d row 2 \u2014 does payment include taxes or insurance?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
+   },
+   "pdf": {
+    "names": [
+     "check33e"
+    ]
+   },
+   "part": 1,
+   "line": "33d",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "other_secured_taxes_insurance_3",
+   "label": "Line 33d row 3 \u2014 does payment include taxes or insurance?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "not modelled; informational to the trustee, not part of the arithmetic"
+   },
+   "pdf": {
+    "names": [
+     "check33f"
+    ]
+   },
+   "part": 1,
+   "line": "33d",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "other_secured_monthly",
+   "label": "Line 33d \u2014 average monthly payment per row (three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "other_secured_payments",
+    "notes": "each row's monthly_payment"
+   },
+   "pdf": {
+    "names": [
+     "undefined_54",
+     "undefined_56",
+     "undefined_58"
+    ]
+   },
+   "part": 1,
+   "line": "33d"
+  },
+  {
+   "id": "secured_debt_total",
+   "label": "Total average monthly payment (lines 33a through 33d)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_59"
+    ]
+   },
+   "part": 1,
+   "line": "33e",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "cure_claimed",
+   "label": "Are any debts in line 33 secured by your primary residence, a vehicle, or other property necessary for your support?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "whether the means_test_input carries a priority_cure_total"
+   },
+   "pdf": {
+    "names": [
+     "check34"
+    ]
+   },
+   "part": 1,
+   "line": "34",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "cure_creditor",
+   "label": "Line 34 \u2014 name of the creditor (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
+   },
+   "pdf": {
+    "names": [
+     "undefined_63",
+     "undefined_67",
+     "undefined_71"
+    ]
+   },
+   "part": 1,
+   "line": "34"
+  },
+  {
+   "id": "cure_property",
+   "label": "Line 34 \u2014 identify property that secures the debt (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
+   },
+   "pdf": {
+    "names": [
+     "undefined_64",
+     "undefined_68",
+     "undefined_72"
+    ]
+   },
+   "part": 1,
+   "line": "34"
+  },
+  {
+   "id": "cure_total_rows",
+   "label": "Line 34 \u2014 total cure amount per row (three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
+   },
+   "pdf": {
+    "names": [
+     "undefined_65",
+     "undefined_69",
+     "undefined_73"
+    ]
+   },
+   "part": 1,
+   "line": "34"
+  },
+  {
+   "id": "cure_monthly_rows",
+   "label": "Line 34 \u2014 monthly cure amount per row (\u00f7 60; three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "the per-creditor cure rows are not modelled; the entered priority_cure_total lands in the total column"
+   },
+   "pdf": {
+    "names": [
+     "undefined_66",
+     "undefined_70",
+     "60"
+    ]
+   },
+   "part": 1,
+   "line": "34",
+   "notes": "the third row's monthly box is named '60' \u2014 after the divisor printed beside it, not a value"
+  },
+  {
+   "id": "cure_monthly_total",
+   "label": "Line 34 total \u2014 the monthly cure amount",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_74"
+    ]
+   },
+   "part": 1,
+   "line": "34",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "priority_claims_owed",
+   "label": "Do you owe any priority claims (priority tax, child support, alimony) that are past due?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "whether the case's claims carry priority portions"
+   },
+   "pdf": {
+    "names": [
+     "check35"
+    ]
+   },
+   "part": 1,
+   "line": "35",
+   "options": [
+    {
+     "value": "no",
+     "label": "No"
+    },
+    {
+     "value": "yes",
+     "label": "Yes"
+    }
+   ]
+  },
+  {
+   "id": "priority_claims_total",
+   "label": "Total amount of all past-due priority claims",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_76"
+    ]
+   },
+   "part": 1,
+   "line": "35"
+  },
+  {
+   "id": "priority_claims_monthly",
+   "label": "Priority claims divided by 60",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_77"
+    ]
+   },
+   "part": 1,
+   "line": "35"
+  },
+  {
+   "id": "ch13_plan_payment",
+   "label": "Projected monthly Chapter 13 plan payment",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "ch13_projected_plan_payment"
+   },
+   "pdf": {
+    "names": [
+     "undefined_78"
+    ]
+   },
+   "part": 1,
+   "line": "36"
+  },
+  {
+   "id": "ch13_multiplier",
+   "label": "Current multiplier for your district",
+   "type": "text",
+   "maps_to": {
+    "derived": "the ust/ch13-admin-multipliers release effective on the filing date, looked up by the case's district"
+   },
+   "pdf": {
+    "names": [
+     "x"
+    ]
+   },
+   "part": 1,
+   "line": "36"
+  },
+  {
+   "id": "ch13_admin_expense",
+   "label": "Average monthly administrative expense",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_79"
+    ]
+   },
+   "part": 1,
+   "line": "36",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "debt_payment_total",
+   "label": "Add all of the deductions for debt payment (lines 33e through 36)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_81"
+    ]
+   },
+   "part": 1,
+   "line": "37",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 38's 'Copy line 37' box"
+  },
+  {
+   "id": "total_deductions",
+   "label": "Total deductions",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_85"
+    ]
+   },
+   "part": 1,
+   "line": "38",
+   "notes": "one field, three printed boxes: the PDF reuses this widget for the right-margin copy box and for line 42 on page 7, 'Copy line 38 here'"
+  },
+  {
+   "id": "current_monthly_income",
+   "label": "Copy your total current monthly income from line 14 of Form 122C-1",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_96"
+    ]
+   },
+   "part": 2,
+   "line": "39"
+  },
+  {
+   "id": "child_support_income",
+   "label": "Reasonably necessary income you receive for support for dependent children",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "child_support_for_dependents"
+   },
+   "pdf": {
+    "names": [
+     "undefined_87"
+    ]
+   },
+   "part": 2,
+   "line": "40"
+  },
+  {
+   "id": "qualified_retirement_deductions",
+   "label": "All qualified retirement deductions (11 U.S.C. \u00a7\u00a7 541(b)(7), 362(b)(19))",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "qualified_retirement_deductions"
+   },
+   "pdf": {
+    "names": [
+     "undefined_88"
+    ]
+   },
+   "part": 2,
+   "line": "41"
+  },
+  {
+   "id": "special_circumstances_description",
+   "label": "Line 43 \u2014 describe the special circumstances (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "special_circumstances",
+    "notes": "each row's description"
+   },
+   "pdf": {
+    "names": [
+     "43a",
+     "43b",
+     "43c"
+    ]
+   },
+   "part": 2,
+   "line": "43"
+  },
+  {
+   "id": "special_circumstances_amount",
+   "label": "Line 43 \u2014 amount of expense (three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "special_circumstances",
+    "notes": "each row's amount"
+   },
+   "pdf": {
+    "names": [
+     "undefined_90",
+     "undefined_91",
+     "undefined_92"
+    ]
+   },
+   "part": 2,
+   "line": "43"
+  },
+  {
+   "id": "special_circumstances_total",
+   "label": "Line 43 total",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_93"
+    ]
+   },
+   "part": 2,
+   "line": "43",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "total_adjustments",
+   "label": "Total adjustments (add lines 40 through 43)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_95"
+    ]
+   },
+   "part": 2,
+   "line": "44",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "monthly_disposable_income",
+   "label": "Your monthly disposable income under \u00a7 1325(b)(2) (line 39 minus line 44)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_98"
+    ]
+   },
+   "part": 2,
+   "line": "45"
+  },
+  {
+   "id": "change_form_1",
+   "label": "Line 46 row 1 \u2014 which form changed",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "c-1",
+     "label": "Form 122C-1"
+    },
+    {
+     "value": "c-2",
+     "label": "Form 122C-2"
+    }
+   ]
+  },
+  {
+   "id": "change_direction_1",
+   "label": "Line 46 row 1 \u2014 increase or decrease?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46a"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "increase",
+     "label": "Increase"
+    },
+    {
+     "value": "decrease",
+     "label": "Decrease"
+    }
+   ]
+  },
+  {
+   "id": "change_form_2",
+   "label": "Line 46 row 2 \u2014 which form changed",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46b"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "c-1",
+     "label": "Form 122C-1"
+    },
+    {
+     "value": "c-2",
+     "label": "Form 122C-2"
+    }
+   ]
+  },
+  {
+   "id": "change_direction_2",
+   "label": "Line 46 row 2 \u2014 increase or decrease?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46c"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "increase",
+     "label": "Increase"
+    },
+    {
+     "value": "decrease",
+     "label": "Decrease"
+    }
+   ]
+  },
+  {
+   "id": "change_form_3",
+   "label": "Line 46 row 3 \u2014 which form changed",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46d"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "c-1",
+     "label": "Form 122C-1"
+    },
+    {
+     "value": "c-2",
+     "label": "Form 122C-2"
+    }
+   ]
+  },
+  {
+   "id": "change_direction_3",
+   "label": "Line 46 row 3 \u2014 increase or decrease?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46e"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "increase",
+     "label": "Increase"
+    },
+    {
+     "value": "decrease",
+     "label": "Decrease"
+    }
+   ]
+  },
+  {
+   "id": "change_form_4",
+   "label": "Line 46 row 4 \u2014 which form changed",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46f"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "c-1",
+     "label": "Form 122C-1"
+    },
+    {
+     "value": "c-2",
+     "label": "Form 122C-2"
+    }
+   ]
+  },
+  {
+   "id": "change_direction_4",
+   "label": "Line 46 row 4 \u2014 increase or decrease?",
+   "type": "radio",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "check46g"
+    ]
+   },
+   "part": 3,
+   "line": "46",
+   "options": [
+    {
+     "value": "increase",
+     "label": "Increase"
+    },
+    {
+     "value": "decrease",
+     "label": "Decrease"
+    }
+   ]
+  },
+  {
+   "id": "change_line",
+   "label": "Line 46 \u2014 the line that changed (four printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "Text1.0",
+     "Text1.1",
+     "Text1.2",
+     "Text1.3"
+    ]
+   },
+   "part": 3,
+   "line": "46"
+  },
+  {
+   "id": "change_reason",
+   "label": "Line 46 \u2014 reason for change (four printed rows)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "undefined_99",
+     "undefined_102",
+     "undefined_105",
+     "undefined_108"
+    ]
+   },
+   "part": 3,
+   "line": "46"
+  },
+  {
+   "id": "change_date",
+   "label": "Line 46 \u2014 date of change (four printed rows)",
+   "type": "date",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "undefined_100",
+     "undefined_103",
+     "undefined_106",
+     "undefined_109"
+    ]
+   },
+   "part": 3,
+   "line": "46"
+  },
+  {
+   "id": "change_amount",
+   "label": "Line 46 \u2014 amount of change (four printed rows)",
+   "type": "money",
+   "maps_to": {
+    "unmapped": "Part 3's post-petition change in income or expenses is a narrative the attorney supplies, not a stored fact; the boxes stay blank"
+   },
+   "pdf": {
+    "names": [
+     "undefined_101",
+     "undefined_104",
+     "undefined_107",
+     "undefined_110"
+    ]
+   },
+   "part": 3,
+   "line": "46"
+  },
+  {
+   "id": "debtor1_signature",
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "undefined_111"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor2_signature",
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "undefined_112"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor1_signature_date",
+   "label": "Date (Debtor 1, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Date"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor2_signature_date",
+   "label": "Date (Debtor 2, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Date_2"
+    ]
+   },
+   "part": 4
+  }
+ ]
+}

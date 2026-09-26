@@ -1,0 +1,830 @@
+{
+ "form": "b122c1",
+ "official_number": "122C-1",
+ "title": "Chapter 13 Statement of Your Current Monthly Income and Calculation of Commitment Period",
+ "revision": "10/19",
+ "effective_date": "2019-10-01",
+ "signature_pages": [
+  4
+ ],
+ "notes": "The Chapter 13 CMI statement (issue #365): lines 2-11 are the same \u00a7 101(10A) derivation B122A-1 prints (core/cmi.py); lines 12-21 are the means-test engine's Chapter 13 branch (core/means_test.py) \u2014 the marital adjustment subtracted BEFORE the median comparison (\u00a7 1325(b)(3), line 17) and the separate commitment-period comparison (\u00a7 1325(b)(4), line 21). Known defects, verified by widget geometry: nearly every amount box is named undefined_NN, the geometry is the identity; the net business and rental boxes (undefined_6.*, undefined_10.*) are shared with the column 'copy here' boxes; line 11's combined total (undefined_32) is reused for lines 12 and 18, line 14 (undefined_38) for 15a, line 16c (undefined_41) for 20c, line 19b (undefined_43) for 20a, and line 13's total (undefined_37) for its own copy box \u2014 one value, two printed boxes, always agreeing; line 15b's widget (undefined_40) has a second, orphaned instance below page 2's bottom edge; line 16a and 16b are named after their prose captions.",
+ "parts": [
+  {
+   "number": 1,
+   "title": "Calculate Your Average Monthly Income"
+  },
+  {
+   "number": 2,
+   "title": "Determine How to Measure Your Deductions from Income"
+  },
+  {
+   "number": 3,
+   "title": "Calculate Your Commitment Period Under 11 U.S.C. \u00a7 1325(b)(4)"
+  },
+  {
+   "number": 4,
+   "title": "Sign Below"
+  }
+ ],
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "label": "Debtor 1 \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 1"
+    ]
+   },
+   "notes": "one field whose widget repeats in every page's header"
+  },
+  {
+   "id": "caption.debtor2_name",
+   "label": "Debtor 2 (Spouse, if filing) \u2014 First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Debtor 2"
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "label": "United States Bankruptcy Court for the __ District of __",
+   "type": "district",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district"
+   },
+   "pdf": {
+    "names": [
+     "Bankruptcy District Information"
+    ]
+   }
+  },
+  {
+   "id": "caption.case_number",
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "names": [
+     "Case number"
+    ]
+   },
+   "notes": "one field whose widget repeats in every page's header"
+  },
+  {
+   "id": "caption.amended",
+   "label": "Check if this is an amended filing",
+   "type": "checkbox",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "is_amended"
+   },
+   "pdf": {
+    "names": [
+     "Check if this is an amended filing"
+    ]
+   }
+  },
+  {
+   "id": "caption.disposable_income_box",
+   "label": "Check as directed in line 17: disposable income is / is not determined under 11 U.S.C. \u00a7 1325(b)(3)",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the line 17 comparison decides the box: 17a checks box 1, 17b checks box 2"
+   },
+   "pdf": {
+    "names": [
+     "check"
+    ]
+   },
+   "options": [
+    {
+     "value": "1",
+     "label": "1. Disposable income is not determined under 11 U.S.C. \u00a7 1325(b)(3)",
+     "maps_to_value": "below_median"
+    },
+    {
+     "value": "2",
+     "label": "2. Disposable income is determined under 11 U.S.C. \u00a7 1325(b)(3)",
+     "maps_to_value": "above_median"
+    }
+   ]
+  },
+  {
+   "id": "caption.commitment_period_box",
+   "label": "Check as directed in line 21: the commitment period is 3 years / 5 years",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the line 21 comparison decides the box: below the median checks box 3, at or above it box 4 (\u00a7 1325(b)(4))"
+   },
+   "pdf": {
+    "names": [
+     "check2"
+    ]
+   },
+   "options": [
+    {
+     "value": "3",
+     "label": "3. The commitment period is 3 years",
+     "maps_to_value": "36"
+    },
+    {
+     "value": "4",
+     "label": "4. The commitment period is 5 years",
+     "maps_to_value": "60"
+    }
+   ]
+  },
+  {
+   "id": "marital_filing_status",
+   "label": "What is your marital and filing status? Check one only.",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the case's debtor records (or the entered means_test_input.marital_filing_status) answer it: married fills both columns whether or not the spouse files"
+   },
+   "pdf": {
+    "names": [
+     "check1"
+    ]
+   },
+   "part": 1,
+   "line": "1",
+   "options": [
+    {
+     "value": "single",
+     "label": "Not married. Fill out Column A, lines 2-11.",
+     "maps_to_value": "not_married"
+    },
+    {
+     "value": "married",
+     "label": "Married. Fill out both Columns A and B, lines 2-11.",
+     "maps_to_value": "married"
+    }
+   ]
+  },
+  {
+   "id": "wages",
+   "label": "Your gross wages, salary, tips, bonuses, overtime, and commissions (before all payroll deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined",
+     "undefined_11"
+    ]
+   },
+   "part": 1,
+   "line": "2"
+  },
+  {
+   "id": "alimony",
+   "label": "Alimony and maintenance payments",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_2",
+     "undefined_12"
+    ]
+   },
+   "part": 1,
+   "line": "3"
+  },
+  {
+   "id": "household_contributions",
+   "label": "All amounts from any source which are regularly paid for household expenses of you or your dependents",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_3",
+     "undefined_13"
+    ]
+   },
+   "part": 1,
+   "line": "4"
+  },
+  {
+   "id": "business_gross",
+   "label": "Business, profession, or farm \u2014 gross receipts (before all deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_4.0",
+     "undefined_4.1"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "business_expenses",
+   "label": "Business, profession, or farm \u2014 ordinary and necessary operating expenses",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_5.0",
+     "undefined_5.1"
+    ]
+   },
+   "part": 1,
+   "line": "5"
+  },
+  {
+   "id": "business_net",
+   "label": "Net monthly income from a business, profession, or farm (copied into the column)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_6.0",
+     "undefined_6.1"
+    ]
+   },
+   "part": 1,
+   "line": "5",
+   "notes": "one widget per debtor, two printed boxes each: the PDF reuses the net box for the column's 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "rental_gross",
+   "label": "Rental and other real property \u2014 gross receipts (before all deductions)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_8.0",
+     "undefined_8.1"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "rental_expenses",
+   "label": "Rental and other real property \u2014 ordinary and necessary operating expenses",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_9.0",
+     "undefined_9.1"
+    ]
+   },
+   "part": 1,
+   "line": "6"
+  },
+  {
+   "id": "rental_net",
+   "label": "Net monthly income from rental or other real property (copied into the column)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_10.0",
+     "undefined_10.1"
+    ]
+   },
+   "part": 1,
+   "line": "6",
+   "notes": "one widget per debtor, two printed boxes each: the PDF reuses the net box for the column's 'Copy here' box, so both always agree"
+  },
+  {
+   "id": "interest_dividends",
+   "label": "Interest, dividends, and royalties",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_16",
+     "undefined_17"
+    ]
+   },
+   "part": 1,
+   "line": "7"
+  },
+  {
+   "id": "unemployment",
+   "label": "Unemployment compensation",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_18",
+     "undefined_19"
+    ]
+   },
+   "part": 1,
+   "line": "8"
+  },
+  {
+   "id": "ssa_contention",
+   "label": "Amounts contended to be benefits under the Social Security Act \u2014 for you / for your spouse",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_20",
+     "undefined_21"
+    ]
+   },
+   "part": 1,
+   "line": "8",
+   "notes": "not part of any column total: the \u00a7 101(10A)(B)(ii) exclusion, shown rather than counted (other_income_record category social_security_act_benefit)"
+  },
+  {
+   "id": "pension",
+   "label": "Pension or retirement income",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_22",
+     "undefined_23"
+    ]
+   },
+   "part": 1,
+   "line": "9"
+  },
+  {
+   "id": "other_income_1",
+   "label": "Income from all other sources not listed above \u2014 first row",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_24",
+     "undefined_25"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_2",
+   "label": "Income from all other sources not listed above \u2014 second row",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_26",
+     "undefined_27"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_separate_pages",
+   "label": "Total amounts from separate pages, if any",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_28",
+     "undefined_29"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_source_1",
+   "label": "Line 10, first row \u2014 specify the source",
+   "type": "text",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "10a"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "other_income_source_2",
+   "label": "Line 10, second row \u2014 specify the source",
+   "type": "text",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "10b"
+    ]
+   },
+   "part": 1,
+   "line": "10"
+  },
+  {
+   "id": "column_total",
+   "label": "Total average monthly income for the column (add lines 2 through 10)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_30",
+     "undefined_31"
+    ]
+   },
+   "part": 1,
+   "line": "11"
+  },
+  {
+   "id": "total_cmi",
+   "label": "Total average monthly income (Column A plus Column B)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the \u00a7 101(10A) CMI derivation (core/cmi.py) from the case's pay_period_record and other_income_record history"
+   },
+   "pdf": {
+    "names": [
+     "undefined_32"
+    ]
+   },
+   "part": 1,
+   "line": "11",
+   "notes": "one field, three printed boxes: the PDF reuses this widget for line 12 (page 2) and line 18 (page 3), the form's own 'Copy your total average monthly income from line 11'"
+  },
+  {
+   "id": "marital_adjustment_status",
+   "label": "Calculate the marital adjustment. Check one.",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the marital and filing status (line 1's source): not married checks the first box, a spouse filing with you the second, a non-filing spouse the third"
+   },
+   "pdf": {
+    "names": [
+     "check13"
+    ]
+   },
+   "part": 2,
+   "line": "13",
+   "options": [
+    {
+     "value": "1",
+     "label": "You are not married. Fill in 0 below.",
+     "maps_to_value": "not_married"
+    },
+    {
+     "value": "2",
+     "label": "You are married and your spouse is filing with you. Fill in 0 below.",
+     "maps_to_value": "married_filing_jointly"
+    },
+    {
+     "value": "3",
+     "label": "You are married and your spouse is not filing with you.",
+     "maps_to_value": "married_not_filing"
+    }
+   ]
+  },
+  {
+   "id": "marital_adjustment_purpose",
+   "label": "Line 13 \u2014 specify the basis for excluding this income (three printed rows)",
+   "type": "text",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "marital_adjustments",
+    "notes": "each row's description"
+   },
+   "pdf": {
+    "names": [
+     "13a",
+     "13b",
+     "13c"
+    ]
+   },
+   "part": 2,
+   "line": "13"
+  },
+  {
+   "id": "marital_adjustment_amount",
+   "label": "Line 13 \u2014 the amount of income devoted to each purpose (three printed rows)",
+   "type": "money",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "marital_adjustments",
+    "notes": "each row's amount"
+   },
+   "pdf": {
+    "names": [
+     "undefined_34",
+     "undefined_35",
+     "undefined_36"
+    ]
+   },
+   "part": 2,
+   "line": "13"
+  },
+  {
+   "id": "marital_adjustment_total",
+   "label": "Line 13 total",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_37"
+    ]
+   },
+   "part": 2,
+   "line": "13",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for the right-margin 'Copy here' box"
+  },
+  {
+   "id": "current_monthly_income",
+   "label": "Your current monthly income (line 12 minus line 13)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_38"
+    ]
+   },
+   "part": 2,
+   "line": "14",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 15a (page 3), 'Copy line 14 here'"
+  },
+  {
+   "id": "annualized_cmi",
+   "label": "15b. Your current monthly income for the year (line 15a x 12)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_40"
+    ]
+   },
+   "part": 2,
+   "line": "15",
+   "notes": "the widget has a second instance positioned BELOW the bottom edge of page 2 (y = -52); it never prints, and the page 3 instance is the box that lands"
+  },
+  {
+   "id": "median_state",
+   "label": "16a. The state in which you live",
+   "type": "state",
+   "maps_to": {
+    "derived": "debtor 1's residence address state \u2014 the same fact 106C's scheme election reads"
+   },
+   "pdf": {
+    "names": [
+     "16 Calculate the median family income that applies to you Follow these steps"
+    ]
+   },
+   "part": 2,
+   "line": "16",
+   "notes": "named after the line's whole caption in the PDF; its position (x=260, the 16a row) is the identity"
+  },
+  {
+   "id": "median_household_size",
+   "label": "16b. The number of people in your household",
+   "type": "integer",
+   "maps_to": {
+    "entity": "means_test_input",
+    "attribute": "people_under_65",
+    "notes": "the sum of people_under_65 and people_65_or_older (or the entered median_household_size) \u2014 one entered household composition feeds line 16b here and line 5 of Form 122C-2"
+   },
+   "pdf": {
+    "names": [
+     "Fill in the number of people in your household"
+    ]
+   },
+   "part": 2,
+   "line": "16"
+  },
+  {
+   "id": "median_income",
+   "label": "16c. The median family income for your state and size of household",
+   "type": "money",
+   "maps_to": {
+    "derived": "the ust/census-median-family-income release effective on the filing date (core/ust_data.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_41"
+    ]
+   },
+   "part": 2,
+   "line": "16",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 20c, 'Copy the median family income from line 16c'"
+  },
+  {
+   "id": "median_comparison",
+   "label": "17. How do the lines compare?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the \u00a7 1325(b)(3) comparison (core/means_test.py): 15b <= 16c checks 17a (do not file 122C-2), 15b > 16c checks 17b (fill out Form 122C-2)"
+   },
+   "pdf": {
+    "names": [
+     "check17"
+    ]
+   },
+   "part": 2,
+   "line": "17",
+   "options": [
+    {
+     "value": "17a",
+     "label": "17a. Line 15b is less than or equal to line 16c",
+     "maps_to_value": "below_or_equal_median"
+    },
+    {
+     "value": "17b",
+     "label": "17b. Line 15b is more than line 16c",
+     "maps_to_value": "above_median"
+    }
+   ]
+  },
+  {
+   "id": "commitment_marital_adjustment",
+   "label": "19a. The marital adjustment deducted for the commitment period (0 when it does not apply)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "fill_7"
+    ]
+   },
+   "part": 3,
+   "line": "19",
+   "notes": "line 13's total when means_test_input.commitment_period_marital_adjustment contends \u00a7 1325(b)(4) allows it, else 0"
+  },
+  {
+   "id": "commitment_monthly_income",
+   "label": "19b. Subtract line 19a from line 18",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_43"
+    ]
+   },
+   "part": 3,
+   "line": "19",
+   "notes": "one field, two printed boxes: the PDF reuses this widget for line 20a, 'Copy line 19b'"
+  },
+  {
+   "id": "commitment_annualized",
+   "label": "20b. Your current monthly income for the year for this part of the form (line 20a x 12)",
+   "type": "money",
+   "maps_to": {
+    "derived": "computed by the means-test engine (core/means_test.py)"
+   },
+   "pdf": {
+    "names": [
+     "undefined_45"
+    ]
+   },
+   "part": 3,
+   "line": "20"
+  },
+  {
+   "id": "commitment_comparison",
+   "label": "21. How do the lines compare?",
+   "type": "radio",
+   "maps_to": {
+    "derived": "the \u00a7 1325(b)(4) comparison (core/means_test.py): 20b < 20c checks the first box (3 years), 20b >= 20c the second (5 years)"
+   },
+   "pdf": {
+    "names": [
+     "check21"
+    ]
+   },
+   "part": 3,
+   "line": "21",
+   "options": [
+    {
+     "value": "yes",
+     "label": "Line 20b is less than line 20c \u2014 the commitment period is 3 years",
+     "maps_to_value": "36"
+    },
+    {
+     "value": "no",
+     "label": "Line 20b is more than or equal to line 20c \u2014 the commitment period is 5 years",
+     "maps_to_value": "60"
+    }
+   ]
+  },
+  {
+   "id": "debtor1_signature",
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "undefined_47"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor2_signature",
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature image or string"
+   },
+   "pdf": {
+    "names": [
+     "undefined_48"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor1_signature_date",
+   "label": "Date (Debtor 1, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "names": [
+     "Date"
+    ]
+   },
+   "part": 4
+  },
+  {
+   "id": "debtor2_signature_date",
+   "label": "Date (Debtor 2, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "names": [
+     "Date_2"
+    ]
+   },
+   "part": 4
+  }
+ ]
+}

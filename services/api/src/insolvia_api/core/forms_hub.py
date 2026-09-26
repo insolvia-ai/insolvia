@@ -60,14 +60,27 @@ from .packet_assembly import (
 # ("creditors" problems come only from the matrix, out of this issue's scope).
 FORM_PROBLEM_SOURCES: Final[dict[str, tuple[str, ...]]] = {
     "petitions": ("form/b101",),
-    "means_test_inputs": ("form/b122a2",),
+    # The means-test pair by chapter (issue #365): `group_problems` keeps
+    # only the series this case files, so a Chapter 7 case never shows a
+    # B122C row and vice versa.
+    "means_test_inputs": ("form/b122a2", "form/b122c1", "form/b122c2"),
     "households": ("form/b106j", "form/b106j2"),
     "income_summaries": ("form/b106i",),
     "claims": ("form/b106d", "form/b106ef"),
     "exemptions": ("form/b106c",),
     "employments": ("form/b106i",),
-    "pay_period_records": ("form/b122a1", "form/b122a2"),
-    "other_income_records": ("form/b122a1", "form/b122a2"),
+    "pay_period_records": (
+        "form/b122a1",
+        "form/b122a2",
+        "form/b122c1",
+        "form/b122c2",
+    ),
+    "other_income_records": (
+        "form/b122a1",
+        "form/b122a2",
+        "form/b122c1",
+        "form/b122c2",
+    ),
     "expenses": ("form/b106j", "form/b106j2"),
     "dependents": ("form/b106j", "form/b106j2"),
     "codebtors": ("form/b106h",),

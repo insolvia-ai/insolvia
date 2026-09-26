@@ -24,12 +24,15 @@ from insolvia_api.core.form_overlay import OutputOptions
 from insolvia_api.core.form_templates import form_revisions_as_of
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
+    ALL_FORM_SERIES,
+    CHAPTER_13_FORM_SERIES,
     PACKET_ASSEMBLY_KIND,
     PACKET_FORM_SERIES,
     AssembledPacket,
     CaseData,
     PacketAssemblyDeps,
     assemble,
+    chapter_form_series,
     completeness_problems,
     packet_form_series,
     packet_zip,
@@ -168,7 +171,50 @@ def test_a_chapter_13_case_is_refused():
     data = reference_case_data()
     data = replace(data, case=replace(data.case, chapter=13))
     problems = completeness_problems(data)
-    assert any(p.source == "case" and p.field == "chapter" for p in problems)
+    [chapter] = [p for p in problems if p.source == "case" and p.field == "chapter"]
+    # Issue #365 built the means-test pair; the refusal names what is still
+    # missing (#366, #367) rather than a bare "only Chapter 7".
+    assert "Forms 122C-1 and 122C-2 are prepared" in chapter.message
+    assert "Official Form 113" in chapter.message
+
+
+def test_a_chapter_11_case_is_refused_too():
+    data = reference_case_data()
+    data = replace(data, case=replace(data.case, chapter=11))
+    problems = completeness_problems(data)
+    assert any(
+        p.source == "case" and p.field == "chapter" and "Chapter 11" in p.message
+        for p in problems
+    )
+
+
+def test_a_chapter_13_case_files_the_b122c_pair_in_place_of_b122a():
+    # The set the forms hub lists for a Chapter 13 case (issue #365): the
+    # Chapter 7 set with the Chapter 13 means-test pair — C-2 only above
+    # the median, exactly as A-2 only files above it on Chapter 7.
+    data = reference_case_data()
+    thirteen = replace(data, case=replace(data.case, chapter=13))
+    series = packet_form_series(thirteen)
+    assert series[-2:] == ("form/b122c1", "form/b122c2")
+    assert not {"form/b122a1", "form/b122a2"} & set(series)
+    assert series[:-2] == packet_form_series(data)[:-2]
+    shrunk = replace(
+        thirteen,
+        pay_period_records=tuple(
+            replace(entity, body=replace(entity.body, gross="4500.00"))
+            for entity in data.pay_period_records
+        ),
+    )
+    below = packet_form_series(shrunk)
+    assert "form/b122c1" in below
+    assert "form/b122c2" not in below
+
+
+def test_the_pin_map_covers_both_chapters_form_sets():
+    assert set(ALL_FORM_SERIES) == set(form_revisions_as_of(TODAY))
+    assert set(CHAPTER_13_FORM_SERIES) | set(PACKET_FORM_SERIES) == set(ALL_FORM_SERIES)
+    assert chapter_form_series(13) == CHAPTER_13_FORM_SERIES
+    assert chapter_form_series(7) == PACKET_FORM_SERIES
 
 
 def test_a_filed_case_never_reassembles():

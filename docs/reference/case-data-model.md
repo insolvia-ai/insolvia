@@ -58,7 +58,7 @@ outside the case store; see below.
 | `employment` | many | 106I Pt.1 |
 | `pay_period_record` | many, references an `employment` | Means test |
 | `other_income_record` | many, references a `debtor` | Means test |
-| `means_test_input` | one | B122A-2 |
+| `means_test_input` | one | B122A-2 (Ch. 7) · B122C-1, B122C-2 (Ch. 13) |
 | `income_summary` | one per debtor column | 106I Pt.2 |
 | `household` | 1–2 (106J-2 adds a second) | 106J Pt.1 |
 | `expense` | many, references a `household` | 106J Pt.2 |
@@ -347,9 +347,12 @@ other_income_record {                    // dated non-wage receipts — CMI's ot
   payer, description
 }
 
-means_test_input {                       // B122A-2's entered figures, one per case
-  id, case_id
-  ...the actual-expense and adjustment answers only the debtor can supply
+means_test_input {                       // the means test's entered figures, one per case
+  id, case_id                            // WHATEVER its chapter: B122A-2 on Ch. 7,
+                                         // B122C-1/C-2 on Ch. 13 read the same record
+  ...the actual-expense and adjustment answers only the debtor can supply,
+  plus the four only the Chapter 13 forms ask (the commitment-period
+  contention, lines 40, 41 and 43's rows)
   (insolvia_core.means_test_inputs owns the field list, named by subject)...
 }                                        // entered and confirmed, like income_summary;
                                          // one-per-case is the packet gate's check
@@ -711,8 +714,10 @@ already granted to every row written before it was named.
 
 ## Not here, on purpose
 
-- **Means-test forms 122A/B/C.** Their own milestone. `pay_period_record`
-  exists so they are implementable; their calculations are not modelled.
+- **Means-test arithmetic (122A, 122C).** The calculations — § 707(b) on
+  Chapter 7, § 1325(b) on Chapter 13 — are the API's engine
+  (`services/api` `core/means_test.py`), computed from the records above and
+  never stored. B122B (Chapter 11) is not built.
 - **The forms-engine field mapping.** Which entity attribute lands on which
   form line, per revision — including the completeness check and the constant
   sets above. That is the forms milestone's artifact.

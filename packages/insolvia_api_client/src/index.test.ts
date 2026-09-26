@@ -41,6 +41,8 @@ import {
   INCOME_LINE_CATEGORIES,
   INTENTIONS,
   MARITAL_FILING_STATUSES,
+  MEANS_TEST_FORMS,
+  MEANS_TEST_OUTCOMES,
   OTHER_INCOME_CATEGORIES,
   PRESUMPTION_EXEMPTIONS,
   SECURED_PAYMENT_BUCKETS,
@@ -6453,6 +6455,7 @@ describe('getCaseMeansTest', () => {
   const REFERENCE_TRACE = {
     asOf: '2026-08-01',
     asOfSource: 'case.created_at',
+    chapter: 7,
     releaseIds: {
       'ust/census-median-family-income': 'ust/census-median-family-income@2026-04-01',
       'ust/irs-national-standards': 'ust/irs-national-standards@2026-07-15',
@@ -6580,25 +6583,74 @@ describe('getCaseMeansTest', () => {
     determinedBy: 'threshold_floor',
     lines: [
       {
+        form: '122A-2',
         line: '1',
         label: 'Total current monthly income',
         amount: '8700.00',
         source: 'Form 122A-1 line 11 — the § 101(10A) derivation (core/cmi.py)',
       },
       {
+        form: '122A-2',
         line: '6',
         label: 'Food, clothing, and other items',
         amount: '1857.00',
         source: 'IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15',
       },
       {
+        form: '122A-2',
         line: '39d',
         label: 'Total over 60 months',
         amount: '-23359.80',
         source: 'line 39c x 60',
       },
     ],
+    chapter13: null,
     problems: [],
+  };
+
+  // The same family filing under Chapter 13 (issue #365), copied from
+  // `means_test_json` for the projection tests' Chapter 13 reference case:
+  // B122C-1's Part 2-3 lines, B122C-2's line 45, and the verdict block.
+  const CHAPTER_13_TRACE = {
+    ...REFERENCE_TRACE,
+    chapter: 13,
+    outcome: 'above_median',
+    determinedBy: 'median',
+    lines: [
+      {
+        form: '122C-1',
+        line: '14',
+        label: 'Current monthly income',
+        amount: '8700.00',
+        source: 'line 12 minus line 13',
+      },
+      {
+        form: '122C-1',
+        line: '21',
+        label: 'Applicable commitment period (months)',
+        amount: '60.00',
+        source:
+          'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+      },
+      {
+        form: '122C-2',
+        line: '45',
+        label: 'Monthly disposable income under 11 U.S.C. § 1325(b)(2)',
+        amount: '-1079.33',
+        source: 'line 39 minus line 44',
+      },
+    ],
+    chapter13: {
+      commitmentPeriodMonths: 60,
+      commitmentSource:
+        'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+      commitmentMaritalAdjustment: '0.00',
+      commitmentMonthlyIncome: '8700.00',
+      commitmentAnnualizedIncome: '104400.00',
+      commitmentAnnualMedian: '97540.00',
+      disposableIncomeRequired: true,
+      monthlyDisposableIncome: '-1079.33',
+    },
   };
 
   // A bare case: the engine refused, the derivation and window still landed.
@@ -6764,6 +6816,70 @@ describe('getCaseMeansTest', () => {
     await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
   });
 
+  test('a Chapter 13 trace decodes the commitment period and disposable income', async () => {
+    const stub = stubFetch(() => jsonResponse(CHAPTER_13_TRACE, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace).toEqual(CHAPTER_13_TRACE);
+    expect(trace.chapter).toBe(13);
+    expect(trace.outcome).toBe('above_median');
+    expect(trace.chapter13?.commitmentPeriodMonths).toBe(60);
+    expect(trace.chapter13?.monthlyDisposableIncome).toBe('-1079.33');
+    expect(trace.lines.map((line) => line.form)).toEqual(['122C-1', '122C-1', '122C-2']);
+  });
+
+  test('a below-median Chapter 13 trace carries a null disposable income', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...CHAPTER_13_TRACE,
+          outcome: 'below_median',
+          lines: CHAPTER_13_TRACE.lines.filter((line) => line.form === '122C-1'),
+          chapter13: {
+            ...CHAPTER_13_TRACE.chapter13,
+            commitmentPeriodMonths: 36,
+            disposableIncomeRequired: false,
+            monthlyDisposableIncome: null,
+          },
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const trace = await client.getCaseMeansTest(ENTITY_CASE_ID);
+
+    expect(trace.chapter13?.commitmentPeriodMonths).toBe(36);
+    expect(trace.chapter13?.disposableIncomeRequired).toBe(false);
+    expect(trace.chapter13?.monthlyDisposableIncome).toBeNull();
+  });
+
+  test('rejects a line naming a form the client does not know', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          ...REFERENCE_TRACE,
+          lines: [{ ...REFERENCE_TRACE.lines[0], form: '122B' }],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCaseMeansTest(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
   test('an unknown or foreign case is a 404, not a trace', async () => {
     const stub = stubFetch(() => jsonResponse({ error: 'case not found' }, 404));
     const client = new InsolviaApiClient(BASE_URL, {
@@ -6805,6 +6921,17 @@ describe('the means-test input enums (issue #349)', () => {
       'non_consumer_debts',
       'disabled_veteran',
       'reservist_national_guard',
+    ]);
+    // core/means_test.py's FORM_122A2 / FORM_122C1 / FORM_122C2 and the
+    // outcomes of both chapters' branches (issue #365).
+    expect(MEANS_TEST_FORMS).toEqual(['122A-2', '122C-1', '122C-2']);
+    expect(MEANS_TEST_OUTCOMES).toEqual([
+      'below_median',
+      'above_median',
+      'no_presumption',
+      'presumption_of_abuse',
+      'exempt',
+      'undetermined',
     ]);
   });
 });

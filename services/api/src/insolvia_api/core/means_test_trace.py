@@ -1,16 +1,21 @@
-"""`GET /v1/cases/<id>/means-test`'s body (issue #349): the whole § 707(b)
-trace for one case, assembled from the SAME calls the B122A-1 and B122A-2
-projections make, and nothing else.
+"""`GET /v1/cases/<id>/means-test`'s body (issues #349, #365): the whole
+means-test trace for one case — § 707(b) on a Chapter 7 case, § 1325(b) on
+a Chapter 13 case — assembled from the SAME calls the B122A-1/A-2 and
+B122C-1/C-2 projections make, and nothing else.
 
 NO ARITHMETIC HERE. `build_means_test_case` (form_projections/b122a2.py)
 derives the engine's inputs from the case records exactly as the packet
 does — the CMI over the dated income history, the debt totals from the
-claims, the under-18 count from the dependents — `resolve_means_test_data`
-pins the datasets as of the same date the forms use (`means_test_as_of`),
-and `run_means_test` computes. This module only lays the result out for the
-screen: every figure the endpoint returns is a figure one of those three
-produced, with the source string the engine attached to it, so the screen
-can never disagree with the form.
+claims, the under-18 count from the dependents, the case's chapter —
+`resolve_means_test_data` pins the datasets as of the same date the forms
+use (`means_test_as_of`), and `run_means_test` computes. This module only
+lays the result out for the screen: every figure the endpoint returns is a
+figure one of those three produced, with the source string the engine
+attached to it, so the screen can never disagree with the form. A Chapter
+13 trace adds `chapter13` — the commitment period, whether Form 122C-2 is
+required, and the disposable income when it is — and every line names the
+form it belongs to (`form`), because B122C-1's and B122C-2's line numbers
+overlap.
 
 PROGRESSIVE, LIKE `/summary` AND `/standards`. A case mid-intake has an
 incomplete means test the way it has an incomplete schedule: the engine's
@@ -42,6 +47,7 @@ from .form_projections.b122a1 import (
 from .form_projections.b122a2 import build_means_test_case
 from .means_test import (
     PRESUMPTION_EXEMPTIONS,
+    CommitmentPeriod,
     MeansTestCase,
     MeansTestError,
     MeansTestLine,
@@ -179,10 +185,32 @@ def _comparison_json(comparison: MedianComparison) -> dict[str, object]:
 
 def _line_json(line: MeansTestLine) -> dict[str, object]:
     return {
+        "form": line.form,
         "line": line.line,
         "label": line.label,
         "amount": line.amount,
         "source": line.source,
+    }
+
+
+def _chapter_13_json(result: MeansTestResult | None) -> dict[str, object] | None:
+    """The Chapter 13 verdict (issue #365): the § 1325(b)(4) commitment
+    period and whether § 1325(b)(3) requires Form 122C-2, with the
+    § 1325(b)(2) disposable income when it does. `null` on a Chapter 7 trace
+    and while the engine has not run."""
+    if result is None or result.chapter != 13:
+        return None
+    commitment: CommitmentPeriod | None = result.commitment
+    assert commitment is not None  # every Chapter 13 result carries one
+    return {
+        "commitmentPeriodMonths": commitment.months,
+        "commitmentSource": commitment.source,
+        "commitmentMaritalAdjustment": commitment.marital_adjustment,
+        "commitmentMonthlyIncome": commitment.monthly_income,
+        "commitmentAnnualizedIncome": commitment.annualized_income,
+        "commitmentAnnualMedian": commitment.annual_median,
+        "disposableIncomeRequired": result.outcome == "above_median",
+        "monthlyDisposableIncome": result.disposable_income,
     }
 
 
@@ -201,11 +229,14 @@ def means_test_json(trace: MeansTestTrace) -> dict[str, object]:
     and `outcome` `undetermined` with the reasons in `problems` when the
     engine refused."""
     inputs = trace.case.inputs
-    exemption = presumption_exemption(inputs)
+    # The Form 122A-1Supp exemptions are § 707(b)'s; a Chapter 13 trace
+    # reports the entered flags but never applies one.
+    exemption = presumption_exemption(inputs) if trace.case.chapter == 7 else None
     result = trace.result
     return {
         "asOf": trace.as_of.isoformat(),
         "asOfSource": trace.as_of_source,
+        "chapter": trace.case.chapter,
         "releaseIds": dict(trace.release_ids),
         "jurisdiction": {
             "state": trace.case.state or None,
@@ -245,6 +276,7 @@ def means_test_json(trace: MeansTestTrace) -> dict[str, object]:
         "outcome": result.outcome if result is not None else "undetermined",
         "determinedBy": result.determined_by if result is not None else None,
         "lines": [_line_json(line) for line in result.lines] if result else [],
+        "chapter13": _chapter_13_json(result),
         "problems": list(trace.problems),
     }
 

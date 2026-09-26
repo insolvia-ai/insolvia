@@ -84,7 +84,9 @@ our supported set (the Chapter 7 individual set —
 [`forms/README.md`](../../forms/README.md) owns the list: B101, B106A–J +
 Summary + Declaration, B107, B108, B121, B122A-1/A-2, and the two Director's
 Forms B2010 and B2030, added under
-[#351](https://github.com/insolvia-ai/insolvia/issues/351)). A cycle that
+[#351](https://github.com/insolvia-ai/insolvia/issues/351) — plus the
+Chapter 13 means-test pair B122C-1/C-2, added under
+[#365](https://github.com/insolvia-ai/insolvia/issues/365)). A cycle that
 touches none of ours still gets a cycle-log entry saying so — that is the walk.
 
 **Director's Forms revise off the December 1 rhythm.** They need only Advisory

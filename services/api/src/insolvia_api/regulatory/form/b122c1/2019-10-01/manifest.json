@@ -1,0 +1,11 @@
+{
+  "series_id": "form/b122c1",
+  "effective_date": "2019-10-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://www.uscourts.gov/sites/default/files/form_b122c-1.pdf",
+    "published": null,
+    "sha256": "97dfdda0e74b33d7c2d8466e6722651766526ca4dcb0ca80d8d4a127b8af0b73"
+  },
+  "notes": "Official Form 122C-1, Chapter 13 Statement of Your Current Monthly Income and Calculation of Commitment Period, printed revision 10/19 (current as of ingestion 2026-09-26; the form page states effective October 1, 2019, and the PDF footer prints 10/19 — the two agree, so the page's date is the effective date). template.pdf is the official fillable PDF vendored verbatim from uscourts.gov, fetched twice with identical digests (sha256 above; the loader re-hashes it); spec.json and acroform.json are the issue-365 field spec and AcroForm dump for this revision, copied from forms/ at ingestion — tests/test_form_templates.py refuses drift between the copies and forms/ while this is the current revision. Known defects carried from the spec: nearly every amount box is named undefined_NN; the net business/rental boxes, line 11's total, line 14, line 16c, line 19b and line 13's total each fill two or three printed boxes from one widget; line 15b's widget has an orphaned second instance below page 2's bottom edge."
+}

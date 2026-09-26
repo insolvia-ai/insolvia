@@ -122,6 +122,7 @@ from insolvia_api.core.form_projections import (
     project,
 )
 from insolvia_api.core.form_projections.b122a2 import files_b122a2
+from insolvia_api.core.form_projections.b122c2 import files_b122c2
 from insolvia_api.core.form_templates import FormRelease, resolve_form
 from insolvia_api.core.jobs import Job, JobError
 from insolvia_api.core.packets import PACKET_CONTENT_TYPE, new_packet, packet_json
@@ -175,6 +176,33 @@ PACKET_FORM_SERIES: Final = (
     "form/b122a1",
     "form/b122a2",
 )
+
+# The individual Chapter 13 set as far as it exists today (issue #365): the
+# Chapter 7 set with the B122C pair in place of the B122A pair — B122C-1
+# always files, B122C-2 only above the median (B122C-1 line 17). The plan
+# (Official Form 113, #366) and B108's Chapter 7-only statement are #367's
+# to settle; until then `completeness_problems` refuses to assemble a
+# Chapter 13 case, and this list serves the forms hub's rows and the pins.
+CHAPTER_13_FORM_SERIES: Final = tuple(
+    {"form/b122a1": "form/b122c1", "form/b122a2": "form/b122c2"}.get(series, series)
+    for series in PACKET_FORM_SERIES
+)
+
+# Every series a case may pin — the union of the chapter sets, in the
+# Chapter 7 set's order with the Chapter 13 pair appended. `form_revisions`
+# records the WHOLE registry's revisions at assembly, so a case whose
+# chapter changes before re-assembly does not find a hole.
+ALL_FORM_SERIES: Final = (
+    *PACKET_FORM_SERIES,
+    *(series for series in CHAPTER_13_FORM_SERIES if series not in PACKET_FORM_SERIES),
+)
+
+
+def chapter_form_series(chapter: int) -> tuple[str, ...]:
+    """The unconditional form set a chapter files, before the per-case
+    conditions `packet_form_series` applies."""
+    return CHAPTER_13_FORM_SERIES if chapter == 13 else PACKET_FORM_SERIES
+
 
 # The one fixed zip timestamp (1980-01-01, DOS epoch): determinism demands a
 # constant, and an obviously-synthetic constant beats a plausible-looking one.
@@ -588,7 +616,24 @@ def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
     references, the statements' own answers — so the same case always
     reports the same list."""
     problems: list[PacketProblem] = []
-    if data.case.chapter != 7:
+    if data.case.chapter == 13:
+        # Issue #365 built the means-test pair; the plan form (#366) and
+        # the Chapter 13 packet's own form set (#367) are what is still
+        # missing before a Chapter 13 case can assemble. Say so, rather
+        # than the bare "only Chapter 7".
+        problems.append(
+            PacketProblem(
+                source="case",
+                item_id=None,
+                field="chapter",
+                message="This is a Chapter 13 case — its packet cannot be"
+                " assembled yet. Forms 122C-1 and 122C-2 are prepared, but"
+                " the Chapter 13 plan (Official Form 113) is not modelled and"
+                " the Chapter 13 form set is not assembled; only the Chapter 7"
+                " packet can be assembled today.",
+            )
+        )
+    elif data.case.chapter != 7:
         problems.append(
             PacketProblem(
                 source="case",
@@ -632,20 +677,25 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     nothing to say is filed at all", and an all-blank J-2 in front of a clerk
     is a question, not a filing. B122A-2 files only when the debtor is not
     determinately below the median (B122A-1 line 14; `files_b122a2` argues
-    the indeterminate case). B108 files only when it has a row — a secured
-    claim, or a lease flagged for it — because § 521(a)(2) asks for it only
-    then; B2030 only when an attorney signs, because it is the attorney's
-    own disclosure. Everything else is unconditional for an individual
-    Chapter 7.
+    the indeterminate case), and B122C-2 likewise on a Chapter 13 case
+    (B122C-1 line 17; `files_b122c2`). B108 files only when it has a row —
+    a secured claim, or a lease flagged for it — because § 521(a)(2) asks
+    for it only then; B2030 only when an attorney signs, because it is the
+    attorney's own disclosure. Everything else is unconditional for an
+    individual filing of the case's chapter (`chapter_form_series`).
     """
     has_separate = any(
         e.body.which_household == "debtor_2_separate" for e in data.households
     )
+    base = chapter_form_series(data.case.chapter)
+    case_file = to_case_file(data)
     skipped = set()
     if not has_separate:
         skipped.add("form/b106j2")
-    if not files_b122a2(to_case_file(data)):
+    if "form/b122a2" in base and not files_b122a2(case_file):
         skipped.add("form/b122a2")
+    if "form/b122c2" in base and not files_b122c2(case_file):
+        skipped.add("form/b122c2")
     has_statement_row = any(
         e.body.claim_class == "secured" for e in data.claims
     ) or any(e.body.list_on_statement_of_intention for e in data.contract_leases)
@@ -653,7 +703,7 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
         skipped.add("form/b108")
     if not any(e.body.role == "attorney" for e in data.filing_professionals):
         skipped.add("form/b2030")
-    return tuple(series for series in PACKET_FORM_SERIES if series not in skipped)
+    return tuple(series for series in base if series not in skipped)
 
 
 @dataclass(frozen=True)
@@ -823,12 +873,13 @@ def assemble(
     return AssembledPacket(
         parts=tuple(parts),
         constants_set_id=constants_release.release_id,
-        # The WHOLE set pins, including a J-2 this case does not file: the
-        # pin map records which revisions were in force for this assembly,
-        # and a household added before re-assembly must not find a hole.
+        # The WHOLE set pins, including a J-2 this case does not file and
+        # the other chapter's means-test pair: the pin map records which
+        # revisions were in force for this assembly, and a household added
+        # (or a chapter changed) before re-assembly must not find a hole.
         form_revisions={
             series_id: resolve_form(series_id, as_of).pin
-            for series_id in PACKET_FORM_SERIES
+            for series_id in ALL_FORM_SERIES
         },
         creditor_count=matrix.creditor_count,
         projections={series_id: projected[series_id] for series_id in series_ids},

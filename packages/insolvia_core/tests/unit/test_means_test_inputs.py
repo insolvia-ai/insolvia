@@ -190,3 +190,50 @@ def test_a_row_without_the_new_members_still_parses() -> None:
     assert row.claim_id is None
     assert row.bucket is None
     assert row.cure_total is None
+
+
+# ── issue #365: the Chapter 13 forms' own questions ───────────────
+
+
+def test_the_chapter_13_answers_parse_on_the_same_record() -> None:
+    body = parse_means_test_input(
+        {
+            "commitment_period_marital_adjustment": True,
+            "child_support_for_dependents": "350",
+            "qualified_retirement_deductions": "210.5",
+            "special_circumstances": [
+                {"id": "sc-1", "description": "Dialysis travel", "amount": "180"}
+            ],
+        }
+    )
+    assert body.commitment_period_marital_adjustment is True
+    assert body.child_support_for_dependents == "350.00"
+    assert body.qualified_retirement_deductions == "210.50"
+    [row] = body.special_circumstances
+    assert (row.id, row.description) == ("sc-1", "Dialysis travel")
+    assert row.amount == "180.00"
+
+
+def test_the_chapter_13_answers_are_absent_by_default() -> None:
+    body = parse_means_test_input({})
+    assert body.commitment_period_marital_adjustment is None
+    assert body.child_support_for_dependents is None
+    assert body.qualified_retirement_deductions is None
+    assert body.special_circumstances == ()
+
+
+def test_a_special_circumstance_row_needs_an_addressable_id() -> None:
+    errors = errors_of({"special_circumstances": [{"amount": "10"}]})
+    assert "special_circumstances[0].id" in errors
+
+
+def test_duplicate_special_circumstance_ids_are_refused() -> None:
+    errors = errors_of(
+        {"special_circumstances": [{"id": "sc"}, {"id": "sc", "amount": "1"}]}
+    )
+    assert "special_circumstances[1].id" in errors
+
+
+def test_a_special_circumstance_amount_is_money() -> None:
+    errors = errors_of({"special_circumstances": [{"id": "sc", "amount": "lots"}]})
+    assert "special_circumstances[0].amount" in errors
