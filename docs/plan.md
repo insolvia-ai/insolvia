@@ -5,20 +5,21 @@ in force, and the work ahead. Completed milestones are summarized in one table
 — their full histories live in git, the PRs, and the ADRs, not here. Desktop
 was dropped entirely (D9); this document no longer plans for it.
 
-Status: **foundation, intake, forms & petition engine, and the MCP server
-(12.1–12.3) all built; forms and MCP await their staging validations (#96,
-#97, 12.4–12.5); means test and AI extraction built 2026-09-04. A gap
-analysis against the incumbent consumer-bankruptcy product (2026-09-16)
-showed the engines are at parity and the layers around them are not: the
-Chapter 7 data-entry surface is unfinished, and there is no practice
-management, client portal, Chapter 13 or post-filing. Those are now five
-milestones (13.x–17.x, below). **13.x was built 2026-09-16→23** (twelve
-PRs, #373–#384 and the tax id's encrypted storage with its logged full-value
-read, #382 / 13.12, which the schedules work surfaced last).
-Next is the design wave: the four spikes that open 14.x, 15.x and 17.x. Still
-open from before: the staging walkthroughs, the MCP harness round-trip
-(12.4–12.5), SES production access, the design partner, and the positioning
-rewrites (12.7/12.8)** · Last pruned 2026-09-23
+Status: **milestones 13 (schedules workbench) and the buildable half of 14
+(practice management) are merged; staging is green end to end for the first
+time.** 13.x landed 2026-09-16→24 as twelve PRs (#373–#390). On 2026-09-24 the
+first Release run ever reached the staging integration tier and exposed four
+latent bugs, each fixed the same day (#391 the SRP prime, #392 the upload
+encryption header, #393 a test's response shape, #398 the MCP Lambda's
+per-invocation lifespan); since then every Release run passes staging and
+stops at the `promote` gate. 14.4–14.8 (tasks, notes, events with generated
+deadlines, dashboard, court registry with firm defaults) merged 2026-09-26
+(#394–#399). **Open decisions:** ADRs 0022 (#387), 0023 (#386), 0024 (#388) and
+the import finding (#389) are proposed and accepted by merging; 14.1–14.3
+(client record, client screens, lifecycle) build on 0022. Still open from
+before: the MCP harness round-trip (12.4–12.5, now unblocked by #398), SES
+production access, the design partner, and the positioning rewrites
+(12.7/12.8)** · Last pruned 2026-09-26
 
 The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
 pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
@@ -169,7 +170,7 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · Firms & access control`](https://github.com/insolvia-ai/insolvia/milestone/8) | M2 / P1 | 11.1–11.7 | A case belongs to a **firm**, not to whoever opened it — firm users, roles, per-case linking, per-feature permissions ([ADR 0009](adr/0009-a-case-belongs-to-a-firm.md)). Two items stay open on purpose: provisioning a firm is still a hand-run script (risk 6), and the pool's case sensitivity is a decision rather than a task (risk 7). |
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
 | [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **built 2026-09-23** | M3 / P2 | 13.1–13.12 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030 — two are flat PDFs, so the engine gained an overlay pass that draws on vendored pages without touching their bytes), output options, and the tax id's encrypted storage with its logged full-value read (13.12 — B121 and B101's last four print). |
-| [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) | — | 14.1–14.8 | The layer around the case: a client distinct from the case (ADR first), the client list, a real lifecycle with post-filing fields, tasks, notes, events with generated deadlines, a dashboard, a court registry and firm defaults. |
+| [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) — **14.4–14.8 built 2026-09-26** | — | 14.1–14.8 | The layer around the case. Merged: tasks, notes, events with sixteen cited deadline rules and Rule 9006(a) counting, the dashboard, and the court registry (ten launch districts as sourced data; `case.district` is now a registry reference) with firm defaults. Waiting on ADR 0022: the client record, the client screens, and the lifecycle with post-filing fields. |
 | [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. Identity and isolation are an ADR before any code. |
 | [`Product · Chapter 13`](https://github.com/insolvia-ai/insolvia/milestone/14) | — | 16.1–16.3 | B122C-1/C-2 on the existing engine, the plan model and calculator (waterfall, feasibility, §1325(a)(4) liquidation test), the plan form and the Chapter 13 packet. |
 | [`Product · Filing and after`](https://github.com/insolvia-ai/insolvia/milestone/15) | — | 17.1–17.4 | Two spikes (CM/ECF filing, importing from other software) that end in decisions, court-notice intake, and amendments. Nothing here is scheduled until 13.x lands. |
