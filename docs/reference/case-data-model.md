@@ -35,7 +35,7 @@ asked.
 
 ## Core entities
 
-Twenty-five case-scoped types. Two more — the tax-identifier access log and
+Twenty-six case-scoped types. Two more — the tax-identifier access log and
 the effective-dated statutory constant sets — are referenced here but live
 outside the case store; see below.
 
@@ -59,6 +59,7 @@ outside the case store; see below.
 | `pay_period_record` | many, references an `employment` | Means test |
 | `other_income_record` | many, references a `debtor` | Means test |
 | `means_test_input` | one | B122A-2 (Ch. 7) · B122C-1, B122C-2 (Ch. 13) |
+| `plan` | one, Ch. 13 | The plan calculator; Official Form 113 (#367) |
 | `income_summary` | one per debtor column | 106I Pt.2 |
 | `household` | 1–2 (106J-2 adds a second) | 106J Pt.1 |
 | `expense` | many, references a `household` | 106J Pt.2 |
@@ -377,6 +378,41 @@ domestic support, union dues, other) so that a stub's itemization maps without
 a lossy translation. Line 11 is one value for the household rather than one per
 debtor column; it is carried on the debtor-1 summary and the forms engine
 renders it in its single box.
+
+## The Chapter 13 plan
+
+```
+plan {                                   // one per case, like means_test_input
+  id, case_id
+  term_months                            // absent = the means test's commitment period
+  payment_source: fixed | schedule_j_excess | disposable_income
+  monthly_payment, step_payments: [ { id, start_month, monthly_payment } ]
+  lump_sums: [ { id, month, amount, description } ]
+  trustee_percentage                     // ≤ 10 (28 U.S.C. § 586(e))
+  attorney_fees, attorney_fee_monthly
+  secured_treatments: [ { id, claim_id,
+      treatment: cure_and_maintain | cramdown | surrender,
+      arrearage, arrearage_interest_rate, maintenance_payment,
+      cramdown_value, interest_rate, monthly_payment } ]
+  priority_percentage, priority_interest_rate
+  unsecured_treatment: pot | percentage | amount
+  unsecured_percentage, unsecured_amount, unsecured_interest_rate
+  chapter_7_other_costs(+description), present_value_rate   // the § 1325(a)(4) side
+}
+```
+
+**The record is the proposal only** (issue
+[#366](https://github.com/insolvia-ai/insolvia/issues/366)); every figure it
+produces — the waterfall per class, feasibility, the liquidation floor — is
+derived, and lives in the API's calculator (`services/api`
+`core/chapter13_plan.py`, whose docstring owns the rules). Two choices keep it
+from restating another record: the term *overrides* the commitment period
+rather than copying it, and the two non-typed payment sources *name* Schedule
+J's line 23c or B122C-2's line 45 rather than storing the figure. Rates are
+percentages carried as strings (`insolvia_core.fields.percentage`), for
+money's reason. Alternatives compared on the plan screen are never stored:
+they are unsaved proposals POSTed to the calculator, and the one a preparer
+adopts is written through the ordinary confirmed save.
 
 ## Expenses and household
 
@@ -743,6 +779,9 @@ already granted to every row written before it was named.
 
 ## Not here, on purpose
 
+- **Plan arithmetic.** The waterfall, feasibility and the § 1325(a)(4)
+  liquidation test are the API's calculator (`core/chapter13_plan.py`),
+  computed from `plan` and the records above and never stored.
 - **Means-test arithmetic (122A, 122C).** The calculations — § 707(b) on
   Chapter 7, § 1325(b) on Chapter 13 — are the API's engine
   (`services/api` `core/means_test.py`), computed from the records above and

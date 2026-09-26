@@ -201,6 +201,53 @@ def money(value: object, path: str, errors: dict[str, str]) -> str | None:
     return f"{parsed.quantize(Decimal('0.01')):f}"
 
 
+_MAX_RATE_PLACES: Final = 3
+
+
+def percentage(
+    value: object,
+    path: str,
+    errors: dict[str, str],
+    *,
+    maximum: Decimal = Decimal("100"),
+) -> str | None:
+    """A rate or a share in percent — `"8.5"` is eight and a half per cent —
+    carried as a string for money's reason: a Till rate or a trustee's
+    commission multiplies every figure of a plan, and a float's binary
+    rounding would surface as a cent that traces to nothing.
+
+    At most three places (a Till rate of 6.375 is real), between 0 and
+    `maximum` (the caller's statute: 10 for a Chapter 13 trustee's
+    percentage fee under 28 U.S.C. § 586(e)(1)(B), 100 for a share). The
+    stored form is canonical — never fewer than two places, trailing zeros
+    past them dropped — so `"8.5"` and `"8.500"` are the same record.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        errors[path] = 'Must be a percentage carried as a string, like "8.5".'
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    try:
+        parsed = Decimal(stripped)
+    except InvalidOperation:
+        errors[path] = 'Must be a percentage, like "8.5".'
+        return None
+    if not parsed.is_finite() or parsed < 0 or parsed > maximum:
+        errors[path] = f"Must be between 0 and {maximum:f} per cent."
+        return None
+    exponent = parsed.as_tuple().exponent
+    if isinstance(exponent, int) and exponent < -_MAX_RATE_PLACES:
+        errors[path] = f"Must have at most {_MAX_RATE_PLACES} decimal places."
+        return None
+    canonical = f"{parsed.quantize(Decimal('0.001')):f}"
+    while canonical.endswith("0") and len(canonical.split(".")[1]) > 2:
+        canonical = canonical[:-1]
+    return canonical
+
+
 def boolean(value: object, path: str, errors: dict[str, str]) -> bool | None:
     """A yes/no answer, or None when the question has not been answered.
 

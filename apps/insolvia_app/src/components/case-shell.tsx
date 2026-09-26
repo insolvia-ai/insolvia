@@ -77,6 +77,8 @@ interface Section {
   readonly feature?: 'extraction_review';
   /** Which count, if any, this section shows beside its name. */
   readonly count?: 'pendingReview';
+  /** Present when the section exists only for one chapter's cases. */
+  readonly chapter?: 13;
 }
 
 const SECTIONS: readonly Section[] = [
@@ -85,6 +87,8 @@ const SECTIONS: readonly Section[] = [
   { segment: 'petition', label: 'Petition' },
   { segment: 'income', label: 'Income' },
   { segment: 'means-test', label: 'Means test' },
+  // Issue 16.2 / #366: a plan is proposed only under Chapter 13.
+  { segment: 'plan', label: 'Plan', chapter: 13 },
   { segment: 'documents', label: 'Documents' },
   {
     segment: 'extraction-review',
@@ -263,7 +267,11 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
     return <StatusScreen title="Opening case" message="Loading this case…" />;
   }
 
-  const visible = SECTIONS.filter((section) => section.feature === undefined || mayReview);
+  const visible = SECTIONS.filter(
+    (section) =>
+      (section.feature === undefined || mayReview) &&
+      (section.chapter === undefined || section.chapter === matter.chapter),
+  );
 
   // Which section is showing, as its route segment — '' for the overview.
   // Derived from the pathname rather than `useSegments()`, whose return type is
