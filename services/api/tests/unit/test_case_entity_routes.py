@@ -139,6 +139,16 @@ def open_case(client, subject=ALICE):
     return response.get_json()["id"]
 
 
+def file_case(client, case_id, subject=ALICE):
+    response = client.patch(
+        f"/v1/cases/{case_id}",
+        json={"status": "filed"},
+        headers=auth(subject),
+    )
+    assert response.status_code == 200
+    return response
+
+
 CREDITOR_BODY = {
     "name": "Example Bank",
     "address": {"line1": "1 Example Way", "city": "Exampleville"},
@@ -296,6 +306,75 @@ def test_removing_a_record_answers_204_then_404(client):
     assert second.status_code == 404
     listing = client.get(f"/v1/cases/{case_id}/creditors", headers=auth(ALICE))
     assert listing.get_json() == {"creditors": []}
+
+
+# ── Amendments (issue #370) ──────────────────────────────────────
+
+
+def test_amended_defaults_false_and_is_always_present(client):
+    case_id = open_case(client)
+    record = add_creditor(client, case_id).get_json()
+    assert record["amended"] is False
+
+
+def test_amended_true_is_refused_before_the_case_is_filed(client):
+    case_id = open_case(client)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": True})
+    assert response.status_code == 409
+
+
+def test_amended_true_is_accepted_once_the_case_is_filed(client):
+    case_id = open_case(client)
+    file_case(client, case_id)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": True})
+    assert response.status_code == 201
+    assert response.get_json()["amended"] is True
+
+
+def test_editing_to_amended_true_is_refused_before_the_case_is_filed(client):
+    case_id = open_case(client)
+    entity_id = add_creditor(client, case_id).get_json()["id"]
+    response = client.put(
+        f"/v1/cases/{case_id}/creditors/{entity_id}",
+        json={"name": "Renamed Bank", "provenance": {"name": TYPED}, "amended": True},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 409
+
+
+def test_amended_false_is_always_allowed_even_unfiled(client):
+    case_id = open_case(client)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": False})
+    assert response.status_code == 201
+    assert response.get_json()["amended"] is False
+
+
+@pytest.mark.parametrize(
+    ("sent", "expected"), [({}, True), ({"amended": False}, False)]
+)
+def test_a_put_that_omits_amended_keeps_the_stored_flag(client, sent, expected):
+    # A screen editing one field sends the body back without `amended`;
+    # silence must not un-amend a filed item, but an explicit false clears it.
+    case_id = open_case(client)
+    file_case(client, case_id)
+    entity_id = add_creditor(
+        client, case_id, body={**CREDITOR_BODY, "amended": True}
+    ).get_json()["id"]
+    response = client.put(
+        f"/v1/cases/{case_id}/creditors/{entity_id}",
+        json={"name": "Renamed Bank", "provenance": {"name": TYPED}, **sent},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 200
+    assert response.get_json()["amended"] is expected
+
+
+def test_amended_must_be_a_boolean(client):
+    case_id = open_case(client)
+    file_case(client, case_id)
+    response = add_creditor(client, case_id, body={**CREDITOR_BODY, "amended": "yes"})
+    assert response.status_code == 400
+    assert "amended" in response.get_json()["fields"]
 
 
 # ── Listing ─────────────────────────────────────────────────────

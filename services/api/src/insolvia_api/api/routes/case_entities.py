@@ -19,11 +19,21 @@ POST mints the id; PUT replaces a record it already minted. There is no
 upsert-by-client-id: a client cannot invent an entity id, for the same reason
 document ids are server-minted — the id is the address provenance paths on
 other records may use, and it must be one shape from one mint.
+
+`amended` (issue #370) rides on every entity generically, alongside
+`provenance` — `core/case_entities.py`'s own module explains why it is not a
+per-body field. It is only meaningful once the case is FILED, which this
+route is the one place that can check (`_refuse_amended_before_filed`): the
+core parsers validate its shape only, and a write that sets it early is
+refused with a 409, not silently dropped. A PUT that omits it keeps the
+stored flag — it is not body data, so "replace the record whole" is about the
+body and its provenance, not about this.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -33,13 +43,15 @@ from insolvia_core.access_log import record_access
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import (
     CaseEntity,
+    EntityDraft,
     EntityKind,
     create_entity,
     entity_json,
     parse_entity,
     replace_entity,
 )
-from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.cases import Case
+from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
 from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
 from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore
 
@@ -87,7 +99,7 @@ def _json_body() -> dict[str, object]:
     return payload
 
 
-def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> None:
+def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Case:
     """Resolve the case first, and record the attempt either way.
 
     EVERY entity route goes through here, because this is the only
@@ -95,6 +107,9 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
     enforces nothing (see its Protocol for why one authorisation path beats
     two). A route that skipped this would read another firm's creditor
     schedule with no error anywhere.
+
+    Returns the resolved case — a write route needs its `status` to decide
+    whether `amended` may be set (see `_refuse_amended_before_filed`).
     """
     case_store, _, access_log = _stores()
     case = case_store.get(case_id, accessor=accessor)
@@ -110,6 +125,24 @@ def _reachable_case_or_404(accessor: Accessor, case_id: str, action: str) -> Non
         # Identical to a case that does not exist — core/errors.py explains why
         # distinguishing them turns this into an id oracle.
         raise NotFoundError("case not found")
+    return case
+
+
+def _refuse_amended_before_filed(case: Case, draft: EntityDraft[Any]) -> None:
+    """The `amended` flag (issue #370) is only meaningful once a case is
+    filed — an item cannot be an AMENDMENT to a schedule that has never been
+    filed in the first place. REFUSED, not silently ignored: dropping the
+    flag would leave a client believing `amended: true` was stored when it
+    was not, the same trap `parse_dependent`'s name field and
+    `case_entities.py`'s provenance invariants both refuse to set. A
+    `ConflictError` (409) rather than a 400 — the request is well-formed, the
+    resource just is not in a state that admits it, exactly `ConflictError`'s
+    own docstring."""
+    if draft.amended and case.status != "filed":
+        raise ConflictError(
+            "amended can only be set once the case is filed — this case's "
+            f"status is {case.status!r}."
+        )
 
 
 def _entity_or_404(
@@ -151,7 +184,8 @@ def create_entity_route(case_id: str, collection: str) -> ResponseReturnValue:
     # reached the case.
     kind = _kind(collection)
     draft = parse_entity(kind, _json_body())
-    _reachable_case_or_404(accessor, case_id, "case.update")
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
+    _refuse_amended_before_filed(case, draft)
 
     entity = create_entity(kind, draft, case_id=case_id)
     entity_store.create(entity)
@@ -206,10 +240,19 @@ def put_entity_route(
     accessor = current_accessor()
 
     kind = _kind(collection)
-    draft = parse_entity(kind, _json_body())
-    _reachable_case_or_404(accessor, case_id, "case.update")
+    payload = _json_body()
+    draft = parse_entity(kind, payload)
+    case = _reachable_case_or_404(accessor, case_id, "case.update")
+    _refuse_amended_before_filed(case, draft)
 
     stored = _entity_or_404(case_id, kind, entity_id)
+    if "amended" not in payload:
+        # `amended` is not body data, so "whole, not partial" does not reach
+        # it: a PUT that says nothing about it leaves the stored flag alone.
+        # Every screen that edits one field of a record (a lien's asset link,
+        # a signer block) sends the body back without it, and reading that
+        # silence as `false` would quietly un-amend a filed schedule's item.
+        draft = replace(draft, amended=stored.amended)
     entity = replace_entity(stored, draft)
     if not entity_store.put(entity):
         # Deleted while this request was in flight. The same 404 a foreign id
