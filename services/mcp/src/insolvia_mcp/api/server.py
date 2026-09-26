@@ -23,6 +23,7 @@ caller's permissions do not admit answers `permission_denied` instead.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
@@ -36,6 +37,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import AnyHttpUrl
 from starlette.applications import Starlette
+from starlette.types import Receive, Scope, Send
 
 from insolvia_mcp.api.auth import CognitoTokenVerifier, resolve_accessor
 from insolvia_mcp.api.dependencies import McpDependencies
@@ -298,7 +300,51 @@ def create_mcp_server(deps: McpDependencies) -> MCPServer:
     return server
 
 
-def create_asgi_app(deps: McpDependencies) -> Starlette:
+class StreamableHttpApp:
+    """An ASGI app whose transport is rebuilt at every lifespan startup.
+
+    The SDK's `streamable_http_app()` creates ONE StreamableHTTPSessionManager
+    and runs it from the Starlette lifespan, and the manager refuses a second
+    `run()` on the same instance ("create a new instance if you need to run
+    again"). A long-lived server enters that lifespan once. Mangum does not:
+    it runs the full lifespan — startup and shutdown — around EVERY Lambda
+    invocation, so on a warm container the second request's startup was the
+    forbidden second run(), the lifespan failed, and Lambda answered 500 to
+    every request after the first. The staging smoke test, the first caller
+    to reach a warm container, is what found it.
+
+    So the manager's lifetime follows the lifespan it is run from: each
+    `lifespan` scope builds a fresh transport app — the SDK's own factory,
+    which is what constructs a fresh manager — and every `http` scope goes to
+    the current one. The MCPServer (tools, token verifier and its JWKS cache)
+    is built once and shared; only the transport around it is per-startup,
+    and building it is route wiring, no I/O. Under uvicorn the lifespan runs
+    once, so this degenerates to exactly the SDK's own shape.
+
+    The alternative — Mangum `lifespan="off"` and one manager per process —
+    was rejected: run() opens an anyio task group, which records the task
+    that entered it as its host and cancels that host when a child fails.
+    Entering it once per process means entering it from a task that has
+    finished by the time any request runs, and nothing promises what a
+    cancellation aimed at a finished host does. This shape keeps every
+    task group inside the lifespan task that owns it, which is the shape the
+    SDK documents.
+    """
+
+    def __init__(self, build: Callable[[], Starlette]) -> None:
+        self._build = build
+        # Built eagerly so the object is a complete ASGI app before any
+        # lifespan runs: the metadata routes answer either way, and /mcp
+        # outside a lifespan fails the way the SDK's own app does.
+        self._current = build()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            self._current = self._build()
+        await self._current(scope, receive, send)
+
+
+def create_asgi_app(deps: McpDependencies) -> StreamableHttpApp:
     """The Streamable HTTP app, stateless and single-JSON-response.
 
     Revision 2026-07-28 removed protocol-level sessions and the standalone
@@ -307,6 +353,12 @@ def create_asgi_app(deps: McpDependencies) -> Starlette:
     mid-call SSE stream, every call is a bounded read or a bounded write
     (mcp-surface.md § Protocol posture). The SDK still bridges older
     initialize-era harnesses on the same endpoint.
+
+    Stateless is also what makes a per-invocation transport correct: nothing
+    the manager holds outlives a request, so rebuilding it at every lifespan
+    startup (StreamableHttpApp) loses nothing. A stateful manager would
+    lose its sessions on every Lambda invocation — and any invocation may
+    land on any container anyway.
     """
     server = create_mcp_server(deps)
     resource_host = urlparse(deps.config.resource_url).netloc
@@ -315,16 +367,20 @@ def create_asgi_app(deps: McpDependencies) -> Starlette:
         # The development server binds loopback on whatever port dev-up
         # chose; a deployed environment answers exactly its custom domain.
         allowed_hosts += ["127.0.0.1:*", "localhost:*", "127.0.0.1", "localhost"]
-    return server.streamable_http_app(
-        json_response=True,
-        stateless_http=True,
-        max_request_body_size=MAX_REQUEST_BYTES,
-        # The spec's DNS-rebinding MUST: validate Origin (absent is fine —
-        # harnesses are not browsers; present and unlisted is a 403) and pin
-        # the Host header to this environment's own hostname.
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=True,
-            allowed_hosts=allowed_hosts,
-            allowed_origins=[],
-        ),
-    )
+
+    def build_transport() -> Starlette:
+        return server.streamable_http_app(
+            json_response=True,
+            stateless_http=True,
+            max_request_body_size=MAX_REQUEST_BYTES,
+            # The spec's DNS-rebinding MUST: validate Origin (absent is fine
+            # — harnesses are not browsers; present and unlisted is a 403)
+            # and pin the Host header to this environment's own hostname.
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=allowed_hosts,
+                allowed_origins=[],
+            ),
+        )
+
+    return StreamableHttpApp(build_transport)
