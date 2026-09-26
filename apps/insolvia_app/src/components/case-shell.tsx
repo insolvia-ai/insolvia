@@ -10,6 +10,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import { recordRecentCase } from '@/components/recent-cases';
 import { StatusScreen } from '@/components/status-screen';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
 
@@ -216,6 +217,10 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
       if (!result.ok) return;
       setMatter(result.value);
       setError(null);
+      // The dashboard's "recently viewed" trail (issue 14.7 / #359) — recorded
+      // here, once per successful open, rather than in each of the six case
+      // screens beneath this shell, since every one of them mounts through it.
+      recordRecentCase(caseId);
     } catch {
       // A 404 here means unknown OR not the caller's — the API refuses to say
       // which (see `getCase`), and so does this. "Could not be opened" is the

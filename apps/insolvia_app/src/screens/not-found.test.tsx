@@ -72,9 +72,12 @@ describe('an unknown path', () => {
     expect(router.getPathname()).toBe('/');
     // Waits for the shell's account control too, so no state update lands
     // after the test. It used to wait on the API panel's claims, which have
-    // moved to /account.
+    // moved to /account. `principalResponse()` carries no firm, so the page
+    // behind the shell is RequireFirm's own explanation rather than the
+    // dashboard — either way, proof `/` rendered rather than staying on
+    // the not-found page.
     expect(await screen.findByRole('button', { name: 'Account menu' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'You are not in a firm yet' })).toBeTruthy();
   });
 
   it('sends a signed-out user from home on to sign-in', async () => {

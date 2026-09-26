@@ -4767,6 +4767,31 @@ describe('tasks', () => {
     expect(tasks).toEqual([TASK]);
   });
 
+  test('GETs /v1/me/tasks with no query for scope: "mine" — the server default', async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.listMyTasks({ scope: 'mine' });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks`);
+  });
+
+  test("GETs /v1/me/tasks?scope=firm — the dashboard's firm-wide toggle", async () => {
+    const stub = stubFetch(() => jsonResponse({ tasks: [TASK] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const tasks = await client.listMyTasks({ scope: 'firm' });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/tasks?scope=firm`);
+    expect(tasks).toEqual([TASK]);
+  });
+
   test('an overdue task decodes overdue: true verbatim', async () => {
     const overdue = { ...TASK, dueDate: '2000-01-01', overdue: true };
     const stub = stubFetch(() => jsonResponse(overdue, 200));

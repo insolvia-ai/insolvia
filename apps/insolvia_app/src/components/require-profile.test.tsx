@@ -110,7 +110,7 @@ describe('the first-run name gate', () => {
 
     expect(await screen.findByRole('heading', { name: 'Tell us your name' })).toBeTruthy();
     // And the screen it was covering is not rendered behind it.
-    expect(screen.queryByRole('heading', { name: 'Your case workspace' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Home' })).toBeNull();
   });
 
   it('asks for a name when the first name is missing', async () => {
@@ -131,7 +131,7 @@ describe('the first-run name gate', () => {
   it('lets a complete name straight through', async () => {
     signedIn({ '/v1/me': () => jsonResponse(200, principal()) });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Tell us your name' })).toBeNull();
   });
 
@@ -150,7 +150,9 @@ describe('the first-run name gate', () => {
     // be worse than either alone.
     signedIn({ '/v1/me': () => jsonResponse(200, principal('', '', false)) });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    // RequireFirm's own explanation, not the profile gate's — proving the
+    // profile gate stepped aside rather than that either screen won a race.
+    expect(await screen.findByRole('heading', { name: 'You are not in a firm yet' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Tell us your name' })).toBeNull();
   });
 
@@ -160,7 +162,12 @@ describe('the first-run name gate', () => {
     // app because a request failed would be the worse answer.
     signedIn({ '/v1/me': () => jsonResponse(500, { error: 'ServerError' }) });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    // The profile gate itself does not block (that is what this test is
+    // about — `RequireProfile` has nothing to gate on when `/v1/me` failed).
+    // What renders behind it is RequireFirm's OWN failure, from its own
+    // independent call to the same failing endpoint — not the profile
+    // gate's, and not the dashboard.
+    expect(await screen.findByRole('heading', { name: 'Could not load your firm' })).toBeTruthy();
   });
 
   it('saves both halves and lifts the gate without a reload', async () => {
@@ -178,7 +185,7 @@ describe('the first-run name gate', () => {
     await user.type(screen.getByLabelText('Last name'), 'Bono');
     await user.press(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Home' })).toBeTruthy();
 
     const patch = fetchMock.mock.calls.find(
       ([url, init]) => url.includes('/v1/me') && init?.method === 'PATCH',

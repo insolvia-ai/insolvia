@@ -699,6 +699,34 @@ export function updateTaskRequestToJson(request: UpdateTaskRequest): Record<stri
 }
 
 /**
+ * `GET /v1/me/tasks` query options.
+ *
+ * `scope: 'mine'` (the server's default, and this package's when the whole
+ * options object is omitted) keeps only tasks assigned to the caller.
+ * `'firm'` drops that filter and returns every task on every case the
+ * caller can reach — the dashboard's firm-wide toggle (issue 14.7 / #359).
+ * Neither widens which CASES are read, only which of a reachable case's
+ * tasks come back — see `api/routes/tasks.py`'s docstring.
+ */
+export interface ListMyTasksOptions {
+  readonly scope?: 'mine' | 'firm' | undefined;
+}
+
+/**
+ * `GET /v1/me/tasks` query options rendered as `URLSearchParams`, omitting
+ * `scope` entirely when absent or `'mine'` — the server's own default —
+ * rather than sending it explicitly, the same omit-when-absent rule
+ * {@link listCasesQuery} follows.
+ */
+export function listMyTasksQuery(options: ListMyTasksOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  if (options.scope !== undefined && options.scope !== 'mine') {
+    params.set('scope', options.scope);
+  }
+  return params;
+}
+
+/**
  * The `POST /v1/waitlist` request body.
  *
  * `name`, `firm`, and `email` are required by the API; the rest are optional
