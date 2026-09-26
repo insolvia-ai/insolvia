@@ -3216,6 +3216,101 @@ export interface MeansTestInputBody {
   readonly special_circumstances?: readonly SpecialCircumstanceItem[] | undefined;
 }
 
+/**
+ * A rate or a share in percent, carried as a string (`"8.5"` is eight and a
+ * half per cent) for money's reason — `insolvia_core.fields.percentage`.
+ * At most three places; the server stores it canonically (`"8.50"`).
+ */
+export type Percentage = string;
+
+/**
+ * Where a Chapter 13 plan's base payment comes from (issue #366): a typed
+ * amount, Schedule J line 23c's net income, or the means test's B122C-2
+ * line 45 disposable income. Mirrors `insolvia_core.plans.PAYMENT_SOURCES`.
+ */
+export const PLAN_PAYMENT_SOURCES = ['fixed', 'schedule_j_excess', 'disposable_income'] as const;
+export type PlanPaymentSource = (typeof PLAN_PAYMENT_SOURCES)[number];
+
+/**
+ * A secured claim's treatment under the plan: cure the arrears and maintain
+ * the contract (§ 1322(b)(5)), cram down to the collateral's value at a rate
+ * (§ 1325(a)(5)(B)), or surrender (§ 1325(a)(5)(C)). Mirrors
+ * `insolvia_core.plans.SECURED_TREATMENTS`.
+ */
+export const SECURED_TREATMENTS = ['cure_and_maintain', 'cramdown', 'surrender'] as const;
+export type SecuredTreatmentKind = (typeof SECURED_TREATMENTS)[number];
+
+/**
+ * What general unsecured creditors receive: whatever is left (`pot`), a
+ * promised percentage, or a promised amount. Mirrors
+ * `insolvia_core.plans.UNSECURED_TREATMENTS`.
+ */
+export const UNSECURED_TREATMENTS = ['pot', 'percentage', 'amount'] as const;
+export type UnsecuredTreatment = (typeof UNSECURED_TREATMENTS)[number];
+
+/** From `start_month` on (1-based), the monthly payment is `monthly_payment`. */
+export interface PlanStepPayment {
+  readonly id: string;
+  readonly start_month?: number | undefined;
+  readonly monthly_payment?: Money | undefined;
+}
+
+/** A one-time payment into the plan in `month`. */
+export interface PlanLumpSum {
+  readonly id: string;
+  readonly month?: number | undefined;
+  readonly amount?: Money | undefined;
+  readonly description?: string | undefined;
+}
+
+/**
+ * How the plan treats one secured claim. `arrearage`,
+ * `arrearage_interest_rate` and `maintenance_payment` (a conduit payment,
+ * absent = paid directly) belong to a cure; `cramdown_value` (absent = the
+ * derived secured portion) and `interest_rate` to a cramdown;
+ * `monthly_payment` fixes the equal monthly payment for either (absent =
+ * amortised over the term). `id` is client-chosen and required.
+ */
+export interface PlanSecuredTreatment {
+  readonly id: string;
+  readonly claim_id?: string | undefined;
+  readonly treatment?: SecuredTreatmentKind | undefined;
+  readonly arrearage?: Money | undefined;
+  readonly arrearage_interest_rate?: Percentage | undefined;
+  readonly maintenance_payment?: Money | undefined;
+  readonly cramdown_value?: Money | undefined;
+  readonly interest_rate?: Percentage | undefined;
+  readonly monthly_payment?: Money | undefined;
+}
+
+/**
+ * The Chapter 13 plan's proposal (issue 16.2 / #366), one record per case —
+ * the preparer's confirmed choices only. Every figure the plan produces is
+ * {@link PlanCalculation}, computed by the API and never stored.
+ * `term_months` absent means the means test's commitment period; the
+ * trustee's percentage is at most 10 (28 U.S.C. § 586(e)).
+ */
+export interface PlanBody {
+  readonly term_months?: number | undefined;
+  readonly payment_source?: PlanPaymentSource | undefined;
+  readonly monthly_payment?: Money | undefined;
+  readonly step_payments?: readonly PlanStepPayment[] | undefined;
+  readonly lump_sums?: readonly PlanLumpSum[] | undefined;
+  readonly trustee_percentage?: Percentage | undefined;
+  readonly attorney_fees?: Money | undefined;
+  readonly attorney_fee_monthly?: Money | undefined;
+  readonly secured_treatments?: readonly PlanSecuredTreatment[] | undefined;
+  readonly priority_percentage?: Percentage | undefined;
+  readonly priority_interest_rate?: Percentage | undefined;
+  readonly unsecured_treatment?: UnsecuredTreatment | undefined;
+  readonly unsecured_percentage?: Percentage | undefined;
+  readonly unsecured_amount?: Money | undefined;
+  readonly unsecured_interest_rate?: Percentage | undefined;
+  readonly chapter_7_other_costs?: Money | undefined;
+  readonly chapter_7_other_costs_description?: string | undefined;
+  readonly present_value_rate?: Percentage | undefined;
+}
+
 /** 106J Part 1's frame: which schedule, and the change narrative. */
 export interface HouseholdBody {
   readonly which_household?: WhichHousehold | undefined;
@@ -3505,6 +3600,7 @@ export interface CaseCollections {
   readonly community_household_members: CommunityHouseholdMemberBody;
   readonly other_income_records: OtherIncomeRecordBody;
   readonly means_test_inputs: MeansTestInputBody;
+  readonly plans: PlanBody;
 }
 
 /** A collection's URL segment: `creditors`, `claims`, … */
@@ -3533,6 +3629,7 @@ export const CASE_COLLECTIONS = [
   'community_household_members',
   'other_income_records',
   'means_test_inputs',
+  'plans',
 ] as const satisfies readonly CaseCollection[];
 
 /**
@@ -4266,4 +4363,197 @@ export interface CreditorMatrix {
   readonly problems: readonly CreditorMatrixProblem[];
   /** The file text. Absent, never null, while `problems` is non-empty. */
   readonly content?: string;
+}
+
+// ---------------------------------------------------------------------------
+// The Chapter 13 plan calculator (issue 16.2 / #366) —
+// `plan_calculation_json` in services/api core/chapter13_plan.py is the
+// shape. Money and rates are STRINGS throughout; a figure the case cannot
+// answer yet is `null`, with the reason in `problems`.
+
+/** The waterfall's classes, in distribution order. */
+export const PLAN_CLASSES = [
+  'trustee',
+  'ongoing_payments',
+  'secured',
+  'attorney_fees',
+  'priority',
+  'general_unsecured',
+] as const;
+export type PlanClassKey = (typeof PLAN_CLASSES)[number];
+
+/**
+ * One payee's line of the waterfall — a claim, the trustee, the attorney.
+ * `allowed` is what the plan owes it before interest; `principal` and
+ * `interest` what the term pays; months are 1-based and `null` when nothing
+ * was paid. `source` names the claim, the plan field or the rule behind it.
+ */
+export interface PlanPayoutRow {
+  readonly key: string;
+  readonly label: string;
+  readonly claimId: string | null;
+  readonly treatment: string | null;
+  readonly allowed: Money;
+  readonly monthlyPayment: Money | null;
+  readonly rate: Percentage | null;
+  readonly principal: Money;
+  readonly interest: Money;
+  readonly payout: Money;
+  readonly firstMonth: number | null;
+  readonly lastMonth: number | null;
+  readonly monthsPaid: number;
+  readonly unpaid: Money;
+  readonly source: string;
+}
+
+/** One class of the waterfall: its totals, its months, and its rows. */
+export interface PlanClass {
+  readonly key: PlanClassKey;
+  readonly label: string;
+  readonly allowed: Money;
+  readonly principal: Money;
+  readonly interest: Money;
+  readonly payout: Money;
+  readonly unpaid: Money;
+  readonly firstMonth: number | null;
+  readonly lastMonth: number | null;
+  readonly rows: readonly PlanPayoutRow[];
+}
+
+/** One claim's part of an unsecured pool, and why it is there. */
+export interface PlanPoolClaim {
+  readonly claimId: string;
+  readonly label: string;
+  readonly amount: Money;
+  readonly source: string;
+}
+
+/** A figure and where it came from. */
+export interface SourcedAmount {
+  readonly amount: Money;
+  readonly source: string;
+}
+
+/** One month's scheduled payment. */
+export interface PlanScheduledPayment {
+  readonly month: number;
+  readonly payment: Money;
+}
+
+/** One lump sum the plan receives. */
+export interface PlanReceivedLumpSum {
+  readonly month: number;
+  readonly amount: Money;
+  readonly description: string | null;
+}
+
+/** What goes into the plan, month by month. */
+export interface PlanFunding {
+  readonly termMonths: number | null;
+  readonly termSource: string | null;
+  readonly basePayment: Money | null;
+  readonly baseSource: string | null;
+  readonly schedule: readonly PlanScheduledPayment[];
+  readonly lumpSums: readonly PlanReceivedLumpSum[];
+  readonly total: Money;
+}
+
+/**
+ * Whether the payments over the term cover the waterfall. `feasible` is
+ * `null` while an input the waterfall needs is missing.
+ */
+export interface PlanFeasibility {
+  readonly feasible: boolean | null;
+  readonly totalFunding: Money;
+  readonly totalDistributed: Money;
+  readonly surplus: Money;
+  readonly shortfall: Money;
+  readonly reasons: readonly string[];
+  readonly scheduleJExcess: SourcedAmount | null;
+  readonly exceedsScheduleJ: boolean | null;
+}
+
+/** One asset's row of the liquidation analysis. */
+export interface LiquidationAsset {
+  readonly assetId: string;
+  readonly description: string | null;
+  readonly value: Money;
+  readonly liens: Money;
+  readonly exempt: Money;
+  readonly unexempt: Money;
+}
+
+/**
+ * The § 1325(a)(4) hypothetical Chapter 7: property less liens, exemptions,
+ * the § 326(a) commission, other costs and priority claims — `available`
+ * to general unsecured creditors, as `percentage` of the Chapter 7 pool.
+ */
+export interface PlanLiquidation {
+  readonly assets: readonly LiquidationAsset[];
+  readonly propertyTotal: Money;
+  readonly liensTotal: Money;
+  readonly exemptionsTotal: Money;
+  readonly unexemptTotal: Money;
+  readonly trusteeCommission: Money;
+  readonly trusteeCommissionRule: string;
+  readonly otherCosts: Money;
+  readonly otherCostsSource: string;
+  readonly priorityTotal: Money;
+  readonly available: Money;
+  readonly pool: readonly PlanPoolClaim[];
+  readonly poolTotal: Money;
+  readonly percentage: Money | null;
+}
+
+/** The best-interests comparison; `passes` is `null` while undetermined. */
+export interface PlanBestInterests {
+  readonly planPercentage: Money | null;
+  readonly liquidationPercentage: Money | null;
+  readonly planUnsecuredValue: Money;
+  readonly presentValueRate: Percentage | null;
+  readonly passes: boolean | null;
+  readonly rule: string;
+}
+
+/** The plan's general unsecured class: who is in it and what it is owed. */
+export interface PlanUnsecured {
+  readonly pool: readonly PlanPoolClaim[];
+  readonly poolTotal: Money;
+  readonly target: Money | null;
+  readonly targetSource: string | null;
+  readonly percentage: Money | null;
+}
+
+/** The commitment period the means test set, and why. */
+export interface PlanCommitmentPeriod {
+  readonly months: number | null;
+  readonly source: string | null;
+}
+
+/** `GET /v1/cases/{caseId}/plan-calculation`'s body. */
+export interface PlanCalculation {
+  readonly planPresent: boolean;
+  readonly chapter: number;
+  readonly commitmentPeriod: PlanCommitmentPeriod;
+  readonly funding: PlanFunding;
+  readonly trusteePercentage: Percentage | null;
+  readonly classes: readonly PlanClass[];
+  readonly unsecured: PlanUnsecured;
+  readonly feasibility: PlanFeasibility;
+  readonly liquidation: PlanLiquidation;
+  readonly bestInterests: PlanBestInterests;
+  readonly warnings: readonly string[];
+  readonly problems: readonly string[];
+}
+
+/** One unsaved alternative to calculate; `plan` is parsed like a stored one. */
+export interface PlanScenarioRequest {
+  readonly label?: string | undefined;
+  readonly plan: PlanBody;
+}
+
+/** One calculated alternative, in the order sent. */
+export interface PlanScenario {
+  readonly label: string | null;
+  readonly calculation: PlanCalculation;
 }

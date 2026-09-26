@@ -44,9 +44,13 @@ import {
   MEANS_TEST_FORMS,
   MEANS_TEST_OUTCOMES,
   OTHER_INCOME_CATEGORIES,
+  PLAN_CLASSES,
+  PLAN_PAYMENT_SOURCES,
   PRESUMPTION_EXEMPTIONS,
   SECURED_PAYMENT_BUCKETS,
+  SECURED_TREATMENTS,
   SMALL_BUSINESS_STATUSES,
+  UNSECURED_TREATMENTS,
   SOFA_ENTRY_TYPES,
   DOCUMENT_CONTENT_TYPES,
   DOCUMENT_KINDS,
@@ -5481,6 +5485,7 @@ describe('the case-collection enums', () => {
       'community_household_members',
       'other_income_records',
       'means_test_inputs',
+      'plans',
     ]);
   });
 
@@ -6570,6 +6575,355 @@ describe('getCaseStandards', () => {
 
     await expect(client.getCaseStandards(ENTITY_CASE_ID)).rejects.toThrow(ApiUnauthorizedException);
     expect(stub.requests()).toHaveLength(0);
+  });
+});
+
+describe('the Chapter 13 plan (issue #366)', () => {
+  // Copied from `plan_calculation_json` (core/chapter13_plan.py) for the
+  // calculator tests' case with a two-month plan — not inferred. Every money
+  // figure and rate is a string on the wire; an unanswerable one is null.
+  const CALCULATION = {
+    planPresent: true,
+    chapter: 13,
+    commitmentPeriod: { months: 60, source: 'line 20b is more than or equal to line 20c' },
+    funding: {
+      termMonths: 2,
+      termSource: 'plan.term_months',
+      basePayment: '600.00',
+      baseSource: 'plan.monthly_payment',
+      schedule: [
+        { month: 1, payment: '600.00' },
+        { month: 2, payment: '600.00' },
+      ],
+      lumpSums: [],
+      total: '1200.00',
+    },
+    trusteePercentage: '10.00',
+    classes: [
+      {
+        key: 'trustee',
+        label: "Trustee's fee",
+        allowed: '120.00',
+        principal: '120.00',
+        interest: '0.00',
+        payout: '120.00',
+        unpaid: '0.00',
+        firstMonth: 1,
+        lastMonth: 2,
+        rows: [
+          {
+            key: 'trustee',
+            label: "Trustee's fee",
+            claimId: null,
+            treatment: null,
+            allowed: '120.00',
+            monthlyPayment: null,
+            rate: '10.00',
+            principal: '120.00',
+            interest: '0.00',
+            payout: '120.00',
+            firstMonth: 1,
+            lastMonth: 2,
+            monthsPaid: 2,
+            unpaid: '0.00',
+            source: 'plan.trustee_percentage 10.00% of every receipt (28 U.S.C. § 586(e))',
+          },
+        ],
+      },
+      {
+        key: 'secured',
+        label: 'Secured claims and arrears',
+        allowed: '9000.00',
+        principal: '1080.00',
+        interest: '0.00',
+        payout: '1080.00',
+        unpaid: '7920.00',
+        firstMonth: 1,
+        lastMonth: 2,
+        rows: [
+          {
+            key: 'secured:claim-auto',
+            label: 'Example Auto Finance — secured value',
+            claimId: 'claim-auto',
+            treatment: 'cramdown',
+            allowed: '9000.00',
+            monthlyPayment: '4500.00',
+            rate: '0.00',
+            principal: '1080.00',
+            interest: '0.00',
+            payout: '1080.00',
+            firstMonth: 1,
+            lastMonth: 2,
+            monthsPaid: 2,
+            unpaid: '7920.00',
+            source:
+              'plan.secured_treatments[t-auto].cramdown_value (§ 506(a), § 1325(a)(5)(B)), 0.00% a year; amortised over 2 months',
+          },
+        ],
+      },
+      {
+        key: 'general_unsecured',
+        label: 'General unsecured claims',
+        allowed: '24000.00',
+        principal: '0.00',
+        interest: '0.00',
+        payout: '0.00',
+        unpaid: '24000.00',
+        firstMonth: null,
+        lastMonth: null,
+        rows: [
+          {
+            key: 'unsecured',
+            label: 'General unsecured claims, pro rata',
+            claimId: null,
+            treatment: 'pot',
+            allowed: '24000.00',
+            monthlyPayment: null,
+            rate: null,
+            principal: '0.00',
+            interest: '0.00',
+            payout: '0.00',
+            firstMonth: null,
+            lastMonth: null,
+            monthsPaid: 0,
+            unpaid: '24000.00',
+            source: 'whatever remains, up to the full unsecured pool (a pot plan)',
+          },
+        ],
+      },
+    ],
+    unsecured: {
+      pool: [
+        {
+          claimId: 'claim-card',
+          label: 'Example Card Bank',
+          amount: '20000.00',
+          source: 'claim claim-card: nonpriority unsecured amount',
+        },
+      ],
+      poolTotal: '24000.00',
+      target: '24000.00',
+      targetSource: 'whatever remains, up to the full unsecured pool (a pot plan)',
+      percentage: '0.00',
+    },
+    feasibility: {
+      feasible: false,
+      totalFunding: '1200.00',
+      totalDistributed: '1200.00',
+      surplus: '0.00',
+      shortfall: '13920.00',
+      reasons: ['Secured claims and arrears: $7,920.00 is still unpaid after month 2.'],
+      scheduleJExcess: { amount: '700.00', source: 'Schedule J line 23c' },
+      exceedsScheduleJ: false,
+    },
+    liquidation: {
+      assets: [
+        {
+          assetId: 'asset-savings',
+          description: 'asset-savings',
+          value: '10000.00',
+          liens: '0.00',
+          exempt: '2000.00',
+          unexempt: '8000.00',
+        },
+      ],
+      propertyTotal: '269000.00',
+      liensTotal: '209000.00',
+      exemptionsTotal: '52000.00',
+      unexemptTotal: '8000.00',
+      trusteeCommission: '1550.00',
+      trusteeCommissionRule:
+        '11 U.S.C. § 326(a): 25% of the first $5,000, 10% of the next $45,000, 5% of the next $950,000, 3% above $1,000,000',
+      otherCosts: '0.00',
+      otherCostsSource: 'none typed',
+      priorityTotal: '3000.00',
+      available: '3450.00',
+      pool: [
+        {
+          claimId: 'claim-auto',
+          label: 'Example Auto Finance',
+          amount: '3000.00',
+          source: 'claim claim-auto: unsecured portion of a secured claim (derived)',
+        },
+      ],
+      poolTotal: '24000.00',
+      percentage: '14.38',
+    },
+    bestInterests: {
+      planPercentage: '0.00',
+      liquidationPercentage: '14.38',
+      planUnsecuredValue: '0.00',
+      presentValueRate: null,
+      passes: false,
+      rule: "11 U.S.C. § 1325(a)(4): unsecured creditors receive at least what a Chapter 7 liquidation would pay them, compared nominally — type a present-value rate to discount the plan's future payments",
+    },
+    warnings: [
+      'The term (2 months) is shorter than the 60-month commitment period, which § 1325(b)(4)(B) allows only when unsecured claims are paid in full.',
+    ],
+    problems: [],
+  };
+
+  const NO_PLAN = {
+    ...CALCULATION,
+    planPresent: false,
+    funding: {
+      termMonths: 60,
+      termSource: 'the applicable commitment period, B122C-1 line 21',
+      basePayment: null,
+      baseSource: null,
+      schedule: [],
+      lumpSums: [],
+      total: '0.00',
+    },
+    trusteePercentage: null,
+    classes: [CALCULATION.classes[2]],
+    unsecured: { ...CALCULATION.unsecured, target: '24000.00' },
+    feasibility: {
+      ...CALCULATION.feasibility,
+      feasible: null,
+      reasons: [],
+      scheduleJExcess: null,
+      exceedsScheduleJ: null,
+    },
+    bestInterests: { ...CALCULATION.bestInterests, passes: null, planPercentage: null },
+    problems: ['There is no plan yet: choose a monthly payment.'],
+  };
+
+  test('the plan enums mirror core/plans.py and the calculator', () => {
+    expect(PLAN_PAYMENT_SOURCES).toEqual(['fixed', 'schedule_j_excess', 'disposable_income']);
+    expect(SECURED_TREATMENTS).toEqual(['cure_and_maintain', 'cramdown', 'surrender']);
+    expect(UNSECURED_TREATMENTS).toEqual(['pot', 'percentage', 'amount']);
+    expect(PLAN_CLASSES).toEqual([
+      'trustee',
+      'ongoing_payments',
+      'secured',
+      'attorney_fees',
+      'priority',
+      'general_unsecured',
+    ]);
+  });
+
+  test('GETs /v1/cases/{id}/plan-calculation and decodes every figure', async () => {
+    const stub = stubFetch(() => jsonResponse(CALCULATION, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const calculation = await client.getCasePlanCalculation(ENTITY_CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/plan-calculation`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(calculation).toEqual(CALCULATION);
+  });
+
+  test('a case with no plan decodes its nulls and its problems', async () => {
+    const stub = stubFetch(() => jsonResponse(NO_PLAN, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const calculation = await client.getCasePlanCalculation(ENTITY_CASE_ID);
+
+    expect(calculation.planPresent).toBe(false);
+    expect(calculation.feasibility.feasible).toBeNull();
+    expect(calculation.feasibility.scheduleJExcess).toBeNull();
+    expect(calculation.bestInterests.passes).toBeNull();
+    expect(calculation.liquidation.percentage).toBe('14.38');
+  });
+
+  test('an unknown class key is a contract violation, not a cast', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ ...CALCULATION, classes: [{ ...CALCULATION.classes[0], key: 'bonus' }] }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.getCasePlanCalculation(ENTITY_CASE_ID)).rejects.toThrow();
+  });
+
+  test('POSTs scenarios with absent members omitted, and decodes them in order', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          scenarios: [
+            { label: '$600 a month', calculation: CALCULATION },
+            { label: null, calculation: NO_PLAN },
+          ],
+        },
+        200,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const scenarios = await client.calculatePlanScenarios(ENTITY_CASE_ID, [
+      {
+        label: '$600 a month',
+        plan: {
+          term_months: 2,
+          monthly_payment: '600',
+          unsecured_percentage: undefined,
+          secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+        },
+      },
+      { plan: {} },
+    ]);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${ENTITY_CASE_ID}/plan-calculation`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      scenarios: [
+        {
+          label: '$600 a month',
+          plan: {
+            term_months: 2,
+            monthly_payment: '600',
+            secured_treatments: [{ id: 't-auto', claim_id: 'claim-auto', treatment: 'cramdown' }],
+          },
+        },
+        { plan: {} },
+      ],
+    });
+    expect(scenarios.map((s) => s.label)).toEqual(['$600 a month', null]);
+    expect(scenarios[0]?.calculation).toEqual(CALCULATION);
+  });
+
+  test("a malformed scenario's 400 names its path", async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: {
+            'scenarios[0].plan.term_months':
+              'A plan runs 1 to 60 months — § 1322(d) caps it at five years.',
+          },
+        },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = asApiValidationException(
+      await rejection(
+        client.calculatePlanScenarios(ENTITY_CASE_ID, [{ plan: { term_months: 84 } }]),
+      ),
+    );
+
+    expect(Object.keys(error.fields)).toEqual(['scenarios[0].plan.term_months']);
   });
 });
 

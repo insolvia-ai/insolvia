@@ -11,6 +11,7 @@ import {
   MARITAL_FILING_STATUSES,
   MEANS_TEST_FORMS,
   MEANS_TEST_OUTCOMES,
+  PLAN_CLASSES,
   PRESUMPTION_EXEMPTIONS,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
@@ -73,6 +74,14 @@ import type {
   MeansTestChapter13,
   MeansTestLine,
   MedianComparison,
+  LiquidationAsset,
+  PlanCalculation,
+  PlanClass,
+  PlanPayoutRow,
+  PlanPoolClaim,
+  PlanScenario,
+  PlanScenarioRequest,
+  SourcedAmount,
   PresumptionExemption,
   CreateCaseRequest,
   CreateDocumentRequest,
@@ -1203,6 +1212,56 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return caseMeansTestFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/plan-calculation` — the stored Chapter 13 plan's
+   * figures (issue 16.2 / #366): the waterfall by class and payee,
+   * feasibility, and the § 1325(a)(4) liquidation test, every figure naming
+   * the claim, plan field or rule it came from. The plan itself is the
+   * `plans` collection ({@link addCaseEntity} / {@link putCaseEntity}).
+   *
+   * Always resolves to 200 on a reachable case; read
+   * {@link PlanCalculation.problems} for what is still missing. A 404 means
+   * the case is unknown *or* not the caller's.
+   */
+  async getCasePlanCalculation(caseId: string): Promise<PlanCalculation> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/plan-calculation`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return planCalculationFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/plan-calculation` — unsaved alternatives, each
+   * calculated against the same case, in the order sent (at most five).
+   * Writes nothing: adopting one is an ordinary confirmed write of its
+   * body to `plans`. A malformed scenario is a 400 whose field paths read
+   * `scenarios[<n>].plan.<field>`.
+   */
+  async calculatePlanScenarios(
+    caseId: string,
+    scenarios: readonly PlanScenarioRequest[],
+  ): Promise<readonly PlanScenario[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/plan-calculation`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarios: scenarios.map((scenario) => ({
+            ...(scenario.label === undefined ? {} : { label: scenario.label }),
+            plan: caseEntityRequestToJson(scenario.plan),
+          })),
+        }),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'scenarios', 'PlanScenario', planScenarioFromJson);
   }
 
   /**
@@ -3636,6 +3695,158 @@ function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
     lines: requireArrayOf(response, 'lines', 'MeansTestLine', meansTestLineFromJson),
     chapter13: chapter13 === null ? null : meansTestChapter13FromJson(chapter13),
     problems: requireStringArray(response, 'problems'),
+  };
+}
+
+// --- the Chapter 13 plan calculator (issue #366) -------------------------------
+// `plan_calculation_json` in services/api/src/insolvia_api/core/chapter13_plan.py
+// is the shape; money and rates are STRINGS, the `caseTotalsFromJson` reason.
+
+function planPayoutRowFromJson(response: DecodedResponse): PlanPayoutRow {
+  return {
+    key: requireString(response, 'key'),
+    label: requireString(response, 'label'),
+    claimId: requireNullableString(response, 'claimId'),
+    treatment: requireNullableString(response, 'treatment'),
+    allowed: requireString(response, 'allowed'),
+    monthlyPayment: requireNullableString(response, 'monthlyPayment'),
+    rate: requireNullableString(response, 'rate'),
+    principal: requireString(response, 'principal'),
+    interest: requireString(response, 'interest'),
+    payout: requireString(response, 'payout'),
+    firstMonth: requireNullableNumber(response, 'firstMonth'),
+    lastMonth: requireNullableNumber(response, 'lastMonth'),
+    monthsPaid: requireNumber(response, 'monthsPaid'),
+    unpaid: requireString(response, 'unpaid'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function planClassFromJson(response: DecodedResponse): PlanClass {
+  return {
+    key: requireChoice(response, 'key', PLAN_CLASSES),
+    label: requireString(response, 'label'),
+    allowed: requireString(response, 'allowed'),
+    principal: requireString(response, 'principal'),
+    interest: requireString(response, 'interest'),
+    payout: requireString(response, 'payout'),
+    unpaid: requireString(response, 'unpaid'),
+    firstMonth: requireNullableNumber(response, 'firstMonth'),
+    lastMonth: requireNullableNumber(response, 'lastMonth'),
+    rows: requireArrayOf(response, 'rows', 'PlanPayoutRow', planPayoutRowFromJson),
+  };
+}
+
+function planPoolClaimFromJson(response: DecodedResponse): PlanPoolClaim {
+  return {
+    claimId: requireString(response, 'claimId'),
+    label: requireString(response, 'label'),
+    amount: requireString(response, 'amount'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function sourcedAmountFromJson(response: DecodedResponse): SourcedAmount {
+  return {
+    amount: requireString(response, 'amount'),
+    source: requireString(response, 'source'),
+  };
+}
+
+function liquidationAssetFromJson(response: DecodedResponse): LiquidationAsset {
+  return {
+    assetId: requireString(response, 'assetId'),
+    description: requireNullableString(response, 'description'),
+    value: requireString(response, 'value'),
+    liens: requireString(response, 'liens'),
+    exempt: requireString(response, 'exempt'),
+    unexempt: requireString(response, 'unexempt'),
+  };
+}
+
+function planCalculationFromJson(response: DecodedResponse): PlanCalculation {
+  const commitment = childObject(response, 'commitmentPeriod');
+  const funding = childObject(response, 'funding');
+  const unsecured = childObject(response, 'unsecured');
+  const feasibility = childObject(response, 'feasibility');
+  const excess = nullableObject(feasibility, 'scheduleJExcess');
+  const liquidation = childObject(response, 'liquidation');
+  const best = childObject(response, 'bestInterests');
+  return {
+    planPresent: requireBoolean(response, 'planPresent'),
+    chapter: requireNumber(response, 'chapter'),
+    commitmentPeriod: {
+      months: requireNullableNumber(commitment, 'months'),
+      source: requireNullableString(commitment, 'source'),
+    },
+    funding: {
+      termMonths: requireNullableNumber(funding, 'termMonths'),
+      termSource: requireNullableString(funding, 'termSource'),
+      basePayment: requireNullableString(funding, 'basePayment'),
+      baseSource: requireNullableString(funding, 'baseSource'),
+      schedule: requireArrayOf(funding, 'schedule', 'PlanScheduledPayment', (row) => ({
+        month: requireNumber(row, 'month'),
+        payment: requireString(row, 'payment'),
+      })),
+      lumpSums: requireArrayOf(funding, 'lumpSums', 'PlanReceivedLumpSum', (row) => ({
+        month: requireNumber(row, 'month'),
+        amount: requireString(row, 'amount'),
+        description: requireNullableString(row, 'description'),
+      })),
+      total: requireString(funding, 'total'),
+    },
+    trusteePercentage: requireNullableString(response, 'trusteePercentage'),
+    classes: requireArrayOf(response, 'classes', 'PlanClass', planClassFromJson),
+    unsecured: {
+      pool: requireArrayOf(unsecured, 'pool', 'PlanPoolClaim', planPoolClaimFromJson),
+      poolTotal: requireString(unsecured, 'poolTotal'),
+      target: requireNullableString(unsecured, 'target'),
+      targetSource: requireNullableString(unsecured, 'targetSource'),
+      percentage: requireNullableString(unsecured, 'percentage'),
+    },
+    feasibility: {
+      feasible: requireNullableBoolean(feasibility, 'feasible'),
+      totalFunding: requireString(feasibility, 'totalFunding'),
+      totalDistributed: requireString(feasibility, 'totalDistributed'),
+      surplus: requireString(feasibility, 'surplus'),
+      shortfall: requireString(feasibility, 'shortfall'),
+      reasons: requireStringArray(feasibility, 'reasons'),
+      scheduleJExcess: excess === null ? null : sourcedAmountFromJson(excess),
+      exceedsScheduleJ: requireNullableBoolean(feasibility, 'exceedsScheduleJ'),
+    },
+    liquidation: {
+      assets: requireArrayOf(liquidation, 'assets', 'LiquidationAsset', liquidationAssetFromJson),
+      propertyTotal: requireString(liquidation, 'propertyTotal'),
+      liensTotal: requireString(liquidation, 'liensTotal'),
+      exemptionsTotal: requireString(liquidation, 'exemptionsTotal'),
+      unexemptTotal: requireString(liquidation, 'unexemptTotal'),
+      trusteeCommission: requireString(liquidation, 'trusteeCommission'),
+      trusteeCommissionRule: requireString(liquidation, 'trusteeCommissionRule'),
+      otherCosts: requireString(liquidation, 'otherCosts'),
+      otherCostsSource: requireString(liquidation, 'otherCostsSource'),
+      priorityTotal: requireString(liquidation, 'priorityTotal'),
+      available: requireString(liquidation, 'available'),
+      pool: requireArrayOf(liquidation, 'pool', 'PlanPoolClaim', planPoolClaimFromJson),
+      poolTotal: requireString(liquidation, 'poolTotal'),
+      percentage: requireNullableString(liquidation, 'percentage'),
+    },
+    bestInterests: {
+      planPercentage: requireNullableString(best, 'planPercentage'),
+      liquidationPercentage: requireNullableString(best, 'liquidationPercentage'),
+      planUnsecuredValue: requireString(best, 'planUnsecuredValue'),
+      presentValueRate: requireNullableString(best, 'presentValueRate'),
+      passes: requireNullableBoolean(best, 'passes'),
+      rule: requireString(best, 'rule'),
+    },
+    warnings: requireStringArray(response, 'warnings'),
+    problems: requireStringArray(response, 'problems'),
+  };
+}
+
+function planScenarioFromJson(response: DecodedResponse): PlanScenario {
+  return {
+    label: requireNullableString(response, 'label'),
+    calculation: planCalculationFromJson(childObject(response, 'calculation')),
   };
 }
 

@@ -112,6 +112,41 @@ export {
   SOFA_ENTRY_TYPES,
   WHICH_HOUSEHOLDS,
 } from './models.ts';
+// The Chapter 13 plan (issue 16.2 / #366): the pickers' options, and the
+// calculator's class order.
+export {
+  PLAN_CLASSES,
+  PLAN_PAYMENT_SOURCES,
+  SECURED_TREATMENTS,
+  UNSECURED_TREATMENTS,
+} from './models.ts';
+export type {
+  LiquidationAsset,
+  Percentage,
+  PlanBestInterests,
+  PlanBody,
+  PlanCalculation,
+  PlanClass,
+  PlanClassKey,
+  PlanCommitmentPeriod,
+  PlanFeasibility,
+  PlanFunding,
+  PlanLiquidation,
+  PlanLumpSum,
+  PlanPaymentSource,
+  PlanPayoutRow,
+  PlanPoolClaim,
+  PlanReceivedLumpSum,
+  PlanScenario,
+  PlanScenarioRequest,
+  PlanScheduledPayment,
+  PlanSecuredTreatment,
+  PlanStepPayment,
+  PlanUnsecured,
+  SecuredTreatmentKind,
+  SourcedAmount,
+  UnsecuredTreatment,
+} from './models.ts';
 export type {
   AssetBody,
   AssetCategory,
