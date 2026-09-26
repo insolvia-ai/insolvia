@@ -47,6 +47,7 @@ Shorter-lived planning decisions live as `D<n>` entries in [`plan.md`](plan.md).
 |---|---|
 | [`business-plan.html`](business/business-plan.html) | What we're building and why. |
 | [`regulatory-source-register.html`](business/regulatory-source-register.html) | Authoritative regulatory source per feature, with its refresh cadence. |
+| [`switching-cost-and-import.html`](business/switching-cost-and-import.html) | What a firm switching to Insolvia can bring from its existing bankruptcy software: per-vendor export capabilities, three candidate import paths, and a recommendation to sequence a real importer after the client portal (issue 17.4). |
 
 ## Not in `docs/`
 
