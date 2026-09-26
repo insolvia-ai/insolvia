@@ -211,6 +211,9 @@ def build_means_test_case(case_file: CaseFile) -> MeansTestCase:
             for dependent in case_file.dependents
             if dependent.age is not None and dependent.age < 18
         ),
+        # The case's chapter selects the calculation (issue #365): § 707(b)
+        # and B122A-2 for Chapter 7, § 1325(b) and B122C-1/C-2 for 13.
+        chapter=case_file.case.chapter,
     )
 
 
@@ -350,6 +353,13 @@ def _caption_and_signatures(values: FieldValues, case_file: CaseFile) -> None:
 def project_b122a2_0425(release: FormRelease, case_file: CaseFile) -> FieldValues:
     """The values for form/b122a2@2025-04-01, from one case's facts."""
     problems: list[str] = []
+    if case_file.case.chapter != 7:
+        raise FormProjectionError(
+            [
+                f"Form 122A-2 is the Chapter 7 means test — this is a Chapter "
+                f"{case_file.case.chapter} case"
+            ]
+        )
     test = build_means_test_case(case_file)
     problems.extend(test.cmi.problems)
     if problems:

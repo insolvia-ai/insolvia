@@ -194,13 +194,17 @@ def _marital_status(
         values["marital_filing_status"] = Option("Not married")
 
 
-def _column(
+def fill_cmi_column(
     release: FormRelease,
     values: FieldValues,
     column: CmiColumn,
     index: int,
     problems: list[str],
 ) -> None:
+    """One column of the CMI statement's lines 2-11, landed on the spec's
+    per-column fields — exported because B122C-1 (issue #365) prints the
+    same lines under the same field ids, and the "$0 on a filled column's
+    silent lines" reading must be one reading."""
     filled: set[str] = set()
 
     def put(field_id: str, amount: str) -> None:
@@ -298,7 +302,9 @@ def _determination(
         values["caption.presumption_box"] = Option("No Abuse")
 
 
-def _signatures(values: FieldValues, case_file: CaseFile) -> None:
+def fill_signature_dates(values: FieldValues, case_file: CaseFile) -> None:
+    """The two signature-date boxes, from `debtor.signed_at` — shared with
+    the Chapter 13 pair, whose specs use the same field ids."""
     for role, field_id in (
         ("debtor_1", "debtor1_signature_date"),
         ("debtor_2", "debtor2_signature_date"),
@@ -308,7 +314,8 @@ def _signatures(values: FieldValues, case_file: CaseFile) -> None:
             values[field_id] = Text(format_date(debtor.signed_at[:10]))
 
 
-def _caption(values: FieldValues, case_file: CaseFile) -> None:
+def fill_caption(values: FieldValues, case_file: CaseFile) -> None:
+    """The two names and the district — shared with the Chapter 13 pair."""
     debtor1 = case_file.debtor("debtor_1")
     debtor2 = case_file.debtor("debtor_2")
     if debtor1 is not None and (name := full_name(debtor1.name)):
@@ -324,7 +331,7 @@ def project_b122a1_1219(release: FormRelease, case_file: CaseFile) -> FieldValue
     values: FieldValues = {}
     problems: list[str] = []
 
-    _caption(values, case_file)
+    fill_caption(values, case_file)
     _marital_status(case_file, values, problems)
 
     cmi = compute_cmi(case_file)
@@ -334,12 +341,12 @@ def project_b122a1_1219(release: FormRelease, case_file: CaseFile) -> FieldValue
     for index, key in enumerate(("A", "B")):
         column = columns.get(key)
         if column is not None:
-            _column(release, values, column, index, problems)
+            fill_cmi_column(release, values, column, index, problems)
     if cmi.columns:
         values["total_cmi"] = Text(format_money(cmi.combined_monthly_total))
         _determination(release, values, case_file, cmi, problems)
 
-    _signatures(values, case_file)
+    fill_signature_dates(values, case_file)
 
     if problems:
         raise FormProjectionError(problems)
