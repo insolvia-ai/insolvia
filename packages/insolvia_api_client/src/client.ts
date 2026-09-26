@@ -22,6 +22,7 @@ import {
   formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
+  listMyTasksQuery,
   noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
@@ -112,6 +113,7 @@ import type {
   CalendarWindowOptions,
   ListCasesOptions,
   ListCasesResult,
+  ListMyTasksOptions,
   LocalStandardsFigures,
   NationalStandardsFigures,
   Note,
@@ -1911,18 +1913,23 @@ export class InsolviaApiClient {
   }
 
   /**
-   * `GET /v1/me/tasks` — every task assigned to the caller, across every
-   * case in their firm they can reach, sorted soonest-due-first (undated
-   * tasks last).
+   * `GET /v1/me/tasks` — every task across every case in the caller's firm
+   * they can reach, sorted soonest-due-first (undated tasks last).
    *
-   * **Never leaks a task from a case outside the caller's reach** — the
-   * server walks the same reachable-case listing `listCases` uses
-   * (`api/routes/tasks.py`'s module docstring owns the argument), so this is
-   * safe to call before the caller has opened any particular case.
+   * `options.scope` (default `'mine'`) narrows to tasks assigned to the
+   * caller; `'firm'` is the dashboard's firm-wide toggle — see
+   * {@link ListMyTasksOptions}.
+   *
+   * **Never leaks a task from a case outside the caller's reach, in either
+   * scope** — the server walks the same reachable-case listing `listCases`
+   * uses (`api/routes/tasks.py`'s module docstring owns the argument), so
+   * this is safe to call before the caller has opened any particular case.
    */
-  async listMyTasks(): Promise<readonly Task[]> {
+  async listMyTasks(options: ListMyTasksOptions = {}): Promise<readonly Task[]> {
     const headers = await this.#protectedHeaders();
-    const response = await this.#fetch(`${this.#baseUrl}/v1/me/tasks`, {
+    const query = listMyTasksQuery(options).toString();
+    const url = `${this.#baseUrl}/v1/me/tasks${query === '' ? '' : `?${query}`}`;
+    const response = await this.#fetch(url, {
       method: 'GET',
       headers,
     });

@@ -174,7 +174,11 @@ describe('the account screen', () => {
   });
 
   it('is reachable from the shell’s account menu', async () => {
-    signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/');
+    // `/cases` rather than `/`: the account menu sits in the shell every
+    // route shares, and `/cases` needs no firm-scoped reads of its own to
+    // settle (unlike the dashboard's several cards), so there is nothing left
+    // in flight to race the navigation this test performs.
+    signedIn({ '/v1/me': () => jsonResponse(200, membership()) }, undefined, '/cases');
 
     const user = userEvent.setup();
     await user.press(await screen.findByRole('button', { name: 'Account menu' }));

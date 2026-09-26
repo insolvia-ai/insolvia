@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -120,17 +120,14 @@ describe('the shell navigation', () => {
   });
 
   it('shows no entry to somebody in no firm at all', async () => {
-    const fetchMock = signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
+    signedIn({ '/v1/me': () => jsonResponse(200, me(null)) });
     // No membership means no membership-derived UI to wait on — the avatar
     // falls back to the email's initials, which render before the request even
-    // starts. So the settle is the request itself: `waitFor` retries across
-    // microtasks, so the state update that follows the response has flushed by
-    // the time the assertion below runs.
-    await waitFor(() => {
-      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
-        1,
-      );
-    });
+    // starts. So the settle is `/`'s own RequireFirm explanation, which can
+    // only appear once its independent `/v1/me` call — a second caller of the
+    // same endpoint alongside MeProvider's, since the dashboard (issue 14.7 /
+    // #359) needs a firm too — has resolved.
+    await screen.findByRole('heading', { name: 'You are not in a firm yet' });
     await screen.findByRole('button', { name: 'Account menu' });
 
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();

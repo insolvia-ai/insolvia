@@ -221,9 +221,19 @@ def delete_task_route(case_id: str, task_id: str) -> ResponseReturnValue:
 @require_auth
 @requires(TASKS, VIEW_ONLY)
 def list_my_tasks_route() -> ResponseReturnValue:
-    """Every open-or-not task assigned to the caller, across every case in
-    their firm they can reach — the module docstring explains why this walks
+    """Every open-or-not task across every case in the caller's firm they
+    can reach — the module docstring explains why this walks
     `CaseStore.list_for_accessor` rather than a cross-case store query.
+
+    `?scope=mine` (the default) keeps only tasks assigned to the caller —
+    the worklist `GET /my-tasks` and the dashboard's "assigned to me" view
+    read. `?scope=firm` drops that filter and returns every task on every
+    reachable case — the dashboard's firm-wide toggle (issue 14.7 / #359).
+    Neither value widens WHICH CASES are read: `scope=firm` is not
+    `access_all_cases` by another name, it is the same reachable-case walk
+    with one fewer filter applied afterwards, so a linked-only user's
+    "firm-wide" view is still bounded by ADR 0009, exactly as `scope=mine`
+    is.
 
     Sorted by due date (soonest first, undated tasks last), tie-broken by
     creation order — a worklist reads soonest-due-first; a plain per-case
@@ -232,6 +242,10 @@ def list_my_tasks_route() -> ResponseReturnValue:
     """
     case_store, task_store, _, _ = _stores()
     accessor = current_accessor()
+
+    scope = request.args.get("scope") or "mine"
+    if scope not in ("mine", "firm"):
+        raise ValidationError("scope must be 'mine' or 'firm'")
 
     reachable_case_ids: list[str] = []
     cursor: str | None = None
@@ -245,11 +259,11 @@ def list_my_tasks_route() -> ResponseReturnValue:
             break
 
     today = datetime.now(UTC).date()
-    mine = [
+    tasks = [
         task
         for case_id in reachable_case_ids
         for task in task_store.list_for_case(case_id)
-        if task.assignee_subject == accessor.subject
+        if scope == "firm" or task.assignee_subject == accessor.subject
     ]
-    mine.sort(key=lambda t: (t.due_date is None, t.due_date or "", t.created_at, t.id))
-    return jsonify({"tasks": [task_json(t, today=today) for t in mine]}), 200
+    tasks.sort(key=lambda t: (t.due_date is None, t.due_date or "", t.created_at, t.id))
+    return jsonify({"tasks": [task_json(t, today=today) for t in tasks]}), 200

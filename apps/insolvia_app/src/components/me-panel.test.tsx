@@ -75,7 +75,12 @@ describe('the API session panel', () => {
       scriptFetch({ token: [() => tokenEndpointResponse()], me: [() => principalResponse()] }),
     );
 
-    renderRouter('src/app', { initialUrl: '/' });
+    // `/cases` rather than `/`: it needs a session but not a firm
+    // (`RequireSession` only, no `RequireFirm`), so `MeProvider` is the ONLY
+    // caller of `/v1/me` here. `/` now also composes `RequireFirm` for the
+    // dashboard (issue 14.7 / #359), whose own independent `client.me()`
+    // call would double every count this file asserts on.
+    renderRouter('src/app', { initialUrl: '/cases' });
 
     await waitFor(() => {
       expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
@@ -103,7 +108,7 @@ describe('the API session panel', () => {
       }),
     );
 
-    renderRouter('src/app', { initialUrl: '/' });
+    renderRouter('src/app', { initialUrl: '/cases' });
 
     await waitFor(() => {
       expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(
@@ -132,7 +137,7 @@ describe('the API session panel', () => {
       }),
     );
 
-    renderRouter('src/app', { initialUrl: '/' });
+    renderRouter('src/app', { initialUrl: '/cases' });
 
     await waitFor(() => {
       expect(readRefreshToken()).toBeNull();
@@ -156,7 +161,7 @@ describe('the API session panel', () => {
       }),
     );
 
-    renderRouter('src/app', { initialUrl: '/' });
+    renderRouter('src/app', { initialUrl: '/cases' });
 
     await waitFor(() => {
       expect(browser.navigations.at(-1) ?? '').toContain('/logout?');
@@ -175,7 +180,7 @@ describe('the API session panel', () => {
     );
 
     const fetchMock = globalThis.fetch as unknown as jest.Mock;
-    renderRouter('src/app', { initialUrl: '/' });
+    renderRouter('src/app', { initialUrl: '/cases' });
 
     await waitFor(() => {
       expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/v1/me'))).toHaveLength(

@@ -100,7 +100,11 @@ describe('completing sign-in at /auth/callback', () => {
       initialUrl: '/auth/callback?code=test-code&state=test-state',
     });
 
-    expect(await screen.findByRole('heading', { name: 'Your case workspace' })).toBeTruthy();
+    // `principalResponse()` carries no firm, so the landing page beyond it is
+    // RequireFirm's own explanation — the dashboard itself needs a firm to
+    // render anything. Either way, this proves the exchange landed at `/`
+    // inside the branded shell rather than leaving the callback page up.
+    expect(await screen.findByRole('heading', { name: 'You are not in a firm yet' })).toBeTruthy();
     expect(router.getPathname()).toBe('/');
     // Branded chrome, not a bare page.
     expect(screen.getByText('Insolvia.')).toBeTruthy();

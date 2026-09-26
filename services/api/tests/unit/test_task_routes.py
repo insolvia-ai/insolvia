@@ -532,6 +532,37 @@ def test_assigned_to_me_reaches_a_task_once_the_case_is_linked(client, case_stor
     assert subjects == {"Now reachable"}
 
 
+def test_scope_firm_includes_tasks_assigned_to_a_colleague(client, firm_store):
+    """`scope=firm` is the dashboard's firm-wide view (issue 14.7 / #359):
+    every task on a reachable case, not only the caller's own."""
+    case_id = open_case(client, ALICE)
+    add_task(client, case_id, body={"subject": "Alice's", "assigneeSubject": ALICE})
+    add_task(client, case_id, body={"subject": "Bob's", "assigneeSubject": BOB})
+
+    mine = client.get("/v1/me/tasks", headers=auth(ALICE))
+    firm = client.get("/v1/me/tasks?scope=firm", headers=auth(ALICE))
+
+    assert {t["subject"] for t in mine.get_json()["tasks"]} == {"Alice's"}
+    assert {t["subject"] for t in firm.get_json()["tasks"]} == {"Alice's", "Bob's"}
+
+
+def test_scope_firm_still_respects_reachability(client):
+    """`scope=firm` drops the assignee filter, not the case-reachability
+    rule — a colleague not linked to the case must still see nothing."""
+    case_id = open_case(client, ALICE)
+    add_task(client, case_id, body={"subject": "Unreachable", "assigneeSubject": ALICE})
+
+    response = client.get("/v1/me/tasks?scope=firm", headers=auth(BOB))
+    assert response.status_code == 200
+    assert response.get_json()["tasks"] == []
+
+
+def test_scope_must_be_mine_or_firm(client):
+    open_case(client, ALICE)
+    response = client.get("/v1/me/tasks?scope=whatever", headers=auth(ALICE))
+    assert response.status_code == 400
+
+
 def test_assigned_to_me_sorts_by_due_date_then_undated_last(client):
     case_id = open_case(client, ALICE)
     add_task(
