@@ -78,7 +78,12 @@ unaddressable.
 case {
   id, firm_id, created_by
   chapter: 7 | 11 | 12 | 13
-  district, status: intake | ready_to_file | filed, filed_at
+  district, status: intake | ready_to_file | filed
+  filed_at, meeting_341_at            // form dates: the petition (the order for relief in a
+                                       // voluntary case) and the FIRST date set for the §341
+                                       // meeting — the anchors the deadline engine counts from
+                                       // (issue 14.6 / #358); the rest of the post-filing
+                                       // lifecycle is #355
   exemption_set: state_and_federal_nonbankruptcy | federal   // 106C line 1
   is_amended, ch13_supplement_date                           // the header box on every form
   form_revisions: { <form>: <revision> }
@@ -667,7 +672,7 @@ quietly comes to mean "can see everything"; collapsing `is_admin` into
 able to change everyone's permissions.
 
 The feature list is ours — `cases`, `intake`, `documents`,
-`extraction_review`, `creditor_library`, `firm_administration` — and the
+`extraction_review`, `creditor_library`, `events`, `firm_administration` — and the
 default for anything not in a user's map is `hidden`. That is what lets a
 feature be listed before it exists (`extraction_review` is) without arriving
 already granted to every row written before it was named.

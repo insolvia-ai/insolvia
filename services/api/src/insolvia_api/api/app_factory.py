@@ -16,6 +16,7 @@ from insolvia_core.errors import (
 from werkzeug.exceptions import HTTPException
 
 from insolvia_api.api.dependencies import ApiDependencies
+from insolvia_api.api.routes.calendar import blueprint as calendar_blueprint
 from insolvia_api.api.routes.case_entities import blueprint as case_entities_blueprint
 from insolvia_api.api.routes.case_summary import blueprint as case_summary_blueprint
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
@@ -24,6 +25,7 @@ from insolvia_api.api.routes.creditor_matrix import (
 )
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
+from insolvia_api.api.routes.events import blueprint as events_blueprint
 from insolvia_api.api.routes.exemption_analysis import (
     blueprint as exemption_analysis_blueprint,
 )
@@ -97,6 +99,12 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(forms_hub_blueprint)
     # /v1/cases/<id>/extraction/... — same static-segment argument (8.9).
     app.register_blueprint(extraction_review_blueprint)
+    # /v1/cases/<id>/events and /v1/firm/events (issue 14.6 / #358) — static
+    # segments under both namespaces, so /events beats /<collection>.
+    app.register_blueprint(events_blueprint)
+    # /v1/calendar and /v1/me/calendar.ics — the latter is the one route
+    # that authenticates by feed token; its module argues why.
+    app.register_blueprint(calendar_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

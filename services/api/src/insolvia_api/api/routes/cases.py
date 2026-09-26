@@ -23,6 +23,7 @@ from insolvia_core.ports import AccessLog, CaseStore, FirmStore
 
 from insolvia_api.api.auth import current_accessor, require_auth, requires
 from insolvia_api.api.dependencies import dependencies
+from insolvia_api.api.routes.events import regenerate_deadlines
 from insolvia_api.core.exemption_analysis import election_refusal, resolution_date
 
 logger = logging.getLogger(__name__)
@@ -246,6 +247,13 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
     )
     if updated is None:
         raise NotFoundError("case not found")
+
+    # The deadline engine's hook (issue 14.6 / #358): a filed date, a § 341
+    # date or a chapter change rewrites the case's generated events. After
+    # the case write, so a regeneration that fails leaves the case correct
+    # and the calendar a request behind, never the reverse.
+    if changes.touches_deadline_anchors:
+        regenerate_deadlines(updated, actor=accessor.subject)
 
     logger.info("case updated", extra={"case_id": updated.id})
     return jsonify(case_json(updated)), 200

@@ -13,6 +13,8 @@ import {
   PRESUMPTION_EXEMPTIONS,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
+  calendarEventDraftToJson,
+  calendarWindowQuery,
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
@@ -98,6 +100,11 @@ import type {
   JobStatus,
   LibraryCreditor,
   LibraryCreditorDraft,
+  CalendarEvent,
+  CalendarEventDraft,
+  CalendarFeedToken,
+  CalendarWindow,
+  CalendarWindowOptions,
   ListCasesOptions,
   ListCasesResult,
   LocalStandardsFigures,
@@ -1533,6 +1540,193 @@ export class InsolviaApiClient {
     await expectNoContent(response, 204);
   }
 
+  // -------------------------------------------------------------------------
+  // Events, the calendar and the feed (issue 14.6 / #358).
+  // -------------------------------------------------------------------------
+
+  /** `/v1/cases/{caseId}/events[/{id}]` or `/v1/firm/events[/{id}]`, encoded once. */
+  #eventsUrl(caseId: string | null, eventId?: string): string {
+    const base =
+      caseId === null
+        ? `${this.#baseUrl}/v1/firm/events`
+        : `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/events`;
+    return eventId === undefined ? base : `${base}/${encodeURIComponent(eventId)}`;
+  }
+
+  async #listEvents(caseId: string | null): Promise<readonly CalendarEvent[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'events', 'CalendarEvent', calendarEventFromJson);
+  }
+
+  async #addEvent(caseId: string | null, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(calendarEventDraftToJson(draft)),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 201));
+  }
+
+  async #updateEvent(
+    caseId: string | null,
+    eventId: string,
+    draft: CalendarEventDraft,
+  ): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(calendarEventDraftToJson(draft)),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 200));
+  }
+
+  async #dismissEvent(
+    caseId: string | null,
+    eventId: string,
+    dismissed: boolean,
+  ): Promise<CalendarEvent> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dismissed }),
+    });
+    return calendarEventFromJson(await decodeExpected(response, 200));
+  }
+
+  async #removeEvent(caseId: string | null, eventId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#eventsUrl(caseId, eventId), {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/events` — a case's events, hand-made and
+   * generated, dismissed included, in start order. Gated by `events`
+   * (`view_only`); a 404 means the case is unknown or not the caller's.
+   */
+  async listCaseEvents(caseId: string): Promise<readonly CalendarEvent[]> {
+    return this.#listEvents(caseId);
+  }
+
+  /** `POST /v1/cases/{caseId}/events` — add a hand-made event to a case. */
+  async addCaseEvent(caseId: string, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#addEvent(caseId, draft);
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/events/{id}` — replace a hand-made event whole.
+   * A generated deadline answers 400: change the case's dates instead.
+   */
+  async updateCaseEvent(
+    caseId: string,
+    eventId: string,
+    draft: CalendarEventDraft,
+  ): Promise<CalendarEvent> {
+    return this.#updateEvent(caseId, eventId, draft);
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/events/{id}` with `{"dismissed"}` — the one
+   * edit a generated deadline admits ("filed with the petition"), and it
+   * survives regeneration. Works on a hand-made event too.
+   */
+  async dismissCaseEvent(
+    caseId: string,
+    eventId: string,
+    dismissed: boolean,
+  ): Promise<CalendarEvent> {
+    return this.#dismissEvent(caseId, eventId, dismissed);
+  }
+
+  /** `DELETE /v1/cases/{caseId}/events/{id}` — a hand-made event only; a generated one is 400. */
+  async removeCaseEvent(caseId: string, eventId: string): Promise<void> {
+    return this.#removeEvent(caseId, eventId);
+  }
+
+  /** `GET /v1/firm/events` — the firm's own, case-less events (office events). */
+  async listFirmEvents(): Promise<readonly CalendarEvent[]> {
+    return this.#listEvents(null);
+  }
+
+  /** `POST /v1/firm/events` */
+  async addFirmEvent(draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#addEvent(null, draft);
+  }
+
+  /** `PUT /v1/firm/events/{id}` */
+  async updateFirmEvent(eventId: string, draft: CalendarEventDraft): Promise<CalendarEvent> {
+    return this.#updateEvent(null, eventId, draft);
+  }
+
+  /** `PATCH /v1/firm/events/{id}` with `{"dismissed"}`. */
+  async dismissFirmEvent(eventId: string, dismissed: boolean): Promise<CalendarEvent> {
+    return this.#dismissEvent(null, eventId, dismissed);
+  }
+
+  /** `DELETE /v1/firm/events/{id}` */
+  async removeFirmEvent(eventId: string): Promise<void> {
+    return this.#removeEvent(null, eventId);
+  }
+
+  /**
+   * `GET /v1/calendar?from=&to=[&attendee=][&case_id=]` — every event the
+   * caller may see that overlaps the window: the firm's own events plus
+   * those on cases the caller can open. The server applies the case access
+   * rule; a `caseId` the caller cannot see answers empty, never 404.
+   */
+  async getCalendar(options: CalendarWindowOptions): Promise<CalendarWindow> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/calendar?${calendarWindowQuery(options).toString()}`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return {
+      from: requireString(decoded, 'from'),
+      to: requireString(decoded, 'to'),
+      events: requireArrayOf(decoded, 'events', 'CalendarEvent', calendarEventFromJson),
+    };
+  }
+
+  /**
+   * `POST /v1/me/calendar-token` — mint (or rotate) the caller's ICS feed
+   * token. The token is returned ONCE; `feedUrl` is the absolute address a
+   * calendar application subscribes to, and the only way to read it again
+   * is to mint a new one, which retires this one.
+   */
+  async mintCalendarToken(): Promise<CalendarFeedToken> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/calendar-token`, {
+      method: 'POST',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 201);
+    const feedPath = requireString(decoded, 'feedPath');
+    return {
+      token: requireString(decoded, 'token'),
+      feedPath,
+      feedUrl: `${this.#baseUrl}${feedPath}`,
+    };
+  }
+
+  /** `DELETE /v1/me/calendar-token` — revoke the feed; 404 when there is none. */
+  async revokeCalendarToken(): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/calendar-token`, {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
   /** `/v1/cases/{caseId}/assignees/{subject}`, each segment encoded once. */
   #assigneeUrl(caseId: string, subject: string): string {
     return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/assignees/${encodeURIComponent(subject)}`;
@@ -1958,6 +2152,9 @@ function caseFromJson(response: DecodedResponse): Case {
   const constantsSetId = optionalString(response, 'constantsSetId');
   // Likewise absent until the 106C election is made (issue #346).
   const exemptionSet = optionalExemptionSet(response, 'exemptionSet');
+  // The deadline anchors (issue 14.6 / #358): absent until recorded.
+  const filedAt = optionalString(response, 'filedAt');
+  const meeting341At = optionalString(response, 'meeting341At');
   return {
     id: requireString(response, 'id'),
     createdBy: requireString(response, 'createdBy'),
@@ -1969,6 +2166,29 @@ function caseFromJson(response: DecodedResponse): Case {
     ...(formRevisions === undefined ? {} : { formRevisions }),
     ...(constantsSetId === undefined ? {} : { constantsSetId }),
     ...(exemptionSet === undefined ? {} : { exemptionSet }),
+    ...(filedAt === undefined ? {} : { filedAt }),
+    ...(meeting341At === undefined ? {} : { meeting341At }),
+  };
+}
+
+function calendarEventFromJson(response: DecodedResponse): CalendarEvent {
+  return {
+    id: requireString(response, 'id'),
+    case_id: optionalString(response, 'case_id'),
+    title: requireString(response, 'title'),
+    description: optionalString(response, 'description'),
+    start: requireString(response, 'start'),
+    end: requireString(response, 'end'),
+    all_day: requireBoolean(response, 'all_day'),
+    location: optionalString(response, 'location'),
+    attendees: requireStringArray(response, 'attendees'),
+    generated: requireBoolean(response, 'generated'),
+    rule_id: optionalString(response, 'rule_id'),
+    rule_citation: optionalString(response, 'rule_citation'),
+    dismissed: requireBoolean(response, 'dismissed'),
+    created_by: requireString(response, 'created_by'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
   };
 }
 
@@ -3280,6 +3500,7 @@ const FIRM_FEATURES = [
   'extraction_review',
   'creditor_library',
   'notes',
+  'events',
   'firm_administration',
 ] as const;
 

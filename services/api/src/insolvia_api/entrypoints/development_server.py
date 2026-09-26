@@ -38,10 +38,18 @@ from insolvia_core.ports import (
     UserDirectory,
 )
 
+from insolvia_api.adapters.aws.event_store import (
+    DynamoDbCalendarTokenStore,
+    DynamoDbEventStore,
+)
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
+from insolvia_api.adapters.memory.event_store import (
+    MemoryCalendarTokenStore,
+    MemoryEventStore,
+)
 from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
@@ -52,6 +60,8 @@ from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.ports import (
+    CalendarTokenStore,
+    EventStore,
     JobQueue,
     JobStore,
     PacketStore,
@@ -201,6 +211,18 @@ if config.case_table_name and config.case_access_log_table_name:
 else:
     candidate_store = MemoryCandidateStore()
 
+# Events, deadlines and the feed token (issue 14.6 / #358): the case table
+# again, so a developer's calendar rides this machine's real dev table and
+# the bare server keeps everything in memory.
+event_store: EventStore
+calendar_token_store: CalendarTokenStore
+if config.case_table_name and config.case_access_log_table_name:
+    event_store = DynamoDbEventStore(config.case_table_name)
+    calendar_token_store = DynamoDbCalendarTokenStore(config.case_table_name)
+else:
+    event_store = MemoryEventStore()
+    calendar_token_store = MemoryCalendarTokenStore()
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -237,5 +259,7 @@ app = create_app(
         job_queue=job_queue,
         packet_store=packet_store,
         candidate_store=candidate_store,
+        event_store=event_store,
+        calendar_token_store=calendar_token_store,
     )
 )

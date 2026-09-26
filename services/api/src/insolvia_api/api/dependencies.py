@@ -21,6 +21,8 @@ from insolvia_core.ports import (
 
 from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
+    CalendarTokenStore,
+    EventStore,
     JobQueue,
     JobStore,
     Mailer,
@@ -105,6 +107,12 @@ class ApiDependencies:
     # the extraction worker and the MCP service, read and resolved by the
     # extraction-review routes.
     candidate_store: CandidateStore | None = None
+    # Events and the calendar (issue 14.6 / #358): both rows live in the case
+    # table — the "nothing to provision" argument yet again — and the token
+    # store is separate from the event store only because it is a different
+    # secret with a different lifetime, not a different table.
+    event_store: EventStore | None = None
+    calendar_token_store: CalendarTokenStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

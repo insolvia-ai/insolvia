@@ -87,6 +87,7 @@ export type FirmFeature =
   | 'extraction_review'
   | 'creditor_library'
   | 'notes'
+  | 'events'
   | 'firm_administration';
 
 /**
@@ -620,6 +621,19 @@ export interface Case {
    * {@link ExemptionAnalysis.election.effective} is what was actually used.
    */
   readonly exemptionSet?: ExemptionSet;
+  /**
+   * The petition date — the order for relief in a voluntary case — as a
+   * form date, `YYYY-MM-DD` (issue 14.6 / #358). **Absent until recorded**
+   * through {@link UpdateCaseChanges.filedAt}; setting it is what populates
+   * the case's generated deadlines.
+   */
+  readonly filedAt?: string;
+  /**
+   * The FIRST date the court set for the § 341(a) meeting of creditors, as a
+   * form date. Absent until recorded; the 60-day objection windows and the
+   * rest of the meeting-anchored deadlines count from it.
+   */
+  readonly meeting341At?: string;
 }
 
 /** The `POST /v1/cases` request body: `{"chapter", "district"}`, both required. */
@@ -700,11 +714,21 @@ export interface UpdateCaseChanges {
    * state has opted out of the federal list.
    */
   readonly exemptionSet?: ExemptionSet | undefined;
+  /**
+   * The petition date (`filed_at` on the wire), or `null` to CLEAR it — the
+   * one place this request sends a null on purpose, because a date entered
+   * by mistake has to be removable and removing it takes the generated
+   * deadlines with it. Omit to leave it unchanged.
+   */
+  readonly filedAt?: string | null | undefined;
+  /** The first § 341 date (`meeting_341_at`), `null` to clear, omit to keep. */
+  readonly meeting341At?: string | null | undefined;
 }
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body, with absent optional fields
- * omitted from the JSON entirely — never sent as `null`.
+ * omitted from the JSON entirely — never sent as `null`, except the two
+ * deadline anchors, where an explicit `null` means "clear".
  */
 export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<string, unknown> {
   const json: Record<string, unknown> = {};
@@ -723,7 +747,122 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.exemptionSet !== undefined) {
     json.exemption_set = changes.exemptionSet;
   }
+  if (changes.filedAt !== undefined) {
+    json.filed_at = changes.filedAt;
+  }
+  if (changes.meeting341At !== undefined) {
+    json.meeting_341_at = changes.meeting341At;
+  }
   return json;
+}
+
+// ---------------------------------------------------------------------------
+// Events, the calendar and the feed — mirrors
+// services/api/src/insolvia_api/core/events.py (`event_json`),
+// api/routes/events.py and api/routes/calendar.py (issue 14.6 / #358).
+// SNAKE_CASE on the wire, like every case-domain body.
+// ---------------------------------------------------------------------------
+
+/**
+ * One calendar event — a case's (`case_id` present) or the firm's own.
+ *
+ * `all_day` decides how `start`/`end` read: form dates (`YYYY-MM-DD`, `end`
+ * INCLUSIVE) when true, RFC 3339 UTC instants (`...Z`) when false.
+ *
+ * `generated` events were written by the deadline engine from the case's
+ * filed and § 341 dates and name their rule (`rule_id`, `rule_citation`).
+ * They cannot be edited or deleted — only DISMISSED, which is what
+ * {@link InsolviaApiClient.dismissCaseEvent} does — and a dismissal survives
+ * regeneration.
+ */
+export interface CalendarEvent {
+  readonly id: string;
+  readonly case_id?: string | undefined;
+  readonly title: string;
+  readonly description?: string | undefined;
+  readonly start: string;
+  readonly end: string;
+  readonly all_day: boolean;
+  readonly location?: string | undefined;
+  /** Firm-user subjects — resolve them through the directory. */
+  readonly attendees: readonly string[];
+  readonly generated: boolean;
+  readonly rule_id?: string | undefined;
+  readonly rule_citation?: string | undefined;
+  readonly dismissed: boolean;
+  readonly created_by: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The `POST`/`PUT` body for a hand-made event — a WHOLE record, never a
+ * partial PATCH, for the same reason {@link LibraryCreditorDraft} is one.
+ *
+ * `start` alone is enough: a bare date makes an all-day event ending the
+ * same day; an instant makes a timed one ending an hour later. `all_day`
+ * only needs stating when `start`'s shape would guess wrong.
+ */
+export interface CalendarEventDraft {
+  readonly title: string;
+  readonly start: string;
+  readonly end?: string | undefined;
+  readonly all_day?: boolean | undefined;
+  readonly description?: string | undefined;
+  readonly location?: string | undefined;
+  readonly attendees?: readonly string[] | undefined;
+}
+
+export function calendarEventDraftToJson(draft: CalendarEventDraft): Record<string, unknown> {
+  return assignDefined(
+    { title: draft.title, start: draft.start },
+    {
+      end: draft.end,
+      all_day: draft.all_day,
+      description: draft.description,
+      location: draft.location,
+      attendees: draft.attendees === undefined ? undefined : [...draft.attendees],
+    },
+  );
+}
+
+/** `GET /v1/calendar`'s query: a window, and two optional narrowings. */
+export interface CalendarWindowOptions {
+  /** Inclusive, `YYYY-MM-DD`. */
+  readonly from: string;
+  /** Inclusive, `YYYY-MM-DD`. At most 400 days after `from`. */
+  readonly to: string;
+  /** A firm-user subject, or `'me'` for the caller. */
+  readonly attendee?: string | undefined;
+  /** One case. A case the caller cannot see answers empty, not 404. */
+  readonly caseId?: string | undefined;
+}
+
+export function calendarWindowQuery(options: CalendarWindowOptions): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set('from', options.from);
+  params.set('to', options.to);
+  if (options.attendee !== undefined) params.set('attendee', options.attendee);
+  if (options.caseId !== undefined) params.set('case_id', options.caseId);
+  return params;
+}
+
+/** The `GET /v1/calendar` 200 body: the window echoed, and its events in start order. */
+export interface CalendarWindow {
+  readonly from: string;
+  readonly to: string;
+  readonly events: readonly CalendarEvent[];
+}
+
+/**
+ * `POST /v1/me/calendar-token`'s 201 body: the feed token, returned ONCE —
+ * only its hash is stored — and the path a calendar application subscribes
+ * to. {@link InsolviaApiClient.mintCalendarToken} adds the absolute `feedUrl`.
+ */
+export interface CalendarFeedToken {
+  readonly token: string;
+  readonly feedPath: string;
+  readonly feedUrl: string;
 }
 
 // ---------------------------------------------------------------------------

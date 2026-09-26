@@ -11,6 +11,7 @@ import { Heading } from '@/components/heading';
 import { NotesPanel } from '@/components/notes-panel';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
+import { EventsPanel } from './events-panel';
 import { filingStages, stagesComplete } from './stages';
 import type { Stage, StageState } from './stages';
 
@@ -300,6 +301,9 @@ export function CaseOverview() {
           <Section title="Notes" meta={`${notes.length} on this case`}>
             <NotesPanel caseId={caseId} notes={notes} onChanged={() => void loadNotes()} />
           </Section>
+
+          {/* ── Events and deadlines (issue 14.6 / #358) ───────────────── */}
+          <EventsPanel colleagues={colleagues} />
         </View>
 
         {/* ── At a glance ─────────────────────────────────────────────── */}

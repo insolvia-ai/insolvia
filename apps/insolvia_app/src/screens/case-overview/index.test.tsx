@@ -130,6 +130,7 @@ function caseReads(
     [`/v1/cases/${CASE_ID}/packets`]: () => jsonResponse(200, { packets: [] }),
     [`/v1/cases/${CASE_ID}/assignees`]: () => jsonResponse(200, { assignees: [] }),
     [`/v1/cases/${CASE_ID}/extraction/candidates`]: () => jsonResponse(200, { candidates: [] }),
+    [`/v1/cases/${CASE_ID}/events`]: () => jsonResponse(200, { events: [] }),
     [`/v1/cases/${CASE_ID}/summary`]: () => jsonResponse(200, summaryBody()),
     ...over,
   };

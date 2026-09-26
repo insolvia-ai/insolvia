@@ -97,6 +97,18 @@ class Case:
     # not one is stored, which the analysis and the B106C projection both
     # apply on read rather than writing a value nobody chose.
     exemption_set: str | None = None
+    # THE TWO POST-FILING DATES the deadline engine counts from (issue 14.6 /
+    # #358), as form dates — `YYYY-MM-DD`, no time, no zone — because each is
+    # a calendar fact the court's docket states, not an instant this server
+    # observed. `filed_at` is the petition date, which in a voluntary case IS
+    # the order for relief (§ 301(b)); `meeting_341_at` is the FIRST date the
+    # court set for the § 341(a) meeting, the anchor Rules 4004(a), 4007(c)
+    # and 1007(c) count from — a continued meeting does not move it. Both are
+    # None until somebody records them, and the smallest addition that lets
+    # a deadline exist at all; the rest of the post-filing lifecycle (#355)
+    # arrives on its own.
+    filed_at: str | None = None
+    meeting_341_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +152,29 @@ class CaseChanges:
     district: str | None = None
     status: str | None = None
     exemption_set: str | None = None
+    # The two dates are the one place "None means unchanged" is not enough:
+    # a filed date entered by mistake has to be removable, and a removed
+    # anchor has to take its generated deadlines with it. So a PATCH sends
+    # explicit JSON `null` to clear one, which the parser records as the
+    # matching `clear_*` flag — two facts, two fields, no sentinel object
+    # for mypy to squint at.
+    filed_at: str | None = None
+    meeting_341_at: str | None = None
+    clear_filed_at: bool = False
+    clear_meeting_341_at: bool = False
+
+    @property
+    def touches_deadline_anchors(self) -> bool:
+        """Whether applying this changes anything the deadline engine reads —
+        a date, a cleared date, or the chapter (the rule table is keyed by
+        it). The case route regenerates on exactly this."""
+        return (
+            self.filed_at is not None
+            or self.meeting_341_at is not None
+            or self.clear_filed_at
+            or self.clear_meeting_341_at
+            or self.chapter is not None
+        )
 
 
 @dataclass(frozen=True)
@@ -211,6 +246,25 @@ def _parse_exemption_set(value: object, errors: dict[str, str]) -> str | None:
     return value
 
 
+def _parse_form_date(value: object, field: str, errors: dict[str, str]) -> str | None:
+    """`YYYY-MM-DD`, parsed rather than pattern-matched — the same rule
+    `fields.form_date` applies to every schedule date, restated here because
+    this module predates that helper and imports nothing from it."""
+    if not isinstance(value, str) or not value.strip():
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    stripped = value.strip()
+    try:
+        parsed = datetime.strptime(stripped, "%Y-%m-%d")
+    except ValueError:
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    if parsed.strftime("%Y-%m-%d") != stripped:
+        errors[field] = "Must be a date in YYYY-MM-DD form."
+        return None
+    return stripped
+
+
 def parse_case_creation(payload: Mapping[str, object]) -> CaseDraft:
     """Validate POST /v1/cases. Unknown keys are ignored.
 
@@ -255,6 +309,32 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
         exemption_set = _parse_exemption_set(payload["exemption_set"], errors)
         if exemption_set is not None:
             changes["exemption_set"] = exemption_set
+    # The two deadline anchors: a date sets, an explicit null clears. Absent
+    # means unchanged, like every other key here.
+    dates: dict[str, str] = {}
+    for field, clear_flag in (
+        ("filed_at", "clear_filed_at"),
+        ("meeting_341_at", "clear_meeting_341_at"),
+    ):
+        if field not in payload:
+            continue
+        if payload[field] is None:
+            changes[clear_flag] = True
+            continue
+        parsed_date = _parse_form_date(payload[field], field, errors)
+        if parsed_date is not None:
+            dates[field] = parsed_date
+            changes[field] = parsed_date
+    # Only checkable when both arrive together; against a stored date it is
+    # the route's read-modify-write that knows both, and a meeting before
+    # the petition there is a data-entry slip the deadline engine tolerates
+    # (it counts from whatever the case says) rather than a refused save.
+    if (
+        "filed_at" in dates
+        and "meeting_341_at" in dates
+        and dates["meeting_341_at"] < dates["filed_at"]
+    ):
+        errors["meeting_341_at"] = "The § 341 meeting cannot precede the petition."
 
     if errors:
         raise FieldValidationError(errors)
@@ -316,16 +396,22 @@ def assign_case(case: Case, *, subject: str, assigned_by: str) -> CaseAssignment
 
 def apply_changes(case: Case, changes: CaseChanges) -> Case:
     """A new Case with the supplied changes applied and updated_at refreshed."""
-    updates = {
+    updates: dict[str, object] = {
         field: value
         for field, value in (
             ("chapter", changes.chapter),
             ("district", changes.district),
             ("status", changes.status),
             ("exemption_set", changes.exemption_set),
+            ("filed_at", changes.filed_at),
+            ("meeting_341_at", changes.meeting_341_at),
         )
         if value is not None
     }
+    if changes.clear_filed_at:
+        updates["filed_at"] = None
+    if changes.clear_meeting_341_at:
+        updates["meeting_341_at"] = None
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
@@ -410,6 +496,10 @@ def case_item(case: Case) -> dict[str, object]:
         item["constantsSetId"] = case.constants_set_id
     if case.exemption_set is not None:
         item["exemptionSet"] = case.exemption_set
+    if case.filed_at is not None:
+        item["filedAt"] = case.filed_at
+    if case.meeting_341_at is not None:
+        item["meeting341At"] = case.meeting_341_at
     return item
 
 
@@ -434,6 +524,8 @@ def case_from_item(item: Mapping[str, object]) -> Case:
         )
         raw_constants = item.get("constantsSetId")
         raw_exemption_set = item.get("exemptionSet")
+        raw_filed_at = item.get("filedAt")
+        raw_meeting_341_at = item.get("meeting341At")
         chapter = item["chapter"]
         if not isinstance(chapter, (int, str)):
             raise ValueError(f"chapter is {chapter!r}")
@@ -450,6 +542,10 @@ def case_from_item(item: Mapping[str, object]) -> Case:
             constants_set_id=str(raw_constants) if raw_constants is not None else None,
             exemption_set=(
                 str(raw_exemption_set) if raw_exemption_set is not None else None
+            ),
+            filed_at=str(raw_filed_at) if raw_filed_at is not None else None,
+            meeting_341_at=(
+                str(raw_meeting_341_at) if raw_meeting_341_at is not None else None
             ),
         )
     except (KeyError, ValueError) as error:
@@ -536,6 +632,13 @@ def case_json(case: Case) -> dict[str, object]:
     # `exemption_set` is the one writer (issue #346).
     if case.exemption_set is not None:
         body["exemptionSet"] = case.exemption_set
+    # The deadline anchors (issue 14.6 / #358): absent until recorded, and
+    # `PATCH /v1/cases/<id>` with `filed_at` / `meeting_341_at` (a date, or
+    # null to clear) is the one writer.
+    if case.filed_at is not None:
+        body["filedAt"] = case.filed_at
+    if case.meeting_341_at is not None:
+        body["meeting341At"] = case.meeting_341_at
     return body
 
 

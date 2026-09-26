@@ -1,0 +1,32 @@
+{
+  "holidays": [
+    {"holiday_id": "new-years-day", "name": "New Year's Day", "rule": {"month": 1, "day": 1}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "mlk-birthday", "name": "Birthday of Martin Luther King, Jr.", "rule": {"month": 1, "weekday": "monday", "ordinal": 3}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "washingtons-birthday", "name": "Washington's Birthday", "rule": {"month": 2, "weekday": "monday", "ordinal": 3}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "memorial-day", "name": "Memorial Day", "rule": {"month": 5, "weekday": "monday", "ordinal": "last"}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "juneteenth", "name": "Juneteenth National Independence Day", "rule": {"month": 6, "day": 19}, "citation": "5 U.S.C. § 6103(a), as amended by Pub. L. 117-17 (June 17, 2021)"},
+    {"holiday_id": "independence-day", "name": "Independence Day", "rule": {"month": 7, "day": 4}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "labor-day", "name": "Labor Day", "rule": {"month": 9, "weekday": "monday", "ordinal": 1}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "columbus-day", "name": "Columbus Day", "rule": {"month": 10, "weekday": "monday", "ordinal": 2}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "veterans-day", "name": "Veterans Day", "rule": {"month": 11, "day": 11}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "thanksgiving-day", "name": "Thanksgiving Day", "rule": {"month": 11, "weekday": "thursday", "ordinal": 4}, "citation": "5 U.S.C. § 6103(a)"},
+    {"holiday_id": "christmas-day", "name": "Christmas Day", "rule": {"month": 12, "day": 25}, "citation": "5 U.S.C. § 6103(a)"}
+  ],
+  "observance": {
+    "saturday": {
+      "shift": "friday_before",
+      "citation": "5 U.S.C. § 6103(b)(1)",
+      "text": "Instead of a holiday that occurs on a Saturday, the Friday immediately before is a legal public holiday for employees whose basic workweek is Monday through Friday."
+    },
+    "sunday": {
+      "shift": "monday_after",
+      "citation": "Exec. Order No. 11582 § 3(a), 36 Fed. Reg. 2957 (Feb. 11, 1971)",
+      "text": "Any employee whose basic workweek does not include Sunday and who would ordinarily be excused from work on a holiday falling within his basic workweek shall be excused from work on the next workday of his basic workweek whenever a holiday falls on Sunday."
+    }
+  },
+  "sources": [
+    {"title": "5 U.S.C. § 6103 — Holidays (Cornell LII)", "url": "https://www.law.cornell.edu/uscode/text/5/6103", "accessed": "2026-09-24"},
+    {"title": "Fed. R. Bankr. P. 9006(a)(6) — 'legal holiday' (Cornell LII)", "url": "https://www.law.cornell.edu/rules/frbp/rule_9006", "accessed": "2026-09-24"},
+    {"title": "Executive Order 11582 — Observance of holidays by Government agencies (National Archives)", "url": "https://www.archives.gov/federal-register/codification/executive-order/11582.html", "accessed": "2026-09-24"}
+  ]
+}

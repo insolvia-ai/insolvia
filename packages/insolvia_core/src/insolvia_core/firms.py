@@ -93,6 +93,13 @@ CREDITOR_LIBRARY: Final = "creditor_library"
 # staff to see the schedule intake without seeing what colleagues have
 # scribbled about it, or the reverse.
 NOTES: Final = "notes"
+# Events and deadlines (issue 14.6 / #358): case-scoped and firm-scoped
+# calendar entries, the deadlines generated from a case's filed and § 341
+# dates, and the per-user ICS feed. Its own feature rather than a facet of
+# CASES because a calendar is read by people who never touch a schedule —
+# and because the generated deadlines are the one thing here a firm may
+# want everybody to SEE and only the case team to change.
+EVENTS: Final = "events"
 FEATURES: Final = (
     CASES,
     INTAKE,
@@ -100,6 +107,7 @@ FEATURES: Final = (
     EXTRACTION_REVIEW,
     CREDITOR_LIBRARY,
     NOTES,
+    EVENTS,
     FIRM_ADMINISTRATION,
 )
 
@@ -291,6 +299,9 @@ def default_permissions(role: str) -> dict[str, str]:
             # default grantee, so this stays HIDDEN until an admin opts them
             # in, the same way EXTRACTION_REVIEW arrived above.
             NOTES: HIDDEN,
+            # Staff see the calendar — a deadline is exactly what they chase
+            # documents against — but the case team owns what is on it.
+            EVENTS: VIEW_ONLY,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -302,6 +313,7 @@ def default_permissions(role: str) -> dict[str, str]:
         # ATTORNEY AND PARALEGAL, same as every feature in this branch (see
         # the docstring above) — both do case work, and a note is part of it.
         NOTES: ADD_EDIT,
+        EVENTS: ADD_EDIT,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two
