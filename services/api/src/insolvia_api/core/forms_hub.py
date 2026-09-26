@@ -39,6 +39,7 @@ from .form_fill import FormFillError, fill_form
 from .form_overlay import (
     DEFAULT_OUTPUT_OPTIONS,
     OutputOptions,
+    apply_amendment_options,
     apply_output_stamps,
     apply_signature_options,
 )
@@ -48,7 +49,9 @@ from .form_templates import FormRelease, get_form, resolve_form
 from .packet_assembly import (
     CaseData,
     PacketProblem,
+    amendment_render_series,
     completeness_problems,
+    filtered_for_render,
     packet_form_series,
     to_case_file,
 )
@@ -92,7 +95,9 @@ FORM_PROBLEM_SOURCES: Final[dict[str, tuple[str, ...]]] = {
 _UNIVERSAL_SOURCES: Final = ("case", "debtors")
 
 
-def group_problems(data: CaseData) -> dict[str, tuple[PacketProblem, ...]]:
+def group_problems(
+    data: CaseData, *, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS
+) -> dict[str, tuple[PacketProblem, ...]]:
     """Every `completeness_problems` entry, grouped by the form series it
     belongs to — one dict entry per form this case files (`packet_form_series`),
     in that same order. A problem whose source feeds more than one form (a
@@ -101,11 +106,13 @@ def group_problems(data: CaseData) -> dict[str, tuple[PacketProblem, ...]]:
 
     This is the ONE grouping both the hub listing and the single-form preview
     read, so the two features can never disagree about which problems block
-    which form.
+    which form. `options` is passed straight to `completeness_problems` —
+    it reads only `amended_only`, which lifts the filed-case refusal for an
+    amendment preview (issue #370); the listing passes nothing.
     """
     series_ids = packet_form_series(data)
     by_form: dict[str, list[PacketProblem]] = {series: [] for series in series_ids}
-    for problem in completeness_problems(data):
+    for problem in completeness_problems(data, options=options):
         if problem.source in _UNIVERSAL_SOURCES:
             targets: tuple[str, ...] = series_ids
         else:
@@ -282,28 +289,54 @@ def render_form_preview(
     unfiled-by-this-case `series_id` into a 404 by checking
     `packet_form_series` itself — this function assumes it is one of them.
     """
-    problems = list(group_problems(data).get(series_id, ()))
+    problems = list(group_problems(data, options=options).get(series_id, ()))
     if problems:
         return tuple(problems)
 
     case_file = to_case_file(data)
+    # An amendment preview (issue #370) shows the form exactly as the
+    # amendedOnly packet would print it — or refuses, with the packet's own
+    # reason, when the packet would leave this form out.
+    render_case_file = case_file
+    if options.amended_only:
+        if series_id not in amendment_render_series(data, packet_form_series(data)):
+            return (
+                PacketProblem(
+                    source=series_id,
+                    item_id=None,
+                    field="",
+                    message="This form is not part of an amendment: no item it"
+                    " prints is marked amended.",
+                ),
+            )
+        render_case_file = to_case_file(filtered_for_render(data, series_id))
     try:
-        release = resolve_case_form(data.case, series_id, as_of=as_of)
+        # An amendment prints on the revision in force TODAY, never the
+        # original filing's pin — exactly what `assemble` resolves for it.
+        release = (
+            resolve_form(series_id, as_of)
+            if options.amended_only
+            else resolve_case_form(data.case, series_id, as_of=as_of)
+        )
     except LookupError as error:
         return (
             PacketProblem(source=series_id, item_id=None, field="", message=str(error)),
         )
 
     try:
-        values = project(release, case_file)
+        values = project(release, render_case_file)
     except FormProjectionError as error:
         return tuple(
             PacketProblem(source=series_id, item_id=None, field="", message=message)
             for message in error.problems
         )
 
-    signed_values = apply_signature_options(
-        release, values, case_file=case_file, options=options, today=as_of
+    signed_values = apply_amendment_options(
+        release,
+        apply_signature_options(
+            release, values, case_file=case_file, options=options, today=as_of
+        ),
+        amended=options.amended_only,
     )
     try:
         rendered = fill_form(release, signed_values)

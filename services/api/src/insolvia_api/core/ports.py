@@ -86,7 +86,12 @@ class PacketStore(Protocol):
     """
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         """Store the packet record AND the pinned case, atomically — both or
         neither, exactly as CaseStore.create pairs the case with its
@@ -96,10 +101,21 @@ class PacketStore(Protocol):
 
         The case write is conditional on the stored `updatedAt` still being
         `expected_updated_at` (the value the worker READ before assembling)
-        and on the status not being `filed`. False means the condition failed
-        — the case was edited, filed, or deleted mid-assembly — and the
-        caller must treat the packet as describing a case that no longer
-        exists; nothing was written.
+        and, unless `allow_filed`, on the status not being `filed`. False
+        means the condition failed — the case was edited, filed, or deleted
+        mid-assembly — and the caller must treat the packet as describing a
+        case that no longer exists; nothing was written.
+
+        `allow_filed` (issue #370) is the ONE exception to "a filed case
+        never re-resolves": an amendedOnly packet. Its caller
+        (`packet_assembly.run_packet_assembly`) passes the case UNCHANGED as
+        `pinned_case` in that mode — never `pin_case`'s output — so the case
+        write is a no-op overwrite of what is already stored (same
+        `form_revisions`, same `constants_set_id`, same `updated_at`), never
+        a rewrite of the ORIGINAL filing's pins. The packet's OWN
+        `form_revisions`/`constants_set_id` still record what THIS amendment
+        run resolved — that is what makes each packet self-describing
+        regardless of what the case's pins say.
 
         The packet put itself refuses to overwrite an existing (case, id),
         the id-minting rule every sibling create states.

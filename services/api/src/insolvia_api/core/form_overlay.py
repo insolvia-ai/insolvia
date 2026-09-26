@@ -40,18 +40,17 @@ produce the same bytes for the same case data and the same clock reading.
 from __future__ import annotations
 
 import io
-import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Literal, get_args
+from typing import Final, Literal, get_args
 
 from insolvia_core.errors import FieldValidationError
-from pypdf import PageObject, PdfReader, PdfWriter
-from pypdf.generic import DictionaryObject, NameObject, StreamObject
+from pypdf import PdfReader, PdfWriter
 
-from .form_fill import FieldFill, FieldValues, Text
+from . import pdf_draw
+from .form_fill import Check, FieldFill, FieldValues, Option, Text
 from .form_projections.shared import CaseFile, format_date, full_name
 from .form_templates import FieldSpec, FormRelease
 
@@ -71,6 +70,19 @@ class OutputOptions:
     route already uses in its URL segment. `None` means every form the case
     files; only packet assembly reads it (the preview already names its one
     form in the URL), and it is refused there — see `parse_output_options`.
+
+    `amended_only` (issue #370) renders an AMENDMENT: only the schedules
+    carrying at least one item flagged `amended` (`core/case_entities.py`'s
+    generic attribute), each such schedule printing only its amended items
+    and its own "amended filing" caption ticked, B106Sum and B106Dec
+    re-rendered alongside them, and a generated amendment cover sheet added
+    to the packet — never an official court form (see
+    `core/amendment_cover_sheet.py`). It is the one option that changes what
+    a FILED case's packet assembly is allowed to do at all
+    (`packet_assembly.completeness_problems`): a plain re-assembly of a filed
+    case still refuses, because a filed case's original packet is pinned to
+    the data that produced it, but an amendment run is exactly the "case
+    already filed" state doing its job.
     """
 
     draft_watermark: bool = False
@@ -78,6 +90,7 @@ class OutputOptions:
     signature_pages: SignaturePagesMode = "all"
     sign_electronically: bool = False
     forms: tuple[str, ...] | None = None
+    amended_only: bool = False
 
     @property
     def is_default(self) -> bool:
@@ -101,6 +114,7 @@ def output_options_json(options: OutputOptions) -> dict[str, object]:
         "printDate": options.print_date,
         "signaturePages": options.signature_pages,
         "signElectronically": options.sign_electronically,
+        "amendedOnly": options.amended_only,
     }
     if options.forms is not None:
         body["forms"] = list(options.forms)
@@ -136,6 +150,7 @@ def parse_output_options(raw: object, *, allow_forms: bool) -> OutputOptions:
         "signaturePages",
         "signElectronically",
         "forms",
+        "amendedOnly",
     }
     unknown = sorted(set(raw) - known)
     if unknown:
@@ -151,6 +166,7 @@ def parse_output_options(raw: object, *, allow_forms: bool) -> OutputOptions:
     draft_watermark = _bool("draftWatermark")
     print_date = _bool("printDate")
     sign_electronically = _bool("signElectronically")
+    amended_only = _bool("amendedOnly")
 
     signature_pages_raw = raw.get("signaturePages", "all")
     if signature_pages_raw not in SIGNATURE_PAGES_MODES:
@@ -179,6 +195,14 @@ def parse_output_options(raw: object, *, allow_forms: bool) -> OutputOptions:
     elif not allow_forms and "forms" in raw:
         errors["forms"] = "this endpoint already names one form; omit it."
 
+    if amended_only and forms is not None:
+        # Both narrow WHICH forms render, by different rules that can name
+        # different sets — "amendedOnly" would then have two contradictory
+        # answers for "which forms". Refused rather than one silently
+        # winning, the same "loud beats a guess" the unknown-forms-subset
+        # check in `packet_assembly.assemble` already follows.
+        errors["amendedOnly"] = "cannot be combined with an explicit forms subset."
+
     if errors:
         raise FieldValidationError(errors)
 
@@ -188,6 +212,7 @@ def parse_output_options(raw: object, *, allow_forms: bool) -> OutputOptions:
         signature_pages=signature_pages,
         sign_electronically=sign_electronically,
         forms=forms,
+        amended_only=amended_only,
     )
 
 
@@ -205,7 +230,7 @@ def parse_output_options_query(args: Mapping[str, str]) -> OutputOptions:
         return args[key].strip().lower() not in ("", "0", "false")
 
     raw: dict[str, object] = {}
-    for key in ("draftWatermark", "printDate", "signElectronically"):
+    for key in ("draftWatermark", "printDate", "signElectronically", "amendedOnly"):
         value = _query_bool(key)
         if value is not None:
             raw[key] = value
@@ -304,6 +329,69 @@ def apply_signature_options(
     return augmented
 
 
+# ── Amendments (issue #370): the "amended filing" caption ───────────────────
+# Also a real field value, applied before fill_form — same reason as
+# apply_signature_options: this is an AcroForm checkbox/radio, not a mark
+# with no field to land in.
+
+# The two spellings this set's specs use for the caption
+# (forms/specs/*.json): a plain checkbox on most schedules, and a two-way
+# radio (amended vs. a Chapter 13 postpetition supplement) on 106I/J/J-2. Both
+# map to `case.is_amended` in the spec today — a case-wide fact the
+# projections deliberately leave blank ("no case.is_amended yet", see
+# form_projections/__init__.py) because nothing has filled it. That blank is
+# exactly the seam this function uses: it does not touch a value the
+# projections set, it fills a caption they have never filled, only when an
+# amendedOnly render (`packet_assembly.assemble`) has decided THIS release's
+# schedule carries an amended item.
+_AMENDED_CAPTION_FIELD_IDS: Final = (
+    "caption.amended_filing",
+    "caption.amended_or_supplement",
+)
+
+
+def apply_amendment_options(
+    release: FormRelease, values: FieldValues, *, amended: bool
+) -> FieldValues:
+    """Tick this release's own "amended filing" caption — a no-op, returning
+    `values` itself, when `amended` is False (the plain filing set's caption
+    stays exactly the blank box it always was) or when this release has
+    neither spelling of the caption at all (B101, B121, B108, B2010, B2030,
+    B122A-1/2 print no per-schedule amended box; case-wide `is_amended`, not
+    this feature, is their concern).
+
+    The caller decides `amended` per release — `packet_assembly.assemble`
+    ticks it for a schedule with an amended item and unconditionally for
+    B106Sum/B106Dec whenever any schedule is amended, per issue #370's
+    done-when.
+    """
+    if not amended:
+        return values
+    field_ids = {field.id for field in release.fields}
+    field_id = next(
+        (fid for fid in _AMENDED_CAPTION_FIELD_IDS if fid in field_ids), None
+    )
+    if field_id is None:
+        return values
+
+    spec = release.field(field_id)
+    augmented = dict(values)
+    if spec.type == "radio":
+        # The "an amended filing" branch, not the Chapter 13 postpetition
+        # supplement branch — selected by the spec's own annotation rather
+        # than by position, so a revision that reorders the two options still
+        # picks the right one.
+        amended_value = next(
+            option.value
+            for option in spec.options
+            if option.maps_to_value == "case.is_amended"
+        )
+        augmented[field_id] = Option(amended_value)
+    else:
+        augmented[field_id] = Check()
+    return augmented
+
+
 # ── Page selection ──────────────────────────────────────────────────────────
 
 
@@ -347,73 +435,16 @@ def select_pages(
 
 
 # ── Stamps: "Draft" watermark, top-margin date/time ─────────────────────────
-# Raw content-stream drawing with a standard-14 font (Helvetica — no
-# embedding, every PDF reader carries it), pypdf's own primitives.
+# Raw content-stream drawing with a standard-14 font — pdf_draw.py's shared
+# primitives, extracted from here when core/amendment_cover_sheet.py (issue
+# #370) became a second caller.
 
-_OVERLAY_FONT_RESOURCE = "/InsolviaOverlay"
 _WATERMARK_TEXT = "DRAFT"
 _WATERMARK_GRAY = 0.75
 _WATERMARK_ROTATE_DEGREES = 45.0
 _STAMP_GRAY = 0.25
 _STAMP_FONT_SIZE = 8.0
 _STAMP_MARGIN_POINTS = 24.0
-
-
-def _pdf_escape(text: str) -> str:
-    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
-
-
-def _text_ops(
-    text: str, *, x: float, y: float, size: float, rotate_degrees: float, gray: float
-) -> bytes:
-    radians = math.radians(rotate_degrees)
-    a, b = math.cos(radians), math.sin(radians)
-    c, d = -math.sin(radians), math.cos(radians)
-    ops = (
-        "q\n"
-        f"{a:.6f} {b:.6f} {c:.6f} {d:.6f} {x:.2f} {y:.2f} cm\n"
-        f"{gray:.2f} g\n"
-        "BT\n"
-        f"{_OVERLAY_FONT_RESOURCE} {size:.1f} Tf\n"
-        "0 0 Td\n"
-        f"({_pdf_escape(text)}) Tj\n"
-        "ET\n"
-        "Q\n"
-    )
-    return ops.encode("latin-1")
-
-
-def _add_helvetica(writer: PdfWriter) -> object:
-    font = DictionaryObject(
-        {
-            NameObject("/Type"): NameObject("/Font"),
-            NameObject("/Subtype"): NameObject("/Type1"),
-            NameObject("/BaseFont"): NameObject("/Helvetica"),
-            NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
-        }
-    )
-    return writer._add_object(font)
-
-
-def _draw_on_page(
-    writer: PdfWriter, page: PageObject, font_ref: object, ops: bytes
-) -> None:
-    resources = page.get("/Resources")
-    resources_obj = (
-        resources.get_object() if resources is not None else DictionaryObject()
-    )
-    fonts = resources_obj.get("/Font")
-    fonts_obj = fonts.get_object() if fonts is not None else DictionaryObject()
-    fonts_obj[NameObject(_OVERLAY_FONT_RESOURCE)] = font_ref
-    resources_obj[NameObject("/Font")] = fonts_obj
-    page[NameObject("/Resources")] = resources_obj
-
-    existing = page.get_contents()
-    combined = (existing.get_data() + b"\n" + ops) if existing is not None else ops
-
-    stream = StreamObject()
-    stream.set_data(combined)
-    page[NameObject("/Contents")] = writer._add_object(stream)
 
 
 def _stamp_text(printed_at: datetime) -> str:
@@ -437,7 +468,7 @@ def stamp_pages(
         return pdf_bytes
 
     writer = PdfWriter(clone_from=io.BytesIO(pdf_bytes))
-    font_ref = _add_helvetica(writer)
+    font_ref = pdf_draw.add_helvetica(writer)
     stamp_text = _stamp_text(printed_at) if print_date else None
 
     for page in writer.pages:
@@ -445,7 +476,7 @@ def stamp_pages(
         width, height = float(box.width), float(box.height)
         ops = b""
         if draft_watermark:
-            ops += _text_ops(
+            ops += pdf_draw.text_ops(
                 _WATERMARK_TEXT,
                 x=width * 0.22,
                 y=height * 0.30,
@@ -454,7 +485,7 @@ def stamp_pages(
                 gray=_WATERMARK_GRAY,
             )
         if stamp_text is not None:
-            ops += _text_ops(
+            ops += pdf_draw.text_ops(
                 stamp_text,
                 x=_STAMP_MARGIN_POINTS,
                 y=height - _STAMP_MARGIN_POINTS,
@@ -462,7 +493,7 @@ def stamp_pages(
                 rotate_degrees=0.0,
                 gray=_STAMP_GRAY,
             )
-        _draw_on_page(writer, page, font_ref, ops)
+        pdf_draw.draw_on_page(writer, page, font_ref, ops)
 
     out = io.BytesIO()
     writer.write(out)

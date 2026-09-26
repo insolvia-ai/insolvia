@@ -107,6 +107,7 @@ def test_options_round_trip_through_the_stored_item():
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
         "forms": ["b101", "b106i"],
     }
     assert packet_from_item(item) == packet

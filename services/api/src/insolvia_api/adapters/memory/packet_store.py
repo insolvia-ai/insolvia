@@ -21,7 +21,12 @@ class MemoryPacketStore:
         self.packets: dict[tuple[str, str], Packet] = {}
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         key = (packet.case_id, packet.id)
         if key in self.packets:
@@ -30,7 +35,7 @@ class MemoryPacketStore:
         if (
             stored_case is None
             or stored_case.updated_at != expected_updated_at
-            or stored_case.status == "filed"
+            or (stored_case.status == "filed" and not allow_filed)
         ):
             return False
         # Both, together — nothing can fail between these lines, which is the

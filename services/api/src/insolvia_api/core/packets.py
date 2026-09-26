@@ -219,6 +219,7 @@ def _options_from_item(raw: object) -> OutputOptions:
         signature_pages=signature_pages,
         sign_electronically=bool(raw.get("signElectronically", False)),
         forms=forms,
+        amended_only=bool(raw.get("amendedOnly", False)),
     )
 
 

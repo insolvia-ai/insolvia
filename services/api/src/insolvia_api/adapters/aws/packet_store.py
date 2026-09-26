@@ -27,15 +27,35 @@ class DynamoDbPacketStore:
         self.client = boto3.client("dynamodb")
 
     def create(
-        self, packet: Packet, *, pinned_case: Case, expected_updated_at: str
+        self,
+        packet: Packet,
+        *,
+        pinned_case: Case,
+        expected_updated_at: str,
+        allow_filed: bool = False,
     ) -> bool:
         """ONE TRANSACTION, TWO ITEMS — the packet record and the pinned case
         (core/ports.PacketStore owns the argument). The case put carries the
         whole condition: the row must still exist, must not have moved since
-        the worker read it, and must not be `filed` — a filed case never
-        re-resolves (effective-dating.md), and the status check closes the
-        window where filing lands mid-assembly.
+        the worker read it, and — unless `allow_filed` (issue #370's
+        amendedOnly exception) — must not be `filed`, closing the window
+        where filing lands mid-assembly.
         """
+        condition = "attribute_exists(PK) AND updatedAt = :read_at"
+        values: dict[str, Any] = {":read_at": {"S": expected_updated_at}}
+        names: dict[str, str] = {}
+        if not allow_filed:
+            condition += " AND #status <> :filed"
+            names["#status"] = "status"
+            values[":filed"] = {"S": "filed"}
+        case_put: dict[str, Any] = {
+            "TableName": self.table_name,
+            "Item": to_attributes(case_item(pinned_case)),
+            "ConditionExpression": condition,
+            "ExpressionAttributeValues": values,
+        }
+        if names:
+            case_put["ExpressionAttributeNames"] = names
         try:
             self.client.transact_write_items(
                 TransactItems=[
@@ -48,22 +68,7 @@ class DynamoDbPacketStore:
                             "ConditionExpression": "attribute_not_exists(SK)",
                         }
                     },
-                    {
-                        "Put": {
-                            "TableName": self.table_name,
-                            "Item": to_attributes(case_item(pinned_case)),
-                            "ConditionExpression": (
-                                "attribute_exists(PK)"
-                                " AND updatedAt = :read_at"
-                                " AND #status <> :filed"
-                            ),
-                            "ExpressionAttributeNames": {"#status": "status"},
-                            "ExpressionAttributeValues": {
-                                ":read_at": {"S": expected_updated_at},
-                                ":filed": {"S": "filed"},
-                            },
-                        }
-                    },
+                    {"Put": case_put},
                 ]
             )
         except ClientError as error:

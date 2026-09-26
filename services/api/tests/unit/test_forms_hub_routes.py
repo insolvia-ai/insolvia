@@ -438,6 +438,7 @@ def test_no_query_params_echo_the_default_options(client):
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
 
 
@@ -455,6 +456,7 @@ def test_query_params_are_validated_and_echoed_back(client, stores):
         "printDate": True,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
     ((_, content),) = stores["blobs"].contents.items()
     assert "DRAFT" in PdfReader(io.BytesIO(content)).pages[0].extract_text()

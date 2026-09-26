@@ -365,6 +365,7 @@ def test_packet_assembly_with_no_options_stores_the_plain_defaults(client, job_s
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
     assert job_store.get(case_id, body["id"]).options == body["options"]
 
@@ -380,6 +381,7 @@ def test_packet_assembly_options_are_canonicalised_and_stored(client, job_store)
         "printDate": False,
         "signaturePages": "all",
         "signElectronically": False,
+        "amendedOnly": False,
     }
     assert job_store.get(case_id, body["id"]).options == body["options"]
 

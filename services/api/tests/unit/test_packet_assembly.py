@@ -21,7 +21,7 @@ from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
 from insolvia_api.core.form_overlay import OutputOptions
-from insolvia_api.core.form_templates import form_revisions_as_of
+from insolvia_api.core.form_templates import form_revisions_as_of, latest_form
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
     ALL_FORM_SERIES,
@@ -552,6 +552,205 @@ def test_an_unfiled_form_named_in_the_subset_is_a_problem():
     assert any(p.source == "form/b106j2" for p in outcome)
 
 
+# ── Amendments (issue #370) ──────────────────────────────────────
+
+
+def _filed_reference_case_data() -> CaseData:
+    data = reference_case_data()
+    return replace(data, case=replace(data.case, status="filed"))
+
+
+def _with_amended(data: CaseData, field: str, entity_id: str) -> CaseData:
+    """A copy of `data` with exactly ONE entity of `field` flagged
+    amended — the test's stand-in for a PUT with `amended: true` against a
+    filed case."""
+    updated = tuple(
+        replace(entity, amended=True) if entity.id == entity_id else entity
+        for entity in getattr(data, field)
+    )
+    return replace(data, **{field: updated})
+
+
+def _part_bytes(outcome: AssembledPacket, suffix: str) -> bytes:
+    ((_, content),) = (
+        (name, content) for name, content in outcome.parts if name.endswith(suffix)
+    )
+    return content
+
+
+def _pdf_field_value(content: bytes, series_id: str, field_id: str):
+    """The AcroForm value of one logical field, resolved through its
+    release's own `pdf_names` — field VALUES (unlike stamped text) are not
+    reliably present in `extract_text()` without generated appearances, so
+    every check here reads `get_fields()` instead."""
+    pdf_name = latest_form(series_id).field(field_id).pdf_names[0]
+    fields = PdfReader(io.BytesIO(content)).get_fields() or {}
+    return fields.get(pdf_name)
+
+
+def test_amended_only_refuses_an_unfiled_case():
+    # `amended` cannot even be SET before filing (core/case_entities.py's
+    # own rule, enforced at the route layer) — this is the packet-assembly
+    # side of the same rule, in case a test or a stale job body sets it
+    # anyway.
+    data = _with_amended(reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(
+        p.source == "case" and "has not been filed" in p.message for p in outcome
+    )
+
+
+def test_amended_only_with_nothing_marked_amended_is_a_problem():
+    outcome = assemble(
+        _filed_reference_case_data(),
+        as_of=TODAY,
+        options=OutputOptions(amended_only=True),
+    )
+    assert not isinstance(outcome, AssembledPacket)
+    assert any("No schedule items are marked amended" in p.message for p in outcome)
+
+
+def test_a_filed_case_still_refuses_an_ordinary_reassembly():
+    # amendedOnly is the ONE exception — a plain re-assembly of a filed case
+    # (no options.amended_only) is unaffected.
+    outcome = assemble(_filed_reference_case_data(), as_of=TODAY)
+    assert not isinstance(outcome, AssembledPacket)
+    assert any(
+        p.source == "case" and "never re-assembled" in p.message for p in outcome
+    )
+
+
+def test_amended_only_renders_exactly_the_amended_schedule_plus_sum_and_dec():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    assert names[0] == "00-amendment-cover.pdf"
+    assert any(name.endswith("-b106d.pdf") for name in names)
+    assert any(name.endswith("-b106sum.pdf") for name in names)
+    assert any(name.endswith("-b106dec.pdf") for name in names)
+    # Nothing else in the schedule set carries an amended item.
+    assert not any(name.endswith("-b106ab.pdf") for name in names)
+    assert not any(name.endswith("-b106ef.pdf") for name in names)
+    assert not any(name.endswith("-b106c.pdf") for name in names)
+    assert names[-1] == MATRIX_FILE_NAME
+
+
+def test_amended_only_prints_only_the_amended_item_on_its_schedule():
+    # Two secured claims exist (claim-mortgage, claim-auto); only the first
+    # is flagged amended, so only ITS creditor's name should print on 106D.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    content = _part_bytes(outcome, "-b106d.pdf")
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(content)).get_fields() or {}).values()
+    )
+    assert "Gulf Coast Home Loans" in values
+    assert "Drive Away Financial" not in values
+
+
+def test_amended_only_ticks_the_amended_caption_on_the_amended_schedule():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    field = _pdf_field_value(
+        _part_bytes(outcome, "-b106d.pdf"), "form/b106d", "caption.amended_filing"
+    )
+    assert field is not None
+    assert field.get("/V") not in (None, "/Off")
+
+
+def test_a_plain_assembly_never_ticks_the_amended_caption():
+    # The plain filing set (no amendedOnly) must leave the caption exactly
+    # as blank as it has always been — the projections themselves still
+    # never fill case-wide `is_amended` (form_projections/__init__.py).
+    outcome = assemble(reference_case_data(), as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    content = _part_bytes(outcome, "-b106ab.pdf")
+    field = _pdf_field_value(content, "form/b106ab", "caption.amended_filing")
+    assert field is None or field.get("/V") in (None, "/Off")
+
+
+def test_amended_only_cover_sheet_lists_the_amended_forms():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    text = (
+        PdfReader(io.BytesIO(_part_bytes(outcome, "amendment-cover.pdf")))
+        .pages[0]
+        .extract_text()
+    )
+    assert "not an official" in text.lower()
+    # Every form rendered after it, Summary and Declaration included.
+    assert text.index("106Sum") < text.index("106D ") < text.index("106Dec")
+
+
+def test_amending_schedule_ef_prints_only_the_amended_unsecured_claim():
+    # Issue #370's done-when: a filed case amends Schedule E/F and produces
+    # an amended-only set — the cover sheet, 106Sum, 106E/F and 106Dec.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    forms = [name.split("-", 1)[1] for name, _ in outcome.parts[:-1]]
+    assert forms == ["amendment-cover.pdf", "b106sum.pdf", "b106ef.pdf", "b106dec.pdf"]
+    ef = _part_bytes(outcome, "-b106ef.pdf")
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(ef)).get_fields() or {}).values()
+    )
+    assert "Bayside General Hospital" in values
+    assert "Meridian Bank Card Services" not in values
+    caption = _pdf_field_value(ef, "form/b106ef", "caption.amended_filing")
+    assert caption is not None
+    assert caption.get("/V") not in (None, "/Off")
+
+
+def test_an_amendment_never_opens_a_tax_id_envelope():
+    # B121 is not amendable, so an amendment never prints it and never
+    # performs its audited full-value read.
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    deps = build_deps(data)
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"amendedOnly": True},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    assert not any(e.action == "taxid.read" for e in deps.access_log.events)
+
+
+def test_amended_only_does_not_repin_the_case():
+    # The CASE's own form_revisions/constants_set_id describe the ORIGINAL
+    # filing; an amendment years later must not rewrite that history — only
+    # the PACKET's own record does (outcome.form_revisions).
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-mortgage")
+    deps = build_deps(data)
+    job = new_job(
+        PACKET_ASSEMBLY_KIND,
+        case_id=CASE_ID,
+        created_by="subject-1",
+        options={"amendedOnly": True},
+    )
+    result = run_packet_assembly(job, deps, today=TODAY)
+    assert result["outcome"] == "assembled"
+    stored_case = deps.case_store.cases[CASE_ID]
+    assert stored_case.status == "filed"
+    assert stored_case.updated_at == data.case.updated_at
+
+
+def test_amended_only_combined_with_forms_is_refused_at_parse_time():
+    from insolvia_api.core.form_overlay import parse_output_options
+    from insolvia_core.errors import FieldValidationError
+
+    with pytest.raises(FieldValidationError):
+        parse_output_options(
+            {"amendedOnly": True, "forms": ["b106d"]}, allow_forms=True
+        )
+
+
 # ── The worker, end to end on the memory adapters ───────────────
 
 
@@ -731,7 +930,9 @@ def test_a_vanished_case_fails_deterministically():
 
 def test_a_case_that_changed_mid_assembly_fails_the_job():
     class RefusingPacketStore:
-        def create(self, packet, *, pinned_case, expected_updated_at):
+        def create(
+            self, packet, *, pinned_case, expected_updated_at, allow_filed=False
+        ):
             return False
 
         def get(self, case_id, packet_id):
