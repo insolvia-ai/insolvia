@@ -38,6 +38,7 @@ from .petitions import (
     RELATED_CASE,
     SOLE_PROPRIETORSHIP,
 )
+from .plans import PLAN
 from .sofa import SOFA_ENTRY
 
 # `EntityKind[Any]` rather than a union of the ten body types: callers of this
@@ -79,6 +80,9 @@ COLLECTIONS: Final[Mapping[str, EntityKind[Any]]] = {
         # B122A-2's entered figures (issue #101), one per case like the
         # petition — the gate owns the cardinality.
         MEANS_TEST_INPUT,
+        # The Chapter 13 plan's proposal (issue 16.2 / #366), one per case
+        # the same way; its figures are the API calculator's, never stored.
+        PLAN,
     )
 }
 

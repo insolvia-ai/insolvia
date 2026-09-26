@@ -239,6 +239,33 @@ SAMPLE_BODIES: dict[str, dict[str, object]] = {
             }
         ],
     },
+    # Issue #366: the plan's nested rows (steps, lump sums, per-claim
+    # treatments) round-trip through the item shape like any other list.
+    "plans": {
+        "term_months": 60,
+        "payment_source": "fixed",
+        "monthly_payment": "850.00",
+        "step_payments": [
+            {"id": "st1", "start_month": 25, "monthly_payment": "1000.00"}
+        ],
+        "lump_sums": [
+            {"id": "ls1", "month": 13, "amount": "2000.00", "description": "Refund"}
+        ],
+        "trustee_percentage": "8.5",
+        "attorney_fees": "3500.00",
+        "secured_treatments": [
+            {
+                "id": "tr1",
+                "claim_id": "c-1",
+                "treatment": "cramdown",
+                "cramdown_value": "9000.00",
+                "interest_rate": "7.25",
+            }
+        ],
+        "priority_percentage": "100",
+        "unsecured_treatment": "pot",
+        "chapter_7_other_costs": "1500.00",
+    },
 }
 
 

@@ -45,6 +45,7 @@ from insolvia_api.api.routes.me import blueprint as me_blueprint
 from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
 from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
+from insolvia_api.api.routes.plan import blueprint as plan_blueprint
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
 from insolvia_api.api.routes.tasks import blueprint as tasks_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
@@ -74,6 +75,10 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(exemption_analysis_blueprint)
     # /v1/cases/<id>/means-test — the same static-segment argument again.
     app.register_blueprint(means_test_blueprint)
+    # /v1/cases/<id>/plan-calculation (issue 16.2 / #366) — the same
+    # static-segment argument; the plan record itself is the `plans`
+    # collection.
+    app.register_blueprint(plan_blueprint)
     app.register_blueprint(firm_blueprint)
     # The court registry (issue #360): read-only, every member.
     app.register_blueprint(courts_blueprint)
