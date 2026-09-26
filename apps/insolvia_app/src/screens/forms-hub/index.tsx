@@ -47,6 +47,8 @@ const OPEN_SEGMENT: Readonly<Record<string, string>> = {
   'form/b106j2': 'income',
   'form/b122a1': 'means-test',
   'form/b122a2': 'means-test',
+  'form/b122c1': 'means-test',
+  'form/b122c2': 'means-test',
 };
 
 /** The gate's `source` in a person's words — the packet screen's own list,

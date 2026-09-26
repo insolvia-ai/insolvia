@@ -43,13 +43,19 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 import { inputBodyOf, overrideFor, verdictOf, withOverride } from './inputs';
 
 /**
- * `/cases/<id>/means-test` — the § 707(b) means test (issue #349).
+ * `/cases/<id>/means-test` — the means test (issues #349, #365): § 707(b)
+ * on a Chapter 7 case, § 1325(b) on a Chapter 13 case.
  *
  * THE VERDICT IS THE SERVER'S. `GET /v1/cases/{id}/means-test` runs the same
- * engine the packet's B122A-1 and B122A-2 use and returns the whole trace;
- * this screen renders it and computes nothing (ADR 0001). Every save of the
- * inputs below re-reads it, which is what "recomputes on every save" means
- * here — the recomputation happens where the rules live.
+ * engine the packet's B122A-1/A-2 (or B122C-1/C-2) use and returns the whole
+ * trace; this screen renders it and computes nothing (ADR 0001). Every save
+ * of the inputs below re-reads it, which is what "recomputes on every save"
+ * means here — the recomputation happens where the rules live. The case's
+ * chapter (from the shell) decides which form the labels name and which
+ * questions are asked: a Chapter 13 case gets the commitment period and the
+ * disposable income in the banner, the four Chapter 13 answers in their own
+ * section, and neither the Form 122A-1Supp exemptions nor B122A-2's
+ * eligibility box — the Chapter 13 forms do not ask them.
  *
  * Three kinds of thing are on the page, and they are kept visibly apart:
  *
@@ -214,6 +220,12 @@ const DEDUCTION_FIELDS: readonly { readonly key: MoneyKey; readonly label: strin
   { key: 'ch13_projected_plan_payment', label: 'Line 36 — projected Chapter 13 plan payment' },
 ];
 
+/** B122C-2's two § 1325(b)(2) subtractions the debtor supplies (issue #365). */
+const CHAPTER_13_FIELDS: readonly { readonly key: MoneyKey; readonly label: string }[] = [
+  { key: 'child_support_for_dependents', label: 'Line 40 — support income for dependent children' },
+  { key: 'qualified_retirement_deductions', label: 'Line 41 — qualified retirement deductions' },
+];
+
 export interface MeansTestProps {
   readonly caseId: string;
 }
@@ -221,7 +233,13 @@ export interface MeansTestProps {
 export function MeansTest({ caseId }: MeansTestProps) {
   const theme = useTheme();
   const { call } = useApi();
-  const { debtors } = useCase();
+  const { debtors, matter } = useCase();
+  // Which pair of forms this case files — the labels name the form the
+  // figure prints on, so a Chapter 13 preparer reads "122C-1 line 16b", not
+  // a Chapter 7 line number.
+  const chapter13 = matter.chapter === 13;
+  const statementForm = chapter13 ? '122C-1' : '122A-1';
+  const calculationForm = chapter13 ? '122C-2' : '122A-2';
 
   const [trace, setTrace] = useState<LoadState<CaseMeansTest>>({ kind: 'loading' });
   const [petition, setPetition] = useState<PetitionBody | null>(null);
@@ -361,9 +379,14 @@ export function MeansTest({ caseId }: MeansTestProps) {
     <CaseColumn>
       <Heading level={1}>Means test</Heading>
       <Text style={[styles.intro, muted]}>
-        The § 707(b) determination as of the expected filing date, computed by the same engine that
-        prints Forms 122A-1 and 122A-2. Every figure below names the rule, input or dataset it came
-        from; nothing on this page is added up here.
+        {chapter13
+          ? 'The § 1325(b) determination as of the expected filing date — the applicable commitment ' +
+            'period and, above the median, the disposable income the plan must commit — computed by ' +
+            'the same engine that prints Forms 122C-1 and 122C-2.'
+          : 'The § 707(b) determination as of the expected filing date, computed by the same engine ' +
+            'that prints Forms 122A-1 and 122A-2.'}{' '}
+        Every figure below names the rule, input or dataset it came from; nothing on this page is
+        added up here.
       </Text>
 
       <VerdictBanner trace={trace} />
@@ -386,7 +409,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
         </Link>
       </Section>
 
-      <Section title="Marital and filing status (122A-1 line 1)">
+      <Section title={`Marital and filing status (${statementForm} line 1)`}>
         <Field.Root invalid={Boolean(errors.marital_filing_status)}>
           <Field.Label>Marital and filing status</Field.Label>
           <Select
@@ -427,58 +450,63 @@ export function MeansTest({ caseId }: MeansTestProps) {
           onValueChange={(next) => setCount('people_65_or_older', next)}
         />
         <CountField
-          label="Household size for the median table (122A-1 line 13) — override"
+          label={`Household size for the median table (${statementForm} line ${chapter13 ? '16b' : '13'}) — override`}
           value={body.median_household_size}
           error={errors.median_household_size}
           description={figureNote(ready?.household.medianHouseholdSize)}
           onValueChange={(next) => setCount('median_household_size', next)}
         />
         <CountField
-          label="IRS family size (122A-2 line 5) — override"
+          label={`IRS family size (${calculationForm} line 5) — override`}
           value={body.irs_family_size}
           error={errors.irs_family_size}
           description={figureNote(ready?.household.irsFamilySize)}
           onValueChange={(next) => setCount('irs_family_size', next)}
         />
         <CountField
-          label="IRS housing family size (122A-2 lines 8–9a) — override"
+          label={`IRS housing family size (${calculationForm} lines 8–9a) — override`}
           value={body.irs_housing_family_size}
           error={errors.irs_housing_family_size}
           description={figureNote(ready?.household.irsHousingFamilySize)}
           onValueChange={(next) => setCount('irs_housing_family_size', next)}
         />
         <CountField
-          label="Vehicles claimed (122A-2 line 11) — at most 2"
+          label={`Vehicles claimed (${calculationForm} line 11) — at most 2`}
           value={body.vehicle_count}
           error={errors.vehicle_count}
           onValueChange={(next) => setCount('vehicle_count', next)}
         />
       </Section>
 
-      <Section title="Exemptions from the presumption (Form 122A-1Supp)">
-        <Text style={[styles.note, muted]}>
-          Any one of these ends the test before the median comparison.
-          {ready?.exemptions.applied === null || ready === null
-            ? ''
-            : ` Applied: ${ready.exemptions.rule ?? ready.exemptions.applied}.`}
-        </Text>
-        {EXEMPTIONS.map((exemption) => (
-          <View key={exemption.key} style={styles.checkboxRow}>
-            <Checkbox.Root
-              aria-label={exemption.label}
-              checked={body[exemption.key] === true}
-              onCheckedChange={(checked) =>
-                setBody((current) => ({ ...current, [exemption.key]: checked ? true : undefined }))
-              }
-            >
-              <Checkbox.Indicator>✓</Checkbox.Indicator>
-            </Checkbox.Root>
-            <Text aria-hidden style={[styles.checkboxLabel, ink]}>
-              {exemption.label}
-            </Text>
-          </View>
-        ))}
-      </Section>
+      {chapter13 ? null : (
+        <Section title="Exemptions from the presumption (Form 122A-1Supp)">
+          <Text style={[styles.note, muted]}>
+            Any one of these ends the test before the median comparison.
+            {ready?.exemptions.applied === null || ready === null
+              ? ''
+              : ` Applied: ${ready.exemptions.rule ?? ready.exemptions.applied}.`}
+          </Text>
+          {EXEMPTIONS.map((exemption) => (
+            <View key={exemption.key} style={styles.checkboxRow}>
+              <Checkbox.Root
+                aria-label={exemption.label}
+                checked={body[exemption.key] === true}
+                onCheckedChange={(checked) =>
+                  setBody((current) => ({
+                    ...current,
+                    [exemption.key]: checked ? true : undefined,
+                  }))
+                }
+              >
+                <Checkbox.Indicator>✓</Checkbox.Indicator>
+              </Checkbox.Root>
+              <Text aria-hidden style={[styles.checkboxLabel, ink]}>
+                {exemption.label}
+              </Text>
+            </View>
+          ))}
+        </Section>
+      )}
 
       <Section title="Dependents">
         <Text style={[styles.note, muted]}>
@@ -491,7 +519,7 @@ export function MeansTest({ caseId }: MeansTestProps) {
         ) : null}
       </Section>
 
-      <Section title="Income (122A-1 lines 2–10)">
+      <Section title={`Income (${statementForm} lines 2–10)`}>
         <Text style={[styles.note, muted]}>
           Each line is derived from the pay records and other income received in the window. Enter a
           monthly figure to replace a line; leave it blank to use the records. The exclusions are
@@ -511,9 +539,12 @@ export function MeansTest({ caseId }: MeansTestProps) {
         ))}
       </Section>
 
-      <Section title="Marital adjustment (122A-2 line 3)">
+      <Section title={`Marital adjustment (${chapter13 ? '122C-1 line 13' : '122A-2 line 3'})`}>
         <Text style={[styles.note, muted]}>
           Parts of a non-filing spouse’s income not paid for the household, listed separately.
+          {chapter13
+            ? ' On Form 122C-1 the adjustment comes off before the median comparison (line 14).'
+            : ''}
         </Text>
         {(body.marital_adjustments ?? []).map((item) => (
           <View key={item.id} style={styles.adjustment}>
@@ -578,7 +609,132 @@ export function MeansTest({ caseId }: MeansTestProps) {
         </Button>
       </Section>
 
-      <Section title="Deductions (122A-2)">
+      {chapter13 ? (
+        <Section title="Chapter 13 (122C-1 line 19a, 122C-2 lines 40–43)">
+          <Text style={[styles.note, muted]}>
+            The questions the Chapter 13 forms ask on their own: whether the marital adjustment also
+            shortens the commitment period, and the § 1325(b)(2) subtractions from current monthly
+            income.
+          </Text>
+          <Field.Root invalid={Boolean(errors.commitment_period_marital_adjustment)}>
+            <Field.Label>
+              Line 19a — deduct the marital adjustment for the commitment period too?
+            </Field.Label>
+            <Select
+              options={[...YES_NO_OPTIONS]}
+              value={
+                body.commitment_period_marital_adjustment === true
+                  ? 'yes'
+                  : body.commitment_period_marital_adjustment === false
+                    ? 'no'
+                    : null
+              }
+              onValueChange={(next) =>
+                setBody((current) => ({
+                  ...current,
+                  commitment_period_marital_adjustment:
+                    next === 'yes' ? true : next === 'no' ? false : undefined,
+                }))
+              }
+              placeholder="Not contended"
+            />
+            <Field.Description>
+              A contention under § 1325(b)(4), not a fact: unanswered, line 19a is 0 as the form
+              instructs.
+            </Field.Description>
+            {errors.commitment_period_marital_adjustment ? (
+              <Field.Error match>{errors.commitment_period_marital_adjustment}</Field.Error>
+            ) : null}
+          </Field.Root>
+          {CHAPTER_13_FIELDS.map((field) => (
+            <Field.Root key={field.key} invalid={Boolean(errors[field.key])}>
+              <Field.Label>{field.label}</Field.Label>
+              <Input
+                value={body[field.key] ?? ''}
+                onValueChange={(next) => setMoney(field.key, next)}
+                autoCorrect={false}
+              />
+              {errors[field.key] ? <Field.Error match>{errors[field.key]}</Field.Error> : null}
+            </Field.Root>
+          ))}
+          <Text style={[styles.note, muted]}>
+            Line 43 — special circumstances that justify additional expenses (§ 707(b)(2)(B)),
+            deducted on Form 122C-2. The trustee gets the documentation; this page gets the amounts.
+          </Text>
+          {(body.special_circumstances ?? []).map((item) => (
+            <View key={item.id} style={styles.adjustment}>
+              <Field.Root
+                invalid={Boolean(errors[`special_circumstances[${item.id}].description`])}
+              >
+                <Field.Label>Special circumstance</Field.Label>
+                <Input
+                  value={item.description ?? ''}
+                  onValueChange={(next) =>
+                    setBody((current) => ({
+                      ...current,
+                      special_circumstances: (current.special_circumstances ?? []).map((row) =>
+                        row.id === item.id
+                          ? { ...row, description: next === '' ? undefined : next }
+                          : row,
+                      ),
+                    }))
+                  }
+                />
+              </Field.Root>
+              <Field.Root invalid={Boolean(errors[`special_circumstances[${item.id}].amount`])}>
+                <Field.Label>Monthly expense</Field.Label>
+                <Input
+                  value={item.amount ?? ''}
+                  onValueChange={(next) =>
+                    setBody((current) => ({
+                      ...current,
+                      special_circumstances: (current.special_circumstances ?? []).map((row) =>
+                        row.id === item.id
+                          ? { ...row, amount: next === '' ? undefined : next }
+                          : row,
+                      ),
+                    }))
+                  }
+                />
+              </Field.Root>
+              <Button
+                size="lg"
+                intent="secondary"
+                onPress={() =>
+                  setBody((current) => {
+                    const rest = (current.special_circumstances ?? []).filter(
+                      (row) => row.id !== item.id,
+                    );
+                    const { special_circumstances: _removed, ...without } = current;
+                    return rest.length === 0
+                      ? without
+                      : { ...current, special_circumstances: rest };
+                  })
+                }
+              >
+                Remove
+              </Button>
+            </View>
+          ))}
+          <Button
+            size="lg"
+            intent="secondary"
+            onPress={() =>
+              setBody((current) => ({
+                ...current,
+                special_circumstances: [
+                  ...(current.special_circumstances ?? []),
+                  { id: newRowId() },
+                ],
+              }))
+            }
+          >
+            Add a special circumstance
+          </Button>
+        </Section>
+      ) : null}
+
+      <Section title={`Deductions (${calculationForm})`}>
         <Text style={[styles.note, muted]}>
           Monthly figures only the debtor can supply. The IRS allowances and the per-claim secured
           payments are read from the records — enter a per-claim payment beside the claim on the
@@ -610,21 +766,30 @@ export function MeansTest({ caseId }: MeansTestProps) {
             <Field.Error match>{errors.housing_adjustment_explanation}</Field.Error>
           ) : null}
         </Field.Root>
-        <Field.Root invalid={Boolean(errors.ch13_eligible)}>
-          <Field.Label>Line 36 — eligible to file under Chapter 13?</Field.Label>
-          <Select
-            options={[...YES_NO_OPTIONS]}
-            value={body.ch13_eligible === true ? 'yes' : body.ch13_eligible === false ? 'no' : null}
-            onValueChange={(next) =>
-              setBody((current) => ({
-                ...current,
-                ch13_eligible: next === 'yes' ? true : next === 'no' ? false : undefined,
-              }))
-            }
-            placeholder="Not answered"
-          />
-          {errors.ch13_eligible ? <Field.Error match>{errors.ch13_eligible}</Field.Error> : null}
-        </Field.Root>
+        {chapter13 ? (
+          <Text style={[styles.note, muted]}>
+            Line 36 multiplies the projected plan payment by the district’s multiplier without an
+            eligibility question — Form 122C-2 is the Chapter 13 form.
+          </Text>
+        ) : (
+          <Field.Root invalid={Boolean(errors.ch13_eligible)}>
+            <Field.Label>Line 36 — eligible to file under Chapter 13?</Field.Label>
+            <Select
+              options={[...YES_NO_OPTIONS]}
+              value={
+                body.ch13_eligible === true ? 'yes' : body.ch13_eligible === false ? 'no' : null
+              }
+              onValueChange={(next) =>
+                setBody((current) => ({
+                  ...current,
+                  ch13_eligible: next === 'yes' ? true : next === 'no' ? false : undefined,
+                }))
+              }
+              placeholder="Not answered"
+            />
+            {errors.ch13_eligible ? <Field.Error match>{errors.ch13_eligible}</Field.Error> : null}
+          </Field.Root>
+        )}
       </Section>
 
       <View style={styles.actions}>{saveButton}</View>
@@ -717,13 +882,27 @@ function VerdictBanner({ trace }: { readonly trace: LoadState<CaseMeansTest> }) 
       <MoneyFigure label="Applicable annual median" value={verdict.median} />
       <MoneyFigure label="Median comparison" value={verdict.position} text />
       <View style={styles.figure}>
-        <Text style={[styles.figureLabel, muted]}>Presumption of abuse</Text>
+        <Text style={[styles.figureLabel, muted]}>{verdict.determinationLabel}</Text>
         <View style={styles.badgeRow}>
           <Badge intent={verdict.intent} size="sm">
             {verdict.presumption}
           </Badge>
         </View>
       </View>
+      {verdict.chapter13 === null ? null : (
+        <>
+          <MoneyFigure
+            label="Commitment period (§ 1325(b)(4))"
+            value={verdict.chapter13.commitmentPeriod}
+            text
+          />
+          <MoneyFigure
+            label="Monthly disposable income (§ 1325(b)(2))"
+            value={verdict.chapter13.disposableIncome}
+            text={!verdict.chapter13.disposableIncome.startsWith('$')}
+          />
+        </>
+      )}
       {trace.value.problems.length > 0 ? (
         <Text style={[styles.note, muted]}>{trace.value.problems.join(' ')}</Text>
       ) : null}
@@ -876,18 +1055,24 @@ function Trace({ trace }: { readonly trace: LoadState<CaseMeansTest> }) {
           {problem}
         </Text>
       ))}
+      {value.chapter13 === null ? null : (
+        <Text style={[styles.row, ink]}>
+          {`Commitment period: ${value.chapter13.commitmentPeriodMonths} months — ${value.chapter13.commitmentSource}.`}
+        </Text>
+      )}
       {value.lines.length === 0 ? (
         <Text style={[styles.note, muted]}>
           {value.outcome === 'below_median'
             ? 'Below the median — Form 122A-2 is not filed.'
             : value.outcome === 'exempt'
               ? 'Exempt — Form 122A-2 is not filed.'
-              : 'The 122A-2 lines appear once the test can run.'}
+              : `The ${value.chapter === 13 ? '122C-1 and 122C-2' : '122A-2'} lines appear once the test can run.`}
         </Text>
       ) : (
         <Table.Root dense>
           <Table.Head>
             <Table.Row>
+              <Table.HeaderCell width={72}>Form</Table.HeaderCell>
               <Table.HeaderCell width={60}>Line</Table.HeaderCell>
               <Table.HeaderCell>Subject</Table.HeaderCell>
               <Table.HeaderCell width={120}>Amount</Table.HeaderCell>
@@ -896,7 +1081,8 @@ function Trace({ trace }: { readonly trace: LoadState<CaseMeansTest> }) {
           </Table.Head>
           <Table.Body>
             {value.lines.map((line) => (
-              <Table.Row key={line.line}>
+              <Table.Row key={`${line.form}-${line.line}`}>
+                <Table.Cell width={72}>{line.form}</Table.Cell>
                 <Table.Cell width={60}>{line.line}</Table.Cell>
                 <Table.Cell>{line.label}</Table.Cell>
                 <Table.Cell width={120}>{`$${line.amount}`}</Table.Cell>

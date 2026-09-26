@@ -3039,8 +3039,19 @@ export interface OtherIncomeRecordBody {
   readonly description?: string | undefined;
 }
 
-/** One B122A-2 line-3 row; `id` is client-chosen and required (provenance). */
+/** One B122A-2 line-3 (B122C-1 line-13) row; `id` is client-chosen and required (provenance). */
 export interface MaritalAdjustmentItem {
+  readonly id: string;
+  readonly description?: string | undefined;
+  readonly amount?: Money | undefined;
+}
+
+/**
+ * One B122C-2 line-43 row (issue #365): a special circumstance that justifies
+ * an additional expense (§ 707(b)(2)(B)), which on the Chapter 13 form is a
+ * deduction in the arithmetic. `id` is client-chosen and required.
+ */
+export interface SpecialCircumstanceItem {
   readonly id: string;
   readonly description?: string | undefined;
   readonly amount?: Money | undefined;
@@ -3135,6 +3146,12 @@ export interface IncomeLineOverride {
  * three household sizes (each absent = `people_under_65 +
  * people_65_or_older`), the three Form 122A-1Supp exemptions (any one
  * short-circuits the test), and the per-line income overrides.
+ *
+ * Issue #365 added the four answers the Chapter 13 forms ask on their own,
+ * on the SAME record: the contention that the marital adjustment also
+ * shortens the commitment period (B122C-1 line 19a), support income for
+ * dependent children (B122C-2 line 40), qualified retirement deductions
+ * (line 41) and the special-circumstance rows (line 43).
  */
 export interface MeansTestInputBody {
   readonly people_under_65?: number | undefined;
@@ -3176,6 +3193,10 @@ export interface MeansTestInputBody {
   readonly priority_cure_total?: Money | undefined;
   readonly ch13_eligible?: boolean | undefined;
   readonly ch13_projected_plan_payment?: Money | undefined;
+  readonly commitment_period_marital_adjustment?: boolean | undefined;
+  readonly child_support_for_dependents?: Money | undefined;
+  readonly qualified_retirement_deductions?: Money | undefined;
+  readonly special_circumstances?: readonly SpecialCircumstanceItem[] | undefined;
 }
 
 /** 106J Part 1's frame: which schedule, and the change narrative. */
@@ -4038,16 +4059,45 @@ export interface MedianComparison {
   readonly source: string;
 }
 
+/** The forms a trace line can print on. */
+export const MEANS_TEST_FORMS = ['122A-2', '122C-1', '122C-2'] as const;
+export type MeansTestForm = (typeof MEANS_TEST_FORMS)[number];
+
 /**
- * One line of the B122A-2 trace: the printed line number, its subject, the
- * computed amount, and where it came from — a dataset release, an entered
- * field, a derived input, or line arithmetic.
+ * One line of the calculation trace: the form it prints on (B122C-1's
+ * Part 2-3 lines and B122C-2's lines share numbers, issue #365), the
+ * printed line number, its subject, the computed amount, and where it came
+ * from — a dataset release, an entered field, a derived input, or line
+ * arithmetic.
  */
 export interface MeansTestLine {
+  readonly form: MeansTestForm;
   readonly line: string;
   readonly label: string;
   readonly amount: Money;
   readonly source: string;
+}
+
+/**
+ * The Chapter 13 verdict (issue #365): B122C-1's applicable commitment
+ * period under § 1325(b)(4) with the comparison that set it, whether
+ * § 1325(b)(3) requires Form 122C-2 (line 17b), and — when it does —
+ * B122C-2 line 45, the monthly disposable income the plan must commit.
+ * `null` on a Chapter 7 trace and while the engine has not run.
+ */
+export interface MeansTestChapter13 {
+  readonly commitmentPeriodMonths: number;
+  readonly commitmentSource: string;
+  /** B122C-1 line 19a — the adjustment deducted for the commitment period. */
+  readonly commitmentMaritalAdjustment: Money;
+  /** Line 19b. */
+  readonly commitmentMonthlyIncome: Money;
+  /** Line 20b. */
+  readonly commitmentAnnualizedIncome: Money;
+  /** Line 20c. */
+  readonly commitmentAnnualMedian: Money;
+  readonly disposableIncomeRequired: boolean;
+  readonly monthlyDisposableIncome: Money | null;
 }
 
 /** A household size the engine read, and where it came from — both `null`
@@ -4090,10 +4140,14 @@ export interface MeansTestExemptions {
 /**
  * How the test ended. `undetermined` means the engine refused and
  * {@link CaseMeansTest.problems} says why; `exempt` means a Form 122A-1Supp
- * exemption ended it before the median.
+ * exemption ended it before the median. On a Chapter 13 case the outcomes
+ * are `below_median` (line 17a: no Form 122C-2) and `above_median` (line
+ * 17b: disposable income is determined under § 1325(b)(3)) — there is no
+ * presumption of abuse to find.
  */
 export const MEANS_TEST_OUTCOMES = [
   'below_median',
+  'above_median',
   'no_presumption',
   'presumption_of_abuse',
   'exempt',
@@ -4111,13 +4165,18 @@ export type MeansTestOutcome = (typeof MEANS_TEST_OUTCOMES)[number];
  * while the case is too early to answer (no household entered yet, a
  * planned filing date the datasets do not cover); `comparison` is `null`
  * then, and for an exempt debtor whose household is not entered. `lines` is
- * empty below the median and for an exempt debtor — Form 122A-2 is not
- * filed in either case.
+ * empty below the median and for an exempt debtor on Chapter 7 — Form
+ * 122A-2 is not filed in either case. On a Chapter 13 case (issue #365)
+ * the same endpoint runs § 1325(b): `chapter13` carries the verdict, and
+ * `lines` holds B122C-1's Part 2-3 lines always, plus B122C-2's above the
+ * median.
  */
 export interface CaseMeansTest {
   readonly asOf: FormDate;
   /** `petition.expected_filing_date` or `case.created_at`. */
   readonly asOfSource: string;
+  /** The case's chapter — which calculation ran. */
+  readonly chapter: number;
   /** Series id → release id, for every dataset the run read. */
   readonly releaseIds: Readonly<Record<string, string>>;
   readonly jurisdiction: {
@@ -4140,6 +4199,7 @@ export interface CaseMeansTest {
   readonly outcome: MeansTestOutcome;
   readonly determinedBy: string | null;
   readonly lines: readonly MeansTestLine[];
+  readonly chapter13: MeansTestChapter13 | null;
   readonly problems: readonly string[];
 }
 

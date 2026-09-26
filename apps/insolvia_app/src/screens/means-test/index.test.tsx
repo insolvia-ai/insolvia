@@ -27,6 +27,7 @@ const STAMP = '2026-09-01T10:00:00.000000Z';
 const UNDETERMINED = {
   asOf: '2026-08-01',
   asOfSource: 'case.created_at',
+  chapter: 7,
   releaseIds: {},
   jurisdiction: { state: null, county: null, district: 'NDCA' },
   maritalFilingStatus: {
@@ -67,6 +68,7 @@ const UNDETERMINED = {
   outcome: 'undetermined',
   determinedBy: null,
   lines: [],
+  chapter13: null,
   problems: ['the household composition (people under 65 / 65 and older) has not been entered'],
 };
 
@@ -120,14 +122,57 @@ const ABOVE_MEDIAN = {
   determinedBy: 'threshold_floor',
   lines: [
     {
+      form: '122A-2',
       line: '6',
       label: 'Food, clothing, and other items',
       amount: '1857.00',
       source: 'IRS National Standards, household of 3 — ust/irs-national-standards@2026-07-15',
     },
-    { line: '39d', label: 'Total over 60 months', amount: '-23359.80', source: 'line 39c x 60' },
+    {
+      form: '122A-2',
+      line: '39d',
+      label: 'Total over 60 months',
+      amount: '-23359.80',
+      source: 'line 39c x 60',
+    },
   ],
   problems: [],
+};
+
+/** The same family under Chapter 13 (issue #365): 60 months, Form 122C-2 required. */
+const CHAPTER_13 = {
+  ...ABOVE_MEDIAN,
+  chapter: 13,
+  outcome: 'above_median',
+  determinedBy: 'median',
+  lines: [
+    {
+      form: '122C-1',
+      line: '21',
+      label: 'Applicable commitment period (months)',
+      amount: '60.00',
+      source:
+        'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+    },
+    {
+      form: '122C-2',
+      line: '45',
+      label: 'Monthly disposable income under 11 U.S.C. § 1325(b)(2)',
+      amount: '-1079.33',
+      source: 'line 39 minus line 44',
+    },
+  ],
+  chapter13: {
+    commitmentPeriodMonths: 60,
+    commitmentSource:
+      'line 20b is more than or equal to line 20c: the commitment period is 5 years — 11 U.S.C. § 1325(b)(4)(A)(ii)',
+    commitmentMaritalAdjustment: '0.00',
+    commitmentMonthlyIncome: '8700.00',
+    commitmentAnnualizedIncome: '104400.00',
+    commitmentAnnualMedian: '97540.00',
+    disposableIncomeRequired: true,
+    monthlyDisposableIncome: '-1079.33',
+  },
 };
 
 const SAVED_INPUT = {
@@ -157,14 +202,14 @@ describe('the means-test screen', () => {
   let browser: FakeBrowser;
   const realFetch = globalThis.fetch;
 
-  function signedIn(routes: readonly Route[]) {
+  function signedIn(routes: readonly Route[], chapter = 7) {
     const fetchMock = jest.fn((url: string, init?: RequestInit) => {
       if (url.includes('/oauth2/token')) return Promise.resolve(tokenEndpointResponse());
       const method = init?.method ?? 'GET';
       const match = routes.find((route) => route.method === method && url.includes(route.fragment));
       if (match === undefined) {
         if (method === 'GET' && url.endsWith(`/v1/cases/${CASE_ID}`)) {
-          return Promise.resolve(jsonResponse(200, caseBody(CASE_ID)));
+          return Promise.resolve(jsonResponse(200, caseBody(CASE_ID, { chapter })));
         }
         return Promise.reject(new Error(`unexpected ${method} ${url}`));
       }
@@ -254,6 +299,82 @@ describe('the means-test screen', () => {
     expect(screen.getByText(/ust\/irs-national-standards@2026-07-15/u)).toBeTruthy();
     // The income grid shows what the records derived for Column A's wages.
     expect(screen.getByText('From the records: $7400.00')).toBeTruthy();
+  });
+
+  it('shows the Chapter 13 verdict — commitment period and disposable income — on a Chapter 13 case', async () => {
+    signedIn(baseRoutes([get(`/v1/cases/${CASE_ID}/means-test`, CHAPTER_13)]), 13);
+
+    expect(await screen.findByText('60 months')).toBeTruthy();
+    // The figure prints in the banner and again on the trace's line 45 —
+    // the same server string in both places.
+    expect(screen.getAllByText('$-1079.33')).toHaveLength(2);
+    expect(screen.getByText('Determined by the standards — Form 122C-2 is required')).toBeTruthy();
+    expect(screen.getByText('Disposable income under § 1325(b)(3)')).toBeTruthy();
+    // The trace table names the form each line prints on.
+    expect(screen.getByText('122C-1')).toBeTruthy();
+    expect(screen.getByText('Monthly disposable income under 11 U.S.C. § 1325(b)(2)')).toBeTruthy();
+    // The Chapter 13 questions are on the page; B122A-2's eligibility box is not.
+    expect(screen.getByLabelText('Line 40 — support income for dependent children')).toBeTruthy();
+    expect(screen.queryByLabelText('Line 36 — eligible to file under Chapter 13?')).toBeNull();
+  });
+
+  it('asks no Chapter 13 question on a Chapter 7 case', async () => {
+    signedIn(baseRoutes([get(`/v1/cases/${CASE_ID}/means-test`, ABOVE_MEDIAN)]));
+
+    expect(await screen.findByText('No presumption of abuse')).toBeTruthy();
+    expect(screen.queryByLabelText('Line 40 — support income for dependent children')).toBeNull();
+    expect(screen.queryByText('Commitment period (§ 1325(b)(4))')).toBeNull();
+    expect(screen.getByLabelText('Line 36 — eligible to file under Chapter 13?')).toBeTruthy();
+  });
+
+  it('saves the Chapter 13 answers on the same record and re-reads the trace', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(
+      baseRoutes([
+        get(`/v1/cases/${CASE_ID}/means-test`, CHAPTER_13),
+        {
+          method: 'POST',
+          fragment: `/v1/cases/${CASE_ID}/means_test_inputs`,
+          respond: () =>
+            jsonResponse(201, {
+              ...SAVED_INPUT,
+              child_support_for_dependents: '300.00',
+              qualified_retirement_deductions: '210.00',
+              special_circumstances: [
+                { id: 'row', description: 'Dialysis travel', amount: '180.00' },
+              ],
+            }),
+        },
+      ]),
+      13,
+    );
+    await screen.findByText('60 months');
+
+    await user.type(
+      screen.getByLabelText('Line 40 — support income for dependent children'),
+      '300.00',
+    );
+    await user.type(screen.getByLabelText('Line 41 — qualified retirement deductions'), '210.00');
+    await user.press(screen.getByRole('button', { name: 'Add a special circumstance' }));
+    await user.type(screen.getByLabelText('Special circumstance'), 'Dialysis travel');
+    await user.type(screen.getByLabelText('Monthly expense'), '180.00');
+    await user.press(screen.getAllByRole('button', { name: 'Save and recompute' })[0]!);
+
+    await waitFor(() => {
+      const sent = lastBody(fetchMock, 'POST', '/means_test_inputs');
+      expect(sent.child_support_for_dependents).toBe('300.00');
+      expect(sent.qualified_retirement_deductions).toBe('210.00');
+      expect(sent.special_circumstances).toEqual([
+        expect.objectContaining({ description: 'Dialysis travel', amount: '180.00' }),
+      ]);
+      const provenance = sent.provenance as Record<string, { source: string }>;
+      expect(provenance.child_support_for_dependents).toEqual({ source: 'staff_typed' });
+      const rowId = (sent.special_circumstances as { id: string }[])[0]!.id;
+      expect(provenance[`special_circumstances[${rowId}].amount`]).toEqual({
+        source: 'staff_typed',
+      });
+    });
+    expect(await screen.findByText('Saved')).toBeTruthy();
   });
 
   it('shows the expected filing date from the petition, with a link to change it there', async () => {

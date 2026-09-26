@@ -9,6 +9,7 @@ import {
   VENUE_BASES,
   INCOME_COLUMNS,
   MARITAL_FILING_STATUSES,
+  MEANS_TEST_FORMS,
   MEANS_TEST_OUTCOMES,
   PRESUMPTION_EXEMPTIONS,
   SIGNATURE_PAGES_MODES,
@@ -69,6 +70,7 @@ import type {
   CmiLine,
   CmiTrace,
   HouseholdFigure,
+  MeansTestChapter13,
   MeansTestLine,
   MedianComparison,
   PresumptionExemption,
@@ -3526,10 +3528,24 @@ function medianComparisonFromJson(response: DecodedResponse): MedianComparison {
 
 function meansTestLineFromJson(response: DecodedResponse): MeansTestLine {
   return {
+    form: requireChoice(response, 'form', MEANS_TEST_FORMS),
     line: requireString(response, 'line'),
     label: requireString(response, 'label'),
     amount: requireString(response, 'amount'),
     source: requireString(response, 'source'),
+  };
+}
+
+function meansTestChapter13FromJson(response: DecodedResponse): MeansTestChapter13 {
+  return {
+    commitmentPeriodMonths: requireNumber(response, 'commitmentPeriodMonths'),
+    commitmentSource: requireString(response, 'commitmentSource'),
+    commitmentMaritalAdjustment: requireString(response, 'commitmentMaritalAdjustment'),
+    commitmentMonthlyIncome: requireString(response, 'commitmentMonthlyIncome'),
+    commitmentAnnualizedIncome: requireString(response, 'commitmentAnnualizedIncome'),
+    commitmentAnnualMedian: requireString(response, 'commitmentAnnualMedian'),
+    disposableIncomeRequired: requireBoolean(response, 'disposableIncomeRequired'),
+    monthlyDisposableIncome: requireNullableString(response, 'monthlyDisposableIncome'),
   };
 }
 
@@ -3570,9 +3586,11 @@ function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
   const exemptions = childObject(response, 'exemptions');
   const debt = childObject(response, 'debt');
   const comparison = nullableObject(response, 'comparison');
+  const chapter13 = nullableObject(response, 'chapter13');
   return {
     asOf: requireString(response, 'asOf'),
     asOfSource: requireString(response, 'asOfSource'),
+    chapter: requireNumber(response, 'chapter'),
     releaseIds: requireStringRecord(response, 'releaseIds'),
     jurisdiction: {
       state: requireNullableString(jurisdiction, 'state'),
@@ -3613,6 +3631,7 @@ function caseMeansTestFromJson(response: DecodedResponse): CaseMeansTest {
     outcome: requireChoice(response, 'outcome', MEANS_TEST_OUTCOMES),
     determinedBy: requireNullableString(response, 'determinedBy'),
     lines: requireArrayOf(response, 'lines', 'MeansTestLine', meansTestLineFromJson),
+    chapter13: chapter13 === null ? null : meansTestChapter13FromJson(chapter13),
     problems: requireStringArray(response, 'problems'),
   };
 }

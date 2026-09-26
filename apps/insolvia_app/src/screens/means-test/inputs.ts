@@ -112,16 +112,32 @@ function withoutKey(body: MeansTestInputBody, key: keyof MeansTestInputBody): Me
 }
 
 /**
+ * The Chapter 13 half of the banner (issue #365): the § 1325(b)(4)
+ * commitment period and the § 1325(b)(2) disposable income, both the
+ * server's figures, or `null` on a Chapter 7 case and before the engine
+ * has run.
+ */
+export interface Chapter13Verdict {
+  readonly commitmentPeriod: string;
+  readonly disposableIncome: string;
+}
+
+/**
  * The one-line verdict the pinned banner prints for a trace, in the order
- * the issue names them: CMI, median, under/over, presumption. Text only —
- * every figure is the server's, unformatted beyond a `$`.
+ * the issue names them: CMI, median, under/over, and the determination —
+ * the presumption of abuse on Chapter 7, whether § 1325(b)(3) applies on
+ * Chapter 13. Text only — every figure is the server's, unformatted beyond
+ * a `$`.
  */
 export interface Verdict {
   readonly cmi: string;
   readonly median: string;
   readonly position: string;
+  /** What the fourth figure is called: the chapter's own question. */
+  readonly determinationLabel: string;
   readonly presumption: string;
   readonly intent: 'neutral' | 'success' | 'warning' | 'danger';
+  readonly chapter13: Chapter13Verdict | null;
 }
 
 export function verdictOf(trace: CaseMeansTest): Verdict {
@@ -134,28 +150,41 @@ export function verdictOf(trace: CaseMeansTest): Verdict {
       : comparison.aboveMedian
         ? 'Above the median'
         : 'At or below the median';
+  const chapter13: Chapter13Verdict | null =
+    trace.chapter13 === null
+      ? null
+      : {
+          commitmentPeriod: `${trace.chapter13.commitmentPeriodMonths} months`,
+          disposableIncome:
+            trace.chapter13.monthlyDisposableIncome === null
+              ? 'Not determined under § 1325(b)(3)'
+              : `$${trace.chapter13.monthlyDisposableIncome}`,
+        };
+  const determinationLabel =
+    trace.chapter === 13 ? 'Disposable income under § 1325(b)(3)' : 'Presumption of abuse';
+  const base = { cmi, median, position, determinationLabel, chapter13 };
   switch (trace.outcome) {
     case 'below_median':
-      return { cmi, median, position, presumption: 'No presumption of abuse', intent: 'success' };
+      return trace.chapter === 13
+        ? {
+            ...base,
+            presumption: 'Not determined by the standards — Form 122C-2 is not filed',
+            intent: 'success',
+          }
+        : { ...base, presumption: 'No presumption of abuse', intent: 'success' };
+    case 'above_median':
+      return {
+        ...base,
+        presumption: 'Determined by the standards — Form 122C-2 is required',
+        intent: 'warning',
+      };
     case 'no_presumption':
-      return { cmi, median, position, presumption: 'No presumption of abuse', intent: 'success' };
+      return { ...base, presumption: 'No presumption of abuse', intent: 'success' };
     case 'presumption_of_abuse':
-      return {
-        cmi,
-        median,
-        position,
-        presumption: 'Presumption of abuse arises',
-        intent: 'danger',
-      };
+      return { ...base, presumption: 'Presumption of abuse arises', intent: 'danger' };
     case 'exempt':
-      return {
-        cmi,
-        median,
-        position,
-        presumption: 'Exempt — the test does not apply',
-        intent: 'success',
-      };
+      return { ...base, presumption: 'Exempt — the test does not apply', intent: 'success' };
     case 'undetermined':
-      return { cmi, median, position, presumption: 'Not yet determined', intent: 'warning' };
+      return { ...base, presumption: 'Not yet determined', intent: 'warning' };
   }
 }
