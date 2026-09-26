@@ -616,6 +616,35 @@ invariant above governs agent writes exactly as it governs extraction. The
 tool surface that enforces this is the MCP milestone's design issue
 ([#260](https://github.com/insolvia-ai/insolvia/issues/260)).
 
+## Amendments — a per-item flag, not a copy of the case
+
+A schedule changed after filing is filed again as an amendment (Fed. R.
+Bankr. P. 1009) naming only what changed. The model carries that as one
+generic attribute beside `provenance` on every case-scoped entity (issue
+#370):
+
+```
+amended: bool          // false unless set; always present on the wire
+```
+
+- **It is not body data.** It needs no provenance entry, is never projected
+  as a value, and a PUT that omits it keeps the stored flag — "replace the
+  record whole" is about the body.
+- **It is only meaningful once the case is `filed`.** The API route refuses
+  `true` on any other status (409), rather than storing a flag that has
+  nothing to amend. The core parser checks shape only; the route is the
+  layer that holds the case's status.
+- **It drives one render, `OutputOptions.amended_only`.** Only the schedules
+  with an amended item print, each showing only those items and its own
+  "amended filing" caption ticked, followed by B106Sum and B106Dec and a
+  generated cover sheet (not an official form). It is the one packet a filed
+  case may still assemble, it resolves today's form revisions, and it writes
+  no pins to the case: the case's `form_revisions` go on describing the
+  original filing, and each amendment packet records its own.
+
+The case header's `is_amended` is a different fact (the whole-case box on
+every caption) and is still unset by anything.
+
 ## What this demands of the store
 
 Handing these constraints, not a decision, to the encrypted-case-store work:

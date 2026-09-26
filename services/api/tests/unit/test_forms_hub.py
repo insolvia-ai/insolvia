@@ -34,7 +34,14 @@ from insolvia_core.errors import ValidationError
 from insolvia_core.expenses import HOUSEHOLD, HouseholdBody
 from pypdf import PdfReader
 
-from tests.unit.test_packet_assembly import CASE_ID, TODAY, _entity, reference_case_data
+from tests.unit.test_packet_assembly import (
+    CASE_ID,
+    TODAY,
+    _entity,
+    _filed_reference_case_data,
+    _with_amended,
+    reference_case_data,
+)
 
 # ── forms_hub: one row per required form ─────────────────────────
 
@@ -325,6 +332,49 @@ def test_sign_electronically_fills_the_debtor_signature_field():
     fields = PdfReader(io.BytesIO(outcome)).get_fields()
     assert fields is not None
     assert fields["Debtor1.signature"].value == "/s/ Ada Quinn Lovelace"
+
+
+# ── Amendment previews (issue #370) ──────────────────────────────
+
+
+def test_a_filed_case_previews_its_amended_schedule_with_only_the_amended_item():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(
+        data, "form/b106ef", as_of=TODAY, options=OutputOptions(amended_only=True)
+    )
+    assert isinstance(outcome, bytes)
+    values = " ".join(
+        str(v) for v in (PdfReader(io.BytesIO(outcome)).get_fields() or {}).values()
+    )
+    assert "Bayside General Hospital" in values
+    assert "Meridian Bank Card Services" not in values
+
+
+@pytest.mark.parametrize(
+    ("series", "renders"),
+    [
+        ("form/b106ef", True),
+        ("form/b106sum", True),
+        ("form/b106dec", True),
+        ("form/b106d", False),
+        ("form/b101", False),
+    ],
+)
+def test_an_amendment_preview_renders_exactly_what_the_amendment_prints(
+    series, renders
+):
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(
+        data, series, as_of=TODAY, options=OutputOptions(amended_only=True)
+    )
+    assert isinstance(outcome, bytes) is renders
+
+
+def test_a_filed_case_still_refuses_a_plain_preview():
+    data = _with_amended(_filed_reference_case_data(), "claims", "claim-hospital")
+    outcome = render_form_preview(data, "form/b106ef", as_of=TODAY)
+    assert isinstance(outcome, tuple)
+    assert any("never re-assembled" in p.message for p in outcome)
 
 
 # ── form_preview_object_key ──────────────────────────────────────

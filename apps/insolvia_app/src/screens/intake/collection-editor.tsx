@@ -10,6 +10,7 @@ import type {
   LibraryCreditor,
 } from '@insolvia-ai/api-client';
 import {
+  Badge,
   Button,
   Checkbox,
   CheckboxGroup,
@@ -80,6 +81,14 @@ type Mode =
        * `staffTypedProvenance` (the ordinary rule) when not.
        */
       readonly librarySourceId: string | null;
+      /**
+       * The generic `amended` attribute (issue #370) — kept beside the
+       * body, never inside it, exactly as `bodyOf`/`amendedOf` split it on
+       * load. `false` for a new record; the server refuses `true` unless
+       * the case is filed, which is why the control that sets it is only
+       * shown when `caseFiled` is.
+       */
+      readonly amended: boolean;
     };
 
 type LoadState =
@@ -90,6 +99,7 @@ type LoadState =
 interface Row {
   readonly id: string;
   readonly body: Body;
+  readonly amended: boolean;
 }
 
 interface ReferenceOption {
@@ -137,9 +147,19 @@ export function bodyOf(record: Record<string, unknown>): Body {
     created_at: _created,
     updated_at: _updated,
     provenance: _provenance,
+    // `amended` (issue #370) is a generic entity attribute, not case data —
+    // the same reason it is stripped here that `provenance` is: it rides
+    // beside the body, never inside it. Callers that need it read `Row.amended`.
+    amended: _amended,
     ...body
   } = record;
   return body;
+}
+
+/** Whether a loaded record's `amended` flag is `true` — the one field
+ * `bodyOf` deliberately excludes. */
+export function amendedOf(record: Record<string, unknown>): boolean {
+  return record.amended === true;
 }
 
 /** Reads a dotted path (`payload.recipient.name`) out of a nested body. */
@@ -247,8 +267,12 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
   const [mode, setMode] = useState<Mode>(
     initialForm === undefined
       ? { kind: 'list' }
-      : { kind: 'form', id: null, body: initialForm, librarySourceId: null },
+      : { kind: 'form', id: null, body: initialForm, librarySourceId: null, amended: false },
   );
+  // Whether THIS case is filed (issue #370) — the one thing that decides
+  // whether the amended control shows at all; fetched once alongside the
+  // collection's own list, never re-derived from anything else on screen.
+  const [caseFiled, setCaseFiled] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
@@ -276,6 +300,18 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
 
   useEffect(() => {
     let cancelled = false;
+    // Whether the case is filed, read separately from — and never gating —
+    // the collection's own list: a failure here should leave the amended
+    // control simply hidden, not turn the whole section into an error the
+    // way a failed list read does.
+    (async () => {
+      try {
+        const caseResult = await call((client) => client.getCase(caseId));
+        if (!cancelled && caseResult.ok) setCaseFiled(caseResult.value.status === 'filed');
+      } catch {
+        // Best-effort, per above.
+      }
+    })();
     (async () => {
       try {
         const result = await call((client) => client.listCaseEntities(caseId, spec.collection));
@@ -284,6 +320,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
           result.value.map((record) => ({
             id: record.id,
             body: bodyOf(record as unknown as Record<string, unknown>),
+            amended: amendedOf(record as unknown as Record<string, unknown>),
           })),
         );
         setLoad({ kind: 'ready' });
@@ -330,6 +367,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
             linked.value.map((record) => ({
               id: record.id,
               body: bodyOf(record as unknown as Record<string, unknown>),
+              amended: amendedOf(record as unknown as Record<string, unknown>),
             })),
           );
         }
@@ -358,6 +396,13 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
         // other save keeps the ordinary `staff_typed` rule.
         const request = {
           ...form.body,
+          // `amended` (issue #370) rides only when the case is filed — the
+          // one state where the control is even shown, and the one state
+          // the server accepts `true` in. Omitted otherwise, matching this
+          // package's own "send only what differs from having nothing to
+          // say" rule, so an unfiled case's request is byte-for-byte what
+          // it was before this feature existed.
+          ...(caseFiled ? { amended: form.amended } : {}),
           provenance:
             form.librarySourceId === null
               ? staffTypedProvenance(form.body)
@@ -372,9 +417,11 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
           setStatus('');
           return;
         }
+        const savedRecord = result.value as unknown as Record<string, unknown>;
         const saved: Row = {
           id: result.value.id,
-          body: bodyOf(result.value as unknown as Record<string, unknown>),
+          body: bodyOf(savedRecord),
+          amended: amendedOf(savedRecord),
         };
         setRows((current) =>
           form.id === null
@@ -419,7 +466,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
         setSaving(false);
       }
     },
-    [addToLibrary, call, caseId, spec],
+    [addToLibrary, call, caseFiled, caseId, spec],
   );
 
   const remove = useCallback(
@@ -476,14 +523,24 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
                   : null;
               return (
                 <View key={row.id} style={[styles.row, { borderColor: theme.colors.line }]}>
-                  <Text
-                    style={[
-                      styles.rowSummary,
-                      { color: theme.colors.ink, fontFamily: theme.typography.body },
-                    ]}
-                  >
-                    {spec.summary(row.body)}
-                  </Text>
+                  <View style={styles.rowHeader}>
+                    <Text
+                      style={[
+                        styles.rowSummary,
+                        { color: theme.colors.ink, fontFamily: theme.typography.body },
+                      ]}
+                    >
+                      {spec.summary(row.body)}
+                    </Text>
+                    {/* Amended (issue #370) — only ever true on a filed
+                        case, so its presence alone is the signal; no
+                        separate "this case is filed" check needed here. */}
+                    {row.amended ? (
+                      <Badge intent="neutral" size="sm">
+                        Amended
+                      </Badge>
+                    ) : null}
+                  </View>
                   {linkingTitle === null ? null : (
                     <Text style={[styles.help, muted]}>
                       {linked.length > 0
@@ -505,6 +562,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
                           id: row.id,
                           body: row.body,
                           librarySourceId: null,
+                          amended: row.amended,
                         });
                       }}
                     >
@@ -529,7 +587,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
               setErrors({});
               setStatus('');
               setAddToLibrary(false);
-              setMode({ kind: 'form', id: null, body: {}, librarySourceId: null });
+              setMode({ kind: 'form', id: null, body: {}, librarySourceId: null, amended: false });
               if (spec.collection === 'creditors') {
                 void loadCreditorSources();
               }
@@ -609,6 +667,25 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
                 ]}
               >
                 Also save this creditor to your firm's library, for reuse on other cases
+              </Text>
+            </View>
+          ) : null}
+          {caseFiled ? (
+            <View style={styles.checkboxRow}>
+              <Checkbox.Root
+                aria-label={`Mark this ${spec.recordName} amended`}
+                checked={mode.amended}
+                onCheckedChange={(checked) => setMode({ ...mode, amended: checked })}
+              >
+                <Checkbox.Indicator>✓</Checkbox.Indicator>
+              </Checkbox.Root>
+              <Text
+                style={[
+                  styles.checkboxLabel,
+                  { color: theme.colors.ink, fontFamily: theme.typography.body },
+                ]}
+              >
+                {`Amended since filing — an amendment packet prints only the items marked this way.`}
               </Text>
             </View>
           ) : null}
@@ -1210,5 +1287,11 @@ const styles = StyleSheet.create({
   listItemRow: { gap: spacing.sm },
   row: { borderBottomWidth: 1, gap: spacing.sm, paddingBottom: spacing.sm },
   rowActions: { flexDirection: 'row', gap: spacing.sm },
+  rowHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
   rowSummary: { fontSize: fontSizes.body },
 });

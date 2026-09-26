@@ -179,5 +179,50 @@ describe('outputOptionsRequestFrom', () => {
     expect(outputOptionsRequestFrom({ ...DEFAULT_OUTPUT_OPTIONS, signaturePages: 'only' })).toEqual(
       { signaturePages: 'only' },
     );
+    expect(outputOptionsRequestFrom({ ...DEFAULT_OUTPUT_OPTIONS, amendedOnly: true })).toEqual({
+      amendedOnly: true,
+    });
+  });
+});
+
+describe('the amendment toggle (issue #370)', () => {
+  it('is offered only when the caller says the case can be amended', () => {
+    render(<OutputOptionsPanel value={DEFAULT_OUTPUT_OPTIONS} onChange={() => {}} />);
+
+    expect(screen.queryByRole('checkbox', { name: 'Amended items only' })).toBeNull();
+  });
+
+  it('turns amendedOnly on and nothing else', async () => {
+    let latest: OutputOptionsValue = DEFAULT_OUTPUT_OPTIONS;
+    render(
+      <OutputOptionsPanel
+        value={DEFAULT_OUTPUT_OPTIONS}
+        onChange={(next) => {
+          latest = next;
+        }}
+        amendment
+      />,
+    );
+
+    await userEvent.press(screen.getByRole('checkbox', { name: 'Amended items only' }));
+
+    expect(latest).toEqual({ ...DEFAULT_OUTPUT_OPTIONS, amendedOnly: true });
+  });
+
+  it('hides the forms subset while an amendment is chosen', () => {
+    render(
+      <OutputOptionsPanel
+        value={{ ...DEFAULT_OUTPUT_OPTIONS, amendedOnly: true }}
+        onChange={() => {}}
+        amendment
+        forms={{
+          options: [{ value: 'b101', label: 'B 101' }],
+          selected: undefined,
+          onChange: () => {},
+        }}
+      />,
+    );
+
+    expect(screen.queryByText('Forms to include')).toBeNull();
   });
 });

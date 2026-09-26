@@ -157,6 +157,7 @@ describe('the creditor matrix screen', () => {
               case_id: CASE_ID,
               created_at: '2026-09-01T10:00:00.000000Z',
               updated_at: '2026-09-01T10:00:00.000000Z',
+              amended: false,
               provenance: { name: { source: 'staff_typed' } },
               name: 'Example Bank',
             },

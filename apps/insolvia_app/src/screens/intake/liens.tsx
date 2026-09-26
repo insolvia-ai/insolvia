@@ -41,7 +41,15 @@ export function formatMoney(value: string): string {
 const claimsSpec = COLLECTION_SPECS.find((spec) => spec.collection === 'claims');
 
 function claimLabel(claim: CaseEntity<'claims'>, index: number): string {
-  const { id: _id, case_id: _c, created_at: _a, updated_at: _u, provenance: _p, ...body } = claim;
+  const {
+    id: _id,
+    case_id: _c,
+    created_at: _a,
+    updated_at: _u,
+    provenance: _p,
+    amended: _amended,
+    ...body
+  } = claim;
   return `Claim ${index + 1} — ${claimsSpec?.summary(body as Body) ?? claim.id}`;
 }
 
@@ -201,7 +209,18 @@ export function AssetLiensPanel({
       // The record's own provenance is kept, and only the one field this
       // action writes gains an entry — rebuilding the map as staff_typed
       // would relabel a confirmed extraction as something a person typed.
-      const { id, case_id: _c, created_at: _a, updated_at: _u, provenance, ...body } = claim;
+      // `amended` (issue #370) is stripped the same way — a generic entity
+      // attribute, not case data, so re-sending it here would be resending
+      // a fact this action never touches.
+      const {
+        id,
+        case_id: _c,
+        created_at: _a,
+        updated_at: _u,
+        provenance,
+        amended: _amended,
+        ...body
+      } = claim;
       const result = await call((client) =>
         client.putCaseEntity(caseId, 'claims', id, {
           ...body,

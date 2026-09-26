@@ -36,6 +36,7 @@ const SECURED_CLAIM = {
     creditor_id: { source: 'staff_typed' },
     collateral_description: { source: 'staff_typed' },
   },
+  amended: false,
   claim_class: 'secured',
   amount: '12000.00',
   creditor_id: CREDITOR_ID,
@@ -48,6 +49,7 @@ const CREDITOR = {
   created_at: STAMP,
   updated_at: STAMP,
   provenance: { name: { source: 'staff_typed' } },
+  amended: false,
   name: 'Example Auto Finance',
 };
 
@@ -58,6 +60,7 @@ const INPUT_WITH_ROW = {
   created_at: STAMP,
   updated_at: STAMP,
   provenance: { taxes: { source: 'staff_typed' } },
+  amended: false,
   taxes: '1620.00',
   other_secured_payments: [
     {

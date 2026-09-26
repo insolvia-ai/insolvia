@@ -30,7 +30,9 @@ Three stages, in a fixed order:
    (core/ports.PacketStore.create) — a packet whose pins were lost, or pins
    whose packet was, would each make "what did this filing use" unanswerable.
    Re-assembly re-pins; a FILED case refuses to assemble at all, because a
-   filed case never re-resolves.
+   filed case never re-resolves — except as an AMENDMENT (issue #370,
+   `OutputOptions.amended_only`), which prints only the changed schedules
+   and writes no pins to the case.
 
 A gate refusal is a SUCCESSFUL job whose result says `blocked` — the
 creditor-matrix route's rule ("both are the same successful act") carried
@@ -102,6 +104,7 @@ from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
 from insolvia_core.tax_ids import read_tax_id
 
 from insolvia_api.core import dollar_amounts
+from insolvia_api.core.amendment_cover_sheet import render_amendment_cover_sheet
 from insolvia_api.core.creditor_matrix import (
     MATRIX_FILE_NAME,
     format_for_court,
@@ -111,6 +114,7 @@ from insolvia_api.core.form_fill import FormFillError, fill_form
 from insolvia_api.core.form_overlay import (
     DEFAULT_OUTPUT_OPTIONS,
     OutputOptions,
+    apply_amendment_options,
     apply_output_stamps,
     apply_signature_options,
     parse_output_options,
@@ -610,11 +614,19 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
     return problems
 
 
-def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
+def completeness_problems(
+    data: CaseData, *, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS
+) -> tuple[PacketProblem, ...]:
     """Every structural reason the case cannot assemble, before a single
     projection runs. Deterministic order: case, debtors, cardinality,
     references, the statements' own answers — so the same case always
-    reports the same list."""
+    reports the same list.
+
+    `options` (issue #370) is read for exactly one thing: `amended_only`
+    lifts the filed-case refusal below. Every OTHER caller — `forms_hub.py`'s
+    listing among them — passes nothing and gets exactly today's behaviour:
+    a filed case still blocks every ordinary re-assembly.
+    """
     problems: list[PacketProblem] = []
     if data.case.chapter == 13:
         # Issue #365 built the means-test pair; the plan form (#366) and
@@ -643,14 +655,26 @@ def completeness_problems(data: CaseData) -> tuple[PacketProblem, ...]:
                 " the Chapter 7 packet can be assembled today.",
             )
         )
-    if data.case.status == "filed":
+    if data.case.status == "filed" and not options.amended_only:
         problems.append(
             PacketProblem(
                 source="case",
                 item_id=None,
                 field="status",
                 message="This case is filed. A filed case's packet is pinned"
-                " to the data that produced it and is never re-assembled.",
+                " to the data that produced it and is never re-assembled."
+                " To change a filed schedule, mark the changed items amended"
+                " and assemble with amendedOnly instead.",
+            )
+        )
+    if options.amended_only and data.case.status != "filed":
+        problems.append(
+            PacketProblem(
+                source="case",
+                item_id=None,
+                field="status",
+                message="amendedOnly renders an amendment to a FILED case —"
+                " this case has not been filed yet.",
             )
         )
     if not any(debtor.filing_role == "debtor_1" for debtor in data.debtors):
@@ -706,6 +730,175 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     return tuple(series for series in base if series not in skipped)
 
 
+# ── Amendments (issue #370) ──────────────────────────────────────────────────
+#
+# `amended` (core/case_entities.py's generic entity attribute) marks a
+# SCHEDULE ITEM as changed since the case was filed. `OutputOptions.amended_
+# only` renders a packet of exactly the schedules that carry one, each
+# printing only ITS amended items, plus B106Sum/B106Dec (always, whenever
+# that set is non-empty) and a generated cover sheet
+# (core/amendment_cover_sheet.py) — never B101, B121, B108, B2010, B2030,
+# or B122A-1/2, none of which prints a per-item list an "amended" flag could
+# narrow.
+#
+# Every schedule below is fed by exactly ONE amendable collection — the
+# thing that keeps `filtered_for_render` simple: narrowing that series'
+# own row list can never strand a CROSS-reference another series in the SAME
+# render needs, because each series gets its own per-series data view (see
+# `assemble`), and only that one series' own collection is ever narrowed in
+# it. A claim's creditor, an exemption's asset, a codebtor's claim — none of
+# those referenced collections is touched by another series' filter.
+AMENDABLE_SERIES: Final = (
+    "form/b106ab",
+    "form/b106c",
+    "form/b106d",
+    "form/b106ef",
+    "form/b106g",
+    "form/b106h",
+    "form/b106i",
+    "form/b106j",
+    "form/b106j2",
+    "form/b107",
+)
+
+# Re-rendered (their own "amended filing" caption ticked) whenever
+# `AMENDABLE_SERIES` produces a non-empty set — B106Sum copies every
+# schedule forward and B106Dec is the declaration about them, so an
+# amendment to any schedule makes both of these stale, filed or not.
+_ALWAYS_WITH_AMENDMENT: Final = ("form/b106sum", "form/b106dec")
+
+
+def _household_ids(data: CaseData, which: str) -> frozenset[str]:
+    return frozenset(e.id for e in data.households if e.body.which_household == which)
+
+
+def _series_has_amended_items(data: CaseData, series_id: str) -> bool:
+    """Whether ANY item feeding `series_id` is flagged amended — the test
+    `amended_series_ids` filters `AMENDABLE_SERIES` by. Unknown or
+    non-amendable series answer False rather than raising: a caller that
+    asks about, say, "form/b101" is asking a question with an honest "no",
+    not a programming error."""
+    if series_id == "form/b106ab":
+        return any(e.amended for e in data.assets)
+    if series_id == "form/b106c":
+        return any(e.amended for e in data.exemptions)
+    if series_id == "form/b106d":
+        return any(e.amended for e in data.claims if e.body.claim_class == "secured")
+    if series_id == "form/b106ef":
+        return any(
+            e.amended
+            for e in data.claims
+            if e.body.claim_class in ("priority_unsecured", "nonpriority_unsecured")
+        )
+    if series_id == "form/b106g":
+        return any(e.amended for e in data.contract_leases)
+    if series_id == "form/b106h":
+        return any(e.amended for e in data.codebtors)
+    if series_id == "form/b106i":
+        return any(e.amended for e in data.income_summaries)
+    if series_id in ("form/b106j", "form/b106j2"):
+        which = "main" if series_id == "form/b106j" else "debtor_2_separate"
+        household_ids = _household_ids(data, which)
+        return any(
+            e.amended for e in data.expenses if e.body.household_id in household_ids
+        )
+    if series_id == "form/b107":
+        return any(e.amended for e in data.sofa_entries)
+    return False
+
+
+def amended_series_ids(data: CaseData, series_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """The subset of `series_ids` that both `AMENDABLE_SERIES` names and
+    carries at least one amended item — filing order preserved."""
+    return tuple(
+        series
+        for series in series_ids
+        if series in AMENDABLE_SERIES and _series_has_amended_items(data, series)
+    )
+
+
+def amendment_render_series(
+    data: CaseData, series_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Every series an amendedOnly render prints, in filing order: the
+    schedules carrying an amended item plus B106Sum/B106Dec — or nothing at
+    all when no schedule does, because a Summary and Declaration about an
+    unchanged set amend nothing. The ONE answer both packet assembly and the
+    forms hub's single-form preview read, so the two cannot disagree about
+    whether a form belongs to the amendment."""
+    amended = amended_series_ids(data, series_ids)
+    if not amended:
+        return ()
+    return tuple(
+        series
+        for series in series_ids
+        if series in amended or series in _ALWAYS_WITH_AMENDMENT
+    )
+
+
+def filtered_for_render(data: CaseData, series_id: str) -> CaseData:
+    """The render-only view of `data` for ONE series of an amendedOnly
+    packet: only THIS series' own printed-row collection narrows to its
+    amended items. Every other collection — including one this series
+    merely RESOLVES A REFERENCE into (a claim's creditor, an exemption's or
+    a secured claim's asset, a codebtor's claim or lease) — stays whole, so
+    a kept row's cross-reference always resolves regardless of whether the
+    referenced record is itself flagged amended. A series this module does
+    not narrow (B106Sum, B106Dec, and everything outside
+    `AMENDABLE_SERIES`) gets `data` back unchanged — it still summarises or
+    declares over the WHOLE case, exactly as it always has; only its
+    caption changes (`form_overlay.apply_amendment_options`).
+    """
+    if series_id == "form/b106ab":
+        return replace(data, assets=tuple(e for e in data.assets if e.amended))
+    if series_id == "form/b106c":
+        return replace(data, exemptions=tuple(e for e in data.exemptions if e.amended))
+    if series_id == "form/b106d":
+        return replace(
+            data,
+            claims=tuple(
+                e for e in data.claims if e.amended and e.body.claim_class == "secured"
+            ),
+        )
+    if series_id == "form/b106ef":
+        return replace(
+            data,
+            claims=tuple(
+                e
+                for e in data.claims
+                if e.amended
+                and e.body.claim_class
+                in ("priority_unsecured", "nonpriority_unsecured")
+            ),
+        )
+    if series_id == "form/b106g":
+        return replace(
+            data,
+            contract_leases=tuple(e for e in data.contract_leases if e.amended),
+        )
+    if series_id == "form/b106h":
+        return replace(data, codebtors=tuple(e for e in data.codebtors if e.amended))
+    # form/b106i is amendable but never narrowed: Schedule I is one income
+    # statement, not a list of items, so an amended income summary re-prints
+    # the whole schedule — it falls through to the whole-data return below.
+    if series_id in ("form/b106j", "form/b106j2"):
+        which = "main" if series_id == "form/b106j" else "debtor_2_separate"
+        household_ids = _household_ids(data, which)
+        return replace(
+            data,
+            expenses=tuple(
+                e
+                for e in data.expenses
+                if e.amended and e.body.household_id in household_ids
+            ),
+        )
+    if series_id == "form/b107":
+        return replace(
+            data, sofa_entries=tuple(e for e in data.sofa_entries if e.amended)
+        )
+    return data
+
+
 @dataclass(frozen=True)
 class AssembledPacket:
     """A clean assembly: the parts in filing order, and the facts the record
@@ -753,8 +946,17 @@ def assemble(
     selection changes what gets PRINTED, not what "complete" means, so a
     packet is exactly as provably complete when printing one form as when
     printing all of them.
+
+    `options.amended_only` (issue #370) is the one exception to "runs over
+    the whole case regardless": each series still resolves and projects, but
+    against a PER-SERIES view of the data (`filtered_for_render`) that
+    narrows only that series' own printed row list to its amended items —
+    see that function's own docstring for why this is safe for
+    cross-references. It also lifts `completeness_problems`'s filed-case
+    refusal (passed straight through here) and adds one gate of its own:
+    nothing to amend is a problem, not a silent empty packet.
     """
-    problems = list(completeness_problems(data))
+    problems = list(completeness_problems(data, options=options))
 
     matrix = generate_creditor_matrix(data.creditors, format_for_court(data.case.court))
     problems.extend(
@@ -769,6 +971,9 @@ def assemble(
 
     case_file = to_case_file(data)
     series_ids = packet_form_series(data)
+    amendment = (
+        amendment_render_series(data, series_ids) if options.amended_only else ()
+    )
     # Resolve every release first: the pins the case records are the packet's
     # identity, and resolution failures gate like any other problem.
     releases: dict[str, FormRelease] = {}
@@ -800,8 +1005,17 @@ def assemble(
 
     projected: dict[str, FieldValues] = {}
     for series_id, release in releases.items():
+        # Every OTHER series still projects the WHOLE case, unfiltered —
+        # `filtered_for_render` is a no-op for anything outside
+        # `AMENDABLE_SERIES` (B106Sum/B106Dec still summarise/declare over
+        # everything, exactly as they always have).
+        series_case_file = (
+            to_case_file(filtered_for_render(data, series_id))
+            if options.amended_only
+            else case_file
+        )
         try:
-            projected[series_id] = project(release, case_file)
+            projected[series_id] = project(release, series_case_file)
         except FormProjectionError as error:
             problems.extend(
                 PacketProblem(source=series_id, item_id=None, field="", message=message)
@@ -816,6 +1030,10 @@ def assemble(
     # key naming a form this case does not currently file (typo, or a stale
     # selection from before a household/median fact changed) is a problem
     # like any other, not a silent drop: the preparer picked it on purpose.
+    # `amendedOnly` narrows the same way, by a different rule — the two are
+    # refused together at the request-validation layer
+    # (`form_overlay.parse_output_options`), so only one of these branches
+    # ever applies.
     render_series_ids = series_ids
     if options.forms is not None:
         requested = {f"form/{key}" for key in options.forms}
@@ -832,9 +1050,34 @@ def assemble(
         if problems:
             return tuple(problems)
         render_series_ids = tuple(s for s in series_ids if s in requested)
+    elif options.amended_only:
+        if not amendment:
+            problems.append(
+                PacketProblem(
+                    source="case",
+                    item_id=None,
+                    field="",
+                    message="No schedule items are marked amended — mark at"
+                    " least one item amended before assembling an"
+                    " amendedOnly packet.",
+                )
+            )
+            return tuple(problems)
+        render_series_ids = amendment
 
     printed_at = printed_at if printed_at is not None else datetime.now(UTC)
     parts: list[tuple[str, bytes]] = []
+    if options.amended_only:
+        parts.append(
+            (
+                "00-amendment-cover.pdf",
+                render_amendment_cover_sheet(
+                    case_file,
+                    amended_releases=[releases[s] for s in amendment],
+                    generated_at=printed_at,
+                ),
+            )
+        )
     for position, series_id in enumerate(series_ids, start=1):
         if series_id not in render_series_ids:
             continue
@@ -845,6 +1088,11 @@ def assemble(
             case_file=case_file,
             options=options,
             today=as_of,
+        )
+        values = apply_amendment_options(
+            release,
+            values,
+            amended=options.amended_only and series_id in render_series_ids,
         )
         try:
             rendered = fill_form(release, values)
@@ -923,7 +1171,10 @@ class PacketAssemblyDeps:
 def prints_b121(options: OutputOptions) -> bool:
     """Whether this render will put B121 on paper — the only reason to
     perform the full-value read. A subset that leaves it out projects B121
-    blank and never opens an envelope."""
+    blank and never opens an envelope. An amendment never prints B121
+    (it is not an amendable schedule), so it never opens one either."""
+    if options.amended_only:
+        return False
     return options.forms is None or "b121" in options.forms
 
 
@@ -1021,13 +1272,28 @@ def run_packet_assembly(
         packet.storage_ref, content=content, content_type=PACKET_CONTENT_TYPE
     )
 
-    pinned = pin_case(
-        case,
-        form_revisions=outcome.form_revisions,
-        constants_set_id=outcome.constants_set_id,
+    # An amendedOnly run never re-pins the CASE (issue #370): the case's
+    # `form_revisions`/`constants_set_id` describe the ORIGINAL filing, and
+    # this amendment's own resolution — possibly years later, against
+    # today's current releases — belongs on the PACKET record alone
+    # (`outcome.form_revisions` above), never overwriting what the case says
+    # the filing used. `pinned_case=case` (unchanged) makes the transactional
+    # case write below a no-op overwrite, and `allow_filed=True` is the one
+    # thing that lets it proceed at all against a filed case.
+    pinned = (
+        case
+        if options.amended_only
+        else pin_case(
+            case,
+            form_revisions=outcome.form_revisions,
+            constants_set_id=outcome.constants_set_id,
+        )
     )
     stored = deps.packet_store.create(
-        packet, pinned_case=pinned, expected_updated_at=case.updated_at
+        packet,
+        pinned_case=pinned,
+        expected_updated_at=case.updated_at,
+        allow_filed=options.amended_only,
     )
     if not stored:
         # The case moved (edited, filed, deleted) between our read and this

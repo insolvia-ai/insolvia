@@ -27,6 +27,7 @@ const SAVED_PETITION = {
   case_id: CASE_ID,
   created_at: '2026-09-01T10:00:00.000000Z',
   updated_at: '2026-09-01T10:00:00.000000Z',
+  amended: false,
   provenance: { fee_handling: { source: 'staff_typed' } },
   fee_handling: 'waiver',
 };
@@ -243,6 +244,7 @@ describe('the petition screen', () => {
               case_id: CASE_ID,
               created_at: '2026-09-01T10:00:00.000000Z',
               updated_at: '2026-09-01T10:00:00.000000Z',
+              amended: false,
               provenance: {},
               role: 'attorney',
               bar_number: '0123456',
@@ -289,6 +291,7 @@ describe('the petition screen', () => {
                 case_id: CASE_ID,
                 created_at: '2026-09-01T10:00:00.000000Z',
                 updated_at: '2026-09-01T10:00:00.000000Z',
+                amended: false,
                 provenance: {},
               })),
             }),

@@ -63,6 +63,7 @@ function bodyOf(record: Record<string, unknown>): PetitionBody {
     created_at: _created,
     updated_at: _updated,
     provenance: _provenance,
+    amended: _amended,
     ...body
   } = record;
   return body as PetitionBody;

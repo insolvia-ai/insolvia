@@ -203,6 +203,7 @@ describe('the assets screen', () => {
             case_id: CASE_ID,
             created_at: STAMP,
             updated_at: STAMP,
+            amended: false,
             provenance: {},
             category: 'vehicle',
             make: 'Honda',
