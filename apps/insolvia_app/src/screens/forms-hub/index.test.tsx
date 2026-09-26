@@ -51,6 +51,7 @@ const DEFAULT_OPTIONS = {
   printDate: false,
   signaturePages: 'all',
   signElectronically: false,
+  amendedOnly: false,
 };
 
 function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Promise<Response> {

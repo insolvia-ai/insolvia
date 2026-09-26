@@ -149,6 +149,7 @@ export function SignerSection({ caseId }: { caseId: string }) {
               created_at: _created,
               updated_at: _updated,
               provenance: _provenance,
+              amended: _amended,
               ...rest
             } = entity;
             byRole[entity.role] = { id: entity.id, body: rest };
@@ -200,6 +201,7 @@ export function SignerSection({ caseId }: { caseId: string }) {
         created_at: _created,
         updated_at: _updated,
         provenance: _provenance,
+        amended: _amended,
         ...rest
       } = result.value;
       setRecords((current) => ({ ...current, [role]: { id: result.value.id, body: rest } }));

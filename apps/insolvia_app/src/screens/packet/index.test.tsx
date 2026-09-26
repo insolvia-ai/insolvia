@@ -46,6 +46,7 @@ function packet(overrides: Record<string, unknown> = {}) {
       printDate: false,
       signaturePages: 'all',
       signElectronically: false,
+      amendedOnly: false,
     },
     ...overrides,
   };
@@ -76,6 +77,8 @@ interface ApiStub {
   url?: Answer;
   /** `GET .../forms` — the output-options panel's forms-subset checklist. */
   forms?: Answer;
+  /** The case record's status — `filed` is what offers an amendment. */
+  caseStatus?: 'intake' | 'filed';
 }
 
 type Answer = () => Response | Promise<Response>;
@@ -113,7 +116,10 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Pro
     return jsonResponse(200, { debtors: [] });
   }
   if (url.endsWith(CASE_ID)) {
-    return jsonResponse(200, caseBody(CASE_ID));
+    return jsonResponse(
+      200,
+      caseBody(CASE_ID, stub.caseStatus === undefined ? {} : { status: stub.caseStatus }),
+    );
   }
   throw new Error(`unexpected ${method} ${url}`);
 }
@@ -288,6 +294,73 @@ describe('the filing packet screen', () => {
     });
   });
 
+  it('never offers an amendment on a case that is not filed', async () => {
+    signedIn({});
+    await screen.findByText(/No packet has been assembled yet/);
+
+    expect(screen.queryByRole('checkbox', { name: 'Amended items only' })).toBeNull();
+  });
+
+  it('assembles an amendment of a filed case, without a forms subset', async () => {
+    const fetchMock = signedIn({
+      caseStatus: 'filed',
+      list: () => jsonResponse(200, { packets: [] }),
+      forms: () =>
+        jsonResponse(200, {
+          forms: [
+            {
+              series: 'form/b106ef',
+              form: 'b106ef',
+              title: 'Schedule E/F',
+              officialNumber: 'B 106E/F',
+              problems: [],
+              openTaskCount: 0,
+            },
+          ],
+        }),
+      accept: () => jsonResponse(202, job()),
+    });
+    await screen.findByText(/No packet has been assembled yet/);
+
+    await userEvent.press(await screen.findByRole('checkbox', { name: 'Amended items only' }));
+    // The API refuses a subset alongside an amendment, so the checklist goes.
+    expect(screen.queryByRole('checkbox', { name: 'B 106E/F' })).toBeNull();
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Assemble the Chapter 7 filing packet for this case' }),
+    );
+
+    const accepts = fetchMock.mock.calls.filter(
+      ([url, init]) => init?.method === 'POST' && String(url).endsWith('/jobs'),
+    );
+    expect(JSON.parse(String(accepts[0]?.[1]?.body))).toEqual({
+      kind: 'packet_assembly',
+      options: { amendedOnly: true },
+    });
+  });
+
+  it('labels an amendment packet on its row', async () => {
+    signedIn({
+      list: () =>
+        jsonResponse(200, {
+          packets: [
+            packet({
+              options: {
+                draftWatermark: false,
+                printDate: false,
+                signaturePages: 'all',
+                signElectronically: false,
+                amendedOnly: true,
+              },
+            }),
+          ],
+        }),
+    });
+
+    await screen.findByText('chapter7-packet.zip');
+
+    expect(screen.getByText('Amendment')).toBeTruthy();
+  });
+
   it('shows a non-default packet’s options as a badge on its row', async () => {
     signedIn({
       list: () =>
@@ -299,6 +372,7 @@ describe('the filing packet screen', () => {
                 printDate: false,
                 signaturePages: 'all',
                 signElectronically: false,
+                amendedOnly: false,
               },
             }),
           ],

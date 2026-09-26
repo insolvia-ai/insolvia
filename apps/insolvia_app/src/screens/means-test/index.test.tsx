@@ -180,6 +180,7 @@ const SAVED_INPUT = {
   case_id: CASE_ID,
   created_at: STAMP,
   updated_at: STAMP,
+  amended: false,
   provenance: { taxes: { source: 'staff_typed' } },
   taxes: '1620.00',
 };
@@ -387,6 +388,7 @@ describe('the means-test screen', () => {
               case_id: CASE_ID,
               created_at: STAMP,
               updated_at: STAMP,
+              amended: false,
               provenance: { expected_filing_date: { source: 'staff_typed' } },
               expected_filing_date: '2026-10-15',
             },

@@ -216,6 +216,7 @@ function describePacketOptions(options: Packet['options']): string | null {
   if (options.signaturePages === 'omit') labels.push('Signature pages omitted');
   if (options.signElectronically) labels.push('/s/ signed');
   if (options.forms !== undefined) labels.push('Partial set');
+  if (options.amendedOnly) labels.push('Amendment');
   return labels.length > 0 ? labels.join(' · ') : null;
 }
 
@@ -273,6 +274,11 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   const [options, setOptions] = useState<OutputOptionsValue>(DEFAULT_OUTPUT_OPTIONS);
   const [formOptions, setFormOptions] = useState<readonly FormsSubsetOption[]>([]);
   const [selectedForms, setSelectedForms] = useState<readonly string[] | undefined>(undefined);
+  // Whether the case is filed (issue #370) — the one state in which an
+  // amendment can be assembled, and so the one state the panel offers it.
+  // Best-effort like the forms checklist: a failed read just leaves the
+  // toggle hidden, and the plain assemble path is unaffected.
+  const [caseFiled, setCaseFiled] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -312,6 +318,21 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   useEffect(() => {
     void loadFormOptions();
   }, [loadFormOptions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await call((client) => client.getCase(caseId));
+        if (!cancelled && result.ok) setCaseFiled(result.value.status === 'filed');
+      } catch {
+        // No amendment toggle this load.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call, caseId]);
 
   const settle = useCallback(
     (job: Job) => {
@@ -380,9 +401,12 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     setActionError(null);
     setActivity('Assembling the filing packet…');
     try {
+      // An amendment picks its own forms (the API refuses a subset with
+      // it), and is only ever sent for a filed case.
+      const amending = caseFiled && options.amendedOnly;
       const outputOptions = {
-        ...outputOptionsRequestFrom(options),
-        ...(selectedForms === undefined ? {} : { forms: selectedForms }),
+        ...outputOptionsRequestFrom({ ...options, amendedOnly: amending }),
+        ...(selectedForms === undefined || amending ? {} : { forms: selectedForms }),
       };
       // Omitted entirely — not sent as `{}` — when nothing was asked for, so
       // the plain "Assemble packet" press still sends exactly `{kind}`, the
@@ -525,6 +549,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
         value={options}
         onChange={setOptions}
         disabled={assembly.phase === 'running'}
+        amendment={caseFiled}
         forms={
           formOptions.length > 0
             ? { options: formOptions, selected: selectedForms, onChange: setSelectedForms }

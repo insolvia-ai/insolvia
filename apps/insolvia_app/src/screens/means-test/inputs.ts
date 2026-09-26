@@ -33,6 +33,7 @@ export function inputBodyOf(record: Record<string, unknown>): MeansTestInputBody
     created_at: _created,
     updated_at: _updated,
     provenance: _provenance,
+    amended: _amended,
     ...body
   } = record;
   return body as MeansTestInputBody;
