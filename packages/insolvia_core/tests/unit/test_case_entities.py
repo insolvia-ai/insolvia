@@ -365,6 +365,73 @@ def test_json_omits_absent_members_and_keeps_false() -> None:
     assert json["provenance"]
 
 
+# ── The amended flag (issue #370) — generic, alongside provenance ──────
+
+
+def test_amended_defaults_false() -> None:
+    kind = COLLECTIONS["creditors"]
+    draft = parse_entity(kind, {})
+    assert draft.amended is False
+    entity = create_entity(kind, draft, case_id=CASE)
+    assert entity.amended is False
+
+
+@pytest.mark.parametrize("collection", sorted(COLLECTIONS))
+def test_amended_true_parses_for_every_collection(collection: str) -> None:
+    # Generic — not a per-body field — so every collection accepts it,
+    # including ones with no printed "amended" checkbox of their own.
+    draft = parse_entity(COLLECTIONS[collection], {"amended": True})
+    assert draft.amended is True
+
+
+def test_amended_must_be_a_boolean() -> None:
+    with pytest.raises(FieldValidationError) as failure:
+        parse_entity(COLLECTIONS["creditors"], {"amended": "yes"})
+    assert "amended" in failure.value.fields
+
+
+def test_amended_is_not_body_data_and_needs_no_provenance() -> None:
+    # A populated body still requires provenance (invariant 1); `amended`
+    # rides beside provenance, like `id`/`case_id`/`created_at`/`updated_at`,
+    # and is never itself a body field a provenance entry could describe.
+    draft = parse_entity(COLLECTIONS["creditors"], {"amended": True})
+    assert draft.provenance == {}
+
+
+def test_amended_survives_the_item_round_trip() -> None:
+    kind = COLLECTIONS["claims"]
+    draft = parse_entity(kind, {**sample_payload("claims"), "amended": True})
+    entity = create_entity(kind, draft, case_id=CASE)
+    restored = entity_from_item(kind, entity_item(entity))
+    assert restored == entity
+    assert restored.amended is True
+
+
+def test_amended_is_always_present_on_the_wire() -> None:
+    kind = COLLECTIONS["creditors"]
+    entity = create_entity(kind, parse_entity(kind, {}), case_id=CASE)
+    assert entity_json(entity)["amended"] is False
+
+
+def test_an_item_written_before_issue_370_reads_as_not_amended() -> None:
+    # A stored item with no "amended" attribute at all — every row this
+    # service wrote before the flag existed.
+    kind = COLLECTIONS["creditors"]
+    entity = create_entity(kind, parse_entity(kind, {}), case_id=CASE)
+    item = entity_item(entity)
+    del item["amended"]
+    restored = entity_from_item(kind, item)
+    assert restored.amended is False
+
+
+def test_replace_keeps_amended_from_the_new_draft() -> None:
+    kind = COLLECTIONS["creditors"]
+    entity = create_entity(kind, parse_entity(kind, {}), case_id=CASE)
+    assert entity.amended is False
+    replaced = replace_entity(entity, parse_entity(kind, {"amended": True}))
+    assert replaced.amended is True
+
+
 def test_replace_keeps_id_and_created_at() -> None:
     kind = COLLECTIONS["creditors"]
     entity = create_entity(

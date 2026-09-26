@@ -40,6 +40,7 @@ from dataclasses import asdict, dataclass
 from typing import Generic, TypeVar
 
 from .cases import partition_key
+from .errors import FieldValidationError
 from .fields import prune_body, timestamp
 from .provenance import (
     ProvenanceEntry,
@@ -76,10 +77,28 @@ class EntityKind(Generic[BodyT]):
 @dataclass(frozen=True)
 class EntityDraft(Generic[BodyT]):
     """A validated body plus its provenance, before the server stamps
-    identity on it."""
+    identity on it.
+
+    `amended` (issue #370) rides alongside `provenance` rather than inside
+    `BodyT` — a GENERIC entity attribute, not a per-body field repeated across
+    the nine schedule-item modules (creditors, claims, assets, exemptions,
+    contract_leases, codebtors, income_summaries, expenses, sofa_entries).
+    Two things point the same way: `provenance` itself already lives here,
+    beside the body rather than duplicated per module, and case-data-model.md
+    already generalises a cross-cutting entity fact this way (`external_refs`,
+    "every case-scoped entity may carry it") rather than adding it to every
+    body dataclass. Putting `amended` here means one parser, one stored
+    column, one place the "only meaningful once filed" rule is enforced —
+    at the API route layer, which is the one place that has the case's
+    `status` (this module's `parse_body` calls stay pure shape-and-type
+    checks, case-data-model.md's "storage validation is not filing
+    completeness"). It defaults to `False` for every collection, including
+    ones with no printed "amended" checkbox of their own — the same harmless
+    default `external_refs` carries."""
 
     body: BodyT
     provenance: Mapping[str, ProvenanceEntry]
+    amended: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,6 +110,7 @@ class CaseEntity(Generic[BodyT]):
     updated_at: str
     body: BodyT
     provenance: Mapping[str, ProvenanceEntry]
+    amended: bool = False
 
 
 def entity_body(entity: CaseEntity[BodyT] | EntityDraft[BodyT]) -> dict[str, object]:
@@ -101,6 +121,18 @@ def entity_body(entity: CaseEntity[BodyT] | EntityDraft[BodyT]) -> dict[str, obj
     if not isinstance(body, dict):  # pragma: no cover - bodies are dataclasses
         raise TypeError("an entity body must be a dataclass")
     return body
+
+
+def _parse_amended(payload: Mapping[str, object]) -> bool:
+    """Shape and type only — true or false, defaulting false. WHETHER an
+    amended flag may be set at all is a case-lifecycle rule (only meaningful
+    once the case is filed) and lives at the API route layer, which is the
+    one place that has the case's `status`; refused there, not ignored, so a
+    client is never left believing a write landed that did not."""
+    value = payload.get("amended", False)
+    if not isinstance(value, bool):
+        raise FieldValidationError({"amended": "amended must be true or false."})
+    return value
 
 
 def parse_entity(
@@ -125,7 +157,8 @@ def parse_entity(
     """
     body = kind.parse_body(payload)
     provenance = parse_provenance(payload.get("provenance"))
-    draft = EntityDraft(body=body, provenance=provenance)
+    amended = _parse_amended(payload)
+    draft = EntityDraft(body=body, provenance=provenance, amended=amended)
     if enforce_provenance:
         # Against the record as it will be STORED rather than as it arrived:
         # the field parsers collapse whitespace-only values to None, so
@@ -147,6 +180,7 @@ def create_entity(
         updated_at=now,
         body=draft.body,
         provenance=draft.provenance,
+        amended=draft.amended,
     )
 
 
@@ -164,6 +198,7 @@ def replace_entity(
         updated_at=timestamp(),
         body=draft.body,
         provenance=draft.provenance,
+        amended=draft.amended,
     )
 
 
@@ -181,13 +216,18 @@ def list_order(entity: CaseEntity[BodyT]) -> tuple[str, str]:
 def entity_json(entity: CaseEntity[BodyT]) -> dict[str, object]:
     """The API representation. Absent values are omitted rather than sent as
     nulls, exactly as debtor_json's are — on a progressive intake most of a
-    record is empty most of the time."""
+    record is empty most of the time.
+
+    `amended` is always present, like `provenance` and unlike the pruned
+    body fields — "not amended" is itself a fact worth stating, the same
+    reasoning `output_options_json` gives for never omitting a default."""
     return {
         "id": entity.id,
         "case_id": entity.case_id,
         "created_at": entity.created_at,
         "updated_at": entity.updated_at,
         "provenance": provenance_json(entity.provenance),
+        "amended": entity.amended,
         **prune_body(entity_body(entity)),
     }
 
@@ -211,6 +251,7 @@ def entity_item(entity: CaseEntity[BodyT]) -> dict[str, object]:
         "updatedAt": entity.updated_at,
         "body": prune_body(entity_body(entity)),
         "provenance": provenance_json(entity.provenance),
+        "amended": entity.amended,
     }
 
 
@@ -222,7 +263,10 @@ def entity_from_item(
     The body is re-parsed rather than trusted: an item written by an older
     revision is exactly the case where a field has since changed shape, and
     failing loudly here beats a `None` surfacing three layers up. Provenance
-    is NOT re-enforced — see parse_entity.
+    is NOT re-enforced — see parse_entity. `amended` defaults to `False` when
+    absent, exactly as a packet's stored `options` do for a field issue
+    13.11 shipped before this one — every row this service wrote before issue
+    #370 reads back as "not amended", which is what it always was.
     """
     body = item.get("body")
     draft = parse_entity(
@@ -230,6 +274,7 @@ def entity_from_item(
         {
             **(body if isinstance(body, Mapping) else {}),
             "provenance": item.get("provenance"),
+            "amended": item.get("amended", False),
         },
         enforce_provenance=False,
     )
@@ -241,4 +286,5 @@ def entity_from_item(
         updated_at=str(item.get("updatedAt", "")),
         body=draft.body,
         provenance=draft.provenance,
+        amended=draft.amended,
     )
