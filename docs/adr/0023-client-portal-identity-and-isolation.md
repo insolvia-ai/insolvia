@@ -55,6 +55,28 @@ otherwise:
    with an active binding cannot be bound again until revoked. When
    **0022 (proposed)** lands, the binding moves from the case to the client
    record; no portal URL names a case id, so the move is server-side.
+
+   **A joint case: a login per debtor by default, one for both on the
+   firm's choice.** The binding also names the filing roles its holder
+   answers for — `roles ⊆ {debtor_1, debtor_2}`, never empty, never
+   `non_filing_spouse` (who has no login in v1; their income is asked of a
+   debtor). By default a joint case is two invitations, each binding
+   holding its own role: each spouse states their own facts, the review
+   queue shows who said what, and a couple who file together but do not
+   share an inbox — or a household — still can. The firm may instead invite
+   one debtor with both roles when that is what the couple wants: an
+   explicit choice on the invitation, recorded in the access log. A case
+   holds at most one active binding per role, so two bindings can never
+   both claim `debtor_2`, and inviting the second spouse later narrows the
+   first binding's roles in the same transaction. A binding's `roles` bound
+   which debtor's fields its candidates may target; where both spouses
+   answer a shared household question, the conflicting candidates are
+   resolved in review like any other pair, and the portal adds no merge
+   logic. *Weighed and rejected:* one login per case (one spouse attesting
+   the other's income, an audit that cannot say who provided what, a model
+   that breaks for an estranged couple and disagrees with 0022's one client
+   per debtor); a login each with no single-login option (forces a second
+   invitation a couple may not want). Chosen by the maintainer, 2026-09-26.
 4. **Read policy: a fixed policy for the class, not the four axes.** ADR
    0009's axes describe staff; a client has no role, admin flag, caseload or
    feature map. The portal is a separate `ClientAccessor` type
