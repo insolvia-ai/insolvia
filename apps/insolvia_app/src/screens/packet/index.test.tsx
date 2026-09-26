@@ -257,6 +257,7 @@ describe('the filing packet screen', () => {
               title: 'Petition',
               officialNumber: 'B 101',
               problems: [],
+              openTaskCount: 0,
             },
             {
               series: 'form/b106ab',
@@ -264,6 +265,7 @@ describe('the filing packet screen', () => {
               title: 'Schedule A/B',
               officialNumber: 'B 106A/B',
               problems: [],
+              openTaskCount: 0,
             },
           ],
         }),

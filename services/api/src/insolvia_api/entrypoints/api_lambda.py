@@ -10,6 +10,7 @@ from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
@@ -150,6 +151,9 @@ app = create_app(
         # more — the calendar query rides its existing by-firm index.
         event_store=DynamoDbEventStore(config.case_table_name),
         calendar_token_store=DynamoDbCalendarTokenStore(config.case_table_name),
+        # Case tasks (issue #356 / 14.4): rows in the case table, no second
+        # table to provision.
+        task_store=DynamoDbTaskStore(config.case_table_name),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

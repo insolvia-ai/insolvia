@@ -31,6 +31,7 @@ function formRow(overrides: Record<string, unknown> = {}) {
     title: 'Voluntary Petition for Individuals Filing for Bankruptcy',
     officialNumber: 'B 101',
     problems: [],
+    openTaskCount: 0,
     ...overrides,
   };
 }
@@ -317,6 +318,34 @@ describe('the forms hub screen', () => {
 
     await screen.findByRole('heading', { name: 'Forms' });
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  // ── Task count (issue #356 / 14.4) ────────────────────────────
+
+  it('shows a row’s open task count', async () => {
+    signedIn({
+      list: () =>
+        jsonResponse(200, {
+          forms: [
+            formRow({
+              series: 'form/b106d',
+              form: 'b106d',
+              title: 'Schedule D: Creditors Who Have Claims Secured by Property',
+              officialNumber: 'B 106D',
+              openTaskCount: 2,
+            }),
+          ],
+        }),
+    });
+
+    expect(await screen.findByText('2 tasks')).toBeTruthy();
+  });
+
+  it('omits the task badge when a form has no open tasks', async () => {
+    signedIn({ list: () => jsonResponse(200, { forms: [formRow()] }) });
+
+    await screen.findByText(/Voluntary Petition/);
+    expect(screen.queryByText(/task/)).toBeNull();
   });
 });
 

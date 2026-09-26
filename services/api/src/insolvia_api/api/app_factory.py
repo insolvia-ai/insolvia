@@ -45,6 +45,7 @@ from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
 from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
+from insolvia_api.api.routes.tasks import blueprint as tasks_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
 from insolvia_api.api.routes.waitlist import blueprint as waitlist_blueprint
 from insolvia_api.core.cors import origin_allowed
@@ -85,6 +86,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # core/notes.py says why (server-stamped authorship, per-record edit
     # ownership, no provenance).
     app.register_blueprint(notes_blueprint)
+    # /v1/cases/<id>/tasks[/<task_id>] and /v1/me/tasks (issue #356 / 14.4) —
+    # same static-segment argument as debtors and documents.
+    app.register_blueprint(tasks_blueprint)
     # AFTER debtors and documents in this list, though registration order does
     # not decide matching — Werkzeug ranks static URL segments above dynamic
     # ones, so /debtors and /documents always beat /<collection>.

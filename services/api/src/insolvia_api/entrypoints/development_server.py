@@ -9,6 +9,7 @@ from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
+from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.adapters.aws.user_directory import CognitoUserDirectory
@@ -20,6 +21,7 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
@@ -33,6 +35,7 @@ from insolvia_core.ports import (
     DocumentStore,
     FirmStore,
     JwksProvider,
+    TaskStore,
     TaxIdCipher,
     TaxIdStore,
     UserDirectory,
@@ -148,6 +151,7 @@ debtor_store: DebtorStore
 case_entity_store: CaseEntityStore
 tax_id_store: TaxIdStore
 tax_id_cipher: TaxIdCipher
+task_store: TaskStore
 if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
@@ -161,6 +165,8 @@ if config.case_table_name and config.case_access_log_table_name:
     # exactly as staging does. The alias is derived from the table name.
     tax_id_store = DynamoDbTaxIdStore(config.case_table_name)
     tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
+    # Likewise: case tasks (issue #356 / 14.4) are child items too.
+    task_store = DynamoDbTaskStore(config.case_table_name)
 else:
     case_store = MemoryCaseStore()
     access_log = MemoryAccessLog()
@@ -169,6 +175,7 @@ else:
     tax_id_store = MemoryTaxIdStore()
     # The deterministic local key — never composed beside a real table.
     tax_id_cipher = LocalTaxIdCipher()
+    task_store = MemoryTaskStore()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -261,5 +268,6 @@ app = create_app(
         candidate_store=candidate_store,
         event_store=event_store,
         calendar_token_store=calendar_token_store,
+        task_store=task_store,
     )
 )

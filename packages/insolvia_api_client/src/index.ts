@@ -43,6 +43,7 @@ export {
   caseEntityRequestToJson,
   createCaseRequestToJson,
   createDocumentRequestToJson,
+  createTaskRequestToJson,
   formPreviewQuery,
   isDocumentContentType,
   isDocumentKind,
@@ -59,6 +60,7 @@ export {
   updateFirmRequestToJson,
   updateFirmUserRequestToJson,
   updateMeRequestToJson,
+  updateTaskRequestToJson,
   waitlistSubmissionToJson,
 } from './models.ts';
 // The four debtor enums are exported as VALUES, not only as types: each one is
@@ -277,6 +279,8 @@ export type {
   PermissionLevel,
   ProvenanceSource,
   PutDebtorRequest,
+  Task,
+  CreateTaskRequest,
   TaxIdEntry,
   TaxIdKind,
   TaxIdView,
@@ -284,6 +288,7 @@ export type {
   UpdateFirmRequest,
   UpdateFirmUserRequest,
   UpdateMeRequest,
+  UpdateTaskRequest,
   UploadDocumentOptions,
   Venue,
   VenueBasis,

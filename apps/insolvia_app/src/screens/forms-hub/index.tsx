@@ -254,9 +254,20 @@ export function FormsHub({ caseId }: { readonly caseId: string }) {
                     {form.officialNumber !== '' ? `${form.officialNumber} — ` : ''}
                     {form.title !== '' ? form.title : form.series}
                   </Text>
-                  <Badge intent={badge.intent} size="sm">
-                    {badge.label}
-                  </Badge>
+                  <View style={styles.rowBadges}>
+                    {/* Open tasks anchored to this form (issue #356 / 14.4) —
+                        server-computed, never re-summed here. Shown only
+                        above zero: a badge that always read "0 tasks" would
+                        be noise on every row that has none. */}
+                    {form.openTaskCount > 0 ? (
+                      <Badge intent="neutral" size="sm">
+                        {form.openTaskCount} {form.openTaskCount === 1 ? 'task' : 'tasks'}
+                      </Badge>
+                    ) : null}
+                    <Badge intent={badge.intent} size="sm">
+                      {badge.label}
+                    </Badge>
+                  </View>
                 </View>
                 {metric !== null ? <Text style={[styles.body, muted]}>{metric}</Text> : null}
 
@@ -361,6 +372,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   row: {
+    gap: spacing.xs,
+  },
+  rowBadges: {
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: spacing.xs,
   },
   rowHeader: {

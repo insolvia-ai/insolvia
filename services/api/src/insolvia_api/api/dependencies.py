@@ -14,6 +14,7 @@ from insolvia_core.ports import (
     DocumentStore,
     FirmStore,
     JwksProvider,
+    TaskStore,
     TaxIdCipher,
     TaxIdStore,
     UserDirectory,
@@ -113,6 +114,9 @@ class ApiDependencies:
     # secret with a different lifetime, not a different table.
     event_store: EventStore | None = None
     calendar_token_store: CalendarTokenStore | None = None
+    # Case tasks (issue #356 / 14.4): the same "nothing to provision"
+    # argument again — task rows are child items of the case partition.
+    task_store: TaskStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

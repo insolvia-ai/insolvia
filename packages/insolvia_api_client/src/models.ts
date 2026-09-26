@@ -88,6 +88,7 @@ export type FirmFeature =
   | 'creditor_library'
   | 'notes'
   | 'events'
+  | 'tasks'
   | 'firm_administration';
 
 /**
@@ -462,6 +463,114 @@ export interface CaseAssignee {
   readonly assignedAt: string;
   /** The subject of whoever made it. */
   readonly assignedBy: string;
+}
+
+// ---------------------------------------------------------------------------
+// Tasks (issue #356 / 14.4) — the case checklist: `/v1/cases/{caseId}/tasks`
+// and `GET /v1/me/tasks`. The contract lives in
+// `services/api/src/insolvia_api/api/routes/tasks.py` and
+// `packages/insolvia_core/src/insolvia_core/tasks.py`.
+//
+// NO PROVENANCE — unlike the case-domain entities below, a task is
+// operational metadata, not case data printed on a form (`core/tasks.py`'s
+// module docstring owns the argument).
+
+/**
+ * One task of a case, as every task endpoint returns it.
+ *
+ * `overdue` is server-COMPUTED on every read, never stored — it is `true`
+ * only when {@link dueDate} is in the past AND {@link done} is `false`. Do
+ * not compute your own version from `dueDate`; the server's clock and
+ * "today" are the ones that count, and computing it independently invites
+ * the client and the server disagreeing right at a day boundary.
+ */
+export interface Task {
+  readonly id: string;
+  readonly caseId: string;
+  readonly subject: string;
+  readonly description?: string;
+  readonly dueDate?: string;
+  /** The assignee's Cognito subject — resolve it through the firm directory, same as {@link CaseAssignee.subject}. Absent means unassigned. */
+  readonly assigneeSubject?: string;
+  /** The short form key this task anchors to (`"b106d"`, not `"form/b106d"`) — the same spelling {@link CaseForm.form} carries. Absent means no anchor. */
+  readonly formSeries?: string;
+  readonly done: boolean;
+  readonly overdue: boolean;
+  /** Present only once {@link done} has been `true`; absent on a task never completed or since reopened. */
+  readonly completedAt?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** The subject of whoever added it — an audit fact, like {@link Case.createdBy}. Grants nothing on its own. */
+  readonly createdBy: string;
+}
+
+/**
+ * The `POST /v1/cases/{caseId}/tasks` request body. Only {@link subject} is
+ * required — everything else is filled in later with
+ * {@link InsolviaApiClient.updateTask}. `done` is never accepted here: every
+ * task starts not-done.
+ */
+export interface CreateTaskRequest {
+  readonly subject: string;
+  readonly description?: string;
+  readonly dueDate?: string;
+  readonly assigneeSubject?: string;
+  readonly formSeries?: string;
+}
+
+/** The `POST /v1/cases/{caseId}/tasks` request body, absent fields omitted. */
+export function createTaskRequestToJson(request: CreateTaskRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = { subject: request.subject };
+  if (request.description !== undefined) body.description = request.description;
+  if (request.dueDate !== undefined) body.dueDate = request.dueDate;
+  if (request.assigneeSubject !== undefined) body.assigneeSubject = request.assigneeSubject;
+  if (request.formSeries !== undefined) body.formSeries = request.formSeries;
+  return body;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` request body — edit, reassign,
+ * complete or reopen a task, all through this one shape.
+ *
+ * **THREE STATES, not two, for {@link description}, {@link dueDate},
+ * {@link assigneeSubject} and {@link formSeries}.** Leave the key OUT of the
+ * object entirely to leave that field unchanged; set it to `null` to CLEAR
+ * it (unassign a task, remove a due date); set it to a value to replace it.
+ * `updateTaskRequestToJson` reads which keys are actually present with the
+ * `in` operator, so build the object literally —
+ * `{ dueDate: null }`, never `{ dueDate: undefined }`, which is
+ * indistinguishable from omitting the key at the JSON layer and would be
+ * silently read as "leave unchanged" by the wire format, not "clear".
+ *
+ * `subject` cannot be cleared, only replaced — a task with no title is not a
+ * task. `done` follows the same two-state rule `subject` does: set it to
+ * complete or reopen the task, and {@link Task.completedAt} follows it
+ * server-side — never send `completedAt` yourself, there is nowhere to send it.
+ */
+export interface UpdateTaskRequest {
+  readonly subject?: string;
+  readonly description?: string | null;
+  readonly dueDate?: string | null;
+  readonly assigneeSubject?: string | null;
+  readonly formSeries?: string | null;
+  readonly done?: boolean;
+}
+
+/**
+ * The `PATCH /v1/cases/{caseId}/tasks/{taskId}` body — reads which keys
+ * `request` actually carries (present-with-`null` means "clear", absent
+ * means "leave unchanged") rather than checking `!== undefined`, which
+ * cannot tell those two apart. See {@link UpdateTaskRequest}.
+ */
+export function updateTaskRequestToJson(request: UpdateTaskRequest): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (request.subject !== undefined) body.subject = request.subject;
+  if ('description' in request) body.description = request.description;
+  if ('dueDate' in request) body.dueDate = request.dueDate;
+  if ('assigneeSubject' in request) body.assigneeSubject = request.assigneeSubject;
+  if ('formSeries' in request) body.formSeries = request.formSeries;
+  if (request.done !== undefined) body.done = request.done;
+  return body;
 }
 
 /**
@@ -1116,6 +1225,12 @@ export interface CaseForm {
   readonly metric?: FormMetric;
   /** Empty when this form has nothing blocking it. */
   readonly problems: readonly CaseProblem[];
+  /**
+   * Not-done tasks (issue #356 / 14.4) anchored to this form via
+   * {@link Task.formSeries} — always present, `0` included, unlike
+   * {@link metric} which some forms genuinely have none of.
+   */
+  readonly openTaskCount: number;
 }
 
 /**

@@ -14,6 +14,7 @@ import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@
 import { EventsPanel } from './events-panel';
 import { filingStages, stagesComplete } from './stages';
 import type { Stage, StageState } from './stages';
+import { TasksPanel } from './tasks-panel';
 
 /**
  * A count this screen shows, once it knows it.
@@ -304,6 +305,9 @@ export function CaseOverview() {
 
           {/* ── Events and deadlines (issue 14.6 / #358) ───────────────── */}
           <EventsPanel colleagues={colleagues} />
+
+          {/* ── Tasks (issue #356 / 14.4) ──────────────────────────────── */}
+          <TasksPanel caseId={caseId} />
         </View>
 
         {/* ── At a glance ─────────────────────────────────────────────── */}

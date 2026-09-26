@@ -114,4 +114,8 @@ RESERVED_SK_NAMESPACES: Final = (
     "CANDIDATE",
     "NOTE",
     "EVENT",
+    # Case tasks (issue #356 / 14.4) — metadata rows, own module, own store
+    # (core/tasks.py), the same reasons DOCUMENT is its own prefix rather
+    # than a COLLECTIONS entry.
+    "TASK",
 )

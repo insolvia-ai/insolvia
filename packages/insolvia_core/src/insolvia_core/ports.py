@@ -22,6 +22,7 @@ from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.tasks import Task
 from insolvia_core.tax_ids import Envelope, SealedTaxId
 
 BodyT = TypeVar("BodyT")
@@ -707,4 +708,55 @@ class CandidateStore(Protocol):
         caller lost a race and must not pretend otherwise — a withdrawal that
         overwrote an acceptance would silently un-review a record the human
         just confirmed, and two reviewers racing must get one winner."""
+        ...
+
+
+class TaskStore(Protocol):
+    """Persists case tasks (issue #356 / 14.4) — metadata rows, no
+    provenance, no bytes; see core/tasks.py's module docstring for why this
+    is its own port rather than a CaseEntityStore kind.
+
+    Ownership is NOT a parameter here, the same rule DocumentStore and
+    CaseEntityStore state: a task is reached only through its case, the
+    caller resolves the case through `CaseStore` first on every path, and a
+    second authorisation path here would eventually disagree with the first.
+    What every method DOES enforce is the case scope: `case_id` is half the
+    key, so a task id from another case does not resolve here.
+
+    NO CROSS-CASE QUERY METHOD. "Assigned to me" (`GET /v1/me/tasks`) walks
+    the caller's reachable cases through `CaseStore.list_for_accessor` and
+    calls `list_for_case` on each — see api/routes/tasks.py — rather than
+    this port growing a by-assignee index. A store-level cross-case read
+    would have to re-derive `may_see_case` itself or risk one firm's task
+    leaking into another's "assigned to me" list, and that rule already lives
+    in exactly one place.
+    """
+
+    def create(self, task: Task) -> None:
+        """Store a new record. Ids are server-minted uuid4s, so an existing
+        (case, id) means the minting is broken — implementations MUST raise
+        rather than silently replace, exactly as CaseEntityStore.create and
+        DocumentStore.create do."""
+        ...
+
+    def get(self, case_id: str, task_id: str) -> Task | None: ...
+
+    def update(self, task: Task) -> Task | None:
+        """Write `task` back, but only over a row that still exists. Returns
+        None if it does not — the route turns that into the same 404 a
+        foreign id gets, so an edit racing a delete does not silently
+        resurrect the record."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[Task, ...]:
+        """Every task of one case, in creation order (core/tasks.list_order —
+        the sort key is a random uuid, so neither implementation gets this
+        ordering for free). All of them: a caller cannot page, so an
+        implementation that can truncate must not."""
+        ...
+
+    def delete(self, case_id: str, task_id: str) -> bool:
+        """Remove the record. True if this call removed it, False if there
+        was nothing there — so two concurrent deletes cannot both report
+        success."""
         ...
