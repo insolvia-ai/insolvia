@@ -15,7 +15,15 @@ import type {
  * sends — ADR 0001, the client stays dumb.
  */
 
-/** The stored record minus its identity — what a PUT sends back. */
+/**
+ * The stored record minus its identity — what a PUT sends back.
+ *
+ * `amended` (issue #370) is stripped with the identity: it is not body data,
+ * a PUT that omits it keeps the stored flag, and it means nothing on a plan
+ * (the amendment packet prints schedule items; a plan changed after
+ * confirmation is a § 1329 modification, not a Rule 1009 amendment). Left
+ * in, it would also earn a provenance entry the server does not expect.
+ */
 export function planBodyOf(record: Record<string, unknown>): PlanBody {
   const {
     id: _id,
@@ -23,6 +31,7 @@ export function planBodyOf(record: Record<string, unknown>): PlanBody {
     created_at: _created,
     updated_at: _updated,
     provenance: _provenance,
+    amended: _amended,
     ...body
   } = record;
   return body as PlanBody;

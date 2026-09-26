@@ -39,6 +39,14 @@ claims are paid in full without interest unless a percentage or a rate says
 otherwise (§ 1322(a)(2) and (a)(4)); general unsecured creditors take what
 is left (`pot`), or are promised a percentage or an amount.
 
+THE GENERIC `amended` FLAG (issue #370) is accepted and ignored here, the
+harmless default every collection without a printed "amended" checkbox
+carries (case_entities.EntityDraft). The amendment packet prints schedule
+items only, and a plan changed after confirmation is a § 1329 modification
+rather than a Rule 1009 amendment; nothing reads the flag on a plan — not
+the calculator, not the packet. Refusing it would make `plans` the one
+collection the generic write path treats differently, for no rule.
+
 RATES ARE PERCENTAGES CARRIED AS STRINGS (`fields.percentage`) — per annum
 for interest, of each receipt for the trustee — for money's reason.
 """

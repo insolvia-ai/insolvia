@@ -164,6 +164,7 @@ const STORED_PLAN = {
   case_id: CASE_ID,
   created_at: STAMP,
   updated_at: STAMP,
+  amended: false,
   provenance: {
     monthly_payment: { source: 'staff_typed' },
     'secured_treatments[t-car].claim_id': { source: 'staff_typed' },
@@ -179,6 +180,7 @@ const CLAIM = {
   created_at: STAMP,
   updated_at: STAMP,
   provenance: {},
+  amended: false,
   creditor_id: 'cr-auto',
   claim_class: 'secured',
   amount: '12000.00',
@@ -191,6 +193,7 @@ const CREDITOR = {
   created_at: STAMP,
   updated_at: STAMP,
   provenance: {},
+  amended: false,
   name: 'Example Auto Finance',
 };
 

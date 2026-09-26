@@ -15,6 +15,8 @@ Every identifier below is obviously fake; this repo is public.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from insolvia_core.case_entities import create_entity, parse_entity
 from insolvia_core.plans import PLAN
@@ -197,6 +199,22 @@ def test_the_reference_case_has_a_feasible_plan_that_clears_the_floor(harness):
     for summary in body["classes"]:
         for row in summary["rows"]:
             assert row["source"]
+
+
+def test_the_generic_amended_flag_changes_nothing_on_a_plan(harness):
+    """Issue #370's flag is accepted on every collection; on a plan nothing
+    reads it (core/plans.py says why), so the figures are the same."""
+    case_id = seed_chapter_13(harness)
+    draft = parse_entity(PLAN, {**REFERENCE_PLAN, "provenance": PROVENANCE})
+    harness.entity_store.create(create_entity(PLAN, draft, case_id=case_id))
+    plain = calculation(harness, case_id).get_json()
+    (stored,) = harness.entity_store.list_for_case(case_id, PLAN)
+    harness.entity_store.put(replace(stored, amended=True))
+
+    flagged = calculation(harness, case_id).get_json()
+
+    assert harness.entity_store.list_for_case(case_id, PLAN)[0].amended is True
+    assert flagged == plain
 
 
 def test_two_plan_records_are_read_first_one_first_and_said_so(harness):

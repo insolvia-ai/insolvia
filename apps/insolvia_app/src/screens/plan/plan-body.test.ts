@@ -21,6 +21,7 @@ describe('the plan record edits', () => {
         created_at: 't',
         updated_at: 't',
         provenance: {},
+        amended: false,
         monthly_payment: '500.00',
       }),
     ).toEqual({ monthly_payment: '500.00' });
