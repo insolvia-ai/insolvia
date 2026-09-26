@@ -1,6 +1,6 @@
 # ADR 0023 — A client is a third principal class: one case, candidates only
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-09-26)
 - **Date:** 2026-09-23
 - **Relates to:** issue [#361](https://github.com/insolvia-ai/insolvia/issues/361)
   (15.1), building toward #362–#364. Sits inside
