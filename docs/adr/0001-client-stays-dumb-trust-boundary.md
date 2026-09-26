@@ -38,3 +38,14 @@ client-side. It already came up once: the marketing site's waitlist form.
   application principal with data-store access.
 - Cost accepted: an extra network hop and an endpoint to build for each new
   capability, even "trivial" ones.
+
+> **Amended by [ADR 0024](0024-electronic-filing-path.md) (2026-09-26).**
+> The rule about clients stands. What this ADR did not contemplate is the
+> server side holding a credential that is **not ours**: to file cases,
+> Insolvia's filing worker holds each enrolled attorney's CM/ECF/PACER
+> password and TOTP seed — by FRBP 5005(a)(3), that attorney's signature in
+> federal court. No client holds it (the seed crosses the enrolment screen
+> once, inbound), and it is fenced by its own KMS key and store, decryptable
+> by the filing worker alone, every use logged and revocable at once. The
+> reasoning above — a credential shipped out of our control is one we no
+> longer control — is why that fence is as narrow as 0024 makes it.
