@@ -193,12 +193,26 @@ def test_group_problems_never_names_a_form_the_case_does_not_file():
 def test_every_completeness_source_with_a_form_mapping_is_reachable():
     # FORM_PROBLEM_SOURCES only matters for sources completeness_problems can
     # actually emit; this pins that every one of its keys names a real series
-    # in the packet's own set, so a typo here cannot silently orphan a source.
-    from insolvia_api.core.packet_assembly import PACKET_FORM_SERIES
+    # in one of the chapters' own sets, so a typo here cannot silently orphan
+    # a source.
+    from insolvia_api.core.packet_assembly import ALL_FORM_SERIES
 
     for series_list in FORM_PROBLEM_SOURCES.values():
         for series in series_list:
-            assert series in PACKET_FORM_SERIES
+            assert series in ALL_FORM_SERIES
+
+
+def test_a_chapter_13_hub_lists_the_b122c_pair_in_place_of_b122a():
+    # Issue #365: the means-test rows follow the chapter, and a source that
+    # feeds both pairs groups only under the pair this case files.
+    data = reference_case_data()
+    data = replace(data, case=replace(data.case, chapter=13))
+    series = {s.series for s in forms_hub(data, as_of=TODAY)}
+    assert {"form/b122c1", "form/b122c2"} <= series
+    assert not {"form/b122a1", "form/b122a2"} & series
+    grouped = group_problems(data)
+    assert "form/b122a2" not in grouped
+    assert "form/b122c2" in grouped
 
 
 # ── resolve_case_form: float, then pin (effective-dating.md) ────

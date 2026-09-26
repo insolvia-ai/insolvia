@@ -45,6 +45,7 @@ from insolvia_api.core.form_projections.b122a1 import (
     means_test_as_of,
 )
 from insolvia_api.core.form_projections.b122a2 import files_b122a2
+from insolvia_api.core.form_projections.b122c2 import files_b122c2
 from insolvia_api.core.form_templates import get_form, latest_form
 from insolvia_core.assets import AssetBody
 from insolvia_core.cases import Case
@@ -65,8 +66,10 @@ from insolvia_core.income import (
 )
 from insolvia_core.means_test_inputs import (
     IncomeLineOverride,
+    MaritalAdjustmentItem,
     MeansTestInputBody,
     OtherSecuredPayment,
+    SpecialCircumstanceItem,
 )
 from insolvia_core.petitions import (
     FilingProfessionalBody,
@@ -1321,7 +1324,38 @@ def reference_case_file() -> CaseFile:
     )
 
 
+def reference_case_file_chapter_13() -> CaseFile:
+    """The same family filing under Chapter 13 (issue #365): the identical
+    income history, household and deductions, plus the four answers the
+    Chapter 13 forms ask on their own — line 40's child support, line 41's
+    retirement withholding, one line-43 special circumstance, and no
+    contention that the (zero) marital adjustment shortens the commitment
+    period. B122C-1 and B122C-2's goldens print from this file."""
+    case_file = reference_case_file()
+    inputs = replace(
+        case_file.means_test_inputs[0],
+        child_support_for_dependents="300.00",
+        qualified_retirement_deductions="210.00",
+        special_circumstances=(
+            SpecialCircumstanceItem(
+                id="sc-1", description="Dialysis travel", amount="180.00"
+            ),
+        ),
+    )
+    return CaseFile(
+        **{
+            **case_file.__dict__,
+            "case": replace(REFERENCE_CASE, chapter=13),
+            "means_test_inputs": (inputs,),
+        }
+    )
+
+
 # --- the projected goldens ----------------------------------------------------
+
+# The Chapter 13 means-test pair prints from the Chapter 13 reference case;
+# every other series from the Chapter 7 one.
+CHAPTER_13_SERIES = frozenset({"form/b122c1", "form/b122c2"})
 
 
 @pytest.mark.parametrize(
@@ -1344,13 +1378,20 @@ def reference_case_file() -> CaseFile:
         "form/b121",
         "form/b122a1",
         "form/b122a2",
+        "form/b122c1",
+        "form/b122c2",
         "form/b2010",
         "form/b2030",
     ],
 )
 def test_reference_case_renders_to_its_golden(series: str) -> None:
     release = latest_form(series)
-    data = fill_form(release, project(release, reference_case_file()))
+    case_file = (
+        reference_case_file_chapter_13()
+        if series in CHAPTER_13_SERIES
+        else reference_case_file()
+    )
+    data = fill_form(release, project(release, case_file))
     observed = {
         "release": release.release_id,
         "sha256": hashlib.sha256(data).hexdigest(),
@@ -2760,3 +2801,169 @@ def test_b122a1_prints_an_overridden_line_as_entered() -> None:
     assert isinstance(wages, dict)
     assert wages["Debto1.Quest2.0"] == Text("8,000.00")
     assert values["total_cmi"] == Text("9,300.00")  # 8,000 + Ben's 1,300
+
+
+# --- B122C-1 / B122C-2 (issue #365) -------------------------------------------
+
+
+def _below_median_chapter_13_file() -> CaseFile:
+    """The Chapter 13 reference case with Ada's paychecks shrunk: 4,500 +
+    Ben's 1,300 annualizes to 69,600, under the FL household-of-3 median
+    (97,540) — line 17a, and 3 years on line 21."""
+    case_file = reference_case_file_chapter_13()
+    shrunk = tuple(
+        replace(record, gross="4500.00") for record in case_file.pay_period_records
+    )
+    return CaseFile(**{**case_file.__dict__, "pay_period_records": shrunk})
+
+
+def test_b122c1_columns_are_the_cmi_derivation_under_its_own_widget_names() -> None:
+    values = project(latest_form("form/b122c1"), reference_case_file_chapter_13())
+    wages = values["wages"]
+    assert isinstance(wages, dict)
+    assert wages["undefined"] == Text("7,400.00")
+    assert wages["undefined_11"] == Text("0.00")
+    unemployment = values["unemployment"]
+    assert isinstance(unemployment, dict)
+    assert unemployment["undefined_19"] == Text("1,300.00")
+    ssa = values["ssa_contention"]
+    assert isinstance(ssa, dict)
+    assert ssa == {"undefined_21": Text("150.00")}
+    # Line 11's box also prints on lines 12 and 18 — one widget.
+    assert values["total_cmi"] == Text("8,700.00")
+    assert latest_form("form/b122c1").field("total_cmi").pdf_names == ("undefined_32",)
+
+
+def test_b122c1_above_the_median_requires_122c2_and_five_years() -> None:
+    values = project(latest_form("form/b122c1"), reference_case_file_chapter_13())
+    # Married and filing jointly: line 1 says married, line 13 says the
+    # spouse files with you (fill in 0).
+    assert values["marital_filing_status"] == Option("married")
+    assert values["marital_adjustment_status"] == Option("2")
+    assert values["marital_adjustment_total"] == Text("0.00")
+    assert values["current_monthly_income"] == Text("8,700.00")
+    assert values["annualized_cmi"] == Text("104,400.00")
+    assert values["median_state"] == Text("FL")
+    assert values["median_household_size"] == Text("3")
+    assert values["median_income"] == Text("97,540.00")
+    assert values["median_comparison"] == Option("17b")
+    assert values["caption.disposable_income_box"] == Option("2")
+    assert values["commitment_marital_adjustment"] == Text("0.00")
+    assert values["commitment_monthly_income"] == Text("8,700.00")
+    assert values["commitment_annualized"] == Text("104,400.00")
+    assert values["commitment_comparison"] == Option("no")
+    assert values["caption.commitment_period_box"] == Option("4")
+
+
+def test_b122c1_below_the_median_checks_17a_and_three_years() -> None:
+    values = project(latest_form("form/b122c1"), _below_median_chapter_13_file())
+    assert values["annualized_cmi"] == Text("69,600.00")
+    assert values["median_comparison"] == Option("17a")
+    assert values["caption.disposable_income_box"] == Option("1")
+    assert values["commitment_comparison"] == Option("yes")
+    assert values["caption.commitment_period_box"] == Option("3")
+
+
+def test_b122c1_leaves_lines_12_to_21_blank_until_the_household_exists() -> None:
+    case_file = reference_case_file_chapter_13()
+    without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
+    values = project(latest_form("form/b122c1"), without_inputs)
+    assert values["total_cmi"] == Text("8,700.00")
+    assert "current_monthly_income" not in values
+    assert "median_comparison" not in values
+    assert "caption.commitment_period_box" not in values
+
+
+def test_b122c1_prints_the_marital_adjustment_rows_and_the_contention() -> None:
+    contended = _with_inputs(
+        reference_case_file_chapter_13(),
+        marital_adjustments=(
+            MaritalAdjustmentItem(
+                id="ma-1", description="Spouse's own student loan", amount="300.00"
+            ),
+        ),
+        commitment_period_marital_adjustment=True,
+    )
+    values = project(latest_form("form/b122c1"), contended)
+    purpose = values["marital_adjustment_purpose"]
+    assert isinstance(purpose, dict)
+    assert purpose == {"13a": Text("Spouse's own student loan")}
+    assert values["marital_adjustment_total"] == Text("300.00")
+    assert values["current_monthly_income"] == Text("8,400.00")
+    assert values["commitment_marital_adjustment"] == Text("300.00")
+    assert values["commitment_monthly_income"] == Text("8,400.00")
+
+
+def test_b122c2_determination_follows_the_engine() -> None:
+    values = project(latest_form("form/b122c2"), reference_case_file_chapter_13())
+    # Lines 5-38 are B122A-2's figures under B122C-2's widgets; line 38's
+    # box is also line 42's (one widget), and line 45 is 8,700 less the
+    # 9,779.33 of adjustments.
+    assert values["household_size"] == Text("3")
+    assert values["total_deductions"] == Text("9,089.33")
+    assert latest_form("form/b122c2").field("total_deductions").pdf_names == (
+        "undefined_85",
+    )
+    assert values["current_monthly_income"] == Text("8,700.00")
+    assert values["child_support_income"] == Text("300.00")
+    assert values["qualified_retirement_deductions"] == Text("210.00")
+    description = values["special_circumstances_description"]
+    assert isinstance(description, dict)
+    assert description == {"43a": Text("Dialysis travel")}
+    assert values["special_circumstances_total"] == Text("180.00")
+    assert values["total_adjustments"] == Text("9,779.33")
+    assert values["monthly_disposable_income"] == Text("-1,079.33")
+    # Line 36 multiplies without B122A-2's eligibility question.
+    assert values["ch13_multiplier"] == Text("0.1")
+    assert values["ch13_plan_payment"] == Text("650.00")
+    assert values["ch13_admin_expense"] == Text("65.00")
+    # Line 11's export states are the line numbers each answer leads to.
+    assert values["vehicle_count"] == Option("12")
+    assert values["cure_claimed"] == Option("yes")
+    assert values["priority_claims_owed"] == Option("yes")
+    creditor = values["other_secured_creditor"]
+    assert isinstance(creditor, dict)
+    assert creditor == {"33d": Text("Suncoast Equipment Finance")}
+
+
+def test_b122c2_lands_13e_on_the_row_that_33c_shares() -> None:
+    # The official PDF wires line 33c's copy box to 13e's first creditor
+    # row; the total lands there so 33c prints it.
+    two_cars = _with_inputs(
+        reference_case_file_chapter_13(),
+        vehicle_count=2,
+        vehicle_2_loan_monthly="220.00",
+    )
+    values = project(latest_form("form/b122c2"), two_cars)
+    assert values["vehicle_2_loan_total"] == Text("220.00")
+    rows = values["vehicle_2_loan_rows"]
+    assert isinstance(rows, dict)
+    assert rows == {"undefined_25": Text("220.00")}
+    assert latest_form("form/b122c2").field("vehicle_2_loan_rows").pdf_names == (
+        "undefined_25",
+        "undefined_25-1",
+    )
+
+
+def test_b122c2_refuses_a_below_median_case() -> None:
+    assert not files_b122c2(_below_median_chapter_13_file())
+    with pytest.raises(FormProjectionError, match="at or below the applicable median"):
+        project(latest_form("form/b122c2"), _below_median_chapter_13_file())
+
+
+def test_the_means_test_forms_refuse_the_other_chapter() -> None:
+    with pytest.raises(FormProjectionError, match="Chapter 7 case"):
+        project(latest_form("form/b122c1"), reference_case_file())
+    with pytest.raises(FormProjectionError, match="Chapter 7 case"):
+        project(latest_form("form/b122c2"), reference_case_file())
+    assert not files_b122c2(reference_case_file())
+    with pytest.raises(FormProjectionError, match="Chapter 13 case"):
+        project(latest_form("form/b122a2"), reference_case_file_chapter_13())
+
+
+def test_b122c2_surfaces_the_engines_refusals_through_the_gate() -> None:
+    case_file = reference_case_file_chapter_13()
+    without_inputs = CaseFile(**{**case_file.__dict__, "means_test_inputs": ()})
+    assert files_b122c2(without_inputs)  # not yet determinable: stays in the set
+    with pytest.raises(FormProjectionError, match="household composition"):
+        project(latest_form("form/b122c2"), without_inputs)

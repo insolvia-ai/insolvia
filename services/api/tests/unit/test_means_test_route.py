@@ -142,10 +142,11 @@ class Harness:
         )
         self.client = app.test_client()
 
-    def seed_reference_case(self) -> str:
-        """The reference case, owned by Alice's firm, in the stores."""
+    def seed_reference_case(self, *, chapter: int = 7) -> str:
+        """The reference case, owned by Alice's firm, in the stores — filing
+        under `chapter` (issue #365: the same family as a Chapter 13 case)."""
         data = reference_case_data()
-        case = replace(data.case, firm_id=FIRM_A, created_by=ALICE)
+        case = replace(data.case, firm_id=FIRM_A, created_by=ALICE, chapter=chapter)
         self.case_store.create(
             case, assign_case(case, subject=ALICE, assigned_by=ALICE)
         )
@@ -320,6 +321,74 @@ def test_the_trace_equals_what_b122a2_prints(harness):
         "ust/irs-local-standards@"
     )
     assert body["problems"] == []
+
+
+def test_a_chapter_7_trace_carries_no_chapter_13_verdict(harness):
+    case_id = harness.seed_reference_case()
+
+    body = harness.means_test(case_id).get_json()
+
+    assert body["chapter"] == 7
+    assert body["chapter13"] is None
+    assert {line["form"] for line in body["lines"]} == {"122A-2"}
+
+
+def test_the_chapter_13_trace_equals_what_b122c1_and_b122c2_print(harness):
+    # Issue #365: the same family under Chapter 13 — the commitment period,
+    # whether Form 122C-2 is required, and the disposable income are the
+    # figures the two projections land, read through one endpoint.
+    case_id = harness.seed_reference_case(chapter=13)
+    case_file = harness.case_file(case_id)
+    c1 = project(latest_form("form/b122c1"), case_file)
+    c2 = project(latest_form("form/b122c2"), case_file)
+
+    body = harness.means_test(case_id).get_json()
+
+    assert body["chapter"] == 13
+    assert body["outcome"] == "above_median"
+    assert body["determinedBy"] == "median"
+    assert body["exemptions"]["applied"] is None
+    comparison = body["comparison"]
+    assert comparison["monthlyCmi"] == money(c1["current_monthly_income"])
+    assert comparison["annualizedCmi"] == money(c1["annualized_cmi"])
+    assert comparison["aboveMedian"] is True
+    assert c1["median_comparison"] == Option("17b")
+    verdict = body["chapter13"]
+    assert verdict["commitmentPeriodMonths"] == 60
+    assert c1["caption.commitment_period_box"] == Option("4")
+    assert verdict["commitmentAnnualizedIncome"] == money(c1["commitment_annualized"])
+    assert verdict["commitmentAnnualMedian"] == money(c1["median_income"])
+    assert "§ 1325(b)(4)" in verdict["commitmentSource"]
+    assert verdict["disposableIncomeRequired"] is True
+    assert verdict["monthlyDisposableIncome"] == money(c2["monthly_disposable_income"])
+    lines = {(line["form"], line["line"]): line for line in body["lines"]}
+    assert lines[("122C-1", "14")]["amount"] == money(c1["current_monthly_income"])
+    assert lines[("122C-2", "38")]["amount"] == money(c2["total_deductions"])
+    assert lines[("122C-2", "45")]["amount"] == money(c2["monthly_disposable_income"])
+    assert all(line["source"] for line in body["lines"])
+    assert body["problems"] == []
+
+
+def test_a_below_median_chapter_13_case_reports_three_years_and_no_122c2(harness):
+    case_id = harness.seed_reference_case(chapter=13)
+    for entity in harness.entity_store.list_for_case(
+        case_id, reference_case_data().pay_period_records[0].kind
+    ):
+        payload = {"gross": "4500.00"}
+        response = harness.client.put(
+            f"/v1/cases/{case_id}/pay_period_records/{entity.id}",
+            json={**payload, "provenance": dict.fromkeys(payload, TYPED)},
+            headers=auth(ALICE),
+        )
+        assert response.status_code == 200, response.get_json()
+
+    body = harness.means_test(case_id).get_json()
+
+    assert body["outcome"] == "below_median"
+    assert body["chapter13"]["commitmentPeriodMonths"] == 36
+    assert body["chapter13"]["disposableIncomeRequired"] is False
+    assert body["chapter13"]["monthlyDisposableIncome"] is None
+    assert {line["form"] for line in body["lines"]} == {"122C-1"}
 
 
 def test_the_inputs_are_reported_as_the_engine_read_them(harness):

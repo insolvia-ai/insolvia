@@ -1,0 +1,508 @@
+{
+ "fields": {
+  "1": {
+   "value": null
+  },
+  "2": {
+   "value": null
+  },
+  "33d": {
+   "value": "Suncoast Equipment Finance"
+  },
+  "33e": {
+   "value": null
+  },
+  "33f": {
+   "value": null
+  },
+  "43a": {
+   "value": "Dialysis travel"
+  },
+  "43b": {
+   "value": null
+  },
+  "43c": {
+   "value": null
+  },
+  "60": {
+   "value": null
+  },
+  "7a Outofpocket health care allowance per person": {
+   "value": "90.00"
+  },
+  "7d Outofpocket health care allowance per person": {
+   "value": "163.00"
+  },
+  "Bankruptcy District Information": {
+   "value": "Middle District of Florida"
+  },
+  "Case number": {
+   "value": null
+  },
+  "Check if this is an amended filing": {
+   "value": null,
+   "widget_states": [
+    "/Off"
+   ]
+  },
+  "Date": {
+   "value": "08/30/2026"
+  },
+  "Date_2": {
+   "value": "08/30/2026"
+  },
+  "Debtor 1": {
+   "value": "Ada Quinn Lovelace"
+  },
+  "Debtor 2": {
+   "value": "Ben Lovelace Jr."
+  },
+  "Describe 1": {
+   "value": null
+  },
+  "Describe 1_2": {
+   "value": null
+  },
+  "Describe 2": {
+   "value": null
+  },
+  "Describe 2_2": {
+   "value": null
+  },
+  "Explain why 1": {
+   "value": null
+  },
+  "Explain why 2": {
+   "value": null
+  },
+  "Text1.0": {
+   "value": null
+  },
+  "Text1.1": {
+   "value": null
+  },
+  "Text1.2": {
+   "value": null
+  },
+  "Text1.3": {
+   "value": null
+  },
+  "X": {
+   "value": "3"
+  },
+  "X_2": {
+   "value": "0"
+  },
+  "check11": {
+   "value": "/12",
+   "widget_states": [
+    "/Off",
+    "/12",
+    "/Off"
+   ]
+  },
+  "check25": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check33d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check33e": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check33f": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check34": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check35": {
+   "value": "/yes",
+   "widget_states": [
+    "/Off",
+    "/yes"
+   ]
+  },
+  "check46": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46a": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46b": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46c": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46d": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46e": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46f": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "check46g": {
+   "value": null,
+   "widget_states": [
+    "/Off",
+    "/Off"
+   ]
+  },
+  "undefined": {
+   "value": "3"
+  },
+  "undefined_10": {
+   "value": null
+  },
+  "undefined_100": {
+   "value": null
+  },
+  "undefined_101": {
+   "value": null
+  },
+  "undefined_102": {
+   "value": null
+  },
+  "undefined_103": {
+   "value": null
+  },
+  "undefined_104": {
+   "value": null
+  },
+  "undefined_105": {
+   "value": null
+  },
+  "undefined_106": {
+   "value": null
+  },
+  "undefined_107": {
+   "value": null
+  },
+  "undefined_108": {
+   "value": null
+  },
+  "undefined_109": {
+   "value": null
+  },
+  "undefined_11": {
+   "value": "1,480.00"
+  },
+  "undefined_110": {
+   "value": null
+  },
+  "undefined_111": {
+   "value": null
+  },
+  "undefined_112": {
+   "value": null
+  },
+  "undefined_12": {
+   "value": "1,833.00"
+  },
+  "undefined_13": {
+   "value": "733.00"
+  },
+  "undefined_14": {
+   "value": "353.00"
+  },
+  "undefined_16": {
+   "value": "0.00"
+  },
+  "undefined_17": {
+   "value": "320.00"
+  },
+  "undefined_18": {
+   "value": "703.00"
+  },
+  "undefined_19": {
+   "value": null
+  },
+  "undefined_19-1": {
+   "value": null
+  },
+  "undefined_2": {
+   "value": "1,857.00"
+  },
+  "undefined_20": {
+   "value": null
+  },
+  "undefined_20-1": {
+   "value": null
+  },
+  "undefined_20-2": {
+   "value": "415.00"
+  },
+  "undefined_21": {
+   "value": "288.00"
+  },
+  "undefined_23": {
+   "value": null
+  },
+  "undefined_24": {
+   "value": null
+  },
+  "undefined_24-1": {
+   "value": null
+  },
+  "undefined_25": {
+   "value": null
+  },
+  "undefined_25-1": {
+   "value": null
+  },
+  "undefined_25-2": {
+   "value": null
+  },
+  "undefined_26": {
+   "value": null
+  },
+  "undefined_28": {
+   "value": "0.00"
+  },
+  "undefined_29": {
+   "value": "0.00"
+  },
+  "undefined_3": {
+   "value": "270.00"
+  },
+  "undefined_30": {
+   "value": "1,620.00"
+  },
+  "undefined_31": {
+   "value": "85.00"
+  },
+  "undefined_32": {
+   "value": "35.00"
+  },
+  "undefined_33": {
+   "value": "0.00"
+  },
+  "undefined_34": {
+   "value": "0.00"
+  },
+  "undefined_35": {
+   "value": "450.00"
+  },
+  "undefined_36": {
+   "value": "0.00"
+  },
+  "undefined_37": {
+   "value": "45.00"
+  },
+  "undefined_38": {
+   "value": "6,056.00"
+  },
+  "undefined_39": {
+   "value": "520.00"
+  },
+  "undefined_4": {
+   "value": "0.00"
+  },
+  "undefined_40": {
+   "value": null
+  },
+  "undefined_41": {
+   "value": "60.00"
+  },
+  "undefined_42": {
+   "value": "580.00"
+  },
+  "undefined_44": {
+   "value": null
+  },
+  "undefined_45": {
+   "value": "0.00"
+  },
+  "undefined_46": {
+   "value": "0.00"
+  },
+  "undefined_47": {
+   "value": "0.00"
+  },
+  "undefined_48": {
+   "value": "150.00"
+  },
+  "undefined_49": {
+   "value": "60.00"
+  },
+  "undefined_5": {
+   "value": "270.00"
+  },
+  "undefined_53": {
+   "value": "Utility trailer"
+  },
+  "undefined_54": {
+   "value": "95.00"
+  },
+  "undefined_55": {
+   "value": null
+  },
+  "undefined_56": {
+   "value": null
+  },
+  "undefined_57": {
+   "value": null
+  },
+  "undefined_58": {
+   "value": null
+  },
+  "undefined_59": {
+   "value": "1,990.00"
+  },
+  "undefined_60": {
+   "value": "100.00"
+  },
+  "undefined_61": {
+   "value": "890.00"
+  },
+  "undefined_63": {
+   "value": null
+  },
+  "undefined_64": {
+   "value": null
+  },
+  "undefined_65": {
+   "value": null
+  },
+  "undefined_66": {
+   "value": null
+  },
+  "undefined_67": {
+   "value": null
+  },
+  "undefined_68": {
+   "value": null
+  },
+  "undefined_69": {
+   "value": null
+  },
+  "undefined_7": {
+   "value": null
+  },
+  "undefined_70": {
+   "value": null
+  },
+  "undefined_71": {
+   "value": null
+  },
+  "undefined_72": {
+   "value": null
+  },
+  "undefined_73": {
+   "value": null
+  },
+  "undefined_74": {
+   "value": "35.00"
+  },
+  "undefined_76": {
+   "value": "3,200.00"
+  },
+  "undefined_77": {
+   "value": "53.33"
+  },
+  "undefined_78": {
+   "value": "650.00"
+  },
+  "undefined_79": {
+   "value": "65.00"
+  },
+  "undefined_8": {
+   "value": null
+  },
+  "undefined_81": {
+   "value": "2,143.33"
+  },
+  "undefined_85": {
+   "value": "9,089.33"
+  },
+  "undefined_87": {
+   "value": "300.00"
+  },
+  "undefined_88": {
+   "value": "210.00"
+  },
+  "undefined_9": {
+   "value": null
+  },
+  "undefined_90": {
+   "value": "180.00"
+  },
+  "undefined_91": {
+   "value": null
+  },
+  "undefined_92": {
+   "value": null
+  },
+  "undefined_93": {
+   "value": "180.00"
+  },
+  "undefined_95": {
+   "value": "9,779.33"
+  },
+  "undefined_96": {
+   "value": "8,700.00"
+  },
+  "undefined_98": {
+   "value": "-1,079.33"
+  },
+  "undefined_99": {
+   "value": null
+  },
+  "x": {
+   "value": "0.1"
+  }
+ },
+ "release": "form/b122c2@2025-04-01",
+ "sha256": "75e19c94ec0bcf83106667ab51cd18a653ae9c2eb95063aa1ef9268ae947512b"
+}
