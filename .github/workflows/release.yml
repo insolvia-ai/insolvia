@@ -35,8 +35,11 @@ name: Release
 #   1. mailer     — the API depends on it (module.mailer's caller allowlist is
 #                   the API's role; the API reads MAILER_API_URL from SSM).
 #   2. api        — the backend everything else talks to.
-#   3. marketing  — its SSR waitlist action POSTs to the API.
-#   4. app        — the client, last: it should never be the first thing that
+#   3. admin, mcp — after the API; nothing at runtime couples them to the
+#                   legs around them, they are placed here only because the
+#                   chain must be linear (see NO concurrency group below).
+#   4. marketing  — its SSR waitlist action POSTs to the API.
+#   5. app        — the client, last: it should never be the first thing that
 #                   expects a new API.
 #
 # SHARED INFRA is the very first leg, ahead of even the staging apply, because
@@ -64,9 +67,22 @@ name: Release
 # already holds the approval and must not ask again.
 #
 # NO concurrency group HERE. The called workflows each hold their environment's
-# group (`insolvia-terraform-staging` / `insolvia-terraform-prod`); `needs`
-# already serialises the legs, and a group on both caller and callee deadlocks
-# — the callee would queue behind its own parent.
+# group (`insolvia-terraform-staging` / `insolvia-terraform-prod`), and a group
+# on both caller and callee deadlocks — the callee would queue behind its own
+# parent.
+#
+# THE LEGS OF EACH STAGE ARE A STRICT CHAIN, one after another, never a
+# fan-out — and that is load-bearing, not tidiness. A GitHub concurrency group
+# holds ONE running and ONE pending entry; a newer pending entry CANCELS the
+# older pending one, whatever `cancel-in-progress` says. When admin, mcp and
+# marketing (or admin, mcp and app, when marketing skipped) all needed only
+# `api`, they queued on the group in the same second: one ran, one waited, and
+# the third evicted the waiter about a second after it started. That cancelled
+# `mcp / deploy` or `admin / deploy` in every multi-leg release for a while, and
+# `record` still went green. The group already made the legs run one at a time,
+# so the chain costs no wall-clock time; it just lets at most one leg of this
+# run wait on the group at once. Add a new leg to the END of the chain, never
+# beside an existing one.
 #
 # TESTING THIS BEFORE MERGING: `workflow_dispatch` runs the workflow file from
 # whatever branch you select, so dispatch this from the PR branch to exercise
@@ -244,15 +260,19 @@ jobs:
 
   # After the API for ordering only (shared tables mean a core change lands on
   # both, and the API is the primary surface) — nothing at runtime couples the
-  # two deploys.
+  # two deploys. After `admin` only to keep the chain linear: a fan-out here is
+  # what cancelled this leg (header, "THE LEGS OF EACH STAGE ARE A STRICT
+  # CHAIN").
   mcp:
-    needs: [changes, infra, api]
+    needs: [changes, infra, api, admin]
     if: ${{ !cancelled() && !failure() && needs.changes.outputs.mcp == 'true' }}
     uses: ./.github/workflows/mcp-staging.yml
     secrets: inherit
 
+  # `mcp` for the chain, not for any runtime reason; `api` stays listed because
+  # it is the real dependency.
   marketing:
-    needs: [changes, infra, api]
+    needs: [changes, infra, api, mcp]
     if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
     uses: ./.github/workflows/marketing-staging.yml
     secrets: inherit
@@ -301,6 +321,21 @@ jobs:
       contents: read
       statuses: write
     steps:
+      # `!cancelled()` above is about the RUN, and `!failure()` ignores a
+      # cancelled job — so a leg evicted from the concurrency group (header)
+      # used to be waved through as though it had deployed, and this job then
+      # stamped the commit staging-green and tagged the OLD image as its
+      # `sha-<commit>`. A cancelled need is a deploy that did not happen:
+      # refuse to record it. Skipped is fine — that is the path filter.
+      - name: Refuse to record a release with a cancelled leg
+        if: ${{ contains(needs.*.result, 'cancelled') }}
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "::error::A staging leg was cancelled, so staging did not fully deploy this commit. Re-run the cancelled jobs; do not promote this run."
+          echo "$RESULTS" | jq -r 'to_entries[] | "  \(.key): \(.value.result)"'
+          exit 1
+
       - uses: actions/checkout@v5
 
       - uses: aws-actions/configure-aws-credentials@v6
@@ -382,9 +417,14 @@ jobs:
   # reviewer should only ever be offered the newest validated commit. `waiting`
   # is precisely "parked at an environment gate", so this cannot touch runs
   # still deploying staging (in_progress) or already approved ones.
+  #
+  # `result == 'success'`, here and on `promote`, rather than `!failure()`:
+  # `record` holds the staging group and can itself be evicted (header), and
+  # `!failure()` treats a cancelled `record` as fine — which would offer the
+  # reviewer a commit that was never stamped staging-green.
   supersede:
     needs: record
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && needs.record.result == 'success' }}
     runs-on: ubuntu-latest
     # Job-level permissions REPLACE the workflow-level block: `actions: write`
     # (to cancel runs) stays confined to this job, which runs no third-party
@@ -420,7 +460,7 @@ jobs:
   # waiting — this closes the window where it was approved first.)
   promote:
     needs: record
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && needs.record.result == 'success' }}
     runs-on: ubuntu-latest
     environment: insolvia-production
     permissions:
@@ -442,7 +482,7 @@ jobs:
           {
             echo "### :rocket: Promotion approved"
             echo
-            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → marketing → app."
+            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → admin → mcp → marketing → app."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── PRODUCTION ───────────────────────────────────────────────────────────
@@ -507,9 +547,13 @@ jobs:
       gated: true
     secrets: inherit
 
+  # The same strict chain as staging (header): every prod deploy job holds
+  # `insolvia-terraform-prod`, so admin, mcp and marketing fanning out after
+  # prod-api would evict one of them from the group. It never bit only because
+  # the prod stage had never run with more than one of them.
   prod-mcp:
-    needs: [prod-infra, prod-api]
-    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
+    needs: [prod-infra, prod-api, prod-admin]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' && needs['prod-admin'].result == 'success' }}
     uses: ./.github/workflows/mcp-prod.yml
     with:
       sha: ${{ github.sha }}
@@ -517,8 +561,8 @@ jobs:
     secrets: inherit
 
   prod-marketing:
-    needs: [prod-infra, prod-api]
-    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' }}
+    needs: [prod-infra, prod-api, prod-mcp]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-api'].result == 'success' && needs['prod-mcp'].result == 'success' }}
     uses: ./.github/workflows/marketing-prod.yml
     with:
       sha: ${{ github.sha }}

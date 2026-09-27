@@ -196,7 +196,10 @@ is the deliberate act that a separate infra dispatch used to be.
 The pipeline declares no concurrency group of its own; each called workflow's
 deploy job holds its environment's group (`insolvia-terraform-staging` /
 `insolvia-terraform-prod`), and `needs` orders the legs. A group on both
-caller and callee would deadlock the callee behind its own parent.
+caller and callee would deadlock the callee behind its own parent. The legs of
+each stage are a strict chain rather than a fan-out, because a group keeps only
+one pending entry and a newer one cancels it — `release.yml`'s header owns the
+detail.
 
 Both environments can also be planned before they are applied: `infra-staging.yml`
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
