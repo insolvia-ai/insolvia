@@ -137,6 +137,12 @@ own tax identification, own signature — and the forms follow. B101 prints a
 full second column for credit counseling *and for venue*; 106I's second column
 may belong to a spouse who is not filing at all.
 
+A debtor is one case's **copy** of a firm-scoped `client` — the person, who
+outlives the matter. [ADR 0022](../adr/0022-a-client-is-not-a-case.md) owns
+that split (the `client_id` on the debtor, the `client` provenance source, and
+what "differs from client" means); this section gains those fields when its
+build lands.
+
 ```
 debtor {
   id, case_id
@@ -214,7 +220,7 @@ argument. The shape it settled on:
 - **The ref, not the location, is the contract.** The item sits in the case's
   partition today; ADR 0022 (a client is not a case) needs a client's later
   matter to point at the *same* sealed identifier rather than copy it, so the
-  ref is an opaque generated id the ADR's backfill can re-parent, and the
+  ref is an opaque generated id a later case can re-use, and the
   firm-plus-ref context is what lets one ref serve two cases of one client
   while refusing replay onto another firm or another identifier.
 - **Two reads.** The last four are on the plain record and travel with every
