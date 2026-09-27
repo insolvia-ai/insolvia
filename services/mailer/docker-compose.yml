@@ -19,7 +19,7 @@ services:
     environment:
       MAILER_RUNTIME: development
       MAILER_DEVELOPMENT_SERVICES_JSON: >-
-        {"insolvia_api":{"sender_name":"Insolvia","sender_address":"no-reply@insolvia.ai","allowed_categories":["welcome","email_verification","password_reset"],"allowed_message_classes":["transactional"]}}
+        {"insolvia_api":{"sender_name":"Insolvia","sender_address":"no-reply@insolvia.ai","allowed_categories":["welcome","email_verification","password_reset","client_invitation"],"allowed_message_classes":["transactional"]}}
       MAILER_SMTP_HOST: mailpit
       MAILER_SMTP_PORT: "1025"
     ports:
