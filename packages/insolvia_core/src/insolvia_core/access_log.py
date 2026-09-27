@@ -62,6 +62,18 @@ from datetime import UTC, datetime
 # "someone decrypted the debtor's Social Security number to print B121" are
 # the two disclosures this table most needs to keep apart. Written by exactly
 # one function, insolvia_core.tax_ids.read_tax_id, and never by a route.
+#
+# The client portal (ADR 0023) adds four, in two pairs:
+#   - client.invite / client.revoke — a FIRM USER inviting (or re-inviting,
+#     which is the same act) a debtor to this case, or withdrawing them. The
+#     principal is the firm user. `roles` records which debtor(s) the binding
+#     answers for — so "the firm chose one login for both spouses" is on the
+#     record, as the ADR requires — and appears on these two rows only.
+#   - portal.read / portal.answer — a CLIENT acting through the portal, the
+#     principal being the client's own subject. A refused portal request (a
+#     revoked binding, a suspended firm) is a `denied` row of whichever the
+#     request would have been: it is what a person whose access was withdrawn
+#     trying anyway looks like.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -74,6 +86,10 @@ ACTIONS = (
     "candidate.propose",
     "candidate.withdraw",
     "taxid.read",
+    "client.invite",
+    "client.revoke",
+    "portal.read",
+    "portal.answer",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -108,6 +124,9 @@ class AccessEvent:
     # null, so the log's older rows and the new ones read the same.
     filing_role: str | None = None
     purpose: str | None = None
+    # Only `client.invite` / `client.revoke` set this: the binding's filing
+    # roles, canonical order, comma-joined (`debtor_1,debtor_2`).
+    roles: str | None = None
 
 
 def record_access(
@@ -118,6 +137,7 @@ def record_access(
     outcome: str = "allowed",
     filing_role: str | None = None,
     purpose: str | None = None,
+    roles: tuple[str, ...] | None = None,
 ) -> AccessEvent:
     recorded_at = (
         datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -131,6 +151,7 @@ def record_access(
         event_id=str(uuid.uuid4()),
         filing_role=filing_role,
         purpose=purpose,
+        roles=",".join(roles) if roles else None,
     )
 
 
@@ -157,4 +178,6 @@ def access_item(event: AccessEvent) -> dict[str, str]:
         item["filingRole"] = event.filing_role
     if event.purpose is not None:
         item["purpose"] = event.purpose
+    if event.roles is not None:
+        item["roles"] = event.roles
     return item

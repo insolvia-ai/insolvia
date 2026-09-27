@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from insolvia_core.cases import Case
+from insolvia_core.clients import ClientBinding
 from insolvia_core.firms import Firm, FirmUser, permits
 
 
@@ -64,6 +65,43 @@ class Accessor:
         """Per-feature permission, delegated to core/firms so the fail-closed
         rules live in one place."""
         return permits(self.user, feature, level)
+
+
+@dataclass(frozen=True)
+class ClientAccessor:
+    """A signed-in CLIENT (ADR 0023) whose live binding has been resolved.
+
+    A SEPARATE TYPE, NOT AN Accessor, and not a subclass of one. Every store
+    method and route helper that reaches case data takes an `Accessor`; a
+    client must be able to reach none of them, and the cheapest way to make
+    that true is for mypy to refuse the call. ADR 0009's four axes (role,
+    admin, caseload, feature map) describe staff — a client has none of them,
+    and a policy for the class is fixed rather than configured: the one case
+    its binding names, through projections that take this type.
+
+    Constructed only by the API's `@require_client` resolution, so holding
+    one means: a portal token verified against the portal's own client id, a
+    live binding read by primary key, and an active firm.
+    """
+
+    firm: Firm
+    binding: ClientBinding
+
+    @property
+    def subject(self) -> str:
+        return self.binding.subject
+
+    @property
+    def firm_id(self) -> str:
+        return self.binding.firm_id
+
+    @property
+    def case_id(self) -> str:
+        return self.binding.case_id
+
+    @property
+    def roles(self) -> tuple[str, ...]:
+        return self.binding.roles
 
 
 def may_see_case(accessor: Accessor, case: Case, *, assigned: bool) -> bool:
