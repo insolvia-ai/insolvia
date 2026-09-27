@@ -1,0 +1,69 @@
+{
+  "//": [
+    "The creditor list every per-court matrix golden beside this file is",
+    "rendered from (ADR 0024, build PR 2). Creditor records in the API's own",
+    "request-body shape — the shape seeds/fixtures/<version>/cases.json uses —",
+    "so a fixture version whose creditors carry full addresses can take this",
+    "list as it is. The seeded case (seeds/fixtures/v2, chapter-7-sample)",
+    "cannot yield a matrix today: its two creditors have no city, state or ZIP,",
+    "and the generator refuses them, as it should.",
+    "",
+    "Chosen to exercise what the courts differ on and what they share: out of",
+    "alphabetical order on purpose, one creditor recorded twice (two accounts,",
+    "one mailing label: printed once), a second address line, a nine-digit ZIP,",
+    "and every line within the common 40 characters so each court's file is",
+    "produced. `case_number` is what the court would have issued; it prints",
+    "only on E.D. Tex.'s separately-filed matrix (txeb_filed_separately.txt).",
+    "",
+    "Every name and address is invented and describes nobody."
+  ],
+  "case_number": "26-40001",
+  "creditors": [
+    {
+      "name": "Example Card Services",
+      "address": {
+        "line1": "PO Box 15168",
+        "city": "Wilmington",
+        "state": "DE",
+        "postal_code": "19850-5168"
+      }
+    },
+    {
+      "name": "Example Community Bank",
+      "address": {
+        "line1": "1 Example Plaza",
+        "line2": "Suite 400",
+        "city": "Tampa",
+        "state": "FL",
+        "postal_code": "33602"
+      }
+    },
+    {
+      "name": "Brazos Example Medical Group",
+      "address": {
+        "line1": "4100 Sample Parkway",
+        "city": "Tyler",
+        "state": "TX",
+        "postal_code": "75701"
+      }
+    },
+    {
+      "name": "Acme Example Auto Finance",
+      "address": {
+        "line1": "PO Box 2230",
+        "city": "Macon",
+        "state": "GA",
+        "postal_code": "31201"
+      }
+    },
+    {
+      "name": "Example Card Services",
+      "address": {
+        "line1": "PO Box 15168",
+        "city": "Wilmington",
+        "state": "DE",
+        "postal_code": "19850-5168"
+      }
+    }
+  ]
+}
