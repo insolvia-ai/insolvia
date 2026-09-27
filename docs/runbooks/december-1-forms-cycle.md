@@ -86,7 +86,10 @@ Summary + Declaration, B107, B108, B121, B122A-1/A-2, and the two Director's
 Forms B2010 and B2030, added under
 [#351](https://github.com/insolvia-ai/insolvia/issues/351) — plus the
 Chapter 13 means-test pair B122C-1/C-2, added under
-[#365](https://github.com/insolvia-ai/insolvia/issues/365)). A cycle that
+[#365](https://github.com/insolvia-ai/insolvia/issues/365), and the Chapter 13
+plan B113, added under
+[#367](https://github.com/insolvia-ai/insolvia/issues/367) — a flat PDF, so a
+new revision means re-measuring its overlay boxes, not re-dumping widgets). A cycle that
 touches none of ours still gets a cycle-log entry saying so — that is the walk.
 
 **Director's Forms revise off the December 1 rhythm.** They need only Advisory

@@ -59,7 +59,7 @@ outside the case store; see below.
 | `pay_period_record` | many, references an `employment` | Means test |
 | `other_income_record` | many, references a `debtor` | Means test |
 | `means_test_input` | one | B122A-2 (Ch. 7) · B122C-1, B122C-2 (Ch. 13) |
-| `plan` | one, Ch. 13 | The plan calculator; Official Form 113 (#367) |
+| `plan` | one, Ch. 13 | The plan calculator; Official Form 113 |
 | `income_summary` | one per debtor column | 106I Pt.2 |
 | `household` | 1–2 (106J-2 adds a second) | 106J Pt.1 |
 | `expense` | many, references a `household` | 106J Pt.2 |
@@ -781,7 +781,10 @@ already granted to every row written before it was named.
 
 - **Plan arithmetic.** The waterfall, feasibility and the § 1325(a)(4)
   liquidation test are the API's calculator (`core/chapter13_plan.py`),
-  computed from `plan` and the records above and never stored.
+  computed from `plan` and the records above and never stored. Official
+  Form 113 prints the calculator's figures (issue #367); which districts
+  take a local plan form instead is the court registry's
+  `chapter_13_plan` fact, not a case attribute.
 - **Means-test arithmetic (122A, 122C).** The calculations — § 707(b) on
   Chapter 7, § 1325(b) on Chapter 13 — are the API's engine
   (`services/api` `core/means_test.py`), computed from the records above and
