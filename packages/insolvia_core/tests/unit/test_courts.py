@@ -9,6 +9,7 @@ record fails a pull request rather than a filing. The launch set is ADR
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import urllib.parse
 from datetime import date
@@ -134,6 +135,33 @@ def test_resolution_follows_effective_dating(release):
         courts.resolve(date(2000, 1, 1))
     with pytest.raises(KeyError):
         courts.get("courts/us-bankruptcy@1999-01-01")
+
+
+def test_the_second_release_changes_only_middle_georgias_matrix():
+    # courts/us-bankruptcy@2026-09-26 (ADR 0024 PR 2) re-read one court's
+    # matrix section; everything else is the first release, carried over.
+    # A difference anywhere else is an edit nobody meant to ship.
+    first = courts.get("courts/us-bankruptcy@2026-09-24")
+    second = courts.get("courts/us-bankruptcy@2026-09-26")
+    for old, new in zip(first.districts, second.districts, strict=True):
+        if old.code != "gamb":
+            assert old == new, old.code
+            continue
+        assert old.matrix != new.matrix
+        assert (
+            dataclasses.replace(
+                new, matrix=old.matrix, sources=old.sources, notes=old.notes
+            )
+            == old
+        )
+    gamb = second.district("gamb")
+    assert gamb is not None
+    rules = gamb.matrix
+    assert rules.blank_lines_between.verified
+    assert rules.blank_lines_between.value == 2
+    assert rules.comma_after_city.value is True
+    assert rules.case_number_header_when_separate.value is False
+    assert not rules.certification_required.verified
 
 
 def test_the_lookup_pair_refuses_a_division_of_another_court():

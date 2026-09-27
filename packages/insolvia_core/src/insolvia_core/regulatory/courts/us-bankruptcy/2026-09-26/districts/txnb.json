@@ -1,0 +1,792 @@
+{
+  "code": "txnb",
+  "court_id": "TXNBK",
+  "name": "Northern District of Texas",
+  "state": "TX",
+  "circuit": 5,
+  "website": "http://www.txnb.uscourts.gov",
+  "divisions": [
+    {
+      "code": "dallas",
+      "name": "Dallas Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "Earle Cabell Building, U.S. Courthouse",
+          "line1": "1100 Commerce Street",
+          "line2": "Room 1254",
+          "city": "Dallas",
+          "state": "TX",
+          "postal_code": "75242"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Dallas",
+          "fips": "48113"
+        },
+        {
+          "name": "Ellis",
+          "fips": "48139"
+        },
+        {
+          "name": "Hunt",
+          "fips": "48231"
+        },
+        {
+          "name": "Johnson",
+          "fips": "48251"
+        },
+        {
+          "name": "Kaufman",
+          "fips": "48257"
+        },
+        {
+          "name": "Navarro",
+          "fips": "48349"
+        },
+        {
+          "name": "Rockwall",
+          "fips": "48397"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "fort-worth",
+      "name": "Fort Worth Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "Eldon B. Mahon U.S. Courthouse",
+          "line1": "501 W. Tenth Street",
+          "line2": null,
+          "city": "Fort Worth",
+          "state": "TX",
+          "postal_code": "76102-3643"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Comanche",
+          "fips": "48093"
+        },
+        {
+          "name": "Erath",
+          "fips": "48143"
+        },
+        {
+          "name": "Hood",
+          "fips": "48221"
+        },
+        {
+          "name": "Jack",
+          "fips": "48237"
+        },
+        {
+          "name": "Palo Pinto",
+          "fips": "48363"
+        },
+        {
+          "name": "Parker",
+          "fips": "48367"
+        },
+        {
+          "name": "Tarrant",
+          "fips": "48439"
+        },
+        {
+          "name": "Wise",
+          "fips": "48497"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "abilene",
+      "name": "Abilene Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists clerk's offices for Dallas, Fort Worth, Amarillo and Lubbock only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Callahan",
+          "fips": "48059"
+        },
+        {
+          "name": "Eastland",
+          "fips": "48133"
+        },
+        {
+          "name": "Fisher",
+          "fips": "48151"
+        },
+        {
+          "name": "Haskell",
+          "fips": "48207"
+        },
+        {
+          "name": "Howard",
+          "fips": "48227"
+        },
+        {
+          "name": "Jones",
+          "fips": "48253"
+        },
+        {
+          "name": "Mitchell",
+          "fips": "48335"
+        },
+        {
+          "name": "Nolan",
+          "fips": "48353"
+        },
+        {
+          "name": "Shackelford",
+          "fips": "48417"
+        },
+        {
+          "name": "Stephens",
+          "fips": "48429"
+        },
+        {
+          "name": "Stonewall",
+          "fips": "48433"
+        },
+        {
+          "name": "Taylor",
+          "fips": "48441"
+        },
+        {
+          "name": "Throckmorton",
+          "fips": "48447"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "san-angelo",
+      "name": "San Angelo Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists clerk's offices for Dallas, Fort Worth, Amarillo and Lubbock only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Brown",
+          "fips": "48049"
+        },
+        {
+          "name": "Coke",
+          "fips": "48081"
+        },
+        {
+          "name": "Coleman",
+          "fips": "48083"
+        },
+        {
+          "name": "Concho",
+          "fips": "48095"
+        },
+        {
+          "name": "Crockett",
+          "fips": "48105"
+        },
+        {
+          "name": "Glasscock",
+          "fips": "48173"
+        },
+        {
+          "name": "Irion",
+          "fips": "48235"
+        },
+        {
+          "name": "Menard",
+          "fips": "48327"
+        },
+        {
+          "name": "Mills",
+          "fips": "48333"
+        },
+        {
+          "name": "Reagan",
+          "fips": "48383"
+        },
+        {
+          "name": "Runnels",
+          "fips": "48399"
+        },
+        {
+          "name": "Schleicher",
+          "fips": "48413"
+        },
+        {
+          "name": "Sterling",
+          "fips": "48431"
+        },
+        {
+          "name": "Sutton",
+          "fips": "48435"
+        },
+        {
+          "name": "Tom Green",
+          "fips": "48451"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "amarillo",
+      "name": "Amarillo Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "U.S. Bankruptcy Court, Amarillo Division",
+          "line1": "205 East Fifth Street",
+          "line2": "Room 133",
+          "city": "Amarillo",
+          "state": "TX",
+          "postal_code": "79101-1559"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Armstrong",
+          "fips": "48011"
+        },
+        {
+          "name": "Briscoe",
+          "fips": "48045"
+        },
+        {
+          "name": "Carson",
+          "fips": "48065"
+        },
+        {
+          "name": "Castro",
+          "fips": "48069"
+        },
+        {
+          "name": "Childress",
+          "fips": "48075"
+        },
+        {
+          "name": "Collingsworth",
+          "fips": "48087"
+        },
+        {
+          "name": "Dallam",
+          "fips": "48111"
+        },
+        {
+          "name": "Deaf Smith",
+          "fips": "48117"
+        },
+        {
+          "name": "Donley",
+          "fips": "48129"
+        },
+        {
+          "name": "Gray",
+          "fips": "48179"
+        },
+        {
+          "name": "Hall",
+          "fips": "48191"
+        },
+        {
+          "name": "Hansford",
+          "fips": "48195"
+        },
+        {
+          "name": "Hartley",
+          "fips": "48205"
+        },
+        {
+          "name": "Hemphill",
+          "fips": "48211"
+        },
+        {
+          "name": "Hutchinson",
+          "fips": "48233"
+        },
+        {
+          "name": "Lipscomb",
+          "fips": "48295"
+        },
+        {
+          "name": "Moore",
+          "fips": "48341"
+        },
+        {
+          "name": "Ochiltree",
+          "fips": "48357"
+        },
+        {
+          "name": "Oldham",
+          "fips": "48359"
+        },
+        {
+          "name": "Parmer",
+          "fips": "48369"
+        },
+        {
+          "name": "Potter",
+          "fips": "48375"
+        },
+        {
+          "name": "Randall",
+          "fips": "48381"
+        },
+        {
+          "name": "Roberts",
+          "fips": "48393"
+        },
+        {
+          "name": "Sherman",
+          "fips": "48421"
+        },
+        {
+          "name": "Swisher",
+          "fips": "48437"
+        },
+        {
+          "name": "Wheeler",
+          "fips": "48483"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "wichita-falls",
+      "name": "Wichita Falls Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": null,
+        "status": "unverified",
+        "source": "S34",
+        "verified_at": null,
+        "note": "The PACER lookup lists clerk's offices for Dallas, Fort Worth, Amarillo and Lubbock only; no address for this division was read."
+      },
+      "counties": [
+        {
+          "name": "Archer",
+          "fips": "48009"
+        },
+        {
+          "name": "Baylor",
+          "fips": "48023"
+        },
+        {
+          "name": "Clay",
+          "fips": "48077"
+        },
+        {
+          "name": "Cottle",
+          "fips": "48101"
+        },
+        {
+          "name": "Foard",
+          "fips": "48155"
+        },
+        {
+          "name": "Hardeman",
+          "fips": "48197"
+        },
+        {
+          "name": "King",
+          "fips": "48269"
+        },
+        {
+          "name": "Knox",
+          "fips": "48275"
+        },
+        {
+          "name": "Montague",
+          "fips": "48337"
+        },
+        {
+          "name": "Wichita",
+          "fips": "48485"
+        },
+        {
+          "name": "Wilbarger",
+          "fips": "48487"
+        },
+        {
+          "name": "Young",
+          "fips": "48503"
+        }
+      ],
+      "counties_source": "S41"
+    },
+    {
+      "code": "lubbock",
+      "name": "Lubbock Division",
+      "office_code": {
+        "value": null,
+        "status": "unverified",
+        "source": null,
+        "verified_at": null,
+        "note": "The CM/ECF office code (the digit before the colon in the case number; Case Upload field 10) was not found on a page read for this court. It is a fact the training-database session (ADR 0024, PR 5) confirms per court."
+      },
+      "courthouse": {
+        "value": {
+          "name": "George Mahon Federal Building",
+          "line1": "1205 Texas Avenue",
+          "line2": "Rm 306",
+          "city": "Lubbock",
+          "state": "TX",
+          "postal_code": "79401-4002"
+        },
+        "status": "verified",
+        "source": "S34",
+        "verified_at": "2026-09-24",
+        "note": null
+      },
+      "counties": [
+        {
+          "name": "Bailey",
+          "fips": "48017"
+        },
+        {
+          "name": "Borden",
+          "fips": "48033"
+        },
+        {
+          "name": "Cochran",
+          "fips": "48079"
+        },
+        {
+          "name": "Crosby",
+          "fips": "48107"
+        },
+        {
+          "name": "Dawson",
+          "fips": "48115"
+        },
+        {
+          "name": "Dickens",
+          "fips": "48125"
+        },
+        {
+          "name": "Floyd",
+          "fips": "48153"
+        },
+        {
+          "name": "Gaines",
+          "fips": "48165"
+        },
+        {
+          "name": "Garza",
+          "fips": "48169"
+        },
+        {
+          "name": "Hale",
+          "fips": "48189"
+        },
+        {
+          "name": "Hockley",
+          "fips": "48219"
+        },
+        {
+          "name": "Kent",
+          "fips": "48263"
+        },
+        {
+          "name": "Lamb",
+          "fips": "48279"
+        },
+        {
+          "name": "Lubbock",
+          "fips": "48303"
+        },
+        {
+          "name": "Lynn",
+          "fips": "48305"
+        },
+        {
+          "name": "Motley",
+          "fips": "48345"
+        },
+        {
+          "name": "Scurry",
+          "fips": "48415"
+        },
+        {
+          "name": "Terry",
+          "fips": "48445"
+        },
+        {
+          "name": "Yoakum",
+          "fips": "48501"
+        }
+      ],
+      "counties_source": "S41"
+    }
+  ],
+  "cmecf": {
+    "live_url": {
+      "value": "https://ecf.txnb.uscourts.gov",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "training_url": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "No training database URL on a page read for this court."
+    },
+    "help_desk": {
+      "value": "ecfhelp@txnb.uscourts.gov; (214) 753-2000 (Dallas), (800) 442-6850",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": null
+    },
+    "release": {
+      "value": "1.9",
+      "status": "verified",
+      "source": "S34",
+      "verified_at": "2026-09-24",
+      "note": "software_version 'NextGen CM/ECF Release 1.9'."
+    }
+  },
+  "pdf": {
+    "max_bytes": {
+      "value": 5242880,
+      "status": "unverified",
+      "source": "S9",
+      "verified_at": null,
+      "note": "5 MB in the 2017 statewide ECF Procedures [S9]; ADR 0024 marks it 'verify' and no current TXNB page read states a limit. The PACER lookup [S34] carries merge_doc_size '25' with no unit."
+    },
+    "text_searchable_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "flatten_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "pdf_a_required": {
+      "value": false,
+      "status": "unverified",
+      "source": "S16",
+      "verified_at": null,
+      "note": "No page of this court read mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page."
+    }
+  },
+  "matrix": {
+    "max_line_chars": {
+      "value": 40,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "'Each line of the creditor listing should be no more than 40 characters in length including spaces.'"
+    },
+    "max_creditor_lines": {
+      "value": 5,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "'Each creditor listing must consist of no more than five lines total for each creditor'."
+    },
+    "blank_lines_between": {
+      "value": 2,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "'at least two blank lines between creditor listing'."
+    },
+    "pad_to_lines": {
+      "value": null,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "No fixed block size is stated."
+    },
+    "name_line_chars": {
+      "value": null,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "No separate name-line width; the 40-character limit applies to every line."
+    },
+    "comma_after_city": {
+      "value": null,
+      "status": "unverified",
+      "source": "S43",
+      "verified_at": null,
+      "note": "The instructions do not say whether a comma follows the city."
+    },
+    "case_number_header_when_separate": {
+      "value": false,
+      "status": "verified",
+      "source": "S43",
+      "verified_at": "2026-09-24",
+      "note": "'Do not include header, footers, or page numbers, etc.'"
+    },
+    "certification_required": {
+      "value": null,
+      "status": "unverified",
+      "source": "S43",
+      "verified_at": null,
+      "note": "No certification or verification requirement is stated in the instructions."
+    }
+  },
+  "opening": {
+    "signature_instrument": {
+      "value": {
+        "kind": "declaration_for_electronic_filing",
+        "title": "Declaration for Electronic Filing (Exhibits B-1/B-2 of the statewide ECF Procedures)",
+        "wet_ink_required": true,
+        "retention": null,
+        "own_docket_event": null,
+        "form_url": null
+      },
+      "status": "unverified",
+      "source": "S9",
+      "verified_at": null,
+      "note": "ADR 0024 [S9]: Texas files a Declaration for Electronic Filing (Exhibits B-1/B-2/B-3) bearing the debtor's wet-ink signature, DocuSign refused; the 2017 statewide text was not re-read today, so the instrument is carried unverified. A court's own current procedures may differ (TXWB's 2025 document is its own). ADR 0024's row: 'Declaration B-1/B-2, no paper copy kept'."
+    },
+    "ssn_statement": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "local_forms": [],
+    "fee_rule": {
+      "value": {
+        "deadline": "Fees for a case opened through petition software's 'quick filing' feature must be settled within 24 hours (2017 statewide procedures)",
+        "note": "ADR 0024 [S9]; the 2017 text was not re-read today."
+      },
+      "status": "unverified",
+      "source": "S9",
+      "verified_at": null,
+      "note": null
+    }
+  },
+  "case_upload": {
+    "status": "unverified",
+    "kind": null,
+    "verified_at": null,
+    "note": "Not proven against this court in a training-database session (ADR 0024, PR 5)."
+  },
+  "registration": {
+    "training_required": {
+      "value": null,
+      "status": "unverified",
+      "source": null,
+      "verified_at": null,
+      "note": "Not stated on a page read for this court."
+    },
+    "notes": "The statewide ECF Procedures [S9] govern registration; TXNB's own procedure sections 404 under the URLs its index publishes (ADR 0024)."
+  },
+  "sources": [
+    {
+      "id": "S9",
+      "title": "Texas Bankruptcy Courts, ECF Procedures (statewide, amended 2017-01-12; carried from ADR 0024, not re-read)",
+      "url": "https://www.txs.uscourts.gov/sites/txs/files/bk_adminproc.pdf.pdf",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S16",
+      "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)",
+      "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept",
+      "read": "2026-09-23"
+    },
+    {
+      "id": "S34",
+      "title": "PACER, Court CM/ECF Lookup data (last_updated Thu, 24 Sep 2026 06:10:04 -0400)",
+      "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S41",
+      "title": "28 U.S.C. § 124 — Texas (judicial districts and divisions)",
+      "url": "https://www.law.cornell.edu/uscode/text/28/124",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S42",
+      "title": "U.S. Census Bureau, 2020 national county file (FIPS codes)",
+      "url": "https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt",
+      "read": "2026-09-24"
+    },
+    {
+      "id": "S43",
+      "title": "TXNB, Creditor Matrix Instructions",
+      "url": "https://www.txnb.uscourts.gov/creditor-matrix-instructions",
+      "read": "2026-09-24"
+    }
+  ],
+  "notes": "Divisions and counties are 28 U.S.C. § 124(a)'s seven divisions [S41]; the statute's 'Brisco' is the Census 'Briscoe' (48045). Courthouse addresses come from the PACER lookup's locations [S34] for the four staffed offices. Office codes, the SSN-statement handling, the current PDF cap and the training requirement were not found on the pages read and are stored unverified. Not reached: the court's own ECF procedure sections (404 per ADR 0024)."
+}

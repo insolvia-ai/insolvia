@@ -1,0 +1,101 @@
+{
+  "code": "flsb",
+  "court_id": "FLSBK",
+  "name": "Southern District of Florida",
+  "state": "FL",
+  "circuit": 11,
+  "website": "https://www.flsb.uscourts.gov/",
+  "divisions": [
+    {
+      "code": "miami",
+      "name": "Miami Division",
+      "office_code": { "value": null, "status": "unverified", "source": "S17", "verified_at": null, "note": "FLSB case numbers carry no office digit: LR 9004-1(e) [S17] defines the caption case number as 'xx-xxxxx-ABC ... beginning with the year, followed by the five-digit case number, followed by the assigned judge's initials', and the Clerk's Procedural Manual [S82] says 'Each case number includes the judge's initials, which corresponds to the division in which the judge is located (e.g., 25-12345-SMG)'. The CM/ECF office number (Case Upload field 10) is not published on any page read." },
+      "courthouse": { "value": { "name": "C. Clyde Atkins United States Courthouse", "line1": "301 North Miami Avenue", "line2": "Room 150", "city": "Miami", "state": "FL", "postal_code": "33128" }, "status": "verified", "source": "S80", "verified_at": "2026-09-24", "note": "Same on the Court Locations page [S90] and in the PACER lookup [S34]." },
+      "counties": [
+        { "name": "Miami-Dade", "fips": "12086" },
+        { "name": "Monroe", "fips": "12087" }
+      ],
+      "counties_source": "S17"
+    },
+    {
+      "code": "fort-lauderdale",
+      "name": "Fort Lauderdale Division",
+      "office_code": { "value": null, "status": "unverified", "source": "S17", "verified_at": null, "note": "See Miami: the court's case-number format has no office code and none is published." },
+      "courthouse": { "value": { "name": "United States Courthouse", "line1": "299 East Broward Blvd.", "line2": "Room 112", "city": "Fort Lauderdale", "state": "FL", "postal_code": "33301" }, "status": "verified", "source": "S80", "verified_at": "2026-09-24", "note": "The homepage writes the city as 'Ft. Lauderdale'; the PACER lookup [S34] gives the same street address as 'Fort Lauderdale'." },
+      "counties": [
+        { "name": "Broward", "fips": "12011" }
+      ],
+      "counties_source": "S17"
+    },
+    {
+      "code": "west-palm-beach",
+      "name": "West Palm Beach Division",
+      "office_code": { "value": null, "status": "unverified", "source": "S17", "verified_at": null, "note": "See Miami: the court's case-number format has no office code and none is published." },
+      "courthouse": { "value": { "name": "Flagler Waterview Building", "line1": "1515 North Flagler Drive", "line2": "Suite 801", "city": "West Palm Beach", "state": "FL", "postal_code": "33401" }, "status": "verified", "source": "S80", "verified_at": "2026-09-24", "note": "The Procedural Manual [S82] gives '1515 N. Flagler Dr., Suite 801'; the PACER lookup [S34] says '8th Floor'." },
+      "counties": [
+        { "name": "Highlands", "fips": "12055" },
+        { "name": "Indian River", "fips": "12061" },
+        { "name": "Martin", "fips": "12085" },
+        { "name": "Okeechobee", "fips": "12093" },
+        { "name": "Palm Beach", "fips": "12099" },
+        { "name": "St. Lucie", "fips": "12111" }
+      ],
+      "counties_source": "S17"
+    }
+  ],
+  "cmecf": {
+    "live_url": { "value": "https://ecf.flsb.uscourts.gov/", "status": "verified", "source": "S35", "verified_at": "2026-09-24", "note": "Also linked from the homepage [S80] and the PACER lookup [S34]." },
+    "training_url": { "value": null, "status": "unverified", "source": null, "verified_at": null, "note": "No training or test database URL appears on the CM/ECF page [S35], the registration page [S85], the FAQs [S86] or the Procedural Manual [S82]." },
+    "help_desk": { "value": "CMECF_support@flsb.uscourts.gov; 305-714-1896", "status": "verified", "source": "S35", "verified_at": "2026-09-24", "note": "The CM/ECF page names Diana Cohen at 305-714-1896 for registration questions and lists the divisional lines Miami (305) 714-1800, Ft. Lauderdale (954) 769-5700, West Palm Beach (561) 514-4100. The PACER lookup [S34] gives 'CM/ECF Help Desk (305) 714-1791' for Miami." },
+    "release": { "value": "1.8.3", "status": "verified", "source": "S34", "verified_at": "2026-09-24", "note": "PACER lookup software_version 'NextGen CM/ECF Release 1.8 (Revision 1.8.3)'; lookup last_updated 'Thu, 24 Sep 2026 06:10:04 -0400'; merge_doc_size '50'." }
+  },
+  "pdf": {
+    "max_bytes": { "value": 52428800, "status": "verified", "source": "S82", "verified_at": "2026-09-24", "note": "Clerk's Procedural Manual (06/01/2026), System Requirements and PDF Document Limitations: 'Each PDF must not exceed 50MB and have a physical size of 8.5 x 11 inches.' The FAQs [S86] agree: 'The current size limitation that CM/ECF allows for electronically filed documents, including exhibits or attachments, is 50 megabytes.' This applies to every PDF, not only exhibits as ADR 0024's row says." },
+    "text_searchable_required": { "value": true, "status": "verified", "source": "S17", "verified_at": "2026-09-24", "note": "LR 9004-1(a)(1): all documents created for filing in CM/ECF must 'be in text-searchable PDF format', with 1-inch margins, 12-point font (10-point footnotes) and double spacing; (b) exempts exhibits, scanned-signature documents under LR 5005-2, and trial exhibits. The Manual [S82] adds: convert rather than scan; documents 'should be text searchable (e.g., include Optical Character Recognition (OCR) metadata)'." },
+    "flatten_required": { "value": true, "status": "verified", "source": "S82", "verified_at": "2026-09-24", "note": "'Flatten all interactive documents, especially this court's local form Chapter 13 plan'; also remove password protection, interactive elements and multimedia; portrait orientation; Times New Roman or Century Schoolbook preferred." },
+    "pdf_a_required": { "value": false, "status": "unverified", "source": "S16", "verified_at": null, "note": "No FLSB page mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page." }
+  },
+  "matrix": {
+    "max_line_chars": { "value": 40, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "CI-3 (rev. 06/01/26) Exhibit A I.(d): 'Each line must not exceed 40 characters in length'." },
+    "max_creditor_lines": { "value": 5, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "I.(e): 'Each name and address must consist of no more than 5 (five) total lines, with one blank line between creditors'." },
+    "blank_lines_between": { "value": 1, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": null },
+    "pad_to_lines": { "value": null, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "No fixed block size is stated." },
+    "name_line_chars": { "value": null, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "No separate name-line width; the 40-character limit applies to every line. First name first, last name last, no titles; 'Attention' or c/o on the second line." },
+    "comma_after_city": { "value": false, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "I.(h): ZIP on the last line with city and two-capital-letter state; the sample list writes 'Wilmington DE 19850' with no comma. Hyphen for nine-digit ZIPs. Typefaces Courier 10 Pitch, Prestige Elite or Letter Gothic; single column; no ALL CAPS." },
+    "case_number_header_when_separate": { "value": false, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "I.(k): 'Do not put any other information on the matrix, such as a heading, date, lines, or page numbers.' E-filing attorneys upload the matrix through Bankruptcy > Creditor Maintenance; the file is ASCII/MS-DOS text named 'creditor.txt' (Manual [S82])." },
+    "certification_required": { "value": false, "status": "verified", "source": "S81", "verified_at": "2026-09-24", "note": "CI-3 requires no certification with the initial matrix; local form LF-4 'Debtor's Notice of Compliance with Requirements for Amending Creditor Information' is required only for post-petition amendments (CI-3 II.a; LR 1007-1(b) [S17])." }
+  },
+  "opening": {
+    "signature_instrument": { "value": { "kind": "s_signature_with_wet_ink_retained", "title": "Local Rule 5005-2 Signature of a Person Other than a Registered User", "wet_ink_required": true, "retention": "5 years after the later of discharge, dismissal, or final adjudication of appeals", "own_docket_event": false, "form_url": null }, "status": "verified", "source": "S17", "verified_at": "2026-09-24", "note": "LR 5005-2(b): a non-registered person's document may be signed '/s/' plus the name, or with a scanned wet-ink image, only with authorization — for a non-user, the person 'actually signed an identical copy of the document with a wet ink signature' and the filer received it (or a copy/scan) before filing. (e)(1): the registered user 'must obtain the wet ink signature no later than 14 days after filing the document, and must retain the wet ink signature for at least 5 years after the later of' discharge, dismissal, or adjudication of all appeals. (c) allows a commercial digital signature instead. Local Rules 2026 edition, effective 2026-06-01." },
+    "ssn_statement": { "value": "own_event", "status": "verified", "source": "S82", "verified_at": "2026-09-24", "note": "Procedural Manual, Protecting Privacy for Filings: 'Specific docket events in CM/ECF, such as the Statement of Social Security Number, will restrict the public's ability to view a PDF image. It is critical that filers select the correct event title'. The individual Chapter 7 petition package [S87] lists B121 among the documents to file." },
+    "local_forms": [
+      { "id": "LF-10", "title": "Declaration Regarding Payment Advices", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/forms/LF-10%20Declaration%20Regarding%20Payment%20Advices_0.pdf", "when_required": "Every individual debtor, by the Bankruptcy Rule 1007(c) deadline, even if no payment advices were received (LR 1007-1(c)); listed in the individual Chapter 7 petition package", "source": "S17" },
+      { "id": "LF-4", "title": "Debtor's Notice of Compliance with Requirements for Amending Creditor Information", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/forms/LF-4%20Debtor%27s_Notice_of_Compliance_with_Requirements_for_Amending_Creditor_Information_0.pdf", "when_required": "When filing Schedules D or E/F other than with the petition, or when amending them (LR 1007-1(b)); with any post-petition addition or correction to the matrix (CI-3 II.a)", "source": "S17" },
+      { "id": "LF-95", "title": "Acknowledgment of Responsibility for Live Access to CM/ECF with Full Attorney Filing Privileges (rev. 06/01/26)", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/forms/LF-95%20Acknowledgment_of_Responsibility_and_Registration_Form_Full_Attorney_Privileges%20%28CC%29_0.pdf", "when_required": "Registration only, not a case filing: emailed to CMECF_Support@flsb.uscourts.gov with a concurrent PACER e-file registration", "source": "S83" }
+    ],
+    "fee_rule": { "value": { "deadline": "CM/ECF-incurred fees must be paid via Pay.gov from an attorney account by 2:00 a.m. on the day following the incurred fee", "note": "Procedural Manual, Methods of Payment: 'CM/ECF-incurred fees must be paid via Pay.gov from an attorney account by 2:00 a.m. on the day following an incurred fee. If it is not paid timely, the user's PACER credential will be placed in a lockout status'. Installments (individuals only, Form 103A): full payment within 120 days; prior-case fees must be paid first. Nothing read says whether Case Upload may be used with installments." }, "status": "verified", "source": "S82", "verified_at": "2026-09-24", "note": null }
+  },
+  "case_upload": { "status": "unverified", "kind": null, "verified_at": null, "note": "No FLSB page read mentions Case Upload; the Procedural Manual says commercial software 'is commonly configured' to produce creditor.txt and describes the Judge/Trustee Assignment module. Verify in a training-database session (no training database is published)." },
+  "registration": {
+    "training_required": { "value": null, "status": "unverified", "source": "S86", "verified_at": null, "note": "The FAQs say 'Additional questions regarding training requirements should be submitted via email to: CMECF_support@flsb.uscourts.gov'; the CM/ECF page [S35], the registration page [S85], LF-95 [S83] and the Manual [S82] state no training prerequisite (LF-95 asks the applicant to certify review of the Local Rules and filing requirements, and optionally full CM/ECF privileges in another bankruptcy court)." },
+    "notes": "Two-part registration: email LF-95 (attorney), LF-94 (trustee) or LF-96 (limited filer) to CMECF_Support@flsb.uscourts.gov, then submit an e-file registration from the PACER account; a public-query PACER account converts to an e-filing credential on the clerk's approval [S82, S85]. Only attorneys with FLSD bar admission get full privileges; the PACER credential must match the attorney on the document; credentials may not be shared — staff use Filing Agent credentials [S83, S82]. LR 5005-1(a)(1): a represented entity must file electronically; unrepresented individuals may not [S17]. Registration forms are rev. 06/01/26."
+  },
+  "sources": [
+    { "id": "S16", "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)", "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept", "read": "2026-09-23" },
+    { "id": "S17", "title": "FLSB, Local Rules (2026 edition, effective 2026-06-01) — LR 1002-2 (divisions), 1007-1, 5005-1, 5005-2, 9004-1, 9009-1", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/local_rules/2026_Local_Rules.pdf", "read": "2026-09-24" },
+    { "id": "S34", "title": "PACER, Court CM/ECF Lookup data (last_updated 2026-09-24 06:10:04 -0400)", "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json", "read": "2026-09-24" },
+    { "id": "S35", "title": "FLSB, CM/ECF Information", "url": "https://www.flsb.uscourts.gov/cmecf", "read": "2026-09-24" },
+    { "id": "S80", "title": "FLSB, home page (divisional addresses)", "url": "https://www.flsb.uscourts.gov/", "read": "2026-09-24" },
+    { "id": "S81", "title": "FLSB, CI-3 Clerk's Instructions for Preparing, Submitting and Obtaining Service Matrices (rev. 06/01/26)", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/clerks_instructions/Clerk%27s_Instructions_for_Preparing_Submitting_and_Obtaining_Service_Matrices_%28CI-3%29_1.pdf", "read": "2026-09-24" },
+    { "id": "S82", "title": "FLSB, Clerk's Procedural Manual (06-08-2026 file; pages dated 06/01/2026)", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/clerks_instructions/Clerk%E2%80%99s_Procedural_Manual_%2806-08-2026%29.pdf", "read": "2026-09-24" },
+    { "id": "S83", "title": "FLSB, LF-95 Acknowledgment of Responsibility for Live Access to CM/ECF with Full Attorney Filing Privileges (rev. 06/01/26)", "url": "https://www.flsb.uscourts.gov/sites/flsb/files/documents/forms/LF-95%20Acknowledgment_of_Responsibility_and_Registration_Form_Full_Attorney_Privileges%20%28CC%29_0.pdf", "read": "2026-09-24" },
+    { "id": "S84", "title": "FLSB, Local Bankruptcy Forms", "url": "https://www.flsb.uscourts.gov/forms/local-forms", "read": "2026-09-24" },
+    { "id": "S85", "title": "FLSB, CM/ECF User Registration", "url": "https://www.flsb.uscourts.gov/cmecf-user-registration", "read": "2026-09-24" },
+    { "id": "S86", "title": "FLSB, Frequently Asked Questions", "url": "https://www.flsb.uscourts.gov/faqs", "read": "2026-09-24" },
+    { "id": "S87", "title": "FLSB, Petition Packages – Individual", "url": "https://www.flsb.uscourts.gov/forms/petition-packages/Individual?field_chapter_type_value=All", "read": "2026-09-24" },
+    { "id": "S88", "title": "FLSB, Clerk's Instructions and Court's Guidelines (index)", "url": "https://www.flsb.uscourts.gov/clerk%E2%80%99s-instructions-and-court%E2%80%99s-guidelines", "read": "2026-09-24" },
+    { "id": "S89", "title": "FLSB, Local Rules (index page)", "url": "https://www.flsb.uscourts.gov/local-rules", "read": "2026-09-24" },
+    { "id": "S90", "title": "FLSB, Court Locations", "url": "https://www.flsb.uscourts.gov/court/locations", "read": "2026-09-24" }
+  ],
+  "notes": "Divisions: FLSB's divisions rule is Local Rule 1002-2(a), not 1071-1 [S17]: Miami (Miami-Dade, Monroe), Fort Lauderdale (Broward), West Palm Beach (Highlands, Indian River, Martin, Okeechobee, Palm Beach, St. Lucie) — all nine statutory counties of 28 U.S.C. § 89(c) ('Dade' = Census 'Miami-Dade', FIPS 12086) appear in exactly one division. 1002-2(b)(1): a chapter 7/11/12/13 petition 'must be filed in the division ... in which the debtor's domicile, residence, principal place of business, or principal assets are located'; the clerk may reassign wrongly filed cases. Office codes could not be verified: the court's case-number format (LR 9004-1(e); Manual) is year–five digits–judge initials with no office digit. LR 9009-1: a promulgated local form 'must be used without material alteration'. Failed URLs: https://www.flsb.uscourts.gov/court-locations (HTTP 404 — the page is /court/locations); direct curl downloads of *.uscourts.gov PDFs (CI-3, Procedural Manual, LF-95) returned HTTP 404 (bot filtering) — they were fetched with WebFetch and text-extracted with pypdf. The WebFetch summariser could not read any PDF; every PDF fact here comes from local pypdf extraction of the fetched file. The Court Locations page [S90] shows different phone numbers for Ft. Lauderdale ((954) 769-5400) and West Palm Beach ((561) 803-3400) than the homepage and the PACER lookup; phones are not recorded in this file."
+}

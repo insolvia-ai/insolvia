@@ -1,0 +1,11 @@
+{
+  "series_id": "courts/us-bankruptcy",
+  "effective_date": "2026-09-26",
+  "sequence": 1,
+  "source": {
+    "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json",
+    "published": null,
+    "sha256": null
+  },
+  "notes": "The second release of the court registry (ADR 0024, build PR 2 — the creditor matrix keyed by court). Nine of the ten district records are byte-identical to courts/us-bankruptcy@2026-09-24. The one change is M.D. Ga. (gamb): its creditor-matrix knobs, carried unverified from ADR 0024's first reading, were re-read from the Clerk's Instructions (December 2024), section XVI 'Master Mailing List/Matrix' and its example list [S52], and are now verified — 40 characters a line, five lines a creditor, two blank lines between creditors, the comma after the city that every example block prints, and no case number or header. The matrix certification (LBR 1007-2) stays unverified: the section defers to the rule and the rule was not read. A new release rather than an edit, because a merged release is append-only (docs/reference/effective-dating.md): anything that ever names @2026-09-24 still resolves it by id, unchanged. Effective on the date it was compiled, as the first release was."
+}

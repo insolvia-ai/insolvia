@@ -1,0 +1,138 @@
+{
+  "code": "flmb",
+  "court_id": "FLMBK",
+  "name": "Middle District of Florida",
+  "state": "FL",
+  "circuit": 11,
+  "website": "https://www.flmb.uscourts.gov/",
+  "divisions": [
+    {
+      "code": "jacksonville",
+      "name": "Jacksonville Division",
+      "office_code": { "value": "3", "status": "verified", "source": "S64", "verified_at": "2026-09-24", "note": "FAQ: 'Example: 6:12-bk-00001-KSJ, 6 indicates the office in which the case is filed (2 - Fort Myers, 3 - Jacksonville, 6 - Orlando, 8 - Tampa)'. The attorney guide [S19, S72] writes the case number as 'office code-yy-bk-nnnnn'." },
+      "courthouse": { "value": { "name": "Bryan Simpson United States Courthouse", "line1": "300 North Hogan Street", "line2": "Suite 3-150", "city": "Jacksonville", "state": "FL", "postal_code": "32202" }, "status": "verified", "source": "S62", "verified_at": "2026-09-24", "note": "Same address on the divisions page [S63] and in the PACER lookup [S34]." },
+      "counties": [
+        { "name": "Baker", "fips": "12003" },
+        { "name": "Bradford", "fips": "12007" },
+        { "name": "Citrus", "fips": "12017" },
+        { "name": "Clay", "fips": "12019" },
+        { "name": "Columbia", "fips": "12023" },
+        { "name": "Duval", "fips": "12031" },
+        { "name": "Flagler", "fips": "12035" },
+        { "name": "Hamilton", "fips": "12047" },
+        { "name": "Marion", "fips": "12083" },
+        { "name": "Nassau", "fips": "12089" },
+        { "name": "Putnam", "fips": "12107" },
+        { "name": "St. Johns", "fips": "12109" },
+        { "name": "Sumter", "fips": "12119" },
+        { "name": "Suwannee", "fips": "12121" },
+        { "name": "Union", "fips": "12125" }
+      ],
+      "counties_source": "S60"
+    },
+    {
+      "code": "orlando",
+      "name": "Orlando Division",
+      "office_code": { "value": "6", "status": "verified", "source": "S64", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "George C. Young Federal Courthouse", "line1": "400 W. Washington Street", "line2": "Suite 5100", "city": "Orlando", "state": "FL", "postal_code": "32801" }, "status": "verified", "source": "S62", "verified_at": "2026-09-24", "note": null },
+      "counties": [
+        { "name": "Brevard", "fips": "12009" },
+        { "name": "Lake", "fips": "12069" },
+        { "name": "Orange", "fips": "12095" },
+        { "name": "Osceola", "fips": "12097" },
+        { "name": "Seminole", "fips": "12117" },
+        { "name": "Volusia", "fips": "12127" }
+      ],
+      "counties_source": "S60"
+    },
+    {
+      "code": "tampa",
+      "name": "Tampa Division",
+      "office_code": { "value": "8", "status": "verified", "source": "S64", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "Sam M. Gibbons United States Courthouse", "line1": "801 N. Florida Avenue", "line2": "Suite 555", "city": "Tampa", "state": "FL", "postal_code": "33602" }, "status": "verified", "source": "S62", "verified_at": "2026-09-24", "note": null },
+      "counties": [
+        { "name": "Hardee", "fips": "12049" },
+        { "name": "Hernando", "fips": "12053" },
+        { "name": "Hillsborough", "fips": "12057" },
+        { "name": "Manatee", "fips": "12081" },
+        { "name": "Pasco", "fips": "12101" },
+        { "name": "Pinellas", "fips": "12103" },
+        { "name": "Polk", "fips": "12105" },
+        { "name": "Sarasota", "fips": "12115" }
+      ],
+      "counties_source": "S60"
+    },
+    {
+      "code": "fort-myers",
+      "name": "Fort Myers Division",
+      "office_code": { "value": "2", "status": "verified", "source": "S64", "verified_at": "2026-09-24", "note": null },
+      "courthouse": { "value": { "name": "United States Courthouse & Federal Building", "line1": "2110 First Street", "line2": null, "city": "Fort Myers", "state": "FL", "postal_code": "33901" }, "status": "verified", "source": "S62", "verified_at": "2026-09-24", "note": "The locations page says this location does not process bankruptcy filings; cases must be filed at the Tampa Division (Tampa's phone number is listed for Fort Myers). LR 1071-1(b)(4): hearings 'in Fort Myers or as determined by the presiding judge'." },
+      "counties": [
+        { "name": "Charlotte", "fips": "12015" },
+        { "name": "Collier", "fips": "12021" },
+        { "name": "DeSoto", "fips": "12027" },
+        { "name": "Glades", "fips": "12043" },
+        { "name": "Hendry", "fips": "12051" },
+        { "name": "Lee", "fips": "12071" }
+      ],
+      "counties_source": "S60"
+    }
+  ],
+  "cmecf": {
+    "live_url": { "value": "https://ecf.flmb.uscourts.gov/cgi-bin/login.pl", "status": "verified", "source": "S65", "verified_at": "2026-09-24", "note": "The CM/ECF page [S66] and the PACER lookup [S34] give https://ecf.flmb.uscourts.gov/." },
+    "training_url": { "value": "https://ecf-train.flmb.uscourts.gov/cgi-bin/flmb_training.pl", "status": "verified", "source": "S65", "verified_at": "2026-09-24", "note": null },
+    "help_desk": { "value": "ecfhelp@flmb.uscourts.gov; 813-301-5319", "status": "verified", "source": "S65", "verified_at": "2026-09-24", "note": "The PACER lookup [S34] lists 813-301-5079 for the help desk and ecfhelp@flmb.uscourts.gov per division; the court's support page is used here." },
+    "release": { "value": "1.8.3", "status": "verified", "source": "S34", "verified_at": "2026-09-24", "note": "PACER lookup software_version 'NextGen CM/ECF Release 1.8 (Revision 1.8.3)'; lookup last_updated 'Thu, 24 Sep 2026 06:10:04 -0400'." }
+  },
+  "pdf": {
+    "max_bytes": { "value": null, "status": "unverified", "source": "S34", "verified_at": null, "note": "No FLMB page read states a file-size cap: LR 1001-2(f) [S12] sets format only, LR 9004-1 is a caption rule, and the hardware/software requirements sheet (2013) has no limit. The PACER lookup [S34] carries merge_doc_size '10' for this court with no unit; ADR 0024 also carries no figure ('1001-2(f); split rule')." },
+    "text_searchable_required": { "value": true, "status": "verified", "source": "S12", "verified_at": "2026-09-24", "note": "LR 1001-2(f): papers 'must be converted to PDF from the word processing original, not scanned, to permit text searches', on 8-1/2 x 11 white paper with one-inch margins; paper-only originals (e.g. exhibits) may be scanned. Amended eff. 2025-08-15." },
+    "flatten_required": { "value": null, "status": "unverified", "source": null, "verified_at": null, "note": "Not stated on any FLMB page read." },
+    "pdf_a_required": { "value": false, "status": "unverified", "source": "S16", "verified_at": null, "note": "No FLMB page mentions PDF/A; the figure is ADR 0024's 'no launch court requires PDF/A today' [S16], not confirmed on a court page." }
+  },
+  "matrix": {
+    "max_line_chars": { "value": 28, "status": "unverified", "source": "S69", "verified_at": null, "note": "UNVERIFIED FOR A REPRESENTED DEBTOR'S UPLOAD. The only figure on any FLMB page is the procedure 'Mailing Matrix - Instructions for Debtors Not Represented by Counsel' (last revision 2020-09-09): 'Each line of information must be 28 characters or less in length.' — a paper-matrix rule for pro se filers. Represented debtors' attorneys 'shall upload the names and addresses of the debtor's creditors via CM/ECF' (LR 1007-2(a)(2) [S61]) and the 2009 Case Upload guide [S19] takes a software-generated Creditor.txt with no line width stated, so the width the upload accepts is unknown; the generator keeps the common 40-character format for FLMB until a training-database session confirms it (ADR 0024, PR 5). ADR 0024's 'none' departure is likewise unconfirmed." },
+    "max_creditor_lines": { "value": 4, "status": "unverified", "source": "S69", "verified_at": null, "note": "Same standing as max_line_chars: the pro se paper instructions say 'Each name and address must consist of no more than 4 (four) total lines single spaced, with at least one blank line between each of the name/address blocks.'; the represented-debtor upload's limit is not published." },
+    "blank_lines_between": { "value": 1, "status": "verified", "source": "S69", "verified_at": "2026-09-24", "note": "'at least one blank line'." },
+    "pad_to_lines": { "value": null, "status": "verified", "source": "S69", "verified_at": "2026-09-24", "note": "No fixed block size is stated." },
+    "name_line_chars": { "value": null, "status": "verified", "source": "S69", "verified_at": "2026-09-24", "note": "No separate name-line width; the 28-character limit applies to each line. Individuals 'should be listed in last name, first name format'." },
+    "comma_after_city": { "value": true, "status": "verified", "source": "S69", "verified_at": "2026-09-24", "note": "'The city and state also need to be separated by a comma.' Sample: 'San Diego, CA 92189'." },
+    "case_number_header_when_separate": { "value": false, "status": "verified", "source": "S69", "verified_at": "2026-09-24", "note": "'Do not use a header or footer to identify your case. Label the CD or USB.' File name Creditor.txt." },
+    "certification_required": { "value": false, "status": "verified", "source": "S61", "verified_at": "2026-09-24", "note": "LR 1007-1(a)(1) requires only 'the petition and a list of creditors or a master mailing matrix, in accordance with Local Rule 1007-2'; LR 1007-2 and the Case Opening procedure [S68] name no matrix certification or verification form." }
+  },
+  "opening": {
+    "signature_instrument": { "value": { "kind": "s_signature_with_wet_ink_retained", "title": "Local Rule 1001-2(g)(2) client signatures; 1001-2(h) retention of original papers", "wet_ink_required": true, "retention": "2 years", "own_docket_event": null, "form_url": null }, "status": "verified", "source": "S12", "verified_at": "2026-09-24", "note": "LR 1001-2(g)(2) (amended eff. 2025-08-15): attorneys 'may file papers signed by their clients by including a scanned paper bearing the client's signature or, subject to the retention requirements of section (h) of this rule, by including the client's name on a signature block'. (h): paper copies bearing original signatures of petitions, lists of creditors, schedules, SOFAs, Statements About Your Social Security Numbers, affidavits and § 1746 declarations must be retained 'for two years after the closing of the case'. ADR 0024's 'Declaration Under Penalty of Perjury for Electronic Filing' comes from the July 2009 attorney guide (ch. 7–9 [S19, S72]), which docketed it as its own 'Declaration for Electronic Filing' event with the debtor's physical signature; the current Case Opening procedure (rev. 2023-09-18) [S68] lists no such event or form and no form was found on the site. Treat the declaration as unverified for today's filings; the rule text above is what is verified." },
+    "ssn_statement": { "value": "own_event", "status": "verified", "source": "S68", "verified_at": "2026-09-24", "note": "Case Opening procedure docketing events include 'Bankruptcy>Miscellaneous>Statement About Your Debtors Social Security Numbers'; checklist item 2: 'File a Statement About Your Social Security Number [Official Form B121] for individual debtors'. LR 1007-1(a)(3) [S61]: the Electronic Filing User keeps the original for four years after closing; the 2004 advisory note describes it as 'a separate non-viewable entry in CM/ECF' with the full SSN also entered 'during the case filing or case upload process'." },
+    "local_forms": [],
+    "fee_rule": { "value": { "deadline": "Paid through the CM/ECF payment screen at filing ('pay as you go' recommended) or at the end of the CM/ECF session; if paying in installments, only the first installment may be paid online and the final installment is due within 120 days of the petition (extendable to 180 days on motion)", "note": "Installments procedure (rev. 2020-10-28) [S70]: the court allows three installments over 90 days after the initial payment; 'only the first installment can be paid online. Future balances must be paid by attorney check ... money order, or cashier's check at the Clerk's Intake Office where the case was filed'; not allowed if fees are owed from a prior case. Case Opening procedure [S68] lists the Chapter 7 fee as $338 (rev. 2023-09-18 — check the current fee schedule). The 2009 Case Upload guide [S19]: 'Case Upload should not be used if you are filing a case in which the fee is to be paid in installments'; payment may be per filing or per session. No lockout deadline for unpaid fees was found on a current page." }, "status": "verified", "source": "S70", "verified_at": "2026-09-24", "note": null }
+  },
+  "case_upload": { "status": "unverified", "kind": null, "verified_at": null, "note": "The current Case Opening procedure (rev. 2023-09-18) [S68] lists 'Bankruptcy>Case Upload' as a docketing event and the 2009 attorney guide ch. 8 [S19] documents the legacy flow (Debtor.txt, Petition.pdf in a prescribed order, Creditor.txt, separate SSN and declaration PDFs; not for installment cases). The AO legacy text format is implied but the court's required field set has not been verified in a training-database session." },
+  "registration": {
+    "training_required": { "value": null, "status": "unverified", "source": "S12", "verified_at": null, "note": "Conflicting signals: LR 1001-2's 2025 advisory note says the amendment 'revises section (b) to delete the provision regarding CM/ECF training' (eff. 2025-08-15), and the NextGen registration form [S67] requires only the court form plus PACER registration and mentions no training; but the help-desk/support page [S65] still says 'If you have not had CM/ECF Training, please Click here' before obtaining a login. No page states the current requirement plainly." },
+    "notes": "LR 1001-2(b): attorneys admitted to the U.S. District Court for the Middle District of Florida register by submitting the New User Registration Form on the court's website and registering with PACER [S12]; the NextGen form is at https://pacer.flmb.uscourts.gov/cmecf/registrationng.asp [S67]. LR 1001-2(c): a password may be used only by the user or an authorized agent; another attorney's password may not be used. Registration waives mail notice and consents to electronic service (1001-2(d)). Training database: https://ecf-train.flmb.uscourts.gov/cgi-bin/flmb_training.pl [S65]."
+  },
+  "sources": [
+    { "id": "S12", "title": "FLMB, Local Rule 1001-2 (amended eff. 2025-08-15)", "url": "https://www.flmb.uscourts.gov/localrules/Rules/1001-2.pdf", "read": "2026-09-24" },
+    { "id": "S16", "title": "PACER FAQ, Is there a limit on the size of the PDF files which CM/ECF will accept (carried from ADR 0024; not re-read)", "url": "https://pacer.uscourts.gov/help/faqs/there-limit-size-pdf-files-which-cmecf-will-accept", "read": "2026-09-23" },
+    { "id": "S19", "title": "FLMB, CM/ECF Attorney Guide ch. 8 Case Upload and ch. 7 Case Opening (July 2009); Local Rule 1007-2", "url": "https://www.flmb.uscourts.gov/cmecf/attorneyguide/documents/Chapter8.pdf", "read": "2026-09-24" },
+    { "id": "S34", "title": "PACER, Court CM/ECF Lookup data (last_updated 2026-09-24 06:10:04 -0400)", "url": "https://pacer.uscourts.gov/file-case/court-cmecf-lookup/data.json", "read": "2026-09-24" },
+    { "id": "S60", "title": "FLMB, Local Rule 1071-1 Divisions – Bankruptcy Court (amended eff. 2025-08-15)", "url": "https://www.flmb.uscourts.gov/localrules/Rules/1071-1.pdf", "read": "2026-09-24" },
+    { "id": "S61", "title": "FLMB, Local Rule 1007-1 Lists, Schedules, Statements, and Other Required Documents", "url": "https://www.flmb.uscourts.gov/localrules/Rules/1007-1.pdf", "read": "2026-09-24" },
+    { "id": "S62", "title": "FLMB, Locations / Phone Lists", "url": "https://www.flmb.uscourts.gov/locations/", "read": "2026-09-24" },
+    { "id": "S63", "title": "FLMB, Court Hours & Locations (divisions)", "url": "https://www.flmb.uscourts.gov/thesource/divisions/default.asp", "read": "2026-09-24" },
+    { "id": "S64", "title": "FLMB, Frequently Asked Questions (case number format and office codes)", "url": "https://www.flmb.uscourts.gov/faqs/", "read": "2026-09-24" },
+    { "id": "S65", "title": "FLMB, CM/ECF Help Desk / Support (live, training and help-desk contacts)", "url": "https://pacer.flmb.uscourts.gov/fwxflmb/training/support.htm", "read": "2026-09-24" },
+    { "id": "S66", "title": "FLMB, CM/ECF page", "url": "https://www.flmb.uscourts.gov/cmecf/", "read": "2026-09-24" },
+    { "id": "S67", "title": "FLMB, CM/ECF Registration and NextGen registration form", "url": "https://pacer.flmb.uscourts.gov/cmecf/registrationng.asp", "read": "2026-09-24" },
+    { "id": "S68", "title": "FLMB, Procedure: Case Opening – Chapter 7, 11, 12, and 13 (last revision 2023-09-18)", "url": "https://www.flmb.uscourts.gov/proguide/documents/Procedure/Case_Opening_Bankruptcy.pdf", "read": "2026-09-24" },
+    { "id": "S69", "title": "FLMB, Procedure: Mailing Matrix – Instructions for Debtors Not Represented by Counsel (last revision 2020-09-09)", "url": "https://www.flmb.uscourts.gov/proguide/documents/Procedure/Mailing_Matrix.pdf", "read": "2026-09-24" },
+    { "id": "S70", "title": "FLMB, Procedure: Application for Payment of Filing Fees in Installments (last revision 2020-10-28)", "url": "https://www.flmb.uscourts.gov/proguide/documents/Procedure/Application_for_Payment_of_Filing_Fees_In_Installments.pdf", "read": "2026-09-24" },
+    { "id": "S71", "title": "FLMB, Local Rules index (with amendments effective 2025-08-15); full rules PDF", "url": "https://www.flmb.uscourts.gov/localrules/", "read": "2026-09-24" },
+    { "id": "S72", "title": "FLMB, CM/ECF Attorney Guide ch. 9 Declarations Under Penalty of Perjury for Electronic Filing (July 2009)", "url": "https://www.flmb.uscourts.gov/cmecf/attorneyguide/documents/chapter9.pdf", "read": "2026-09-24" },
+    { "id": "S73", "title": "FLMB, Local Rule 5005-1 Filing Papers – Requirements", "url": "https://www.flmb.uscourts.gov/localrules/Rules/5005-1.pdf", "read": "2026-09-24" },
+    { "id": "S74", "title": "FLMB, Local Rule 9004-1 Papers – Caption (no format or size rule)", "url": "https://www.flmb.uscourts.gov/localrules/Rules/9004-1.pdf", "read": "2026-09-24" },
+    { "id": "S75", "title": "FLMB, Procedure Manual index (links to each procedure)", "url": "https://www.flmb.uscourts.gov/forms/", "read": "2026-09-24" },
+    { "id": "S76", "title": "FLMB, CM/ECF Hardware and Software Requirements (2013)", "url": "https://www.flmb.uscourts.gov/cmecf/documents/requirements.pdf", "read": "2026-09-24" }
+  ],
+  "notes": "Divisions: LR 1071-1(b) [S60] assigns the 35 statutory counties (28 U.S.C. § 89(b)) to four divisions (Jacksonville 15, Orlando 6, Tampa 8, Fort Myers 6); every statutory county appears in exactly one division; Volusia moved from Jacksonville to Orlando in 2014 and the Ocala Division was abolished in 1995 (advisory notes). The statute's 'De Soto' is the Census 'DeSoto'. Office codes come from the FAQ [S64]. The current Case Opening procedure [S68] lists no local form and no e-filing declaration for a Chapter 7 individual opening — only Official Forms (B101, B121, credit-counseling certificate, B103A/B, schedules, B122A, B2030) — so local_forms is empty. Failed URLs: https://ecf.flmb.uscourts.gov/cgi-bin/flmb_faq.pl (HTTP 404; ADR 0024's S33); https://www.flmb.uscourts.gov/thesource/counties/default.asp (HTTP 404 — the locations page links a 'Counties in the Middle District of Florida' page whose URL is not exposed); https://www.flmb.uscourts.gov/proguide/ (HTTP 403 — individual procedures under /proguide/documents.asp?ID=... and /proguide/documents/Procedure/*.pdf load); https://www.flmb.uscourts.gov/localrules/Rules/1006-1.pdf (HTTP 404; not in the index); https://www.flmb.uscourts.gov/proguide/documents/Procedure/Case_Opening_Chapter_7_11_12_13.pdf (HTTP 404 — a guessed name; the real file is Case_Opening_Bankruptcy.pdf); direct curl downloads of *.uscourts.gov PDFs returned HTTP 404 (bot filtering) — PDFs were fetched with WebFetch and text-extracted with pypdf. The full local rules PDF (https://www.flmb.uscourts.gov/localrules/Rules/localrules-FLMB.pdf) was fetched; its title page reads 'WITH AMENDMENTS EFFECTIVE AUGUST 15, 2025'. The court's website says the Fort Myers office does not process filings (file at Tampa)."
+}
