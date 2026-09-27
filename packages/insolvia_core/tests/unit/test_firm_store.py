@@ -24,8 +24,15 @@ from typing import Any
 import pytest
 from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws import firm_store as aws_firm_store
+from insolvia_core.adapters.aws.dynamo import to_attributes
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.firm_clients import (
+    create_firm_client,
+    firm_client_item,
+    parse_firm_client,
+    set_firm_client_status,
+)
 from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
@@ -642,3 +649,132 @@ def test_the_library_query_excludes_the_firms_other_rows(monkeypatch):
     _, kwargs = fake.calls[0]
     assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
     assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "LIBCREDITOR#"}
+
+
+# ── Firm clients (ADR 0022 / #353) ───────────────────────────────────
+
+
+def firm_client(firm_id: str = FIRM_ID, surname: str = "Example"):
+    draft = parse_firm_client(
+        {
+            "name": {"given": "Jordan", "surname": surname},
+            "residence_address": {"line1": "1 Example St", "county": "Sangamon"},
+            "other_names_used": [{"id": "alias-1", "surname": "Sample"}],
+            "date_of_birth": "1980-02-29",
+        }
+    )
+    return create_firm_client(draft, firm_id=firm_id, created_by=ALICE)
+
+
+def test_creating_the_same_client_twice_is_refused():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    with pytest.raises(RuntimeError):
+        store.create_client(client)
+
+
+def test_a_client_is_read_within_its_firm():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    assert store.get_client(FIRM_ID, client.id) == client
+    assert store.get_client(OTHER_FIRM_ID, client.id) is None
+
+
+def test_the_directory_is_one_firm_in_directory_order():
+    store = MemoryFirmStore()
+    store.create_client(firm_client(surname="Zeta"))
+    store.create_client(firm_client(surname="adams"))
+    store.create_client(firm_client(firm_id=OTHER_FIRM_ID, surname="Other"))
+    archived = set_firm_client_status(firm_client(surname="Middle"), "archived")
+    store.create_client(archived)
+
+    listed = store.list_clients(FIRM_ID)
+    # Archived clients are listed too: the directory is the whole directory.
+    assert [c.name.surname for c in listed] == ["adams", "Middle", "Zeta"]
+
+
+def test_updating_a_client_that_is_not_there_is_none():
+    assert MemoryFirmStore().update_client(firm_client()) is None
+
+
+def test_updating_across_firms_does_not_move_a_client():
+    store = MemoryFirmStore()
+    client = firm_client()
+    store.create_client(client)
+    assert store.update_client(replace(client, firm_id=OTHER_FIRM_ID)) is None
+    assert store.get_client(OTHER_FIRM_ID, client.id) is None
+
+
+def test_a_client_round_trips_through_the_wire_format(monkeypatch):
+    original = replace(
+        firm_client(),
+        tax_id_ref="00000000-0000-4000-8000-0000000000ef",
+        tax_id_last_four="4320",
+    )
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    store.create_client(original)
+
+    _, kwargs = fake.calls[0]
+    assert kwargs["ConditionExpression"] == "attribute_not_exists(SK)"
+    item = kwargs["Item"]
+    assert item["SK"] == {"S": f"FIRMCLIENT#{original.id}"}
+    assert item["body"]["M"]["residence_address"]["M"]["county"] == {"S": "Sangamon"}
+
+    fake.responses["get_item"] = {"Item": item}
+    assert store.get_client(FIRM_ID, original.id) == original
+
+
+def test_a_client_update_is_scoped_to_the_firm(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_client(firm_client())
+    _, kwargs = fake.calls[0]
+    assert kwargs["ConditionExpression"] == "attribute_exists(SK) AND firmId = :firm"
+    assert kwargs["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_refused_client_update_is_none(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    assert store.update_client(firm_client()) is None
+
+
+def test_a_refused_client_create_raises(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+    fake.raises = conditional_check_failed()
+    with pytest.raises(RuntimeError):
+        store.create_client(firm_client())
+
+
+def test_the_directory_query_reads_only_client_rows_and_every_page(monkeypatch):
+    """Under `FIRMCLIENT#`, never `CLIENT#` — the portal binding's prefix in
+    this same partition (`firm_clients` owns why)."""
+    first, second = firm_client(surname="Zeta"), firm_client(surname="Adams")
+    pages = iter(
+        [
+            {
+                "Items": [to_attributes(firm_client_item(first))],
+                "LastEvaluatedKey": {"PK": {"S": "x"}},
+            },
+            {"Items": [to_attributes(firm_client_item(second))]},
+        ]
+    )
+
+    class Paging(FakeDynamoDb):
+        def query(self, **kwargs: Any) -> Any:
+            self.calls.append(("query", kwargs))
+            return next(pages)
+
+    fake = Paging()
+    listed = dynamo_store(monkeypatch, fake).list_clients(FIRM_ID)
+
+    assert [c.name.surname for c in listed] == ["Adams", "Zeta"]
+    assert len(fake.calls) == 2
+    _, kwargs = fake.calls[0]
+    assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
+    assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "FIRMCLIENT#"}
+    assert fake.calls[1][1]["ExclusiveStartKey"] == {"PK": {"S": "x"}}

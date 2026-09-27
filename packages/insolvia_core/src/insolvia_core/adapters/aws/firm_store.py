@@ -6,6 +6,14 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.firm_clients import SK_PREFIX as FIRM_CLIENT_SK_PREFIX
+from insolvia_core.firm_clients import (
+    FirmClient,
+    firm_client_from_item,
+    firm_client_item,
+    sorted_firm_clients,
+)
+from insolvia_core.firm_clients import sort_key as firm_client_sort_key
 from insolvia_core.firms import (
     Firm,
     FirmUser,
@@ -346,3 +354,73 @@ class DynamoDbFirmStore:
                 return False
             raise
         return True
+
+    # ── Firm clients (ADR 0022) ─────────────────────────────────────
+    #
+    # The library creditors' shape exactly, under `FIRMCLIENT#`. Neither that
+    # prefix nor the portal binding's `CLIENT#` begins the other, so neither
+    # `begins_with` listing can return the other's rows (`firm_clients` owns
+    # why that matters). `client` below is the record; `self.client` is boto3.
+
+    def create_client(self, client: FirmClient) -> None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=to_attributes(firm_client_item(client)),
+                ConditionExpression="attribute_not_exists(SK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                raise RuntimeError(f"client {client.id} already exists") from error
+            raise
+
+    def get_client(self, firm_id: str, client_id: str) -> FirmClient | None:
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={
+                "PK": {"S": partition_key(firm_id)},
+                "SK": {"S": firm_client_sort_key(client_id)},
+            },
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return None if not item else firm_client_from_item(from_attributes(item))
+
+    def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
+        clients: list[FirmClient] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "KeyConditionExpression": "PK = :firm AND begins_with(SK, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":firm": {"S": partition_key(firm_id)},
+                    ":prefix": {"S": f"{FIRM_CLIENT_SK_PREFIX}#"},
+                },
+                "ConsistentRead": True,
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.query(**kwargs)
+            clients.extend(
+                firm_client_from_item(from_attributes(item))
+                for item in response.get("Items", [])
+            )
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        return sorted_firm_clients(clients)
+
+    def update_client(self, client: FirmClient) -> FirmClient | None:
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=to_attributes(firm_client_item(client)),
+                ConditionExpression="attribute_exists(SK) AND firmId = :firm",
+                ExpressionAttributeValues={":firm": {"S": client.firm_id}},
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return None
+            raise
+        return client

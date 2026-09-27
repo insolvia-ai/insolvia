@@ -89,6 +89,7 @@ export type FirmFeature =
   | 'notes'
   | 'events'
   | 'tasks'
+  | 'clients'
   | 'client_portal'
   | 'firm_administration';
 
@@ -577,6 +578,121 @@ export function libraryCreditorDraftToJson(draft: LibraryCreditorDraft): Record<
           : draft.additional_notice_parties.map(noticePartyToJson),
       preferred: draft.preferred,
       notes: draft.notes,
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The firm's client directory (ADR 0022) — mirrors insolvia_core/firm_clients.py
+// (`firm_client_json`, `parse_firm_client`, `STATUSES`) and the API's
+// api/routes/firm_clients.py. NOT the portal's client binding below, which is
+// a different record (`insolvia_core/clients.py`): a `FirmClient` is the firm's
+// directory entry for a person, with or without a portal login.
+// ---------------------------------------------------------------------------
+
+/**
+ * `archived` leaves the person in the directory — archiving is a status
+ * write, never a delete (ADR 0022).
+ */
+export type FirmClientStatus = 'active' | 'archived';
+
+/**
+ * A person in the firm's client directory — `/v1/firm/clients`, gated by the
+ * `clients` feature. One client has many cases over time; a prospect is a
+ * client with no case yet.
+ *
+ * **Snake_case**, for {@link LibraryCreditor}'s reason: the identity fields
+ * are the case domain's own shapes ({@link PersonName}, {@link Address},
+ * {@link OtherName}), reused verbatim so a client copied onto a debtor needs
+ * no mapping. Absent optional fields are omitted by the server, never `null`.
+ */
+export interface FirmClient {
+  readonly id: string;
+  readonly status: FirmClientStatus;
+  /** Always present; at least one of `surname` / `given` is set. */
+  readonly name: PersonName;
+  readonly other_names_used?: readonly OtherName[] | undefined;
+  /** `YYYY-MM-DD`. */
+  readonly date_of_birth?: string | undefined;
+  readonly residence_address?: Address | undefined;
+  readonly mailing_address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly mobile?: string | undefined;
+  readonly email?: string | undefined;
+  /** Free text in v1; a firm pick-list is a later issue. */
+  readonly lead_source?: string | undefined;
+  readonly referred_by?: string | undefined;
+  /** `YYYY-MM-DD`. */
+  readonly first_retained_at?: string | undefined;
+  /**
+   * The last four digits of the client's tax ID — the only tax-ID fact any
+   * response carries. It cannot be set through this API: the full value is
+   * sealed once and entered on a case.
+   */
+  readonly tax_id_last_four?: string | undefined;
+  readonly created_at: string;
+  readonly updated_at: string;
+  /** The subject of the firm user who created the record. */
+  readonly created_by: string;
+}
+
+/**
+ * The `POST` / `PUT /v1/firm/clients/{id}` body — a WHOLE record, never a
+ * partial PATCH ({@link LibraryCreditorDraft}'s reason): a field omitted from
+ * a PUT is cleared. `status`, `created_by` and the tax ID are the server's and
+ * are not part of the draft; archive with `setFirmClientStatus`.
+ */
+export interface FirmClientDraft {
+  /** `surname` or `given` is required. */
+  readonly name: PersonName;
+  /** Each row needs its own client-chosen `id`, as a debtor's does. */
+  readonly other_names_used?: readonly OtherName[] | undefined;
+  readonly date_of_birth?: string | undefined;
+  readonly residence_address?: Address | undefined;
+  readonly mailing_address?: Address | undefined;
+  readonly phone?: string | undefined;
+  readonly mobile?: string | undefined;
+  readonly email?: string | undefined;
+  readonly lead_source?: string | undefined;
+  readonly referred_by?: string | undefined;
+  readonly first_retained_at?: string | undefined;
+}
+
+/**
+ * An address WITH its county — unlike {@link addressToJson}, which drops it
+ * because no debtor write path sends one yet. A client's residence county is
+ * B101 line 5's County box once it is copied onto a debtor, so it travels.
+ */
+function clientAddressToJson(address: Address | undefined): Record<string, unknown> | undefined {
+  if (address === undefined) {
+    return undefined;
+  }
+  return definedMembersOrUndefined({
+    line1: address.line1,
+    line2: address.line2,
+    city: address.city,
+    state: address.state,
+    postal_code: address.postal_code,
+    county: address.county,
+  });
+}
+
+/** The `POST`/`PUT /v1/firm/clients[/{id}]` body, snake_case, absent
+ * optionals omitted entirely. */
+export function firmClientDraftToJson(draft: FirmClientDraft): Record<string, unknown> {
+  return assignDefined(
+    { name: personNameToJson(draft.name) ?? {} },
+    {
+      other_names_used: otherNamesToJson(draft.other_names_used),
+      date_of_birth: draft.date_of_birth,
+      residence_address: clientAddressToJson(draft.residence_address),
+      mailing_address: clientAddressToJson(draft.mailing_address),
+      phone: draft.phone,
+      mobile: draft.mobile,
+      email: draft.email,
+      lead_source: draft.lead_source,
+      referred_by: draft.referred_by,
+      first_retained_at: draft.first_retained_at,
     },
   );
 }

@@ -119,6 +119,15 @@ TASKS: Final = "tasks"
 # list-before-build rule: an admin holds it (admins hold everything), and
 # anyone else holds it only once an admin grants it.
 CLIENT_PORTAL: Final = "client_portal"
+# The firm's client directory (ADR 0022 / #353): the person who outlives any
+# one matter — `insolvia_core.firm_clients`. Its own feature rather than a
+# facet of CASES or INTAKE for CREDITOR_LIBRARY's reason: a firm may want a
+# paralegal keeping the directory without every matter, or the reverse.
+# Reaching a client is same firm AND `clients >= view_only`; reaching a case
+# stays `access.may_see_case`, unchanged. Every row written before this
+# feature existed lacks it and so has it `hidden` (`permission_for`) — the
+# maintainer's choice: existing users reach clients only by an admin's grant.
+CLIENTS: Final = "clients"
 FEATURES: Final = (
     CASES,
     INTAKE,
@@ -128,6 +137,7 @@ FEATURES: Final = (
     NOTES,
     EVENTS,
     TASKS,
+    CLIENTS,
     CLIENT_PORTAL,
     FIRM_ADMINISTRATION,
 )
@@ -408,6 +418,9 @@ def default_permissions(role: str) -> dict[str, str]:
             # them — the same reasoning that gives them DOCUMENTS, not the
             # narrower CASES/INTAKE treatment.
             TASKS: ADD_EDIT,
+            # Staff read the directory — the person they are chasing
+            # documents from — and the case team keeps it (ADR 0022).
+            CLIENTS: VIEW_ONLY,
             # Fail-closed default (ADR 0023), like NOTES above.
             CLIENT_PORTAL: HIDDEN,
             FIRM_ADMINISTRATION: HIDDEN,
@@ -423,6 +436,9 @@ def default_permissions(role: str) -> dict[str, str]:
         NOTES: ADD_EDIT,
         EVENTS: ADD_EDIT,
         TASKS: ADD_EDIT,
+        # Opening a matter starts from a client (ADR 0022), so the people
+        # who open matters keep the directory.
+        CLIENTS: ADD_EDIT,
         # Hidden for every role until an admin grants it — ADR 0023 lists the
         # feature before its screens exist, and an invitation admits a member
         # of the public, so nobody holds it by job title.

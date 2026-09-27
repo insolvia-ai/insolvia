@@ -1,4 +1,5 @@
-"""Who read or changed which case (issue 8.3).
+"""Who read or changed which case (issue 8.3) — and, since ADR 0022, which
+firm client.
 
 The log that answers the question CloudTrail structurally cannot. Per
 docs/adr/0001 the API's execution role is the only principal AWS ever sees,
@@ -21,6 +22,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Final
 
 # What happened. Kept coarse — this records that an access occurred and by
 # whom, not a diff. Reconstructing what changed is the case record's job.
@@ -74,6 +76,17 @@ from datetime import UTC, datetime
 #     revoked binding, a suspended firm) is a `denied` row of whichever the
 #     request would have been: it is what a person whose access was withdrawn
 #     trying anyway looks like.
+#
+# The firm's client directory (ADR 0022) adds three more, and they are the
+# first rows NOT keyed by a case: client.create / client.read / client.update
+# name a `firm_clients.FirmClient`, a firm-scoped person with no case to be
+# logged under — so the row's subject is `CLIENT#<client_id>` rather than
+# `CASE#<case_id>` (see `AccessEvent.subject_key`). Same table, same
+# PutItem-only grant. A single-record read is logged, because a client record
+# is PII; the directory LIST is not, matching `GET /v1/cases`. An archive is a
+# client.update — a status write, not a verb of its own. These share the
+# `client.` prefix with the portal's client.invite / client.revoke, which are
+# about a portal BINDING and stay keyed by the case they bind to.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -90,6 +103,9 @@ ACTIONS = (
     "client.revoke",
     "portal.read",
     "portal.answer",
+    "client.create",
+    "client.read",
+    "client.update",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -110,9 +126,17 @@ OUTCOMES = ("allowed", "denied")
 # going to expire. It read exactly like working retention.
 
 
+# The subject-key prefixes. A row is about exactly one of these.
+CASE_SUBJECT: Final = "CASE"
+CLIENT_SUBJECT: Final = "CLIENT"
+
+
 @dataclass(frozen=True)
 class AccessEvent:
-    case_id: str
+    # WHAT was accessed, as the table's partition key: `CASE#<case_id>` for
+    # every row until ADR 0022, `CLIENT#<client_id>` for the client.create /
+    # read / update rows. `case_id` and `client_id` below read it back.
+    subject_key: str
     principal: str
     action: str
     outcome: str
@@ -128,10 +152,25 @@ class AccessEvent:
     # roles, canonical order, comma-joined (`debtor_1,debtor_2`).
     roles: str | None = None
 
+    def _id_under(self, prefix: str) -> str | None:
+        head, _, rest = self.subject_key.partition("#")
+        return rest if head == prefix else None
+
+    @property
+    def case_id(self) -> str | None:
+        """The case this row is about, or None on a client row."""
+        return self._id_under(CASE_SUBJECT)
+
+    @property
+    def client_id(self) -> str | None:
+        """The firm client this row is about, or None on a case row."""
+        return self._id_under(CLIENT_SUBJECT)
+
 
 def record_access(
     *,
-    case_id: str,
+    case_id: str | None = None,
+    client_id: str | None = None,
     principal: str,
     action: str,
     outcome: str = "allowed",
@@ -139,11 +178,22 @@ def record_access(
     purpose: str | None = None,
     roles: tuple[str, ...] | None = None,
 ) -> AccessEvent:
+    """One access-log row about exactly one subject — a case (`case_id`) or a
+    firm client (`client_id`). Naming both, or neither, is a programming
+    error: a row about two things answers neither "who saw this case" nor
+    "who saw this client"."""
+    if (case_id is None) == (client_id is None):
+        raise ValueError("an access event names exactly one of case_id, client_id")
+    subject_key = (
+        f"{CASE_SUBJECT}#{case_id}"
+        if case_id is not None
+        else f"{CLIENT_SUBJECT}#{client_id}"
+    )
     recorded_at = (
         datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     )
     return AccessEvent(
-        case_id=case_id,
+        subject_key=subject_key,
         principal=principal,
         action=action,
         outcome=outcome,
@@ -158,22 +208,27 @@ def record_access(
 def access_item(event: AccessEvent) -> dict[str, str]:
     """The stored item shape, shared by both AccessLog implementations.
 
-    PK  CASE#<case_id>                 keyed by case, because "who saw this
-    SK  <recordedAt>#<eventId>         file" is the question actually asked
+    PK  CASE#<case_id>                 keyed by what was accessed, because
+        | CLIENT#<client_id>           "who saw this file" (or this person)
+    SK  <recordedAt>#<eventId>         is the question actually asked
 
-    No expiry attribute — see the note above. `filingRole` and `purpose`
-    appear only on the rows that carry them (a `taxid.read`).
+    `caseId` or `clientId` repeats the id beside the key, whichever the row
+    is about. No expiry attribute — see the note above. `filingRole` and
+    `purpose` appear only on the rows that carry them (a `taxid.read`).
     """
     item = {
-        "PK": f"CASE#{event.case_id}",
+        "PK": event.subject_key,
         "SK": f"{event.recorded_at}#{event.event_id}",
         "eventId": event.event_id,
-        "caseId": event.case_id,
         "principal": event.principal,
         "action": event.action,
         "outcome": event.outcome,
         "recordedAt": event.recorded_at,
     }
+    if event.case_id is not None:
+        item["caseId"] = event.case_id
+    if event.client_id is not None:
+        item["clientId"] = event.client_id
     if event.filing_role is not None:
         item["filingRole"] = event.filing_role
     if event.purpose is not None:

@@ -171,7 +171,10 @@ class DebtorDraft:
     provenance: Mapping[str, ProvenanceEntry]
 
 
-def _parse_other_names(value: object, errors: dict[str, str]) -> tuple[OtherName, ...]:
+def parse_other_names(value: object, errors: dict[str, str]) -> tuple[OtherName, ...]:
+    """The 8-year alias list. Public because `firm_clients` parses a client's
+    `other_names_used` with it — ADR 0022 copies a client's identity onto a
+    debtor, so the two must accept exactly the same rows."""
     if value is None:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
@@ -295,7 +298,7 @@ def parse_debtor(
 
     tax_id = parse_tax_id(payload.get("tax_id"), "tax_id", errors)
     name = parse_name(payload.get("name"), "name", errors)
-    other_names_used = _parse_other_names(payload.get("other_names_used"), errors)
+    other_names_used = parse_other_names(payload.get("other_names_used"), errors)
     employer_ids = _parse_employer_ids(payload.get("employer_ids"), errors)
     residence_address = parse_address(
         payload.get("residence_address"), "residence_address", errors
