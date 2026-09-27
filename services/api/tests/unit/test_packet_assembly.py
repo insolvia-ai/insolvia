@@ -248,7 +248,7 @@ def test_an_infeasible_plan_is_refused_by_the_plan_form():
 @pytest.mark.parametrize(
     ("court", "refused"),
     [
-        # FLSB's local form is verified in the registry (@2026-09-26).
+        # FLSB's local form is verified in the registry (@2026-09-26+2).
         ("flsb", True),
         # FLMB's answer is unverified: the national form is the default.
         ("flmb", False),
