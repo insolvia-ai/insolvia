@@ -18,6 +18,7 @@ from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage
+from insolvia_core.clients import ClientBinding
 from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firms import Firm, FirmUser
@@ -654,6 +655,73 @@ class TaxIdStore(Protocol):
         ...
 
     def get(self, case_id: str, ref: str) -> SealedTaxId | None: ...
+
+
+class ClientBindingStore(Protocol):
+    """Which case a client-portal subject may reach (ADR 0023).
+
+    TWO TABLES, ONE STORE: the authoritative row lives in the firm table
+    (resolved by the by-subject index, like a firm user), its mirror and the
+    per-role claims in the case partition. insolvia_core.clients owns the
+    shapes and why each exists. Every write that touches more than one of
+    them is ONE transaction — a binding without its mirror is a client the
+    firm cannot see on the case; a mirror without its binding is a client
+    who cannot sign in; a role claim without either is a role nobody can
+    ever be given again.
+
+    Nothing here is firm-scoped by an Accessor: the API's invitation routes
+    resolve the case through `CaseStore.get(accessor=...)` FIRST, and only a
+    case the caller may see reaches this store. `find` is the one
+    unscoped read — necessarily, since its job is to discover the firm, as
+    `FirmStore.find_user`'s is.
+    """
+
+    def bind(
+        self, binding: ClientBinding, *, narrowed: tuple[ClientBinding, ...]
+    ) -> None:
+        """Write a new (or re-bound) binding, its mirror and its role claims,
+        and rewrite each `narrowed` binding with its smaller role set — in one
+        transaction.
+
+        MUST refuse with `insolvia_core.errors.ConflictError`, writing
+        nothing, when the subject already holds a LIVE binding in this firm,
+        or when any role is held by a subject other than the new one and the
+        `narrowed` ones. That second refusal is what makes "at most one live
+        binding per role per case" hold under a race, not only after a read.
+        """
+        ...
+
+    def update(self, binding: ClientBinding) -> ClientBinding | None:
+        """Rewrite an existing binding and its mirror — a status change.
+        A revocation also releases the role claims this subject holds, in the
+        same transaction. None if the binding does not exist."""
+        ...
+
+    def get(self, firm_id: str, subject: str) -> ClientBinding | None:
+        """The authoritative row, by primary key, STRONGLY consistent. Portal
+        resolution re-reads through this after `find`, so a revocation takes
+        effect on the very next request rather than whenever the index
+        catches up."""
+        ...
+
+    def find(self, subject: str) -> ClientBinding | None:
+        """Which binding a portal token's subject holds, via the by-subject
+        index. Eventually consistent (a GSI). MUST raise rather than choose
+        when a subject resolves to more than one firm — the rule
+        `FirmStore.find_user` states, for the same reason."""
+        ...
+
+    def find_by_email(self, firm_id: str, email: str) -> ClientBinding | None:
+        """This firm's binding for `email`, if it has ever had one — how an
+        address Cognito already knows is resolved to OUR prior binding (a
+        refiled case) rather than guessed at. Firm-scoped: another firm's
+        client is not ours to re-bind."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[ClientBinding, ...]:
+        """Every binding on a case, revoked ones included, oldest first —
+        read from the mirrors, strongly consistent."""
+        ...
 
 
 class AccessLog(Protocol):

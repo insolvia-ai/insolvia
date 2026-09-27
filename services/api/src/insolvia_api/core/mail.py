@@ -10,7 +10,8 @@ development server).
 
 Every category name and the message_class here MUST match the mailer's
 service-registry allowlist for insolvia_api exactly (allowed_categories =
-["welcome", "email_verification", "password_reset"], allowed_message_classes =
+["welcome", "email_verification", "password_reset", "client_invitation"],
+allowed_message_classes =
 ["transactional"] — see infra/modules/mailer/main.tf local.insolvia_api_service)
 or the mailer rejects the send with a 4xx.
 
@@ -335,6 +336,75 @@ def password_reset_email(
         message_class=_MESSAGE_CLASS,
         to_address=to_address,
         subject="Reset your Insolvia password",
+        html_body=html_body,
+        text_body=text_body,
+        list_unsubscribe_url=links.unsubscribe_url,
+    )
+
+
+def client_invitation_email(
+    to_address: str,
+    *,
+    links: MailLinks,
+    firm_name: str,
+    portal_url: str,
+    recipient_name: str | None = None,
+) -> OutboundEmail:
+    """category "client_invitation" — the CONTEXT half of a client-portal
+    invitation (ADR 0023 § Invitation: two messages, one purpose each).
+
+    Cognito's own invitation mail carries the temporary password, and nothing
+    in this service ever sees it. This one says who is asking and why: which
+    law firm, what the portal is for, where to sign in, and that a second
+    message with the password is coming. IT CARRIES NO SECRET — no password,
+    no code, no token in the link — so a forwarded copy admits nobody, and
+    the link is the portal's front door, the same URL for every client.
+
+    Sent on every invitation and every re-send, so it also serves a client
+    whose account already existed (a refiled case) and who therefore gets no
+    new Cognito mail: the copy says to use their existing password then.
+    """
+    greeting = _greeting(recipient_name)
+    intro = (
+        f"{firm_name} has invited you to their client portal on Insolvia, where "
+        "you can answer questions about your bankruptcy case and send the "
+        "documents they ask for."
+    )
+    password_note = (
+        "You will receive a separate email from Insolvia with your sign-in name "
+        "and a temporary password. If you have signed in to Insolvia before, "
+        "use the password you already chose."
+    )
+    safety_note = (
+        f"Nobody from {firm_name} or Insolvia will ever ask you for your "
+        "password. If you were not expecting this, contact your law firm "
+        "directly."
+    )
+    body_html = (
+        f'<p style="margin:0 0 16px 0;">{escape(greeting)}</p>'
+        f'<p style="margin:0 0 16px 0;">{escape(intro)}</p>'
+        f'<p style="margin:0 0 16px 0;">{escape(password_note)}</p>'
+        f"{_button_html(label='Open the client portal', url=portal_url)}"
+        f'<p style="margin:16px 0 0 0;font-size:13px;color:{_COLOR_MUTED};">'
+        f"{escape(safety_note)}</p>"
+    )
+    html_body = _html_document(
+        preheader=f"{firm_name} invited you to their client portal.",
+        heading="You're invited to your client portal",
+        body_html=body_html,
+        links=links,
+    )
+    text_body = (
+        f"{greeting}\n\n{intro}\n\n{password_note}\n\n"
+        f"Client portal: {portal_url}\n\n"
+        f"{safety_note}"
+        f"{_text_footer(links)}"
+    )
+    return OutboundEmail(
+        category="client_invitation",
+        message_class=_MESSAGE_CLASS,
+        to_address=to_address,
+        subject=f"{firm_name} invited you to your client portal",
         html_body=html_body,
         text_body=text_body,
         list_unsubscribe_url=links.unsubscribe_url,

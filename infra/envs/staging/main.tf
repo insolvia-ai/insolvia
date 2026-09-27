@@ -344,6 +344,19 @@ resource "aws_ssm_parameter" "auth_client_id" {
   tags  = local.common_tags
 }
 
+# The client portal's app client (ADR 0023), the same namespace and the same
+# derivation as auth-client-id above: the deploy workflow turns it into
+# AUTH_PORTAL_CLIENT_ID, which is the ONE client id every /v1/portal/ route
+# verifies — disjoint from AUTH_CLIENT_ID, and the API refuses to verify
+# portal tokens at all if the two are ever equal. A public value, like the
+# web client id: it rides in every portal sign-in redirect.
+resource "aws_ssm_parameter" "auth_portal_client_id" {
+  name  = "/insolvia/${local.environment}/api/auth-portal-client-id"
+  type  = "String"
+  value = module.auth.portal_client_id
+  tags  = local.common_tags
+}
+
 # ── Marketing site: staging-www.insolvia.ai ─────────────────────
 # The marketing site DOES have a staging environment (issue #45 revisited —
 # the original "production + PR previews only" decision D2 is reversed; see

@@ -89,6 +89,7 @@ export type FirmFeature =
   | 'notes'
   | 'events'
   | 'tasks'
+  | 'client_portal'
   | 'firm_administration';
 
 /**
@@ -578,6 +579,64 @@ export function libraryCreditorDraftToJson(draft: LibraryCreditorDraft): Record<
       notes: draft.notes,
     },
   );
+}
+
+// ---------------------------------------------------------------------------
+// The client portal (ADR 0023) — mirrors insolvia_core/clients.py
+// (`binding_json`, `CLIENT_ROLES`, `STATUSES`) and the API's
+// api/routes/portal_invitations.py (the FIRM side, staff tokens) and
+// api/routes/portal.py (the CLIENT side, portal tokens).
+// ---------------------------------------------------------------------------
+
+/**
+ * Which debtor a portal client answers for. Never `non_filing_spouse` — who
+ * has no login in v1.
+ */
+export type ClientRole = 'debtor_1' | 'debtor_2';
+
+/**
+ * `invited` until the client's first portal request, `active` after it,
+ * `revoked` once the firm withdraws access (kept, not deleted).
+ */
+export type PortalClientStatus = 'invited' | 'active' | 'revoked';
+
+/** A client bound to a case, as a FIRM USER sees them. */
+export interface PortalClient {
+  /** The client's Cognito subject — the key the resend and revoke calls take. */
+  readonly subject: string;
+  readonly email: string;
+  /** The name the firm gave at invitation — what the review queue shows. */
+  readonly displayName: string;
+  /** Canonical order: `debtor_1` before `debtor_2`. Never empty. */
+  readonly roles: readonly ClientRole[];
+  readonly status: PortalClientStatus;
+  /** The subject of the firm user who invited them. */
+  readonly invitedBy: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * `POST /v1/cases/{caseId}/portal/invitation`. `roles` defaults to
+ * `['debtor_1']` server-side; `['debtor_1', 'debtor_2']` is the firm's
+ * explicit choice of one login for both spouses.
+ */
+export interface InvitePortalClientRequest {
+  readonly email: string;
+  readonly displayName: string;
+  readonly roles?: readonly ClientRole[];
+}
+
+/**
+ * `GET /v1/portal/me` — who the portal says the signed-in CLIENT is. Called
+ * with a portal session's token, never a staff one. Deliberately carries no
+ * case id: no portal URL names a case.
+ */
+export interface PortalMe {
+  readonly subject: string;
+  readonly displayName: string;
+  readonly roles: readonly ClientRole[];
+  readonly firm: { readonly name: string };
 }
 
 /** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */
@@ -1497,7 +1556,8 @@ export type CandidateStatus = 'pending' | 'accepted' | 'corrected' | 'rejected' 
 
 /** Which surface wrote a candidate, and as whom — never client-claimed. */
 export interface CandidateOrigin {
-  readonly channel: 'extraction' | 'mcp';
+  /** `client` is a debtor answering through the client portal (ADR 0023). */
+  readonly channel: 'extraction' | 'mcp' | 'client';
   /** The model that extracted it, or the harness's OAuth client id. */
   readonly clientId: string;
   /** The subject it is attributed to — resolve through the firm directory. */

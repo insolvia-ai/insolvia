@@ -111,6 +111,14 @@ EVENTS: Final = "events"
 # that wants intake locked down while task work continues should be able to
 # say so without a second axis.
 TASKS: Final = "tasks"
+# The client portal (ADR 0023): inviting a debtor to their own case, resending
+# and revoking that invitation, and — from #363 — reviewing what they send.
+# Its own feature rather than a facet of CASES because inviting a member of
+# the public into a GLBA-scope system is an act a firm may want only some of
+# its people to perform. HIDDEN BY DEFAULT for every role, ADR 0009's
+# list-before-build rule: an admin holds it (admins hold everything), and
+# anyone else holds it only once an admin grants it.
+CLIENT_PORTAL: Final = "client_portal"
 FEATURES: Final = (
     CASES,
     INTAKE,
@@ -120,6 +128,7 @@ FEATURES: Final = (
     NOTES,
     EVENTS,
     TASKS,
+    CLIENT_PORTAL,
     FIRM_ADMINISTRATION,
 )
 
@@ -399,6 +408,8 @@ def default_permissions(role: str) -> dict[str, str]:
             # them — the same reasoning that gives them DOCUMENTS, not the
             # narrower CASES/INTAKE treatment.
             TASKS: ADD_EDIT,
+            # Fail-closed default (ADR 0023), like NOTES above.
+            CLIENT_PORTAL: HIDDEN,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -412,6 +423,10 @@ def default_permissions(role: str) -> dict[str, str]:
         NOTES: ADD_EDIT,
         EVENTS: ADD_EDIT,
         TASKS: ADD_EDIT,
+        # Hidden for every role until an admin grants it — ADR 0023 lists the
+        # feature before its screens exist, and an invitation admits a member
+        # of the public, so nobody holds it by job title.
+        CLIENT_PORTAL: HIDDEN,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two

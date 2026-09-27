@@ -46,6 +46,15 @@ services:
       # auth_issuer_url / auth_web_client_id) to exercise a real sign-in.
       AUTH_ISSUER_URL: ${AUTH_ISSUER_URL:-}
       AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      # The client portal's app client (ADR 0023): every /v1/portal/ route
+      # verifies it and only it. dev-aws-setup.sh writes it; unset, portal
+      # routes answer 401 and staff routes are untouched.
+      AUTH_PORTAL_CLIENT_ID: ${AUTH_PORTAL_CLIENT_ID:-}
+      # Unset records mail in memory. Set it to the local mailer
+      # (http://host.docker.internal:8026, after
+      # ./services/mailer/scripts/dev-up.sh) to see the portal invitation's
+      # context mail in Mailpit at http://127.0.0.1:8025.
+      MAILER_API_URL: ${MAILER_API_URL:-}
       # The pool POST /v1/firm/users CALLS (AUTH_ISSUER_URL is what tokens are
       # verified against); unset means the in-memory directory.
       AUTH_USER_POOL_ID: ${AUTH_USER_POOL_ID:-}

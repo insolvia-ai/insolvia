@@ -127,6 +127,21 @@ whole of hard rule "nothing real in a fixture": a dev stack holds nothing but
 what a developer typed, so a fixture captured from one is synthetic by
 construction. A reviewer of a `seeds/fixtures/` diff should still ask.
 
+## Clients (ADR 0023)
+
+A fixture case may name CLIENTS — debtors bound to it for the client portal,
+in the invitation route's own body shape (`email`, `displayName`, `roles`)
+plus a `handle` and, where the environment owns its accounts, a `password`.
+The account is converged exactly as a firm person's is (`_subject_for`); the
+binding is parsed by `parse_invitation`, planned by `plan_binding` and written
+by the same ClientBindingStore the API composes, so a fixture client is
+indistinguishable from one a firm invited — except that no invitation mail is
+sent: the password is set here, which is what lets the integration tier sign
+the client in over SRP against the portal's app client. A binding that
+exists is left alone, revoked or not, for the "rows that exist" reason above.
+A client's address may not also be a firm person's: a subject is staff or a
+client, never both.
+
 ## Adding an entity
 
 A `_seed_<entity>` function that takes its slice of the fixture and the stores
@@ -150,6 +165,7 @@ from typing import Any, Final, Protocol
 
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
@@ -159,6 +175,7 @@ from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.case_collections import COLLECTIONS
 from insolvia_core.case_entities import create_entity, entity_json, parse_entity
 from insolvia_core.cases import assign_case, create_case, parse_case_creation
+from insolvia_core.clients import create_binding, parse_invitation, plan_binding
 from insolvia_core.debtors import create_debtor, debtor_json, parse_debtor
 from insolvia_core.documents import (
     STATUS_STORED,
@@ -167,6 +184,7 @@ from insolvia_core.documents import (
     object_key,
     parse_document_upload,
 )
+from insolvia_core.errors import ConflictError
 from insolvia_core.firms import (
     create_firm,
     create_firm_user,
@@ -176,6 +194,7 @@ from insolvia_core.firms import (
 from insolvia_core.ports import (
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
@@ -410,6 +429,10 @@ class Dependencies:
     tax_id_store: Callable[[str], TaxIdStore] = DynamoDbTaxIdStore
     tax_id_cipher: Callable[[str], TaxIdCipher] = lambda table: KmsTaxIdCipher(
         case_key_alias(table)
+    )
+    # (firm table, case table): a binding spans both (insolvia_core.clients).
+    client_binding_store: Callable[[str, str], ClientBindingStore] = (
+        DynamoDbClientBindingStore
     )
 
 
@@ -795,6 +818,76 @@ def _seed_one_case(
     return missing
 
 
+def _seed_clients(
+    entries: list[Any],
+    *,
+    case_id: str,
+    firm_id: str,
+    invited_by: str,
+    firm_store: FirmStore,
+    accounts: Accounts,
+    bindings: ClientBindingStore,
+    check: bool,
+) -> int:
+    """Converge a fixture case's portal clients. Returns how many are missing.
+
+    See the module docstring's "Clients" — the one path that writes a binding
+    outside the invitation route, and it writes it through the same parser,
+    planner and store.
+    """
+    missing = 0
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise RefusedError("each client in a fixture case must be an object")
+        handle = str(entry.get("handle") or "")
+        draft = parse_invitation(
+            {
+                key: entry[key]
+                for key in ("email", "displayName", "roles")
+                if key in entry
+            }
+        )
+        try:
+            subject = _subject_for(entry, accounts, check=check)
+        except RefusedError:
+            if not check:
+                raise
+            print(f"    client '{handle}': no account")
+            missing += 1
+            continue
+        if firm_store.find_user(subject) is not None:
+            raise RefusedError(
+                f"client '{handle}' is also a firm user — a subject is staff or a "
+                "client, never both (ADR 0023)"
+            )
+        existing = bindings.get(firm_id, subject)
+        if existing is not None:
+            print(f"    client '{handle}': present ({existing.status})")
+            continue
+        missing += 1
+        if check:
+            print(f"    client '{handle}': missing")
+            continue
+        binding = create_binding(
+            draft,
+            firm_id=firm_id,
+            case_id=case_id,
+            subject=subject,
+            invited_by=invited_by,
+        )
+        try:
+            narrowed = plan_binding(
+                binding, previous=None, on_case=bindings.list_for_case(case_id)
+            )
+            bindings.bind(binding, narrowed=narrowed)
+        except ConflictError as conflict:
+            # The API's 409 is this loader's refusal: a fixture that gives two
+            # clients one debtor role is a fixture to fix, not to half-load.
+            raise RefusedError(f"client '{handle}': {conflict}") from None
+        print(f"    client '{handle}': bound ({', '.join(binding.roles)})")
+    return missing
+
+
 def _seed_cases(
     entries: list[Any],
     fixture: Mapping[str, Any],
@@ -804,8 +897,12 @@ def _seed_cases(
     firm_store: FirmStore,
     accounts: Accounts,
     stores: CaseStores,
+    bindings: Callable[[], ClientBindingStore],
     check: bool,
 ) -> int:
+    """`bindings` is a factory, called only for a case that names clients —
+    so a fixture without any never constructs a client for a store it does
+    not use."""
     missing = 0
     versions: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     for entry in entries:
@@ -839,6 +936,25 @@ def _seed_cases(
             stores=stores,
             check=check,
         )
+        clients = entry.get("clients") or []
+        if clients:
+            case_id = derived_id(case_table, firm_id, version, str(spec["handle"]))
+            if stores.cases.read_for_worker(case_id) is None:
+                # Only reachable under --check on an unseeded case: a binding
+                # must never point at a case that is not there.
+                print(f"  case '{wanted}': clients wait for the case")
+                missing += len(clients)
+                continue
+            missing += _seed_clients(
+                list(clients),
+                case_id=case_id,
+                firm_id=firm_id,
+                invited_by=subject,
+                firm_store=firm_store,
+                accounts=accounts,
+                bindings=bindings(),
+                check=check,
+            )
     return missing
 
 
@@ -1136,6 +1252,9 @@ def _load(args: argparse.Namespace, deps: Dependencies) -> int:
             firm_store=firm_store,
             accounts=accounts,
             stores=stores,
+            bindings=lambda: deps.client_binding_store(
+                args.firm_table, args.case_table
+            ),
             check=args.check,
         )
     if args.check and missing:

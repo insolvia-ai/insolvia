@@ -51,6 +51,10 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
   { value: 'notes', label: 'Notes' },
   { value: 'events', label: 'Events and calendar' },
   { value: 'tasks', label: 'Tasks' },
+  {
+    value: 'client_portal',
+    label: 'Client portal (invitations; the portal itself is not yet available)',
+  },
   { value: 'firm_administration', label: 'Firm administration' },
 ];
 

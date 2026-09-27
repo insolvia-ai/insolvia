@@ -5,6 +5,7 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
@@ -67,6 +68,21 @@ if not config.case_table_name or not config.case_access_log_table_name:
 # /insolvia/<env>/api/firm-table-name.
 if not config.firm_table_name:
     raise RuntimeError("FIRM_TABLE_NAME must be set for the Lambda entrypoint")
+
+# NOT hard-required, unlike AUTH_CLIENT_ID: without it every /v1/portal/ route
+# fails CLOSED with a 401 (insolvia_core.auth.portal_settings_or_raise) and
+# every staff route is untouched — refusing to boot would take attorneys down
+# over a portal nobody can reach yet. What IS refused is the one
+# misconfiguration that would make the portal an open door: the same client
+# id in both, which would make every staff token a portal token and back.
+if (
+    config.auth_portal_client_id
+    and config.auth_portal_client_id == config.auth_client_id
+):
+    raise RuntimeError(
+        "AUTH_PORTAL_CLIENT_ID must differ from AUTH_CLIENT_ID — the disjoint "
+        "client ids ARE the audience check between staff and clients (ADR 0023)"
+    )
 
 # Hard-required, and it is the pool this deployment already verifies tokens
 # against — published alongside the issuer as /insolvia/<env>/api/auth-user-pool-id.
@@ -154,6 +170,11 @@ app = create_app(
         # Case tasks (issue #356 / 14.4): rows in the case table, no second
         # table to provision.
         task_store=DynamoDbTaskStore(config.case_table_name),
+        # The client portal's bindings (ADR 0023): one store over BOTH tables
+        # already named above — its writes are one transaction across them.
+        client_binding_store=DynamoDbClientBindingStore(
+            config.firm_table_name, config.case_table_name
+        ),
     )
 )
 handler = Mangum(WsgiToAsgi(app), lifespan="off")  # type: ignore[no-untyped-call]

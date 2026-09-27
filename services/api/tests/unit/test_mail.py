@@ -1,5 +1,6 @@
 import pytest
 from insolvia_api.core.mail import (
+    client_invitation_email,
     email_verification_email,
     links_for,
     password_reset_email,
@@ -152,6 +153,12 @@ BUILDERS_WITH_LINKS = [
     lambda links: password_reset_email(
         "a@b.com", links=links, reset_url="https://x.example"
     ),
+    lambda links: client_invitation_email(
+        "a@b.com",
+        links=links,
+        firm_name="Example & Partners",
+        portal_url="https://app.insolvia.ai/portal",
+    ),
 ]
 
 
@@ -197,3 +204,42 @@ def test_links_follow_the_environment(builder):
     # tester's click to the production API and suppress the address there.
     assert "https://staging-www.insolvia.ai/privacy" in email.html_body
     assert "https://www.insolvia.ai" not in email.html_body
+
+
+# --- client invitation (ADR 0023) ---------------------------------------
+
+
+def test_client_invitation_email_says_who_is_asking_and_where_to_go():
+    email = client_invitation_email(
+        "pat@example.test",
+        links=LINKS_WITHOUT_UNSUBSCRIBE,
+        firm_name="Example & Partners",
+        portal_url="https://app.insolvia.ai/portal",
+        recipient_name="Pat",
+    )
+
+    assert email.category == "client_invitation"
+    assert email.message_class == "transactional"
+    assert email.subject == "Example & Partners invited you to your client portal"
+    for body in (email.html_body, email.text_body):
+        assert "https://app.insolvia.ai/portal" in body
+        assert "temporary password" in body
+    # Escaped in HTML — a firm name is firm-supplied text.
+    assert "Example &amp; Partners" in email.html_body
+
+
+def test_client_invitation_email_carries_no_secret():
+    """The OTHER message — Cognito's — carries the temporary password, and
+    nothing in this service ever sees it. So the one link here is the
+    portal's front door: no query string, no token, nothing a forwarded copy
+    could use."""
+    email = client_invitation_email(
+        "pat@example.test",
+        links=LINKS_WITHOUT_UNSUBSCRIBE,
+        firm_name="Example & Partners",
+        portal_url="https://app.insolvia.ai/portal",
+    )
+
+    assert "?" not in email.text_body.split("Client portal: ", 1)[1].split()[0]
+    assert "{####}" not in email.html_body
+    assert "{username}" not in email.html_body

@@ -106,6 +106,7 @@ firm_table="$(jq -r '.firm_table_name.value' <<<"$outputs")"
 document_bucket="$(jq -r '.case_document_bucket.value' <<<"$outputs")"
 pool_id="$(jq -r '.auth_user_pool_id.value' <<<"$outputs")"
 web_client_id="$(jq -r '.auth_web_client_id.value' <<<"$outputs")"
+portal_client_id="$(jq -r '.auth_portal_client_id.value' <<<"$outputs")"
 auth_domain="$(jq -r '.auth_domain.value' <<<"$outputs")"
 issuer_url="$(jq -r '.auth_issuer_url.value' <<<"$outputs")"
 admin_audit_table="$(jq -r '.admin_audit_table_name.value' <<<"$outputs")"
@@ -152,6 +153,10 @@ upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$api_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 upsert_env "$api_env" AUTH_ISSUER_URL "$issuer_url"
 upsert_env "$api_env" AUTH_CLIENT_ID "$web_client_id"
+# The client portal's app client (ADR 0023): the one id every /v1/portal/
+# route verifies, disjoint from AUTH_CLIENT_ID. Also what
+# dev-test-integration.sh signs the seeded client in against.
+upsert_env "$api_env" AUTH_PORTAL_CLIENT_ID "$portal_client_id"
 # The pool the API CALLS, as against the issuer it verifies against. Both end
 # in the same id and neither is derived from the other — see services/api's
 # core/config.py for why parsing one out of the other is refused.
@@ -207,6 +212,9 @@ app_env="$APP_DIR/.env"
 upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
+# The portal's own client (ADR 0023) — the name is reserved now, the
+# (portal) route group that reads it is PR 2 of that ADR's build.
+upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
 ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env and apps/insolvia_app/.env were updated."
 
@@ -226,6 +234,7 @@ fi
 printf '\nCognito (for upcoming local auth work — nothing consumes these yet):\n'
 printf '  User pool id:      %s\n' "$pool_id"
 printf '  Web client id:     %s\n' "$web_client_id"
+printf '  Portal client id:  %s\n' "$portal_client_id"
 printf '  Hosted domain:     %s\n' "$auth_domain"
 printf '  Issuer:            %s\n' "$issuer_url"
 printf '\nStart the API against your per-machine table with:\n  ./services/api/scripts/dev-up.sh\n'

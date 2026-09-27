@@ -46,6 +46,10 @@ from insolvia_api.api.routes.means_test import blueprint as means_test_blueprint
 from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.plan import blueprint as plan_blueprint
+from insolvia_api.api.routes.portal import blueprint as portal_blueprint
+from insolvia_api.api.routes.portal_invitations import (
+    blueprint as portal_invitations_blueprint,
+)
 from insolvia_api.api.routes.standards import blueprint as standards_blueprint
 from insolvia_api.api.routes.tasks import blueprint as tasks_blueprint
 from insolvia_api.api.routes.unsubscribe import blueprint as unsubscribe_blueprint
@@ -117,6 +121,14 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/calendar and /v1/me/calendar.ics — the latter is the one route
     # that authenticates by feed token; its module argues why.
     app.register_blueprint(calendar_blueprint)
+    # The client portal (ADR 0023). /v1/portal/* is the CLIENT principal
+    # class's whole surface — every rule there carries @require_client and
+    # no rule elsewhere does (tests/unit/test_portal_routes.py walks the URL
+    # map to hold that). The invitation routes beside it are STAFF routes
+    # under /v1/cases/<id>/portal/..., static segments that beat
+    # /<collection> for the same Werkzeug-ranking reason as the rest.
+    app.register_blueprint(portal_blueprint)
+    app.register_blueprint(portal_invitations_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)
     app.register_blueprint(unsubscribe_blueprint)

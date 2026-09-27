@@ -1,6 +1,8 @@
 # Cognito auth for the Insolvia app (#65): one user pool per environment
-# (insolvia-<env>-users), a Cognito-provided hosted domain, and one public
-# PKCE app client for the web SPA. The house style is email-as-username,
+# (insolvia-<env>-users), a Cognito-provided hosted domain, and public PKCE
+# app clients: the web SPA's (staff), the client portal's (debtors, ADR 0023)
+# and one per MCP harness — disjoint ids, each verified by exactly the
+# surface it serves. The house style is email-as-username,
 # admin-only creation, and SRP-only explicit flows, on the OAuth
 # authorization-code + PKCE flows a browser SPA actually needs.
 #
@@ -30,10 +32,21 @@ data "aws_region" "current" {}
 # that trains recipients to click buttons is phishing practice; this one tells
 # them what happened and what the temporary password is, and the sign-in page
 # is wherever their firm already goes.
+#
+# AUDIENCE-NEUTRAL since ADR 0023: this one template now reaches two kinds of
+# recipient — an attorney or paralegal added by their firm, and a debtor
+# invited to the client portal by the law firm representing them — because
+# invitation copy is a POOL setting and the portal shares this pool. "The
+# platform your firm uses" was true of the first and false of the second, who
+# does not have a firm; "a law firm that uses it" is true of both. Anything
+# audience-specific (which firm, what to do next, where to sign in) travels in
+# the second message, which the API sends through the mailer and which carries
+# no secret. Diverging copy per audience is one of the recorded reasons to
+# reopen ADR 0023's one-pool decision, not something to fake here.
 locals {
   invite_email_message = join("", [
     "<p>Hello,</p>",
-    "<p>An account has been created for you on <b>Insolvia</b>, the bankruptcy case preparation platform your firm uses.</p>",
+    "<p>An account has been created for you on <b>Insolvia</b>, a bankruptcy case preparation platform, at the request of a law firm that uses it.</p>",
     "<p>Your sign-in name is {username} and your temporary password is <b>{####}</b>. It expires in 7 days — when you first sign in, you will choose a password of your own.</p>",
     "<p>If you were not expecting this invitation, you can ignore this email.</p>",
     "<p>— Insolvia</p>",
@@ -228,7 +241,10 @@ resource "aws_cognito_user_pool_domain" "main" {
   # local sign-in per machine, with no CI run to notice. Depending on the
   # branding makes "managed login is on but has nothing to render" unreachable
   # rather than merely unlikely.
-  depends_on = [aws_cognito_managed_login_branding.web]
+  depends_on = [
+    aws_cognito_managed_login_branding.web,
+    aws_cognito_managed_login_branding.portal,
+  ]
 }
 
 # ── Custom auth domain (staging, prod) ──────────────────────────
@@ -264,7 +280,10 @@ resource "aws_cognito_user_pool_domain" "custom" {
 
   # Same ordering rule as the prefix domain above: a domain on managed login
   # with no branding style serves "Login pages unavailable", not a default.
-  depends_on = [aws_cognito_managed_login_branding.web]
+  depends_on = [
+    aws_cognito_managed_login_branding.web,
+    aws_cognito_managed_login_branding.portal,
+  ]
 }
 
 # Cognito creates its own CloudFront distribution for the custom domain and
@@ -434,6 +453,114 @@ resource "aws_cognito_user_pool_client" "web" {
   refresh_token_rotation {
     feature                    = "ENABLED"
     retry_grace_period_seconds = 30
+  }
+}
+
+# ── Client portal app client (ADR 0023) ─────────────────────────
+# A debtor using the client portal is a THIRD principal class — a `client` —
+# signed in by THIS pool through a SECOND public PKCE client. The class is
+# decided by the token's `client_id` at verification: services/api verifies
+# the web client's id on every staff route and this client's id on every
+# /v1/portal/ route, so a portal token fails closed on staff routes and a
+# staff token fails closed on portal routes, with no role check to forget.
+# That is ADR 0016's disjoint-client-id audience check applied a second time.
+# The API's copy of this id is derived from this resource via the env's SSM
+# parameter (`/insolvia/<env>/api/auth-portal-client-id`), never hand-listed.
+#
+# What this client does NOT decide: which case a client may reach. That is a
+# binding row in our own store (insolvia_core.clients), exactly as ADR 0009
+# keeps firm membership out of the token. A pool user who holds no binding
+# can sign in here and is refused by every portal route.
+#
+# ONE POOL, SO ONE POLICY. Password policy, MFA and the invitation copy above
+# are pool settings, shared with attorneys. ADR 0023 accepts that at launch
+# and names the divergence as its reason to reopen.
+#
+# Same redirect contract shape as the web client, under the app's `/portal`
+# route group (PR 2 of ADR 0023 builds the screens): the code exchange at
+# <origin>/portal/auth/callback, sign-outs landing on <origin>/portal. Exact
+# match, same origins — including http://localhost:3000, which is the local
+# third of "three environments": each developer's own pool gets this client
+# on their next dev apply.
+locals {
+  portal_callback_urls = [for o in var.web_origins : "${o}/portal/auth/callback"]
+  portal_logout_urls   = [for o in var.web_origins : "${o}/portal"]
+}
+
+resource "aws_cognito_user_pool_client" "portal" {
+  # insolvia-<env>-portal: component named for the surface it signs people in
+  # to, as `app` is for the web client above.
+  name         = "${var.project}-${var.environment}-portal"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  generate_secret = false # public client — same argument as the web client
+
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+
+  callback_urls = local.portal_callback_urls
+  logout_urls   = local.portal_logout_urls
+
+  # SRP only, as every client in this pool: sign-in is on the managed login
+  # pages, and the integration tier signs the seeded client in over SRP
+  # (services/api/tests/integration/cognito_srp.py) against THIS client.
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+  ]
+
+  prevent_user_existence_errors = "ENABLED"
+  enable_token_revocation       = true
+
+  # SHORTER THAN THE WEB CLIENT, on purpose (ADR 0023's threat model): portal
+  # sessions are memory-only — ADR 0011's choice, not ADR 0007's — because a
+  # debtor's device is the least controlled in the system, and the
+  # questionnaire resumes server-side, so a lost session costs one sign-in.
+  # The 1 h access token bounds a stolen token and a revoked binding; the
+  # 1-day refresh token bounds a session left open on a shared computer.
+  access_token_validity  = 1
+  id_token_validity      = 1
+  refresh_token_validity = 1
+  token_validity_units {
+    access_token  = "hours"
+    id_token      = "hours"
+    refresh_token = "days"
+  }
+
+  refresh_token_rotation {
+    feature                    = "ENABLED"
+    retry_grace_period_seconds = 30
+  }
+}
+
+# The managed login pages for the portal client. BRANDING IS PER APP CLIENT,
+# and a client on managed login with none does not fall back to defaults — it
+# serves "Login pages unavailable" (see the domains' depends_on, which name
+# this too). The same generated settings and marks as the web client: one
+# brand, one sign-in page, whichever door a person comes through.
+resource "aws_cognito_managed_login_branding" "portal" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  client_id    = aws_cognito_user_pool_client.portal.id
+
+  settings = file("${path.module}/managed-login-settings.json")
+
+  dynamic "asset" {
+    for_each = toset(["LIGHT", "DARK"])
+
+    content {
+      category   = "FORM_LOGO"
+      color_mode = asset.value
+      extension  = "SVG"
+      bytes      = filebase64("${path.module}/wordmark-${lower(asset.value)}.svg")
+    }
+  }
+
+  asset {
+    category   = "FAVICON_SVG"
+    color_mode = "DYNAMIC"
+    extension  = "SVG"
+    bytes      = filebase64("${path.module}/favicon.svg")
   }
 }
 

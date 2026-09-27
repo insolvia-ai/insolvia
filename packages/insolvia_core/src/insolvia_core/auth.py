@@ -146,6 +146,33 @@ def settings_or_raise(issuer_url: str | None, client_id: str | None) -> AuthSett
     return AuthSettings(issuer_url=issuer_url.rstrip("/"), client_id=client_id)
 
 
+def portal_settings_or_raise(
+    issuer_url: str | None,
+    portal_client_id: str | None,
+    *,
+    staff_client_id: str | None,
+) -> AuthSettings:
+    """The client-portal verify profile (ADR 0023): the same pool's issuer,
+    the portal's OWN app client — and a refusal to verify anything when that
+    client is not disjoint from the staff one.
+
+    Everything else about the check is `verify_access_token` unchanged:
+    signature, issuer, `token_use == access`, and `client_id` compared for
+    EQUALITY against exactly one id. Cognito access tokens carry no `aud`, so
+    "this token was issued for the portal" is "this token names the portal's
+    client" — which is only an audience check if the two ids differ. A
+    deployment configured with the same id twice would let every staff token
+    through every portal route and back; that is a misconfiguration to fail
+    closed on, not a state to serve. Missing staff config does not excuse it:
+    disjointness cannot be shown against a value that is not there.
+    """
+    if not portal_client_id or not staff_client_id:
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    if portal_client_id == staff_client_id:
+        raise AuthenticationError(AuthFailureReason.NOT_CONFIGURED)
+    return settings_or_raise(issuer_url, portal_client_id)
+
+
 def bearer_token(header_value: str | None) -> str:
     """Pull the token out of an `Authorization: Bearer <jwt>` header.
 
