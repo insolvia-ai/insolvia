@@ -30,9 +30,11 @@ import json
 from pathlib import Path
 
 import pytest
-from insolvia_admin.entrypoints.seed import Dependencies, RefusedError, main
+from insolvia_admin.entrypoints.seed import Dependencies, RefusedError, derived_id, main
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.ports import FirmStore
+
+from tests import paths
 
 DEV_TABLE = "insolvia-dev-0123456789ab-firms"
 STAGING_TABLE = "insolvia-staging-firms"
@@ -1129,3 +1131,224 @@ def test_two_fixture_clients_cannot_both_hold_debtor_2(tmp_path: Path) -> None:
     )
 
     assert env.load() == 2
+
+
+# ── references between a case's records ─────────────────────────
+
+
+def _cases_json(env: Env) -> Path:
+    return env.env_fixture.parent / "fixtures" / "v1" / "cases.json"
+
+
+def _with_references(env: Env) -> None:
+    """The Env's case, grown the graph a real case has: a claim naming its
+    creditor and an income summary naming its debtor — by reference, since a
+    fixture publishes no ids."""
+    body = json.loads(_cases_json(env).read_text())
+    collections = body["cases"][0]["collections"]
+    collections["creditors"][0]["$handle"] = "bank"
+    collections["claims"] = [
+        {
+            "creditor_id": {"$ref": "creditors/bank"},
+            "claim_class": "secured",
+            "provenance": {"creditor_id": TYPED, "claim_class": TYPED},
+        }
+    ]
+    collections["income_summaries"] = [
+        {
+            "debtor_id": {"$ref": "debtors/debtor_1"},
+            "wages": "100.00",
+            "provenance": {"debtor_id": TYPED, "wages": TYPED},
+        }
+    ]
+    _cases_json(env).write_text(json.dumps(body))
+
+
+def test_a_reference_lands_as_the_id_this_target_gave_the_record(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    _with_references(env)
+
+    assert env.load() == 0
+
+    case = env.the_case()
+    assert case is not None
+    [creditor] = env.entities.list_for_case(case.id, COLLECTIONS["creditors"])
+    [claim] = env.entities.list_for_case(case.id, COLLECTIONS["claims"])
+    [summary] = env.entities.list_for_case(case.id, COLLECTIONS["income_summaries"])
+    debtor = env.debtors.get(case.id, filing_role="debtor_1")
+    assert debtor is not None
+    assert claim.body.creditor_id == creditor.id
+    assert summary.body.debtor_id == debtor.id
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        {"$ref": "creditors/nobody"},
+        {"$ref": "debtors/debtor_2"},
+        {"$ref": "creditors"},
+        {"$ref": "claims/bank"},
+        {"$ref": "creditors/bank", "extra": "key"},
+    ],
+)
+def test_a_reference_to_nothing_is_refused_before_anything_is_written(
+    tmp_path: Path, reference: dict[str, str]
+) -> None:
+    env = Env(tmp_path)
+    _with_references(env)
+    body = json.loads(_cases_json(env).read_text())
+    body["cases"][0]["collections"]["claims"][0]["creditor_id"] = reference
+    _cases_json(env).write_text(json.dumps(body))
+
+    assert env.load() == 2
+    assert env.cases.cases == {}
+
+
+def test_two_items_with_one_handle_are_refused(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    _with_references(env)
+    body = json.loads(_cases_json(env).read_text())
+    creditors = body["cases"][0]["collections"]["creditors"]
+    creditors.append(dict(creditors[0]))
+    _cases_json(env).write_text(json.dumps(body))
+
+    assert env.load() == 2
+    assert env.cases.cases == {}
+
+
+def _capture(env: Env, case_id: str, target: Path) -> int:
+    return main(
+        [
+            "capture",
+            "--version",
+            str(target),
+            "--case",
+            case_id,
+            "--handle",
+            "captured",
+            "--case-table",
+            DEV_CASE_TABLE,
+            "--document-bucket",
+            DEV_BUCKET,
+        ],
+        deps=env.deps(),
+    )
+
+
+def test_capture_writes_the_court_and_references_rather_than_ids(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    _with_references(env)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    target = tmp_path / "fixtures" / "v2"
+
+    assert _capture(env, case.id, target) == 0
+
+    spec = json.loads((target / "cases.json").read_text())["cases"][0]
+    # The registry reference `load` parses — not the printed district.
+    assert (spec["court"], spec["division"]) == ("flmb", "tampa")
+    assert "district" not in spec
+    [creditor] = spec["collections"]["creditors"]
+    [claim] = spec["collections"]["claims"]
+    [summary] = spec["collections"]["income_summaries"]
+    assert creditor["$handle"] == "creditors-1"
+    assert claim["creditor_id"] == {"$ref": "creditors/creditors-1"}
+    assert summary["debtor_id"] == {"$ref": "debtors/debtor_1"}
+    assert "$handle" not in claim  # nothing points at it
+    assert "amended" not in claim  # the parser's default, so it says nothing
+
+
+def test_a_captured_case_loads_into_another_target_with_its_graph_intact(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    _with_references(env)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    target = tmp_path / "fixtures" / "v2"
+    assert _capture(env, case.id, target) == 0
+    for key in json.loads((target / "manifest.json").read_text())["objects"]:
+        env.objects.put(
+            f"v2/{key}", content=(target / key).read_bytes(), content_type=""
+        )
+    body = json.loads(env.env_fixture.read_text())
+    body["cases"][0].update({"fixture": "v2", "case": "captured"})
+    env.env_fixture.write_text(json.dumps(body))
+
+    assert env.load(table=STAGING_TABLE) == 0
+
+    subject = env.accounts.subjects["e2e-admin@insolvia.test"]
+    placed = env.firms.find_user(subject)
+    assert placed is not None
+    loaded = derived_id(
+        STAGING_TABLE.replace("firms", "cases"), placed.firm_id, "v2", "captured"
+    )
+    [creditor] = env.entities.list_for_case(loaded, COLLECTIONS["creditors"])
+    [claim] = env.entities.list_for_case(loaded, COLLECTIONS["claims"])
+    [original] = env.entities.list_for_case(case.id, COLLECTIONS["creditors"])
+    assert claim.body.creditor_id == creditor.id
+    assert creditor.id != original.id
+
+
+# ── the committed fixtures ──────────────────────────────────────
+
+
+@pytest.mark.parametrize("environment", ["dev", "staging"])
+def test_the_committed_environment_fixture_loads_and_converges(
+    tmp_path: Path, environment: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """seeds/<env>.json and every fixture version it names, through the
+    loader into memory stores — the check a seeds/ diff would otherwise get
+    only on a real dev stack or the next staging deploy. Every reference
+    must resolve, every body must pass the API's parsers, and a second load
+    must find nothing missing."""
+    seeds = paths.REPO_ROOT / "seeds"
+    env = Env(tmp_path / "memory")
+    committed = tmp_path / "committed"
+    committed.mkdir()
+    (committed / "fixtures").symlink_to(seeds / "fixtures")
+    env_fixture = committed / f"{environment}.json"
+    env_fixture.write_text((seeds / f"{environment}.json").read_text())
+    # Staging's one secret; never a real value here.
+    monkeypatch.setenv("E2E_TEST_USER_PASSWORD", "Example-Passw0rd-not-real")
+    body = json.loads(env_fixture.read_text())
+    people = [u["email"] for f in body["firms"] for u in f["users"]] + [
+        c["email"] for entry in body["cases"] for c in entry.get("clients") or []
+    ]
+    env.accounts = FakeAccounts(
+        known={
+            email: f"00000000-0000-4000-8000-{n:012d}" for n, email in enumerate(people)
+        }
+    )
+    for folder in (seeds / "fixtures").iterdir():
+        for key in json.loads((folder / "manifest.json").read_text())["objects"]:
+            env.objects.put(
+                f"{folder.name}/{key}",
+                content=(folder / key).read_bytes(),
+                content_type="",
+            )
+    argv = [
+        "load",
+        "--fixture",
+        str(env_fixture),
+        "--firm-table",
+        DEV_TABLE,
+        "--user-pool-id",
+        POOL,
+        "--case-table",
+        DEV_CASE_TABLE,
+        "--document-bucket",
+        DEV_BUCKET,
+        "--fixture-bucket",
+        FIXTURE_BUCKET,
+    ]
+
+    assert main(argv, deps=env.deps()) == 0
+    assert main([*argv, "--check"], deps=env.deps()) == 0
+    assert len(env.cases.cases) == len(body["cases"])

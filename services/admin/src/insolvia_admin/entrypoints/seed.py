@@ -115,8 +115,10 @@ IDS ARE DERIVED, NOT PUBLISHED. A case's id is `uuid5` over the target table,
 the firm it lands in, the fixture version and the case's `handle`; a document's
 and a collection item's over the case id and their own position. So two
 environments seed different ids from one fixture, and a second run finds every
-row it wrote last time instead of writing it twice — which is what makes
-"seed on every staging deploy" a convergence rather than an accumulation.
+row it wrote last time instead of writing it twice (a debtor's id is derived
+too, over the case id and its filing role — see "references" below for
+why) — which is what makes "seed on every staging deploy" a convergence
+rather than an accumulation.
 Rows that exist are LEFT ALONE, even if the fixture has since changed: a
 seeded environment is somewhere people work, and a re-seed that rewrote a
 debtor under them would be the mystery regression this module exists to
@@ -594,6 +596,111 @@ def derived_id(*parts: str) -> str:
     return str(uuid.uuid5(_SEED_NAMESPACE, "/".join(parts)))
 
 
+# ── references between a case's own records ────────────────────────
+#
+# A case is a graph, not a list: a claim names its creditor and its
+# collateral (`creditor_id`, `asset_id`), a plan names the claims it treats,
+# an income summary names its debtor column. Those are ids — and a fixture
+# publishes NO ids (every one is derived per target), so a fixture cannot
+# write one down. It writes a REFERENCE instead:
+#
+#     {"$handle": "car-loan", ...}         on the collection item referred TO
+#     {"$ref": "claims/car-loan"}          wherever an id of it is wanted
+#     {"$ref": "debtors/debtor_1"}         a debtor, by filing role
+#
+# and the loader swaps each `$ref` for the id that record has (or will have)
+# in THIS target before the route's own parser sees the body — so the parser
+# still validates exactly what the API would have been sent. `capture` writes
+# the same shapes back out, which is what makes a captured case with a plan
+# on it loadable anywhere.
+
+_REF: Final = "$ref"
+_HANDLE: Final = "$handle"
+_DEBTORS: Final = "debtors"
+
+
+def _debtor_id(case_id: str, role: str) -> str:
+    """The id a seeded debtor gets — derived like every other seeded row's,
+    so a reference to it can be resolved before it is written."""
+    return derived_id(case_id, "debtor", role)
+
+
+def _collection_handles(
+    handle: str, collections: Mapping[str, Any]
+) -> dict[str, dict[str, int]]:
+    """{collection: {item $handle: position}} — refused on a duplicate."""
+    found: dict[str, dict[str, int]] = {}
+    for name, items in collections.items():
+        for index, body in enumerate(items or []):
+            item_handle = body.get(_HANDLE) if isinstance(body, dict) else None
+            if item_handle is None:
+                continue
+            seen = found.setdefault(str(name), {})
+            if str(item_handle) in seen:
+                raise RefusedError(
+                    f"case '{handle}': {name} has two items with $handle "
+                    f"'{item_handle}'"
+                )
+            seen[str(item_handle)] = index
+    return found
+
+
+def _resolved(
+    node: Any,
+    *,
+    handle: str,
+    case_id: str,
+    handles: Mapping[str, Mapping[str, int]],
+    debtor_ids: Mapping[str, str],
+) -> Any:
+    """`node` with every `{"$ref": …}` replaced by the id it names in this
+    target, and every `$handle` dropped — a body the API's parser accepts."""
+    if isinstance(node, list):
+        return [
+            _resolved(
+                item,
+                handle=handle,
+                case_id=case_id,
+                handles=handles,
+                debtor_ids=debtor_ids,
+            )
+            for item in node
+        ]
+    if not isinstance(node, dict):
+        return node
+    if _REF in node:
+        target = node[_REF]
+        if len(node) != 1 or not isinstance(target, str) or "/" not in target:
+            raise RefusedError(
+                f'case \'{handle}\': a reference is {{"$ref": "<collection>/'
+                f'<handle>"}} and nothing else, not {node!r}'
+            )
+        collection, _, name = target.partition("/")
+        if collection == _DEBTORS:
+            if name not in debtor_ids:
+                raise RefusedError(
+                    f"case '{handle}': $ref {target!r} names no fixture debtor"
+                )
+            return debtor_ids[name]
+        position = (handles.get(collection) or {}).get(name)
+        if position is None:
+            raise RefusedError(
+                f"case '{handle}': $ref {target!r} names no item with that $handle"
+            )
+        return derived_id(case_id, collection, str(position))
+    return {
+        key: _resolved(
+            value,
+            handle=handle,
+            case_id=case_id,
+            handles=handles,
+            debtor_ids=debtor_ids,
+        )
+        for key, value in node.items()
+        if key != _HANDLE
+    }
+
+
 def _fixture_version(
     env_fixture: Path, version: str
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -677,6 +784,42 @@ def _seed_one_case(
     case_id = derived_id(case_table, firm_id, version, handle)
     missing = 0
 
+    debtors = spec.get("debtors") or {}
+    if not isinstance(debtors, dict):
+        raise RefusedError(f"case '{handle}': debtors must be an object keyed by role")
+    collections = spec.get("collections") or {}
+    if not isinstance(collections, dict):
+        raise RefusedError(f"case '{handle}': collections must be an object")
+
+    # What a `$ref` resolves to in THIS target (see "references" above): a
+    # debtor already here keeps the id it has — a v1/v2 debtor was minted
+    # before ids were derived — and one about to be written gets the
+    # derived id it will be written under.
+    debtor_ids = {
+        str(role): (
+            found.id
+            if (found := stores.debtors.get(case_id, filing_role=str(role))) is not None
+            else _debtor_id(case_id, str(role))
+        )
+        for role in debtors
+    }
+    handles = _collection_handles(handle, collections)
+
+    def resolve(body: Any) -> Any:
+        return _resolved(
+            body,
+            handle=handle,
+            case_id=case_id,
+            handles=handles,
+            debtor_ids=debtor_ids,
+        )
+
+    # Every reference resolved ONCE before anything is written, so a
+    # fixture naming a record it does not contain is refused while the
+    # table is still untouched rather than half a case in.
+    resolve(debtors)
+    resolve(collections)
+
     # The case itself: parsed by the route's own parser, stamped by the same
     # factory, and then given its derived id and a matching assignment.
     if stores.cases.read_for_worker(case_id) is None:
@@ -705,11 +848,8 @@ def _seed_one_case(
         print(f"  case '{handle}': present")
 
     # Debtors, keyed by filing role — the API's natural key for them.
-    debtors = spec.get("debtors") or {}
-    if not isinstance(debtors, dict):
-        raise RefusedError(f"case '{handle}': debtors must be an object keyed by role")
     for role, body in debtors.items():
-        debtor_draft = parse_debtor(body)
+        debtor_draft = parse_debtor(resolve(body))
         if stores.debtors.get(case_id, filing_role=role) is not None:
             continue
         missing += 1
@@ -730,24 +870,21 @@ def _seed_one_case(
                 cipher=stores.tax_id_cipher,
                 store=stores.tax_ids,
             )
-            stores.debtors.create(
-                create_debtor(
-                    debtor_draft, case_id=case_id, filing_role=role, tax_id=tax_id
-                )
+            minted_debtor = create_debtor(
+                debtor_draft, case_id=case_id, filing_role=role, tax_id=tax_id
             )
+            stores.debtors.create(replace(minted_debtor, id=debtor_ids[role]))
             print(f"    debtor {role}: created")
 
     # Collection items, in fixture order, each with an id derived from its
-    # position so a re-run finds it rather than adding a twin.
-    collections = spec.get("collections") or {}
-    if not isinstance(collections, dict):
-        raise RefusedError(f"case '{handle}': collections must be an object")
+    # position so a re-run finds it rather than adding a twin — and so a
+    # `$ref` to it resolves before it exists.
     for name, items in collections.items():
         kind = COLLECTIONS.get(str(name))
         if kind is None:
             raise RefusedError(f"case '{handle}': unknown collection '{name}'")
         for index, body in enumerate(items or []):
-            entity_draft = parse_entity(kind, body)
+            entity_draft = parse_entity(kind, resolve(body))
             entity_id = derived_id(case_id, str(name), str(index))
             if stores.entities.get(case_id, kind, entity_id) is not None:
                 continue
@@ -1023,7 +1160,22 @@ _SERVER_OWNED = ("id", "case_id", "filing_role", "created_at", "updated_at")
 
 
 def _strip(body: Mapping[str, object]) -> dict[str, object]:
-    return {k: v for k, v in body.items() if k not in _SERVER_OWNED}
+    """The request body a captured record came from, laid out for review:
+    the fields as the API prints them, then provenance, sorted — the order
+    a reviewer reads a fixture diff in. `amended` is dropped when false,
+    the default the parser supplies, so it only appears where it says
+    something."""
+    fields = {
+        k: v
+        for k, v in body.items()
+        if k not in _SERVER_OWNED
+        and k != "provenance"
+        and not (k == "amended" and v is False)
+    }
+    provenance = body.get("provenance")
+    if isinstance(provenance, Mapping):
+        fields["provenance"] = dict(sorted(provenance.items()))
+    return fields
 
 
 def _without_tax_id(body: dict[str, object]) -> dict[str, object]:
@@ -1034,6 +1186,20 @@ def _without_tax_id(body: dict[str, object]) -> dict[str, object]:
     if isinstance(provenance, Mapping):
         stripped["provenance"] = {k: v for k, v in provenance.items() if k != "tax_id"}
     return stripped
+
+
+def _with_refs(node: Any, refs: Mapping[str, str], referenced: set[str]) -> Any:
+    """`node` with every string that is one of this case's record ids
+    replaced by `{"$ref": …}` — the inverse of `_resolved`. `referenced`
+    collects what was pointed at, so only those items carry a `$handle`."""
+    if isinstance(node, str) and node in refs:
+        referenced.add(refs[node])
+        return {_REF: refs[node]}
+    if isinstance(node, list):
+        return [_with_refs(item, refs, referenced) for item in node]
+    if isinstance(node, dict):
+        return {k: _with_refs(v, refs, referenced) for k, v in node.items()}
+    return node
 
 
 def capture(
@@ -1079,10 +1245,21 @@ def capture(
     if existing and not replace_existing:
         raise RefusedError(f"{version} already has a case '{handle}' (pass --replace)")
 
+    if case.court is None or case.division is None:
+        # A pre-registry row (issue #360): the loader's parser — the API's —
+        # needs the reference, and free text cannot be turned into one here.
+        raise RefusedError(
+            f"case {case_id} names no court and division; pick them on the "
+            "case before capturing it"
+        )
+    debtors = stores.debtors.list_for_case(case_id)
     spec: dict[str, Any] = {
         "handle": handle,
         "chapter": case.chapter,
-        "district": case.district,
+        # The registry reference, which is what `load` parses; `district` is
+        # the printed name the parser derives from it.
+        "court": case.court,
+        "division": case.division,
         # `tax_id` is DROPPED from a captured debtor, and its provenance
         # entry with it: the API's own representation is the last-four view,
         # which the loader cannot re-seal (the full digits are behind the
@@ -1091,17 +1268,42 @@ def capture(
         # never-issued advertising block (insolvia_core.tax_ids).
         "debtors": {
             debtor.filing_role: _without_tax_id(_strip(debtor_json(debtor)))
-            for debtor in stores.debtors.list_for_case(case_id)
+            for debtor in debtors
         },
         "collections": {},
         "documents": [],
     }
+    # Every id this case's records carry, and the reference that names the
+    # same record in a fixture ("references" above). A captured body that
+    # holds one of these ids gets the `$ref`; the item it points at gets a
+    # `$handle`. An id the case does not own is left as typed.
+    refs: dict[str, str] = {
+        debtor.id: f"{_DEBTORS}/{debtor.filing_role}" for debtor in debtors
+    }
+    captured: dict[str, list[tuple[str, dict[str, object]]]] = {}
     for name, kind in COLLECTIONS.items():
-        items = [
-            _strip(entity_json(e)) for e in stores.entities.list_for_case(case_id, kind)
+        entities = stores.entities.list_for_case(case_id, kind)
+        if not entities:
+            continue
+        captured[name] = []
+        for index, entity in enumerate(entities, start=1):
+            item_handle = f"{name}-{index}"
+            refs[entity.id] = f"{name}/{item_handle}"
+            captured[name].append((item_handle, _strip(entity_json(entity))))
+    referenced: set[str] = set()
+    spec["debtors"] = {
+        role: _with_refs(body, refs, referenced)
+        for role, body in spec["debtors"].items()
+    }
+    bodies = {
+        name: [(h, _with_refs(body, refs, referenced)) for h, body in items]
+        for name, items in captured.items()
+    }
+    for name, items in bodies.items():
+        spec["collections"][name] = [
+            {_HANDLE: h, **body} if f"{name}/{h}" in referenced else body
+            for h, body in items
         ]
-        if items:
-            spec["collections"][name] = items
 
     (folder / "objects").mkdir(parents=True, exist_ok=True)
     for document in stores.documents.list_for_case(case_id):
