@@ -112,8 +112,8 @@ def test_a_caller_in_no_firm_is_403(client):
 def test_every_member_reads_the_ten_launch_districts(client):
     # Staff with role defaults only — no feature gate applies here.
     body = client.get("/v1/courts", headers=auth(GREG)).get_json()
-    assert body["releaseId"] == "courts/us-bankruptcy@2026-09-24"
-    assert body["effectiveDate"] == "2026-09-24"
+    assert body["releaseId"] == "courts/us-bankruptcy@2026-09-26"
+    assert body["effectiveDate"] == "2026-09-26"
     assert [d["code"] for d in body["districts"]] == [
         "flmb", "flnb", "flsb", "gamb", "ganb", "gasb",
         "txeb", "txnb", "txsb", "txwb",

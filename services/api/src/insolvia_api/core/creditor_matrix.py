@@ -36,13 +36,19 @@ blocks where everyone else wants up-to-five plus a separator — so the format
 is a value (`MatrixFormat`), and since issue #360 the numbers come from the
 COURT REGISTRY (`insolvia_core.courts`, the `courts/us-bankruptcy` series):
 each district record carries its matrix knobs as sourced, dated facts, and
-`format_for_court` reads the VERIFIED ones into a `MatrixFormat`. A knob the
-court's pages did not confirm falls back to the common format — a matrix in
-the common format is accepted everywhere the instructions above were read,
-while a figure guessed from a stale page is a mis-addressed notice.
-`DISTRICT_VARIANCES` is now derived from the registry rather than written
-here, keyed by the court's CM/ECF code as `case.court` names it; a case from
-before the registry (no `court`) gets the common format.
+`format_for_court` reads the VERIFIED ones into a `MatrixFormat`, keyed by
+the court's CM/ECF code as `case.court` names it. That function is the ONLY
+way a district's format is known here — there is no table beside the
+registry (ADR 0024 PR 2 removed the last one, an import-time snapshot that
+would have kept serving the old release after a new one took effect). A knob
+the court's pages did not confirm falls back to the common format — a matrix
+in the common format is accepted everywhere the instructions above were
+read, while a figure guessed from a stale page is a mis-addressed notice. A
+case from before the registry (no `court`) gets the common format.
+
+The per-district output is pinned by goldens (tests/unit/goldens/
+creditor_matrix/): one creditor list rendered for every court in the
+registry, each file byte-for-byte.
 
 VIOLATIONS ARE REPORTED, NEVER REPAIRED. A 41-character creditor name could be
 truncated to fit, but a truncated line on the matrix is a mis-addressed
@@ -103,9 +109,14 @@ class MatrixFormat:
     blocks with a separator. `name_line_chars` and `comma_after_city` are
     the two knobs ADR 0024's research added (W.D. Tex. allows a 50-character
     name line and wants "Midland, TX"; N.D. Fla. wants the comma too).
-    `case_number_header_when_separate` (E.D. Tex.) is carried as data only —
-    it applies to a matrix filed separately AFTER the case has a number,
-    which is the filing-set PR's rendering, not this generator's.
+    `case_number_header_when_separate` is E.D. Tex.'s LBR Appendix 1007-b-5,
+    III.A.2: a matrix filed as its own docket event, after the case is
+    open, carries "the case number issued by the Court on the first line of
+    the matrix followed by two (2) blank lines" — the first creditor starts
+    on line four. Through Case Upload the matrix is not filed separately
+    (III.B), and before the case has a number there is nothing to print, so
+    the header renders only when the caller passes a case number
+    (`generate_creditor_matrix(..., case_number=...)`).
     """
 
     max_line_chars: int = 40
@@ -169,31 +180,15 @@ def format_for_court(court_code: str | None) -> MatrixFormat:
     )
 
 
-def district_variances() -> dict[str, MatrixFormat]:
-    """The registry's departures from the common format, keyed by court
-    code — the table this module once hand-wrote, now read. A court whose
-    verified facts match the common format is recorded by ABSENCE, exactly
-    as before."""
-    return {
-        code: fmt
-        for code in courts.district_codes()
-        if (fmt := format_for_court(code)) != COMMON_FORMAT
-    }
-
-
-# Kept under its old name for the callers and tests that read it as a table;
-# the registry is its only author now.
-DISTRICT_VARIANCES: Final[dict[str, MatrixFormat]] = district_variances()
-
-
 @dataclass(frozen=True)
 class MatrixProblem:
     """One reason one creditor cannot go on the matrix as recorded.
 
-    `creditor_id` is None for the one case-level problem (no creditors at
-    all). `field` is the body path the fix belongs to, matching the paths the
-    entity endpoints validate, so the client can put the message next to the
-    input that needs the edit.
+    `creditor_id` is None for the case-level problems (no creditors at all;
+    a separately-filed matrix's case number that cannot print). `field` is
+    the body path the fix belongs to, matching the paths the entity
+    endpoints validate, so the client can put the message next to the input
+    that needs the edit.
     """
 
     creditor_id: str | None
@@ -338,9 +333,45 @@ def _line_problems(
     return problems
 
 
+# E.D. Tex. prints exactly two blank lines under the case number (III.A.2),
+# independent of the blank lines between creditors — the same two today, but
+# a different rule, so not the same number.
+_CASE_NUMBER_BLANK_LINES: Final = 2
+
+
+def _case_number_problems(case_number: str, fmt: MatrixFormat) -> list[MatrixProblem]:
+    """The header line is held to the same rules as every other line. The
+    number comes from the court, not from a person typing, so a failure here
+    is a wiring fault upstream — but it is reported like any other problem,
+    because a matrix with a malformed first line is refused by the clerk
+    all the same."""
+    problems: list[MatrixProblem] = []
+    if not case_number.strip():
+        problems.append(
+            MatrixProblem(
+                creditor_id=None,
+                field="case_number",
+                message="The case number for the matrix header is blank.",
+            )
+        )
+    elif len(case_number) > fmt.max_line_chars or not _printable_ascii(case_number):
+        problems.append(
+            MatrixProblem(
+                creditor_id=None,
+                field="case_number",
+                message=f"The case number must be plain ASCII of at most"
+                f" {fmt.max_line_chars} characters to print as the matrix's"
+                " first line.",
+            )
+        )
+    return problems
+
+
 def generate_creditor_matrix(
     creditors: Sequence[CaseEntity[CreditorBody]],
     fmt: MatrixFormat = COMMON_FORMAT,
+    *,
+    case_number: str | None = None,
 ) -> CreditorMatrix:
     """The matrix for one case's creditor list, or every reason there isn't
     one — never both, and never a partial file.
@@ -357,6 +388,16 @@ def generate_creditor_matrix(
     The file uses CRLF line endings and ends with a newline — the clerks'
     instructions all describe an "MS-DOS text" file, and CRLF is the one
     convention every district's intake tooling predates.
+
+    `case_number` is for a matrix FILED SEPARATELY, after the court has
+    opened the case and issued a number: where the court's format asks for
+    it (`case_number_header_when_separate`, E.D. Tex.), the number prints
+    alone on the first line followed by two blank lines. Everywhere else it
+    is ignored — the other launch courts either forbid headers (S.D. Fla.
+    CI-3 (k); M.D. Ga. "do not include case numbers") or have not said, and
+    an unconfirmed header is a line the clerk's scanner reads as a creditor.
+    None, the default, is every matrix produced before filing and every
+    Case Upload.
     """
     problems: list[MatrixProblem] = []
     if not creditors:
@@ -368,6 +409,10 @@ def generate_creditor_matrix(
                 " creditor before it can be filed.",
             )
         )
+
+    header = case_number if fmt.case_number_header_when_separate else None
+    if header is not None:
+        problems.extend(_case_number_problems(header, fmt))
 
     printable: list[tuple[str, ...]] = []
     for entity in creditors:
@@ -409,6 +454,11 @@ def generate_creditor_matrix(
         rendered.append("\r\n".join(lines))
     separator = "\r\n" * (fmt.blank_lines_between + 1)
     content = separator.join(rendered) + "\r\n"
+    if header is not None:
+        # "The case number ... on the first line of the matrix followed by
+        # two (2) blank lines. You can then begin with the first creditor on
+        # the fourth line." — E.D. Tex. LBR App. 1007-b-5 III.A.2.
+        content = header + "\r\n" * (_CASE_NUMBER_BLANK_LINES + 1) + content
     return CreditorMatrix(
         content=content,
         creditor_count=len(blocks),
