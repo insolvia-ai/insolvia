@@ -220,7 +220,7 @@ argument. The shape it settled on:
 - **The ref, not the location, is the contract.** The item sits in the case's
   partition today; ADR 0022 (a client is not a case) needs a client's later
   matter to point at the *same* sealed identifier rather than copy it, so the
-  ref is an opaque generated id the ADR's backfill can re-parent, and the
+  ref is an opaque generated id a later case can re-use, and the
   firm-plus-ref context is what lets one ref serve two cases of one client
   while refusing replay onto another firm or another identifier.
 - **Two reads.** The last four are on the plain record and travel with every

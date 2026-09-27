@@ -1,6 +1,11 @@
 # ADR 0022 — A client is not a case
 
-- **Status:** Proposed — accepted by merging; the build is
+- **Status:** Accepted (2026-09-26) — with four answers from the
+  maintainer: copy over live reference (as proposed); **no data migration**,
+  because the product is not live and every environment's data is
+  disposable; the `clients` permission reaches existing users only by an
+  admin's grant; a non-filing spouse may be a client but need not be, and
+  *merge clients* is built in this series rather than deferred. The build is
   [#353](https://github.com/insolvia-ai/insolvia/issues/353) (model, store,
   API), [#354](https://github.com/insolvia-ai/insolvia/issues/354) (screens)
   and [#355](https://github.com/insolvia-ai/insolvia/issues/355) (lifecycle).
@@ -61,15 +66,15 @@ stays `access.may_see_case`, unchanged. A client's case list is filtered per
 case and shows **no count of the rest** — ADR 0009's 404 covers "an in-firm
 case you are not linked to", and a count would be the enumeration it hides.
 
-**Migration: every existing debtor becomes a client, once.** A `backfill`
-command beside `seed` in `services/admin/…/entrypoints/`, deriving the client
-id as `uuid5(target table, case id, filing role)` so re-runs converge, writing
-the client with `attribute_not_exists(SK)` and stamping the debtor's
-`client_id` with `attribute_not_exists(clientId)`. Dev runs it from
-`scripts/dev-aws-seed.sh`; staging from a step beside
-`.github/actions/seed-staging`; prod from the release run behind the same
-`promote` gate the deploy sits behind — and unlike the seeder it does **not**
-refuse a prod table, because prod is where a migration is for.
+**No migration: a case without a client is not carried forward.** The
+product has no live data — the maintainer confirmed on 2026-09-26 that any
+data in any environment may be destroyed — so no backfill is written. From the
+PR that makes `POST /v1/cases` require clients, a debtor without a
+`client_id` is a state the store no longer produces; the pre-client rows in
+dev, staging and prod are deleted by that PR's release (the case partitions
+whose debtors carry no `client_id`, and nothing else), and the seed fixture
+that replaces them names a client for every debtor. The code does not grow a
+"legacy debtor with no client" branch to maintain forever.
 
 ## Context
 
@@ -140,6 +145,13 @@ existing row by default, per ADR 0009 — see Consequences.
 would write firm-table rows, and the API's firm grant does not include that
 for a reason.
 
+**A converging backfill** (every existing debtor becomes a client once,
+`uuid5`-derived ids, run in each environment's release — the proposed
+draft's answer). Rejected on 2026-09-26 by the maintainer: with no live
+data it protects nothing, costs a PR, and leaves a prod-writing migration
+command and a no-client code path behind. Revisit only if a schema change
+like this one lands after launch.
+
 ## Consequences
 
 - **`POST /v1/cases` takes `client_ids` (one or two) and creates the debtors
@@ -158,8 +170,8 @@ for a reason.
 - **The tax id is one item, addressed by `tax_id_ref`.** #382 owns the bytes,
   the KMS grant, the last-four view and the `taxid.*` access-log action. This
   ADR asks one thing of it: address the encrypted item by an opaque id rather
-  than `(case_id, filing_role)`, so a refiled case reuses it. If #382 ships
-  keyed by debtor first, the backfill gives each item a ref and repoints. The
+  than `(case_id, filing_role)`, so a refiled case reuses it — which
+  `insolvia_core.tax_ids` (13.12) already does. The
   full-value read stays a case operation (B121, e-filing); a client screen
   shows last four only. #382's "the MCP read tool stays last-four only" holds
   for client records too.
@@ -174,22 +186,29 @@ for a reason.
   firm-wide client list is not a tool in v1, and a `client` proposal lands as
   a candidate like any other write
   ([`mcp-surface.md`](../reference/mcp-surface.md) gains the row).
-- **Seeds.** A changed fixture is a new version: `fixtures/v2/cases.json` adds
-  a top-level `clients` list keyed by handle, and each debtor names one; the
-  loader derives the client id from (target table, firm, version, handle) as
-  it derives the case id. Rows seeded from v1 are left alone by the seeder's
-  rule and receive their client from the backfill — which is also the local
-  test of the backfill.
+- **Seeds.** A changed fixture is a new version: the next
+  `fixtures/v<N>/cases.json` adds a top-level `clients` list keyed by handle,
+  and each debtor names one; the loader derives the client id from (target
+  table, firm, version, handle) as it derives the case id. Rows seeded from
+  earlier versions have no client and are deleted with the rest of the
+  pre-client data, not upgraded.
 - **Fail-closed lands as invisibility.** Every existing `firm_user` row lacks
   `clients` and so has it `hidden`; admins see the list, nobody else does until
-  granted. `default_permissions` gives it `add_edit` to attorney and paralegal
-  and `view_only` to staff for *new* rows. The staging `paralegal` in
-  `seeds/staging.json` predates the feature; the e2e admin grants it, or the
-  fixture bumps.
-- **Two people, one row, one merge.** The backfill cannot know that two
-  debtors are one person; it makes two clients. *Merge clients* is a #354
-  follow-up, not a migration concern, and the number of duplicates in staging
-  is one (one seeded case).
+  granted — the maintainer's choice, over granting it by role in a
+  migration. `default_permissions` gives it `add_edit` to attorney and
+  paralegal and `view_only` to staff for *new* rows. The seeded users in
+  `seeds/<env>.json` are written with the grant their e2e flows need.
+- **Two people, one row, one merge.** A preparer who creates a second client
+  for a person the firm already knows gets two rows; *merge clients* folds
+  one into the other — the survivor keeps its id, the merged client's cases
+  are re-pointed (their debtors' `client_id` and the `by-client` entries, one
+  transaction per case), the merged record is archived with a `merged_into`
+  pointer rather than deleted, and the act is access-logged. It never touches
+  a debtor's copied identity fields: a filed petition still says what it
+  said. Built in this series (PR 7 below) at the maintainer's request.
+- **A non-filing spouse is optional.** `non_filing_spouse` *may* name a
+  client and need not: the firm does not represent them, and a client record
+  for them would put a non-client in the firm's directory.
 - **[`case-data-model.md`](../reference/case-data-model.md)** stays the owner
   of the debtor and gains `client_id` and the `client` source when the build
   lands; it is not rewritten here.
@@ -202,17 +221,18 @@ Ordered; each is one PR, one responsibility, all three environments.
 |---|---|---|---|
 | 1 | `core+api: client entity, store and /v1/firm/clients behind a clients feature` | `FEATURES` has `clients`; the five routes pass unit tests over the memory adapter; `client.*` access actions recorded; nothing references a client yet | M |
 | 2 | `core+api+api-client: cases are opened for clients — client_id on the debtor, the client source, the by-client index` | `POST /v1/cases` requires `client_ids`, writes debtors with `client` provenance in one transaction; `GET /v1/firm/clients/<id>/cases` lists reachable cases; `differs_from_client` served; Terraform adds `by-client` on dev, staging, prod | L |
-| 3 | `admin+seeds+ci: the client backfill and fixture v2` | `backfill` converges on a dev stack twice with the same ids; runs on staging deploy and in the prod release; `fixtures/v2` seeds clients and the e2e suite finds them | M |
+| 3 | `api+admin+seeds+ci: pre-client data removed, a fixture with clients` | the next fixture version seeds a client for every debtor and the e2e suite finds them; the release deletes case partitions whose debtors lack a `client_id` on dev, staging and prod (no backfill — the product is not live); run twice, the second run deletes nothing | S |
 | 4 | `app: the client list, the client record, and "add client" as the front door` (#354) | A preparer creates a client, starts two cases, finds either from the list; joint cases one row per client; `/cases` "new case" picks a client | L |
 | 5 | `app: the debtor screen reads its client — differs-from-client, re-copy, update client` (#354) | The intake debtor section shows the linked client, the diff, both acts; role picker links rather than mints | M |
 | 6 | `mcp: client records and the clients gate` | `client` in `ENTITY_TYPES`; `whoami` reports the feature; harness round-trip in 12.5's checklist | S |
-| 7 | `core+api+app: lifecycle as data, post-filing fields, archive, delete, copy` (#355) | Funnel to `filed` with case number, dates, judge, trustee; archived cases leave the default list; `first_retained_at` set by the retained transition; copy-case names its source in provenance | L |
+| 7 | `core+api+app: merge clients` (#354) | Merging B into A re-points every B case's debtors and `by-client` entries to A, archives B with `merged_into: A`, logs `client.merge`; a merged client cannot be merged again or opened for a new case; a debtor's copied fields are unchanged | M |
+| 8 | `core+api+app: lifecycle as data, post-filing fields, archive, delete, copy` (#355) | Funnel to `filed` with case number, dates, judge, trustee; archived cases leave the default list; `first_retained_at` set by the retained transition; copy-case names its source in provenance | L |
 
 **Risks.** *The joint-case row model*: a `debtor_2` linked to the same client
 as `debtor_1` is a valid write today and must be refused (one client, one
-role per case), or the `by-client` index shows one case twice. *Existing
-seeded cases*: the fixture's `chapter-7-sample` is v1 with no client; until PR
-3 runs, PR 2's `POST /v1/cases` works and the seeded case shows a debtor with
-no client — the app must render that state rather than assume the link. *#382
-ordering*: whichever of #382 and PR 2 merges second repoints the other's key;
-the ADR above says how, and the backfill is where it happens.
+role per case), or the `by-client` index shows one case twice. *The gap
+between PR 2 and PR 3*: for one release, seeded cases have debtors with no
+client; ship PR 2 and PR 3 back to back, and let the app show "no client
+linked" rather than crash in between. *Merge races*: two merges into and out
+of the same client at once must not strand a case — PR 7 takes a conditional
+write on both clients' status.
