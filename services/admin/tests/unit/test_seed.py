@@ -495,6 +495,9 @@ from insolvia_core.adapters.memory.case_entity_store import (  # noqa: E402
     MemoryCaseEntityStore,
 )
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore  # noqa: E402
+from insolvia_core.adapters.memory.client_binding_store import (  # noqa: E402
+    MemoryClientBindingStore,
+)
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore  # noqa: E402
 from insolvia_core.adapters.memory.document_blobs import (  # noqa: E402
     MemoryDocumentBlobStore,
@@ -558,6 +561,7 @@ class Env:
         self.objects = FakeFixtureObjects(self.blobs, {"v1/objects/stub.pdf": PDF})
         self.tax_ids = MemoryTaxIdStore()
         self.tax_id_cipher = LocalTaxIdCipher()
+        self.bindings = MemoryClientBindingStore()
         self.accounts = FakeAccounts(known={})
         folder = tmp_path / "fixtures" / "v1"
         (folder / "objects").mkdir(parents=True)
@@ -662,6 +666,7 @@ class Env:
             fixture_objects=lambda _f, _t: self.objects,
             tax_id_store=lambda _: self.tax_ids,
             tax_id_cipher=lambda _: self.tax_id_cipher,
+            client_binding_store=lambda _firms, _cases: self.bindings,
         )
 
     def load(self, *extra: str, table: str = DEV_TABLE) -> int:
@@ -1041,3 +1046,86 @@ def test_capture_refuses_a_staging_source(tmp_path: Path) -> None:
         deps=env.deps(),
     )
     assert status == 2
+
+
+# ── Portal clients (ADR 0023) ───────────────────────────────────
+
+
+def _with_clients(env: Env, *clients: dict[str, object]) -> None:
+    body = json.loads(env.env_fixture.read_text())
+    body["cases"][0]["clients"] = list(clients)
+    env.env_fixture.write_text(json.dumps(body))
+
+
+CLIENT = {
+    "handle": "client",
+    "email": "e2e-client@insolvia.test",
+    "password": "hunter2ABCDEF",
+    "displayName": "Sample Debtor",
+    "roles": ["debtor_1"],
+}
+
+
+def test_a_fixture_client_is_bound_to_the_fixture_case(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    _with_clients(env, CLIENT)
+
+    assert env.load() == 0
+
+    case = env.the_case()
+    assert case is not None
+    subject = env.accounts.subjects["e2e-client@insolvia.test"]
+    binding = env.bindings.get(case.firm_id, subject)
+    assert binding is not None
+    assert (binding.case_id, binding.roles, binding.status) == (
+        case.id,
+        ("debtor_1",),
+        "invited",
+    )
+    # The account's password is SET, which is what lets the integration tier
+    # sign the client in over SRP with no invitation mail in between.
+    assert env.accounts.passwords["e2e-client@insolvia.test"] == "hunter2ABCDEF"
+    # A client is not a firm user.
+    assert env.firms.find_user(subject) is None
+
+
+def test_a_loaded_client_is_left_alone_and_check_is_clean(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    _with_clients(env, CLIENT)
+    assert env.load() == 0
+
+    assert env.load("--check") == 0
+    assert env.load() == 0
+    assert len(env.bindings.bindings) == 1
+
+
+def test_check_reports_a_missing_client_without_binding_it(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    assert env.load() == 0
+    _with_clients(env, CLIENT)
+
+    assert env.load("--check") == 1
+    assert env.bindings.bindings == {}
+
+
+def test_a_client_who_is_also_a_firm_person_is_refused(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    _with_clients(env, {**CLIENT, "email": "e2e-admin@insolvia.test"})
+
+    assert env.load() == 2
+
+
+def test_two_fixture_clients_cannot_both_hold_debtor_2(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    _with_clients(
+        env,
+        {**CLIENT, "roles": ["debtor_2"]},
+        {
+            **CLIENT,
+            "handle": "other",
+            "email": "e2e-other@insolvia.test",
+            "roles": ["debtor_2"],
+        },
+    )
+
+    assert env.load() == 2

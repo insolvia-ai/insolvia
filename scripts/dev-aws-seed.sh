@@ -177,6 +177,8 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
 # FROM THE FIXTURE, not from an env var or a default that has to be kept in
 # step with it: a fixture person WITHOUT a password is one whose account this
 # wrapper must provide (with one, the loader creates it — staging's model).
+# That includes a fixture case's portal CLIENTS (ADR 0023), which get the same
+# dev password — one secret for every throwaway seat on this machine.
 # The addresses are all `.test` ones — a reserved TLD (RFC 2606) that can
 # never be a real mailbox, which matters twice over: this repo is public, and
 # Cognito would otherwise be able to mail a stranger. Nothing is emailed
@@ -185,7 +187,7 @@ pool_name="$(aws_dev cognito-idp describe-user-pool --user-pool-id "$POOL_ID" \
 ACCOUNT_EMAILS=()
 while IFS= read -r email; do
   ACCOUNT_EMAILS+=("$email")
-done < <(jq -r '[.firms[].users[] | select(has("password") | not) | .email] | unique | .[]' "$FIXTURE")
+done < <(jq -r '[(.firms[].users[], (.cases // [])[].clients[]?) | select(has("password") | not) | .email] | reduce .[] as $e ([]; if index([$e]) then . else . + [$e] end) | .[]' "$FIXTURE")
 [[ ${#ACCOUNT_EMAILS[@]} -gt 0 ]] ||
   die "No passwordless person in $(basename "$FIXTURE") — nothing for this wrapper to ensure, which is not the dev fixture's shape."
 for email in "${ACCOUNT_EMAILS[@]}"; do
