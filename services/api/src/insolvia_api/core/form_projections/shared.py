@@ -37,6 +37,7 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import PlanBody
 from insolvia_core.sofa import SofaEntryBody
 
 from ..form_fill import FieldFill, Option, Text, helvetica_width
@@ -110,6 +111,10 @@ class CaseFile:
     dependents: tuple[DependentBody, ...] = ()
     # B107.
     sofa_entries: tuple[SofaEntryBody, ...] = ()
+    # B113, the Chapter 13 plan (issue #367): the one `plans` record —
+    # packet assembly's gate refuses a second, so the projection reads the
+    # first. Chapter 7 cases carry none that anything reads.
+    plans: tuple[PlanBody, ...] = ()
 
     def debtor(self, *roles: str) -> Debtor | None:
         return next((d for d in self.debtors if d.filing_role in roles), None)
@@ -178,17 +183,30 @@ def wrap_lines(
 
 
 def wrap_width(
-    value: str, *, points: float, lines: int, where: str, problems: list[str]
+    value: str,
+    *,
+    points: float,
+    lines: int,
+    where: str,
+    problems: list[str],
+    size: float | None = None,
 ) -> list[str]:
     """`wrap_lines` for a flat release's overlay rows: the measure is the
-    row's width in POINTS under the font the engine draws with, so a line
-    that fits here is a line the engine will accept. Overflow is an error."""
+    row's width in POINTS under the font the engine draws with — at the
+    box's own `size` where it carries one (`OverlayBox.size`), the engine's
+    default otherwise — so a line that fits here is a line the engine will
+    accept. Overflow is an error."""
     words = value.split()
     rows_out: list[str] = []
     current = ""
     for word in words:
         candidate = f"{current} {word}".strip()
-        if helvetica_width(candidate) <= points or not current:
+        measured = (
+            helvetica_width(candidate)
+            if size is None
+            else helvetica_width(candidate, size)
+        )
+        if measured <= points or not current:
             current = candidate
         else:
             rows_out.append(current)

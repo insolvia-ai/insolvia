@@ -79,6 +79,7 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import LumpSum, PlanBody, SecuredTreatment, StepPayment
 from insolvia_core.sofa import (
     BusinessConnection,
     CharitableContribution,
@@ -1330,7 +1331,12 @@ def reference_case_file_chapter_13() -> CaseFile:
     Chapter 13 forms ask on their own — line 40's child support, line 41's
     retirement withholding, one line-43 special circumstance, and no
     contention that the (zero) marital adjustment shortens the commitment
-    period. B122C-1 and B122C-2's goldens print from this file."""
+    period. B122C-1 and B122C-2's goldens print from this file.
+
+    Issue #367 adds what the Chapter 13 PACKET needs beyond the means test:
+    the plan (`REFERENCE_PLAN_BODY`, which B113's golden prints) and an
+    assume-or-reject answer on every lease — the plan's Part 6 assumes the
+    RAV4 lease the Chapter 7 file already assumes and rejects the rest."""
     case_file = reference_case_file()
     inputs = replace(
         case_file.means_test_inputs[0],
@@ -1347,15 +1353,41 @@ def reference_case_file_chapter_13() -> CaseFile:
             **case_file.__dict__,
             "case": replace(REFERENCE_CASE, chapter=13),
             "means_test_inputs": (inputs,),
+            "contract_leases": tuple(
+                (lease_id, replace(lease, intention=lease.intention or "reject"))
+                for lease_id, lease in case_file.contract_leases
+            ),
+            "plans": (REFERENCE_PLAN_BODY,),
         }
     )
 
 
+# The Chapter 13 reference plan (#366's route test types the same one): $500
+# a month over the commitment period, the mortgage kept current outside the
+# plan, the car crammed down at 7%, the rest to unsecured creditors.
+REFERENCE_PLAN_BODY = PlanBody(
+    payment_source="fixed",
+    monthly_payment="500.00",
+    trustee_percentage="10",
+    attorney_fees="3500.00",
+    secured_treatments=(
+        SecuredTreatment(
+            id="t-home", claim_id="claim-mortgage", treatment="cure_and_maintain"
+        ),
+        SecuredTreatment(
+            id="t-car", claim_id="claim-auto", treatment="cramdown", interest_rate="7"
+        ),
+    ),
+    unsecured_treatment="pot",
+)
+
+
 # --- the projected goldens ----------------------------------------------------
 
-# The Chapter 13 means-test pair prints from the Chapter 13 reference case;
+# The Chapter 13 means-test pair and the plan print from the Chapter 13
+# reference case;
 # every other series from the Chapter 7 one.
-CHAPTER_13_SERIES = frozenset({"form/b122c1", "form/b122c2"})
+CHAPTER_13_SERIES = frozenset({"form/b113", "form/b122c1", "form/b122c2"})
 
 
 @pytest.mark.parametrize(
@@ -1375,6 +1407,7 @@ CHAPTER_13_SERIES = frozenset({"form/b122c1", "form/b122c2"})
         "form/b106sum",
         "form/b107",
         "form/b108",
+        "form/b113",
         "form/b121",
         "form/b122a1",
         "form/b122a2",
@@ -2967,3 +3000,102 @@ def test_b122c2_surfaces_the_engines_refusals_through_the_gate() -> None:
     assert files_b122c2(without_inputs)  # not yet determinable: stays in the set
     with pytest.raises(FormProjectionError, match="household composition"):
         project(latest_form("form/b122c2"), without_inputs)
+
+
+# --- B113, the Chapter 13 plan (issue #367) -----------------------------------
+
+
+def b113_values(**plan_changes: object) -> dict[str, object]:
+    case_file = reference_case_file_chapter_13()
+    plan = replace(REFERENCE_PLAN_BODY, **plan_changes)
+    return dict(project(latest_form("form/b113"), replace(case_file, plans=(plan,))))
+
+
+def test_b113_prints_the_calculators_figures() -> None:
+    values = b113_values()
+    assert values["line_2_1_amount"] == {"2.1.amount.1": Text("500.00")}
+    assert values["line_2_1_months"] == {"2.1.months.1": Text("60")}
+    assert values["line_2_5_total"] == Text("30,000.00")
+    # The car is crammed down, so Part 1 line 1.1 says so and § 3.2 lists it.
+    assert values["line_1_1_included"] == Check()
+    assert values["line_3_2_rate"] == {"3.2.rate.1": Text("7")}
+    assert values["line_5_1_remaining"] == Check()
+    # A pot plan disburses everything it takes in: the exhibit adds up to § 2.5.
+    assert values["exhibit.total"] == Text("30,000.00")
+
+
+def test_b113_prints_a_step_and_its_lump_sums() -> None:
+    values = b113_values(
+        step_payments=(StepPayment(id="s1", start_month=25, monthly_payment="650.00"),),
+        lump_sums=(
+            LumpSum(id="l1", month=13, amount="1200.00", description="Tax refund"),
+        ),
+    )
+    assert values["line_2_1_amount"] == {
+        "2.1.amount.1": Text("500.00"),
+        "2.1.amount.2": Text("650.00"),
+    }
+    assert values["line_2_1_months"] == {
+        "2.1.months.1": Text("24"),
+        "2.1.months.2": Text("36"),
+    }
+    assert values["line_2_4_additional"] == Check()
+    assert values["line_2_4_description"] == {
+        "2.4.description.1": Text("Tax refund: $1,200.00 in month 13")
+    }
+
+
+def test_b113_prints_a_promised_percentage() -> None:
+    values = b113_values(unsecured_treatment="percentage", unsecured_percentage="45")
+    assert values["line_5_1_percentage"] == Check()
+    assert values["line_5_1_percentage_value"] == Text("45")
+    assert "line_5_1_remaining" not in values
+
+
+def test_b113_lists_a_surrender_and_no_cramdown() -> None:
+    values = b113_values(
+        secured_treatments=(
+            SecuredTreatment(
+                id="t-home", claim_id="claim-mortgage", treatment="cure_and_maintain"
+            ),
+            SecuredTreatment(id="t-car", claim_id="claim-auto", treatment="surrender"),
+        )
+    )
+    assert values["line_3_5_surrender"] == Check()
+    assert values["line_3_5_creditor"] == {
+        "3.5.creditor.1": Text("Drive Away Financial LLC")
+    }
+    assert values["line_3_2_none"] == Check()
+    assert values["line_1_1_not_included"] == Check()
+
+
+@pytest.mark.parametrize(
+    ("changes", "problem"),
+    [
+        pytest.param(
+            {
+                "step_payments": (
+                    StepPayment(id="s1", start_month=13, monthly_payment="600.00"),
+                    StepPayment(id="s2", start_month=25, monthly_payment="700.00"),
+                )
+            },
+            "prints 2 payment lines",
+            id="three-payment-runs",
+        ),
+        pytest.param(
+            {"priority_percentage": "50"}, "§ 4.5", id="priority-paid-less-than-full"
+        ),
+        pytest.param({"monthly_payment": "50.00"}, "not feasible", id="infeasible"),
+        pytest.param({"trustee_percentage": None}, "Plan: ", id="calculator-problem"),
+    ],
+)
+def test_b113_refuses_a_plan_it_cannot_print_honestly(changes, problem) -> None:
+    with pytest.raises(FormProjectionError, match=problem):
+        b113_values(**changes)
+
+
+def test_b113_without_a_plan_prints_the_caption_alone() -> None:
+    case_file = replace(reference_case_file_chapter_13(), plans=())
+    values = project(latest_form("form/b113"), case_file)
+    assert values["caption.debtor1_name"] == Text("Ada Quinn Lovelace")
+    assert not any(key.startswith(("line_", "exhibit.")) for key in values)

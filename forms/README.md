@@ -4,13 +4,15 @@ The machine-readable field inventory of the Chapter 7 individual filing set —
 B101, B106 Summary + Declaration, Schedules A/B–J (J-2 included), B107, B108,
 B121, the B122A means-test pair, and the two Director's Forms the packet files
 with them (B2010, B2030) — plus the Chapter 13 means-test pair (B122C-1,
-B122C-2) that replaces B122A on a Chapter 13 case, that the forms engine
+B122C-2) that replaces B122A on a Chapter 13 case and the national Chapter 13
+plan (Official Form 113) that files with it, that the forms engine
 ([issue 9.3](https://github.com/insolvia-ai/insolvia/issues/93)) fills from and
 the intake map (8.1) refines against. Produced for
 [issue 9.2](https://github.com/insolvia-ai/insolvia/issues/92) by desk research
 against uscourts.gov; B108/B121/B2010/B2030 joined under
-[issue 13.10](https://github.com/insolvia-ai/insolvia/issues/351) and the
-B122C pair under [issue 16.1](https://github.com/insolvia-ai/insolvia/issues/365).
+[issue 13.10](https://github.com/insolvia-ai/insolvia/issues/351), the
+B122C pair under [issue 16.1](https://github.com/insolvia-ai/insolvia/issues/365)
+and B113 under [issue 16.3](https://github.com/insolvia-ai/insolvia/issues/367).
 
 Two layers per form, deliberately:
 
@@ -46,6 +48,7 @@ missing fields" an executable property, not a one-time review.
 | B106J-2 | Schedule J-2: Expenses for Separate Household of Debtor 2 | 12/15 | 2015-12-01 |
 | B107 | Statement of Financial Affairs | **04/25** | 2025-04-01 |
 | B108 | Statement of Intention for Individuals Filing Under Chapter 7 | 12/15 | 2015-12-01 |
+| B113 | Chapter 13 Plan | 12/17 | 2017-12-01 |
 | B121 | Statement About Your Social Security Numbers | 12/15 | 2015-12-01 |
 | B122A-1 | Chapter 7 Statement of Your Current Monthly Income | 12/19 | 2019-12-01 |
 | B122A-2 | Chapter 7 Means Test Calculation | **04/25** | 2025-04-01 |
@@ -73,11 +76,12 @@ date on which B2030 first replaced B203, so for a Director's Form the PDF
 footer and the recent-changes page are the revision's authority, not the
 page's "Effective on" line.
 
-## Flat forms: the two Director's Forms have no AcroForm
+## Flat forms: the two Director's Forms and B113 have no AcroForm
 
 B2010 and B2030 are published as flat PDFs — a Word document distilled, with
-no fillable field at all — so there is no widget to claim and the two-layer
-scheme above bends in one place:
+no fillable field at all — and so is Official Form 113, the Chapter 13 plan,
+so there is no widget to claim and the two-layer scheme above bends in one
+place:
 
 - `acroform/<form>.json` records an empty `fields` list (the dump is still
   the ground truth: it says the PDF cannot be filled).
@@ -88,6 +92,15 @@ scheme above bends in one place:
   PDF's own text and image operators. The fill engine draws the value —
   Helvetica text on the baseline, an X across the box — into a content stream
   appended to the page, leaving the official page streams byte-identical.
+  Each value draws in its own saved graphics state (black fill, reset text
+  state): B113's page 5 ends on a white fill that would otherwise draw every
+  value invisibly.
+- A text box may carry `size`, the point size its value draws at, where the
+  printed blank is too small for the engine's 10-point default — B113's
+  table cells are 7.6-point type. B113's boxes were measured from pdfplumber's
+  character boxes for each printed underscore run (the value sits 1.2 pt
+  above their baseline) and from the rasterised Wingdings box glyphs (the
+  checkbox box is the drawn square grown 1.5 pt a side).
 - B2010 is a notice with nothing to print at all: an empty `fields` list on
   both sides, and the packet ships the court's bytes verbatim.
 
@@ -172,6 +185,11 @@ one in a `notes` where it bites. The recurring kinds:
   B122C-2's line 33c, which is wired to line 13e's *first creditor row*
   rather than its total (the spec's `vehicle_2_loan_rows` note says how the
   projection compensates).
+- **Printed rows that run out** — B113 prints two payment lines in § 2.1 and
+  two rows in each of §§ 3.1, 3.2, 3.5 and 6.1, each with "Insert additional
+  lines/claims as needed". Adding a row edits the official form's text, which
+  Rule 3015(c) makes a nonstandard provision (Part 8); the projection refuses
+  a plan that needs more rather than editing the form.
 - **Widgets off the page** — B122C-1's line 15b widget has a second
   instance positioned below page 2's bottom edge. It never prints; the
   page 3 instance is the box.

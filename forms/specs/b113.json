@@ -1,0 +1,2902 @@
+{
+ "form": "b113",
+ "official_number": "113",
+ "title": "Chapter 13 Plan",
+ "revision": "12/17",
+ "effective_date": "2017-12-01",
+ "signature_pages": [],
+ "parts": [
+  {
+   "number": 1,
+   "title": "Notices"
+  },
+  {
+   "number": 2,
+   "title": "Plan Payments and Length of Plan"
+  },
+  {
+   "number": 3,
+   "title": "Treatment of Secured Claims"
+  },
+  {
+   "number": 4,
+   "title": "Treatment of Fees and Priority Claims"
+  },
+  {
+   "number": 5,
+   "title": "Treatment of Nonpriority Unsecured Claims"
+  },
+  {
+   "number": 6,
+   "title": "Executory Contracts and Unexpired Leases"
+  },
+  {
+   "number": 7,
+   "title": "Vesting of Property of the Estate"
+  },
+  {
+   "number": 8,
+   "title": "Nonstandard Plan Provisions"
+  },
+  {
+   "number": 9,
+   "title": "Signature(s)"
+  }
+ ],
+ "notes": "Official Form 113 (12/17), the national Chapter 13 plan (Bankruptcy Rule 3015(c)), is published FLAT — no AcroForm at all — so every field claims an `overlay` box the fill engine draws onto an appended content stream, as B2030's do. Boxes were measured from the PDF itself: each text box sits 1.2 pt above the baseline of the printed underscores it fills (pdfplumber's character boxes), and each checkbox box is the square the Wingdings box glyph actually draws (rasterised), grown 1.5 pt a side. The table cells are 7.6-point type, so their boxes carry a `size` (6–9 pt) and are widened to the column's own width where the underscores are shorter than a figure. The exhibit (page 9) is part of the form. `signature_pages` is empty for the reason B2030's is: signature-page selection counts widget pages, and a flat form has none. A district that has replaced this form under Rule 3015.1 is the court registry's fact (insolvia_core/courts.py, `chapter_13_plan`), and packet assembly refuses such a case rather than printing this form.",
+ "fields": [
+  {
+   "id": "caption.debtor1_name",
+   "part": null,
+   "label": "Debtor 1 — First Name, Middle Name, Last Name",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "debtor1.name",
+      "page": 1,
+      "x": 80,
+      "y": 691.4,
+      "w": 254,
+      "size": 9
+     }
+    ]
+   },
+   "notes": "underscores x 78.4–335.4 on baseline 690.1 (7 pt)"
+  },
+  {
+   "id": "caption.debtor2_name",
+   "part": null,
+   "label": "Debtor 2 (Spouse, if filing)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "debtor2.name",
+      "page": 1,
+      "x": 84,
+      "y": 657.1,
+      "w": 247,
+      "size": 9
+     }
+    ]
+   }
+  },
+  {
+   "id": "caption.district",
+   "part": null,
+   "label": "United States Bankruptcy Court for the: __ District of __ (State)",
+   "type": "text",
+   "maps_to": {
+    "entity": "case",
+    "attribute": "district",
+    "notes": "the stored name (e.g. `Middle District of Florida`) is split around `District of` onto the two printed blanks, as B2030's caption is"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "district.1",
+      "page": 1,
+      "x": 161,
+      "y": 621.2,
+      "w": 83,
+      "size": 8
+     },
+     {
+      "name": "district.2",
+      "page": 1,
+      "x": 279,
+      "y": 621.2,
+      "w": 52,
+      "size": 8
+     }
+    ]
+   },
+   "notes": "underscores x 159.4–245.0 and x 277.4–332.0 on baseline 620.0"
+  },
+  {
+   "id": "caption.case_number",
+   "part": null,
+   "label": "Case number (If known)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number; the case data model has no attribute for it yet"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "case_number",
+      "page": 1,
+      "x": 84,
+      "y": 596.1,
+      "w": 165,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "caption.amended_plan",
+   "part": null,
+   "label": "Check if this is an amended plan",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "a plan changed after filing is modified under § 1323/§ 1329, not amended under Rule 1009; the plan record accepts and ignores the generic `amended` flag (insolvia_core/plans.py), so nothing ticks this box"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "amended_plan",
+      "page": 1,
+      "x": 456.12,
+      "y": 661.75,
+      "w": 11.5,
+      "h": 11.5
+     }
+    ]
+   },
+   "notes": "the 12 pt box glyph at x 456.6"
+  },
+  {
+   "id": "caption.amended_sections",
+   "part": null,
+   "label": "…and list below the sections of the plan that have been changed",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "see caption.amended_plan"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "amended_sections.1",
+      "page": 1,
+      "x": 458,
+      "y": 618.1,
+      "w": 126,
+      "size": 7
+     },
+     {
+      "name": "amended_sections.2",
+      "page": 1,
+      "x": 458,
+      "y": 604.1,
+      "w": 126,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "header.debtor_name",
+   "part": null,
+   "label": "Debtor (running header, pages 2–8)",
+   "type": "text",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "name",
+    "notes": "filing_role=debtor_1, the same name on every page"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "header.debtor.p2",
+      "page": 2,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p3",
+      "page": 3,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p4",
+      "page": 4,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p5",
+      "page": 5,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p6",
+      "page": 6,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p7",
+      "page": 7,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     },
+     {
+      "name": "header.debtor.p8",
+      "page": 8,
+      "x": 62.5,
+      "y": 759.4,
+      "w": 289,
+      "size": 8
+     }
+    ]
+   },
+   "notes": "underscores x 61.0–353.0 on baseline 758.2 on each of pages 2–8; the exhibit (page 9) has no header"
+  },
+  {
+   "id": "header.case_number",
+   "part": null,
+   "label": "Case number (running header, pages 2–8)",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "court-assigned case number"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "header.case_number.p2",
+      "page": 2,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p3",
+      "page": 3,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p4",
+      "page": 4,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p5",
+      "page": 5,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p6",
+      "page": 6,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p7",
+      "page": 7,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     },
+     {
+      "name": "header.case_number.p8",
+      "page": 8,
+      "x": 431,
+      "y": 759.4,
+      "w": 103,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_1_1_included",
+   "part": 1,
+   "line": "1.1",
+   "label": "A limit on the amount of a secured claim, set out in Section 3.2 — Included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "any secured claim the plan crams down (treatment `cramdown`) — § 3.2 then prints it"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.1.included",
+      "page": 1,
+      "x": 449.38,
+      "y": 254.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_1_1_not_included",
+   "part": 1,
+   "line": "1.1",
+   "label": "A limit on the amount of a secured claim, set out in Section 3.2 — Not included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "no secured claim is crammed down, so § 3.2 prints `None`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.1.not_included",
+      "page": 1,
+      "x": 509.0,
+      "y": 254.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   },
+   "notes": "Part 1 requires one box on each line; exactly one of the pair is ticked"
+  },
+  {
+   "id": "line_1_2_included",
+   "part": 1,
+   "line": "1.2",
+   "label": "Avoidance of a judicial lien or nonpossessory, nonpurchase-money security interest, set out in Section 3.4 — Included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "never: the plan record models no § 522(f) lien avoidance, so § 3.4 always prints `None`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.2.included",
+      "page": 1,
+      "x": 449.38,
+      "y": 226.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_1_2_not_included",
+   "part": 1,
+   "line": "1.2",
+   "label": "Avoidance of a judicial lien or nonpossessory, nonpurchase-money security interest, set out in Section 3.4 — Not included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record models no § 522(f) lien avoidance"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.2.not_included",
+      "page": 1,
+      "x": 509.0,
+      "y": 226.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   },
+   "notes": "Part 1 requires one box on each line; exactly one of the pair is ticked"
+  },
+  {
+   "id": "line_1_3_included",
+   "part": 1,
+   "line": "1.3",
+   "label": "Nonstandard provisions, set out in Part 8 — Included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "never: the plan record models no nonstandard provision, so Part 8 always prints `None`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.3.included",
+      "page": 1,
+      "x": 449.38,
+      "y": 197.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_1_3_not_included",
+   "part": 1,
+   "line": "1.3",
+   "label": "Nonstandard provisions, set out in Part 8 — Not included",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record models no nonstandard provision"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "part1.1.3.not_included",
+      "page": 1,
+      "x": 509.0,
+      "y": 197.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   },
+   "notes": "Part 1 requires one box on each line; exactly one of the pair is ticked"
+  },
+  {
+   "id": "line_2_1_amount",
+   "part": 2,
+   "line": "2.1",
+   "label": "Debtor(s) will make regular payments to the trustee as follows: $ ___",
+   "type": "money",
+   "repeats": {
+    "group": "payment_runs",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the plan calculator's month-by-month payment schedule (services/api core/chapter13_plan.py), compressed into runs of equal payments: the base payment (typed, Schedule J line 23c, or B122C-2 line 45) and each step"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.1.amount.1",
+      "page": 1,
+      "x": 66,
+      "y": 123.5,
+      "w": 47,
+      "size": 8
+     },
+     {
+      "name": "2.1.amount.2",
+      "page": 1,
+      "x": 84,
+      "y": 108.2,
+      "w": 47,
+      "size": 8
+     }
+    ]
+   },
+   "notes": "the second printed line is the bracketed `[and $ ___ per ___ for ___ months]`; a plan with more than two runs does not fit and is refused (the form's `Insert additional lines` is a nonstandard edit)"
+  },
+  {
+   "id": "line_2_1_per",
+   "part": 2,
+   "line": "2.1",
+   "label": "per ___",
+   "type": "text",
+   "repeats": {
+    "group": "payment_runs",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "always `month` — the calculator's schedule is monthly"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.1.per.1",
+      "page": 1,
+      "x": 152,
+      "y": 123.5,
+      "w": 29,
+      "size": 8
+     },
+     {
+      "name": "2.1.per.2",
+      "page": 1,
+      "x": 152,
+      "y": 108.2,
+      "w": 29,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_1_months",
+   "part": 2,
+   "line": "2.1",
+   "label": "for ___ months",
+   "type": "integer",
+   "repeats": {
+    "group": "payment_runs",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the run's length in months"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.1.months.1",
+      "page": 1,
+      "x": 210.5,
+      "y": 123.5,
+      "w": 20,
+      "size": 8
+     },
+     {
+      "name": "2.1.months.2",
+      "page": 1,
+      "x": 208.5,
+      "y": 108.2,
+      "w": 20,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_2_payroll_deduction",
+   "part": 2,
+   "line": "2.2",
+   "label": "Debtor(s) will make payments pursuant to a payroll deduction order",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model how payments reach the trustee (a wage order is out of #366's scope)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.2.payroll_deduction",
+      "page": 2,
+      "x": 57.88,
+      "y": 701.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_2_direct",
+   "part": 2,
+   "line": "2.2",
+   "label": "Debtor(s) will make payments directly to the trustee",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model how payments reach the trustee (a wage order is out of #366's scope)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.2.direct",
+      "page": 2,
+      "x": 57.88,
+      "y": 686.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_2_other",
+   "part": 2,
+   "line": "2.2",
+   "label": "Other (specify method of payment)",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model how payments reach the trustee (a wage order is out of #366's scope)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.2.other",
+      "page": 2,
+      "x": 57.88,
+      "y": 672.5,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_2_other_specify",
+   "part": 2,
+   "line": "2.2",
+   "label": "Other — method of payment",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "see line_2_2_other"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.2.other_specify",
+      "page": 2,
+      "x": 199,
+      "y": 675.1,
+      "w": 122,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_3_retain",
+   "part": 2,
+   "line": "2.3",
+   "label": "Debtor(s) will retain any income tax refunds received during the plan term",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model the treatment of income tax refunds; a refund the plan counts on is a lump sum, printed in § 2.4"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.3.retain",
+      "page": 2,
+      "x": 57.75,
+      "y": 627.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_3_turn_over",
+   "part": 2,
+   "line": "2.3",
+   "label": "Debtor(s) will supply the trustee with each return and turn over all income tax refunds",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model the treatment of income tax refunds; a refund the plan counts on is a lump sum, printed in § 2.4"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.3.turn_over",
+      "page": 2,
+      "x": 57.75,
+      "y": 612.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_3_other",
+   "part": 2,
+   "line": "2.3",
+   "label": "Debtor(s) will treat income tax refunds as follows",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model the treatment of income tax refunds; a refund the plan counts on is a lump sum, printed in § 2.4"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.3.other",
+      "page": 2,
+      "x": 57.75,
+      "y": 589.25,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_3_other_treatment",
+   "part": 2,
+   "line": "2.3",
+   "label": "Income tax refunds — treatment",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "see line_2_3_other"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.3.other.1",
+      "page": 2,
+      "x": 75,
+      "y": 576.4,
+      "w": 442,
+      "size": 8
+     },
+     {
+      "name": "2.3.other.2",
+      "page": 2,
+      "x": 75,
+      "y": 561.1,
+      "w": 442,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_4_none",
+   "part": 2,
+   "line": "2.4",
+   "label": "Additional payments — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "the plan has no lump sum within its term"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.4.none",
+      "page": 2,
+      "x": 57.88,
+      "y": 513.38,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_4_additional",
+   "part": 2,
+   "line": "2.4",
+   "label": "Debtor(s) will make additional payment(s) to the trustee from other sources",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "the plan has at least one lump sum within its term"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.4.additional",
+      "page": 2,
+      "x": 57.88,
+      "y": 498.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_4_description",
+   "part": 2,
+   "line": "2.4",
+   "label": "Source, estimated amount, and date of each anticipated payment",
+   "type": "text",
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "lump_sums",
+    "notes": "each lump sum's description, amount and plan month, joined and wrapped by Helvetica's metrics; overflow is an error"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.4.description.1",
+      "page": 2,
+      "x": 74,
+      "y": 480.0,
+      "w": 473,
+      "size": 8
+     },
+     {
+      "name": "2.4.description.2",
+      "page": 2,
+      "x": 74.5,
+      "y": 464.8,
+      "w": 473,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_2_5_total",
+   "part": 2,
+   "line": "2.5",
+   "label": "The total amount of estimated payments to the trustee provided for in §§ 2.1 and 2.4",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's total funding: every monthly payment of the term plus every lump sum"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "2.5.total",
+      "page": 2,
+      "x": 394,
+      "y": 442.4,
+      "w": 78,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_none",
+   "part": 3,
+   "line": "3.1",
+   "label": "Maintenance of payments and cure of default — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "no secured claim is treated `cure_and_maintain`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.none",
+      "page": 2,
+      "x": 57.88,
+      "y": 360.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_maintain",
+   "part": 3,
+   "line": "3.1",
+   "label": "The debtor(s) will maintain the current contractual installment payments…",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "at least one secured claim is treated `cure_and_maintain`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.maintain",
+      "page": 2,
+      "x": 57.88,
+      "y": 343.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_creditor",
+   "part": 3,
+   "line": "3.1",
+   "label": "Name of creditor",
+   "type": "text",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "name",
+    "notes": "through the treated claim's creditor_id"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.creditor.1.1",
+      "page": 2,
+      "x": 78,
+      "y": 183.3,
+      "w": 110,
+      "size": 7
+     },
+     {
+      "name": "3.1.creditor.1.2",
+      "page": 2,
+      "x": 78,
+      "y": 175.3,
+      "w": 110,
+      "size": 7
+     },
+     {
+      "name": "3.1.creditor.2.1",
+      "page": 2,
+      "x": 78,
+      "y": 115.0,
+      "w": 110,
+      "size": 7
+     },
+     {
+      "name": "3.1.creditor.2.2",
+      "page": 2,
+      "x": 78,
+      "y": 107.0,
+      "w": 110,
+      "size": 7
+     }
+    ]
+   },
+   "notes": "two printed rows, two lines each (row-major); a third cure-and-maintain claim does not fit and is refused"
+  },
+  {
+   "id": "line_3_1_collateral",
+   "part": 3,
+   "line": "3.1",
+   "label": "Collateral",
+   "type": "text",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "collateral_description",
+    "notes": "resolved through core/liens.py — the typed override, else the linked asset's description"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.collateral.1.1",
+      "page": 2,
+      "x": 196,
+      "y": 183.3,
+      "w": 60,
+      "size": 7
+     },
+     {
+      "name": "3.1.collateral.1.2",
+      "page": 2,
+      "x": 196,
+      "y": 175.3,
+      "w": 60,
+      "size": 7
+     },
+     {
+      "name": "3.1.collateral.2.1",
+      "page": 2,
+      "x": 196,
+      "y": 115.0,
+      "w": 60,
+      "size": 7
+     },
+     {
+      "name": "3.1.collateral.2.2",
+      "page": 2,
+      "x": 196,
+      "y": 107.0,
+      "w": 60,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_installment",
+   "part": 3,
+   "line": "3.1",
+   "label": "Current installment payment (including escrow)",
+   "type": "money",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "secured_treatments[].maintenance_payment",
+    "notes": "present only when the plan pays the ongoing installment through the trustee (a conduit); a directly paid installment is not recorded, so its box stays blank"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.installment.1",
+      "page": 2,
+      "x": 268,
+      "y": 183.3,
+      "w": 74,
+      "size": 7
+     },
+     {
+      "name": "3.1.installment.2",
+      "page": 2,
+      "x": 268,
+      "y": 115.0,
+      "w": 74,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_arrearage",
+   "part": 3,
+   "line": "3.1",
+   "label": "Amount of arrearage (if any)",
+   "type": "money",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "secured_treatments[].arrearage"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.arrearage.1",
+      "page": 2,
+      "x": 353,
+      "y": 183.3,
+      "w": 51,
+      "size": 7
+     },
+     {
+      "name": "3.1.arrearage.2",
+      "page": 2,
+      "x": 353,
+      "y": 115.0,
+      "w": 51,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_rate",
+   "part": 3,
+   "line": "3.1",
+   "label": "Interest rate on arrearage (if applicable) %",
+   "type": "text",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "secured_treatments[].arrearage_interest_rate"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.rate.1",
+      "page": 2,
+      "x": 412,
+      "y": 183.3,
+      "w": 28,
+      "size": 7
+     },
+     {
+      "name": "3.1.rate.2",
+      "page": 2,
+      "x": 412,
+      "y": 115.0,
+      "w": 28,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_monthly",
+   "part": 3,
+   "line": "3.1",
+   "label": "Monthly plan payment on arrearage",
+   "type": "money",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the calculator's equal monthly payment on the arrearage — typed, or amortised over the term"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.monthly.1",
+      "page": 2,
+      "x": 475,
+      "y": 183.3,
+      "w": 53,
+      "size": 7
+     },
+     {
+      "name": "3.1.monthly.2",
+      "page": 2,
+      "x": 475,
+      "y": 115.0,
+      "w": 53,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_total",
+   "part": 3,
+   "line": "3.1",
+   "label": "Estimated total payments by trustee",
+   "type": "money",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the calculator's payout on the arrearage (principal and interest) plus the conduit installments it disburses"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.total.1",
+      "page": 2,
+      "x": 538,
+      "y": 183.3,
+      "w": 50,
+      "size": 7
+     },
+     {
+      "name": "3.1.total.2",
+      "page": 2,
+      "x": 538,
+      "y": 115.0,
+      "w": 50,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_disbursed_trustee",
+   "part": 3,
+   "line": "3.1",
+   "label": "Disbursed by: Trustee",
+   "type": "checkbox",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the plan pays the installment through the trustee (a maintenance_payment is typed)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.disbursed_trustee.1",
+      "page": 2,
+      "x": 262.75,
+      "y": 154.88,
+      "w": 10.88,
+      "h": 10.88
+     },
+     {
+      "name": "3.1.disbursed_trustee.2",
+      "page": 2,
+      "x": 262.75,
+      "y": 86.5,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_1_disbursed_debtor",
+   "part": 3,
+   "line": "3.1",
+   "label": "Disbursed by: Debtor(s)",
+   "type": "checkbox",
+   "repeats": {
+    "group": "cure_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "no maintenance_payment is typed: the debtor pays the installment directly"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.1.disbursed_debtor.1",
+      "page": 2,
+      "x": 262.75,
+      "y": 142.62,
+      "w": 10.88,
+      "h": 10.88
+     },
+     {
+      "name": "3.1.disbursed_debtor.2",
+      "page": 2,
+      "x": 262.75,
+      "y": 74.25,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_none",
+   "part": 3,
+   "line": "3.2",
+   "label": "Request for valuation of security… — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "no secured claim is treated `cramdown`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.none",
+      "page": 3,
+      "x": 57.88,
+      "y": 712.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_request",
+   "part": 3,
+   "line": "3.2",
+   "label": "The debtor(s) request that the court determine the value of the secured claims listed below",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "at least one secured claim is treated `cramdown`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.request",
+      "page": 3,
+      "x": 57.88,
+      "y": 679.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_creditor",
+   "part": 3,
+   "line": "3.2",
+   "label": "Name of creditor",
+   "type": "text",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "name",
+    "notes": "through the treated claim's creditor_id"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.creditor.1.1",
+      "page": 3,
+      "x": 78,
+      "y": 472.2,
+      "w": 78,
+      "size": 7
+     },
+     {
+      "name": "3.2.creditor.1.2",
+      "page": 3,
+      "x": 78,
+      "y": 464.2,
+      "w": 78,
+      "size": 7
+     },
+     {
+      "name": "3.2.creditor.2.1",
+      "page": 3,
+      "x": 78,
+      "y": 443.4,
+      "w": 78,
+      "size": 7
+     },
+     {
+      "name": "3.2.creditor.2.2",
+      "page": 3,
+      "x": 78,
+      "y": 435.4,
+      "w": 78,
+      "size": 7
+     }
+    ]
+   },
+   "notes": "two printed rows, two lines each (row-major); a third crammed-down claim does not fit and is refused"
+  },
+  {
+   "id": "line_3_2_claim_amount",
+   "part": 3,
+   "line": "3.2",
+   "label": "Estimated amount of creditor's total claim",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "amount"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.claim_amount.1",
+      "page": 3,
+      "x": 167,
+      "y": 472.2,
+      "w": 58,
+      "size": 7
+     },
+     {
+      "name": "3.2.claim_amount.2",
+      "page": 3,
+      "x": 167,
+      "y": 443.4,
+      "w": 58,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_collateral",
+   "part": 3,
+   "line": "3.2",
+   "label": "Collateral",
+   "type": "text",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "collateral_description",
+    "notes": "resolved through core/liens.py"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.collateral.1.1",
+      "page": 3,
+      "x": 232,
+      "y": 472.2,
+      "w": 52,
+      "size": 7
+     },
+     {
+      "name": "3.2.collateral.1.2",
+      "page": 3,
+      "x": 232,
+      "y": 464.2,
+      "w": 52,
+      "size": 7
+     },
+     {
+      "name": "3.2.collateral.2.1",
+      "page": 3,
+      "x": 232,
+      "y": 443.4,
+      "w": 52,
+      "size": 7
+     },
+     {
+      "name": "3.2.collateral.2.2",
+      "page": 3,
+      "x": 232,
+      "y": 435.4,
+      "w": 52,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_collateral_value",
+   "part": 3,
+   "line": "3.2",
+   "label": "Value of collateral",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "collateral_value",
+    "notes": "resolved through core/liens.py — the typed value, else the linked asset's"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.collateral_value.1",
+      "page": 3,
+      "x": 294,
+      "y": 472.2,
+      "w": 35,
+      "size": 6
+     },
+     {
+      "name": "3.2.collateral_value.2",
+      "page": 3,
+      "x": 294,
+      "y": 443.4,
+      "w": 35,
+      "size": 6
+     }
+    ]
+   },
+   "notes": "the column is 45 pt wide, so the box draws at 6 pt"
+  },
+  {
+   "id": "line_3_2_senior",
+   "part": 3,
+   "line": "3.2",
+   "label": "Amount of claims senior to creditor's claim",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "core/liens.py's senior liens on the same collateral"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.senior.1",
+      "page": 3,
+      "x": 339.5,
+      "y": 472.2,
+      "w": 53,
+      "size": 7
+     },
+     {
+      "name": "3.2.senior.2",
+      "page": 3,
+      "x": 339.5,
+      "y": 443.4,
+      "w": 53,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_secured",
+   "part": 3,
+   "line": "3.2",
+   "label": "Amount of secured claim",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the calculator's secured principal — plan.secured_treatments[].cramdown_value where typed (capped at the claim), else the § 506(a) secured portion core/liens.py derives"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.secured.1",
+      "page": 3,
+      "x": 402.5,
+      "y": 472.2,
+      "w": 48,
+      "size": 7
+     },
+     {
+      "name": "3.2.secured.2",
+      "page": 3,
+      "x": 402.5,
+      "y": 443.4,
+      "w": 48,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_rate",
+   "part": 3,
+   "line": "3.2",
+   "label": "Interest rate %",
+   "type": "text",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "secured_treatments[].interest_rate"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.rate.1",
+      "page": 3,
+      "x": 451.5,
+      "y": 472.2,
+      "w": 13,
+      "size": 6
+     },
+     {
+      "name": "3.2.rate.2",
+      "page": 3,
+      "x": 451.5,
+      "y": 443.4,
+      "w": 13,
+      "size": 6
+     }
+    ]
+   },
+   "notes": "the printed blank is three underscores before the `%` (13 pt); a rate longer than `6.25` does not fit and is refused by the engine"
+  },
+  {
+   "id": "line_3_2_monthly",
+   "part": 3,
+   "line": "3.2",
+   "label": "Monthly payment to creditor",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the calculator's equal monthly payment — typed, or amortised over the term"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.monthly.1",
+      "page": 3,
+      "x": 492.5,
+      "y": 472.2,
+      "w": 42,
+      "size": 7
+     },
+     {
+      "name": "3.2.monthly.2",
+      "page": 3,
+      "x": 492.5,
+      "y": 443.4,
+      "w": 42,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_2_total",
+   "part": 3,
+   "line": "3.2",
+   "label": "Estimated total of monthly payments",
+   "type": "money",
+   "repeats": {
+    "group": "cramdown_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "the calculator's payout to the claim, principal and interest"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.2.total.1",
+      "page": 3,
+      "x": 546.5,
+      "y": 472.2,
+      "w": 50,
+      "size": 7
+     },
+     {
+      "name": "3.2.total.2",
+      "page": 3,
+      "x": 546.5,
+      "y": 443.4,
+      "w": 50,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_3_none",
+   "part": 3,
+   "line": "3.3",
+   "label": "Secured claims excluded from 11 U.S.C. § 506 — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record has no treatment for a claim paid in full outside § 506 (the 910-day vehicle and one-year purchase-money claims)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.3.none",
+      "page": 3,
+      "x": 57.88,
+      "y": 367.62,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_4_none",
+   "part": 3,
+   "line": "3.4",
+   "label": "Lien avoidance — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record models no § 522(f) lien avoidance"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.4.none",
+      "page": 4,
+      "x": 57.88,
+      "y": 707.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_5_none",
+   "part": 3,
+   "line": "3.5",
+   "label": "Surrender of collateral — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "no secured claim is treated `surrender`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.5.none",
+      "page": 4,
+      "x": 57.88,
+      "y": 183.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_5_surrender",
+   "part": 3,
+   "line": "3.5",
+   "label": "The debtor(s) elect to surrender to each creditor listed below the collateral…",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "at least one secured claim is treated `surrender`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.5.surrender",
+      "page": 4,
+      "x": 57.88,
+      "y": 165.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_3_5_creditor",
+   "part": 3,
+   "line": "3.5",
+   "label": "Name of creditor",
+   "type": "text",
+   "repeats": {
+    "group": "surrender_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "creditor",
+    "attribute": "name",
+    "notes": "through the surrendered claim's creditor_id"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.5.creditor.1",
+      "page": 4,
+      "x": 76,
+      "y": 103.4,
+      "w": 237,
+      "size": 8
+     },
+     {
+      "name": "3.5.creditor.2",
+      "page": 4,
+      "x": 76,
+      "y": 85.8,
+      "w": 237,
+      "size": 8
+     }
+    ]
+   },
+   "notes": "two printed rows; a third surrender does not fit and is refused"
+  },
+  {
+   "id": "line_3_5_collateral",
+   "part": 3,
+   "line": "3.5",
+   "label": "Collateral",
+   "type": "text",
+   "repeats": {
+    "group": "surrender_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "claim",
+    "attribute": "collateral_description",
+    "notes": "resolved through core/liens.py"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "3.5.collateral.1",
+      "page": 4,
+      "x": 365,
+      "y": 103.4,
+      "w": 197,
+      "size": 8
+     },
+     {
+      "name": "3.5.collateral.2",
+      "page": 4,
+      "x": 365,
+      "y": 85.8,
+      "w": 197,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_2_percentage",
+   "part": 4,
+   "line": "4.2",
+   "label": "Trustee's fees … are estimated to be ___% of plan payments",
+   "type": "text",
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "trustee_percentage"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.2.percentage",
+      "page": 5,
+      "x": 446,
+      "y": 651.5,
+      "w": 33,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_2_total",
+   "part": 4,
+   "line": "4.2",
+   "label": "…during the plan term, they are estimated to total $",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's trustee fee: the percentage of every receipt, summed over the term"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.2.total",
+      "page": 5,
+      "x": 231,
+      "y": 640.4,
+      "w": 47,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_3_attorney_fees",
+   "part": 4,
+   "line": "4.3",
+   "label": "The balance of the fees owed to the attorney for the debtor(s) is estimated to be $",
+   "type": "money",
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "attorney_fees"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.3.attorney_fees",
+      "page": 5,
+      "x": 345.5,
+      "y": 597.7,
+      "w": 47,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_4_none",
+   "part": 4,
+   "line": "4.4",
+   "label": "Priority claims other than attorney's fees and those treated in § 4.5 — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "the case has no priority claim with a priority portion"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.4.none",
+      "page": 5,
+      "x": 62.38,
+      "y": 539.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_4_estimate",
+   "part": 4,
+   "line": "4.4",
+   "label": "The debtor(s) estimate the total amount of other priority claims to be",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "the case has at least one priority claim"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.4.estimate",
+      "page": 5,
+      "x": 62.38,
+      "y": 521.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_4_total",
+   "part": 4,
+   "line": "4.4",
+   "label": "Total amount of other priority claims",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's priority class: each priority claim's priority portion (claim.priority_amount, else its amount)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.4.total",
+      "page": 5,
+      "x": 319,
+      "y": 524.4,
+      "w": 56,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_4_5_none",
+   "part": 4,
+   "line": "4.5",
+   "label": "Domestic support obligations assigned or owed to a governmental unit and paid less than full amount — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: a priority class paid less than in full (plan.priority_percentage below 100) is § 1322(a)(4)'s treatment, which needs the claims named in § 4.5 — not modelled, so such a plan is refused instead"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "4.5.none",
+      "page": 5,
+      "x": 62.38,
+      "y": 464.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_sum",
+   "part": 5,
+   "line": "5.1",
+   "label": "The sum of $",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "plan.unsecured_treatment is `amount`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.sum",
+      "page": 5,
+      "x": 62.38,
+      "y": 210.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_sum_amount",
+   "part": 5,
+   "line": "5.1",
+   "label": "The sum of $ ___",
+   "type": "money",
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "unsecured_amount"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.sum_amount",
+      "page": 5,
+      "x": 128.5,
+      "y": 213.5,
+      "w": 47,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_percentage",
+   "part": 5,
+   "line": "5.1",
+   "label": "___% of the total amount of these claims",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "plan.unsecured_treatment is `percentage`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.percentage",
+      "page": 5,
+      "x": 62.38,
+      "y": 193.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_percentage_value",
+   "part": 5,
+   "line": "5.1",
+   "label": "___% of the total amount of these claims",
+   "type": "text",
+   "maps_to": {
+    "entity": "plan",
+    "attribute": "unsecured_percentage"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.percentage_value",
+      "page": 5,
+      "x": 84,
+      "y": 196.4,
+      "w": 29,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_percentage_estimate",
+   "part": 5,
+   "line": "5.1",
+   "label": "…an estimated payment of $",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's unsecured target: the percentage of the plan's unsecured pool"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.percentage_estimate",
+      "page": 5,
+      "x": 345,
+      "y": 196.4,
+      "w": 38,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_remaining",
+   "part": 5,
+   "line": "5.1",
+   "label": "The funds remaining after disbursements have been made to all other creditors provided for in this plan",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "plan.unsecured_treatment is `pot` (or unset — the calculator's default)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.remaining",
+      "page": 5,
+      "x": 62.38,
+      "y": 176.88,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_1_liquidation",
+   "part": 5,
+   "line": "5.1",
+   "label": "If the estate of the debtor(s) were liquidated under chapter 7, nonpriority unsecured claims would be paid approximately $",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's § 1325(a)(4) liquidation analysis: unexempt property less the § 326(a) commission, other Chapter 7 costs and the priority claims"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.1.liquidation",
+      "page": 5,
+      "x": 507,
+      "y": 163.9,
+      "w": 43,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_2_none",
+   "part": 5,
+   "line": "5.2",
+   "label": "Maintenance of payments and cure of any default on nonpriority unsecured claims — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record has no long-term unsecured debt treatment"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.2.none",
+      "page": 6,
+      "x": 62.38,
+      "y": 706.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_5_3_none",
+   "part": 5,
+   "line": "5.3",
+   "label": "Other separately classified nonpriority unsecured claims — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record has one general unsecured class"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "5.3.none",
+      "page": 6,
+      "x": 54.75,
+      "y": 418.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_6_1_none",
+   "part": 6,
+   "line": "6.1",
+   "label": "Executory contracts and unexpired leases assumed — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "no contract_lease has intention `assume` — every one is rejected, as the paragraph says"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.none",
+      "page": 6,
+      "x": 54.75,
+      "y": 186.12,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_6_1_assumed",
+   "part": 6,
+   "line": "6.1",
+   "label": "Assumed items",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "at least one contract_lease has intention `assume`"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.assumed",
+      "page": 6,
+      "x": 54.75,
+      "y": 169.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_6_1_creditor",
+   "part": 6,
+   "line": "6.1",
+   "label": "Name of creditor",
+   "type": "text",
+   "repeats": {
+    "group": "assumed_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "contract_lease",
+    "attribute": "counterparty_name",
+    "notes": "intention=assume"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.creditor.1.1",
+      "page": 7,
+      "x": 77.5,
+      "y": 689.0,
+      "w": 107,
+      "size": 7
+     },
+     {
+      "name": "6.1.creditor.1.2",
+      "page": 7,
+      "x": 77.5,
+      "y": 681.0,
+      "w": 107,
+      "size": 7
+     },
+     {
+      "name": "6.1.creditor.2.1",
+      "page": 7,
+      "x": 77.5,
+      "y": 626.3,
+      "w": 107,
+      "size": 7
+     },
+     {
+      "name": "6.1.creditor.2.2",
+      "page": 7,
+      "x": 77.5,
+      "y": 618.3,
+      "w": 107,
+      "size": 7
+     }
+    ]
+   },
+   "notes": "two printed rows (page 7), two lines each; a third assumed contract does not fit and is refused"
+  },
+  {
+   "id": "line_6_1_description",
+   "part": 6,
+   "line": "6.1",
+   "label": "Description of leased property or executory contract",
+   "type": "text",
+   "repeats": {
+    "group": "assumed_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "entity": "contract_lease",
+    "attribute": "description",
+    "notes": "intention=assume; wrapped over four lines"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.description.1.1",
+      "page": 7,
+      "x": 191,
+      "y": 689.0,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.1.2",
+      "page": 7,
+      "x": 191,
+      "y": 681.0,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.1.3",
+      "page": 7,
+      "x": 191,
+      "y": 673.0,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.1.4",
+      "page": 7,
+      "x": 191,
+      "y": 665.0,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.2.1",
+      "page": 7,
+      "x": 191,
+      "y": 626.3,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.2.2",
+      "page": 7,
+      "x": 191,
+      "y": 618.3,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.2.3",
+      "page": 7,
+      "x": 191,
+      "y": 610.3,
+      "w": 87,
+      "size": 7
+     },
+     {
+      "name": "6.1.description.2.4",
+      "page": 7,
+      "x": 191,
+      "y": 602.3,
+      "w": 87,
+      "size": 7
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_6_1_disbursed_trustee",
+   "part": 6,
+   "line": "6.1",
+   "label": "Disbursed by: Trustee",
+   "type": "checkbox",
+   "repeats": {
+    "group": "assumed_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "unmapped": "the plan record pays no contract or lease through the trustee; see line_6_1_disbursed_debtor"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.disbursed_trustee.1",
+      "page": 7,
+      "x": 281.62,
+      "y": 661.62,
+      "w": 8.75,
+      "h": 8.75
+     },
+     {
+      "name": "6.1.disbursed_trustee.2",
+      "page": 7,
+      "x": 281.38,
+      "y": 598.88,
+      "w": 8.75,
+      "h": 8.75
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_6_1_disbursed_debtor",
+   "part": 6,
+   "line": "6.1",
+   "label": "Disbursed by: Debtor(s)",
+   "type": "checkbox",
+   "repeats": {
+    "group": "assumed_rows",
+    "count": 2
+   },
+   "maps_to": {
+    "derived": "every assumed row: the plan record disburses nothing to a lessor, so the debtor pays the installments directly"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "6.1.disbursed_debtor.1",
+      "page": 7,
+      "x": 281.12,
+      "y": 646.38,
+      "w": 8.75,
+      "h": 8.75
+     },
+     {
+      "name": "6.1.disbursed_debtor.2",
+      "page": 7,
+      "x": 281.12,
+      "y": 583.62,
+      "w": 8.75,
+      "h": 8.75
+     }
+    ]
+   },
+   "notes": "the 8 pt box glyph draws a 5.75 pt square"
+  },
+  {
+   "id": "line_7_1_confirmation",
+   "part": 7,
+   "line": "7.1",
+   "label": "Property of the estate will vest in the debtor(s) upon plan confirmation",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model when property vests; the district's practice (and often its local rules) decides it"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "7.1.confirmation",
+      "page": 7,
+      "x": 53.88,
+      "y": 443.0,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_7_1_discharge",
+   "part": 7,
+   "line": "7.1",
+   "label": "Property of the estate will vest in the debtor(s) upon entry of discharge",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model when property vests; the district's practice (and often its local rules) decides it"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "7.1.discharge",
+      "page": 7,
+      "x": 53.88,
+      "y": 427.75,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_7_1_other",
+   "part": 7,
+   "line": "7.1",
+   "label": "Property of the estate will vest in the debtor(s) upon other",
+   "type": "checkbox",
+   "maps_to": {
+    "unmapped": "the plan record does not model when property vests; the district's practice (and often its local rules) decides it"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "7.1.other",
+      "page": 7,
+      "x": 53.88,
+      "y": 412.5,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_7_1_other_specify",
+   "part": 7,
+   "line": "7.1",
+   "label": "other: ___",
+   "type": "text",
+   "maps_to": {
+    "unmapped": "see line_7_1_other"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "7.1.other_specify",
+      "page": 7,
+      "x": 101,
+      "y": 415.1,
+      "w": 193,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "line_8_1_none",
+   "part": 8,
+   "line": "8.1",
+   "label": "Check “None” or List Nonstandard Plan Provisions — None",
+   "type": "checkbox",
+   "maps_to": {
+    "derived": "always: the plan record models no nonstandard provision (Part 1 line 1.3 prints `Not included`)"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "8.1.none",
+      "page": 7,
+      "x": 54.75,
+      "y": 335.38,
+      "w": 10.88,
+      "h": 10.88
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor1_signature",
+   "part": 9,
+   "line": "9.1",
+   "label": "Signature of Debtor 1",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line; the model records debtor.signed_at, not a signature"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.debtor1",
+      "page": 8,
+      "x": 61,
+      "y": 637.5,
+      "w": 178,
+      "size": 9
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_signature",
+   "part": 9,
+   "line": "9.1",
+   "label": "Signature of Debtor 2",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "a wet/typed signature line"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.debtor2",
+      "page": 8,
+      "x": 286,
+      "y": 637.5,
+      "w": 178,
+      "size": 9
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor1_executed_on",
+   "part": 9,
+   "line": "9.1",
+   "label": "Executed on (Debtor 1, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_1"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.debtor1_date",
+      "page": 8,
+      "x": 107,
+      "y": 604.2,
+      "w": 72,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.debtor2_executed_on",
+   "part": 9,
+   "line": "9.1",
+   "label": "Executed on (Debtor 2, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "debtor",
+    "attribute": "signed_at",
+    "notes": "filing_role=debtor_2"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.debtor2_date",
+      "page": 8,
+      "x": 331.5,
+      "y": 604.2,
+      "w": 67,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.attorney_signature",
+   "part": 9,
+   "line": "9.1",
+   "label": "Signature of Attorney for Debtor(s)",
+   "type": "signature",
+   "maps_to": {
+    "unmapped": "the attorney's own signature line; filing_professional records who signs, not a signature"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.attorney",
+      "page": 8,
+      "x": 61,
+      "y": 550.5,
+      "w": 178,
+      "size": 9
+     }
+    ]
+   }
+  },
+  {
+   "id": "sign.attorney_date",
+   "part": 9,
+   "line": "9.1",
+   "label": "Date (Attorney, MM/DD/YYYY)",
+   "type": "date",
+   "maps_to": {
+    "entity": "filing_professional",
+    "attribute": "signature_date",
+    "notes": "role=attorney"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "sign.attorney_date",
+      "page": 8,
+      "x": 287,
+      "y": 550.5,
+      "w": 100,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.a",
+   "part": null,
+   "line": "a",
+   "label": "Maintenance and cure payments on secured claims (Part 3, Section 3.1 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "the § 3.1 rows' estimated totals, summed"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.a",
+      "page": 9,
+      "x": 437.5,
+      "y": 655.2,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.b",
+   "part": null,
+   "line": "b",
+   "label": "Modified secured claims (Part 3, Section 3.2 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "the § 3.2 rows' estimated totals, summed"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.b",
+      "page": 9,
+      "x": 437.5,
+      "y": 632.6,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.c",
+   "part": null,
+   "line": "c",
+   "label": "Secured claims excluded from 11 U.S.C. § 506 (Part 3, Section 3.3 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: § 3.3 prints None"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.c",
+      "page": 9,
+      "x": 437.5,
+      "y": 610.1,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.d",
+   "part": null,
+   "line": "d",
+   "label": "Judicial liens or security interests partially avoided (Part 3, Section 3.4 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: § 3.4 prints None"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.d",
+      "page": 9,
+      "x": 437.5,
+      "y": 587.4,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.e",
+   "part": null,
+   "line": "e",
+   "label": "Fees and priority claims (Part 4 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's payouts to the trustee, the attorney and the priority class"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.e",
+      "page": 9,
+      "x": 437.5,
+      "y": 564.8,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.f",
+   "part": null,
+   "line": "f",
+   "label": "Nonpriority unsecured claims (Part 5, Section 5.1, highest stated amount)",
+   "type": "money",
+   "maps_to": {
+    "derived": "the calculator's payout to the general unsecured class"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.f",
+      "page": 9,
+      "x": 437.5,
+      "y": 542.3,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.g",
+   "part": null,
+   "line": "g",
+   "label": "Maintenance and cure payments on unsecured claims (Part 5, Section 5.2 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: § 5.2 prints None"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.g",
+      "page": 9,
+      "x": 437.5,
+      "y": 519.7,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.h",
+   "part": null,
+   "line": "h",
+   "label": "Separately classified unsecured claims (Part 5, Section 5.3 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: § 5.3 prints None"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.h",
+      "page": 9,
+      "x": 437.5,
+      "y": 497.2,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.i",
+   "part": null,
+   "line": "i",
+   "label": "Trustee payments on executory contracts and unexpired leases (Part 6, Section 6.1 total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: the plan record disburses nothing to a lessor"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.i",
+      "page": 9,
+      "x": 437.5,
+      "y": 474.6,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.j",
+   "part": null,
+   "line": "j",
+   "label": "Nonstandard payments (Part 8, total)",
+   "type": "money",
+   "maps_to": {
+    "derived": "always 0.00: Part 8 prints None"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.j",
+      "page": 9,
+      "x": 437.5,
+      "y": 451.9,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  },
+  {
+   "id": "exhibit.total",
+   "part": null,
+   "line": "total",
+   "label": "Total of lines a through j",
+   "type": "money",
+   "maps_to": {
+    "derived": "lines a through j, summed"
+   },
+   "pdf": {
+    "overlay": [
+     {
+      "name": "exhibit.total",
+      "page": 9,
+      "x": 438,
+      "y": 421.3,
+      "w": 70,
+      "size": 8
+     }
+    ]
+   }
+  }
+ ]
+}

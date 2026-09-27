@@ -187,6 +187,27 @@ class PlanInputs:
     upstream_problems: tuple[str, ...] = ()
 
 
+def exemption_case_of(case_file: CaseFile) -> ExemptionCase:
+    """The exemption workbench's input, from a projection's CaseFile — for
+    the plan form (B113, issue #367), which sees only the file.
+
+    The file carries exemptions as bare bodies, so each gets a positional
+    id (`exemption-<n>`). The ids only label the workbench's per-claim rows;
+    the per-asset equity the liquidation test reads never depends on them."""
+    return ExemptionCase(
+        case=case_file.case,
+        debtors=case_file.debtors,
+        petition=case_file.petition,
+        assets=case_file.assets,
+        claims=case_file.claims,
+        exemptions=tuple(
+            (f"exemption-{index}", body)
+            for index, body in enumerate(case_file.exemptions)
+        ),
+        sofa_entries=case_file.sofa_entries,
+    )
+
+
 def build_plan_inputs(
     case_file: CaseFile, exemptions: ExemptionCase, *, today: date
 ) -> PlanInputs:

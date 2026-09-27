@@ -52,6 +52,17 @@ from .shared import (
 _DISTRICT_RE: Final = re.compile(r"^(.*?)\s*District of\s+(.+)$", re.IGNORECASE)
 
 
+def district_parts(district: str) -> tuple[str | None, str | None]:
+    """A district's printed name split around "District of" for a caption
+    that prints `__ District of __` as two blanks (B2030, B113): `Middle
+    District of Florida` -> ("Middle", "Florida"); a name with no prefix
+    (`District of Columbia`) leaves the first blank empty."""
+    match = _DISTRICT_RE.match(district)
+    if match is None:
+        return district, None
+    return (match.group(1) or None), match.group(2)
+
+
 def attorney_of(case_file: CaseFile) -> FilingProfessionalBody | None:
     """The filing professional this form is about — the first attorney."""
     return next(
@@ -81,9 +92,7 @@ def project_b2030_1225(release: FormRelease, case_file: CaseFile) -> FieldValues
     values: FieldValues = {}
     case = case_file.case
 
-    match = _DISTRICT_RE.match(case.district)
-    parts = (match.group(1), match.group(2)) if match else (case.district, None)
-    for index, part in enumerate(parts):
+    for index, part in enumerate(district_parts(case.district)):
         row_fill(
             release, values, "caption.district", index, text_or_none(part), problems
         )
