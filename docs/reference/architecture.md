@@ -201,6 +201,16 @@ each stage are a strict chain rather than a fan-out, because a group keeps only
 one pending entry and a newer one cancels it — `release.yml`'s header owns the
 detail.
 
+The staging legs are path-filtered against **the newest ancestor carrying a
+successful `insolvia/staging-release` status** — the last commit staging
+served on every leg — not against the previous tip of `main`. Diffing against
+the previous push meant a leg an earlier run lost (evicted from the group, or
+failed) was never retried, because the next push did not touch its paths, and
+staging drifted behind `main` with nothing red. With no such ancestor in the
+last 200 commits every leg deploys; if the status API itself fails, the
+previous push is the fallback. `.github/scripts/release-diff-base.sh` owns
+the rules and has a unit test beside it.
+
 Both environments can also be planned before they are applied: `infra-staging.yml`
 and `infra-prod.yml` each take `mode: plan`, which writes the plan to the job
 summary. `shared-infra-plan.yml` validates every env offline on a PR, which

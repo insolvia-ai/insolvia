@@ -21,8 +21,9 @@ The only credential that touches staging/prod AWS is the CI OIDC deploy role.
 One workflow, `release.yml`, owns the whole path to production:
 
 1. **Merge to `main`.** The staging stage runs automatically: staging infra
-   applies, then the changed services deploy (path-filtered), in dependency
-   order.
+   applies, then the changed services deploy (path-filtered against the last
+   commit staging released green, so a leg an earlier run lost is retried),
+   in dependency order.
 2. **Staging goes green → the run parks at the `promote` job**, waiting on the
    `insolvia-production` environment's required reviewer.
 3. **Approve it in the GitHub UI** (the run's page, "Review deployments" —
@@ -37,7 +38,7 @@ commit, and an unapproved run ending `cancelled` is normal, not a failure.
 
 | Target | Trigger |
 |---|---|
-| **staging** (infra + api, app, mailer, marketing) | automatic on merge to `main` — the staging stage of `release.yml` |
+| **staging** (infra + mailer, api, admin, mcp, marketing, app) | automatic on merge to `main` — the staging stage of `release.yml` |
 | **prod** (infra + all services) | approving the `promote` gate of a green `release.yml` run |
 | **shared infra** | automatic on merge to `main` — the first leg of `release.yml`'s staging stage (path-filtered on `infra/envs/shared/**` + `infra/modules/**`), ahead of the gate because both envs consume it; `shared-infra-deploy.yml` stays dispatchable out of band |
 | **one prod service, out of band** | dispatch its `*-prod.yml` (emergency path: staging-green check + its own approval) |
