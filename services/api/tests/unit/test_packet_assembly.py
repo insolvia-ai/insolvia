@@ -20,7 +20,9 @@ import pytest
 from insolvia_api.adapters.memory.packet_store import MemoryPacketStore
 from insolvia_api.core import dollar_amounts
 from insolvia_api.core.creditor_matrix import MATRIX_FILE_NAME
+from insolvia_api.core.form_fill import Text
 from insolvia_api.core.form_overlay import OutputOptions
+from insolvia_api.core.form_projections import CaseFile
 from insolvia_api.core.form_templates import form_revisions_as_of, latest_form
 from insolvia_api.core.jobs import KINDS, JobError, new_job
 from insolvia_api.core.packet_assembly import (
@@ -70,11 +72,15 @@ from insolvia_core.petitions import (
     RELATED_CASE,
     SOLE_PROPRIETORSHIP,
 )
+from insolvia_core.plans import PLAN
 from insolvia_core.sofa import SOFA_ENTRY
 from insolvia_core.tax_ids import TaxIdInput, store_tax_id
 from pypdf import PdfReader
 
-from tests.unit.test_form_projections import REFERENCE_CASE, reference_case_file
+from tests.unit.test_form_projections import (
+    reference_case_file,
+    reference_case_file_chapter_13,
+)
 
 CASE_ID = "11111111-2222-4333-8444-000000000001"
 TODAY = date(2026, 9, 3)
@@ -94,12 +100,12 @@ def _entity(kind, body, entity_id, position):
     )
 
 
-def reference_case_data() -> CaseData:
+def reference_case_data(case_file: CaseFile | None = None) -> CaseData:
     """The reference CaseFile, wrapped back into stored-entity shape. Bare
     bodies get synthetic ids; id-paired collections keep the ids the file's
     cross-references use."""
-    case_file = reference_case_file()
-    case = replace(REFERENCE_CASE, id=CASE_ID)
+    case_file = case_file if case_file is not None else reference_case_file()
+    case = replace(case_file.case, id=CASE_ID)
     position = iter(range(10_000))
 
     def wrap_bodies(kind, bodies, prefix):
@@ -157,7 +163,13 @@ def reference_case_data() -> CaseData:
         expenses=wrap_bodies(EXPENSE, case_file.expenses, "expense"),
         dependents=wrap_bodies(DEPENDENT, case_file.dependents, "dependent"),
         sofa_entries=wrap_bodies(SOFA_ENTRY, case_file.sofa_entries, "sofa"),
+        plans=wrap_bodies(PLAN, case_file.plans, "plan"),
     )
+
+
+def reference_chapter_13_case_data() -> CaseData:
+    """The same family under Chapter 13, with its plan (issue #367)."""
+    return reference_case_data(reference_case_file_chapter_13())
 
 
 # ── The completeness gate ───────────────────────────────────────
@@ -167,15 +179,98 @@ def test_the_reference_case_passes_the_gate():
     assert completeness_problems(reference_case_data()) == ()
 
 
-def test_a_chapter_13_case_is_refused():
-    data = reference_case_data()
-    data = replace(data, case=replace(data.case, chapter=13))
+def test_the_chapter_13_reference_case_passes_the_gate():
+    assert completeness_problems(reference_chapter_13_case_data()) == ()
+
+
+def test_the_chapter_13_reference_case_assembles_with_its_plan():
+    """Issue #367's done-when, on the reference case: the Chapter 13 set,
+    B122C in place of B122A, no B108, and the plan closing the set."""
+    outcome = assemble(reference_chapter_13_case_data(), as_of=TODAY)
+    assert isinstance(outcome, AssembledPacket)
+    forms = [name.split("-", 1)[1] for name, _ in outcome.parts[:-1]]
+    assert forms[-3:] == ["b122c1.pdf", "b122c2.pdf", "b113.pdf"]
+    assert "b108.pdf" not in forms
+    assert not {"b122a1.pdf", "b122a2.pdf"} & set(forms)
+    assert outcome.projections["form/b113"]["line_2_5_total"] == Text("30,000.00")
+    assert outcome.form_revisions["form/b113"] == "2017-12-01"
+
+
+def test_a_chapter_13_case_without_a_plan_is_refused():
+    data = replace(reference_chapter_13_case_data(), plans=())
     problems = completeness_problems(data)
-    [chapter] = [p for p in problems if p.source == "case" and p.field == "chapter"]
-    # Issue #365 built the means-test pair; the refusal names what is still
-    # missing (#366, #367) rather than a bare "only Chapter 7".
-    assert "Forms 122C-1 and 122C-2 are prepared" in chapter.message
-    assert "Official Form 113" in chapter.message
+    assert [p.source for p in problems] == ["plans"]
+    assert "Official Form 113" in problems[0].message
+
+
+def test_a_second_plan_record_is_refused_by_id():
+    data = reference_chapter_13_case_data()
+    extra = replace(data.plans[0], id="plan-extra")
+    problems = completeness_problems(replace(data, plans=(*data.plans, extra)))
+    assert [(p.source, p.item_id) for p in problems] == [("plans", "plan-extra")]
+
+
+def test_a_chapter_13_lease_without_an_answer_is_refused():
+    # B113 Part 6 assumes the listed leases and rejects every other one, so
+    # an unanswered lease would be rejected by silence.
+    data = reference_chapter_13_case_data()
+    leases = tuple(
+        replace(e, body=replace(e.body, intention=None)) if e.id == "cl-storage" else e
+        for e in data.contract_leases
+    )
+    problems = completeness_problems(replace(data, contract_leases=leases))
+    assert [(p.source, p.item_id, p.field) for p in problems] == [
+        ("contract_leases", "cl-storage", "intention")
+    ]
+
+
+def test_a_chapter_13_secured_claim_needs_no_statement_of_intention():
+    # B108 is Chapter 7's (Rule 1007(b)(2)); on Chapter 13 the plan treats
+    # the claim instead.
+    data = reference_chapter_13_case_data()
+    claims = tuple(
+        replace(e, body=replace(e.body, intention=None)) for e in data.claims
+    )
+    assert completeness_problems(replace(data, claims=claims)) == ()
+
+
+def test_an_infeasible_plan_is_refused_by_the_plan_form():
+    data = reference_chapter_13_case_data()
+    starved = replace(
+        data.plans[0], body=replace(data.plans[0].body, monthly_payment="50.00")
+    )
+    outcome = assemble(replace(data, plans=(starved,)), as_of=TODAY)
+    assert not isinstance(outcome, AssembledPacket)
+    assert {p.source for p in outcome} == {"form/b113"}
+    assert any("not feasible" in p.message for p in outcome)
+
+
+@pytest.mark.parametrize(
+    ("court", "refused"),
+    [
+        # FLSB's local form is verified in the registry (@2026-09-26).
+        ("flsb", True),
+        # FLMB's answer is unverified: the national form is the default.
+        ("flmb", False),
+        # A case written before the registry names no court.
+        (None, False),
+    ],
+)
+def test_a_district_with_a_local_plan_form_is_refused(court, refused):
+    data = reference_chapter_13_case_data()
+    data = replace(data, case=replace(data.case, court=court))
+    problems = completeness_problems(data)
+    local = [p for p in problems if p.source == "case" and p.field == "court"]
+    assert bool(local) is refused
+    if refused:
+        assert "Rule 3015.1" in local[0].message
+        assert "Official Form 113" in local[0].message
+
+
+def test_a_chapter_7_case_is_not_asked_for_a_plan():
+    data = reference_case_data()
+    assert "form/b113" not in packet_form_series(data)
+    assert completeness_problems(data) == ()
 
 
 def test_a_chapter_11_case_is_refused_too():
@@ -189,15 +284,18 @@ def test_a_chapter_11_case_is_refused_too():
 
 
 def test_a_chapter_13_case_files_the_b122c_pair_in_place_of_b122a():
-    # The set the forms hub lists for a Chapter 13 case (issue #365): the
-    # Chapter 7 set with the Chapter 13 means-test pair — C-2 only above
-    # the median, exactly as A-2 only files above it on Chapter 7.
+    # The set the forms hub lists for a Chapter 13 case (issues #365, #367):
+    # the Chapter 7 set with the Chapter 13 means-test pair — C-2 only above
+    # the median, exactly as A-2 only files above it on Chapter 7 — without
+    # B108, and with the plan last.
     data = reference_case_data()
     thirteen = replace(data, case=replace(data.case, chapter=13))
     series = packet_form_series(thirteen)
-    assert series[-2:] == ("form/b122c1", "form/b122c2")
-    assert not {"form/b122a1", "form/b122a2"} & set(series)
-    assert series[:-2] == packet_form_series(data)[:-2]
+    assert series[-3:] == ("form/b122c1", "form/b122c2", "form/b113")
+    assert not {"form/b122a1", "form/b122a2", "form/b108"} & set(series)
+    assert series[:-3] == tuple(
+        s for s in packet_form_series(data)[:-2] if s != "form/b108"
+    )
     shrunk = replace(
         thirteen,
         pay_period_records=tuple(
@@ -442,7 +540,10 @@ def test_the_zip_carries_fixed_timestamps():
 # Re-pinned once by issue 13.12 / #382: the reference case gained its two
 # tax identifiers, so B121 (part 02) prints lines 2-3 and B101 (part 01) its
 # line 3 boxes — the same deliberate move as a goldens regeneration.
-PLAIN_PACKET_SHA256 = "84ad06545a2d578da16ce25bc38b382d3a3b391bb83a8bd404f8999e540bba74"
+# Re-pinned by issue #367: B2030 (part 16) draws each overlay value in its
+# own saved graphics state (black fill, reset text state) — the same values
+# in the same places, different content-stream bytes.
+PLAIN_PACKET_SHA256 = "f52503cefe9589055842dbf1c195031055d61e86a48f8d2101f19d18cb71d5b7"
 
 
 def test_output_options_default_to_the_plain_filing_set():
@@ -741,6 +842,24 @@ def test_amended_only_does_not_repin_the_case():
     assert stored_case.updated_at == data.case.updated_at
 
 
+def test_a_chapter_13_amendment_prints_the_schedules_not_the_plan():
+    """amendedOnly stays coherent on Chapter 13 (issue #367): the changed
+    schedule, B106Sum/B106Dec and the cover — never B113, whose post-filing
+    change is a § 1323/§ 1329 modification, not a Rule 1009 amendment."""
+    data = reference_chapter_13_case_data()
+    data = replace(data, case=replace(data.case, status="filed"))
+    data = _with_amended(data, "claims", "claim-mortgage")
+    outcome = assemble(data, as_of=TODAY, options=OutputOptions(amended_only=True))
+    assert isinstance(outcome, AssembledPacket)
+    names = [name for name, _ in outcome.parts]
+    assert names[0] == "00-amendment-cover.pdf"
+    assert [n.split("-", 1)[1] for n in names[1:-1]] == [
+        "b106sum.pdf",
+        "b106d.pdf",
+        "b106dec.pdf",
+    ]
+
+
 def test_amended_only_combined_with_forms_is_refused_at_parse_time():
     from insolvia_api.core.form_overlay import parse_output_options
     from insolvia_core.errors import FieldValidationError
@@ -785,6 +904,7 @@ def build_deps(data: CaseData):
         "expenses",
         "dependents",
         "sofa_entries",
+        "plans",
     ):
         for entity in getattr(data, field_name):
             entity_store.create(entity)

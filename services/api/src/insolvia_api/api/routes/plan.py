@@ -123,8 +123,9 @@ def plan_calculation_route(case_id: str) -> ResponseReturnValue:
     inputs, plan, count = _inputs(case)
     calculation = plan_calculation_json(calculate_plan(inputs, plan))
     if count > 1:
-        # The packet gate owns the cardinality (#367); the calculator says
-        # which record it read rather than refusing.
+        # The packet gate owns the cardinality (#367 refuses to assemble
+        # with a second plan); the calculator says which record it read
+        # rather than refusing.
         warnings = calculation["warnings"]
         assert isinstance(warnings, list)
         warnings.insert(

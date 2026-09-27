@@ -1,8 +1,9 @@
-"""Chapter 7 packet assembly — the completeness gate, the deterministic
-render, and the pipeline worker that runs both (issue #96).
+"""Packet assembly — the completeness gate, the deterministic render, and
+the pipeline worker that runs both (issue #96; Chapter 13, issue #367).
 
 The milestone's definition of done: intake data in, a complete, filed-ready
-Chapter 7 packet out. This module is the end of that pipe, and it is a
+Chapter 7 packet out — and, since #367, the Chapter 13 packet with its plan
+(`CHAPTER_13_FORM_SERIES`). This module is the end of that pipe, and it is a
 PIPELINE WORKER, not an endpoint (ADR 0015/0018): rendering up to nineteen
 official PDFs takes longer than a request should, so the API accepts a
 `packet_assembly` job (api/routes/jobs.py) and this worker runs it.
@@ -54,6 +55,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Final
 
+from insolvia_core import courts
 from insolvia_core.access_log import record_access
 from insolvia_core.assets import ASSET, AssetBody
 from insolvia_core.case_entities import CaseEntity
@@ -100,6 +102,7 @@ from insolvia_core.petitions import (
     RelatedCaseBody,
     SoleProprietorshipBody,
 )
+from insolvia_core.plans import PLAN, PlanBody
 from insolvia_core.sofa import SOFA_ENTRY, SofaEntryBody
 from insolvia_core.tax_ids import read_tax_id
 
@@ -181,19 +184,46 @@ PACKET_FORM_SERIES: Final = (
     "form/b122a2",
 )
 
-# The individual Chapter 13 set as far as it exists today (issue #365): the
-# Chapter 7 set with the B122C pair in place of the B122A pair — B122C-1
-# always files, B122C-2 only above the median (B122C-1 line 17). The plan
-# (Official Form 113, #366) and B108's Chapter 7-only statement are #367's
-# to settle; until then `completeness_problems` refuses to assemble a
-# Chapter 13 case, and this list serves the forms hub's rows and the pins.
-CHAPTER_13_FORM_SERIES: Final = tuple(
-    {"form/b122a1": "form/b122c1", "form/b122a2": "form/b122c2"}.get(series, series)
-    for series in PACKET_FORM_SERIES
+# The individual Chapter 13 set, in filing order (issues #365, #367). It
+# differs from the Chapter 7 set in three places:
+#
+# - the B122C pair replaces the B122A pair (§ 1325(b) instead of
+#   § 707(b)): B122C-1 always files, B122C-2 only above the median
+#   (B122C-1 line 17);
+# - there is no B108. Bankruptcy Rule 1007(b)(2) asks for the Statement of
+#   Intention from "an individual debtor in a chapter 7 case", and the form
+#   says so in its title; on Chapter 13 what happens to each secured claim
+#   and each lease is the PLAN's to say (B113 Parts 3 and 6);
+# - Official Form 113, the plan, closes the set. Rule 3015(b) lets it file
+#   with the petition or within 14 days after, so it follows every
+#   statement it rests on — the schedules it treats, the means test whose
+#   commitment period sets its term. A district that has opted out of the
+#   national form under Rule 3015.1 is refused at the gate rather than
+#   handed the wrong form (`_local_plan_form_problem`).
+CHAPTER_13_FORM_SERIES: Final = (
+    "form/b101",
+    "form/b121",
+    "form/b106sum",
+    "form/b106ab",
+    "form/b106c",
+    "form/b106d",
+    "form/b106ef",
+    "form/b106g",
+    "form/b106h",
+    "form/b106i",
+    "form/b106j",
+    "form/b106j2",
+    "form/b106dec",
+    "form/b107",
+    "form/b2010",
+    "form/b2030",
+    "form/b122c1",
+    "form/b122c2",
+    "form/b113",
 )
 
 # Every series a case may pin — the union of the chapter sets, in the
-# Chapter 7 set's order with the Chapter 13 pair appended. `form_revisions`
+# Chapter 7 set's order with the Chapter 13 additions appended. `form_revisions`
 # records the WHOLE registry's revisions at assembly, so a case whose
 # chapter changes before re-assembly does not find a hole.
 ALL_FORM_SERIES: Final = (
@@ -281,6 +311,7 @@ class CaseData:
     expenses: tuple[CaseEntity[ExpenseBody], ...] = ()
     dependents: tuple[CaseEntity[DependentBody], ...] = ()
     sofa_entries: tuple[CaseEntity[SofaEntryBody], ...] = ()
+    plans: tuple[CaseEntity[PlanBody], ...] = ()
 
 
 def read_case_data(
@@ -314,6 +345,7 @@ def read_case_data(
         expenses=entity_store.list_for_case(case.id, EXPENSE),
         dependents=entity_store.list_for_case(case.id, DEPENDENT),
         sofa_entries=entity_store.list_for_case(case.id, SOFA_ENTRY),
+        plans=entity_store.list_for_case(case.id, PLAN),
     )
 
 
@@ -393,6 +425,7 @@ def to_case_file(data: CaseData) -> CaseFile:
         expenses=tuple(e.body for e in data.expenses),
         dependents=tuple(e.body for e in data.dependents),
         sofa_entries=tuple(e.body for e in data.sofa_entries),
+        plans=tuple(e.body for e in data.plans),
     )
 
 
@@ -494,6 +527,31 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
             )
         )
 
+    if data.case.chapter == 13:
+        # One plan per case, not key-enforced (insolvia_core/plans.py leaves
+        # the cardinality here, as means_test_input does): B113 prints ONE
+        # proposal, and a second record would be a second answer to it.
+        if not data.plans:
+            problems.append(
+                PacketProblem(
+                    source="plans",
+                    item_id=None,
+                    field="",
+                    message="The Chapter 13 plan has not been entered yet —"
+                    " Official Form 113 prints from it.",
+                )
+            )
+        for extra_plan in data.plans[1:]:
+            problems.append(
+                PacketProblem(
+                    source="plans",
+                    item_id=extra_plan.id,
+                    field="",
+                    message="A case has exactly one plan record — delete the"
+                    " duplicates before assembling.",
+                )
+            )
+
     for extra_input in data.means_test_inputs[1:]:
         problems.append(
             PacketProblem(
@@ -554,7 +612,9 @@ def _cardinality_problems(data: CaseData) -> list[PacketProblem]:
 
 
 def _statement_problems(data: CaseData) -> list[PacketProblem]:
-    """What B108 and B2030 need answered before they can print (issue #351).
+    """What B108 and B2030 need answered before they can print (issue #351)
+    — and, on a Chapter 13 case, what B113 Part 6 needs in B108's place
+    (issue #367).
 
     A B108 row without its intention box, or a B2030 without its amounts,
     is a signed statement with its one question blank — so each is a gate,
@@ -567,6 +627,28 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
     still open).
     """
     problems: list[PacketProblem] = []
+    if data.case.chapter == 13:
+        # No B108 on Chapter 13 (Rule 1007(b)(2) is Chapter 7's): each secured
+        # claim's fate is the plan's treatment instead, which the B113
+        # projection checks. A lease still needs its answer, for a harder
+        # reason — B113 Part 6.1 lists the ASSUMED contracts and leases and
+        # rejects every other one, so an unanswered lease would be rejected
+        # by silence.
+        for lease in data.contract_leases:
+            if lease.body.intention is None:
+                problems.append(
+                    PacketProblem(
+                        source="contract_leases",
+                        item_id=lease.id,
+                        field="intention",
+                        message="Say whether this contract or lease will be"
+                        " assumed or rejected — the Chapter 13 plan (B113"
+                        " Part 6) lists the assumed ones and rejects every"
+                        " other.",
+                    )
+                )
+        problems.extend(_attorney_disclosure_problems(data))
+        return problems
     for claim in data.claims:
         if claim.body.claim_class == "secured" and claim.body.intention is None:
             problems.append(
@@ -591,6 +673,14 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
                     " prints one answer per listed lease.",
                 )
             )
+    problems.extend(_attorney_disclosure_problems(data))
+    return problems
+
+
+def _attorney_disclosure_problems(data: CaseData) -> list[PacketProblem]:
+    """B2030's answers — the attorney's Rule 2016(b) disclosure files on
+    either chapter."""
+    problems: list[PacketProblem] = []
     for professional in data.filing_professionals:
         if professional.body.role != "attorney":
             continue
@@ -614,6 +704,38 @@ def _statement_problems(data: CaseData) -> list[PacketProblem]:
     return problems
 
 
+def _local_plan_form_problem(case: Case) -> PacketProblem | None:
+    """A Chapter 13 case in a district that has opted out of Official Form
+    113 (Rule 3015.1) — refused, naming the district's form, rather than
+    handed a national plan the court's rules say not to file.
+
+    The court registry owns the fact (`CourtDistrict.chapter_13_plan`,
+    issue #367). Only a VERIFIED `local` answer refuses: an unverified one
+    ("we have not read the page") and a case written before the registry
+    (`case.court` None) both take the national form, which is what Rule
+    3015(c) makes the default. The district's own plan forms are data to
+    add, one district at a time; until one is modelled, its cases stop
+    here."""
+    if case.court is None:
+        return None
+    district = courts.district(case.court)
+    if district is None:
+        return None
+    fact = district.chapter_13_plan
+    if not fact.verified or fact.value is None or fact.value.form != "local":
+        return None
+    title = fact.value.title or "its own local plan form"
+    return PacketProblem(
+        source="case",
+        item_id=None,
+        field="court",
+        message=f"The {district.name} requires {title} in place of Official"
+        " Form 113 (Bankruptcy Rule 3015.1), and that form is not prepared"
+        " here yet — the Chapter 13 plan for this court has to be prepared"
+        " outside Insolvia.",
+    )
+
+
 def completeness_problems(
     data: CaseData, *, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS
 ) -> tuple[PacketProblem, ...]:
@@ -628,33 +750,21 @@ def completeness_problems(
     a filed case still blocks every ordinary re-assembly.
     """
     problems: list[PacketProblem] = []
-    if data.case.chapter == 13:
-        # Issue #365 built the means-test pair; the plan form (#366) and
-        # the Chapter 13 packet's own form set (#367) are what is still
-        # missing before a Chapter 13 case can assemble. Say so, rather
-        # than the bare "only Chapter 7".
-        problems.append(
-            PacketProblem(
-                source="case",
-                item_id=None,
-                field="chapter",
-                message="This is a Chapter 13 case — its packet cannot be"
-                " assembled yet. Forms 122C-1 and 122C-2 are prepared, but"
-                " the Chapter 13 plan (Official Form 113) is not modelled and"
-                " the Chapter 13 form set is not assembled; only the Chapter 7"
-                " packet can be assembled today.",
-            )
-        )
-    elif data.case.chapter != 7:
+    if data.case.chapter not in (7, 13):
         problems.append(
             PacketProblem(
                 source="case",
                 item_id=None,
                 field="chapter",
                 message=f"This is a Chapter {data.case.chapter} case — only"
-                " the Chapter 7 packet can be assembled today.",
+                " the individual Chapter 7 and Chapter 13 packets can be"
+                " assembled today.",
             )
         )
+    if data.case.chapter == 13:
+        local_plan = _local_plan_form_problem(data.case)
+        if local_plan is not None:
+            problems.append(local_plan)
     if data.case.status == "filed" and not options.amended_only:
         problems.append(
             PacketProblem(
@@ -704,9 +814,11 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
     the indeterminate case), and B122C-2 likewise on a Chapter 13 case
     (B122C-1 line 17; `files_b122c2`). B108 files only when it has a row —
     a secured claim, or a lease flagged for it — because § 521(a)(2) asks
-    for it only then; B2030 only when an attorney signs, because it is the
-    attorney's own disclosure. Everything else is unconditional for an
-    individual filing of the case's chapter (`chapter_form_series`).
+    for it only then (and never on Chapter 13, whose set has no B108);
+    B2030 only when an attorney signs, because it is the attorney's own
+    disclosure. Everything else — the Chapter 13 plan, B113, among it — is
+    unconditional for an individual filing of the case's chapter
+    (`chapter_form_series`).
     """
     has_separate = any(
         e.body.which_household == "debtor_2_separate" for e in data.households
@@ -738,8 +850,12 @@ def packet_form_series(data: CaseData) -> tuple[str, ...]:
 # printing only ITS amended items, plus B106Sum/B106Dec (always, whenever
 # that set is non-empty) and a generated cover sheet
 # (core/amendment_cover_sheet.py) — never B101, B121, B108, B2010, B2030,
-# or B122A-1/2, none of which prints a per-item list an "amended" flag could
-# narrow.
+# B122A-1/2 or B122C-1/2, none of which prints a per-item list an "amended"
+# flag could narrow. Nor B113 on a Chapter 13 case: a plan changed after
+# filing is modified under § 1329 (before confirmation, § 1323), a motion of
+# its own, not a Rule 1009 amendment — `plans.py` accepts and ignores the
+# flag for the same reason. So a Chapter 13 amendment prints exactly what a
+# Chapter 7 one does: the changed schedules, B106Sum/B106Dec, the cover.
 #
 # Every schedule below is fed by exactly ONE amendable collection — the
 # thing that keeps `filtered_for_render` simple: narrowing that series'
