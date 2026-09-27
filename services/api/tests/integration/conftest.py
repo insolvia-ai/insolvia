@@ -77,7 +77,7 @@ TARGETS = ("dev", "staging")
 #: The court and division the suite's scratch case carries. `district` used to
 #: be free text and the marker was a string no real case would carry; a case
 #: now names a registry reference (issue #360), so the marker is a launch
-#: division the fixture case (`flmb`/`tampa`, seeds/fixtures/v1) does NOT use
+#: division no fixture case (`flmb`/`tampa`, seeds/fixtures/v1..v3) uses
 #: — which is what lets a later run find the scratch case rather than open
 #: another. The suite's own writes never change it.
 SCRATCH_COURT = {"court": "flnb", "division": "gainesville"}
