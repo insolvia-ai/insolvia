@@ -79,6 +79,8 @@ interface ApiStub {
   forms?: Answer;
   /** The case record's status — `filed` is what offers an amendment. */
   caseStatus?: 'intake' | 'filed';
+  /** The case record's chapter — 13 assembles the Chapter 13 set (#367). */
+  caseChapter?: 7 | 13;
 }
 
 type Answer = () => Response | Promise<Response>;
@@ -118,7 +120,10 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Pro
   if (url.endsWith(CASE_ID)) {
     return jsonResponse(
       200,
-      caseBody(CASE_ID, stub.caseStatus === undefined ? {} : { status: stub.caseStatus }),
+      caseBody(CASE_ID, {
+        ...(stub.caseStatus === undefined ? {} : { status: stub.caseStatus }),
+        ...(stub.caseChapter === undefined ? {} : { chapter: stub.caseChapter }),
+      }),
     );
   }
   throw new Error(`unexpected ${method} ${url}`);
@@ -292,6 +297,17 @@ describe('the filing packet screen', () => {
       kind: 'packet_assembly',
       options: { forms: ['b101'] },
     });
+  });
+
+  it('names the Chapter 13 set, with its plan, on a Chapter 13 case', async () => {
+    signedIn({ caseChapter: 13 });
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Assemble the Chapter 13 filing packet for this case',
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText(/the Chapter 13 plan \(Official Form 113\)/)).toBeTruthy();
   });
 
   it('never offers an amendment on a case that is not filed', async () => {

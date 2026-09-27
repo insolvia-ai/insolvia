@@ -291,6 +291,30 @@ describe('the forms hub screen', () => {
     expect(await screen.findByRole('heading', { name: 'Intake' })).toBeTruthy();
   });
 
+  it('opens the plan screen from the Chapter 13 plan row', async () => {
+    // Issue #367: B113 prints from the plan record, so its row opens /plan.
+    signedIn({
+      list: () =>
+        jsonResponse(200, {
+          forms: [
+            formRow({
+              series: 'form/b113',
+              form: 'b113',
+              title: 'Chapter 13 Plan',
+              officialNumber: '113',
+            }),
+          ],
+        }),
+    });
+    await screen.findByText(/Chapter 13 Plan/);
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Open the screen that collects Chapter 13 Plan' }),
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Chapter 13 plan' })).toBeTruthy();
+  });
+
   it('a summary form with no data-entry screen offers no Open button', async () => {
     signedIn({
       list: () =>

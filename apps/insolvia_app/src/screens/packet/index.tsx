@@ -199,6 +199,8 @@ function describeSource(source: string): string {
     expenses: 'Expenses',
     dependents: 'Dependents',
     codebtors: 'Codebtors',
+    contract_leases: 'Contracts and leases',
+    plans: 'Chapter 13 plan',
   };
   return labels[source] ?? source.replace(/_/g, ' ');
 }
@@ -228,8 +230,9 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * `/cases/<id>/packet` — assemble and download the Chapter 7 filing packet
- * (issue #96).
+ * `/cases/<id>/packet` — assemble and download the case's filing packet
+ * (issue #96): the Chapter 7 set, or the Chapter 13 set with its plan
+ * (issue #367).
  *
  * The shape follows the pipeline it fronts (ADR 0018): "Assemble" accepts a
  * `packet_assembly` job and this screen POLLS the job's status — the client
@@ -279,6 +282,10 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   // Best-effort like the forms checklist: a failed read just leaves the
   // toggle hidden, and the plain assemble path is unaffected.
   const [caseFiled, setCaseFiled] = useState(false);
+  // The case's chapter (issue #367): a Chapter 13 case assembles its own set,
+  // with the plan. Chapter 7 until the case reads, which is what the screen
+  // said before a Chapter 13 packet could be assembled at all.
+  const [chapter, setChapter] = useState(7);
 
   const load = useCallback(async () => {
     try {
@@ -324,7 +331,10 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     (async () => {
       try {
         const result = await call((client) => client.getCase(caseId));
-        if (!cancelled && result.ok) setCaseFiled(result.value.status === 'filed');
+        if (!cancelled && result.ok) {
+          setCaseFiled(result.value.status === 'filed');
+          setChapter(result.value.chapter);
+        }
       } catch {
         // No amendment toggle this load.
       }
@@ -539,10 +549,9 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
     <CaseColumn>
       <Heading level={1}>Filing packet</Heading>
       <Text style={[styles.body, muted]}>
-        Assembles the full individual Chapter 7 set — the petition, every schedule, the
-        declarations, the statement of financial affairs and the creditor matrix — into one download
-        of filed-ready PDFs. Assembly first checks the case is complete, and refuses with a list of
-        what to fix rather than producing a partial packet.
+        {`Assembles the full individual Chapter ${chapter} set — the petition, every schedule, the declarations, the statement of financial affairs${
+          chapter === 13 ? ', the Chapter 13 plan (Official Form 113)' : ''
+        } and the creditor matrix — into one download of filed-ready PDFs. Assembly first checks the case is complete, and refuses with a list of what to fix rather than producing a partial packet.`}
       </Text>
 
       <OutputOptionsPanel
@@ -571,7 +580,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           size="lg"
           onPress={assemble}
           disabled={assembly.phase === 'running'}
-          aria-label="Assemble the Chapter 7 filing packet for this case"
+          aria-label={`Assemble the Chapter ${chapter} filing packet for this case`}
         >
           {assembly.phase === 'running' ? 'Assembling…' : 'Assemble packet'}
         </Button>
