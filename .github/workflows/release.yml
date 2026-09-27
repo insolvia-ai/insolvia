@@ -20,7 +20,9 @@ name: Release
 #
 # WHAT AN APPROVAL PROMOTES: everything, at this run's commit — not just what
 # this push changed. Staging legs are path-filtered (deploying an unchanged
-# service is waste), but production promotion is whole-state: you might merge
+# service is waste) — against the last commit staging released green on every
+# leg, not the previous push, so a leg an earlier run lost is retried (see the
+# `changes` job) — but production promotion is whole-state: you might merge
 # five PRs and only approve the fifth run, and services touched by the first
 # four must not be left behind. The `record` job is what makes that resolvable
 # — see its comment.
@@ -129,9 +131,15 @@ jobs:
   # blocks. The repo's `changed-paths` action cannot be reused: it reads
   # `github.event.pull_request.base.sha` and hard-fails on any other event, by
   # design — it exists to keep required PR checks reporting, which is a
-  # different problem from "what did this push change".
+  # different problem from "what is staging missing".
   changes:
     runs-on: ubuntu-latest
+    # Job-level permissions REPLACE the workflow-level block, so this job gets
+    # only what it uses: the checkout, and reading commit statuses to find the
+    # diff base.
+    permissions:
+      contents: read
+      statuses: read
     outputs:
       admin: ${{ steps.f.outputs.admin }}
       api: ${{ steps.f.outputs.api }}
@@ -145,32 +153,67 @@ jobs:
         with:
           fetch-depth: 0
 
-      - id: f
+      # THE DIFF BASE IS WHERE STAGING WAS LAST WHOLE, not the previous tip of
+      # `main`. Diffing against `github.event.before` asked "what did this
+      # push change", so a leg an earlier run lost (evicted from the
+      # concurrency group, or failed) was never retried: the next push did not
+      # touch that service's paths, and staging drifted behind `main` with
+      # nothing red. The base is now the newest first-parent ancestor carrying
+      # a successful `insolvia/staging-release` status — `record` stamps it
+      # only when every leg the run needed deployed — so the diff covers
+      # everything since staging last served one commit on every leg. None in
+      # the last 200 commits: every leg deploys. The status API failing:
+      # `github.event.before`, the old behaviour, with a warning.
+      # .github/scripts/release-diff-base.sh owns the rules and logs which base
+      # it chose and why; release-diff-base.test.sh is their unit test.
+      - id: base
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           # On a push this is the previous tip of `main`. It is all-zeroes for a
           # branch's first push, and absent entirely on workflow_dispatch.
           BEFORE: ${{ github.event.before }}
           ALL: ${{ inputs.all }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # From the PARENT: HEAD is never its own base (a re-run of a green
+          # commit would diff against itself). A root commit has no parent, so
+          # the list is empty and the script answers `all`.
+          candidates="$(git rev-list --first-parent --max-count=200 "$SHA^" 2>/dev/null || true)"
+          base="$(printf '%s\n' "$candidates" | .github/scripts/release-diff-base.sh)"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - id: f
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          # Deploy everything when we cannot know what changed (manual dispatch,
-          # or a first push with no previous tip). Failing OPEN is right here:
-          # deploying a service that did not change is wasteful, while skipping
-          # one that did leaves staging silently behind `main`, which is the one
-          # property staging exists to have.
-          if [ "$ALL" = "true" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+          # Every leg, admin included — it was once missing from this list, so
+          # an `all=true` dispatch deployed everything except admin.
+          all_legs() {
+            for s in admin api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+          }
+
+          # Deploy everything when we cannot know what staging is missing.
+          # Failing OPEN is right here: deploying a service that did not change
+          # is wasteful, while skipping one that did leaves staging silently
+          # behind `main`, which is the one property staging exists to have.
+          if [ -z "$BASE" ] || [ "$BASE" = "all" ]; then
             echo "No usable diff base — deploying every service."
-            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            all_legs
             exit 0
           fi
 
-          files="$(git diff --name-only "$BEFORE" "${{ github.sha }}")"
+          files="$(git diff --name-only "$BASE" "$SHA")"
           if [ -z "$files" ]; then
-            echo "::warning::Empty diff against $BEFORE — deploying every service rather than nothing."
-            for s in api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            echo "::warning::Empty diff against $BASE — deploying every service rather than nothing."
+            all_legs
             exit 0
           fi
+          echo "Changed since $BASE:"
           printf '%s\n' "$files" | sed 's/^/  /'
 
           # These sets are copied verbatim from the `on.push.paths:` filters the
@@ -226,10 +269,13 @@ jobs:
 
   # Env infra next, always — every service job below reads its outputs.
   # `!cancelled() && !failure()` for the same reason as the legs below: a push
-  # that skips `shared` must not skip the rest of the release behind it.
+  # that skips `shared` must not skip the rest of the release behind it. The
+  # explicit `shared` result is because `!failure()` ignores a CANCELLED need:
+  # a cancelled shared apply is one that may not have happened, and staging's
+  # `data` lookups into it must not run on that guess.
   infra:
     needs: [changes, shared]
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && !failure() && (needs.shared.result == 'success' || needs.shared.result == 'skipped') }}
     uses: ./.github/workflows/infra-staging.yml
     with:
       mode: apply
@@ -240,21 +286,31 @@ jobs:
   # mean a docs-only change to the mailer path silently cancelling the whole
   # chain behind it. `!cancelled() && !failure()` runs after a skipped upstream
   # but still stops dead on a failed one.
+  #
+  # `needs.infra.result == 'success'` on top, because `infra` is never
+  # path-filtered — it runs on every release, so anything but `success` means
+  # the apply did not complete — and `!failure()` waves a CANCELLED infra
+  # through. A newer run's jobs can evict this run's waiting `infra` from the
+  # concurrency group (header), and a leg deploying against outputs that were
+  # never applied is exactly the stale-outputs race infra-first exists to
+  # prevent. (The status-check function has to stay in the expression: an
+  # `if:` with none gets an implicit `success()`, which a path-skipped leg
+  # upstream would turn false.)
   mailer:
     needs: [changes, infra]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mailer == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.mailer == 'true' }}
     uses: ./.github/workflows/mailer-staging.yml
     secrets: inherit
 
   api:
     needs: [changes, infra, mailer]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.api == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.api == 'true' }}
     uses: ./.github/workflows/api-staging.yml
     secrets: inherit
 
   admin:
     needs: [changes, infra, api]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.admin == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.admin == 'true' }}
     uses: ./.github/workflows/admin-staging.yml
     secrets: inherit
 
@@ -265,7 +321,7 @@ jobs:
   # CHAIN").
   mcp:
     needs: [changes, infra, api, admin]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.mcp == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.mcp == 'true' }}
     uses: ./.github/workflows/mcp-staging.yml
     secrets: inherit
 
@@ -273,13 +329,13 @@ jobs:
   # it is the real dependency.
   marketing:
     needs: [changes, infra, api, mcp]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.marketing == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.marketing == 'true' }}
     uses: ./.github/workflows/marketing-staging.yml
     secrets: inherit
 
   app:
     needs: [changes, infra, marketing]
-    if: ${{ !cancelled() && !failure() && needs.changes.outputs.app == 'true' }}
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.app == 'true' }}
     uses: ./.github/workflows/app-staging.yml
     secrets: inherit
 

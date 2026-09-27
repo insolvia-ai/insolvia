@@ -54,7 +54,7 @@ die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_reset" "$*" >&2; exit 1; }
 
 # Every area, in the order they run. Python first because a core change is
 # the most common reason for a broad run and its suites are the fastest.
-ALL_AREAS="core api admin mailer mcp api-client app portal marketing forms"
+ALL_AREAS="core api admin mailer mcp api-client app portal marketing forms ci-scripts"
 
 # ── Which areas a path can break ────────────────────────────────────────────
 # One line per path family; an area listed twice is run once. Kept broad on
@@ -68,6 +68,7 @@ areas_for_path() {
     services/mailer/*)                              echo "mailer" ;;
     services/mcp/*)                                 echo "mcp" ;;
     forms/*)                                        echo "forms api" ;;
+    .github/scripts/*|.github/workflows/release.yml) echo "ci-scripts" ;;
     packages/insolvia_api_client/*)                 echo "api-client app" ;;
     apps/insolvia_app/*)                            echo "app" ;;
     apps/insolvia_admin/*)                          echo "portal" ;;
@@ -116,6 +117,7 @@ run_area() {
     portal)     node_standalone_suite portal apps/insolvia_admin apps/insolvia_admin/scripts/dev-setup.sh ;;
     marketing)  node_standalone_suite marketing apps/insolvia_marketing apps/insolvia_marketing/scripts/dev-setup.sh ;;
     forms)      ( cd "$REPO_ROOT" && ./forms/scripts/dev-test.sh ) ;;
+    ci-scripts) ( cd "$REPO_ROOT" && ./.github/scripts/release-diff-base.test.sh ) ;;
     *)          die "unknown area '$1'" ;;
   esac
 }
@@ -132,6 +134,7 @@ describe_area() {
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
     marketing)  echo "apps/insolvia_marketing  npm test (own lockfile)" ;;
     forms)      echo "forms/                   forms/scripts/dev-test.sh" ;;
+    ci-scripts) echo ".github/scripts/         release-diff-base.test.sh (plain bash)" ;;
   esac
 }
 
