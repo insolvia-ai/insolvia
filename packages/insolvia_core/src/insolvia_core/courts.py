@@ -67,6 +67,14 @@ CASE_UPLOAD_STATUSES: Final = ("unverified", "legacy_txt", "xml")
 # instead), or inside the petition package.
 SSN_STATEMENT_HANDLINGS: Final = ("own_event", "not_filed", "with_petition")
 
+# Which Chapter 13 plan form the court takes (issue #367). Bankruptcy Rule
+# 3015(c) makes Official Form 113 the national plan; Rule 3015.1 lets a
+# district adopt its own local form instead, which then REPLACES the
+# national one for every Chapter 13 case filed there. Nothing else varies
+# per district at this grain — a local form's own content is a form to
+# model, not a fact to record here.
+CHAPTER_13_PLAN_FORMS: Final = ("official", "local")
+
 _CODE_RE: Final = re.compile(r"^[a-z]{4}$")
 _DIVISION_CODE_RE: Final = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 _FIPS_RE: Final = re.compile(r"^\d{5}$")
@@ -206,6 +214,17 @@ class Opening:
 
 
 @dataclass(frozen=True)
+class Chapter13PlanForm:
+    """The plan form a district's Chapter 13 cases file: `official` (Form
+    113) or `local` (the district's Rule 3015.1 form, named by `title`, and
+    by `url` where one was read)."""
+
+    form: str
+    title: str | None
+    url: str | None
+
+
+@dataclass(frozen=True)
 class CaseUpload:
     status: str
     kind: str | None
@@ -238,6 +257,11 @@ class CourtDistrict:
     registration: Registration
     sources: tuple[Source, ...]
     notes: str
+    # Issue #367. A release compiled before the fact existed (2026-09-24)
+    # carries no `chapter_13_plan` key and loads as unverified-and-unknown
+    # (`_chapter_13_plan`), so an append-only registry stays loadable; every
+    # later release states it for every district.
+    chapter_13_plan: Fact[Chapter13PlanForm]
 
     def division(self, code: str) -> Division | None:
         return next((d for d in self.divisions if d.code == code), None)
@@ -540,6 +564,35 @@ def _opening(raw: object, where: str, facts: _Facts) -> Opening:
     )
 
 
+def _chapter_13_plan(
+    raw: Mapping[str, object], where: str, facts: _Facts
+) -> Fact[Chapter13PlanForm]:
+    """The `chapter_13_plan` fact, or unverified-and-unknown when a release
+    predates it (see `CourtDistrict.chapter_13_plan`)."""
+    if "chapter_13_plan" not in raw:
+        return Fact(
+            None,
+            "unverified",
+            None,
+            None,
+            "not recorded in this release — the fact was added on 2026-09-26",
+        )
+    value, fact = facts.mapping(raw, "chapter_13_plan")
+    plan: Chapter13PlanForm | None = None
+    if value is not None:
+        pw = f"{where} chapter_13_plan"
+        form = value.get("form")
+        if form not in CHAPTER_13_PLAN_FORMS:
+            raise _fail(pw, f"form must be one of {CHAPTER_13_PLAN_FORMS}")
+        title = _optional_str(value, "title", pw)
+        if form == "local" and not title:
+            raise _fail(pw, "a local plan form needs a title — name the form")
+        plan = Chapter13PlanForm(
+            form=str(form), title=title, url=_optional_str(value, "url", pw)
+        )
+    return Fact(plan, fact.status, fact.source, fact.verified_at, fact.note)
+
+
 def _case_upload(raw: object, where: str) -> CaseUpload:
     if not isinstance(raw, dict):
         raise _fail(where, "case_upload is not an object")
@@ -652,6 +705,7 @@ def _district(raw: Mapping[str, object], where: str) -> CourtDistrict:
         ),
         sources=sources,
         notes=_notes(raw, "notes", where),
+        chapter_13_plan=_chapter_13_plan(raw, where, facts),
     )
 
 
