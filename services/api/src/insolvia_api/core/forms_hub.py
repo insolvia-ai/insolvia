@@ -58,7 +58,7 @@ from .packet_assembly import (
 
 # Collection source -> every form series it feeds, per case-data-model.md's
 # Feeds column. A source missing here either never appears on a
-# `PacketProblem` (assets, contract_leases, sofa_entries, creditors — none of
+# `PacketProblem` (assets, sofa_entries, creditors — none of
 # `completeness_problems`'s checks name them) or has no packet-form counterpart
 # ("creditors" problems come only from the matrix, out of this issue's scope).
 FORM_PROBLEM_SOURCES: Final[dict[str, tuple[str, ...]]] = {
@@ -87,6 +87,12 @@ FORM_PROBLEM_SOURCES: Final[dict[str, tuple[str, ...]]] = {
     "expenses": ("form/b106j", "form/b106j2"),
     "dependents": ("form/b106j", "form/b106j2"),
     "codebtors": ("form/b106h",),
+    # A lease's assume/reject answer: B108 on Chapter 7, B113 Part 6 on
+    # Chapter 13 (issue #367) — `group_problems` keeps the one this case
+    # files.
+    "contract_leases": ("form/b108", "form/b113"),
+    # The Chapter 13 plan's one-per-case record (issue #367).
+    "plans": ("form/b113",),
 }
 
 # The two sources that gate every form: the case's own header (district,

@@ -41,6 +41,7 @@ from tests.unit.test_packet_assembly import (
     _filed_reference_case_data,
     _with_amended,
     reference_case_data,
+    reference_chapter_13_case_data,
 )
 
 # ── forms_hub: one row per required form ─────────────────────────
@@ -220,6 +221,16 @@ def test_a_chapter_13_hub_lists_the_b122c_pair_in_place_of_b122a():
     grouped = group_problems(data)
     assert "form/b122a2" not in grouped
     assert "form/b122c2" in grouped
+
+
+def test_a_missing_plan_groups_under_the_plan_form_only():
+    # Issue #367: the plan's gate problem belongs to B113's row, and the
+    # plan form is the last row of a Chapter 13 hub.
+    data = replace(reference_chapter_13_case_data(), plans=())
+    hub = forms_hub(data, as_of=TODAY)
+    assert hub[-1].series == "form/b113"
+    assert [p.source for p in hub[-1].problems] == ["plans"]
+    assert all(not row.problems for row in hub[:-1])
 
 
 # ── resolve_case_form: float, then pin (effective-dating.md) ────

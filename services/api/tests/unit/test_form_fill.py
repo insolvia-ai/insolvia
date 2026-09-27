@@ -84,6 +84,7 @@ FORM_SERIES = (
     "form/b106sum",
     "form/b107",
     "form/b108",
+    "form/b113",
     "form/b121",
     "form/b122a1",
     "form/b122a2",
@@ -93,9 +94,9 @@ FORM_SERIES = (
     "form/b2030",
 )
 
-# The two flat releases (no AcroForm): B2010 draws nothing and ships the
-# court's bytes verbatim; B2030 draws overlay boxes.
-FLAT_SERIES = ("form/b2010", "form/b2030")
+# The three flat releases (no AcroForm): B2010 draws nothing and ships the
+# court's bytes verbatim; B2030 and B113 draw overlay boxes.
+FLAT_SERIES = ("form/b113", "form/b2010", "form/b2030")
 
 
 # --- synthetic full-coverage values -------------------------------------------
@@ -192,8 +193,8 @@ def _qualified_name(annotation: DictionaryObject) -> str | None:
 _OVERLAY_MARKER = b"% insolvia-overlay\n"
 _OVERLAY_BOX_RE = re.compile(
     rb"% box:(?P<name>\S+)(?P<check> check)?\n"
-    rb"(?:BT /Helv [\d.]+ Tf 1 0 0 1 [\d.]+ [\d.]+ Tm "
-    rb"\((?P<text>(?:[^()\\]|\\.)*)\) Tj ET)?"
+    rb"(?:q 0 g 0 Tr 0 Tc 0 Tw 100 Tz 0 Ts BT /Helv [\d.]+ Tf 1 0 0 1 [\d.]+ [\d.]+ Tm "
+    rb"\((?P<text>(?:[^()\\]|\\.)*)\) Tj ET Q)?"
 )
 
 

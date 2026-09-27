@@ -49,6 +49,8 @@ const OPEN_SEGMENT: Readonly<Record<string, string>> = {
   'form/b122a2': 'means-test',
   'form/b122c1': 'means-test',
   'form/b122c2': 'means-test',
+  // The Chapter 13 plan (issue #367) prints from the plan screen's record.
+  'form/b113': 'plan',
 };
 
 /** The gate's `source` in a person's words — the packet screen's own list,
@@ -74,6 +76,8 @@ function describeSource(source: string): string {
     expenses: 'Expenses',
     dependents: 'Dependents',
     codebtors: 'Codebtors',
+    contract_leases: 'Contracts and leases',
+    plans: 'Chapter 13 plan',
   };
   return labels[source] ?? source.replace(/_/g, ' ');
 }

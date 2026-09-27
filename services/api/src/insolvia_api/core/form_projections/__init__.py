@@ -44,10 +44,13 @@ numbering and cross-schedule line references ("Schedule D, line __"), which
 the specs assign to packet assembly (9.6) — the packet decides page and row
 placement across continuation sheets, so the projection cannot know them.
 
-Two of the mappings target FLAT releases (issue #351): B2030's values land
-on overlay boxes the engine draws rather than widgets it sets, and B2010
-projects nothing at all — a notice with no field. Both are registered like
-every other so a revision bump still has to bring its own mapping.
+Three of the mappings target FLAT releases (issues #351, #367): B2030's
+and B113's values land on overlay boxes the engine draws rather than
+widgets it sets, and B2010 projects nothing at all — a notice with no
+field. All are registered like every other so a revision bump still has to
+bring its own mapping. B113, the Chapter 13 plan, is the one projection
+that runs a calculator (core/chapter13_plan.py) rather than reading stored
+facts alone; its module says why that is still a projection.
 """
 
 from __future__ import annotations
@@ -70,6 +73,7 @@ from .b106j2 import project_b106j2_1215
 from .b106sum import project_b106sum_1215
 from .b107 import project_b107_0425
 from .b108 import project_b108_1215
+from .b113 import project_b113_1217
 from .b121 import project_b121_1215
 from .b122a1 import project_b122a1_1219
 from .b122a2 import project_b122a2_0425
@@ -119,6 +123,7 @@ PROJECTIONS: Final[Mapping[tuple[str, str], Projector]] = {
     ("form/b106sum", "2015-12-01"): project_b106sum_1215,
     ("form/b107", "2025-04-01"): project_b107_0425,
     ("form/b108", "2015-12-01"): project_b108_1215,
+    ("form/b113", "2017-12-01"): project_b113_1217,
     ("form/b121", "2015-12-01"): project_b121_1215,
     ("form/b122a1", "2019-12-01"): project_b122a1_1219,
     ("form/b122a2", "2025-04-01"): project_b122a2_0425,

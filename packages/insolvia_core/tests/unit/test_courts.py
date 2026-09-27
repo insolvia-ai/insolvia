@@ -113,6 +113,47 @@ def test_every_verified_fact_cites_a_source_read_on_a_date(release):
         check(district.opening.ssn_statement, where, ids)
         check(district.opening.fee_rule, where, ids)
         check(district.registration.training_required, where, ids)
+        check(district.chapter_13_plan, where, ids)
+
+
+def test_every_district_states_its_chapter_13_plan_form(release):
+    # Issue #367: the latest release carries the key on every record (a
+    # missing key would load as "unknown" and silently mean Form 113).
+    root = Path(courts.__file__).parent / "regulatory/courts/us-bankruptcy"
+    districts = root / release.release_id.split("@")[1] / "districts"
+    for path in sorted(districts.glob("*.json")):
+        assert "chapter_13_plan" in json.loads(path.read_text()), path.name
+    for district in release.districts:
+        fact = district.chapter_13_plan
+        # An unverified answer carries no value: "we have not read the page"
+        # must never be mistaken for "the court takes Form 113".
+        assert fact.verified or fact.value is None, district.code
+
+
+def test_flsb_takes_its_local_plan_form():
+    flsb = courts.district("flsb")
+    assert flsb is not None
+    fact = flsb.chapter_13_plan
+    assert fact.verified
+    assert fact.value is not None
+    assert fact.value.form == "local"
+
+
+@pytest.mark.parametrize("release_id", ["2026-09-24", "2026-09-26"])
+def test_a_release_before_the_fact_loads_it_as_unknown(release_id):
+    # Append-only: the releases that predate the fact still load, as unknown.
+    earlier = courts.get(f"courts/us-bankruptcy@{release_id}")
+    for district in earlier.districts:
+        assert not district.chapter_13_plan.verified
+        assert district.chapter_13_plan.value is None
+
+
+def test_the_plan_form_release_adds_only_the_plan_form_fact():
+    # @2026-09-26+2 (issue #367) is @2026-09-26 plus `chapter_13_plan`.
+    before = courts.get("courts/us-bankruptcy@2026-09-26")
+    after = courts.get("courts/us-bankruptcy@2026-09-26+2")
+    for old, new in zip(before.districts, after.districts, strict=True):
+        assert dataclasses.replace(new, chapter_13_plan=old.chapter_13_plan) == old
 
 
 def test_case_upload_is_unverified_everywhere_until_a_training_session(release):
@@ -213,3 +254,15 @@ def test_a_malformed_record_fails_the_load(tmp_path: Path):
     (release_dir / "districts" / "flsb.json").write_text(json.dumps(real))
     with pytest.raises(ValueError, match="S999"):
         courts.load_registry(root)
+
+
+def test_a_local_plan_form_without_a_title_fails_the_load(tmp_path: Path):
+    here = Path(courts.__file__).parent / "regulatory/courts/us-bankruptcy/2026-09-26+2"
+    release_dir = tmp_path / "regulatory" / "courts" / "us-bankruptcy" / "2026-09-26+2"
+    (release_dir / "districts").mkdir(parents=True)
+    (release_dir / "manifest.json").write_text((here / "manifest.json").read_text())
+    real = json.loads((here / "districts" / "flsb.json").read_text())
+    real["chapter_13_plan"]["value"]["title"] = None
+    (release_dir / "districts" / "flsb.json").write_text(json.dumps(real))
+    with pytest.raises(ValueError, match="needs a title"):
+        courts.load_registry(tmp_path / "regulatory")

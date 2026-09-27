@@ -128,7 +128,12 @@ class OverlayBox:
     `x`/`y` are PDF user-space points from the page's bottom-left: for a
     text box `y` is the BASELINE the value is drawn on and `w` the width the
     value must fit within; for a checkbox box (`h` set) the four numbers are
-    the printed square an X is drawn across. `page` is 1-based."""
+    the printed square an X is drawn across. `page` is 1-based.
+
+    `size` is a text box's point size, where its printed blank is too small
+    for the engine's default (Official Form 113's table cells, issue #367);
+    None draws at `form_fill.OVERLAY_FONT_SIZE`, which is what every box
+    that predates it does, byte for byte. A checkbox never carries one."""
 
     name: str
     page: int
@@ -136,6 +141,7 @@ class OverlayBox:
     y: float
     w: float
     h: float | None = None
+    size: float | None = None
 
     @property
     def is_check(self) -> bool:
@@ -402,6 +408,11 @@ def _overlay_boxes(
                 f"{fid}: overlay box {name!r} carries h exactly when the field "
                 "is a checkbox",
             )
+        size = item.get("size")
+        if size is not None and height is not None:
+            raise _fail(
+                where, f"{fid}: overlay box {name!r} is a checkbox and has no size"
+            )
         boxes[name] = OverlayBox(
             name=name,
             page=page,
@@ -411,6 +422,11 @@ def _overlay_boxes(
             h=(
                 _number(height, where, f"{fid}: overlay box {name!r} h")
                 if height is not None
+                else None
+            ),
+            size=(
+                _number(size, where, f"{fid}: overlay box {name!r} size")
+                if size is not None
                 else None
             ),
         )
