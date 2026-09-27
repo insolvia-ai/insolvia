@@ -21,6 +21,7 @@ import {
   createCaseRequestToJson,
   createDocumentRequestToJson,
   createTaskRequestToJson,
+  firmClientDraftToJson,
   formPreviewQuery,
   libraryCreditorDraftToJson,
   listCasesQuery,
@@ -107,6 +108,9 @@ import type {
   Firm,
   FirmColleague,
   FirmFeature,
+  FirmClient,
+  FirmClientDraft,
+  FirmClientStatus,
   FirmMembership,
   FirmRole,
   FirmStatus,
@@ -1746,6 +1750,96 @@ export class InsolviaApiClient {
       headers,
     });
     await expectNoContent(response, 204);
+  }
+
+  // -------------------------------------------------------------------------
+  // The firm's client directory (ADR 0022 / #353).
+  // -------------------------------------------------------------------------
+
+  /** `/v1/firm/clients/{id}`, with the id encoded exactly once. */
+  #firmClientUrl(id: string): string {
+    return `${this.#baseUrl}/v1/firm/clients/${encodeURIComponent(id)}`;
+  }
+
+  /**
+   * `GET /v1/firm/clients` — the firm's whole client directory, archived
+   * clients included, ordered by surname then given name.
+   *
+   * Needs `clients` at `view_only`. Not access-logged (the list, like
+   * `GET /v1/cases`); every single-record call below is.
+   */
+  async listFirmClients(): Promise<readonly FirmClient[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/clients`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'clients', 'FirmClient', firmClientFromJson);
+  }
+
+  /**
+   * `POST /v1/firm/clients` — add a person to the directory. The new client
+   * is `active`, and `created_by` is the caller.
+   *
+   * Needs `clients` at `add_edit`. Throws {@link ApiValidationException} on a
+   * 400 (per-field: `name`, `date_of_birth`, `residence_address.*`,
+   * `other_names_used[n].id`, …; `tax_id` if one was sent — it cannot be set
+   * here).
+   */
+  async createFirmClient(draft: FirmClientDraft): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/clients`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(firmClientDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/firm/clients/{id}` — one client. A 404 means the id is not in
+   * the caller's firm or does not exist — deliberately indistinguishable.
+   */
+  async getFirmClient(id: string): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmClientUrl(id), { method: 'GET', headers });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/clients/{id}` — replace a client's WHOLE editable record;
+   * see {@link FirmClientDraft}. The status, `created_by` and the tax ID are
+   * kept. Needs `clients` at `add_edit`.
+   */
+  async updateFirmClient(id: string, draft: FirmClientDraft): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#firmClientUrl(id), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(firmClientDraftToJson(draft)),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `PUT /v1/firm/clients/{id}/status` — archive a client (`'archived'`) or
+   * bring one back (`'active'`). A status write, never a delete: there is no
+   * way to delete a client through this API (ADR 0022). Needs `clients` at
+   * `add_edit`.
+   */
+  async setFirmClientStatus(id: string, status: FirmClientStatus): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/status`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
   }
 
   // -------------------------------------------------------------------------
@@ -4043,6 +4137,7 @@ const FIRM_FEATURES = [
   'notes',
   'events',
   'tasks',
+  'clients',
   'client_portal',
   'firm_administration',
 ] as const;
@@ -4279,6 +4374,43 @@ function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
   };
+}
+
+const FIRM_CLIENT_STATUSES: readonly FirmClientStatus[] = ['active', 'archived'];
+
+/**
+ * `firm_client_json`'s exact shape. `name` is required (the server always
+ * sends it); the addresses use {@link libraryAddress} because they carry
+ * `county`, which {@link optionalAddress} deliberately omits.
+ */
+function firmClientFromJson(response: DecodedResponse): FirmClient {
+  const residence = optionalObject(response, 'residence_address');
+  const mailing = optionalObject(response, 'mailing_address');
+  const name = optionalPersonName(response, 'name');
+  if (name === undefined) {
+    throw malformedField(response, 'name', 'object');
+  }
+  return definedMembers<FirmClient>({
+    id: requireString(response, 'id'),
+    status: requireChoice(response, 'status', FIRM_CLIENT_STATUSES),
+    name,
+    other_names_used: optionalOtherNames(response, 'other_names_used'),
+    date_of_birth: optionalString(response, 'date_of_birth'),
+    residence_address:
+      residence === undefined ? undefined : libraryAddress(response, 'residence_address'),
+    mailing_address:
+      mailing === undefined ? undefined : libraryAddress(response, 'mailing_address'),
+    phone: optionalString(response, 'phone'),
+    mobile: optionalString(response, 'mobile'),
+    email: optionalString(response, 'email'),
+    lead_source: optionalString(response, 'lead_source'),
+    referred_by: optionalString(response, 'referred_by'),
+    first_retained_at: optionalString(response, 'first_retained_at'),
+    tax_id_last_four: optionalString(response, 'tax_id_last_four'),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
+    created_by: requireString(response, 'created_by'),
+  });
 }
 
 function firmUserFromJson(response: DecodedResponse): FirmUser {

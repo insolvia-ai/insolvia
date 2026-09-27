@@ -777,11 +777,20 @@ attorney's own fact and self-service on `PATCH /v1/me`; every colleague may
 read it from the directory, because the prefill is case work and a bar number
 is printed on every filing.
 
-The feature list is ours — `cases`, `intake`, `documents`,
-`extraction_review`, `creditor_library`, `events`, `firm_administration` — and the
+The feature list is ours — `insolvia_core.firms.FEATURES` owns it — and the
 default for anything not in a user's map is `hidden`. That is what lets a
 feature be listed before it exists (`extraction_review` is) without arriving
-already granted to every row written before it was named.
+already granted to every row written before it was named. `clients`
+([ADR 0022](../adr/0022-a-client-is-not-a-case.md)) arrived that way on
+purpose: every existing row has it hidden until an admin grants it.
+
+**A client is not a debtor.** The firm's client directory
+(`insolvia_core.firm_clients`, `/v1/firm/clients`) is a firm-scoped person
+record in the firm table, beside the library creditors; a debtor is that
+person's identity as copied into one case. In this revision no debtor
+references a client yet — `client_id` on the debtor and the `client`
+provenance source arrive with ADR 0022's second PR, and this page gains them
+then.
 
 ## Not here, on purpose
 

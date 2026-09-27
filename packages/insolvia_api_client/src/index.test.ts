@@ -68,6 +68,7 @@ import {
 import type {
   Debtor,
   FetchLike,
+  FirmClient,
   LibraryCreditor,
   PutDebtorRequest,
   WaitlistSubmission,
@@ -3547,6 +3548,7 @@ describe('the firm block on /v1/me', () => {
     notes: 'hidden',
     events: 'hidden',
     tasks: 'add_edit',
+    clients: 'hidden',
     client_portal: 'hidden',
     firm_administration: 'add_edit',
   };
@@ -4304,6 +4306,7 @@ describe('the firm user endpoints', () => {
       notes: 'add_edit',
       events: 'hidden',
       tasks: 'hidden',
+      clients: 'add_edit',
       client_portal: 'hidden',
       firm_administration: 'hidden',
     },
@@ -4601,6 +4604,170 @@ describe('the library creditor endpoints', () => {
       name: { source: 'library', library_creditor_id: CREDITOR_ID },
       'address.line1': { source: 'library', library_creditor_id: CREDITOR_ID },
     });
+  });
+});
+
+describe('the firm client endpoints (ADR 0022)', () => {
+  const FIRM_CLIENT_ID = 'c11e0000-0000-4000-8000-000000000001';
+  const CREATOR = 'a11c0000-0000-4000-8000-00000000a11c';
+  // firm_client_json's exact shape — snake_case, absent fields omitted.
+  const FIRM_CLIENT_JSON = {
+    id: FIRM_CLIENT_ID,
+    status: 'active',
+    name: { given: 'Jordan', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    date_of_birth: '1980-02-29',
+    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    email: 'jordan@example.test',
+    lead_source: 'Referral',
+    tax_id_last_four: '4320',
+    created_at: '2026-09-26T09:15:00.123456Z',
+    updated_at: '2026-09-26T09:15:00.123456Z',
+    created_by: CREATOR,
+  };
+  const FIRM_CLIENT: FirmClient = {
+    id: FIRM_CLIENT_ID,
+    status: 'active',
+    name: { given: 'Jordan', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    date_of_birth: '1980-02-29',
+    residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+    email: 'jordan@example.test',
+    lead_source: 'Referral',
+    tax_id_last_four: '4320',
+    created_at: '2026-09-26T09:15:00.123456Z',
+    updated_at: '2026-09-26T09:15:00.123456Z',
+    created_by: CREATOR,
+  };
+
+  function clientWith(stub: ReturnType<typeof stubFetch>): InsolviaApiClient {
+    return new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+  }
+
+  test('GETs /v1/firm/clients and maps the whole directory', async () => {
+    const stub = stubFetch(() => jsonResponse({ clients: [FIRM_CLIENT_JSON] }, 200));
+
+    const clients = await clientWith(stub).listFirmClients();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(clients).toEqual([FIRM_CLIENT]);
+  });
+
+  test('POSTs a snake_case draft, county included, and maps the 201 back', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 201));
+
+    const created = await clientWith(stub).createFirmClient({
+      name: { given: 'Jordan', surname: 'Example' },
+      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+      date_of_birth: '1980-02-29',
+      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      email: 'jordan@example.test',
+      lead_source: 'Referral',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { given: 'Jordan', surname: 'Example' },
+      other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+      date_of_birth: '1980-02-29',
+      residence_address: { line1: '1 Example St', city: 'Springfield', county: 'Sangamon' },
+      email: 'jordan@example.test',
+      lead_source: 'Referral',
+    });
+    expect(created).toEqual(FIRM_CLIENT);
+  });
+
+  test('a name-only draft omits every other key — no undefined leaks', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 201));
+
+    await clientWith(stub).createFirmClient({ name: { surname: 'Example' } });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { surname: 'Example' },
+    });
+  });
+
+  test('GETs one client by id, encoded once', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 200));
+
+    const fetched = await clientWith(stub).getFirmClient('id/with slash');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/id%2Fwith%20slash`);
+    expect(fetched).toEqual(FIRM_CLIENT);
+  });
+
+  test('PUTs a whole replacement to /v1/firm/clients/{id}', async () => {
+    const stub = stubFetch(() => jsonResponse(FIRM_CLIENT_JSON, 200));
+
+    const updated = await clientWith(stub).updateFirmClient(FIRM_CLIENT_ID, {
+      name: { surname: 'Example' },
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}`);
+    expect(stub.lastRequest().method).toBe('PUT');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      name: { surname: 'Example' },
+    });
+    expect(updated).toEqual(FIRM_CLIENT);
+  });
+
+  test('archives with a PUT to /status carrying only the status', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FIRM_CLIENT_JSON, status: 'archived' }, 200));
+
+    const archived = await clientWith(stub).setFirmClientStatus(FIRM_CLIENT_ID, 'archived');
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}/status`);
+    expect(stub.lastRequest().method).toBe('PUT');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({ status: 'archived' });
+    expect(archived.status).toBe('archived');
+  });
+
+  test('a minimal record decodes with every optional field absent', async () => {
+    const minimal = {
+      id: FIRM_CLIENT_ID,
+      status: 'active',
+      name: { given: 'Mononym' },
+      created_at: '2026-09-26T09:15:00.123456Z',
+      updated_at: '2026-09-26T09:15:00.123456Z',
+      created_by: CREATOR,
+    };
+    const stub = stubFetch(() => jsonResponse(minimal, 200));
+
+    const fetched = await clientWith(stub).getFirmClient(FIRM_CLIENT_ID);
+
+    expect(fetched).toEqual(minimal);
+  });
+
+  test('an unknown status or a missing name is a contract break', async () => {
+    const badStatus = stubFetch(() => jsonResponse({ ...FIRM_CLIENT_JSON, status: 'merged' }, 200));
+    await expect(clientWith(badStatus).getFirmClient(FIRM_CLIENT_ID)).rejects.toThrow('status');
+
+    const { name: _dropped, ...nameless } = FIRM_CLIENT_JSON;
+    const noName = stubFetch(() => jsonResponse(nameless, 200));
+    await expect(clientWith(noName).getFirmClient(FIRM_CLIENT_ID)).rejects.toThrow('name');
+  });
+
+  test('a 400 on POST throws ApiValidationException with the server field messages', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { name: 'A surname or a given name is required.' } },
+        400,
+      ),
+    );
+
+    const error = await clientWith(stub)
+      .createFirmClient({ name: {} })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.name).toBe(
+      'A surname or a given name is required.',
+    );
   });
 });
 
