@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from insolvia_core.firm_clients import FirmClient, sorted_firm_clients
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
 
@@ -22,6 +23,8 @@ class MemoryFirmStore:
         self.users: dict[tuple[str, str], FirmUser] = {}
         # Same keying discipline as `users` above, for the same reason.
         self.library_creditors: dict[tuple[str, str], LibraryCreditor] = {}
+        # And again for the client directory (ADR 0022).
+        self.clients: dict[tuple[str, str], FirmClient] = {}
 
     # ── Firms ───────────────────────────────────────────────────────
 
@@ -127,3 +130,27 @@ class MemoryFirmStore:
 
     def delete_library_creditor(self, firm_id: str, creditor_id: str) -> bool:
         return self.library_creditors.pop((firm_id, creditor_id), None) is not None
+
+    # ── Firm clients ────────────────────────────────────────────────
+
+    def create_client(self, client: FirmClient) -> None:
+        key = (client.firm_id, client.id)
+        if key in self.clients:
+            raise RuntimeError(f"client {client.id} already exists")
+        self.clients[key] = client
+
+    def get_client(self, firm_id: str, client_id: str) -> FirmClient | None:
+        return self.clients.get((firm_id, client_id))
+
+    def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
+        # The shared ordering, so this store and DynamoDB cannot disagree.
+        return sorted_firm_clients(
+            client for client in self.clients.values() if client.firm_id == firm_id
+        )
+
+    def update_client(self, client: FirmClient) -> FirmClient | None:
+        key = (client.firm_id, client.id)
+        if key not in self.clients:
+            return None
+        self.clients[key] = client
+        return client

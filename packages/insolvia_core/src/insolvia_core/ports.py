@@ -21,6 +21,7 @@ from insolvia_core.cases import Case, CaseAssignment, CasePage
 from insolvia_core.clients import ClientBinding
 from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
+from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
 from insolvia_core.tasks import Task
@@ -256,6 +257,34 @@ class FirmStore(Protocol):
         link to it (the module docstring owns why), so there is nothing else
         for this store to clean up.
         """
+        ...
+
+    # ── Firm clients (ADR 0022 / #353) ─────────────────────────────
+    #
+    # No delete, on purpose: archiving is a status write through
+    # `update_client`, and a client with cases can never be deleted at all
+    # (ADR 0022). Deleting a client with none is issue #355's to add.
+
+    def create_client(self, client: FirmClient) -> None:
+        """Store a new client. MUST refuse to overwrite an existing
+        (firm_id, id) — `create_library_creditor`'s rule and reason."""
+        ...
+
+    def get_client(self, firm_id: str, client_id: str) -> FirmClient | None:
+        """One client, firm-scoped by key — a member of one firm cannot read
+        another firm's client by knowing its id."""
+        ...
+
+    def list_clients(self, firm_id: str) -> tuple[FirmClient, ...]:
+        """A firm's whole directory, archived clients included, in
+        `firm_clients.sorted_firm_clients` order. All of them: a caller cannot
+        page, and an implementation that can truncate must not."""
+        ...
+
+    def update_client(self, client: FirmClient) -> FirmClient | None:
+        """Write `client` back, but only over a row that still exists AND
+        still belongs to `client.firm_id` — `update_user`'s two-part condition,
+        for its reason. None when either no longer holds."""
         ...
 
 
