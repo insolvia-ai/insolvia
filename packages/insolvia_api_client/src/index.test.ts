@@ -3547,6 +3547,7 @@ describe('the firm block on /v1/me', () => {
     notes: 'hidden',
     events: 'hidden',
     tasks: 'add_edit',
+    client_portal: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -4303,6 +4304,7 @@ describe('the firm user endpoints', () => {
       notes: 'add_edit',
       events: 'hidden',
       tasks: 'hidden',
+      client_portal: 'hidden',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -7650,5 +7652,160 @@ describe('the event, calendar and feed endpoints', () => {
     const me = await api.me();
     expect(me.firm?.permissions.events).toBe('view_only');
     expect(me.firm?.permissions.creditor_library).toBe('hidden');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The client portal (ADR 0023). The FIRM side takes a staff token; the CLIENT
+// side (`getPortalMe`) takes a portal session's token — the server refuses
+// each on the other's routes, so these tests pin only the wire contract.
+// Bodies are copied from api/routes/portal*.py and core/clients.binding_json.
+// ---------------------------------------------------------------------------
+
+describe('the client portal endpoints', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const CLIENT_SUBJECT = 'c1c10000-0000-4000-8000-0000000000a1';
+  const BINDING = {
+    subject: CLIENT_SUBJECT,
+    email: 'pat@example.test',
+    displayName: 'Pat Example',
+    roles: ['debtor_1', 'debtor_2'],
+    status: 'invited',
+    invitedBy: SUBJECT,
+    createdAt: '2026-09-26T10:00:00.000000Z',
+    updatedAt: '2026-09-26T10:00:00.000000Z',
+  };
+
+  function portalClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  test('POSTs an invitation with the roles and maps the binding', async () => {
+    const { stub, client } = portalClient(() => jsonResponse(BINDING, 201));
+
+    const invited = await client.invitePortalClient(CASE_ID, {
+      email: 'pat@example.test',
+      displayName: 'Pat Example',
+      roles: ['debtor_1', 'debtor_2'],
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/portal/invitation`);
+    expect(seen.headers.get('Authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(JSON.parse(seen.body)).toEqual({
+      email: 'pat@example.test',
+      displayName: 'Pat Example',
+      roles: ['debtor_1', 'debtor_2'],
+    });
+    expect(invited).toEqual(BINDING);
+  });
+
+  test('omits roles when the caller leaves them to the server default', async () => {
+    const { stub, client } = portalClient(() =>
+      jsonResponse({ ...BINDING, roles: ['debtor_1'] }, 201),
+    );
+
+    await client.invitePortalClient(CASE_ID, { email: 'pat@example.test', displayName: 'Pat' });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      email: 'pat@example.test',
+      displayName: 'Pat',
+    });
+  });
+
+  test('a role conflict is a 409 the caller can show', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ error: 'ConflictError', message: 'another client answers for debtor_2' }, 409),
+    );
+
+    const error = await rejection(
+      client.invitePortalClient(CASE_ID, { email: 'sam@example.test', displayName: 'Sam' }),
+    );
+
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+
+  test('lists the clients on a case', async () => {
+    const { stub, client } = portalClient(() => jsonResponse({ clients: [BINDING] }, 200));
+
+    const clients = await client.listPortalClients(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/portal/clients`);
+    expect(clients).toEqual([BINDING]);
+  });
+
+  test('refuses a binding with no roles rather than passing it on', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ clients: [{ ...BINDING, roles: [] }] }, 200),
+    );
+
+    await expect(client.listPortalClients(CASE_ID)).rejects.toThrow();
+  });
+
+  test('resends with a POST and resolves on 204', async () => {
+    const { stub, client } = portalClient(() => new Response(null, { status: 204 }));
+
+    await expect(client.resendPortalInvitation(CASE_ID, CLIENT_SUBJECT)).resolves.toBeUndefined();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/${CASE_ID}/portal/clients/${CLIENT_SUBJECT}/resend`,
+    );
+  });
+
+  test('revokes with a DELETE and maps the revoked binding', async () => {
+    const { stub, client } = portalClient(() =>
+      jsonResponse({ ...BINDING, status: 'revoked' }, 200),
+    );
+
+    const revoked = await client.revokePortalClient('case/with slash', CLIENT_SUBJECT);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(
+      `${BASE_URL}/v1/cases/case%2Fwith%20slash/portal/clients/${CLIENT_SUBJECT}`,
+    );
+    expect(revoked.status).toBe('revoked');
+  });
+
+  test('reads the portal identity, which names no case', async () => {
+    const { stub, client } = portalClient(() =>
+      jsonResponse(
+        {
+          subject: CLIENT_SUBJECT,
+          displayName: 'Pat Example',
+          roles: ['debtor_1'],
+          firm: { name: 'Example & Partners' },
+        },
+        200,
+      ),
+    );
+
+    const me = await client.getPortalMe();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/portal/me`);
+    expect(me).toEqual({
+      subject: CLIENT_SUBJECT,
+      displayName: 'Pat Example',
+      roles: ['debtor_1'],
+      firm: { name: 'Example & Partners' },
+    });
+  });
+
+  test('a staff token on the portal is a 401', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse({ error: 'Unauthorized', message: 'authentication required' }, 401),
+    );
+
+    const error = await rejection(client.getPortalMe());
+
+    expect(error).toBeInstanceOf(ApiUnauthorizedException);
   });
 });

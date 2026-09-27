@@ -4,6 +4,7 @@ from insolvia_core.adapters.aws.access_log import DynamoDbAccessLog
 from insolvia_core.adapters.aws.candidate_store import DynamoDbCandidateStore
 from insolvia_core.adapters.aws.case_entity_store import DynamoDbCaseEntityStore
 from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
+from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
@@ -17,6 +18,9 @@ from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.candidate_store import MemoryCandidateStore
 from insolvia_core.adapters.memory.case_entity_store import MemoryCaseEntityStore
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.client_binding_store import (
+    MemoryClientBindingStore,
+)
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
@@ -30,6 +34,7 @@ from insolvia_core.ports import (
     CandidateStore,
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
@@ -47,6 +52,7 @@ from insolvia_api.adapters.aws.event_store import (
 )
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
+from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.adapters.aws.waitlist_store import DynamoDbWaitlistStore
 from insolvia_api.adapters.memory.event_store import (
@@ -67,6 +73,7 @@ from insolvia_api.core.ports import (
     EventStore,
     JobQueue,
     JobStore,
+    Mailer,
     PacketStore,
     WaitlistStore,
 )
@@ -88,10 +95,21 @@ if config.waitlist_table_name:
 else:
     waitlist_store = MemoryWaitlistStore(echo=True)
 
-# The plain development server never sends real mail — mirroring the memory
-# waitlist store, this is local-only and never composed in a deployed
-# environment (adapters/aws/mailer_client.py's SigV4MailerClient is).
-mailer = InMemoryMailerClient()
+# The plain development server never sends real mail. Unset MAILER_API_URL
+# records sends in memory — mirroring the memory waitlist store. Set, it
+# posts to THAT mailer: pointed at services/mailer's own local stack
+# (`./services/mailer/scripts/dev-up.sh`, then MAILER_API_URL=
+# http://127.0.0.1:8026 — or http://host.docker.internal:8026 from the API's
+# compose container), every message lands in Mailpit at :8025 and nothing
+# leaves the machine, which is how the client-portal invitation's context
+# mail (ADR 0023) is checked locally. The local mailer ignores the SigV4
+# signature API Gateway would verify, so the client needs only whatever
+# credentials the developer's session already exports to sign with.
+mailer: Mailer
+if config.mailer_api_url:
+    mailer = SigV4MailerClient(config.mailer_api_url)
+else:
+    mailer = InMemoryMailerClient()
 
 # Auth against this machine's own Cognito pool when AUTH_ISSUER_URL and
 # AUTH_CLIENT_ID are set (infra/envs/dev publishes both; export them into
@@ -230,6 +248,17 @@ else:
     event_store = MemoryEventStore()
     calendar_token_store = MemoryCalendarTokenStore()
 
+# The client portal's bindings (ADR 0023) span the firm table AND the case
+# table, so they ride this machine's real pair when BOTH are named and the
+# in-memory store otherwise — the same "the group moves together" rule.
+client_binding_store: ClientBindingStore
+if config.firm_table_name and config.case_table_name:
+    client_binding_store = DynamoDbClientBindingStore(
+        config.firm_table_name, config.case_table_name
+    )
+else:
+    client_binding_store = MemoryClientBindingStore()
+
 jwks_provider: JwksProvider | None = None
 if config.auth_issuer_url and config.auth_client_id:
     jwks_provider = CognitoJwksProvider(config.auth_issuer_url)
@@ -269,5 +298,6 @@ app = create_app(
         event_store=event_store,
         calendar_token_store=calendar_token_store,
         task_store=task_store,
+        client_binding_store=client_binding_store,
     )
 )

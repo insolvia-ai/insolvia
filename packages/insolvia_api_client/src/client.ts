@@ -48,6 +48,11 @@ import type {
   CaseChapter,
   CaseCollection,
   CaseEntity,
+  ClientRole,
+  InvitePortalClientRequest,
+  PortalClient,
+  PortalClientStatus,
+  PortalMe,
   CaseEntityRequest,
   CaseForm,
   CaseLiens,
@@ -1555,6 +1560,114 @@ export class InsolviaApiClient {
     await expectNoContent(response, 204);
   }
 
+  /**
+   * `GET /v1/cases/{caseId}/portal/clients` — everyone ever invited to this
+   * case's client portal (ADR 0023), revoked included, oldest first.
+   *
+   * Needs `client_portal` at `view_only` — hidden by default for every role.
+   */
+  async listPortalClients(caseId: string): Promise<readonly PortalClient[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/clients`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'clients', 'PortalClient', portalClientFromJson);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/portal/invitation` — invite a debtor to this
+   * case's client portal. Cognito mails the temporary password; the API mails
+   * the context (which firm, where to sign in), and neither passes through
+   * here.
+   *
+   * Throws {@link ApiException} with status **409** when the roles are held
+   * by another client whose binding would be left with none, when the person
+   * already has live access to a case, or when the address has an Insolvia
+   * account that is not one of this firm's clients. Needs `client_portal` at
+   * `add_edit`.
+   */
+  async invitePortalClient(
+    caseId: string,
+    request: InvitePortalClientRequest,
+  ): Promise<PortalClient> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, unknown> = {
+      email: request.email,
+      displayName: request.displayName,
+    };
+    if (request.roles !== undefined) body.roles = [...request.roles];
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/invitation`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return portalClientFromJson(decoded);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/portal/clients/{subject}/resend` — re-send an
+   * invitation that has not been used yet. A **409** means the client has
+   * already used the portal.
+   */
+  async resendPortalInvitation(caseId: string, subject: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#portalClientUrl(caseId, subject)}/resend`, {
+      method: 'POST',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/portal/clients/{subject}` — withdraw a
+   * client's access. Answers the binding, now `revoked`.
+   */
+  async revokePortalClient(caseId: string, subject: string): Promise<PortalClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalClientUrl(caseId, subject), {
+      method: 'DELETE',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return portalClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/portal/me` — the CLIENT side (ADR 0023). Construct the client
+   * with the PORTAL session's token for this one: a staff token answers
+   * **401** here, and a portal token answers 401 on every staff method.
+   * A **403** means the signed-in person has no live access to a case.
+   */
+  async getPortalMe(): Promise<PortalMe> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/me`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    const firm = optionalObject(decoded, 'firm');
+    if (firm === undefined) {
+      throw malformedField(decoded, 'firm', 'object');
+    }
+    return {
+      subject: requireString(decoded, 'subject'),
+      displayName: requireString(decoded, 'displayName'),
+      roles: requireClientRoles(decoded, 'roles'),
+      firm: { name: requireString(firm, 'name') },
+    };
+  }
+
+  /** `/v1/cases/{caseId}/portal/clients/{subject}`, each segment encoded once. */
+  #portalClientUrl(caseId: string, subject: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/portal/clients/${encodeURIComponent(subject)}`;
+  }
+
   /** `/v1/firm/users/{subject}`, with the subject encoded exactly once. */
   #firmUserUrl(subject: string): string {
     return `${this.#baseUrl}/v1/firm/users/${encodeURIComponent(subject)}`;
@@ -2500,8 +2613,8 @@ function requireCandidateStatus(response: DecodedResponse, key: string): Candida
 
 function candidateOriginFromJson(response: DecodedResponse): CandidateOrigin {
   const channel = requireString(response, 'channel');
-  if (channel !== 'extraction' && channel !== 'mcp') {
-    throw malformedField(response, 'channel', "'extraction' | 'mcp'");
+  if (channel !== 'extraction' && channel !== 'mcp' && channel !== 'client') {
+    throw malformedField(response, 'channel', "'extraction' | 'mcp' | 'client'");
   }
   return {
     channel,
@@ -3894,6 +4007,30 @@ function requireArrayOf<T>(
   });
 }
 
+const CLIENT_ROLES: readonly ClientRole[] = ['debtor_1', 'debtor_2'];
+const PORTAL_CLIENT_STATUSES: readonly PortalClientStatus[] = ['invited', 'active', 'revoked'];
+
+function requireClientRoles(response: DecodedResponse, key: string): readonly ClientRole[] {
+  const roles = requireStringArray(response, key);
+  if (roles.length === 0 || roles.some((role) => !CLIENT_ROLES.includes(role as ClientRole))) {
+    throw malformedField(response, key, 'ClientRole[] (non-empty)');
+  }
+  return roles as readonly ClientRole[];
+}
+
+function portalClientFromJson(response: DecodedResponse): PortalClient {
+  return {
+    subject: requireString(response, 'subject'),
+    email: requireString(response, 'email'),
+    displayName: requireString(response, 'displayName'),
+    roles: requireClientRoles(response, 'roles'),
+    status: requireChoice(response, 'status', PORTAL_CLIENT_STATUSES),
+    invitedBy: requireString(response, 'invitedBy'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
 const FIRM_ROLES: readonly FirmRole[] = ['attorney', 'paralegal', 'staff'];
 const PERMISSION_LEVELS: readonly PermissionLevel[] = ['hidden', 'view_only', 'add_edit'];
 const FIRM_USER_STATUSES = ['active', 'disabled'] as const;
@@ -3906,6 +4043,7 @@ const FIRM_FEATURES = [
   'notes',
   'events',
   'tasks',
+  'client_portal',
   'firm_administration',
 ] as const;
 

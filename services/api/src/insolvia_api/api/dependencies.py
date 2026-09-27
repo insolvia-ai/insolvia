@@ -9,6 +9,7 @@ from insolvia_core.ports import (
     CandidateStore,
     CaseEntityStore,
     CaseStore,
+    ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
     DocumentStore,
@@ -117,6 +118,12 @@ class ApiDependencies:
     # Case tasks (issue #356 / 14.4): the same "nothing to provision"
     # argument again — task rows are child items of the case partition.
     task_store: TaskStore | None = None
+    # The client portal's bindings (ADR 0023): which case a portal subject
+    # may reach. Spans the firm table and the case table — both already
+    # configured — so, like the stores above, nothing new to provision.
+    # Optional for the same test-convenience reason; the portal and
+    # invitation routes raise rather than degrade when it is absent.
+    client_binding_store: ClientBindingStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

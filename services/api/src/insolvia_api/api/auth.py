@@ -74,6 +74,7 @@ from insolvia_core.access import Accessor
 from insolvia_core.auth import (
     AuthenticationError,
     AuthFailureReason,
+    AuthSettings,
     bearer_token,
     key_id,
     settings_or_raise,
@@ -95,18 +96,40 @@ _ACCESSOR_KEY = "insolvia_accessor"
 
 View = TypeVar("View", bound=Callable[..., ResponseReturnValue])
 
+# Which principal class a registered view admits, stamped by the decorator
+# that authenticates it: `staff` by `require_auth`, `client` by
+# `api/client_auth.require_client` (ADR 0023). tests/unit/test_portal_routes.py
+# reads it off every rule in the URL map — the static half of the proof that
+# every /v1/portal/ route admits clients and no other route does.
+PRINCIPAL_CLASS_ATTRIBUTE = "insolvia_principal_class"
+STAFF = "staff"
+CLIENT = "client"
+
 
 def authenticate() -> Principal:
-    """Verify the request's bearer token and return the principal.
+    """Verify the request's bearer token as a STAFF token and return the
+    principal.
 
     Raises AuthenticationError for every rejection. Composed from the pure
     pieces in core/auth.py plus exactly one impure step — asking the
     JwksProvider port for the key named by the token's `kid`.
+
+    STAFF means the web app client: `AUTH_CLIENT_ID`, compared for equality.
+    A client-portal token names a different client and fails here with
+    INVALID_CLIENT — which is the whole of why a debtor's token reaches no
+    staff route, with no role check to forget (ADR 0023).
     """
     deps = dependencies()
-    settings = settings_or_raise(
-        deps.config.auth_issuer_url, deps.config.auth_client_id
+    return verify_request_token(
+        settings_or_raise(deps.config.auth_issuer_url, deps.config.auth_client_id)
     )
+
+
+def verify_request_token(settings: AuthSettings) -> Principal:
+    """The request's bearer token, verified against `settings` — the one
+    implementation both principal classes' profiles share, so the
+    cryptographic half cannot drift between them."""
+    deps = dependencies()
     provider = deps.jwks_provider
     if provider is None:
         # Configured issuer/client but no provider composed: a broken
@@ -135,6 +158,7 @@ def require_auth(view: View) -> View:
         setattr(g, _PRINCIPAL_KEY, principal)
         return view(*args, **kwargs)
 
+    setattr(wrapper, PRINCIPAL_CLASS_ATTRIBUTE, STAFF)
     return cast("View", wrapper)
 
 

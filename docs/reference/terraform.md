@@ -12,7 +12,8 @@ infra/
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
 │   ├── auth/                 # reusable: Cognito user pool + hosted domain
-│   │                         #   + one web (SPA) PKCE app client
+│   │                         #   + public PKCE app clients: the web SPA's,
+│   │                         #   the client portal's (ADR 0023), one per MCP harness
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into

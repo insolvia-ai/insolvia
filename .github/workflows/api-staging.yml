@@ -60,6 +60,7 @@ jobs:
       fixture_bucket: ${{ steps.tf.outputs.fixture_bucket }}
       auth_pool_id: ${{ steps.tf.outputs.auth_pool_id }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
+      auth_portal_client_id: ${{ steps.tf.outputs.auth_portal_client_id }}
     steps:
       - uses: actions/checkout@v5
 
@@ -94,6 +95,9 @@ jobs:
             echo "fixture_bucket=$(terraform -chdir=infra/envs/staging output -raw dev_fixtures_bucket)"
             echo "auth_pool_id=$(terraform -chdir=infra/envs/staging output -raw auth_user_pool_id)"
             echo "auth_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_web_client_id)"
+            # The client portal's app client (ADR 0023): the seeded client
+            # signs in against it, and staff routes must refuse its token.
+            echo "auth_portal_client_id=$(terraform -chdir=infra/envs/staging output -raw auth_portal_client_id)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to ECR
@@ -338,5 +342,6 @@ jobs:
           INTEGRATION_API_URL: https://${{ needs.deploy.outputs.domain }}
           INTEGRATION_AUTH_POOL_ID: ${{ needs.deploy.outputs.auth_pool_id }}
           INTEGRATION_AUTH_CLIENT_ID: ${{ needs.deploy.outputs.auth_client_id }}
+          INTEGRATION_AUTH_PORTAL_CLIENT_ID: ${{ needs.deploy.outputs.auth_portal_client_id }}
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: pytest tests/integration
