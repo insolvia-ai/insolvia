@@ -7,7 +7,7 @@ Two kinds of file, one loader
 |---|---|---|
 | `dev.json` | Who exists on a developer's machine — the dev account's firm — and which fixture case it holds, with the portal client bound to it ([ADR 0023](../docs/adr/0023-client-portal-identity-and-isolation.md)) | `scripts/dev-aws-seed.sh`, by hand, after `dev-aws-setup.sh` |
 | `staging.json` | Who exists in staging — three people across two firms, so cross-tenant isolation is testable — which fixture case they hold, and the portal client bound to it | `.github/actions/seed-staging`, on every staging deploy, before the API's integration tier and the browser suite |
-| `fixtures/<version>/cases.json` | What each fixture case contains: chapter, court and division (a reference into the court registry, `insolvia_core.courts`), debtors, collection items, documents — in the API's own request-body shapes | the loader, when an environment fixture names one of its cases |
+| `fixtures/<version>/cases.json` | What each fixture case contains: chapter, court and division (a reference into the court registry, `insolvia_core.courts`), debtors, collection items, documents — in the API's own request-body shapes, with `{"$ref": "claims/<handle>"}` wherever one record names another (a fixture publishes no ids) | the loader, when an environment fixture names one of its cases |
 | `fixtures/<version>/manifest.json` | Every sample document's size and sha256 | the loader, to verify a copy landed as published |
 | `fixtures/<version>/objects/` | The sample documents themselves — small, synthetic, committed | `scripts/dev-fixture.sh publish`, which copies them into the shared fixture bucket the loader reads from |
 
@@ -18,7 +18,11 @@ second run finds the rows it wrote and writes nothing twice. Rows that exist
 are left alone — a seeded environment is somewhere people work — so **a changed
 fixture is a new version**, captured out of a dev stack with
 `scripts/dev-fixture.sh capture v2 <case-id> <handle>` and published after its
-PR merges.
+PR merges. Capture drops a debtor's tax id (the API only ever shows its last
+four); type it back from the SSA's never-issued block before committing.
+`services/admin`'s unit tier loads `dev.json` and `staging.json`, with every
+version they name, into memory stores — so a fixture that would not load
+fails `scripts/dev-test.sh` there, not the next staging deploy.
 
 **Nothing here is real.** Every address ends in `.test` (RFC 2606 — it can never
 be a mailbox); every name, employer and figure is invented; every document

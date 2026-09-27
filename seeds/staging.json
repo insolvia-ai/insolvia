@@ -32,10 +32,14 @@
     "`cases` names which cases from a committed fixture version",
     "(seeds/fixtures/<version>/cases.json) are loaded into which firm, and",
     "who opened them. The rows AND the sample documents converge on every",
-    "load — staging gets the same synthetic Chapter 7 matter every other",
-    "environment gets, with the same two documents copied server-side from",
-    "the shared fixture bucket. Rows that already exist are left alone; a",
-    "changed fixture is a new version, not an edit to one that has loaded.",
+    "load — staging gets the same synthetic Chapter 7 and Chapter 13 matters",
+    "every other environment gets, with the Chapter 7 case's two documents",
+    "copied server-side from the shared fixture bucket. Rows that already",
+    "exist are left alone; a changed fixture is a new version, not an edit",
+    "to one that has loaded — so moving to v3 ADDS v3's cases beside the v2",
+    "one an environment already holds, and a portal client bound to the v2",
+    "case stays bound to it (one binding per person per firm; the loader",
+    "leaves an existing binding alone).",
     "",
     "A case's `clients` are debtors bound to it for the client portal (ADR",
     "0023), in the invitation route's own body shape. The loader sets their",
@@ -98,7 +102,7 @@
   ],
   "cases": [
     {
-      "fixture": "v2",
+      "fixture": "v3",
       "case": "chapter-7-sample",
       "firm": "Insolvia E2E",
       "openedBy": "admin",
@@ -111,6 +115,12 @@
           "roles": ["debtor_1"]
         }
       ]
+    },
+    {
+      "fixture": "v3",
+      "case": "chapter-13-sample",
+      "firm": "Insolvia E2E",
+      "openedBy": "admin"
     }
   ]
 }
