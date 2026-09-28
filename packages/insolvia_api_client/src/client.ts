@@ -923,6 +923,54 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `POST /v1/cases/{caseId}/debtors/{filingRole}/copy-from-client` — ADR
+   * 0022's *re-copy from client*: the debtor's copied fields (name, other
+   * names, both addresses, phone, mobile, email) are overwritten with the
+   * linked client's, each with `client` provenance again, and the saved
+   * debtor comes back (its `differs_from_client` now `[]`). The case's own
+   * answers — venue, counselling, the signature date, the tax ID — are
+   * untouched. No body.
+   *
+   * Throws a plain {@link ApiException} with `statusCode` **409** when the
+   * case is filed (changing a filed petition is an amendment) or the debtor
+   * has no linked client, and {@link ApiValidationException} keyed
+   * `client_id` when that client is archived. Needs `intake` at `add_edit`
+   * and `clients` at `view_only`.
+   */
+  async copyDebtorFromClient(caseId: string, filingRole: FilingRole): Promise<Debtor> {
+    return this.#debtorClientAct(caseId, filingRole, 'copy-from-client');
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/debtors/{filingRole}/copy-to-client` — ADR
+   * 0022's *update client from this case*: the linked client's copied fields
+   * are overwritten with what this debtor now says (the client's own date of
+   * birth, lead source and so on are kept). Answers the DEBTOR, unchanged
+   * but for `differs_from_client`, now `[]`. No body.
+   *
+   * Allowed on a filed case — the petition does not change, the directory
+   * does. Throws a plain {@link ApiException} with `statusCode` **409** when
+   * the debtor has no linked client, and {@link ApiValidationException}
+   * keyed `name` when the case's name is empty (a client needs one). Needs
+   * `clients` at `add_edit`.
+   */
+  async copyDebtorToClient(caseId: string, filingRole: FilingRole): Promise<Debtor> {
+    return this.#debtorClientAct(caseId, filingRole, 'copy-to-client');
+  }
+
+  async #debtorClientAct(
+    caseId: string,
+    filingRole: FilingRole,
+    act: 'copy-from-client' | 'copy-to-client',
+  ): Promise<Debtor> {
+    const headers = await this.#protectedHeaders();
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors/${encodeURIComponent(filingRole)}/${act}`;
+    const response = await this.#fetch(url, { method: 'POST', headers });
+    const decoded = await decodeExpected(response, 200);
+    return debtorFromJson(decoded);
+  }
+
+  /**
    * `POST /v1/cases/{caseId}/{collection}` — add one record to a generic case
    * collection (issue #249): creditors, claims, assets, employments,
    * income_summaries, households, expenses, dependents, codebtors,

@@ -62,6 +62,7 @@ import {
   isUploadIncomplete,
   libraryProvenance,
   permits,
+  revisedProvenance,
   staffTypedProvenance,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
@@ -3252,6 +3253,115 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
       ),
     );
     expect(Object.keys(error.fields)).toEqual(['client_id']);
+  });
+
+  test.each([
+    ['copyDebtorFromClient', 'copy-from-client'],
+    ['copyDebtorToClient', 'copy-to-client'],
+  ] as const)('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
+    const recopied = { ...CLIENT_DEBTOR, differs_from_client: [] };
+    const stub = stubFetch(() => jsonResponse(recopied, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const debtor = await client[method](CLIENT_DEBTOR.case_id, 'debtor_2');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/${act}`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(debtor.differs_from_client).toEqual([]);
+    expect(debtor.provenance['name.given']).toEqual({ source: 'client', client_id: CLIENT_ID_1 });
+  });
+
+  test('a re-copy refused on a filed case is a 409 ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message:
+            'This case is filed — re-copying would change a filed petition. Amend it instead.',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    const error = await rejection(client.copyDebtorFromClient(CLIENT_DEBTOR.case_id, 'debtor_1'));
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+});
+
+describe('revisedProvenance', () => {
+  const COPIED = { source: 'client', client_id: CLIENT_ID_1 } as const;
+  const LOADED = {
+    name: { given: 'Sam', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    phone: '555-0100',
+    tax_id: { kind: 'ssn', last_four: '4321' },
+    provenance: {
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      'other_names_used[alias-1].surname': COPIED,
+      phone: COPIED,
+      tax_id: { source: 'staff_typed' },
+    },
+  } as const;
+
+  test('an untouched record keeps every entry it was loaded with', () => {
+    const { provenance: _provenance, ...body } = LOADED;
+    expect(revisedProvenance(body, LOADED)).toEqual(LOADED.provenance);
+  });
+
+  test('only the field the person changed becomes staff_typed', () => {
+    const body = { ...LOADED, provenance: undefined, name: { ...LOADED.name, given: 'Samuel' } };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      ...LOADED.provenance,
+      'name.given': { source: 'staff_typed' },
+    });
+  });
+
+  test('a field the person added is staff_typed, and a cleared one has no entry', () => {
+    const body = { name: LOADED.name, email: 'sam@example.test' };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      email: { source: 'staff_typed' },
+    });
+  });
+
+  test('an alias is matched by its id, not its position', () => {
+    const body = {
+      other_names_used: [
+        { id: 'alias-2', surname: 'New' },
+        { id: 'alias-1', surname: 'Sample' },
+      ],
+    };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'other_names_used[alias-2].surname': { source: 'staff_typed' },
+      'other_names_used[alias-1].surname': COPIED,
+    });
+  });
+
+  test('a tax ID echoed as loaded keeps its entry; a number typed into it does not', () => {
+    const echoed = revisedProvenance({ tax_id: { kind: 'ssn', last_four: '4321' } }, LOADED);
+    const retyped = revisedProvenance(
+      { tax_id: { kind: 'ssn', last_four: '4321', value: '987-65-4321' } },
+      LOADED,
+    );
+    expect(echoed.tax_id).toBe(LOADED.provenance.tax_id);
+    expect(retyped.tax_id).toEqual({ source: 'staff_typed' });
+  });
+
+  test('with nothing loaded it is staffTypedProvenance', () => {
+    const body = { name: { given: 'Sam' }, phone: '555-0100' };
+    expect(revisedProvenance(body, undefined)).toEqual(staffTypedProvenance(body));
   });
 });
 

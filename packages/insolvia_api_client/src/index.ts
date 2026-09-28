@@ -55,6 +55,7 @@ export {
   noteRequestToJson,
   outputOptionsRequestToJson,
   putDebtorRequestToJson,
+  revisedProvenance,
   staffTypedProvenance,
   submittedAtUtc,
   permits,

@@ -2715,6 +2715,81 @@ export function libraryProvenance(
   return entries;
 }
 
+/**
+ * The `provenance` map for a whole-record save of `body` that EDITS a record
+ * the caller loaded as `previous`: every populated field whose value is still
+ * the one `previous` held keeps the entry `previous` carried for it; every
+ * field the person changed or added becomes `staff_typed`.
+ *
+ * {@link staffTypedProvenance} is right for a record a person typed from
+ * scratch, and wrong for one that arrived with provenance of its own — a
+ * debtor copied from the firm's client (ADR 0022) says `client` on every
+ * copied field, and re-stamping the whole record `staff_typed` on the first
+ * autosave would erase that for fields nobody touched. The data model's rule
+ * is that a field keeps its provenance until a human changes THAT field; this
+ * is the rule, per path. The API enforces the `client` half of it — a
+ * `client` entry on a changed value is refused — so a caller that sends
+ * {@link staffTypedProvenance}'s map loses the copy's attribution, and one
+ * that echoes `previous.provenance` whole is refused.
+ *
+ * "Still the value" compares the field's value at its path — list elements
+ * by their `id`, as the paths address them. The tax ID compares as its kind
+ * and last four; a number typed into it is always a change.
+ *
+ * ```ts
+ * await client.putDebtor(caseId, role, { ...body, provenance: revisedProvenance(body, loaded) });
+ * ```
+ */
+export function revisedProvenance(
+  body: DebtorBodyLike,
+  previous: DebtorBodyLike | undefined,
+): Record<string, ProvenanceEntry> {
+  const kept: Readonly<Record<string, unknown>> =
+    isPlainObject(previous) && isPlainObject(previous.provenance) ? previous.provenance : {};
+  const before = previous === undefined ? undefined : caseDataOf(previous, taxIdIdentity);
+  const after = caseDataOf(body, taxIdIdentity);
+  const entries: Record<string, ProvenanceEntry> = {};
+  for (const path of populatedPaths(after)) {
+    const entry = kept[path];
+    const unchanged =
+      before !== undefined &&
+      isPlainObject(entry) &&
+      JSON.stringify(valueAt(before, path)) === JSON.stringify(valueAt(after, path));
+    entries[path] = unchanged ? (entry as unknown as ProvenanceEntry) : { source: 'staff_typed' };
+  }
+  return entries;
+}
+
+/** The tax ID as {@link revisedProvenance} compares it: kind and last four,
+ * or — when digits are being sent — the digits, which no loaded record holds. */
+function taxIdIdentity(sent: Record<string, unknown>): string {
+  return typeof sent.value === 'string'
+    ? `typed:${sent.value}`
+    : `${String(sent.kind)}:${String(sent.last_four)}`;
+}
+
+const PATH_SEGMENT_RE = /^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$/;
+
+/** The value a provenance path addresses in `record` — `value_at` in
+ * `core/provenance.py`, and the inverse of {@link populatedPaths}. */
+function valueAt(record: unknown, path: string): unknown {
+  let current: unknown = record;
+  for (const segment of path.split('.')) {
+    const match = PATH_SEGMENT_RE.exec(segment);
+    if (match === null || !isPlainObject(current)) {
+      return undefined;
+    }
+    current = current[match[1] as string];
+    const id = match[2];
+    if (id !== undefined) {
+      current = Array.isArray(current)
+        ? current.find((element) => isPlainObject(element) && element.id === id)
+        : undefined;
+    }
+  }
+  return current;
+}
+
 // Stamped by the server or already the record's address, so there is nothing
 // to record the origin of. The same six keys `debtor_body()` drops.
 const NOT_CASE_DATA: readonly string[] = [
@@ -2726,7 +2801,10 @@ const NOT_CASE_DATA: readonly string[] = [
   'provenance',
 ];
 
-function caseDataOf(body: DebtorBodyLike): unknown {
+function caseDataOf(
+  body: DebtorBodyLike,
+  taxIdAs: (sent: Record<string, unknown>) => unknown = () => 'present',
+): unknown {
   if (!isPlainObject(body)) {
     return body;
   }
@@ -2748,7 +2826,7 @@ function caseDataOf(body: DebtorBodyLike): unknown {
     if (sent === undefined) {
       delete caseData.tax_id;
     } else {
-      caseData.tax_id = 'present';
+      caseData.tax_id = taxIdAs(sent);
     }
   }
   return caseData;
