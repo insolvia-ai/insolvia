@@ -15,8 +15,12 @@ Two kinds of file, one loader
 on every run; firms are keyed on the people in them; a case's id is derived
 from the target table, the firm, the version and the case's `handle`, so a
 second run finds the rows it wrote and writes nothing twice. Rows that exist
-are left alone — a seeded environment is somewhere people work — so **a changed
-fixture is a new version**, captured out of a dev stack with
+are left alone — a seeded environment is somewhere people work — which also
+means **no test may write to a fixture case**: a re-seed will not undo it, and
+the integration tier, which finds fixture cases by what the seed wrote, fails
+the next run saying the case "was modified after seeding". Suites write to
+their own scratch cases (`services/api/tests/integration/conftest.py`,
+`e2e/support/scratch-case.ts`). And **a changed fixture is a new version**, captured out of a dev stack with
 `scripts/dev-fixture.sh capture v2 <case-id> <handle>` and published after its
 PR merges. Capture drops a debtor's tax id (the API only ever shows its last
 four); type it back from the SSA's never-issued block before committing.
