@@ -29,7 +29,7 @@ runs against which environment. This file owns *how* to write one.
 | **unit** | `services/*/tests/unit/`, `packages/insolvia_core/tests/unit/` | pytest | each unit's `scripts/dev-test.sh` (ruff → mypy → pytest, exactly as CI); a bare `pytest` is unit-only | nothing — memory adapters |
 | **unit** | `apps/insolvia_app` (colocated) | Jest (`jest-expo`) | `npm test --workspace apps/insolvia_app` | nothing — mocks |
 | **unit** | `packages/insolvia_api_client`, `apps/insolvia_admin` (colocated) | Vitest | `npm run test --workspace <pkg>` / `npm test` | nothing — stubbed `fetch` |
-| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs | nothing |
+| **unit**, all of the above at once | — | `scripts/dev-test-unit.sh` | every suite, or the ones a set of files touches; what the **pre-push hook** runs. Python areas run CI's ruff lint + format check first (not mypy) | nothing |
 | **integration** | `services/api/tests/integration/` | pytest, gated on `INSOLVIA_INTEGRATION=1` | `services/api/scripts/dev-test-integration.sh` (dev); `api-staging.yml` (staging) | the RUNNING API over HTTP, signed in by SRP as a seeded person |
 | **e2e `flows`** | `e2e/tests/flows/` | Playwright | `e2e/scripts/dev-test.sh` (dev); `app-staging.yml` (staging) | a real browser, signed in |
 | **e2e `smoke`** | `e2e/tests/smoke/` | Playwright | same wrappers; `app-prod.yml` (production) | HTTP + a browser, **no credentials** — the only thing that runs on prod |
