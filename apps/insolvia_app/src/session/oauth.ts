@@ -35,6 +35,22 @@ export const OAUTH_SCOPES = 'openid email profile';
 /** The path the hosted UI redirects back to. Pinned by infra — see the route file. */
 export const CALLBACK_PATH = '/auth/callback';
 
+/**
+ * The CLIENT PORTAL's return leg (ADR 0023). `infra/modules/auth/main.tf`
+ * registers `<origin>/portal/auth/callback` as the portal app client's only
+ * callback, exact match — the route file `src/app/portal/auth/callback.tsx`
+ * is this path, and `portal-routes.test.tsx` pins both.
+ */
+export const PORTAL_CALLBACK_PATH = '/portal/auth/callback';
+
+/**
+ * Where the portal's sign-out lands: `<origin>/portal`, the portal client's
+ * only registered `logout_uri` (`portal_logout_urls` in the same file). Unlike
+ * the staff client's, it carries a path — so the portal passes
+ * `origin + PORTAL_HOME_PATH` to {@link logoutUrl}, never the bare origin.
+ */
+export const PORTAL_HOME_PATH = '/portal';
+
 /** A set of tokens as the session holds them. */
 export interface TokenSet {
   /** The bearer credential for the API. Memory only, never persisted. */
@@ -83,9 +99,13 @@ function formEncode(params: Record<string, string>): string {
     .join('&');
 }
 
-/** The redirect URI for an origin. Cognito matches this **exactly**. */
-export function callbackUrlFor(origin: string): string {
-  return `${origin}${CALLBACK_PATH}`;
+/**
+ * The redirect URI for an origin. Cognito matches this **exactly**. `path` is
+ * {@link CALLBACK_PATH} for the staff app and {@link PORTAL_CALLBACK_PATH}
+ * for the client portal — each app client registers only its own.
+ */
+export function callbackUrlFor(origin: string, path: string = CALLBACK_PATH): string {
+  return `${origin}${path}`;
 }
 
 /** Parameters for {@link authorizeUrl}. */
