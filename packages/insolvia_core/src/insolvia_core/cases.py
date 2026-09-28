@@ -172,6 +172,20 @@ class CaseDraft:
 
     chapter: int
     court: CourtReference
+    # The firm clients the case is opened for (ADR 0022), in filing-role
+    # order: the first is Debtor 1, the second — when present — Debtor 2.
+    # Ids only: whether each names a client of THIS firm is the route's
+    # question, answered against the firm store, not the parser's.
+    client_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ClientCase:
+    """One entry of a client's case list (`GET /v1/firm/clients/<id>/cases`):
+    a case the caller may see, and which debtor of it the client is."""
+
+    case: Case
+    filing_role: str
 
 
 @dataclass(frozen=True)
@@ -331,22 +345,61 @@ def _parse_form_date(value: object, field: str, errors: dict[str, str]) -> str |
     return stripped
 
 
-def parse_case_creation(payload: Mapping[str, object]) -> CaseDraft:
+MAX_CASE_CLIENTS = 2
+
+
+def _parse_client_ids(value: object, errors: dict[str, str]) -> tuple[str, ...]:
+    """`client_ids`: one or two distinct client ids, Debtor 1 first (ADR 0022).
+
+    Two, not three: a non-filing spouse is not the firm's client and need not
+    be one, so opening a case never requires them — linking one afterwards is
+    the debtor link route's. The same client twice is refused here because it
+    is refused everywhere: one client, one role per case, or the `by-client`
+    index lists the case twice.
+    """
+    if not isinstance(value, list) or not value:
+        errors["client_ids"] = "Choose the client this case is for."
+        return ()
+    if len(value) > MAX_CASE_CLIENTS:
+        errors["client_ids"] = "A case is opened for one client, or two filing jointly."
+        return ()
+    if not all(isinstance(item, str) and item.strip() for item in value):
+        errors["client_ids"] = "Each client must be a client id."
+        return ()
+    ids = tuple(str(item).strip() for item in value)
+    if len(set(ids)) != len(ids):
+        errors["client_ids"] = "The same client cannot be both debtors on one case."
+        return ()
+    return ids
+
+
+def parse_case_creation(
+    payload: Mapping[str, object], *, require_clients: bool = True
+) -> CaseDraft:
     """Validate POST /v1/cases. Unknown keys are ignored.
 
     Status is deliberately NOT accepted here: every case starts at "intake",
     and letting a client create one already marked "filed" would be a lie the
     server told on its behalf.
+
+    `client_ids` is REQUIRED (ADR 0022): a case is opened for a client, and a
+    debtor without one is a state the store no longer produces.
+    `require_clients=False` exists for the callers that build a case with no
+    request behind it — the seed loader until its fixtures name clients, and
+    tests that compose stores directly — never for a route.
     """
     errors: dict[str, str] = {}
     chapter = _parse_chapter(payload.get("chapter"), errors)
     _refuse_typed_district(payload, errors)
     court = _parse_court(payload, errors)
+    client_ids = (
+        _parse_client_ids(payload.get("client_ids"), errors) if require_clients else ()
+    )
     # The None checks are redundant with `errors` but they are what narrows
     # the types, and a redundant guard beats an assert that a future -O strips.
     if errors or chapter is None or court is None:
         raise FieldValidationError(errors)
-    return CaseDraft(chapter=chapter, court=court)
+    return CaseDraft(chapter=chapter, court=court, client_ids=client_ids)
 
 
 def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
@@ -523,6 +576,14 @@ def firm_key(firm_id: str) -> str:
 
 def assignee_key(subject: str) -> str:
     return f"ASSIGNEE#{subject}"
+
+
+def client_key(client_id: str) -> str:
+    """GSI3PK on a debtor item that names a firm client — the `by-client`
+    index's partition (ADR 0022). `CLIENT#` is free in THIS table: the
+    portal binding's `CLIENT#<subject>` rows live in the firm table, and a
+    GSI key is a different namespace from a sort key in any case."""
+    return f"CLIENT#{client_id}"
 
 
 def listing_sort_key(created_at: str, case_id: str) -> str:
@@ -763,6 +824,10 @@ def parse_list_limit(raw: str | None) -> int:
 # correct answer, because their listing genuinely changed.
 INDEX_BY_FIRM = "by-firm"
 INDEX_BY_ASSIGNEE = "by-assignee"
+# A client's cases (ADR 0022), fed by debtor items that carry a `client_id`.
+# Never paginated through a cursor — a person has a handful of matters — so
+# it takes no part in the cursor tagging above.
+INDEX_BY_CLIENT = "by-client"
 
 
 def encode_cursor(key: Mapping[str, str], *, index: str) -> str:

@@ -33,7 +33,9 @@ OTHER_FIRM = make_accessor(is_admin=True, firm_id=OTHER_FIRM_ID)
 
 def _case(tools, accessor=ADMIN):
     case, assignment = create_case(
-        parse_case_creation({"chapter": 7, "court": "flmb", "division": "tampa"}),
+        parse_case_creation(
+            {"chapter": 7, "court": "flmb", "division": "tampa"}, require_clients=False
+        ),
         firm_id=accessor.firm_id,
         created_by=accessor.subject,
     )

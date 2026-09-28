@@ -33,6 +33,8 @@ from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from pypdf import PdfReader
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 FIRM_A = "00000000-0000-4000-8000-00000000f18a"
@@ -87,9 +89,10 @@ def member(subject: str, firm_id: str) -> FirmUser:
 
 @pytest.fixture
 def stores():
+    debtors = MemoryDebtorStore()
     return {
-        "case_store": MemoryCaseStore(),
-        "debtor_store": MemoryDebtorStore(),
+        "case_store": MemoryCaseStore(debtor_store=debtors),
+        "debtor_store": debtors,
         "entity_store": MemoryCaseEntityStore(),
         "blobs": MemoryDocumentBlobStore(),
         "task_store": MemoryTaskStore(),
@@ -144,7 +147,9 @@ def open_case(client, subject=ALICE):
     # only a full name like the reference case's is one of them.
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -157,7 +162,7 @@ def add_debtor_1(client, case_id):
         json={"name": {"given": "Ada"}, "provenance": {"name.given": TYPED}},
         headers=auth(ALICE),
     )
-    assert response.status_code == 201
+    assert response.status_code == 200
     return response.get_json()["id"]
 
 
@@ -205,8 +210,10 @@ def test_a_bare_case_lists_every_chapter_7_form_all_blocked(client):
     case_id = open_case(client)
     body = client.get(f"/v1/cases/{case_id}/forms", headers=auth(ALICE)).get_json()
     assert len(body["forms"]) > 0
-    # No Debtor 1 yet — every row carries at least one problem.
-    assert all(row["problems"] for row in body["forms"])
+    # Debtor 1 is only the client's name so far (a case is opened for a
+    # client — ADR 0022), so the petition itself is far from printable.
+    by_series = {row["series"]: row for row in body["forms"]}
+    assert by_series["form/b101"]["problems"]
     series_ids = [row["series"] for row in body["forms"]]
     assert series_ids == sorted(set(series_ids), key=series_ids.index)
     assert "form/b101" in series_ids
@@ -381,7 +388,7 @@ def add_debtor_1_with_a_tax_id(client, case_id):
         },
         headers=auth(ALICE),
     )
-    assert response.status_code == 201
+    assert response.status_code == 200
 
 
 def test_previewing_b121_performs_the_logged_read_against_the_caller(client, stores):

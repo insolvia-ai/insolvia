@@ -93,6 +93,11 @@ function bodyOf(debtor: Debtor): DebtorBody {
     created_at: _created,
     updated_at: _updated,
     provenance: _provenance,
+    // Server-owned (ADR 0022): the link to the firm client and the computed
+    // divergence from it are not answers on this form. Left in the body they
+    // would be walked by `staffTypedProvenance` and sent back as "typed".
+    client_id: _clientId,
+    differs_from_client: _differs,
     ...body
   } = debtor;
   return body;

@@ -31,6 +31,8 @@ from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
+from tests.unit.opening import add_client, with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 # Two firms. ALICE and DANA are colleagues; BOB administers the OTHER firm,
@@ -117,6 +119,9 @@ def firms():
 
 @pytest.fixture
 def client(access_log, firms):
+    # One debtor store for both: opening a case writes its debtors through
+    # the case store (ADR 0022), and the debtor routes must see them.
+    debtors = MemoryDebtorStore()
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -129,10 +134,10 @@ def client(access_log, firms):
             waitlist_store=MemoryWaitlistStore(),
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
-            case_store=MemoryCaseStore(),
+            case_store=MemoryCaseStore(debtor_store=debtors),
             firm_store=firms,
             access_log=access_log,
-            debtor_store=MemoryDebtorStore(),
+            debtor_store=debtors,
             tax_id_store=MemoryTaxIdStore(),
             tax_id_cipher=LocalTaxIdCipher(),
         )
@@ -143,11 +148,21 @@ def client(access_log, firms):
 def open_case(client, subject=ALICE):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
     return response.get_json()["id"]
+
+
+def link(client, case_id, role, client_id, subject=ALICE):
+    return client.put(
+        f"/v1/cases/{case_id}/debtors/{role}/client",
+        json={"client_id": client_id},
+        headers=auth(subject),
+    )
 
 
 def put(client, case_id, role="debtor_1", subject=ALICE, **body):
@@ -203,15 +218,52 @@ def test_a_debtor_written_by_one_firm_is_invisible_to_another(client):
 
 
 def test_creating_a_debtor_answers_201_and_updating_answers_200(client):
+    # The non-filing spouse: the one role a questionnaire save may still
+    # start from nothing (ADR 0022 — they need not be the firm's client).
     case_id = open_case(client)
     first = put(
-        client, case_id, name={"given": "Ada"}, provenance={"name.given": TYPED}
+        client,
+        case_id,
+        role="non_filing_spouse",
+        name={"given": "Ada"},
+        provenance={"name.given": TYPED},
     )
     assert first.status_code == 201
     second = put(
-        client, case_id, name={"given": "Ada"}, provenance={"name.given": TYPED}
+        client,
+        case_id,
+        role="non_filing_spouse",
+        name={"given": "Ada"},
+        provenance={"name.given": TYPED},
     )
     assert second.status_code == 200
+
+
+def test_debtor_1_already_exists_when_the_case_is_opened(client):
+    saved = put(
+        client,
+        open_case(client),
+        name={"given": "Ada"},
+        provenance={"name.given": TYPED},
+    )
+    assert saved.status_code == 200
+
+
+def test_a_second_debtor_is_linked_never_minted_by_a_save(client):
+    """Debtor 2 is the firm's client too: a questionnaire save cannot create
+    them from nothing, and says what to do instead."""
+    case_id = open_case(client)
+    refused = put(
+        client,
+        case_id,
+        role="debtor_2",
+        name={"given": "Sam"},
+        provenance={"name.given": TYPED},
+    )
+    assert refused.status_code == 400
+    assert "client_id" in refused.get_json()["fields"]
+    listed = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(ALICE))
+    assert [d["filing_role"] for d in listed.get_json()["debtors"]] == ["debtor_1"]
 
 
 def test_a_repeated_save_keeps_the_same_debtor_id(client):
@@ -230,7 +282,7 @@ def test_a_repeated_save_keeps_the_same_debtor_id(client):
 def test_an_empty_body_saves(client):
     # Progressive intake: opening the questionnaire and typing nothing is a
     # legitimate save, not an error.
-    assert put(client, open_case(client)).status_code == 201
+    assert put(client, open_case(client)).status_code == 200
 
 
 def test_an_unknown_filing_role_is_rejected(client):
@@ -265,7 +317,7 @@ TAX_ID_PROVENANCE = {"tax_id": TYPED}
 def test_a_tax_id_is_stored_and_only_its_last_four_ever_comes_back(client):
     case_id = open_case(client)
     saved = put(client, case_id, tax_id=TAX_ID, provenance=TAX_ID_PROVENANCE)
-    assert saved.status_code == 201
+    assert saved.status_code == 200
     assert saved.get_json()["tax_id"] == {"kind": "ssn", "last_four": "4321"}
     listed = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(ALICE))
     (debtor,) = listed.get_json()["debtors"]
@@ -354,17 +406,17 @@ def test_saving_a_tax_id_never_performs_the_full_value_read(client, access_log):
 # ── Reading ─────────────────────────────────────────────────────
 
 
-def test_a_case_with_no_debtors_lists_none(client):
+def test_a_new_case_lists_its_client_as_debtor_1_and_nobody_else(client):
     response = client.get(f"/v1/cases/{open_case(client)}/debtors", headers=auth(ALICE))
     assert response.status_code == 200
-    assert response.get_json() == {"debtors": []}
+    assert [d["filing_role"] for d in response.get_json()["debtors"]] == ["debtor_1"]
 
 
 def test_debtors_list_in_the_order_the_forms_print_them(client):
     case_id = open_case(client)
     # Written out of order on purpose.
     put(client, case_id, role="non_filing_spouse")
-    put(client, case_id, role="debtor_2")
+    link(client, case_id, "debtor_2", add_client(client, auth(ALICE)))
     put(client, case_id, role="debtor_1")
     response = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(ALICE))
     roles = [debtor["filing_role"] for debtor in response.get_json()["debtors"]]
@@ -419,7 +471,11 @@ def test_a_second_first_save_cannot_erase_the_first_ones_id(client):
 
     case_id = open_case(client)
     first = put(
-        client, case_id, name={"given": "Ada"}, provenance={"name.given": TYPED}
+        client,
+        case_id,
+        role="non_filing_spouse",
+        name={"given": "Ada"},
+        provenance={"name.given": TYPED},
     )
     assert first.status_code == 201
 
@@ -441,7 +497,11 @@ def test_a_second_first_save_cannot_erase_the_first_ones_id(client):
     store.get = get_once_stale  # type: ignore[method-assign]
     try:
         second = put(
-            client, case_id, name={"given": "Augusta"}, provenance={"name.given": TYPED}
+            client,
+            case_id,
+            role="non_filing_spouse",
+            name={"given": "Augusta"},
+            provenance={"name.given": TYPED},
         )
     finally:
         store.get = real_get  # type: ignore[method-assign]
@@ -486,7 +546,7 @@ def test_a_colleague_on_the_matter_can_run_its_intake(client):
         name={"given": "Ada"},
         provenance={"name.given": TYPED},
     )
-    assert saved.status_code == 201
+    assert saved.status_code == 200
     assert (
         client.get(f"/v1/cases/{case_id}/debtors", headers=auth(DANA)).status_code
         == 200
@@ -531,3 +591,109 @@ def test_view_only_intake_can_read_but_not_save(client, firms):
         ).status_code
         == 403
     )
+
+
+# ── Linking a client (ADR 0022) ─────────────────────────────────
+
+
+def debtors_of(client, case_id, subject=ALICE):
+    return client.get(f"/v1/cases/{case_id}/debtors", headers=auth(subject)).get_json()[
+        "debtors"
+    ]
+
+
+def test_linking_a_client_to_an_empty_role_copies_them_in(client):
+    case_id = open_case(client)
+    sam = add_client(
+        client, auth(ALICE), name={"given": "Sam"}, email="sam@example.test"
+    )
+    response = link(client, case_id, "debtor_2", sam)
+    assert response.status_code == 201
+    body = response.get_json()
+    assert (body["filing_role"], body["client_id"]) == ("debtor_2", sam)
+    assert body["email"] == "sam@example.test"
+    assert body["provenance"]["email"] == {"source": "client", "client_id": sam}
+    assert body["differs_from_client"] == []
+
+
+def test_re_linking_moves_the_link_and_never_the_case_facts(client):
+    case_id = open_case(client)
+    [original] = debtors_of(client, case_id)
+    other = add_client(client, auth(ALICE), name={"given": "Robin", "surname": "Other"})
+    response = link(client, case_id, "debtor_1", other)
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["id"] == original["id"]
+    assert body["client_id"] == other
+    # What the case says is unchanged; how it now differs is shown.
+    assert body["name"] == original["name"]
+    assert body["differs_from_client"] == ["name.given", "name.surname"]
+
+
+def test_one_client_holds_one_role_per_case(client):
+    case_id = open_case(client)
+    [debtor_1] = debtors_of(client, case_id)
+    response = link(client, case_id, "debtor_2", debtor_1["client_id"])
+    assert response.status_code == 400
+    assert "client_id" in response.get_json()["fields"]
+    assert [d["filing_role"] for d in debtors_of(client, case_id)] == ["debtor_1"]
+
+
+def test_another_firms_client_cannot_be_linked(client):
+    case_id = open_case(client)
+    bobs = add_client(client, auth(BOB))
+    foreign = link(client, case_id, "debtor_2", bobs)
+    unknown = link(client, case_id, "debtor_2", "no-such-client")
+    assert foreign.status_code == unknown.status_code == 400
+    assert foreign.get_json() == unknown.get_json()
+
+
+def test_linking_needs_a_client_id(client):
+    response = link(client, open_case(client), "debtor_2", "  ")
+    assert response.status_code == 400
+    assert "client_id" in response.get_json()["fields"]
+
+
+def test_linking_needs_the_client_directory(client, firms):
+    case_id = open_case(client)
+    sam = add_client(client, auth(ALICE))
+    firms.users[(FIRM_A, ALICE)] = member(
+        ALICE,
+        FIRM_A,
+        is_admin=False,
+        access_all_cases=True,
+        permissions={**default_permissions("attorney"), "clients": "hidden"},
+    )
+    assert link(client, case_id, "debtor_2", sam).status_code == 403
+
+
+def test_a_questionnaire_save_keeps_the_client_link(client):
+    case_id = open_case(client)
+    [before] = debtors_of(client, case_id)
+    saved = put(
+        client,
+        case_id,
+        client_id="someone-else",
+        name={"given": "Typed"},
+        provenance={"name.given": TYPED},
+    )
+    assert saved.status_code == 200
+    assert saved.get_json()["client_id"] == before["client_id"]
+    # The client still says Jordan Example; the case now says Typed.
+    assert saved.get_json()["differs_from_client"] == ["name.given", "name.surname"]
+
+
+def test_a_caller_without_the_client_directory_is_not_told_how_a_client_differs(
+    client, firms
+):
+    case_id = open_case(client)
+    firms.users[(FIRM_A, ALICE)] = member(
+        ALICE,
+        FIRM_A,
+        is_admin=False,
+        access_all_cases=True,
+        permissions={**default_permissions("attorney"), "clients": "hidden"},
+    )
+    [debtor] = debtors_of(client, case_id)
+    assert "client_id" in debtor
+    assert "differs_from_client" not in debtor

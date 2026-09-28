@@ -86,6 +86,9 @@ const BASE_URL = 'https://staging-api.insolvia.ai';
 const SUBJECT = 'a11c0000-0000-4000-8000-00000000a11c';
 const USERNAME = '11111111-2222-3333-4444-555555555555';
 const CLIENT_ID = 'exampleappclientid000000';
+// A firm client's id (ADR 0022) — not to be confused with the Cognito app
+// client id above.
+const CLIENT_ID_1 = 'c1100000-0000-4000-8000-0000000c11a0';
 
 /** What the stub captured about a request, flattened for assertions. */
 interface SeenRequest {
@@ -724,14 +727,24 @@ describe('createCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const created = await client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' });
+    const created = await client.createCase({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      clientIds: [CLIENT_ID_1],
+    });
 
     const seen = stub.lastRequest();
     expect(seen.method).toBe('POST');
     expect(seen.url).toBe('https://staging-api.insolvia.ai/v1/cases');
     expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
     expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(JSON.parse(seen.body)).toEqual({ chapter: 7, court: 'flmb', division: 'tampa' });
+    expect(JSON.parse(seen.body)).toEqual({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      client_ids: [CLIENT_ID_1],
+    });
 
     expect(created).toEqual({
       id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
@@ -756,7 +769,12 @@ describe('createCase', () => {
       accessToken: () => ACCESS_TOKEN,
     });
 
-    const created = await client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' });
+    const created = await client.createCase({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      clientIds: [CLIENT_ID_1],
+    });
 
     expect(created.district).toBe('NDCA');
     expect('court' in created).toBe(false);
@@ -776,7 +794,14 @@ describe('createCase', () => {
     });
 
     const error = asApiValidationException(
-      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(400);
@@ -796,7 +821,14 @@ describe('createCase', () => {
     });
 
     const error = asApiException(
-      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(400);
@@ -813,7 +845,14 @@ describe('createCase', () => {
     });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(error.statusCode).toBe(401);
@@ -825,7 +864,14 @@ describe('createCase', () => {
     const client = new InsolviaApiClient('http://localhost:8080', { fetch: stub.fetch });
 
     const error = asApiUnauthorizedException(
-      await rejection(client.createCase({ chapter: 7, court: 'flmb', division: 'tampa' })),
+      await rejection(
+        client.createCase({
+          chapter: 7,
+          court: 'flmb',
+          division: 'tampa',
+          clientIds: [CLIENT_ID_1],
+        }),
+      ),
     );
 
     expect(stub.callCount()).toBe(0);
@@ -3101,6 +3147,164 @@ const DEBTOR_WITH_TAX_ID = {
   provenance: { ...DEBTOR.provenance, tax_id: { source: 'staff_typed' } },
   tax_id: { kind: 'ssn', last_four: '4321' },
 };
+
+// A debtor copied from a firm client (ADR 0022), exactly as `debtor_json`
+// writes one: `client_id` beside the identity, `differs_from_client` when the
+// caller may see the directory, `client` provenance with its `client_id`, and
+// the residence county the copy carries.
+const CLIENT_DEBTOR = {
+  id: 'd1c10000-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+  case_id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+  filing_role: 'debtor_2',
+  created_at: '2026-09-27T09:15:00.000000Z',
+  updated_at: '2026-09-27T09:15:00.000000Z',
+  client_id: CLIENT_ID_1,
+  differs_from_client: ['phone'],
+  provenance: {
+    'name.given': { source: 'client', client_id: CLIENT_ID_1 },
+    'residence_address.county': { source: 'client', client_id: CLIENT_ID_1 },
+    phone: { source: 'staff_typed' },
+  },
+  name: { given: 'Sam' },
+  residence_address: { state: 'FL', county: 'Hillsborough' },
+  phone: '555-0199',
+} as const;
+
+describe('debtors linked to firm clients (ADR 0022)', () => {
+  test('a copied debtor decodes its client link, its divergence and its client provenance', async () => {
+    const stub = stubFetch(() => jsonResponse({ debtors: [CLIENT_DEBTOR] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const [debtor] = await client.listDebtors(CLIENT_DEBTOR.case_id);
+
+    expect(debtor).toEqual(CLIENT_DEBTOR);
+  });
+
+  test('putDebtor keeps the county and never sends client_id — the server owns it', async () => {
+    const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.putDebtor(CLIENT_DEBTOR.case_id, 'debtor_2', {
+      name: CLIENT_DEBTOR.name,
+      residence_address: CLIENT_DEBTOR.residence_address,
+      phone: CLIENT_DEBTOR.phone,
+      provenance: CLIENT_DEBTOR.provenance,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      name: { given: 'Sam' },
+      residence_address: { state: 'FL', county: 'Hillsborough' },
+      phone: '555-0199',
+      provenance: CLIENT_DEBTOR.provenance,
+    });
+  });
+
+  test('linkDebtorClient PUTs {client_id} to the role and maps a 201 copy', async () => {
+    const stub = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const linked = await client.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/client`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(JSON.parse(seen.body)).toEqual({ client_id: CLIENT_ID_1 });
+    expect(linked.client_id).toBe(CLIENT_ID_1);
+  });
+
+  test('linkDebtorClient accepts a 200 re-link and surfaces a client_id refusal', async () => {
+    const ok = stubFetch(() => jsonResponse(CLIENT_DEBTOR, 200));
+    const okClient = new InsolviaApiClient(BASE_URL, {
+      fetch: ok.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    expect(
+      (await okClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1)).id,
+    ).toBe(CLIENT_DEBTOR.id);
+
+    const refused = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ValidationError',
+          fields: { client_id: 'That client is already another debtor on this case.' },
+        },
+        400,
+      ),
+    );
+    const refusedClient = new InsolviaApiClient(BASE_URL, {
+      fetch: refused.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    const error = asApiValidationException(
+      await rejection(
+        refusedClient.linkDebtorClient(CLIENT_DEBTOR.case_id, 'debtor_2', CLIENT_ID_1),
+      ),
+    );
+    expect(Object.keys(error.fields)).toEqual(['client_id']);
+  });
+});
+
+describe('listFirmClientCases', () => {
+  const ENTRY = {
+    filing_role: 'debtor_2',
+    case: {
+      id: 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+      createdBy: '3c9a1f7e-0d52-4a18-b6c3-9e14f7a20b55',
+      chapter: 13,
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
+      status: 'intake',
+      createdAt: '2026-09-27T09:15:00.123456Z',
+      updatedAt: '2026-09-27T09:15:00.123456Z',
+    },
+  };
+
+  test('GETs /v1/firm/clients/{id}/cases and maps each role and case', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [ENTRY] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const entries = await client.listFirmClientCases(CLIENT_ID_1);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/clients/${CLIENT_ID_1}/cases`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(entries).toEqual([ENTRY]);
+  });
+
+  test('a prospect with no case is an empty list', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    expect(await client.listFirmClientCases(CLIENT_ID_1)).toEqual([]);
+  });
+
+  test('an entry without its case is refused rather than half-mapped', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [{ filing_role: 'debtor_1' }] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    await expect(client.listFirmClientCases(CLIENT_ID_1)).rejects.toThrow();
+  });
+});
 
 describe('listDebtors', () => {
   const SECOND_DEBTOR = {

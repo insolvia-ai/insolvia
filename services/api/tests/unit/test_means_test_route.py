@@ -41,6 +41,7 @@ from insolvia_core.cases import assign_case
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 from insolvia_core.means_test_inputs import MEANS_TEST_INPUT, parse_means_test_input
 
+from tests.unit.opening import with_client
 from tests.unit.test_packet_assembly import reference_case_data
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
@@ -116,8 +117,8 @@ class Harness:
         firms.create_firm(firm(FIRM_B, "Other Firm LLP"))
         firms.add_user(member(ALICE, FIRM_A))
         firms.add_user(member(BOB, FIRM_B))
-        self.case_store = MemoryCaseStore()
         self.debtor_store = MemoryDebtorStore()
+        self.case_store = MemoryCaseStore(debtor_store=self.debtor_store)
         self.entity_store = MemoryCaseEntityStore()
         app = create_app(
             ApiDependencies(
@@ -189,7 +190,9 @@ def harness() -> Harness:
 def open_case(client, subject=ALICE):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201

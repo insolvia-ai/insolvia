@@ -50,7 +50,15 @@ from insolvia_core.errors import FieldValidationError
 # `extraction_id` or `external_refs` fit a firm's own prior record, so this is
 # the source-specific member that names it, the same way `extraction_id` names
 # an `extraction_candidate` for `ai_extracted`.
-SOURCES: Final = ("staff_typed", "ai_extracted", "imported", "library")
+#
+# `client` is the fifth (ADR 0022): a debtor's identity COPIED from the firm's
+# client directory (`firm_clients.py`) when a case is opened for that client,
+# or when a client is linked to a filing role. The same shape as `library`
+# for the same reason — a copy of a firm-owned record, chosen by a person —
+# with `client_id` naming the record it came from. Never a live reference: a
+# filed petition must not change because the client record did, and
+# divergence is computed on read (`firm_clients.differs_from_client`).
+SOURCES: Final = ("staff_typed", "ai_extracted", "imported", "library", "client")
 MACHINE_SOURCES: Final = frozenset({"ai_extracted", "imported"})
 
 # A dotted field path, with embedded list elements addressed by their id in
@@ -72,7 +80,13 @@ _FIELD_NAME_RE: Final = re.compile(rf"^{_FIELD_NAME}$")
 
 # Stamped by the server, never supplied, so there is nothing to record the
 # origin of. Matched as whole paths — see require_provenance.
-_SERVER_OWNED: Final = frozenset({"id", "case_id", "created_at", "updated_at"})
+#
+# `client_id` is the debtor's link to the firm's client (ADR 0022): set when a
+# case is opened for a client or by the debtor's link route, KEPT by the
+# questionnaire's whole-record PUT, and never a fact a caller asserts.
+_SERVER_OWNED: Final = frozenset(
+    {"id", "case_id", "created_at", "updated_at", "client_id"}
+)
 _SEGMENT = rf"{_FIELD_NAME}(?:\[[A-Za-z0-9_-]+\])?"
 _FIELD_PATH_RE: Final = re.compile(rf"^{_SEGMENT}(?:\.{_SEGMENT})*$")
 
@@ -100,6 +114,10 @@ class ProvenanceEntry:
     # creditor_id) — so a library entry deleted after the copy leaves the
     # provenance readable rather than the case record unwritable.
     library_creditor_id: str | None = None
+    # The `firm_clients.py` row a `client`-sourced value was copied from —
+    # the same "shape and type only" rule as `library_creditor_id`: a client
+    # archived or merged after the copy leaves the provenance readable.
+    client_id: str | None = None
 
 
 def _is_utc_timestamp(value: object) -> bool:
@@ -251,6 +269,11 @@ def _parse_entry(
         )
         return None
 
+    client_id = value.get("client_id")
+    if client_id is not None and not isinstance(client_id, str):
+        errors[f"provenance.{path}.client_id"] = "client_id must be a string."
+        return None
+
     return ProvenanceEntry(
         source=source,
         confirmed_by=confirmed_by,
@@ -260,6 +283,7 @@ def _parse_entry(
         extraction_id=extraction_id,
         confidence=confidence,
         library_creditor_id=library_creditor_id,
+        client_id=client_id,
     )
 
 
@@ -386,7 +410,7 @@ def require_provenance(
     omitting the key, which is the loophole that would make invariant 2
     decorative.
 
-    The four server-assigned fields in `_SERVER_OWNED` are exempt: they are
+    The server-assigned fields in `_SERVER_OWNED` are exempt: they are
     stamped here, not supplied by anyone, so "where did this come from" has one
     answer and it is not a fact about the case.
 
@@ -427,6 +451,7 @@ def provenance_json(
             ("extraction_id", entry.extraction_id),
             ("confidence", entry.confidence),
             ("library_creditor_id", entry.library_creditor_id),
+            ("client_id", entry.client_id),
         ):
             if value is not None:
                 member[key] = value

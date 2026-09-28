@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import boto3
@@ -9,26 +10,32 @@ from insolvia_core.access import Accessor, may_see_case
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
+    INDEX_BY_CLIENT,
     INDEX_BY_FIRM,
     Case,
     CaseAssignment,
     CasePage,
+    ClientCase,
     assignee_key,
     assignment_from_item,
     assignment_item,
     assignment_sort_key,
     case_from_item,
     case_item,
+    client_key,
     decode_cursor,
     encode_cursor,
     firm_key,
     partition_key,
 )
+from insolvia_core.debtors import Debtor, debtor_item
 
-# The two sparse indexes in infra/modules/case_store. Which one a listing reads
-# depends on the caller — see list_for_accessor.
+# The sparse indexes in infra/modules/case_store. Which of the first two a
+# listing reads depends on the caller — see list_for_accessor. The third is a
+# client's cases (ADR 0022), fed by debtor items.
 FIRM_INDEX = INDEX_BY_FIRM
 ASSIGNEE_INDEX = INDEX_BY_ASSIGNEE
+CLIENT_INDEX = INDEX_BY_CLIENT
 
 _CONDITION_FAILED = "ConditionalCheckFailedException"
 
@@ -46,14 +53,25 @@ class DynamoDbCaseStore:
         self.table_name = table_name
         self.client = boto3.client("dynamodb")
 
-    def create(self, case: Case, assignment: CaseAssignment) -> None:
-        # ONE TRANSACTION, TWO ITEMS. Not a nicety: a case whose assignment
-        # write failed is invisible to the person who just created it, and
-        # indistinguishable from the request having failed — except that the id
-        # is taken. TransactWriteItems is granted in infra/modules/case_store.
+    def create(
+        self,
+        case: Case,
+        assignment: CaseAssignment,
+        debtors: Sequence[Debtor] = (),
+    ) -> None:
+        # ONE TRANSACTION: the case, its creator's assignment, and the debtors
+        # copied from its clients (ADR 0022). Not a nicety: a case whose
+        # assignment write failed is invisible to the person who just created
+        # it, and a case whose debtor write failed is invisible from its
+        # client — the debtor item is the `by-client` index entry. Either is
+        # indistinguishable from the request having failed, except that the
+        # id is taken. TransactWriteItems is granted in infra/modules/case_store.
         #
         # attribute_not_exists(PK) makes the write fail rather than silently
         # overwrite if a uuid4 ever collided, or if a retry replayed a create.
+        for debtor in debtors:
+            if debtor.case_id != case.id:
+                raise RuntimeError("a debtor written with a case must belong to it")
         self.client.transact_write_items(
             TransactItems=[
                 {
@@ -73,8 +91,106 @@ class DynamoDbCaseStore:
                         "ConditionExpression": "attribute_not_exists(SK)",
                     }
                 },
+                *(
+                    {
+                        "Put": {
+                            "TableName": self.table_name,
+                            "Item": to_attributes(debtor_item(debtor)),
+                            # SK for the assignment's reason; it is also
+                            # DebtorStore.create's own guard, so a role can
+                            # exist at most once however it was written.
+                            "ConditionExpression": "attribute_not_exists(SK)",
+                        }
+                    }
+                    for debtor in debtors
+                ),
             ]
         )
+
+    def list_for_client(
+        self, client_id: str, *, accessor: Accessor
+    ) -> tuple[ClientCase, ...]:
+        # The index holds DEBTOR items — which role, which case — never the
+        # case: the by-assignee listing's reasoning, a projected copy of the
+        # case would go stale. So it is one query plus one BatchGetItem, and
+        # the BatchGetItem fetches each case's META AND the caller's
+        # assignment row together, which is everything `may_see_case` needs.
+        roles: list[tuple[str, str]] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "IndexName": CLIENT_INDEX,
+                "KeyConditionExpression": "GSI3PK = :client",
+                "ExpressionAttributeValues": {":client": {"S": client_key(client_id)}},
+                # Newest matter first — GSI3SK is <caseCreatedAt>#<caseId>.
+                "ScanIndexForward": False,
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.query(**kwargs)
+            for raw in response.get("Items", []):
+                plain = from_attributes(raw)
+                roles.append((str(plain["caseId"]), str(plain["filingRole"])))
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        if not roles:
+            return ()
+        visible = self._visible_cases([case_id for case_id, _ in roles], accessor)
+        return tuple(
+            ClientCase(case=visible[case_id], filing_role=role)
+            for case_id, role in roles
+            if case_id in visible
+        )
+
+    def _visible_cases(
+        self, case_ids: list[str], accessor: Accessor
+    ) -> dict[str, Case]:
+        """The cases among `case_ids` this accessor may see: each case's META
+        and the caller's assignment row, read together and decided by
+        `may_see_case`. 50 cases per call — two keys each, BatchGetItem's
+        100-key cap."""
+        unique = list(dict.fromkeys(case_ids))
+        metas: dict[str, Case] = {}
+        assigned: set[str] = set()
+        for offset in range(0, len(unique), 50):
+            remaining: list[dict[str, Any]] = []
+            for case_id in unique[offset : offset + 50]:
+                remaining.append(
+                    {"PK": {"S": partition_key(case_id)}, "SK": {"S": "META"}}
+                )
+                remaining.append(
+                    {
+                        "PK": {"S": partition_key(case_id)},
+                        "SK": {"S": assignment_sort_key(accessor.subject)},
+                    }
+                )
+            while remaining:
+                response = self.client.batch_get_item(
+                    RequestItems={
+                        self.table_name: {"Keys": remaining, "ConsistentRead": True}
+                    }
+                )
+                for raw in response.get("Responses", {}).get(self.table_name, []):
+                    plain = from_attributes(raw)
+                    if plain.get("SK") == "META":
+                        case = case_from_item(plain)
+                        metas[case.id] = case
+                    else:
+                        assigned.add(str(plain.get("caseId")))
+                # Throttled keys are retried, never dropped — `_cases_by_id`'s
+                # reason: a list that quietly loses rows under load.
+                remaining = (
+                    response.get("UnprocessedKeys", {})
+                    .get(self.table_name, {})
+                    .get("Keys", [])
+                )
+        return {
+            case_id: case
+            for case_id, case in metas.items()
+            if may_see_case(accessor, case, assigned=case_id in assigned)
+        }
 
     def get(self, case_id: str, *, accessor: Accessor) -> Case | None:
         # ONE ROUND TRIP FOR BOTH HALVES of the access question. The case and

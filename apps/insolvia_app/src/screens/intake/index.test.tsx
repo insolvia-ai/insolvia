@@ -109,6 +109,33 @@ describe('the intake screen', () => {
     });
   });
 
+  it('never sends back the client link or the divergence, which the server owns', async () => {
+    // ADR 0022: a debtor copied from a firm client carries `client_id` and a
+    // computed `differs_from_client`. Neither is an answer on this form; left
+    // in the body they would be sent, and walked into "typed" provenance.
+    const linked = {
+      ...SAVED,
+      client_id: '00000000-0000-4000-8000-0000000c11a0',
+      differs_from_client: [],
+    };
+    const fetchMock = signedIn({
+      [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () => jsonResponse(200, linked),
+      [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [linked] }),
+    });
+
+    const user = userEvent.setup();
+    const first = await screen.findByDisplayValue('Ada');
+    await user.type(first, 'm');
+
+    await waitFor(() =>
+      expect(lastSave(fetchMock).name).toEqual({ given: 'Adam', surname: 'Lovelace' }),
+    );
+    const body = lastSave(fetchMock);
+    expect('client_id' in body).toBe(false);
+    expect('differs_from_client' in body).toBe(false);
+    expect(Object.keys(body.provenance as object).sort()).toEqual(['name.given', 'name.surname']);
+  });
+
   it('puts a server field message on the field it belongs to', async () => {
     signedIn({
       [`/v1/cases/${CASE_ID}/debtors/debtor_1`]: () =>

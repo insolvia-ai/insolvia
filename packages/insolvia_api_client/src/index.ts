@@ -294,6 +294,7 @@ export type {
   FilingRole,
   Firm,
   FirmClient,
+  FirmClientCase,
   FirmClientDraft,
   FirmClientStatus,
   FirmColleague,

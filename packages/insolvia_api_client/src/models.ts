@@ -659,9 +659,19 @@ export interface FirmClientDraft {
 }
 
 /**
+ * One entry of `GET /v1/firm/clients/{id}/cases` (ADR 0022): a case the
+ * caller may see, and which debtor of it the client is.
+ */
+export interface FirmClientCase {
+  readonly filing_role: FilingRole;
+  readonly case: Case;
+}
+
+/**
  * An address WITH its county — unlike {@link addressToJson}, which drops it
- * because no debtor write path sends one yet. A client's residence county is
- * B101 line 5's County box once it is copied onto a debtor, so it travels.
+ * for the entities whose write paths never send one. A client's residence
+ * county is B101 line 5's County box once it is copied onto a debtor, so it
+ * travels on a client and on a debtor alike.
  */
 function clientAddressToJson(address: Address | undefined): Record<string, unknown> | undefined {
   if (address === undefined) {
@@ -1084,10 +1094,11 @@ export interface Case {
 }
 
 /**
- * The `POST /v1/cases` request body: `{"chapter", "court", "division"}`, all
- * required. `court` and `division` are codes from {@link CourtRegistry}
- * (issue #360); the server refuses a pair it does not know with a 400 keyed
- * `court` or `division`, and refuses a typed `district` by name.
+ * The `POST /v1/cases` request body: `{"chapter", "court", "division",
+ * "client_ids"}`, all required. `court` and `division` are codes from
+ * {@link CourtRegistry} (issue #360); the server refuses a pair it does not
+ * know with a 400 keyed `court` or `division`, and refuses a typed `district`
+ * by name.
  */
 export interface CreateCaseRequest {
   /** The bankruptcy chapter. */
@@ -1096,14 +1107,24 @@ export interface CreateCaseRequest {
   readonly court: string;
   /** The division's code, from {@link CourtDivision.code}. */
   readonly division: string;
+  /**
+   * The {@link FirmClient} ids the case is opened for (ADR 0022): one, or two
+   * filing jointly — the first becomes Debtor 1, the second Debtor 2, each a
+   * copy of the client with `client` provenance. Sent as `client_ids`. The
+   * server refuses (400, keyed `client_ids`) none, three, the same client
+   * twice, or one that is unknown, another firm's, or archived; it answers
+   * 403 to a caller without `clients` at `view_only`.
+   */
+  readonly clientIds: readonly string[];
 }
 
-/** The `POST /v1/cases` request body, verbatim — every field is required. */
+/** The `POST /v1/cases` request body — every field is required. */
 export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
   return {
     chapter: request.chapter,
     court: request.court,
     division: request.division,
+    client_ids: [...request.clientIds],
   };
 }
 
@@ -2137,8 +2158,19 @@ export interface TaxIdEntry {
  * creditor library onto a case record — a human chose the entry, so it needs
  * no confirmation, the same as `staff_typed`. See {@link libraryProvenance}
  * and {@link ProvenanceEntry.library_creditor_id}.
+ *
+ * `client` (ADR 0022) is a debtor's identity COPIED from the firm's client
+ * directory when the case was opened for that client, or when the client was
+ * linked to the role — a human's choice, like `library`, so no confirmation.
+ * See {@link ProvenanceEntry.client_id}.
  */
-export const PROVENANCE_SOURCES = ['staff_typed', 'ai_extracted', 'imported', 'library'] as const;
+export const PROVENANCE_SOURCES = [
+  'staff_typed',
+  'ai_extracted',
+  'imported',
+  'library',
+  'client',
+] as const;
 
 /** Who supplied a value. See {@link PROVENANCE_SOURCES}. */
 export type ProvenanceSource = (typeof PROVENANCE_SOURCES)[number];
@@ -2183,6 +2215,12 @@ export interface ProvenanceEntry {
    * readable rather than the case record unwritable.
    */
   readonly library_creditor_id?: string | undefined;
+  /**
+   * The {@link FirmClient.id} this value was copied from. Present only when
+   * {@link source} is `'client'`. Not validated against the directory — an
+   * archived or merged client leaves the provenance readable.
+   */
+  readonly client_id?: string | undefined;
 }
 
 /**
@@ -2359,6 +2397,22 @@ export interface Debtor extends DebtorBody {
   /** The server's UTC last-update timestamp, kept verbatim as the wire string. */
   readonly updated_at: string;
   /**
+   * The {@link FirmClient} this debtor is (ADR 0022) — present on every
+   * Debtor 1 and Debtor 2 opened since cases are opened for clients, and on a
+   * non-filing spouse who is a client. **Server-owned**: {@link putDebtor}
+   * never sends it and the server keeps it; re-linking is
+   * `linkDebtorClient`.
+   */
+  readonly client_id?: string | undefined;
+  /**
+   * The copied field paths where this case's debtor and the linked client
+   * record now disagree (`name.given`, `residence_address.county`, …) —
+   * computed on read, never stored. `[]` means identical. Absent when the
+   * debtor names no client, or when the caller cannot see the firm's client
+   * directory.
+   */
+  readonly differs_from_client?: readonly string[] | undefined;
+  /**
    * Where each populated field came from. **Always present**, unlike every
    * other optional member here — the API emits it unconditionally, as `{}` on
    * a record with nothing in it.
@@ -2389,8 +2443,11 @@ export function putDebtorRequestToJson(request: PutDebtorRequest): Record<string
       name: personNameToJson(request.name),
       other_names_used: otherNamesToJson(request.other_names_used),
       employer_ids: stringListToJson(request.employer_ids),
-      residence_address: addressToJson(request.residence_address),
-      mailing_address: addressToJson(request.mailing_address),
+      // WITH county: a debtor copied from a client carries B101 line 5's
+      // County box, and a save that dropped it would erase it on every
+      // autosave — and then report it as differing from the client.
+      residence_address: clientAddressToJson(request.residence_address),
+      mailing_address: clientAddressToJson(request.mailing_address),
       phone: request.phone,
       mobile: request.mobile,
       email: request.email,
@@ -2555,6 +2612,7 @@ function provenanceToJson(
         extraction_id: entry.extraction_id,
         confidence: entry.confidence,
         library_creditor_id: entry.library_creditor_id,
+        client_id: entry.client_id,
       },
     );
   }

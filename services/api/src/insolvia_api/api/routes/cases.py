@@ -17,7 +17,8 @@ from insolvia_core.cases import (
     parse_list_limit,
 )
 from insolvia_core.errors import FieldValidationError, NotFoundError, ValidationError
-from insolvia_core.firms import ADD_EDIT, CASES, VIEW_ONLY
+from insolvia_core.firm_clients import FirmClient, debtor_from_client
+from insolvia_core.firms import ADD_EDIT, CASES, CLIENTS, VIEW_ONLY
 from insolvia_core.petitions import PETITION
 from insolvia_core.ports import AccessLog, CaseStore, FirmStore
 
@@ -33,6 +34,10 @@ blueprint = Blueprint("cases", __name__)
 # A case record is a handful of short fields. Anything larger is a mistake or
 # an attack, and rejecting it before JSON parsing keeps both cheap.
 MAX_REQUEST_BYTES = 64 * 1024
+
+# `client_ids[0]` is Debtor 1, `client_ids[1]` Debtor 2 — the order B101
+# prints them in. `parse_case_creation` caps the list at two.
+OPENING_ROLES = ("debtor_1", "debtor_2")
 
 
 def _stores() -> tuple[CaseStore, AccessLog]:
@@ -108,11 +113,54 @@ def _json_body() -> dict[str, object]:
     return payload
 
 
+def _clients_to_open_for(
+    client_ids: tuple[str, ...], access_log: AccessLog
+) -> list[FirmClient]:
+    """The firm clients a new case is opened for, in filing-role order — or a
+    400 keyed `client_ids` naming what is wrong.
+
+    Each id is resolved IN THE CALLER'S FIRM, so another firm's client and an
+    id that never existed get the same answer — the `/v1/firm/clients/<id>`
+    404's anti-oracle rule, as a field error here because the fault is in the
+    request body. Each read is access-logged as a `client.read`, refused ones
+    as `denied`: copying a person's identity into a case is reading their
+    record, and someone walking client ids through this route is what the
+    log is for.
+
+    An ARCHIVED client is refused: archiving says the firm is done with
+    them, and a new matter for them starts with bringing them back — a
+    visible act, rather than a case quietly opened for someone the directory
+    hides.
+    """
+    accessor = current_accessor()
+    firm_store = _firm_store()
+    clients: list[FirmClient] = []
+    for client_id in client_ids:
+        client = firm_store.get_client(accessor.firm_id, client_id)
+        access_log.record(
+            record_access(
+                client_id=client_id,
+                principal=accessor.subject,
+                action="client.read",
+                outcome="allowed" if client is not None else "denied",
+            )
+        )
+        if client is None:
+            raise FieldValidationError({"client_ids": "No such client."})
+        if client.archived:
+            raise FieldValidationError(
+                {"client_ids": "That client is archived — restore them first."}
+            )
+        clients.append(client)
+    return clients
+
+
 @blueprint.post("/v1/cases")
 @require_auth
 @requires(CASES, ADD_EDIT)
+@requires(CLIENTS, VIEW_ONLY)
 def create_case_route() -> ResponseReturnValue:
-    """Open a case for the caller's firm.
+    """Open a case for the caller's firm, FOR ONE OR TWO OF ITS CLIENTS.
 
     The firm comes from the caller's resolved accessor and is never read from
     the body, so there is no request a client can make that creates a case in
@@ -122,15 +170,31 @@ def create_case_route() -> ResponseReturnValue:
     paralegal without `access_all_cases` would open a matter they cannot see,
     cannot list and cannot reach by id — indistinguishable, from the outside,
     from the request having failed. core/cases.create_case returns the pair.
+
+    And the DEBTORS are written in that transaction too (ADR 0022): each
+    client in `client_ids` is copied into the case — the first as Debtor 1,
+    the second, when present, as Debtor 2 — every copied field with `client`
+    provenance. A non-filing spouse is never required here; they are linked
+    (or typed) afterwards.
+
+    `clients >= view_only` is required ON TOP OF `cases >= add_edit`: the
+    copy reads a client record into a case the caller can then read back, so
+    a caller the firm has not let see its client directory must not be able
+    to read one through this route.
     """
     store, access_log = _stores()
     draft = parse_case_creation(_json_body())
     accessor = current_accessor()
+    clients = _clients_to_open_for(draft.client_ids, access_log)
 
     case, assignment = create_case(
         draft, firm_id=accessor.firm_id, created_by=accessor.subject
     )
-    store.create(case, assignment)
+    debtors = [
+        debtor_from_client(client, case=case, filing_role=role)
+        for client, role in zip(clients, OPENING_ROLES, strict=False)
+    ]
+    store.create(case, assignment, debtors)
     access_log.record(
         record_access(case_id=case.id, principal=accessor.subject, action="case.create")
     )

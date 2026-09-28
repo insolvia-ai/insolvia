@@ -23,10 +23,51 @@ from insolvia_core.errors import FieldValidationError
 
 FIRM = "00000000-0000-4000-8000-00000000f18a"
 ALICE = "00000000-0000-4000-8000-00000000a11c"
+CLIENT_A = "00000000-0000-4000-8000-0000000c11a0"
+CLIENT_B = "00000000-0000-4000-8000-0000000c11b0"
+OPENING = {"chapter": 7, "court": "flmb", "division": "tampa", "client_ids": [CLIENT_A]}
+
+
+# ── client_ids (ADR 0022) ───────────────────────────────────────────
+
+
+def test_a_case_is_opened_for_one_client_or_two_in_filing_order():
+    one = parse_case_creation(OPENING)
+    two = parse_case_creation({**OPENING, "client_ids": [CLIENT_A, CLIENT_B]})
+    assert one.client_ids == (CLIENT_A,)
+    assert two.client_ids == (CLIENT_A, CLIENT_B)
+
+
+@pytest.mark.parametrize(
+    "client_ids",
+    [
+        None,
+        [],
+        "not-a-list",
+        [CLIENT_A, CLIENT_B, "third"],
+        [CLIENT_A, 7],
+        [" "],
+        # One client, one role per case — or the by-client index lists the
+        # case twice.
+        [CLIENT_A, CLIENT_A],
+    ],
+)
+def test_client_ids_are_required_and_must_be_one_or_two_distinct_ids(client_ids):
+    payload = {**OPENING, "client_ids": client_ids}
+    with pytest.raises(FieldValidationError) as caught:
+        parse_case_creation(payload)
+    assert set(caught.value.fields) == {"client_ids"}
+
+
+def test_a_caller_with_no_request_behind_it_may_open_a_case_without_clients():
+    draft = parse_case_creation(
+        {"chapter": 7, "court": "flmb", "division": "tampa"}, require_clients=False
+    )
+    assert draft.client_ids == ()
 
 
 def test_a_case_names_its_court_and_the_district_is_derived():
-    draft = parse_case_creation({"chapter": 7, "court": "flmb", "division": "tampa"})
+    draft = parse_case_creation(OPENING)
     case, _ = create_case(draft, firm_id=FIRM, created_by=ALICE)
     assert (case.court, case.division) == ("flmb", "tampa")
     # The B101 dropdown's own spelling, never typed by a client.
@@ -58,7 +99,7 @@ def test_an_unknown_or_half_reference_is_refused_by_name(payload, field):
 
 def test_a_court_change_rewrites_all_three_fields_together():
     case, _ = create_case(
-        parse_case_creation({"chapter": 7, "court": "flmb", "division": "tampa"}),
+        parse_case_creation(OPENING),
         firm_id=FIRM,
         created_by=ALICE,
     )
@@ -84,7 +125,7 @@ def test_a_patch_carrying_one_half_is_refused():
 
 def test_the_item_round_trips_the_reference():
     case, _ = create_case(
-        parse_case_creation({"chapter": 7, "court": "flnb", "division": "pensacola"}),
+        parse_case_creation({**OPENING, "court": "flnb", "division": "pensacola"}),
         firm_id=FIRM,
         created_by=ALICE,
     )

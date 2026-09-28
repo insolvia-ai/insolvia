@@ -42,6 +42,8 @@ from insolvia_core.firms import (
     would_leave_no_admin,
 )
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 KID = "test-key-1"
@@ -175,7 +177,9 @@ def client(firms, cases, directory, access_log):
 def open_case(client, subject=ALICE):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
