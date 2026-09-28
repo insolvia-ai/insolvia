@@ -368,9 +368,7 @@ def _parse_client_ids(value: object, errors: dict[str, str]) -> tuple[str, ...]:
         return ()
     ids = tuple(str(item).strip() for item in value)
     if len(set(ids)) != len(ids):
-        errors["client_ids"] = (
-            "The same client cannot be both debtors on one case."
-        )
+        errors["client_ids"] = "The same client cannot be both debtors on one case."
         return ()
     return ids
 
@@ -395,9 +393,7 @@ def parse_case_creation(
     _refuse_typed_district(payload, errors)
     court = _parse_court(payload, errors)
     client_ids = (
-        _parse_client_ids(payload.get("client_ids"), errors)
-        if require_clients
-        else ()
+        _parse_client_ids(payload.get("client_ids"), errors) if require_clients else ()
     )
     # The None checks are redundant with `errors` but they are what narrows
     # the types, and a redundant guard beats an assert that a future -O strips.

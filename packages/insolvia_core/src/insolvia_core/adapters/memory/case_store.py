@@ -44,8 +44,8 @@ class MemoryCaseStore:
         # the one the debtor routes are composed with, or the debtors this
         # store writes are invisible to them. A composition with no debtor
         # routes gets a private one.
-        self.debtor_store = debtor_store if debtor_store is not None else (
-            MemoryDebtorStore()
+        self.debtor_store = (
+            debtor_store if debtor_store is not None else (MemoryDebtorStore())
         )
 
     def create(
@@ -82,8 +82,7 @@ class MemoryCaseStore:
             (
                 debtor
                 for debtor in self.debtor_store.debtors.values()
-                if debtor.client_id == client_id
-                and debtor.case_created_at is not None
+                if debtor.client_id == client_id and debtor.case_created_at is not None
             ),
             key=lambda d: listing_sort_key(d.case_created_at or "", d.case_id),
             reverse=True,

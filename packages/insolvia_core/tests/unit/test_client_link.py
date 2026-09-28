@@ -22,7 +22,12 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.dynamo import to_attributes
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
-from insolvia_core.cases import assignment_item, case_item, create_case, parse_case_creation
+from insolvia_core.cases import (
+    assignment_item,
+    case_item,
+    create_case,
+    parse_case_creation,
+)
 from insolvia_core.debtors import (
     create_debtor,
     debtor_from_item,
@@ -260,9 +265,7 @@ def test_an_alias_is_compared_by_its_id_not_its_position():
     )
     assert differs_from_client(debtor, reordered) == []
     dropped = replace(client, other_names_used=client.other_names_used[:1])
-    assert differs_from_client(debtor, dropped) == [
-        "other_names_used[alias-2].surname"
-    ]
+    assert differs_from_client(debtor, dropped) == ["other_names_used[alias-2].surname"]
 
 
 def test_the_firms_own_fields_never_count_as_divergence():
@@ -430,9 +433,7 @@ def test_the_client_listing_reads_the_index_then_decides_per_case(monkeypatch):
         {
             "Items": [
                 to_attributes(
-                    debtor_item(
-                        debtor_from_client(client, case=case, filing_role=role)
-                    )
+                    debtor_item(debtor_from_client(client, case=case, filing_role=role))
                 )
                 for case, role in ((mine, "debtor_1"), (theirs, "debtor_2"))
             ]

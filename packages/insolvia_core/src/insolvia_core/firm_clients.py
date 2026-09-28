@@ -449,7 +449,7 @@ def debtor_from_client(client: FirmClient, *, case: Case, filing_role: str) -> D
     entry = {"source": "client", "client_id": client.id}
     # The paths to cover are whatever invariant 1 will demand of this body,
     # so they come from the same walk it uses.
-    provenance = {path: entry for path in populated_paths(body)}
+    provenance = dict.fromkeys(populated_paths(body), entry)
     draft = parse_debtor({**body, "provenance": provenance})
     return create_debtor(
         draft,
