@@ -49,11 +49,11 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        description: 'Commit to deploy (default: main HEAD). Must have deployed green to staging.'
         required: false
         type: string
       force:
-        description: "Skip the staging-green check (emergency only)"
+        description: 'Skip the staging-green check (emergency only)'
         required: false
         default: false
         type: boolean
@@ -63,11 +63,11 @@ on:
   workflow_call:
     inputs:
       sha:
-        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        description: 'Commit to deploy (default: main HEAD). Must have deployed green to staging.'
         required: false
         type: string
       force:
-        description: "Skip the staging-green check (emergency only)"
+        description: 'Skip the staging-green check (emergency only)'
         required: false
         default: false
         type: boolean
@@ -149,7 +149,7 @@ jobs:
       # major is what makes "same source" mean "same toolchain" — see the header.
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
           cache: npm
 
       # `ci`, never `install`: it installs exactly the committed lockfile, which
@@ -182,7 +182,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "~1.10"
+          terraform_version: '~1.10'
           # The wrapper interposes on stdout, which corrupts the
           # `terraform output -raw` capture below.
           terraform_wrapper: false
@@ -205,6 +205,7 @@ jobs:
             echo "url=$(tf url)"
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
+            echo "auth_portal_client_id=$(tf auth_portal_client_id)"
             # For the smoke job: the API and marketing origins it probes.
             echo "api_domain=$(tf api_domain)"
             echo "marketing_url=$(tf marketing_url)"
@@ -242,6 +243,11 @@ jobs:
           EXPO_PUBLIC_INSOLVIA_ENV: production
           EXPO_PUBLIC_COGNITO_DOMAIN: ${{ steps.tf.outputs.auth_domain }}
           EXPO_PUBLIC_COGNITO_CLIENT_ID: ${{ steps.tf.outputs.auth_client_id }}
+          # The client portal's own app client (ADR 0023) — same pool, same
+          # hosted domain, a disjoint id that /v1/portal/* alone accepts. Empty,
+          # the staff app still signs in and /portal says "not configured",
+          # which is exactly the quiet failure the check below refuses.
+          EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID: ${{ steps.tf.outputs.auth_portal_client_id }}
           # The footer's build stamp — see app-staging.yml for why a commit sha
           # is legitimately an `EXPO_PUBLIC_` value.
           EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
@@ -251,9 +257,11 @@ jobs:
           missing=()
           [ -n "$EXPO_PUBLIC_COGNITO_DOMAIN" ] || missing+=(EXPO_PUBLIC_COGNITO_DOMAIN)
           [ -n "$EXPO_PUBLIC_COGNITO_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_CLIENT_ID)
+          [ -n "$EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID)
           if [ "${#missing[@]}" -ne 0 ]; then
             echo "::error::Empty Cognito build config: ${missing[*]}. These come from the" \
-                 "infra/envs/prod outputs auth_domain / auth_web_client_id. Refusing to" \
+                 "infra/envs/prod outputs auth_domain / auth_web_client_id /" \
+                 "auth_portal_client_id. Refusing to" \
                  "ship a production bundle that cannot sign anyone in."
             exit 1
           fi
@@ -358,7 +366,7 @@ jobs:
       # package.json), so it installs from its OWN lockfile.
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 

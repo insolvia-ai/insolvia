@@ -145,6 +145,16 @@ export function cognitoClientId(): string | undefined {
 }
 
 /**
+ * The CLIENT PORTAL's app client (ADR 0023), when the caller knows it — the
+ * workflow passes the Terraform `auth_portal_client_id` output. Not a secret,
+ * for `cognitoClientId`'s reason. Lets the portal flow assert its redirect
+ * named the portal client and not the staff one.
+ */
+export function cognitoPortalClientId(): string | undefined {
+  return optional('E2E_COGNITO_PORTAL_CLIENT_ID');
+}
+
+/**
  * True when `hostname` is the sign-in page we expect to be redirected to.
  *
  * The fallback accepts EITHER form because staging and prod now sign in on
@@ -210,9 +220,7 @@ function seededUsers(): Map<string, string> {
   fixtureUsers = new Map(
     (parsed.firms ?? [])
       .flatMap((firm) => firm.users ?? [])
-      .filter((user): user is Required<FixtureUser> =>
-        Boolean(user.handle && user.email),
-      )
+      .filter((user): user is Required<FixtureUser> => Boolean(user.handle && user.email))
       .map((user) => [user.handle, user.email]),
   );
   return fixtureUsers;
@@ -229,6 +237,58 @@ function seededUsers(): Map<string, string> {
  * The password is shared by every seeded account and read from the
  * environment; it is the only credential this suite touches.
  */
+/** A seeded portal client, with what the fixture says they should see. */
+export interface SeededClient {
+  readonly email: string;
+  readonly password: string;
+  readonly displayName: string;
+  /** The firm the fixture case is loaded into — the name the portal shows. */
+  readonly firmName: string;
+  /** The fixture case's chapter, from `seeds/fixtures/<version>/cases.json`. */
+  readonly chapter: number;
+}
+
+interface FixtureCaseEntry {
+  fixture?: string;
+  case?: string;
+  firm?: string;
+  clients?: { handle?: string; email?: string; displayName?: string }[];
+}
+
+/**
+ * A debtor bound to a fixture case for the client portal (ADR 0023), by the
+ * `handle` the fixture gives them — `seeds/<target>.json`'s `cases[].clients`,
+ * the same rows the seeder binds. Same password as every seeded account.
+ */
+export function seededClient(handle = 'client'): SeededClient {
+  const fixture = fixturePath();
+  const parsed = JSON.parse(readFileSync(fixture, 'utf8')) as { cases?: FixtureCaseEntry[] };
+  for (const entry of parsed.cases ?? []) {
+    const client = (entry.clients ?? []).find((c) => c.handle === handle);
+    if (client?.email === undefined || entry.fixture === undefined || entry.case === undefined) {
+      continue;
+    }
+    const cases = JSON.parse(
+      readFileSync(
+        new URL(`../../seeds/fixtures/${entry.fixture}/cases.json`, import.meta.url),
+        'utf8',
+      ),
+    ) as { cases?: Record<string, { chapter?: number }> };
+    const chapter = cases.cases?.[entry.case]?.chapter;
+    if (chapter === undefined || entry.firm === undefined) {
+      throw new Error(`The fixture entry binding '${handle}' names no firm or no chapter.`);
+    }
+    return {
+      email: client.email,
+      password: required('E2E_TEST_USER_PASSWORD'),
+      displayName: client.displayName ?? '',
+      firmName: entry.firm,
+      chapter,
+    };
+  }
+  throw new Error(`No portal client with handle '${handle}' in ${fixture.pathname}.`);
+}
+
 export function testUser(handle = 'admin'): { email: string; password: string } {
   const email = seededUsers().get(handle);
   if (email === undefined) {

@@ -66,6 +66,7 @@ jobs:
       url: ${{ steps.tf.outputs.url }}
       auth_domain: ${{ steps.tf.outputs.auth_domain }}
       auth_client_id: ${{ steps.tf.outputs.auth_client_id }}
+      auth_portal_client_id: ${{ steps.tf.outputs.auth_portal_client_id }}
       firm_table: ${{ steps.tf.outputs.firm_table }}
       case_table: ${{ steps.tf.outputs.case_table }}
       document_bucket: ${{ steps.tf.outputs.document_bucket }}
@@ -83,7 +84,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "~1.10"
+          terraform_version: '~1.10'
           # The wrapper interposes on stdout, which corrupts the
           # `terraform output -raw` captures below — same reason app-prod.yml
           # sets it.
@@ -108,6 +109,7 @@ jobs:
             echo "url=$(tf url)"
             echo "auth_domain=$(tf auth_domain)"
             echo "auth_client_id=$(tf auth_web_client_id)"
+            echo "auth_portal_client_id=$(tf auth_portal_client_id)"
             echo "firm_table=$(tf firm_table_name)"
             echo "case_table=$(tf case_table_name)"
             echo "document_bucket=$(tf case_document_bucket)"
@@ -133,7 +135,7 @@ jobs:
       # lockfile is the repo-root one setup-node already looks for by default.
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
           cache: npm
 
       - run: npm ci
@@ -176,6 +178,11 @@ jobs:
           EXPO_PUBLIC_INSOLVIA_ENV: staging
           EXPO_PUBLIC_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
           EXPO_PUBLIC_COGNITO_CLIENT_ID: ${{ needs.terraform.outputs.auth_client_id }}
+          # The client portal's own app client (ADR 0023) — same pool, same
+          # hosted domain, a disjoint id that /v1/portal/* alone accepts. Empty,
+          # the staff app still signs in and /portal says "not configured",
+          # which is exactly the quiet failure the check below refuses.
+          EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID: ${{ needs.terraform.outputs.auth_portal_client_id }}
           # The footer's build stamp — which bundle this is, for a support
           # call. Not a secret: a commit sha is public the moment it is pushed,
           # which is what makes `EXPO_PUBLIC_` legitimate for it. Absent
@@ -187,9 +194,11 @@ jobs:
           missing=()
           [ -n "$EXPO_PUBLIC_COGNITO_DOMAIN" ] || missing+=(EXPO_PUBLIC_COGNITO_DOMAIN)
           [ -n "$EXPO_PUBLIC_COGNITO_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_CLIENT_ID)
+          [ -n "$EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID" ] || missing+=(EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID)
           if [ "${#missing[@]}" -ne 0 ]; then
             echo "::error::Empty Cognito build config: ${missing[*]}. These come from the" \
-                 "infra/envs/staging outputs auth_domain / auth_web_client_id (see the" \
+                 "infra/envs/staging outputs auth_domain / auth_web_client_id /" \
+                 "auth_portal_client_id (see the" \
                  "terraform job). Refusing to ship a bundle that cannot sign anyone in."
             exit 1
           fi
@@ -318,7 +327,7 @@ jobs:
       # catches a dependency it forgot to declare.
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: '24'
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
@@ -381,6 +390,9 @@ jobs:
           E2E_MARKETING_URL: ${{ needs.terraform.outputs.marketing_url }}
           E2E_COGNITO_DOMAIN: ${{ needs.terraform.outputs.auth_domain }}
           E2E_COGNITO_CLIENT_ID: ${{ needs.terraform.outputs.auth_client_id }}
+          # The portal flow asserts its redirect names THIS client, not the
+          # staff one (e2e/tests/flows/client-portal.spec.ts).
+          E2E_COGNITO_PORTAL_CLIENT_ID: ${{ needs.terraform.outputs.auth_portal_client_id }}
           # The footer's build stamp must be THIS commit's — proof the bundle
           # CloudFront serves is the one this run just shipped.
           E2E_EXPECTED_BUILD_SHA: ${{ github.sha }}
