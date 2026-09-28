@@ -417,3 +417,83 @@ def test_a_forbidden_caller_writes_no_row(client, access_log):
     before = len(access_log.events)
     client.get(f"/v1/firm/clients/{created['id']}", headers=auth(BLOCKED))
     assert len(access_log.events) == before
+
+
+# ── A client's cases (ADR 0022, PR 2) ───────────────────────────────
+
+
+def open_for(client, client_ids, subject=ADMIN):
+    response = client.post(
+        "/v1/cases",
+        json={
+            "chapter": 7,
+            "court": "flmb",
+            "division": "tampa",
+            "client_ids": client_ids,
+        },
+        headers=auth(subject),
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["id"]
+
+
+def cases_of(client, client_id, subject=ADMIN):
+    return client.get(f"/v1/firm/clients/{client_id}/cases", headers=auth(subject))
+
+
+def test_a_clients_cases_list_newest_first_with_the_role_they_hold(client):
+    jordan = add(client).get_json()["id"]
+    sam = add(client, name={"given": "Sam"}).get_json()["id"]
+    alone = open_for(client, [jordan])
+    joint = open_for(client, [sam, jordan])
+
+    response = cases_of(client, jordan)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert [(e["case"]["id"], e["filing_role"]) for e in body["cases"]] == [
+        (joint, "debtor_2"),
+        (alone, "debtor_1"),
+    ]
+    # The case in GET /v1/cases/<id>'s own shape.
+    assert body["cases"][0]["case"]["district"] == "Middle District of Florida"
+    # A joint case is in each of its clients' lists, once.
+    assert [e["case"]["id"] for e in cases_of(client, sam).get_json()["cases"]] == [
+        joint
+    ]
+
+
+def test_a_client_with_no_case_yet_is_a_prospect_with_an_empty_list(client):
+    prospect = add(client).get_json()["id"]
+    assert cases_of(client, prospect).get_json() == {"cases": []}
+
+
+def test_the_list_holds_only_cases_the_caller_may_see_and_no_count(client):
+    """The paralegal is linked to the matter they opened and nothing else.
+    The admin's case for the same client is not listed, and nothing in the
+    body says it exists — a count would be ADR 0009's enumeration."""
+    jordan = add(client).get_json()["id"]
+    open_for(client, [jordan], subject=ADMIN)
+    theirs = open_for(client, [jordan], subject=PARALEGAL)
+
+    body = cases_of(client, jordan, PARALEGAL).get_json()
+
+    assert [e["case"]["id"] for e in body["cases"]] == [theirs]
+    assert set(body) == {"cases"}
+    assert len(cases_of(client, jordan).get_json()["cases"]) == 2
+
+
+def test_another_firms_client_is_the_same_404_as_none_and_is_logged(client, access_log):
+    jordan = add(client).get_json()["id"]
+    open_for(client, [jordan])
+    foreign = cases_of(client, jordan, OTHER_ADMIN)
+    missing = cases_of(client, "no-such-client", OTHER_ADMIN)
+    assert foreign.status_code == missing.status_code == 404
+    assert foreign.get_json() == missing.get_json()
+    assert rows(access_log)[-2] == ("client.read", jordan, OTHER_ADMIN, "denied")
+
+
+def test_listing_a_clients_cases_needs_the_cases_feature_too(client):
+    """VIEWER may see the directory but holds no `cases` grant at all."""
+    jordan = add(client).get_json()["id"]
+    assert cases_of(client, jordan, VIEWER).status_code == 403

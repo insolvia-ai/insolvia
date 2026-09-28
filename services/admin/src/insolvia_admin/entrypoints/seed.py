@@ -831,12 +831,17 @@ def _seed_one_case(
             # a fixture naming a court the registry does not know fails here
             # with the API's own field error rather than seeding a case the
             # service would refuse to write.
+            # `require_clients=False` until the fixtures name clients: the
+            # next fixture version does, and its loader passes them (ADR
+            # 0022's PR 3). Cases seeded from these versions are the
+            # pre-client rows that PR's release deletes.
             draft = parse_case_creation(
                 {
                     "chapter": spec.get("chapter"),
                     "court": spec.get("court"),
                     "division": spec.get("division"),
-                }
+                },
+                require_clients=False,
             )
             minted, _ = create_case(draft, firm_id=firm_id, created_by=created_by)
             case = replace(minted, id=case_id)

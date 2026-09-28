@@ -32,6 +32,8 @@ from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 FIRM_A = "00000000-0000-4000-8000-00000000f18a"
@@ -101,6 +103,9 @@ def client():
     firms.create_firm(firm(FIRM_B, "Other Firm LLP"))
     firms.add_user(member(ALICE, FIRM_A))
     firms.add_user(member(BOB, FIRM_B))
+    # One debtor store for both: opening a case writes its debtors through
+    # the case store (ADR 0022), and the debtor routes must see them.
+    debtors = MemoryDebtorStore()
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -113,10 +118,10 @@ def client():
             waitlist_store=MemoryWaitlistStore(),
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
-            case_store=MemoryCaseStore(),
+            case_store=MemoryCaseStore(debtor_store=debtors),
             firm_store=firms,
             access_log=MemoryAccessLog(),
-            debtor_store=MemoryDebtorStore(),
+            debtor_store=debtors,
             tax_id_store=MemoryTaxIdStore(),
             tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
@@ -128,7 +133,9 @@ def client():
 def open_case(client, subject=ALICE):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -145,7 +152,7 @@ def put_debtor_1(client, case_id, *, state):
         },
         headers=auth(ALICE),
     )
-    assert response.status_code == 201, response.get_json()
+    assert response.status_code == 200, response.get_json()
 
 
 def add(client, case_id, collection, **body):

@@ -159,8 +159,27 @@ debtor {
     exemption_reason: incapacity | disability | active_duty
   }
   signed_at
+  client_id                                                            // the firm client this debtor was copied from — server-owned
 }
 ```
+
+**Every Debtor 1 and Debtor 2 is a firm client, copied**
+([ADR 0022](../adr/0022-a-client-is-not-a-case.md)). `POST /v1/cases` takes
+`client_ids` — one, or two filing jointly — and writes the case, its
+creator's assignment and a debtor per client in one transaction; each copied
+field (name, other names, both addresses with the residence county, phone,
+mobile, email) carries `client` provenance. `client_id` is server-owned: the
+questionnaire's whole-record PUT keeps it, and
+`PUT /v1/cases/<id>/debtors/<role>/client` is the only thing that sets or
+moves it — copying the client in when the role is empty, moving only the
+link when it is not. A questionnaire save cannot create Debtor 1 or Debtor 2
+from nothing; a non-filing spouse, who need not be the firm's client, still
+can. One client holds at most one role per case. The copy is never synced:
+`differs_from_client` (the field paths where the case and the client now
+disagree) is computed on every read for a caller who may see the client
+directory, and nothing resolves it silently. The debtor item carries
+`GSI3PK CLIENT#<client_id>` / `GSI3SK <case createdAt>#<case id>`, which is
+the `by-client` index a client's case list reads.
 
 **A case belongs to a FIRM.** `firm_id` is the tenant; `created_by` is the
 Cognito subject of whoever opened the matter and is an audit fact rather than a
@@ -468,15 +487,23 @@ per-field, carried on every record as a map keyed by field path:
 ```
 provenance: {
   "<field_path>": {
-    source: staff_typed | ai_extracted | imported | library,
+    source: staff_typed | ai_extracted | imported | library | client,
     confirmed_by, confirmed_at,
     document_id, locator,
     extraction_id,          // the extraction_candidate.id this value came from
     confidence,
-    library_creditor_id     // the library_creditor.id this value was copied from
+    library_creditor_id,    // the library_creditor.id this value was copied from
+    client_id               // the firm client this value was copied from
   }
 }
 ```
+
+`client` ([ADR 0022](../adr/0022-a-client-is-not-a-case.md)) is `library`'s
+twin for a person: a debtor's identity copied from the firm's client
+directory when the case was opened for that client, or when the client was
+linked to the role. A copy, never a live link — a filed petition must not
+change because the client record did — and, like `library`, outside the
+confirmation rule, because a person chose the client.
 
 `library` (issue 13.9 / #350) names a value copied from the firm's reusable
 creditor library (`insolvia_core.library_creditors`) onto a case record — a
@@ -787,10 +814,11 @@ purpose: every existing row has it hidden until an admin grants it.
 **A client is not a debtor.** The firm's client directory
 (`insolvia_core.firm_clients`, `/v1/firm/clients`) is a firm-scoped person
 record in the firm table, beside the library creditors; a debtor is that
-person's identity as copied into one case. In this revision no debtor
-references a client yet — `client_id` on the debtor and the `client`
-provenance source arrive with ADR 0022's second PR, and this page gains them
-then.
+person's identity as copied into one case (see "Identity" above for the
+copy, `client_id` and the `by-client` index). Opening a case therefore needs
+`clients` at `view_only` as well as `cases` at `add_edit`, and a client's own
+case list (`GET /v1/firm/clients/<id>/cases`) is filtered per case through
+`may_see_case` and shows no count of the rest.
 
 ## Not here, on purpose
 

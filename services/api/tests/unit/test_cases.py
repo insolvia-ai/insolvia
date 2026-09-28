@@ -60,6 +60,8 @@ from insolvia_core.firms import (
     default_permissions,
 )
 
+from tests.unit.opening import add_client, with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 KID = "test-key-1"
@@ -146,8 +148,13 @@ def member(
 
 
 @pytest.fixture
-def store():
-    return MemoryCaseStore()
+def debtors():
+    return MemoryDebtorStore()
+
+
+@pytest.fixture
+def store(debtors):
+    return MemoryCaseStore(debtor_store=debtors)
 
 
 @pytest.fixture
@@ -171,7 +178,7 @@ def firms():
 
 
 @pytest.fixture
-def client(store, access_log, firms):
+def client(store, access_log, firms, debtors):
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -189,7 +196,7 @@ def client(store, access_log, firms):
             firm_store=firms,
             # The exemption election's opt-out check (issue #346) reads
             # Debtor 1's state and the petition's filing date.
-            debtor_store=MemoryDebtorStore(),
+            debtor_store=debtors,
             tax_id_store=MemoryTaxIdStore(),
             tax_id_cipher=LocalTaxIdCipher(),
             case_entity_store=MemoryCaseEntityStore(),
@@ -201,7 +208,11 @@ def client(store, access_log, firms):
 def open_case(client, subject=ALICE, *, chapter=7, court="flmb", division="tampa"):
     response = client.post(
         "/v1/cases",
-        json={"chapter": chapter, "court": court, "division": division},
+        json=with_client(
+            client,
+            auth(subject),
+            {"chapter": chapter, "court": court, "division": division},
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201
@@ -326,7 +337,9 @@ def test_create_never_returns_the_firm(client):
 def test_create_ignores_a_firm_supplied_by_the_client(client, store):
     response = client.post(
         "/v1/cases",
-        json={**TAMPA, "firmId": FIRM_B, "createdBy": CAROL},
+        json=with_client(
+            client, auth(ALICE), {**TAMPA, "firmId": FIRM_B, "createdBy": CAROL}
+        ),
         headers=auth(ALICE),
     )
     assert response.status_code == 201
@@ -350,7 +363,7 @@ def test_creating_a_case_links_its_creator(client, store):
 def test_create_starts_at_intake_even_if_asked_otherwise(client):
     response = client.post(
         "/v1/cases",
-        json={**TAMPA, "status": "filed"},
+        json=with_client(client, auth(ALICE), {**TAMPA, "status": "filed"}),
         headers=auth(ALICE),
     )
     assert response.get_json()["status"] == "intake"
@@ -733,7 +746,8 @@ def put_debtor_1_in(client, case_id, state):
         },
         headers=auth(ALICE),
     )
-    assert response.status_code == 201, response.get_json()
+    # 200: Debtor 1 exists from the moment the case is opened for its client.
+    assert response.status_code == 200, response.get_json()
 
 
 def test_a_case_starts_with_no_election(client):
@@ -808,8 +822,21 @@ def test_a_case_with_no_debtor_state_yet_accepts_either_election(client):
 
 def test_creating_a_case_is_recorded(client, access_log):
     case_id = open_case(client)["id"]
-    assert [(e.action, e.case_id, e.principal) for e in access_log.events] == [
+    case_rows = [e for e in access_log.events if e.case_id is not None]
+    assert [(e.action, e.case_id, e.principal) for e in case_rows] == [
         ("case.create", case_id, ALICE)
+    ]
+
+
+def test_the_client_copied_into_a_case_is_recorded_as_read(client, access_log):
+    """Copying a person's identity into a case is reading their record."""
+    client_id = add_client(client, auth(ALICE))
+    client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+    reads = [e for e in access_log.events if e.action == "client.read"]
+    assert [(e.client_id, e.outcome, e.principal) for e in reads] == [
+        (client_id, "allowed", ALICE)
     ]
 
 
@@ -1010,3 +1037,145 @@ def test_case_assignment_denormalises_the_cases_timestamp():
     assert assignment.case_created_at == case.created_at
     # Its own stamp is a different fact and is recorded separately.
     assert assignment.assigned_at != case.created_at
+
+
+# ── Opening a case for a client (ADR 0022) ─────────────────────────────
+
+
+def debtors_of(client, case_id, subject=ALICE):
+    response = client.get(f"/v1/cases/{case_id}/debtors", headers=auth(subject))
+    assert response.status_code == 200
+    return response.get_json()["debtors"]
+
+
+def test_a_case_opened_for_a_client_starts_with_that_client_as_debtor_1(client):
+    client_id = add_client(
+        client,
+        auth(ALICE),
+        name={"given": "Jordan", "surname": "Example"},
+        phone="555-0100",
+        lead_source="Referral",
+    )
+    case = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    ).get_json()
+
+    [debtor] = debtors_of(client, case["id"])
+    assert debtor["filing_role"] == "debtor_1"
+    assert debtor["client_id"] == client_id
+    assert debtor["name"] == {"given": "Jordan", "surname": "Example"}
+    assert debtor["phone"] == "555-0100"
+    # The firm's own fields stay the firm's.
+    assert "lead_source" not in debtor
+    copied = {"source": "client", "client_id": client_id}
+    assert debtor["provenance"] == {
+        "name.given": copied,
+        "name.surname": copied,
+        "phone": copied,
+    }
+    assert debtor["differs_from_client"] == []
+
+
+def test_two_clients_open_a_joint_case_in_filing_order(client):
+    first = add_client(client, auth(ALICE), name={"given": "Jordan"})
+    second = add_client(client, auth(ALICE), name={"given": "Sam"})
+    case = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [first, second]},
+        headers=auth(ALICE),
+    ).get_json()
+    listed = debtors_of(client, case["id"])
+    assert [(d["filing_role"], d["client_id"]) for d in listed] == [
+        ("debtor_1", first),
+        ("debtor_2", second),
+    ]
+
+
+@pytest.mark.parametrize(
+    "client_ids",
+    [None, [], ["a", "b", "c"]],
+    ids=["missing", "empty", "three"],
+)
+def test_a_case_needs_one_or_two_clients(client, client_ids):
+    body = {**TAMPA} if client_ids is None else {**TAMPA, "client_ids": client_ids}
+    response = client.post("/v1/cases", json=body, headers=auth(ALICE))
+    assert response.status_code == 400
+    assert "client_ids" in response.get_json()["fields"]
+
+
+def test_the_same_client_cannot_be_both_debtors(client, store):
+    client_id = add_client(client, auth(ALICE))
+    response = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [client_id, client_id]},
+        headers=auth(ALICE),
+    )
+    assert response.status_code == 400
+    assert "client_ids" in response.get_json()["fields"]
+    assert store.cases == {}
+
+
+def test_another_firms_client_is_indistinguishable_from_no_client(
+    client, store, access_log
+):
+    """The anti-oracle rule of `GET /v1/firm/clients/<id>`, as a field error:
+    Carol's client and a made-up id get the same answer, nothing is written,
+    and the refused read is on the log."""
+    carols = add_client(client, auth(CAROL))
+    foreign = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [carols]}, headers=auth(ALICE)
+    )
+    unknown = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": ["no-such-client"]},
+        headers=auth(ALICE),
+    )
+    assert foreign.status_code == unknown.status_code == 400
+    assert foreign.get_json() == unknown.get_json()
+    assert store.cases == {}
+    denied = [e for e in access_log.events if e.outcome == "denied"]
+    assert [(e.action, e.client_id) for e in denied] == [
+        ("client.read", carols),
+        ("client.read", "no-such-client"),
+    ]
+
+
+def test_an_archived_client_is_restored_before_a_case_is_opened_for_them(client):
+    client_id = add_client(client, auth(ALICE))
+    client.put(
+        f"/v1/firm/clients/{client_id}/status",
+        json={"status": "archived"},
+        headers=auth(ALICE),
+    )
+    response = client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
+    )
+    assert response.status_code == 400
+    assert "archived" in response.get_json()["fields"]["client_ids"]
+
+
+def test_opening_a_case_needs_the_client_directory_too(client, firms):
+    """`cases: add_edit` alone is not enough: the copy would read a client
+    record the firm has not let this person see."""
+    client_id = add_client(client, auth(ALICE))
+    no_clients = "00000000-0000-4000-8000-0000000c0de0"
+    firms.add_user(
+        member(
+            no_clients,
+            permissions={**default_permissions("attorney"), "clients": HIDDEN},
+        )
+    )
+    response = client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [client_id]},
+        headers=auth(no_clients),
+    )
+    assert response.status_code == 403
+
+
+def test_a_restricted_creator_is_still_linked_and_sees_their_debtor(client):
+    """BOB opens a matter for a client: the transaction that links him also
+    wrote the debtor he is about to fill in."""
+    case = open_case(client, BOB)
+    [debtor] = debtors_of(client, case["id"], BOB)
+    assert debtor["filing_role"] == "debtor_1"

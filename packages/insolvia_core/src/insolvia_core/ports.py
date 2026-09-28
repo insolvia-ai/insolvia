@@ -10,14 +10,14 @@ composes stay in that service.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, TypeVar
 
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
-from insolvia_core.cases import Case, CaseAssignment, CasePage
+from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
 from insolvia_core.clients import ClientBinding
 from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
@@ -306,14 +306,44 @@ class CaseStore(Protocol):
     matters a colleague is working.
     """
 
-    def create(self, case: Case, assignment: CaseAssignment) -> None:
-        """Store a new case AND link its creator, atomically.
+    def create(
+        self,
+        case: Case,
+        assignment: CaseAssignment,
+        debtors: Sequence[Debtor] = (),
+    ) -> None:
+        """Store a new case, link its creator, and write the debtors copied
+        from its clients — atomically.
 
-        BOTH OR NEITHER, and it must be a transaction rather than two writes.
+        ALL OR NONE, and it must be a transaction rather than several writes.
         A case whose assignment write failed is invisible to the person who
         just created it — they cannot list it, cannot open it, and cannot tell
         it apart from the request having failed — while still occupying its id.
-        core/cases.create_case returns the pair for exactly this reason.
+        core/cases.create_case returns the pair for exactly this reason. The
+        debtors join it for the same reason (ADR 0022): a case opened for a
+        client that lost its debtor write is a matter nobody can find from
+        the client, because the debtor item IS the `by-client` index entry.
+
+        `debtors` is empty only for callers with no clients to copy (the seed
+        loader, until its fixtures name clients); `POST /v1/cases` always
+        passes one or two.
+        """
+        ...
+
+    def list_for_client(
+        self, client_id: str, *, accessor: Accessor
+    ) -> tuple[ClientCase, ...]:
+        """The cases naming `client_id` on a debtor that this accessor may
+        see, newest first — the `by-client` index (ADR 0022), each entry
+        filtered through `may_see_case` exactly as `get` filters one.
+
+        The ones filtered out leave NO trace: no count, no placeholder. A
+        client's list that said "and 2 more you cannot open" would be the
+        enumeration ADR 0009's 404 exists to hide.
+
+        Unpaginated, deliberately: one person's matters are a handful, and a
+        cursor over a list that is then filtered per case would page by a
+        count the caller must not learn.
         """
         ...
 

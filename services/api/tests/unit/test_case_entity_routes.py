@@ -29,6 +29,8 @@ from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
 FIRM_A = "00000000-0000-4000-8000-00000000f18a"
@@ -132,7 +134,9 @@ def client(access_log):
 def open_case(client, subject=ALICE):
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, auth(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201

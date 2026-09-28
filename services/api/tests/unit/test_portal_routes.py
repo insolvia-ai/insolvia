@@ -46,6 +46,8 @@ from insolvia_core.firms import (
     default_permissions,
 )
 
+from tests.unit.opening import with_client
+
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 STAFF_CLIENT_ID = "exampleappclientid000000"
 PORTAL_CLIENT_ID = "exampleportalclientid000"
@@ -192,7 +194,9 @@ def client(app):
 def open_case(client, subject: str = ALICE) -> str:
     response = client.post(
         "/v1/cases",
-        json={"chapter": 7, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client, staff(subject), {"chapter": 7, "court": "flmb", "division": "tampa"}
+        ),
         headers=staff(subject),
     )
     assert response.status_code == 201

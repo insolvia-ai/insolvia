@@ -1,6 +1,12 @@
 import { ApiValidationException } from '@insolvia-ai/api-client';
-import type { Case, CaseChapter, CourtRegistry, FirmColleague } from '@insolvia-ai/api-client';
-import { Badge, Button, Field, RadioGroup, Select, Table } from '@insolvia-ai/design-system';
+import type {
+  Case,
+  CaseChapter,
+  CourtRegistry,
+  FirmClient,
+  FirmColleague,
+} from '@insolvia-ai/api-client';
+import { Badge, Button, Field, Input, RadioGroup, Select, Table } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -41,6 +47,21 @@ type RegistryState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly registry: CourtRegistry }
   | { readonly kind: 'error' };
+
+type ClientsState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'ready'; readonly clients: readonly FirmClient[] }
+  | { readonly kind: 'error' };
+
+/** The client `Select`'s value for "a new client, named below". */
+const NEW_CLIENT = '__new_client__';
+
+/** How a client reads in the picker: "Surname, Given", or whichever half exists. */
+function clientLabel(client: FirmClient): string {
+  const { given, surname } = client.name;
+  if (surname !== undefined && given !== undefined) return `${surname}, ${given}`;
+  return surname ?? given ?? client.id;
+}
 
 /**
  * The case list, and the form that opens one — the screen that closes issue
@@ -86,6 +107,65 @@ export function Cases() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // A case is opened FOR A CLIENT (ADR 0022): `POST /v1/cases` requires
+  // `client_ids`. This is the minimum that keeps the form working until the
+  // client list and record screens arrive (#354) — pick an existing client,
+  // or name a new one here and it is added to the directory first.
+  const [clients, setClients] = useState<ClientsState>({ kind: 'loading' });
+  const [clientChoice, setClientChoice] = useState<string | null>(null);
+  const [newGiven, setNewGiven] = useState('');
+  const [newSurname, setNewSurname] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadClients = async () => {
+      try {
+        const result = await call((client) => client.listFirmClients());
+        if (result.ok && !cancelled) {
+          const active = result.value.filter((client) => client.status === 'active');
+          setClients({ kind: 'ready', clients: active });
+          // With nobody in the directory the only possible answer is a new
+          // client, so the form starts there rather than on an empty list.
+          if (active.length === 0) setClientChoice(NEW_CLIENT);
+        }
+      } catch {
+        // A 403 is the firm not having granted `clients`, which opening a case
+        // now needs — the message below says so rather than an empty picker.
+        if (!cancelled) setClients({ kind: 'error' });
+      }
+    };
+    void loadClients();
+    return () => {
+      cancelled = true;
+    };
+  }, [call]);
+
+  /** The chosen client's id — adding the named new client first when that is
+   * the choice. `null` when the add failed (its errors are already shown) or
+   * the session ended. */
+  const resolveClient = async (): Promise<string | null | undefined> => {
+    if (clientChoice !== NEW_CLIENT) return clientChoice ?? undefined;
+    const given = newGiven.trim();
+    const surname = newSurname.trim();
+    const added = await call((client) =>
+      client.createFirmClient({
+        name: {
+          ...(given === '' ? {} : { given }),
+          ...(surname === '' ? {} : { surname }),
+        },
+      }),
+    );
+    if (!added.ok) return null;
+    // Chosen from now on, so a retry after a case-level error does not add
+    // the same person twice.
+    setClients((current) =>
+      current.kind === 'ready'
+        ? { kind: 'ready', clients: [...current.clients, added.value] }
+        : current,
+    );
+    setClientChoice(added.value.id);
+    return added.value.id;
+  };
 
   useEffect(() => {
     if (defaultsApplied || membership === undefined || membership === null) return;
@@ -150,12 +230,22 @@ export function Cases() {
     setSubmitting(true);
     setFieldErrors({});
     setFormError(null);
+    let addingClient = clientChoice === NEW_CLIENT;
     try {
+      const clientId = await resolveClient();
+      addingClient = false;
+      if (clientId === null) return;
       // The pair goes as chosen, empty when not — the server's per-field
-      // message ("Choose the bankruptcy court…") is the validation, not a
-      // second copy of the rule here (ADR 0001).
+      // message ("Choose the bankruptcy court…", "Choose the client this case
+      // is for.") is the validation, not a second copy of the rule here
+      // (ADR 0001).
       const result = await call((client) =>
-        client.createCase({ chapter, court: court ?? '', division: division ?? '' }),
+        client.createCase({
+          chapter,
+          court: court ?? '',
+          division: division ?? '',
+          clientIds: clientId === undefined ? [] : [clientId],
+        }),
       );
       if (result.ok) {
         await load();
@@ -163,8 +253,14 @@ export function Cases() {
     } catch (cause) {
       if (cause instanceof ApiValidationException) {
         // The server is the source of truth for validation (ADR 0001), so its
-        // per-field messages are rendered as-is rather than restated here.
-        setFieldErrors(cause.fields);
+        // per-field messages are rendered as-is rather than restated here. A
+        // refused NEW client's `name` belongs to the name boxes below the
+        // picker, not to the case form's own fields.
+        setFieldErrors(
+          addingClient && cause.fields.name !== undefined
+            ? { clientName: cause.fields.name }
+            : cause.fields,
+        );
       } else {
         setFormError('Could not open the case. Please try again.');
       }
@@ -231,6 +327,29 @@ export function Cases() {
           </Text>
         ) : null}
 
+        {clients.kind === 'ready' ? (
+          <ClientPicker
+            clients={clients.clients}
+            choice={clientChoice}
+            onChoose={setClientChoice}
+            given={newGiven}
+            surname={newSurname}
+            onGiven={setNewGiven}
+            onSurname={setNewSurname}
+            errors={fieldErrors}
+          />
+        ) : (
+          <Text
+            aria-live={clients.kind === 'error' ? 'assertive' : 'polite'}
+            style={[styles.body, muted]}
+          >
+            {clients.kind === 'loading'
+              ? 'Loading your clients…'
+              : 'Could not load your client directory — a case is opened for a client, so ' +
+                'opening one needs access to it. Ask a firm admin to grant “Clients”.'}
+          </Text>
+        )}
+
         {courts.kind === 'ready' ? (
           <CourtPicker
             registry={courts.registry}
@@ -258,7 +377,11 @@ export function Cases() {
         <View style={styles.actions}>
           {/* size="lg" (48dp): the package's md is 40dp, under the 44dp
               WCAG 2.5.5 target-size floor this app enforces. */}
-          <Button size="lg" onPress={submit} disabled={submitting || courts.kind !== 'ready'}>
+          <Button
+            size="lg"
+            onPress={submit}
+            disabled={submitting || courts.kind !== 'ready' || clients.kind !== 'ready'}
+          >
             {submitting ? 'Opening…' : 'Open case'}
           </Button>
         </View>
@@ -288,6 +411,69 @@ export function Cases() {
         </Text>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * Who the case is for (ADR 0022): an active client from the firm's directory,
+ * or a new one named in two boxes. Deliberately the least that works — the
+ * real front door is the client list and record (#354), which replaces this.
+ * Errors are the server's: `client_ids` from the case, `clientName` from a
+ * refused new client's `name`.
+ */
+function ClientPicker({
+  clients,
+  choice,
+  onChoose,
+  given,
+  surname,
+  onGiven,
+  onSurname,
+  errors,
+}: {
+  clients: readonly FirmClient[];
+  choice: string | null;
+  onChoose: (choice: string) => void;
+  given: string;
+  surname: string;
+  onGiven: (value: string) => void;
+  onSurname: (value: string) => void;
+  errors: Readonly<Record<string, string>>;
+}) {
+  const options = [
+    ...clients.map((client) => ({ value: client.id, label: clientLabel(client) })),
+    { value: NEW_CLIENT, label: 'New client…' },
+  ];
+  return (
+    <>
+      <Field.Root name="client_ids" invalid={Boolean(errors.client_ids)}>
+        <Field.Label>Client</Field.Label>
+        <Select
+          options={options}
+          value={choice}
+          onValueChange={onChoose}
+          placeholder="Choose a client"
+        />
+        <Field.Description>
+          The person this case is for. Their name and contact details are copied into the case as
+          Debtor 1.
+        </Field.Description>
+        {errors.client_ids ? <Field.Error match>{errors.client_ids}</Field.Error> : null}
+      </Field.Root>
+      {choice === NEW_CLIENT ? (
+        <>
+          <Field.Root name="clientGiven" invalid={Boolean(errors.clientName)}>
+            <Field.Label>Client’s first name</Field.Label>
+            <Input value={given} onValueChange={onGiven} autoCorrect={false} />
+          </Field.Root>
+          <Field.Root name="clientName" invalid={Boolean(errors.clientName)}>
+            <Field.Label>Client’s last name</Field.Label>
+            <Input value={surname} onValueChange={onSurname} autoCorrect={false} />
+            {errors.clientName ? <Field.Error match>{errors.clientName}</Field.Error> : null}
+          </Field.Root>
+        </>
+      ) : null}
+    </>
   );
 }
 

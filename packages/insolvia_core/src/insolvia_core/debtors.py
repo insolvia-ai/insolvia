@@ -25,12 +25,12 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Final
 
 from insolvia_core.errors import FieldValidationError
 
-from .cases import partition_key
+from .cases import client_key, listing_sort_key, partition_key
 
 # The scalar and structured parsers live in core/fields.py, shared with every
 # other case entity (issue #249). `Address` and `PersonName` are re-exported
@@ -67,6 +67,7 @@ __all__ = [
     "debtor_from_item",
     "debtor_item",
     "debtor_json",
+    "link_client",
     "parse_debtor",
     "parse_filing_role",
     "replace_debtor",
@@ -143,6 +144,16 @@ class Debtor:
     # design, and `debtor_body` keeps this out of the stored body.
     tax_id: TaxIdRef | None = None
     provenance: Mapping[str, ProvenanceEntry] = field(default_factory=dict)
+    # The firm client this debtor was copied from (ADR 0022) — SERVER-OWNED:
+    # set when the case is opened for the client or by the link route, kept
+    # by every questionnaire save, never read from a body. None only for a
+    # non-filing spouse who is not the firm's client.
+    client_id: str | None = None
+    # The CASE's creation time, denormalised for the `by-client` index's sort
+    # key — `CaseAssignment.case_created_at`'s reason exactly: a client's
+    # cases must list in the order the matters were opened. Set with
+    # `client_id`, and only with it.
+    case_created_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -378,6 +389,8 @@ def debtor_body(draft: DebtorDraft | Debtor) -> dict[str, object]:
         "updated_at",
         "provenance",
         "tax_id",
+        "client_id",
+        "case_created_at",
     ):
         body.pop(key, None)
     return body
@@ -399,7 +412,14 @@ def create_debtor(
     case_id: str,
     filing_role: str,
     tax_id: TaxIdRef | None = None,
+    client_id: str | None = None,
+    case_created_at: str | None = None,
 ) -> Debtor:
+    """A new debtor. `client_id` and `case_created_at` travel together — the
+    `by-client` index needs both, and one without the other is refused
+    rather than half-indexed."""
+    if (client_id is None) != (case_created_at is None):
+        raise ValueError("client_id and case_created_at are set together")
     now = _timestamp()
     return Debtor(
         id=str(uuid.uuid4()),
@@ -408,6 +428,8 @@ def create_debtor(
         created_at=now,
         updated_at=now,
         tax_id=tax_id,
+        client_id=client_id,
+        case_created_at=case_created_at,
         **_record_fields(draft),
     )
 
@@ -422,7 +444,11 @@ def replace_debtor(
     `tax_id` is what the debtor will carry AFTER this save — the caller
     resolves it from the draft's write and the existing reference through
     `tax_ids.store_tax_id`; a draft that carries no tax id clears it here,
-    exactly as PUT semantics clear any other omitted field."""
+    exactly as PUT semantics clear any other omitted field.
+
+    `client_id` (and the index's `case_created_at`) are KEPT from `existing`
+    — server-owned (ADR 0022): a questionnaire save cannot link, re-link or
+    unlink a client, whatever its body says. `link_client` is that act."""
     return Debtor(
         id=existing.id,
         case_id=existing.case_id,
@@ -430,7 +456,24 @@ def replace_debtor(
         created_at=existing.created_at,
         updated_at=_timestamp(),
         tax_id=tax_id,
+        client_id=existing.client_id,
+        case_created_at=existing.case_created_at,
         **_record_fields(draft),
+    )
+
+
+def link_client(existing: Debtor, *, client_id: str, case_created_at: str) -> Debtor:
+    """`existing` pointed at another firm client, its copied fields untouched.
+
+    Re-linking changes which client the debtor is (and so which `by-client`
+    entry the item feeds) — never what the case says about them. The fields
+    that now differ from the newly linked client show up in
+    `differs_from_client`; copying them over is its own, explicit act."""
+    return replace(
+        existing,
+        client_id=client_id,
+        case_created_at=case_created_at,
+        updated_at=_timestamp(),
     )
 
 
@@ -457,10 +500,20 @@ def role_order(filing_role: str) -> int:
         return len(FILING_ROLES)
 
 
-def debtor_json(debtor: Debtor) -> dict[str, object]:
+def debtor_json(
+    debtor: Debtor, *, differs_from_client: Sequence[str] | None = None
+) -> dict[str, object]:
     """The API representation. Absent values are omitted rather than sent as
     nulls: on a progressive intake most of the record is empty most of the
-    time, and a body of nulls is mostly noise."""
+    time, and a body of nulls is mostly noise.
+
+    `client_id` is present whenever the debtor names a firm client (ADR
+    0022). `differs_from_client` — the field paths where this copy and the
+    client record now disagree (`firm_clients.differs_from_client`) — is
+    present only when the caller computed it: it needs the client record,
+    which this pure function does not have, and a caller without the
+    `clients` feature is not told how a client record reads. An empty list
+    is an answer ("identical"), so it is sent, not pruned."""
     body = prune_body(debtor_body(debtor))
     # The LAST-FOUR VIEW, and the only tax-id representation any response
     # carries — the debtor routes, the generic collection routes' summaries,
@@ -468,12 +521,19 @@ def debtor_json(debtor: Debtor) -> dict[str, object]:
     # wire shape at all (tax_ids.read_tax_id is not reachable from a route).
     if debtor.tax_id is not None:
         body["tax_id"] = tax_id_json(debtor.tax_id)
-    return {
+    identity: dict[str, object] = {
         "id": debtor.id,
         "case_id": debtor.case_id,
         "filing_role": debtor.filing_role,
         "created_at": debtor.created_at,
         "updated_at": debtor.updated_at,
+    }
+    if debtor.client_id is not None:
+        identity["client_id"] = debtor.client_id
+    if differs_from_client is not None:
+        identity["differs_from_client"] = list(differs_from_client)
+    return {
+        **identity,
         "provenance": provenance_json(debtor.provenance),
         **body,
     }
@@ -486,13 +546,22 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
     SK  DEBTOR#<filing_role>    debtor is read with the case it belongs to and
                                 a role can exist at most once per case.
 
-    Carries no GSI keys: debtors are always reached through their case, never
-    listed across cases, and the sparse by-owner index stays one entry per case.
+    GSI3PK  CLIENT#<client_id>          the `by-client` index (ADR 0022) —
+    GSI3SK  <caseCreatedAt>#<case_id>   only when the debtor names a client
+
+    The debtor item IS the index entry for "this client's cases", exactly as
+    an assignment item is the `by-assignee` entry: linking a client and
+    making the case appear in their list are one write, and no second row
+    can disagree with the debtor's `client_id`. SPARSE: a non-filing spouse
+    who is not a client carries neither key and is simply not in it. A joint
+    case appears once per client. The sort key is built by
+    `cases.listing_sort_key`, the same function both other listings use.
 
     `taxId` is its OWN attribute beside `body`, never inside it: the kind,
     the last four, and the reference to the sealed item (SK=TAXID#<ref>, in
     this partition today — tax_ids.py). The body is what a client sent and
-    what a client gets back; the reference is neither.
+    what a client gets back; the reference is neither. `clientId` sits
+    beside `body` for the same reason: the server set it, nobody sent it.
     """
     item: dict[str, object] = {
         "PK": partition_key(debtor.case_id),
@@ -511,6 +580,11 @@ def debtor_item(debtor: Debtor) -> dict[str, object]:
             "lastFour": debtor.tax_id.last_four,
             "ref": debtor.tax_id.ref,
         }
+    if debtor.client_id is not None and debtor.case_created_at is not None:
+        item["clientId"] = debtor.client_id
+        item["caseCreatedAt"] = debtor.case_created_at
+        item["GSI3PK"] = client_key(debtor.client_id)
+        item["GSI3SK"] = listing_sort_key(debtor.case_created_at, debtor.case_id)
     return item
 
 
@@ -552,5 +626,11 @@ def debtor_from_item(item: Mapping[str, object]) -> Debtor:
         created_at=str(item.get("createdAt", "")),
         updated_at=str(item.get("updatedAt", "")),
         tax_id=_tax_id_from_item(item.get("taxId")),
+        client_id=_optional_str(item.get("clientId")),
+        case_created_at=_optional_str(item.get("caseCreatedAt")),
         **_record_fields(draft),
     )
+
+
+def _optional_str(value: object) -> str | None:
+    return str(value) if value is not None else None

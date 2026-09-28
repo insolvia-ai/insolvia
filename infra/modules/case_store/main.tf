@@ -133,9 +133,10 @@ resource "aws_kms_alias" "case" {
 #   SK = META                     the case record itself
 #      | <ENTITY>#<id>            DEBTOR#…, CLAIM#…, ASSET#…, SOFA#…, …
 #
-# TWO cross-case reads, because "list the cases I may see" has two answers.
-# Both indexes are SPARSE: only the item that carries the key attributes
-# appears, so neither holds one entry per row.
+# TWO cross-case reads, because "list the cases I may see" has two answers —
+# and a third for "this client's cases" (by-client, below the other two).
+# Every index is SPARSE: only the item that carries the key attributes
+# appears, so none holds one entry per row.
 #
 #   by-firm       GSI1PK = FIRM#<firm_id>              on the META item
 #                 GSI1SK = <created_at>#<case_id>
@@ -193,6 +194,14 @@ resource "aws_dynamodb_table" "cases" {
     name = "GSI2SK"
     type = "S"
   }
+  attribute {
+    name = "GSI3PK"
+    type = "S"
+  }
+  attribute {
+    name = "GSI3SK"
+    type = "S"
+  }
 
   # key_schema rather than the GSI's hash_key/range_key: the provider
   # deprecated those in 6.29.0 when it added multi-attribute index keys, and
@@ -240,6 +249,35 @@ resource "aws_dynamodb_table" "cases" {
     }
     key_schema {
       attribute_name = "GSI2SK"
+      key_type       = "RANGE"
+    }
+  }
+
+  # A firm client's cases (ADR 0022). Its entries are DEBTOR#<role> items that
+  # name a client — the debtor copy IS the index entry, exactly as an
+  # assignment is by-assignee's, so opening a case for a client and making it
+  # appear in that client's list are one write, and there is no link row to
+  # disagree with the debtor's clientId. Sparse: a non-filing spouse who is
+  # not a client carries no GSI3 keys. A joint case appears once per client.
+  #
+  #   by-client     GSI3PK = CLIENT#<client_id>        on DEBTOR#… items
+  #                 GSI3SK = <case created_at>#<case_id>
+  #
+  # ADDED ONLINE: a new GSI is created and backfilled by DynamoDB while the
+  # table serves traffic (docs/reference/terraform.md). One index per
+  # UpdateTable call is DynamoDB's rule, and this is one — a single apply.
+  # The API's grant below already covers `${table}/index/*`, so no IAM
+  # changes with it.
+  global_secondary_index {
+    name            = "by-client"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "GSI3PK"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "GSI3SK"
       key_type       = "RANGE"
     }
   }

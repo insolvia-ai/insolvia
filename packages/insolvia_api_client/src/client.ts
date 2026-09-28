@@ -109,6 +109,7 @@ import type {
   FirmColleague,
   FirmFeature,
   FirmClient,
+  FirmClientCase,
   FirmClientDraft,
   FirmClientStatus,
   FirmMembership,
@@ -888,6 +889,37 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireDebtorArray(decoded, 'debtors');
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/debtors/{filingRole}/client` — link a firm client
+   * to one debtor of a case (ADR 0022). The only way a debtor's `client_id`
+   * changes after the case is opened: {@link putDebtor} keeps it.
+   *
+   * With no debtor in that role yet, the client is COPIED in (201) — how a
+   * joint case gains its Debtor 2, since a questionnaire save can no longer
+   * create one from nothing. With one already there, only the link moves
+   * (200); the case's copied fields stay, and where they now disagree with
+   * the client is {@link Debtor.differs_from_client}.
+   *
+   * Needs `intake` at `add_edit` and `clients` at `view_only`. Throws
+   * {@link ApiValidationException} keyed `client_id` for an unknown, foreign
+   * or archived client, or one already holding another role on this case.
+   */
+  async linkDebtorClient(
+    caseId: string,
+    filingRole: FilingRole,
+    clientId: string,
+  ): Promise<Debtor> {
+    const headers = await this.#protectedHeaders();
+    const url = `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/debtors/${encodeURIComponent(filingRole)}/client`;
+    const response = await this.#fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId }),
+    });
+    const decoded = await decodeExpectedOneOf(response, [200, 201]);
+    return debtorFromJson(decoded);
   }
 
   /**
@@ -1840,6 +1872,25 @@ export class InsolviaApiClient {
     });
     const decoded = await decodeExpected(response, 200);
     return firmClientFromJson(decoded);
+  }
+
+  /**
+   * `GET /v1/firm/clients/{id}/cases` — the client's cases THAT THE CALLER
+   * MAY SEE, newest first, each with the role the client holds (ADR 0022).
+   * A case the caller is not linked to is simply absent — the response never
+   * says how many were left out. A prospect's list is empty.
+   *
+   * Needs `clients` and `cases`, each at `view_only`. A 404 means the client
+   * is not in the caller's firm or does not exist.
+   */
+  async listFirmClientCases(id: string): Promise<readonly FirmClientCase[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/cases`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'cases', 'FirmClientCase', firmClientCaseFromJson);
   }
 
   // -------------------------------------------------------------------------
@@ -3176,18 +3227,13 @@ function optionalPersonName(response: DecodedResponse, key: string): PersonName 
   });
 }
 
+/**
+ * A debtor's address, `county` included — B101 line 5's County box, which a
+ * debtor copied from a firm client carries (ADR 0022). Absent when the
+ * response has no such member, unlike {@link libraryAddress}'s `{}`.
+ */
 function optionalAddress(response: DecodedResponse, key: string): Address | undefined {
-  const nested = optionalObject(response, key);
-  if (nested === undefined) {
-    return undefined;
-  }
-  return definedMembers<Address>({
-    line1: optionalString(nested, 'line1'),
-    line2: optionalString(nested, 'line2'),
-    city: optionalString(nested, 'city'),
-    state: optionalString(nested, 'state'),
-    postal_code: optionalString(nested, 'postal_code'),
-  });
+  return optionalObject(response, key) === undefined ? undefined : libraryAddress(response, key);
 }
 
 function optionalVenue(response: DecodedResponse, key: string): Venue | undefined {
@@ -3282,6 +3328,8 @@ function requireProvenanceMap(response: DecodedResponse, key: string): Provenanc
       locator: optionalObject(entry, 'locator')?.json,
       extraction_id: optionalString(entry, 'extraction_id'),
       confidence: optionalNumber(entry, 'confidence'),
+      library_creditor_id: optionalString(entry, 'library_creditor_id'),
+      client_id: optionalString(entry, 'client_id'),
     });
   }
   return entries;
@@ -3295,6 +3343,8 @@ function debtorFromJson(response: DecodedResponse): Debtor {
     filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
+    client_id: optionalString(response, 'client_id'),
+    differs_from_client: optionalStringArray(response, 'differs_from_client'),
     provenance: requireProvenanceMap(response, 'provenance'),
     name: optionalPersonName(response, 'name'),
     other_names_used: optionalOtherNames(response, 'other_names_used'),
@@ -4324,11 +4374,10 @@ function courtDivisionFromJson(response: DecodedResponse): CourtDivision {
 }
 
 /**
- * A snake_case address decoder, alongside `optionalAddress` above rather than
- * reusing it: `optionalAddress` deliberately omits `county` (no debtor
- * address surface needs it yet), and a library creditor's does — it is the
- * same `fields.Address` the debtor's residence address is, and the county is
- * there because it exists on that shared shape.
+ * A snake_case address decoder, `county` included — it is the same
+ * `fields.Address` the debtor's residence address is, and the county is there
+ * because it exists on that shared shape. `{}` when absent;
+ * {@link optionalAddress} is the absent-means-undefined wrapper debtors use.
  */
 function libraryAddress(response: DecodedResponse, key: string): Address {
   const nested = optionalObject(response, key);
@@ -4378,10 +4427,22 @@ function libraryCreditorFromJson(response: DecodedResponse): LibraryCreditor {
 
 const FIRM_CLIENT_STATUSES: readonly FirmClientStatus[] = ['active', 'archived'];
 
+/** One entry of `GET /v1/firm/clients/{id}/cases`: the role, and the case in
+ * `GET /v1/cases/{id}`'s own shape. */
+function firmClientCaseFromJson(response: DecodedResponse): FirmClientCase {
+  const nested = optionalObject(response, 'case');
+  if (nested === undefined) {
+    throw malformedField(response, 'case', 'object');
+  }
+  return {
+    filing_role: requireChoice(response, 'filing_role', FILING_ROLES),
+    case: caseFromJson(nested),
+  };
+}
+
 /**
  * `firm_client_json`'s exact shape. `name` is required (the server always
- * sends it); the addresses use {@link libraryAddress} because they carry
- * `county`, which {@link optionalAddress} deliberately omits.
+ * sends it); the addresses use {@link libraryAddress}, `county` included.
  */
 function firmClientFromJson(response: DecodedResponse): FirmClient {
   const residence = optionalObject(response, 'residence_address');

@@ -34,12 +34,15 @@ from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
+    CLIENTS,
     EVENTS,
     HIDDEN,
     VIEW_ONLY,
     Firm,
     FirmUser,
 )
+
+from tests.unit.opening import with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -105,7 +108,7 @@ def member(
         role="attorney",
         is_admin=is_admin,
         access_all_cases=access_all_cases,
-        permissions={EVENTS: events, CASES: ADD_EDIT},
+        permissions={EVENTS: events, CASES: ADD_EDIT, CLIENTS: ADD_EDIT},
         status="active",
         created_at="2026-01-01T00:00:00.000Z",
         updated_at="2026-01-01T00:00:00.000Z",
@@ -159,7 +162,11 @@ def client(firms, events):
 def open_case(client, subject=ADMIN, chapter=7) -> str:
     response = client.post(
         "/v1/cases",
-        json={"chapter": chapter, "court": "flmb", "division": "tampa"},
+        json=with_client(
+            client,
+            auth(subject),
+            {"chapter": chapter, "court": "flmb", "division": "tampa"},
+        ),
         headers=auth(subject),
     )
     assert response.status_code == 201

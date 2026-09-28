@@ -60,7 +60,13 @@ test.describe('staging intake', () => {
     if ((await caseLink.count()) === 0) {
       // First run against a fresh environment: open one. The chapter radio
       // defaults to 7, so only the court and division need an answer — picked
-      // from the registry (`GET /v1/courts`, issue #360), never typed.
+      // from the registry (`GET /v1/courts`, issue #360), never typed. And a
+      // case is opened FOR A CLIENT (ADR 0022): name a new one, which the
+      // screen adds to the directory before opening the case.
+      await page.getByRole('combobox', { name: 'Client' }).click();
+      await page.getByRole('option', { name: 'New client…' }).click();
+      await page.getByRole('textbox', { name: 'Client’s first name' }).fill('Probe');
+      await page.getByRole('textbox', { name: 'Client’s last name' }).fill('Example');
       await page.getByRole('combobox', { name: 'Court' }).click();
       await page.getByRole('option', { name: 'Middle District of Florida' }).click();
       await page.getByRole('combobox', { name: 'Division' }).click();

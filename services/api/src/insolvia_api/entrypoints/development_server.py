@@ -186,9 +186,12 @@ if config.case_table_name and config.case_access_log_table_name:
     # Likewise: case tasks (issue #356 / 14.4) are child items too.
     task_store = DynamoDbTaskStore(config.case_table_name)
 else:
-    case_store = MemoryCaseStore()
-    access_log = MemoryAccessLog()
     debtor_store = MemoryDebtorStore()
+    # ONE debtor store for both: opening a case writes its debtors through
+    # the case store (ADR 0022), and the debtor routes must see them — the
+    # shared-table property the DynamoDB pair has by construction.
+    case_store = MemoryCaseStore(debtor_store=debtor_store)
+    access_log = MemoryAccessLog()
     case_entity_store = MemoryCaseEntityStore()
     tax_id_store = MemoryTaxIdStore()
     # The deterministic local key — never composed beside a real table.

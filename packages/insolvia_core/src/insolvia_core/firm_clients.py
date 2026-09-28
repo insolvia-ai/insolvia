@@ -3,10 +3,12 @@
 A `client` is a firm-scoped person; a `debtor` (`debtors.py`) is that person's
 identity as COPIED into one case. One client has many cases over time, a joint
 case is two clients on one matter, and a prospect is a client with no case
-yet. This module is the client record, its item shape and its wire shape. In
-this revision nothing references a client: the debtor's `client_id`, the
-`client` provenance source and the case table's `by-client` index are ADR
-0022's second PR.
+yet. This module is the client record, its item shape and its wire shape —
+and, since ADR 0022's second PR, the COPY: `debtor_from_client` builds a
+case's debtor from a client with `client` provenance on every copied field,
+and `differs_from_client` is the computed divergence the debtor screen shows.
+The debtor's own side of the link (`Debtor.client_id`, the `by-client`
+index it feeds) is `debtors.py`'s.
 
 ## Why the module is `firm_clients`, not `clients`
 
@@ -75,7 +77,8 @@ from typing import Final
 
 from insolvia_core.errors import FieldValidationError, ValidationError
 
-from .debtors import OtherName, parse_other_names
+from .cases import Case
+from .debtors import Debtor, OtherName, create_debtor, parse_debtor, parse_other_names
 from .fields import (
     Address,
     PersonName,
@@ -87,6 +90,7 @@ from .fields import (
     timestamp,
 )
 from .firms import partition_key
+from .provenance import populated_paths
 
 # The DynamoDB sort-key namespace in the firm partition, alongside "META",
 # "USER#", "LIBCREDITOR#" and the portal binding's "CLIENT#". NOT "CLIENT" —
@@ -403,3 +407,91 @@ def firm_client_json(client: FirmClient) -> dict[str, object]:
     if client.tax_id_last_four is not None:
         body["tax_id_last_four"] = client.tax_id_last_four
     return body
+
+
+# ── The copy onto a case (ADR 0022) ─────────────────────────────────
+
+# The identity a case copies from a client, and the ONLY fields
+# `differs_from_client` compares. Everything else on a client is the firm's
+# (lead source, referral, retained date) or is never on a debtor (date of
+# birth — no form prints it). The tax id is not here yet: a client's
+# `tax_id_ref` has no writer until #382 lands the client side, and a debtor's
+# sealed identifier is entered on the case.
+COPIED_FIELDS: Final = (
+    "name",
+    "other_names_used",
+    "residence_address",
+    "mailing_address",
+    "phone",
+    "mobile",
+    "email",
+)
+
+
+def _copied_body(record: FirmClient | Debtor) -> dict[str, object]:
+    whole = asdict(record)
+    return prune_body({key: whole[key] for key in COPIED_FIELDS})
+
+
+def debtor_from_client(client: FirmClient, *, case: Case, filing_role: str) -> Debtor:
+    """A NEW debtor of `case` carrying `client`'s identity, every copied field
+    with provenance `{source: "client", client_id}`.
+
+    Built by round-tripping the copy through `parse_debtor` — with invariant
+    1 ENFORCED — rather than by assembling a Debtor directly, so a client
+    value the debtor's parser would refuse fails here, at the copy, instead
+    of producing a stored debtor that the next questionnaire save cannot
+    re-send. The two parsers share every shape (`parse_name`,
+    `parse_address`, `parse_other_names`) precisely so this cannot fail on
+    a client that parsed.
+    """
+    body = _copied_body(client)
+    entry = {"source": "client", "client_id": client.id}
+    # The paths to cover are whatever invariant 1 will demand of this body,
+    # so they come from the same walk it uses.
+    provenance = {path: entry for path in populated_paths(body)}
+    draft = parse_debtor({**body, "provenance": provenance})
+    return create_debtor(
+        draft,
+        case_id=case.id,
+        filing_role=filing_role,
+        client_id=client.id,
+        case_created_at=case.created_at,
+    )
+
+
+def _leaves(record: object, prefix: str = "") -> dict[str, object]:
+    """Field path -> value for every populated leaf, addressing list elements
+    by their `id` — the provenance grammar, so a path here is one the debtor
+    screen can also look up provenance for."""
+    out: dict[str, object] = {}
+    if isinstance(record, Mapping):
+        for key, value in record.items():
+            if key == "id" and prefix.endswith("]"):
+                continue
+            out.update(_leaves(value, f"{prefix}.{key}" if prefix else str(key)))
+        return out
+    if isinstance(record, (list, tuple)):
+        for element in record:
+            element_id = element.get("id") if isinstance(element, Mapping) else None
+            out.update(_leaves(element, f"{prefix}[{element_id}]"))
+        return out
+    return {prefix: record} if prefix else {}
+
+
+def differs_from_client(debtor: Debtor, client: FirmClient) -> list[str]:
+    """The copied field paths where `debtor` and `client` now disagree —
+    ADR 0022's computed divergence, sorted.
+
+    A path is listed when the two hold different values OR only one of them
+    holds one: a phone number the client gained after the case was opened
+    differs just as much as one that changed. Nothing is written by this:
+    divergence is shown, never silently resolved, and the two acts that
+    resolve it (re-copy, update the client) are explicit writes."""
+    ours = _leaves(_copied_body(debtor))
+    theirs = _leaves(_copied_body(client))
+    return sorted(
+        path
+        for path in ours.keys() | theirs.keys()
+        if ours.get(path) != theirs.get(path)
+    )

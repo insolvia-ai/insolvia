@@ -300,9 +300,26 @@ def admin(as_user) -> Api:
 # ── the scratch case ────────────────────────────────────────────
 
 
+#: The suite's one firm client (ADR 0022) — what the scratch case is opened
+#: for. Found by this exact name on later runs, for the scratch case's reason:
+#: clients have no delete route either. Nobody real is called this.
+SCRATCH_CLIENT_NAME = {"given": "Scratch", "surname": "Integration-Suite"}
+
+
 @pytest.fixture(scope="session")
-def scratch_case(admin: Api) -> dict[str, Any]:
-    """ONE case per environment for the suite to work in, opened on demand.
+def scratch_client(admin: Api) -> dict[str, Any]:
+    """ONE firm client per environment, added on demand."""
+    for client in admin.get("/v1/firm/clients").get("clients") or []:
+        active = client.get("status") == "active"
+        if active and client.get("name") == SCRATCH_CLIENT_NAME:
+            return dict(client)
+    return dict(admin.post("/v1/firm/clients", {"name": SCRATCH_CLIENT_NAME}))
+
+
+@pytest.fixture(scope="session")
+def scratch_case(admin: Api, scratch_client: dict[str, Any]) -> dict[str, Any]:
+    """ONE case per environment for the suite to work in, opened on demand —
+    for the scratch client, since a case is opened for a client (ADR 0022).
 
     Found by its court and division on later runs rather than re-opened:
     cases have no delete route, and a fresh row per run is a table nobody
@@ -323,4 +340,9 @@ def scratch_case(admin: Api) -> dict[str, Any]:
         cursor = page.get("nextCursor")
         if not cursor:
             break
-    return dict(admin.post("/v1/cases", {"chapter": 7, **SCRATCH_COURT}))
+    return dict(
+        admin.post(
+            "/v1/cases",
+            {"chapter": 7, **SCRATCH_COURT, "client_ids": [scratch_client["id"]]},
+        )
+    )

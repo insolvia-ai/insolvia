@@ -34,6 +34,16 @@ const CASE = {
   updatedAt: '2026-08-04T10:00:00.000000Z',
 };
 
+/** One active client in the firm's directory (ADR 0022), in `firm_client_json`'s shape. */
+const CLIENT = {
+  id: '00000000-0000-4000-8000-0000000c11a0',
+  status: 'active',
+  name: { given: 'Jordan', surname: 'Example' },
+  created_at: '2026-09-27T09:00:00.000000Z',
+  updated_at: '2026-09-27T09:00:00.000000Z',
+  created_by: '00000000-0000-4000-8000-00000000a11c',
+};
+
 /** A two-court slice of `GET /v1/courts`, in the API's wire shape. */
 const COURTS = {
   releaseId: 'courts/us-bankruptcy@2026-09-24',
@@ -150,6 +160,9 @@ describe('the cases screen', () => {
       '/oauth2/token': tokenEndpointResponse,
       ...handlers,
       ...('/v1/courts' in handlers ? {} : { '/v1/courts': () => jsonResponse(200, COURTS) }),
+      ...('/v1/firm/clients' in handlers
+        ? {}
+        : { '/v1/firm/clients': () => jsonResponse(200, { clients: [CLIENT] }) }),
     });
     const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -204,12 +217,13 @@ describe('the cases screen', () => {
     }
   });
 
-  it('sends the chosen chapter, court and division to the API — never a district string', async () => {
+  it('sends the chosen chapter, court, division and client to the API — never a district string', async () => {
     const fetchMock = signedIn({
       '/v1/cases': () => jsonResponse(200, { cases: [] }),
     });
     await screen.findByText(/No cases yet/);
 
+    await choose('Client', 'Example, Jordan');
     await userEvent.press(screen.getByRole('radio', { name: /Chapter 13/ }));
     await choose('Court', 'Middle District of Florida');
     await choose('Division', 'Orlando Division');
@@ -226,6 +240,7 @@ describe('the cases screen', () => {
         chapter: 13,
         court: 'flmb',
         division: 'orlando',
+        client_ids: [CLIENT.id],
       });
     });
   });
@@ -254,6 +269,7 @@ describe('the cases screen', () => {
     // The defaults have arrived once the trigger shows the division's name.
     await screen.findByText('Houston Division');
 
+    await choose('Client', 'Example, Jordan');
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
     await waitFor(() => {
@@ -264,6 +280,7 @@ describe('the cases screen', () => {
         chapter: 13,
         court: 'txsb',
         division: 'houston',
+        client_ids: [CLIENT.id],
       });
     });
   });
@@ -316,11 +333,76 @@ describe('the cases screen', () => {
     });
     await screen.findByText(/No cases yet/);
 
+    await choose('Client', 'Example, Jordan');
     await choose('Court', 'Middle District of Florida');
     await choose('Division', 'Tampa Division');
     await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
 
     expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
+  });
+
+  it('with an empty directory, adds the named client first and opens the case for them', async () => {
+    // ADR 0022's minimum on this screen until the client screens land (#354):
+    // a case needs a client, so a firm with none names one here.
+    let clientCalls = 0;
+    const fetchMock = signedIn({
+      '/v1/firm/clients': () => {
+        clientCalls += 1;
+        return clientCalls === 1
+          ? jsonResponse(200, { clients: [] })
+          : jsonResponse(201, { ...CLIENT, name: { given: 'Sam', surname: 'Sample' } });
+      },
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+
+    await userEvent.type(await screen.findByLabelText('Client’s first name'), 'Sam');
+    await userEvent.type(screen.getByLabelText('Client’s last name'), 'Sample');
+    await choose('Court', 'Middle District of Florida');
+    await choose('Division', 'Tampa Division');
+    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
+
+    await waitFor(() => {
+      const posts = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
+      const added = posts.find(([url]) => url.includes('/v1/firm/clients'));
+      const opened = posts.find(([url]) => url.includes('/v1/cases'));
+      expect(JSON.parse(String(added?.[1]?.body))).toEqual({
+        name: { given: 'Sam', surname: 'Sample' },
+      });
+      expect(JSON.parse(String(opened?.[1]?.body))).toMatchObject({ client_ids: [CLIENT.id] });
+    });
+  });
+
+  it('puts a missing client on the client field, as the server words it', async () => {
+    let calls = 0;
+    signedIn({
+      '/v1/cases': () => {
+        calls += 1;
+        return calls === 1
+          ? jsonResponse(200, { cases: [] })
+          : jsonResponse(400, {
+              error: 'ValidationError',
+              fields: { client_ids: 'Choose the client this case is for.' },
+            });
+      },
+    });
+    await screen.findByText(/No cases yet/);
+
+    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
+
+    expect(await screen.findByText('Choose the client this case is for.')).toBeTruthy();
+  });
+
+  it('cannot open a case without access to the client directory, and says why', async () => {
+    signedIn({
+      '/v1/firm/clients': () => jsonResponse(403, { error: 'ForbiddenError' }),
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+
+    const message = await screen.findByText(/Could not load your client directory/);
+    expect(message.props['aria-live']).toBe('assertive');
+    expect(screen.getByRole('button', { name: 'Open case' })).toBeDisabled();
   });
 
   it('reports a failed load without pretending the list is empty', async () => {
