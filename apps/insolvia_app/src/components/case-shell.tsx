@@ -121,7 +121,7 @@ const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
  * so a debtor with only a surname still reads as a name rather than as
  * `undefined undefined Reyes`.
  */
-function personName(name: PersonName | undefined): string | null {
+export function personName(name: PersonName | undefined): string | null {
   if (name === undefined) return null;
   const joined = [name.given, name.middle, name.surname, name.suffix]
     .map((part) => part?.trim() ?? '')
