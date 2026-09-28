@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 import boto3
 from botocore.exceptions import ClientError
@@ -8,18 +8,24 @@ from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.cases import partition_key
 from insolvia_core.debtors import (
+    FILING_ROLES,
     Debtor,
+    LinkOutcome,
     debtor_from_item,
     debtor_item,
     role_order,
     sort_key,
 )
+from insolvia_core.errors import ConflictError
 
 # Derived from the one function that builds debtor sort keys, so the two cannot
 # drift. This prefix is what makes list_for_case safe to run against a case's
 # whole partition: the case root lives there too, under SK=META, and a bare
 # `PK = :case` would hand that row to debtor_from_item to parse as a debtor.
 DEBTOR_PREFIX: Final = sort_key("")
+
+_CANCELLED: Final = "TransactionCanceledException"
+_CONDITION_FAILED: Final = "ConditionalCheckFailed"
 
 
 class DynamoDbDebtorStore:
@@ -66,6 +72,67 @@ class DynamoDbDebtorStore:
             TableName=self.table_name,
             Item=to_attributes(debtor_item(debtor)),
         )
+
+    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+        """One transaction: the Put of this role, plus a ConditionCheck on
+        each OTHER role's item that it does not name the same client.
+
+        FILING_ROLES caps a case at three debtor items, so "every other
+        role" is two fixed keys — no query, and no lock item to keep in step
+        with the debtor. A ConditionCheck on an item that does not exist
+        evaluates against an empty item, where `attribute_not_exists` holds,
+        so an empty role passes. Two racing links of one client to two roles
+        conflict on each other's items: DynamoDB serialises them, and the
+        second fails its check (or is cancelled as a conflict, which is
+        answered as one)."""
+        if debtor.client_id is None:
+            raise ValueError("link needs a debtor that names a client")
+        put: dict[str, Any] = {
+            "TableName": self.table_name,
+            "Item": to_attributes(debtor_item(debtor)),
+        }
+        if create:
+            put["ConditionExpression"] = "attribute_not_exists(SK)"
+        items: list[dict[str, Any]] = [{"Put": put}]
+        for role in FILING_ROLES:
+            if role == debtor.filing_role:
+                continue
+            items.append(
+                {
+                    "ConditionCheck": {
+                        "TableName": self.table_name,
+                        "Key": {
+                            "PK": {"S": partition_key(debtor.case_id)},
+                            "SK": {"S": sort_key(role)},
+                        },
+                        "ConditionExpression": (
+                            "attribute_not_exists(clientId) OR clientId <> :client"
+                        ),
+                        "ExpressionAttributeValues": {
+                            ":client": {"S": debtor.client_id}
+                        },
+                    }
+                }
+            )
+        try:
+            self.client.transact_write_items(TransactItems=items)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != _CANCELLED:
+                raise
+            reasons = error.response.get("CancellationReasons") or []
+            codes = [reason.get("Code") for reason in reasons]
+            if codes and codes[0] == _CONDITION_FAILED:
+                return "role_taken"
+            if _CONDITION_FAILED in codes[1:]:
+                return "client_taken"
+            # A TransactionConflict: another write to one of these items was
+            # in flight. Refused as "someone else is linking" rather than
+            # retried — the caller reloads and sees who won.
+            raise ConflictError(
+                "this case's debtors changed while the client was linked; "
+                "reload and try again"
+            ) from error
+        return "written"
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None:
         response = self.client.get_item(

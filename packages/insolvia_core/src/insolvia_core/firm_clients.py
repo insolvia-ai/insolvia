@@ -78,7 +78,15 @@ from typing import Final
 from insolvia_core.errors import FieldValidationError, ValidationError
 
 from .cases import Case
-from .debtors import Debtor, OtherName, create_debtor, parse_debtor, parse_other_names
+from .debtors import (
+    Debtor,
+    OtherName,
+    create_debtor,
+    debtor_body,
+    parse_debtor,
+    parse_other_names,
+    replace_debtor,
+)
 from .fields import (
     Address,
     PersonName,
@@ -90,7 +98,7 @@ from .fields import (
     timestamp,
 )
 from .firms import partition_key
-from .provenance import populated_paths
+from .provenance import ProvenanceEntry, populated_paths, provenance_json
 
 # The DynamoDB sort-key namespace in the firm partition, alongside "META",
 # "USER#", "LIBCREDITOR#" and the portal binding's "CLIENT#". NOT "CLIENT" —
@@ -495,3 +503,62 @@ def differs_from_client(debtor: Debtor, client: FirmClient) -> list[str]:
         for path in ours.keys() | theirs.keys()
         if ours.get(path) != theirs.get(path)
     )
+
+
+def _copied_root(path: str) -> bool:
+    """Whether a provenance path addresses one of COPIED_FIELDS —
+    `name.given`, `other_names_used[a1].surname`, `phone`."""
+    return path.split(".", 1)[0].split("[", 1)[0] in COPIED_FIELDS
+
+
+def recopy_from_client(debtor: Debtor, client: FirmClient) -> Debtor:
+    """ADR 0022's *re-copy from client*: `debtor` with every copied field
+    replaced by `client`'s — a whole-record write, as the questionnaire's is —
+    and each of those fields carrying `{source: "client", client_id}` again.
+
+    ONLY the copied fields move. Venue, credit counselling, the signature
+    date, employer ids and the tax id are the case's own answers and keep
+    their values and their provenance; a copied field the client leaves
+    empty becomes empty here too (it is a copy of the record, not a merge
+    into it), and its old entry goes with it. The id, `created_at` and the
+    link are `replace_debtor`'s to keep.
+
+    Round-tripped through `parse_debtor` with invariant 1 enforced, for
+    `debtor_from_client`'s reason. The caller refuses a filed case — this
+    function cannot see one."""
+    whole = asdict(client)
+    body = {**debtor_body(debtor), **{key: whole[key] for key in COPIED_FIELDS}}
+    entry = ProvenanceEntry(source="client", client_id=client.id)
+    provenance = {
+        **{
+            path: kept
+            for path, kept in debtor.provenance.items()
+            if not _copied_root(path)
+        },
+        **dict.fromkeys(populated_paths(_copied_body(client)), entry),
+    }
+    draft = parse_debtor(
+        {**prune_body(body), "provenance": provenance_json(provenance)}
+    )
+    return replace_debtor(debtor, draft, tax_id=debtor.tax_id)
+
+
+def client_updated_from_debtor(client: FirmClient, debtor: Debtor) -> FirmClient:
+    """ADR 0022's *update client from this case*: `client` with every copied
+    field replaced by what the case now says — the whole-record client write
+    `PUT /v1/firm/clients/<id>` makes.
+
+    The client's own fields (date of birth, lead source, referral, retained
+    date) and everything server-owned are kept. Re-parsed through
+    `parse_firm_client`, so a debtor whose name has been emptied is refused
+    with the client's own "a surname or a given name is required" rather than
+    leaving a nameless directory entry. The debtor is not written: its values
+    are already what the client now holds, and its provenance still says
+    truthfully where each one came from."""
+    whole = asdict(client)
+    ours = asdict(debtor)
+    draft_body = {
+        key: (ours[key] if key in COPIED_FIELDS else whole[key])
+        for key in FirmClientDraft.__dataclass_fields__
+    }
+    return replace_firm_client(client, parse_firm_client(prune_body(draft_body)))

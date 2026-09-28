@@ -26,7 +26,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from insolvia_core.errors import FieldValidationError
 
@@ -45,8 +45,10 @@ from .provenance import (
     ADDRESSABLE_ID_RE,
     ProvenanceEntry,
     parse_provenance,
+    populated_paths,
     provenance_json,
     require_provenance,
+    value_at,
 )
 from .tax_ids import TaxIdInput, TaxIdRef, parse_tax_id, tax_id_json
 
@@ -59,6 +61,7 @@ __all__ = [
     "CreditCounseling",
     "Debtor",
     "DebtorDraft",
+    "LinkOutcome",
     "OtherName",
     "PersonName",
     "Venue",
@@ -71,6 +74,7 @@ __all__ = [
     "parse_debtor",
     "parse_filing_role",
     "replace_debtor",
+    "require_client_provenance_kept",
     "role_order",
     "sort_key",
 ]
@@ -79,6 +83,10 @@ __all__ = [
 # than a uuid: "the second debtor" is a position on the form, and a case can no
 # more have two debtor_2s than form B101 can print two second columns.
 FILING_ROLES: Final = ("debtor_1", "debtor_2", "non_filing_spouse")
+
+# What `DebtorStore.link` answers — the conditional write behind the link
+# route's "one client, one role per case" (ADR 0022).
+LinkOutcome = Literal["written", "role_taken", "client_taken"]
 
 # B101 line 6. `other` carries the explanation the form asks for.
 VENUE_BASES: Final = ("lived_longest_180_days", "other")
@@ -372,6 +380,46 @@ def parse_debtor(
             checked["tax_id"] = "present"
         require_provenance(checked, provenance)
     return draft
+
+
+def require_client_provenance_kept(draft: DebtorDraft, stored: Debtor | None) -> None:
+    """A questionnaire save may KEEP `client` provenance, never mint it
+    (ADR 0022; case-data-model.md: a field keeps `client` provenance until a
+    human changes that field).
+
+    `client` provenance says "this value is the firm's client record, copied
+    in" — and only the server copies: `POST /v1/cases`, the link route, and
+    the re-copy route (`firm_clients.debtor_from_client` /
+    `recopy_from_client`). So a `client` entry arriving on the whole-record
+    PUT is legitimate in exactly one shape: the entry the stored record
+    already carries at that path, on the value that path already holds. That
+    is the autosave echoing back a field the preparer did not touch.
+
+    Anything else is refused rather than rewritten: a `client` entry on a
+    value that has since changed (the preparer typed over the copy — that
+    field is `staff_typed` now), or one the stored record never had (a
+    caller claiming a copy the server did not make). Refused, not silently
+    downgraded, for the rule every parser here follows — a caller that
+    believes it saved one thing must not find another stored. The app's
+    `revisedProvenance` is what sends the right map.
+
+    Entries at paths the draft leaves empty describe nothing and are not
+    checked. Pure; the route passes the record it just read."""
+    body = debtor_body(draft)
+    stored_body = debtor_body(stored) if stored is not None else {}
+    populated = set(populated_paths(body))
+    errors: dict[str, str] = {}
+    for path, entry in draft.provenance.items():
+        if entry.source != "client" or path not in populated:
+            continue
+        kept = stored.provenance.get(path) if stored is not None else None
+        if kept != entry or value_at(stored_body, path) != value_at(body, path):
+            errors[f"provenance.{path}"] = (
+                "Only a value copied from the client, and unchanged since, "
+                "can say it came from the client."
+            )
+    if errors:
+        raise FieldValidationError(errors)
 
 
 def debtor_body(draft: DebtorDraft | Debtor) -> dict[str, object]:
