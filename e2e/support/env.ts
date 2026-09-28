@@ -273,8 +273,8 @@ export function seededClient(handle = 'client'): SeededClient {
         new URL(`../../seeds/fixtures/${entry.fixture}/cases.json`, import.meta.url),
         'utf8',
       ),
-    ) as { cases?: Record<string, { chapter?: number }> };
-    const chapter = cases.cases?.[entry.case]?.chapter;
+    ) as { cases?: { handle?: string; chapter?: number }[] };
+    const chapter = (cases.cases ?? []).find((c) => c.handle === entry.case)?.chapter;
     if (chapter === undefined || entry.firm === undefined) {
       throw new Error(`The fixture entry binding '${handle}' names no firm or no chapter.`);
     }

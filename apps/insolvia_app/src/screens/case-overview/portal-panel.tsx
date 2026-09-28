@@ -267,22 +267,34 @@ function InviteForm({
   const theme = useTheme();
   const { call } = useApi();
   const [choice, setChoice] = useState<Choice>('debtor_1');
-  const [displayName, setDisplayName] = useState(() => debtorNames.debtor_1 ?? '');
-  const [email, setEmail] = useState(() => debtorEmail(debtors, 'debtor_1'));
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  // Whether the person has typed in a field since the last prefill. A typed
+  // value is never overwritten by one arriving from the debtor record.
+  const [edited, setEdited] = useState({ name: false, email: false });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * Picking whom the login is for prefills from that debtor's record — a
-   * convenience, never a lock: the firm may know a better address than the
-   * one intake captured, and the name is what the review queue will show.
+   * Prefill from the chosen debtor's record — a convenience, never a lock:
+   * the firm may know a better address than the one intake captured, and the
+   * name is what the review queue will show. An EFFECT rather than initial
+   * state because `CaseShell` reads the debtors after the case itself, so on
+   * the first render they are usually not there yet.
    */
+  const prefillRole: ClientRole | null = choice === 'both' ? null : choice;
+  const prefillName = prefillRole === null ? null : (debtorNames[prefillRole] ?? '');
+  const prefillEmail = prefillRole === null ? null : debtorEmail(debtors, prefillRole);
+  useEffect(() => {
+    if (prefillName !== null && !edited.name) setDisplayName(prefillName);
+    if (prefillEmail !== null && !edited.email) setEmail(prefillEmail);
+  }, [edited.email, edited.name, prefillEmail, prefillName]);
+
+  /** Choosing whom the login is for is a fresh prefill, over any typing. */
   const choose = (next: Choice) => {
     setChoice(next);
-    if (next === 'both') return;
-    setDisplayName(debtorNames[next] ?? '');
-    setEmail(debtorEmail(debtors, next));
+    if (next !== 'both') setEdited({ name: false, email: false });
   };
 
   const submit = async () => {
@@ -353,13 +365,26 @@ function InviteForm({
       <Field.Root name="displayName" invalid={Boolean(fieldErrors.displayName)}>
         <Field.Label>Name</Field.Label>
         <Field.Description>What your firm will see beside their answers.</Field.Description>
-        <Input value={displayName} onValueChange={setDisplayName} />
+        <Input
+          value={displayName}
+          onValueChange={(next) => {
+            setDisplayName(next);
+            setEdited((was) => ({ ...was, name: true }));
+          }}
+        />
         <Field.Error>{fieldErrors.displayName}</Field.Error>
       </Field.Root>
 
       <Field.Root name="email" invalid={Boolean(fieldErrors.email)}>
         <Field.Label>Email address</Field.Label>
-        <Input type="email" value={email} onValueChange={setEmail} />
+        <Input
+          type="email"
+          value={email}
+          onValueChange={(next) => {
+            setEmail(next);
+            setEdited((was) => ({ ...was, email: true }));
+          }}
+        />
         <Field.Error>{fieldErrors.email}</Field.Error>
       </Field.Root>
 
