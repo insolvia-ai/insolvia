@@ -31,7 +31,9 @@ from pathlib import Path
 
 import pytest
 from insolvia_admin.entrypoints.seed import Dependencies, RefusedError, derived_id, main
+from insolvia_core.access import Accessor
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
+from insolvia_core.firm_clients import differs_from_client
 from insolvia_core.ports import FirmStore
 
 from tests import paths
@@ -555,8 +557,11 @@ class Env:
         import hashlib
 
         self.firms = MemoryFirmStore()
-        self.cases = MemoryCaseStore()
+        # One debtor store behind both: the case store writes a case's
+        # client debtors in its own transaction (ADR 0022), as the shared
+        # DynamoDB table does.
         self.debtors = MemoryDebtorStore()
+        self.cases = MemoryCaseStore(debtor_store=self.debtors)
         self.entities = MemoryCaseEntityStore()
         self.documents = MemoryDocumentStore()
         self.blobs = MemoryDocumentBlobStore()
@@ -585,6 +590,10 @@ class Env:
             json.dumps(
                 {
                     "version": "v1",
+                    # ADR 0022: every Debtor 1 names a firm client.
+                    "clients": [
+                        {"handle": "sample-client", "name": {"given": "Sample"}}
+                    ],
                     "cases": [
                         {
                             "handle": "sample",
@@ -593,6 +602,7 @@ class Env:
                             "division": "tampa",
                             "debtors": {
                                 "debtor_1": {
+                                    "client_id": {"$ref": "clients/sample-client"},
                                     "name": {"given": "Sample"},
                                     # The SSA's never-issued advertising
                                     # block — the fixture value the parser
@@ -1011,6 +1021,8 @@ def test_capture_round_trips_a_loaded_case_into_a_new_version(tmp_path: Path) ->
             "captured",
             "--case-table",
             DEV_CASE_TABLE,
+            "--firm-table",
+            DEV_TABLE,
             "--document-bucket",
             DEV_BUCKET,
         ],
@@ -1230,6 +1242,8 @@ def _capture(env: Env, case_id: str, target: Path) -> int:
             "captured",
             "--case-table",
             DEV_CASE_TABLE,
+            "--firm-table",
+            DEV_TABLE,
             "--document-bucket",
             DEV_BUCKET,
         ],
@@ -1352,3 +1366,108 @@ def test_the_committed_environment_fixture_loads_and_converges(
     assert main(argv, deps=env.deps()) == 0
     assert main([*argv, "--check"], deps=env.deps()) == 0
     assert len(env.cases.cases) == len(body["cases"])
+    # ADR 0022: every Debtor 1 and Debtor 2 is a copy of a firm client, the
+    # copy agrees with the client, and the case is in that client's list.
+    for debtor in env.debtors.debtors.values():
+        if debtor.filing_role not in ("debtor_1", "debtor_2"):
+            continue
+        assert debtor.client_id is not None
+        case = env.cases.cases[debtor.case_id]
+        client = env.firms.get_client(case.firm_id, debtor.client_id)
+        assert client is not None
+        assert differs_from_client(debtor, client) == []
+        listed = env.cases.list_for_client(
+            client.id, accessor=_accessor(env, case.firm_id)
+        )
+        assert [(e.case.id, e.filing_role) for e in listed] == [
+            (case.id, debtor.filing_role)
+        ]
+    # Nothing the purge would delete: the fixture is post-client by design.
+    assert all(
+        any(d.client_id for d in env.debtors.debtors.values() if d.case_id == case_id)
+        for case_id in env.cases.cases
+    )
+
+
+def _accessor(env: Env, firm_id: str) -> Accessor:
+    """The firm's first admin — who sees every case."""
+    admin = next(u for u in env.firms.list_users(firm_id) if u.is_admin)
+    firm = env.firms.get_firm(firm_id)
+    assert firm is not None
+    return Accessor(firm=firm, user=admin)
+
+
+# ── Firm clients (ADR 0022) ─────────────────────────────────────────
+
+
+def test_a_seeded_debtor_is_a_copy_of_its_firm_client(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    debtor = env.debtors.get(case.id, filing_role="debtor_1")
+    assert debtor is not None
+    from insolvia_admin.entrypoints.seed import derived_id
+
+    expected = derived_id(DEV_TABLE, case.firm_id, "v1", "clients", "sample-client")
+    assert debtor.client_id == expected
+    assert debtor.case_created_at == case.created_at
+    client = env.firms.get_client(case.firm_id, expected)
+    assert client is not None
+    assert client.name.given == "Sample"
+
+
+def test_a_debtor_without_a_client_refuses_the_whole_load(tmp_path: Path) -> None:
+    """v1 to v3 are pre-client: loading one again is refused before any
+    case row is written — its rows are what the release step deletes."""
+    env = Env(tmp_path)
+    path = tmp_path / "fixtures" / "v1" / "cases.json"
+    body = json.loads(path.read_text())
+    del body["cases"][0]["debtors"]["debtor_1"]["client_id"]
+    path.write_text(json.dumps(body))
+
+    assert env.load() == 2
+    assert env.cases.cases == {}
+    assert env.debtors.debtors == {}
+
+
+def test_a_client_ref_to_no_fixture_client_is_refused(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    path = tmp_path / "fixtures" / "v1" / "cases.json"
+    body = json.loads(path.read_text())
+    body["cases"][0]["debtors"]["debtor_1"]["client_id"] = {"$ref": "clients/nobody"}
+    path.write_text(json.dumps(body))
+
+    assert env.load() == 2
+    assert env.cases.cases == {}
+
+
+def test_check_names_a_missing_client(tmp_path: Path, capsys) -> None:
+    env = Env(tmp_path)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    debtor = env.debtors.get(case.id, filing_role="debtor_1")
+    assert debtor is not None
+    assert debtor.client_id is not None
+    del env.firms.clients[(case.firm_id, debtor.client_id)]
+    capsys.readouterr()
+
+    assert env.load("--check") == 1
+    assert "client 'sample-client': missing" in capsys.readouterr().out
+
+
+def test_capture_writes_the_client_and_references_it(tmp_path: Path) -> None:
+    env = Env(tmp_path)
+    assert env.load() == 0
+    case = env.the_case()
+    assert case is not None
+    target = tmp_path / "fixtures" / "v2"
+
+    assert _capture(env, case.id, target) == 0
+
+    captured = json.loads((target / "cases.json").read_text())
+    [client] = captured["clients"]
+    assert client == {"handle": "captured-debtor-1", "name": {"given": "Sample"}}
+    debtor = captured["cases"][0]["debtors"]["debtor_1"]
+    assert debtor["client_id"] == {"$ref": "clients/captured-debtor-1"}

@@ -1,0 +1,4353 @@
+{
+  "//": [
+    "The case rows a seeded environment carries, one version of the",
+    "shared fixture. `seeds/dev.json` and `seeds/staging.json` name which",
+    "of these cases to load, into which firm, opened by which person;",
+    "this file says what each case contains.",
+    "",
+    "SHAPE. Every body below is the JSON the API's own routes accept —",
+    "a debtor is the PUT /v1/cases/<id>/debtors/<role> body, a collection",
+    "item is the POST /v1/cases/<id>/<collection> body — and the loader",
+    "parses them with the same core/ functions those routes use, so a",
+    "malformed row fails with the API's own field errors and a rule that",
+    "tightens (provenance, say) breaks seeding loudly rather than writing",
+    "rows the service has stopped agreeing with.",
+    "",
+    "NO IDS ARE PUBLISHED, AND THAT IS THE DESIGN. A case's id in an",
+    "environment is derived by the loader from the target table, the",
+    "firm and this file's `handle`, so two environments seed different",
+    "ids from the same fixture and a re-run finds the rows it wrote last",
+    "time instead of writing them again. An id written here would be an",
+    "id from someone else's environment.",
+    "",
+    "EVERY VALUE IS SYNTHETIC. Nothing here describes a real person, a",
+    "real employer or a real account. `seed capture` refuses a source",
+    "that is not a dev stack for exactly this reason, and a review of a",
+    "diff to this file should ask the same question.",
+    "",
+    "The Chapter 13 case names public payers and agencies as themselves (the",
+    "IRS, the Social Security Administration, Florida's reemployment program,",
+    "a county court) and real vehicle makes; every person, business, account",
+    "and street address in it is invented.",
+    "",
+    "REFERENCES. A case is a graph — a claim names its creditor and its",
+    "collateral, a plan names the claims it treats, an income summary names",
+    "its debtor — but no id is published, so a fixture names a record by",
+    "reference: `{\"$ref\": \"claims/claims-2\"}` wherever an id is wanted, and",
+    "`\"$handle\": \"claims-2\"` on the item it means (`debtors/<role>` for a",
+    "debtor). The loader resolves each to the id that record has in the",
+    "target before the route's parser sees the body; `seed capture` writes",
+    "them. services/admin entrypoints/seed.py, \"references\".",
+    "",
+    "v1: one Chapter 7 case. v2 (issue 13.12 / #382): its debtor's tax",
+    "id, from the Social Security Administration's never-issued advertising",
+    "block 987-65-4320..4329 — the only way a real-looking SSN may enter a",
+    "fixture; the loader seals it the way the API does.",
+    "",
+    "v3 (milestone 16 staging proof): the two cases milestone 16 (#401, #403,",
+    "#406) and the creditor matrix (#404) deferred to a new version. Both were",
+    "typed into a dev stack through the API and captured with",
+    "`scripts/dev-fixture.sh capture v3`; the tax ids (capture drops them) and",
+    "the Chapter 7 sample's two v2 documents were put back by hand.",
+    "",
+    "  chapter-7-sample   v2's case, now able to assemble: its creditors carry",
+    "                     city, state and ZIP (so the matrix prints), and it",
+    "                     has a petition and a household size.",
+    "  chapter-13-sample  a complete above-median Chapter 13 case in M.D. Fla.",
+    "                     (Official Form 113 — not flsb, whose local plan form",
+    "                     the packet refuses): 60-month commitment period, so",
+    "                     B122C-2 files; a saved plan that is feasible and",
+    "                     clears the § 1325(a)(4) test; an assume/reject answer",
+    "                     on every lease. It is the API's own Chapter 13",
+    "                     reference case (services/api tests, test_form_",
+    "                     projections.reference_case_file_chapter_13) with",
+    "                     every name replaced by an invented one.",
+    "",
+    "BOTH PETITIONS PIN expected_filing_date (2026-08-03). The means test's",
+    "six-month lookback and the dollar-amounts release are resolved from that",
+    "date, else from the case's creation date — and a seeded case is created on",
+    "whatever day the seeder runs, so without the pin the pay history would",
+    "slide out of the window month by month and the verdict would drift from",
+    "above-median to below it. Pinned, the answer is the same on every load.",
+    "",
+    "v4 (ADR 0022 PR 3 / #353): v3's two cases, each Debtor 1 and Debtor 2 now",
+    "a COPY of a firm client. The top-level `clients` are the firm's",
+    "directory entries, in the POST /v1/firm/clients body shape plus a",
+    "`handle`; a debtor names one with `\"client_id\": {\"$ref\":",
+    "\"clients/<handle>\"}`, and its identity fields carry `client`",
+    "provenance pointing at the same client. The loader derives each",
+    "client's id from (firm table, firm, version, handle) as it derives a",
+    "case's, writes the clients before the case, and writes the case, its",
+    "assignment and its client debtors in POST /v1/cases's one transaction.",
+    "Rows seeded from v1..v3 have no client: they are the pre-client data",
+    "ADR 0022's release deletes (services/admin entrypoints/",
+    "purge_pre_client.py), and the loader refuses to load those versions",
+    "again. Generated from v3 by moving the debtors' identity onto clients;",
+    "the lead sources and retained dates are invented."
+  ],
+  "version": "v4",
+  "clients": [
+    {
+      "handle": "chapter-7-sample-debtor-1",
+      "name": {
+        "given": "Sample",
+        "surname": "Debtor"
+      },
+      "residence_address": {
+        "line1": "123 Fixture Street",
+        "city": "Tampa",
+        "state": "FL",
+        "postal_code": "33602",
+        "county": "Hillsborough"
+      },
+      "lead_source": "Website form",
+      "first_retained_at": "2026-07-20"
+    },
+    {
+      "handle": "chapter-13-sample-debtor-1",
+      "name": {
+        "given": "Avery",
+        "middle": "Quinn",
+        "surname": "Sampleton"
+      },
+      "other_names_used": [
+        {
+          "id": "alias-1",
+          "given": "Avery",
+          "surname": "Example"
+        },
+        {
+          "id": "alias-2",
+          "business_name": "Avery's Fixture Repair"
+        }
+      ],
+      "residence_address": {
+        "line1": "12 Fixture Court",
+        "line2": "Apt 4",
+        "city": "Tampa",
+        "state": "FL",
+        "postal_code": "33601",
+        "county": "Hillsborough"
+      },
+      "mailing_address": {
+        "line1": "4501 Postal Way",
+        "line2": "PO Box 99",
+        "city": "Tampa",
+        "state": "FL",
+        "postal_code": "33602"
+      },
+      "phone": "(813) 555-0101",
+      "mobile": "(813) 555-0102",
+      "email": "debtor-one@example.test",
+      "lead_source": "Referral",
+      "referred_by": "A former client",
+      "first_retained_at": "2026-07-27"
+    },
+    {
+      "handle": "chapter-13-sample-debtor-2",
+      "name": {
+        "given": "Blake",
+        "surname": "Sampleton",
+        "suffix": "Jr."
+      },
+      "residence_address": {
+        "line1": "12 Fixture Court",
+        "line2": "Apt 4",
+        "city": "Tampa",
+        "state": "FL",
+        "postal_code": "33601",
+        "county": "Hillsborough"
+      },
+      "lead_source": "Referral",
+      "referred_by": "A former client",
+      "first_retained_at": "2026-07-27"
+    }
+  ],
+  "cases": [
+    {
+      "handle": "chapter-7-sample",
+      "chapter": 7,
+      "court": "flmb",
+      "division": "tampa",
+      "debtors": {
+        "debtor_1": {
+          "client_id": {
+            "$ref": "clients/chapter-7-sample-debtor-1"
+          },
+          "name": {
+            "given": "Sample",
+            "surname": "Debtor"
+          },
+          "residence_address": {
+            "line1": "123 Fixture Street",
+            "city": "Tampa",
+            "state": "FL",
+            "postal_code": "33602",
+            "county": "Hillsborough"
+          },
+          "tax_id": {
+            "kind": "ssn",
+            "value": "987-65-4321"
+          },
+          "provenance": {
+            "name.given": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "name.surname": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "residence_address.city": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "residence_address.county": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "residence_address.line1": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "residence_address.postal_code": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "residence_address.state": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-7-sample-debtor-1"
+              }
+            },
+            "tax_id": {
+              "source": "staff_typed"
+            }
+          }
+        }
+      },
+      "collections": {
+        "creditors": [
+          {
+            "name": "Example Community Bank (fictitious)",
+            "address": {
+              "line1": "1 Example Plaza",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33602"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "name": "Example Card Services (fictitious)",
+            "address": {
+              "line1": "PO Box 4100",
+              "city": "Orlando",
+              "state": "FL",
+              "postal_code": "32801"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "petitions": [
+          {
+            "fee_handling": "full",
+            "rents_residence": true,
+            "eviction_judgment_against_you": false,
+            "small_business_status": "not_filing_under_chapter_11",
+            "debt_character": "consumer",
+            "ch7_funds_available_for_creditors": false,
+            "estimated_creditors": "1_49",
+            "estimated_assets": "0_50000",
+            "estimated_liabilities": "0_50000",
+            "expected_filing_date": "2026-08-03",
+            "provenance": {
+              "ch7_funds_available_for_creditors": {
+                "source": "staff_typed"
+              },
+              "debt_character": {
+                "source": "staff_typed"
+              },
+              "estimated_assets": {
+                "source": "staff_typed"
+              },
+              "estimated_creditors": {
+                "source": "staff_typed"
+              },
+              "estimated_liabilities": {
+                "source": "staff_typed"
+              },
+              "eviction_judgment_against_you": {
+                "source": "staff_typed"
+              },
+              "expected_filing_date": {
+                "source": "staff_typed"
+              },
+              "fee_handling": {
+                "source": "staff_typed"
+              },
+              "rents_residence": {
+                "source": "staff_typed"
+              },
+              "small_business_status": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "means_test_inputs": [
+          {
+            "people_under_65": 1,
+            "people_65_or_older": 0,
+            "provenance": {
+              "people_65_or_older": {
+                "source": "staff_typed"
+              },
+              "people_under_65": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ]
+      },
+      "documents": [
+        {
+          "handle": "pay-stub",
+          "kind": "pay_stub",
+          "fileName": "sample-pay-stub.pdf",
+          "contentType": "application/pdf",
+          "object": "objects/sample-pay-stub.pdf"
+        },
+        {
+          "handle": "bank-statement",
+          "kind": "bank_statement",
+          "fileName": "sample-bank-statement.pdf",
+          "contentType": "application/pdf",
+          "object": "objects/sample-bank-statement.pdf"
+        }
+      ]
+    },
+    {
+      "handle": "chapter-13-sample",
+      "chapter": 13,
+      "court": "flmb",
+      "division": "tampa",
+      "debtors": {
+        "debtor_1": {
+          "client_id": {
+            "$ref": "clients/chapter-13-sample-debtor-1"
+          },
+          "name": {
+            "given": "Avery",
+            "middle": "Quinn",
+            "surname": "Sampleton"
+          },
+          "other_names_used": [
+            {
+              "id": "alias-1",
+              "given": "Avery",
+              "surname": "Example"
+            },
+            {
+              "id": "alias-2",
+              "business_name": "Avery's Fixture Repair"
+            }
+          ],
+          "employer_ids": [
+            "12-3456789"
+          ],
+          "residence_address": {
+            "line1": "12 Fixture Court",
+            "line2": "Apt 4",
+            "city": "Tampa",
+            "state": "FL",
+            "postal_code": "33601",
+            "county": "Hillsborough"
+          },
+          "mailing_address": {
+            "line1": "4501 Postal Way",
+            "line2": "PO Box 99",
+            "city": "Tampa",
+            "state": "FL",
+            "postal_code": "33602"
+          },
+          "phone": "(813) 555-0101",
+          "mobile": "(813) 555-0102",
+          "email": "debtor-one@example.test",
+          "venue": {
+            "basis": "lived_longest_180_days"
+          },
+          "credit_counseling": {
+            "status": "completed_with_certificate"
+          },
+          "signed_at": "2026-08-30",
+          "tax_id": {
+            "kind": "ssn",
+            "value": "987-65-4322"
+          },
+          "provenance": {
+            "credit_counseling.status": {
+              "source": "staff_typed"
+            },
+            "email": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "employer_ids": {
+              "source": "staff_typed"
+            },
+            "mailing_address.city": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "mailing_address.line1": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "mailing_address.line2": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "mailing_address.postal_code": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "mailing_address.state": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "mobile": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "name.given": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "name.middle": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "name.surname": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "other_names_used[alias-1].given": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "other_names_used[alias-1].surname": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "other_names_used[alias-2].business_name": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "phone": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.city": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.county": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.line1": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.line2": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.postal_code": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "residence_address.state": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-1"
+              }
+            },
+            "signed_at": {
+              "source": "staff_typed"
+            },
+            "tax_id": {
+              "source": "staff_typed"
+            },
+            "venue.basis": {
+              "source": "staff_typed"
+            }
+          }
+        },
+        "debtor_2": {
+          "client_id": {
+            "$ref": "clients/chapter-13-sample-debtor-2"
+          },
+          "name": {
+            "given": "Blake",
+            "surname": "Sampleton",
+            "suffix": "Jr."
+          },
+          "residence_address": {
+            "line1": "12 Fixture Court",
+            "line2": "Apt 4",
+            "city": "Tampa",
+            "state": "FL",
+            "postal_code": "33601",
+            "county": "Hillsborough"
+          },
+          "venue": {
+            "basis": "other",
+            "explanation": "Moved from Georgia in July; the greater part of the last 180 days was spent in this district."
+          },
+          "credit_counseling": {
+            "status": "not_required",
+            "exemption_reason": "disability"
+          },
+          "signed_at": "2026-08-30",
+          "tax_id": {
+            "kind": "ssn",
+            "value": "987-65-4323"
+          },
+          "provenance": {
+            "credit_counseling.exemption_reason": {
+              "source": "staff_typed"
+            },
+            "credit_counseling.status": {
+              "source": "staff_typed"
+            },
+            "name.given": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "name.suffix": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "name.surname": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.city": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.county": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.line1": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.line2": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.postal_code": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "residence_address.state": {
+              "source": "client",
+              "client_id": {
+                "$ref": "clients/chapter-13-sample-debtor-2"
+              }
+            },
+            "signed_at": {
+              "source": "staff_typed"
+            },
+            "tax_id": {
+              "source": "staff_typed"
+            },
+            "venue.basis": {
+              "source": "staff_typed"
+            },
+            "venue.explanation": {
+              "source": "staff_typed"
+            }
+          }
+        }
+      },
+      "collections": {
+        "creditors": [
+          {
+            "$handle": "creditors-1",
+            "name": "Fixture Home Loans",
+            "address": {
+              "line1": "100 Lender Way",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33602"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "creditors-2",
+            "name": "Example Auto Finance LLC",
+            "address": {
+              "line1": "88 Motor Row",
+              "city": "Orlando",
+              "state": "FL",
+              "postal_code": "32801"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "creditors-3",
+            "name": "Internal Revenue Service",
+            "address": {
+              "line1": "PO Box 7346",
+              "city": "Philadelphia",
+              "state": "PA",
+              "postal_code": "19101"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "creditors-4",
+            "name": "Specimen Card Services",
+            "address": {
+              "line1": "1 Specimen Plaza",
+              "city": "Wilmington",
+              "state": "DE",
+              "postal_code": "19801"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "creditors-5",
+            "name": "Example General Hospital",
+            "address": {
+              "line1": "2 Care Circle",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33606"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "creditors-6",
+            "name": "Example Student Servicing",
+            "address": {
+              "line1": "500 Loan Loop",
+              "city": "Lincoln",
+              "state": "NE",
+              "postal_code": "68501"
+            },
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "claims": [
+          {
+            "$handle": "claims-1",
+            "creditor_id": {
+              "$ref": "creditors/creditors-1"
+            },
+            "claim_class": "secured",
+            "account_last4": "3321",
+            "date_incurred": "2019-06-01",
+            "amount": "195000.00",
+            "contingent": false,
+            "unliquidated": false,
+            "disputed": false,
+            "who_incurred": "both",
+            "notice_parties": [
+              {
+                "id": "np-mortgage-servicer",
+                "name": "Fixture Loan Servicing",
+                "address": {
+                  "line1": "101 Lender Way",
+                  "line2": "Suite 4",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33602"
+                },
+                "account_last4": "3321"
+              }
+            ],
+            "asset_id": {
+              "$ref": "assets/assets-1"
+            },
+            "lien_position": 1,
+            "collateral_description": "12 Fixture Court, Tampa, FL 33601",
+            "collateral_value": "240000.00",
+            "lien_nature": [
+              "agreement"
+            ],
+            "intention": "retain_reaffirm",
+            "provenance": {
+              "account_last4": {
+                "source": "staff_typed"
+              },
+              "amount": {
+                "source": "staff_typed"
+              },
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "collateral_description": {
+                "source": "staff_typed"
+              },
+              "collateral_value": {
+                "source": "staff_typed"
+              },
+              "contingent": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "disputed": {
+                "source": "staff_typed"
+              },
+              "intention": {
+                "source": "staff_typed"
+              },
+              "lien_nature": {
+                "source": "staff_typed"
+              },
+              "lien_position": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].account_last4": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].address.city": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].address.line1": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].address.line2": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].address.postal_code": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].address.state": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-mortgage-servicer].name": {
+                "source": "staff_typed"
+              },
+              "unliquidated": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "claims-2",
+            "creditor_id": {
+              "$ref": "creditors/creditors-2"
+            },
+            "claim_class": "secured",
+            "account_last4": "8890",
+            "date_incurred": "2023-04-15",
+            "amount": "7400.00",
+            "who_incurred": "debtor_1",
+            "asset_id": {
+              "$ref": "assets/assets-2"
+            },
+            "lien_position": 1,
+            "lien_nature": [
+              "agreement"
+            ],
+            "intention": "retain_redeem",
+            "provenance": {
+              "account_last4": {
+                "source": "staff_typed"
+              },
+              "amount": {
+                "source": "staff_typed"
+              },
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "intention": {
+                "source": "staff_typed"
+              },
+              "lien_nature": {
+                "source": "staff_typed"
+              },
+              "lien_position": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "claims-3",
+            "creditor_id": {
+              "$ref": "creditors/creditors-4"
+            },
+            "claim_class": "nonpriority_unsecured",
+            "account_last4": "4412",
+            "date_incurred": "2020-11-01",
+            "amount": "8200.00",
+            "subject_to_offset": false,
+            "who_incurred": "both",
+            "notice_parties": [
+              {
+                "id": "np-visa-collector",
+                "name": "Specimen Recovery Services",
+                "address": {
+                  "line1": "9 Collection Court",
+                  "city": "Wilmington",
+                  "state": "DE",
+                  "postal_code": "19801"
+                },
+                "account_last4": "4412"
+              }
+            ],
+            "nonpriority_type": "other",
+            "nonpriority_type_other": "Credit card purchases",
+            "provenance": {
+              "account_last4": {
+                "source": "staff_typed"
+              },
+              "amount": {
+                "source": "staff_typed"
+              },
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "nonpriority_type": {
+                "source": "staff_typed"
+              },
+              "nonpriority_type_other": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].account_last4": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].address.city": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].address.line1": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].address.postal_code": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].address.state": {
+                "source": "staff_typed"
+              },
+              "notice_parties[np-visa-collector].name": {
+                "source": "staff_typed"
+              },
+              "subject_to_offset": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "creditor_id": {
+              "$ref": "creditors/creditors-3"
+            },
+            "claim_class": "priority_unsecured",
+            "date_incurred": "2025-04-15",
+            "subject_to_offset": false,
+            "who_incurred": "both",
+            "priority_amount": "3200.00",
+            "nonpriority_amount": "450.00",
+            "priority_type": "tax_and_government",
+            "provenance": {
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "nonpriority_amount": {
+                "source": "staff_typed"
+              },
+              "priority_amount": {
+                "source": "staff_typed"
+              },
+              "priority_type": {
+                "source": "staff_typed"
+              },
+              "subject_to_offset": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "creditor_id": {
+              "$ref": "creditors/creditors-5"
+            },
+            "claim_class": "nonpriority_unsecured",
+            "account_last4": "0072",
+            "date_incurred": "2026-02-10",
+            "amount": "2600.00",
+            "disputed": true,
+            "subject_to_offset": true,
+            "who_incurred": "debtor_2",
+            "nonpriority_type": "other",
+            "nonpriority_type_other": "Medical services",
+            "provenance": {
+              "account_last4": {
+                "source": "staff_typed"
+              },
+              "amount": {
+                "source": "staff_typed"
+              },
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "disputed": {
+                "source": "staff_typed"
+              },
+              "nonpriority_type": {
+                "source": "staff_typed"
+              },
+              "nonpriority_type_other": {
+                "source": "staff_typed"
+              },
+              "subject_to_offset": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "creditor_id": {
+              "$ref": "creditors/creditors-6"
+            },
+            "claim_class": "nonpriority_unsecured",
+            "account_last4": "5510",
+            "date_incurred": "2012-09-01",
+            "amount": "12000.00",
+            "subject_to_offset": false,
+            "who_incurred": "debtor_1",
+            "nonpriority_type": "student_loan",
+            "provenance": {
+              "account_last4": {
+                "source": "staff_typed"
+              },
+              "amount": {
+                "source": "staff_typed"
+              },
+              "claim_class": {
+                "source": "staff_typed"
+              },
+              "creditor_id": {
+                "source": "staff_typed"
+              },
+              "date_incurred": {
+                "source": "staff_typed"
+              },
+              "nonpriority_type": {
+                "source": "staff_typed"
+              },
+              "subject_to_offset": {
+                "source": "staff_typed"
+              },
+              "who_incurred": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "assets": [
+          {
+            "$handle": "assets-1",
+            "category": "real_property",
+            "property_types": [
+              "single_family_home"
+            ],
+            "description": "12 Fixture Court, Tampa, FL 33601",
+            "county": "Hillsborough",
+            "value_entire": "265000.00",
+            "value_portion_owned": "240000.00",
+            "ownership_interest": "both",
+            "ownership_interest_description": "Fee simple, tenancy by the entireties",
+            "community_property": false,
+            "detail": "Two-bedroom bungalow; the family homestead",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "community_property": {
+                "source": "staff_typed"
+              },
+              "county": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "ownership_interest_description": {
+                "source": "staff_typed"
+              },
+              "property_types": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "assets-2",
+            "category": "vehicle",
+            "description": "2016 Honda Civic LX",
+            "value_entire": "9000.00",
+            "value_portion_owned": "9000.00",
+            "ownership_interest": "debtor_1",
+            "detail": "One owner; always garaged",
+            "year": 2016,
+            "make": "Honda",
+            "model": "Civic LX",
+            "mileage": 92000,
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "make": {
+                "source": "staff_typed"
+              },
+              "mileage": {
+                "source": "staff_typed"
+              },
+              "model": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              },
+              "year": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "assets-3",
+            "category": "household_goods",
+            "description": "Used furniture and kitchen appliances",
+            "value_entire": "2200.00",
+            "value_portion_owned": "2200.00",
+            "ownership_interest": "both",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "$handle": "assets-4",
+            "category": "retirement_accounts",
+            "description": "401(k) retirement account",
+            "value_portion_owned": "48000.00",
+            "ownership_interest": "debtor_1",
+            "detail": "401(k), Example Retirement Services — Placeholder Machines Inc",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "watercraft_aircraft_or_recreational_vehicle",
+            "description": "2005 Sun Tracker pontoon boat",
+            "value_entire": "3500.00",
+            "value_portion_owned": "3500.00",
+            "ownership_interest": "both",
+            "detail": "Trailer included; engine needs work",
+            "year": 2005,
+            "make": "Sun Tracker",
+            "model": "Pontoon boat",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "make": {
+                "source": "staff_typed"
+              },
+              "model": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              },
+              "year": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "electronics",
+            "description": "Two laptops, one television",
+            "value_entire": "900.00",
+            "value_portion_owned": "900.00",
+            "ownership_interest": "both",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "clothes",
+            "description": "Everyday clothing",
+            "value_entire": "400.00",
+            "value_portion_owned": "400.00",
+            "ownership_interest": "both",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "jewelry",
+            "description": "Wedding rings",
+            "value_entire": "1800.00",
+            "value_portion_owned": "1800.00",
+            "ownership_interest": "both",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_entire": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "cash",
+            "description": "Cash on hand",
+            "value_portion_owned": "150.00",
+            "ownership_interest": "both",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "deposits_of_money",
+            "value_portion_owned": "1250.00",
+            "ownership_interest": "both",
+            "detail": "Checking account, Example Community Credit Union",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "deposits_of_money",
+            "value_portion_owned": "2100.00",
+            "ownership_interest": "debtor_1",
+            "detail": "Business checking account, Example National Bank",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "security_deposits_and_prepayments",
+            "value_portion_owned": "200.00",
+            "ownership_interest": "both",
+            "detail": "Utility deposit, Example Electric Co.",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "money_owed_to_you",
+            "description": "2025 federal income tax refund, return filed",
+            "value_portion_owned": "1100.00",
+            "ownership_interest": "both",
+            "detail": "Federal",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "insurance_policy_interests",
+            "description": "Term life policy, Example Life",
+            "value_portion_owned": "0.00",
+            "ownership_interest": "debtor_1",
+            "detail": "Beneficiary: Blake Sampleton",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "detail": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "office_equipment",
+            "description": "Workbench, test rigs, and hand tools",
+            "value_portion_owned": "750.00",
+            "ownership_interest": "debtor_1",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "inventory",
+            "description": "Replacement engine parts inventory",
+            "value_portion_owned": "1200.00",
+            "ownership_interest": "debtor_1",
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              },
+              "value_portion_owned": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "category": "customer_lists_and_intangibles",
+            "description": "Walk-in repair customers' names and phone numbers",
+            "ownership_interest": "debtor_1",
+            "includes_personal_information": true,
+            "provenance": {
+              "category": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "includes_personal_information": {
+                "source": "staff_typed"
+              },
+              "ownership_interest": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "employments": [
+          {
+            "$handle": "employments-1",
+            "debtor_id": {
+              "$ref": "debtors/debtor_1"
+            },
+            "status": "employed",
+            "occupation": "Systems analyst",
+            "employer_name": "Placeholder Machines Inc",
+            "employer_address": {
+              "line1": "200 Engine Row",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33605"
+            },
+            "employed_since": "2019-02-14",
+            "provenance": {
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "employed_since": {
+                "source": "staff_typed"
+              },
+              "employer_address.city": {
+                "source": "staff_typed"
+              },
+              "employer_address.line1": {
+                "source": "staff_typed"
+              },
+              "employer_address.postal_code": {
+                "source": "staff_typed"
+              },
+              "employer_address.state": {
+                "source": "staff_typed"
+              },
+              "employer_name": {
+                "source": "staff_typed"
+              },
+              "occupation": {
+                "source": "staff_typed"
+              },
+              "status": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "status": "not_employed",
+            "provenance": {
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "status": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "pay_period_records": [
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-02-01",
+            "period_end": "2026-02-28",
+            "pay_date": "2026-02-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-02-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-02-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-02-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-02-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-02-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-02-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-03-01",
+            "period_end": "2026-03-28",
+            "pay_date": "2026-03-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-03-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-03-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-03-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-03-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-03-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-03-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-04-01",
+            "period_end": "2026-04-28",
+            "pay_date": "2026-04-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-04-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-04-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-04-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-04-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-04-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-04-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-05-01",
+            "period_end": "2026-05-28",
+            "pay_date": "2026-05-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-05-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-05-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-05-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-05-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-05-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-05-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-06-01",
+            "period_end": "2026-06-28",
+            "pay_date": "2026-06-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-06-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-06-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-06-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-06-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-06-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-06-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "employment_id": {
+              "$ref": "employments/employments-1"
+            },
+            "period_start": "2026-07-01",
+            "period_end": "2026-07-28",
+            "pay_date": "2026-07-27",
+            "gross": "7400.00",
+            "net": "5610.00",
+            "frequency": "monthly",
+            "deductions": [
+              {
+                "id": "ded-07-1",
+                "category": "tax",
+                "amount": "1620.00"
+              },
+              {
+                "id": "ded-07-2",
+                "category": "insurance",
+                "amount": "170.00"
+              }
+            ],
+            "provenance": {
+              "deductions[ded-07-1].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-07-1].category": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-07-2].amount": {
+                "source": "staff_typed"
+              },
+              "deductions[ded-07-2].category": {
+                "source": "staff_typed"
+              },
+              "employment_id": {
+                "source": "staff_typed"
+              },
+              "frequency": {
+                "source": "staff_typed"
+              },
+              "gross": {
+                "source": "staff_typed"
+              },
+              "net": {
+                "source": "staff_typed"
+              },
+              "pay_date": {
+                "source": "staff_typed"
+              },
+              "period_end": {
+                "source": "staff_typed"
+              },
+              "period_start": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "other_income_records": [
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-02-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-03-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-04-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-05-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-06-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "unemployment",
+            "received_on": "2026-07-10",
+            "amount": "1300.00",
+            "payer": "Florida Reemployment Assistance",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "category": "social_security_act_benefit",
+            "received_on": "2026-05-20",
+            "amount": "900.00",
+            "payer": "Social Security Administration",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "payer": {
+                "source": "staff_typed"
+              },
+              "received_on": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "income_summaries": [
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_1"
+            },
+            "wages": "5200.00",
+            "overtime": "250.00",
+            "deduction_tax": "830.00",
+            "deduction_insurance": "120.50",
+            "family_support": "400.00",
+            "household_contributions": "250.00",
+            "household_contributions_specify": "Adult son shares rent",
+            "change_expected": true,
+            "change_explanation": "Overtime ends in November.",
+            "provenance": {
+              "change_expected": {
+                "source": "staff_typed"
+              },
+              "change_explanation": {
+                "source": "staff_typed"
+              },
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "deduction_insurance": {
+                "source": "staff_typed"
+              },
+              "deduction_tax": {
+                "source": "staff_typed"
+              },
+              "family_support": {
+                "source": "staff_typed"
+              },
+              "household_contributions": {
+                "source": "staff_typed"
+              },
+              "household_contributions_specify": {
+                "source": "staff_typed"
+              },
+              "overtime": {
+                "source": "staff_typed"
+              },
+              "wages": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "debtor_id": {
+              "$ref": "debtors/debtor_2"
+            },
+            "wages": "3000.00",
+            "provenance": {
+              "debtor_id": {
+                "source": "staff_typed"
+              },
+              "wages": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "households": [
+          {
+            "$handle": "households-1",
+            "which_household": "main",
+            "separate_household": false,
+            "expenses_include_others": true,
+            "change_expected": true,
+            "change_explanation": "Health insurance premiums increase in January.",
+            "provenance": {
+              "change_expected": {
+                "source": "staff_typed"
+              },
+              "change_explanation": {
+                "source": "staff_typed"
+              },
+              "expenses_include_others": {
+                "source": "staff_typed"
+              },
+              "separate_household": {
+                "source": "staff_typed"
+              },
+              "which_household": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "expenses": [
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "rent_or_home_ownership",
+            "amount": "1480.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "home_maintenance",
+            "amount": "120.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "electricity_heat_gas",
+            "amount": "210.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "water_sewer_garbage",
+            "amount": "95.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "telephone_and_internet",
+            "amount": "140.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "food_and_housekeeping",
+            "amount": "850.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "childcare_and_education",
+            "amount": "300.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "clothing_and_laundry",
+            "amount": "120.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "personal_care",
+            "amount": "60.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "medical_and_dental",
+            "amount": "180.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "transportation",
+            "amount": "240.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "entertainment_and_recreation",
+            "amount": "90.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "charitable_contributions",
+            "amount": "50.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "life_insurance",
+            "amount": "45.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "health_insurance",
+            "amount": "380.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "vehicle_insurance",
+            "amount": "165.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "taxes",
+            "specify_text": "Self-employment tax estimate",
+            "amount": "150.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              },
+              "specify_text": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "vehicle_installment_payments",
+            "amount": "260.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "other_installment_payments",
+            "specify_text": "Financed laptop",
+            "amount": "55.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              },
+              "specify_text": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "category": "other",
+            "specify_text": "Dog food and veterinary care",
+            "amount": "70.00",
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "category": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              },
+              "specify_text": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "dependents": [
+          {
+            "household_id": {
+              "$ref": "households/households-1"
+            },
+            "relationship": "Daughter",
+            "age": 9,
+            "lives_with_debtor": true,
+            "provenance": {
+              "age": {
+                "source": "staff_typed"
+              },
+              "household_id": {
+                "source": "staff_typed"
+              },
+              "lives_with_debtor": {
+                "source": "staff_typed"
+              },
+              "relationship": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "codebtors": [
+          {
+            "name": "Morgan Sampleton",
+            "address": {
+              "line1": "9 Garden Lane",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33603"
+            },
+            "claim_ids": [
+              {
+                "$ref": "claims/claims-2"
+              }
+            ],
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "claim_ids": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "name": "Casey Placeholder",
+            "address": {
+              "line1": "41 Engine Row",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33605"
+            },
+            "claim_ids": [
+              {
+                "$ref": "claims/claims-3"
+              }
+            ],
+            "contract_lease_ids": [
+              {
+                "$ref": "contract_leases/contract_leases-1"
+              }
+            ],
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "claim_ids": {
+                "source": "staff_typed"
+              },
+              "contract_lease_ids": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "sofa_entries": [
+          {
+            "entry_type": "marital_status",
+            "payload": {
+              "status": "married"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.status": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "prior_address",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "address": {
+                "line1": "3 Difference Court",
+                "city": "Tampa",
+                "state": "FL",
+                "postal_code": "33604"
+              },
+              "from_date": "2023-01-01",
+              "to_date": "2024-06-30"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.from_date": {
+                "source": "staff_typed"
+              },
+              "payload.to_date": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "prior_address",
+            "payload": {
+              "which_debtor": "debtor_2",
+              "address": {
+                "line1": "8 Peachtree Lane",
+                "city": "Decatur",
+                "state": "GA",
+                "postal_code": "30030"
+              },
+              "from_date": "2024-11-01",
+              "to_date": "2026-07-01"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.from_date": {
+                "source": "staff_typed"
+              },
+              "payload.to_date": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "kind": "wages_and_commissions",
+              "period_start": "2026-01-01",
+              "period_end": "2026-08-01",
+              "gross_amount": "41600.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "kind": "wages_and_commissions",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "gross_amount": "61000.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "kind": "operating_a_business",
+              "description": "Avery's Fixture Repair",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "gross_amount": "4200.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "kind": "wages_and_commissions",
+              "period_start": "2024-01-01",
+              "period_end": "2024-12-31",
+              "gross_amount": "58300.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_2",
+              "kind": "wages_and_commissions",
+              "period_start": "2026-01-01",
+              "period_end": "2026-08-01",
+              "gross_amount": "24000.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_2",
+              "kind": "wages_and_commissions",
+              "period_start": "2025-01-01",
+              "period_end": "2025-12-31",
+              "gross_amount": "35000.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "income_by_period",
+            "payload": {
+              "which_debtor": "debtor_1",
+              "kind": "other",
+              "description": "Unemployment compensation",
+              "period_start": "2024-03-01",
+              "period_end": "2024-08-31",
+              "gross_amount": "3100.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.gross_amount": {
+                "source": "staff_typed"
+              },
+              "payload.kind": {
+                "source": "staff_typed"
+              },
+              "payload.period_end": {
+                "source": "staff_typed"
+              },
+              "payload.period_start": {
+                "source": "staff_typed"
+              },
+              "payload.which_debtor": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "creditor_payment",
+            "payload": {
+              "creditor": {
+                "name": "Fixture Home Loans",
+                "address": {
+                  "line1": "100 Lender Way",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33602"
+                }
+              },
+              "dates": [
+                "2026-05-01",
+                "2026-06-01",
+                "2026-07-01"
+              ],
+              "total_paid": "4440.00",
+              "amount_still_owed": "195000.00",
+              "payment_for": [
+                "mortgage"
+              ]
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.amount_still_owed": {
+                "source": "staff_typed"
+              },
+              "payload.creditor.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.creditor.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.creditor.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.creditor.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.creditor.name": {
+                "source": "staff_typed"
+              },
+              "payload.dates": {
+                "source": "staff_typed"
+              },
+              "payload.payment_for": {
+                "source": "staff_typed"
+              },
+              "payload.total_paid": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "insider_payment",
+            "payload": {
+              "insider": {
+                "name": "Morgan Sampleton",
+                "address": {
+                  "line1": "9 Garden Lane",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33603"
+                }
+              },
+              "relationship": "Mother of Debtor 2",
+              "dates": [
+                "2025-12-20"
+              ],
+              "total_paid": "1200.00",
+              "amount_still_owed": "0.00",
+              "reason": "Repayment of a family loan"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.amount_still_owed": {
+                "source": "staff_typed"
+              },
+              "payload.dates": {
+                "source": "staff_typed"
+              },
+              "payload.insider.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.insider.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.insider.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.insider.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.insider.name": {
+                "source": "staff_typed"
+              },
+              "payload.reason": {
+                "source": "staff_typed"
+              },
+              "payload.relationship": {
+                "source": "staff_typed"
+              },
+              "payload.total_paid": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "lawsuit",
+            "payload": {
+              "case_title": "Specimen Card Services v. Sampleton",
+              "case_number": "26-CC-1184",
+              "nature_of_case": "Credit card collection",
+              "court": {
+                "name": "Hillsborough County Court",
+                "address": {
+                  "line1": "800 Example Street",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33602"
+                }
+              },
+              "status": "pending"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.case_number": {
+                "source": "staff_typed"
+              },
+              "payload.case_title": {
+                "source": "staff_typed"
+              },
+              "payload.court.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.court.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.court.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.court.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.court.name": {
+                "source": "staff_typed"
+              },
+              "payload.nature_of_case": {
+                "source": "staff_typed"
+              },
+              "payload.status": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "gift",
+            "payload": {
+              "recipient": {
+                "name": "Riley Example",
+                "address": {
+                  "line1": "15 Loom Lane",
+                  "city": "Atlanta",
+                  "state": "GA",
+                  "postal_code": "30301"
+                }
+              },
+              "relationship": "Niece",
+              "description": "Wedding gift",
+              "dates": [
+                "2025-10-12"
+              ],
+              "value": "650.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.dates": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.name": {
+                "source": "staff_typed"
+              },
+              "payload.relationship": {
+                "source": "staff_typed"
+              },
+              "payload.value": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "charitable_contribution",
+            "payload": {
+              "organization": {
+                "name": "Example Food Bank",
+                "address": {
+                  "line1": "5 Harvest Road",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33610"
+                }
+              },
+              "description": "Cash donations",
+              "dates": [
+                "2025-11-30"
+              ],
+              "value": "700.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.dates": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.organization.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.organization.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.organization.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.organization.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.organization.name": {
+                "source": "staff_typed"
+              },
+              "payload.value": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "loss",
+            "payload": {
+              "description": "Hurricane damage to the back fence",
+              "insurance_coverage": "Not covered; below the deductible",
+              "date": "2025-09-28",
+              "value": "1400.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.date": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.insurance_coverage": {
+                "source": "staff_typed"
+              },
+              "payload.value": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "consultant_payment",
+            "payload": {
+              "person": {
+                "name": "Counsel & Counsel PA",
+                "address": {
+                  "line1": "1 Example Way",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33604"
+                }
+              },
+              "email_or_website": "counsel@example.test",
+              "description": "Attorney fees for this bankruptcy case",
+              "date": "2026-07-15",
+              "amount": "1500.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.amount": {
+                "source": "staff_typed"
+              },
+              "payload.date": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.email_or_website": {
+                "source": "staff_typed"
+              },
+              "payload.person.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.person.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.person.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.person.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.person.name": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "property_transfer",
+            "payload": {
+              "transferee": {
+                "name": "Casey Placeholder",
+                "address": {
+                  "line1": "41 Engine Row",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33605"
+                }
+              },
+              "relationship": "Friend",
+              "description": "Sold a spare engine lathe valued at about $800",
+              "value_received": "$500 cash",
+              "date": "2025-03-15"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.date": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.relationship": {
+                "source": "staff_typed"
+              },
+              "payload.transferee.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.transferee.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.transferee.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.transferee.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.transferee.name": {
+                "source": "staff_typed"
+              },
+              "payload.value_received": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "closed_account",
+            "payload": {
+              "institution": {
+                "name": "First Fixture Bank",
+                "address": {
+                  "line1": "12 Bay Street",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33601"
+                }
+              },
+              "account_last4": "2210",
+              "account_type": "checking",
+              "date_closed": "2026-01-15",
+              "last_balance": "25.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.account_last4": {
+                "source": "staff_typed"
+              },
+              "payload.account_type": {
+                "source": "staff_typed"
+              },
+              "payload.date_closed": {
+                "source": "staff_typed"
+              },
+              "payload.institution.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.institution.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.institution.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.institution.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.institution.name": {
+                "source": "staff_typed"
+              },
+              "payload.last_balance": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "storage_unit",
+            "payload": {
+              "facility": {
+                "name": "Example Storage LLC",
+                "address": {
+                  "line1": "77 Keeper Street",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33605"
+                }
+              },
+              "who_has_access": [
+                "Avery Sampleton"
+              ],
+              "description": "Business records and spare parts",
+              "still_have": true
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.facility.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.facility.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.facility.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.facility.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.facility.name": {
+                "source": "staff_typed"
+              },
+              "payload.still_have": {
+                "source": "staff_typed"
+              },
+              "payload.who_has_access": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "held_for_another",
+            "payload": {
+              "owner": {
+                "name": "Placeholder Machines Inc",
+                "address": {
+                  "line1": "200 Engine Row",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33605"
+                }
+              },
+              "location": "Workshop shelf at 12 Fixture Court",
+              "description": "Loaned test equipment",
+              "value": "900.00"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.description": {
+                "source": "staff_typed"
+              },
+              "payload.location": {
+                "source": "staff_typed"
+              },
+              "payload.owner.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.owner.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.owner.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.owner.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.owner.name": {
+                "source": "staff_typed"
+              },
+              "payload.value": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "business_connection",
+            "payload": {
+              "business": {
+                "name": "Avery's Fixture Repair",
+                "address": {
+                  "line1": "88 Difference Drive",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33603"
+                }
+              },
+              "nature_of_business": "Repair and resale of sample machines",
+              "ein": "12-3456789",
+              "from_date": "2019-01-01",
+              "connection": [
+                "sole_proprietor"
+              ]
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.business.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.business.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.business.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.business.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.business.name": {
+                "source": "staff_typed"
+              },
+              "payload.connection": {
+                "source": "staff_typed"
+              },
+              "payload.ein": {
+                "source": "staff_typed"
+              },
+              "payload.from_date": {
+                "source": "staff_typed"
+              },
+              "payload.nature_of_business": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "entry_type": "financial_statement_issued",
+            "payload": {
+              "recipient": {
+                "name": "Example Community Credit Union",
+                "address": {
+                  "line1": "6801 Fixture Road",
+                  "city": "Tampa",
+                  "state": "FL",
+                  "postal_code": "33607"
+                }
+              },
+              "date_issued": "2025-06-01"
+            },
+            "provenance": {
+              "entry_type": {
+                "source": "staff_typed"
+              },
+              "payload.date_issued": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.city": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.line1": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.address.state": {
+                "source": "staff_typed"
+              },
+              "payload.recipient.name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "petitions": [
+          {
+            "fee_handling": "installments",
+            "rents_residence": false,
+            "eviction_judgment_against_you": false,
+            "small_business_status": "not_filing_under_chapter_11",
+            "hazardous_property": {
+              "description": "Two corroding propane tanks behind the shed",
+              "why_immediate": "A slow leak was found in August",
+              "address": {
+                "line1": "12 Fixture Court",
+                "city": "Tampa",
+                "state": "FL",
+                "postal_code": "33601"
+              }
+            },
+            "debt_character": "consumer",
+            "ch7_funds_available_for_creditors": false,
+            "estimated_creditors": "1_49",
+            "estimated_assets": "100000001_500000000",
+            "estimated_liabilities": "50001_100000",
+            "expected_filing_date": "2026-08-03",
+            "provenance": {
+              "ch7_funds_available_for_creditors": {
+                "source": "staff_typed"
+              },
+              "debt_character": {
+                "source": "staff_typed"
+              },
+              "estimated_assets": {
+                "source": "staff_typed"
+              },
+              "estimated_creditors": {
+                "source": "staff_typed"
+              },
+              "estimated_liabilities": {
+                "source": "staff_typed"
+              },
+              "eviction_judgment_against_you": {
+                "source": "staff_typed"
+              },
+              "expected_filing_date": {
+                "source": "staff_typed"
+              },
+              "fee_handling": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.address.city": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.address.line1": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.address.postal_code": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.address.state": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.description": {
+                "source": "staff_typed"
+              },
+              "hazardous_property.why_immediate": {
+                "source": "staff_typed"
+              },
+              "rents_residence": {
+                "source": "staff_typed"
+              },
+              "small_business_status": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "prior_cases": [
+          {
+            "district": "Northern District of Georgia",
+            "filed_on": "2019-03-04",
+            "case_number": "19-01234",
+            "provenance": {
+              "case_number": {
+                "source": "staff_typed"
+              },
+              "district": {
+                "source": "staff_typed"
+              },
+              "filed_on": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "related_cases": [
+          {
+            "debtor_name": "Fixture Repair Holdings LLC",
+            "relationship": "Affiliate",
+            "district": "Middle District of Florida",
+            "filed_on": "2026-06-15",
+            "case_number": "26-00042",
+            "provenance": {
+              "case_number": {
+                "source": "staff_typed"
+              },
+              "debtor_name": {
+                "source": "staff_typed"
+              },
+              "district": {
+                "source": "staff_typed"
+              },
+              "filed_on": {
+                "source": "staff_typed"
+              },
+              "relationship": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "sole_proprietorships": [
+          {
+            "name": "Avery's Fixture Repair",
+            "address": {
+              "line1": "88 Difference Drive",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33603"
+            },
+            "business_type": "none_of_the_above",
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "business_type": {
+                "source": "staff_typed"
+              },
+              "name": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "filing_professionals": [
+          {
+            "role": "attorney",
+            "name": {
+              "given": "Alex",
+              "surname": "Counsel"
+            },
+            "firm_name": "Counsel & Counsel PA",
+            "address": {
+              "line1": "1 Example Way",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33604"
+            },
+            "phone": "(813) 555-0100",
+            "email": "counsel@example.test",
+            "bar_number": "112233",
+            "bar_state": "FL",
+            "signature_date": "2026-08-31",
+            "compensation_agreed": "1500.00",
+            "compensation_received": "1000.00",
+            "compensation_source_paid": "debtor",
+            "compensation_source_to_be_paid": "other",
+            "compensation_source_to_be_paid_other": "Morgan Sampleton, Debtor 1's mother",
+            "compensation_shared": false,
+            "services_other": "Negotiation of the reaffirmation agreement with Fixture Loan Servicing and the redemption of the Honda Civic.",
+            "services_excluded": "Representation in any adversary proceeding, appeal, or non-bankruptcy matter; motions to avoid liens; and defense of any motion to dismiss under section 707(b). Each is billed separately under a written agreement.",
+            "provenance": {
+              "address.city": {
+                "source": "staff_typed"
+              },
+              "address.line1": {
+                "source": "staff_typed"
+              },
+              "address.postal_code": {
+                "source": "staff_typed"
+              },
+              "address.state": {
+                "source": "staff_typed"
+              },
+              "bar_number": {
+                "source": "staff_typed"
+              },
+              "bar_state": {
+                "source": "staff_typed"
+              },
+              "compensation_agreed": {
+                "source": "staff_typed"
+              },
+              "compensation_received": {
+                "source": "staff_typed"
+              },
+              "compensation_shared": {
+                "source": "staff_typed"
+              },
+              "compensation_source_paid": {
+                "source": "staff_typed"
+              },
+              "compensation_source_to_be_paid": {
+                "source": "staff_typed"
+              },
+              "compensation_source_to_be_paid_other": {
+                "source": "staff_typed"
+              },
+              "email": {
+                "source": "staff_typed"
+              },
+              "firm_name": {
+                "source": "staff_typed"
+              },
+              "name.given": {
+                "source": "staff_typed"
+              },
+              "name.surname": {
+                "source": "staff_typed"
+              },
+              "phone": {
+                "source": "staff_typed"
+              },
+              "role": {
+                "source": "staff_typed"
+              },
+              "services_excluded": {
+                "source": "staff_typed"
+              },
+              "services_other": {
+                "source": "staff_typed"
+              },
+              "signature_date": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "exemptions": [
+          {
+            "asset_id": {
+              "$ref": "assets/assets-1"
+            },
+            "statute_citation": "Fla. Const. art. X, § 4(a)(1)",
+            "claims_full_fmv": true,
+            "acquired_within_1215_days": false,
+            "provenance": {
+              "acquired_within_1215_days": {
+                "source": "staff_typed"
+              },
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claims_full_fmv": {
+                "source": "staff_typed"
+              },
+              "statute_citation": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "asset_id": {
+              "$ref": "assets/assets-2"
+            },
+            "statute_citation": "Fla. Stat. § 222.25(1)",
+            "amount": "5000.00",
+            "claims_full_fmv": false,
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claims_full_fmv": {
+                "source": "staff_typed"
+              },
+              "statute_citation": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "asset_id": {
+              "$ref": "assets/assets-3"
+            },
+            "statute_citation": "Fla. Const. art. X, § 4(a)(2)",
+            "amount": "1000.00",
+            "claims_full_fmv": false,
+            "provenance": {
+              "amount": {
+                "source": "staff_typed"
+              },
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claims_full_fmv": {
+                "source": "staff_typed"
+              },
+              "statute_citation": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "asset_id": {
+              "$ref": "assets/assets-4"
+            },
+            "statute_citation": "Fla. Stat. § 222.21(2)",
+            "claims_full_fmv": true,
+            "provenance": {
+              "asset_id": {
+                "source": "staff_typed"
+              },
+              "claims_full_fmv": {
+                "source": "staff_typed"
+              },
+              "statute_citation": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "contract_leases": [
+          {
+            "$handle": "contract_leases-1",
+            "counterparty_name": "Example Storage LLC",
+            "counterparty_address": {
+              "line1": "77 Keeper Street",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33605"
+            },
+            "description": "Month-to-month storage unit lease, unit 214; debtor's interest: lessee",
+            "intention": "reject",
+            "provenance": {
+              "counterparty_address.city": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.line1": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.postal_code": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.state": {
+                "source": "staff_typed"
+              },
+              "counterparty_name": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "intention": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "counterparty_name": "Example Wireless LLC",
+            "counterparty_address": {
+              "line1": "300 Signal Drive",
+              "city": "Tampa",
+              "state": "FL",
+              "postal_code": "33607"
+            },
+            "description": "Two-year wireless service agreement, 14 months remaining",
+            "intention": "reject",
+            "provenance": {
+              "counterparty_address.city": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.line1": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.postal_code": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.state": {
+                "source": "staff_typed"
+              },
+              "counterparty_name": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "intention": {
+                "source": "staff_typed"
+              }
+            }
+          },
+          {
+            "counterparty_name": "Example Auto Leasing LLC",
+            "counterparty_address": {
+              "line1": "500 Lease Lane",
+              "city": "Orlando",
+              "state": "FL",
+              "postal_code": "32801"
+            },
+            "description": "Lease of a 2024 Toyota RAV4, 22 months remaining; debtor's interest: lessee",
+            "intention": "assume",
+            "list_on_statement_of_intention": true,
+            "provenance": {
+              "counterparty_address.city": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.line1": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.postal_code": {
+                "source": "staff_typed"
+              },
+              "counterparty_address.state": {
+                "source": "staff_typed"
+              },
+              "counterparty_name": {
+                "source": "staff_typed"
+              },
+              "description": {
+                "source": "staff_typed"
+              },
+              "intention": {
+                "source": "staff_typed"
+              },
+              "list_on_statement_of_intention": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "means_test_inputs": [
+          {
+            "people_under_65": 3,
+            "people_65_or_older": 0,
+            "home_secured_monthly_total": "1480.00",
+            "vehicle_count": 1,
+            "vehicle_1_loan_monthly": "415.00",
+            "taxes": "1620.00",
+            "involuntary_deductions": "85.00",
+            "term_life_insurance": "35.00",
+            "childcare": "450.00",
+            "optional_telecom": "45.00",
+            "health_insurance": "520.00",
+            "health_savings_account": "60.00",
+            "education_under_18": "150.00",
+            "additional_food_clothing": "60.00",
+            "charitable_contributions": "100.00",
+            "other_secured_payments": [
+              {
+                "id": "os-1",
+                "creditor_name": "Example Equipment Finance",
+                "property_description": "Utility trailer",
+                "monthly_payment": "95.00"
+              }
+            ],
+            "priority_cure_total": "2100.00",
+            "ch13_eligible": true,
+            "ch13_projected_plan_payment": "650.00",
+            "child_support_for_dependents": "300.00",
+            "qualified_retirement_deductions": "210.00",
+            "special_circumstances": [
+              {
+                "id": "sc-1",
+                "description": "Dialysis travel",
+                "amount": "180.00"
+              }
+            ],
+            "provenance": {
+              "additional_food_clothing": {
+                "source": "staff_typed"
+              },
+              "ch13_eligible": {
+                "source": "staff_typed"
+              },
+              "ch13_projected_plan_payment": {
+                "source": "staff_typed"
+              },
+              "charitable_contributions": {
+                "source": "staff_typed"
+              },
+              "child_support_for_dependents": {
+                "source": "staff_typed"
+              },
+              "childcare": {
+                "source": "staff_typed"
+              },
+              "education_under_18": {
+                "source": "staff_typed"
+              },
+              "health_insurance": {
+                "source": "staff_typed"
+              },
+              "health_savings_account": {
+                "source": "staff_typed"
+              },
+              "home_secured_monthly_total": {
+                "source": "staff_typed"
+              },
+              "involuntary_deductions": {
+                "source": "staff_typed"
+              },
+              "optional_telecom": {
+                "source": "staff_typed"
+              },
+              "other_secured_payments[os-1].creditor_name": {
+                "source": "staff_typed"
+              },
+              "other_secured_payments[os-1].monthly_payment": {
+                "source": "staff_typed"
+              },
+              "other_secured_payments[os-1].property_description": {
+                "source": "staff_typed"
+              },
+              "people_65_or_older": {
+                "source": "staff_typed"
+              },
+              "people_under_65": {
+                "source": "staff_typed"
+              },
+              "priority_cure_total": {
+                "source": "staff_typed"
+              },
+              "qualified_retirement_deductions": {
+                "source": "staff_typed"
+              },
+              "special_circumstances[sc-1].amount": {
+                "source": "staff_typed"
+              },
+              "special_circumstances[sc-1].description": {
+                "source": "staff_typed"
+              },
+              "taxes": {
+                "source": "staff_typed"
+              },
+              "term_life_insurance": {
+                "source": "staff_typed"
+              },
+              "vehicle_1_loan_monthly": {
+                "source": "staff_typed"
+              },
+              "vehicle_count": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ],
+        "plans": [
+          {
+            "payment_source": "fixed",
+            "monthly_payment": "500.00",
+            "trustee_percentage": "10.00",
+            "attorney_fees": "3500.00",
+            "secured_treatments": [
+              {
+                "id": "t-home",
+                "claim_id": {
+                  "$ref": "claims/claims-1"
+                },
+                "treatment": "cure_and_maintain"
+              },
+              {
+                "id": "t-car",
+                "claim_id": {
+                  "$ref": "claims/claims-2"
+                },
+                "treatment": "cramdown",
+                "interest_rate": "7.00"
+              }
+            ],
+            "unsecured_treatment": "pot",
+            "provenance": {
+              "attorney_fees": {
+                "source": "staff_typed"
+              },
+              "monthly_payment": {
+                "source": "staff_typed"
+              },
+              "payment_source": {
+                "source": "staff_typed"
+              },
+              "secured_treatments[t-car].claim_id": {
+                "source": "staff_typed"
+              },
+              "secured_treatments[t-car].interest_rate": {
+                "source": "staff_typed"
+              },
+              "secured_treatments[t-car].treatment": {
+                "source": "staff_typed"
+              },
+              "secured_treatments[t-home].claim_id": {
+                "source": "staff_typed"
+              },
+              "secured_treatments[t-home].treatment": {
+                "source": "staff_typed"
+              },
+              "trustee_percentage": {
+                "source": "staff_typed"
+              },
+              "unsecured_treatment": {
+                "source": "staff_typed"
+              }
+            }
+          }
+        ]
+      },
+      "documents": []
+    }
+  ]
+}

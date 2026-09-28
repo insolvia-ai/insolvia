@@ -327,11 +327,26 @@ seed() {
     "$@"
 }
 
+# ADR 0022's release step, on this machine: delete the case partitions whose
+# debtors name no firm client — the rows seeded from fixtures v1..v3, or opened
+# before cases were opened for clients. Idempotent (a second run finds none),
+# and it can never delete a case that has a client; the entrypoint's docstring
+# owns the rule. Run before the load, so the v4 cases replace the v3 ones
+# rather than sitting beside them.
+purge_pre_client() {
+  PYTHONPATH="$REPO_ROOT/services/admin/src" "$VENV_PYTHON" -m insolvia_admin.entrypoints.purge_pre_client \
+    --case-table "$CASE_TABLE" \
+    --firm-table "$FIRM_TABLE" \
+    "$@"
+}
+
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
   for email in "${ACCOUNT_EMAILS[@]}"; do
     user_is_confirmed "$email" ||
       die "No CONFIRMED user '$email' in $pool_name. Re-run without --check to create it."
   done
+  purge_pre_client --check ||
+    die "This machine still holds pre-client cases (ADR 0022). Re-run without --check."
   seed --check || die "seeds/dev.json is not fully loaded. Re-run without --check."
   ok "Sign-in ready and this machine matches seeds/dev.json."
   exit 0
@@ -341,6 +356,9 @@ for email in "${ACCOUNT_EMAILS[@]}"; do
   ensure_account "$email"
 done
 offer_to_save_password
+
+log "Deleting pre-client cases from $CASE_TABLE (ADR 0022) — finding none is the usual answer"
+purge_pre_client --apply
 
 log "Loading $(basename "$FIXTURE") into $FIRM_TABLE and $CASE_TABLE (documents from s3://$FIXTURE_BUCKET)"
 seed

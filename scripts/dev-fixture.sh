@@ -89,11 +89,17 @@ case "$COMMAND" in
     outputs="$(terraform_output_json)"
     CASE_TABLE="$(jq -r '.case_table_name.value // empty' <<<"$outputs")"
     DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
+    # The firm table too: a case's debtors are copies of firm clients
+    # (ADR 0022), and capture writes those clients into the version.
+    FIRM_TABLE="$(jq -r '.firm_table_name.value // empty' <<<"$outputs")"
     [[ "$CASE_TABLE" == "$CASE_TABLE_NAME_EXPECTED" ]] ||
       die "Refusing: case table '$CASE_TABLE' is not '$CASE_TABLE_NAME_EXPECTED'."
+    [[ "$FIRM_TABLE" == "$FIRM_TABLE_NAME_EXPECTED" ]] ||
+      die "Refusing: firm table '$FIRM_TABLE' is not '$FIRM_TABLE_NAME_EXPECTED'."
     log "Capturing case $CASE_ID from $CASE_TABLE as '$HANDLE' into $FOLDER"
     seed capture --version "$FOLDER" --case "$CASE_ID" --handle "$HANDLE" \
-      --case-table "$CASE_TABLE" --document-bucket "$DOCUMENT_BUCKET" "$@"
+      --case-table "$CASE_TABLE" --firm-table "$FIRM_TABLE" \
+      --document-bucket "$DOCUMENT_BUCKET" "$@"
     ok "Review the diff under seeds/fixtures/$VERSION, open a PR, then publish it once merged."
     ;;
   *) usage 1 ;;
