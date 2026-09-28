@@ -111,6 +111,9 @@ const styles = StyleSheet.create({
     backgroundColor: chromeColors.bg,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    // The signed-in row holds a 48dp button; holding the same height signed
+    // out keeps the page from jumping 22px down when sign-in completes.
+    minHeight: 64,
     gap: spacing.md,
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
