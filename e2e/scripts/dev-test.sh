@@ -113,7 +113,14 @@ if [[ -z "${E2E_COGNITO_CLIENT_ID:-}" ]]; then
   E2E_COGNITO_CLIENT_ID="$(read_env EXPO_PUBLIC_COGNITO_CLIENT_ID)"
   [[ -n "$E2E_COGNITO_CLIENT_ID" ]] || die "EXPO_PUBLIC_COGNITO_CLIENT_ID is not in $APP_ENV — re-run ./scripts/dev-aws-setup.sh."
 fi
-export E2E_COGNITO_DOMAIN E2E_COGNITO_CLIENT_ID
+# The client portal's app client (ADR 0023). Optional here, unlike the two
+# above: without it the portal flow still runs and only skips its "the
+# redirect named the portal client" assertion — and an app built without it
+# says so at /portal, which fails that flow loudly on its own.
+if [[ -z "${E2E_COGNITO_PORTAL_CLIENT_ID:-}" ]]; then
+  E2E_COGNITO_PORTAL_CLIENT_ID="$(read_env EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID)"
+fi
+export E2E_COGNITO_DOMAIN E2E_COGNITO_CLIENT_ID E2E_COGNITO_PORTAL_CLIENT_ID
 export E2E_BASE_URL="$BASE_URL"
 export E2E_API_URL="$API_URL"
 

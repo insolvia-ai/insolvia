@@ -13,12 +13,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, TypeVar
 
-from insolvia_core.access import Accessor
+from insolvia_core.access import Accessor, ClientAccessor
 from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
-from insolvia_core.clients import ClientBinding
+from insolvia_core.clients import CasePublicStatus, ClientBinding
 from insolvia_core.debtors import Debtor
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
@@ -420,6 +420,22 @@ class CaseStore(Protocol):
         caller always has an accessor, and `get` is the only read a request
         path may use — this method existing does not change that rule, it is
         the one deliberate exception for the process that has no caller.
+        """
+        ...
+
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        """The bound case's chapter and stage — the CLIENT's read of a case,
+        and the only one (ADR 0023 decision 4).
+
+        Takes the `ClientAccessor`, never a case id: the case is the one the
+        verified binding names, so there is no id a route could pass in
+        wrongly. Returns the projection, never a `Case`: implementations read
+        only `clients.PUBLIC_STATUS_ATTRIBUTES` and build the result with
+        `clients.public_status_from_case_item`, which answers None unless the
+        row belongs to the binding's firm.
+
+        `get` cannot serve here — it takes an `Accessor`, which a client
+        never holds and mypy will not let one be passed as.
         """
         ...
 

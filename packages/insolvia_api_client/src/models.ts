@@ -763,6 +763,18 @@ export interface PortalMe {
   readonly displayName: string;
   readonly roles: readonly ClientRole[];
   readonly firm: { readonly name: string };
+  /** The bound case's public status — and nothing else of the case record. */
+  readonly case: PortalCaseStatus;
+}
+
+/**
+ * What a client may read of their case (ADR 0023 decision 4): its chapter
+ * and its stage. `stage` is the case's lifecycle status, read server-side
+ * through a projection that takes the client's binding.
+ */
+export interface PortalCaseStatus {
+  readonly chapter: CaseChapter;
+  readonly stage: CaseStatus;
 }
 
 /** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */

@@ -1691,11 +1691,19 @@ export class InsolviaApiClient {
     if (firm === undefined) {
       throw malformedField(decoded, 'firm', 'object');
     }
+    const matter = optionalObject(decoded, 'case');
+    if (matter === undefined) {
+      throw malformedField(decoded, 'case', 'object');
+    }
     return {
       subject: requireString(decoded, 'subject'),
       displayName: requireString(decoded, 'displayName'),
       roles: requireClientRoles(decoded, 'roles'),
       firm: { name: requireString(firm, 'name') },
+      case: {
+        chapter: requireCaseChapter(matter, 'chapter'),
+        stage: requireCaseStatus(matter, 'stage'),
+      },
     };
   }
 

@@ -11,6 +11,7 @@
  * | `token-store.ts` | what is written down, and where |
  * | `id-token.ts` | display identity, decoded — never verified |
  * | `session-provider.tsx` | the React context tying them together |
+ * | `portal-session-provider.tsx` | the client portal's second, memory-only session (ADR 0023) |
  *
  * Screens and components need only `useSession()`. The rest is exported for the
  * one legitimate outside consumer — the tests — and because a module whose
@@ -28,6 +29,18 @@ export type {
   SessionUser,
 } from './session-provider';
 
+// The client portal's session (ADR 0023): a second provider, memory-only —
+// its own file says why it is not a parameter on the one above.
+export {
+  PortalSessionProvider,
+  safePortalReturnTo,
+  usePortalSession,
+} from './portal-session-provider';
+export type {
+  PortalSessionContextValue,
+  PortalSessionProviderProps,
+} from './portal-session-provider';
+
 export {
   authorizeUrl,
   callbackUrlFor,
@@ -37,6 +50,8 @@ export {
   OAuthError,
   OAUTH_SCOPES,
   CALLBACK_PATH,
+  PORTAL_CALLBACK_PATH,
+  PORTAL_HOME_PATH,
 } from './oauth';
 export type { AuthorizeUrlParams, CodeExchangeParams, FetchLike, TokenSet } from './oauth';
 
@@ -57,10 +72,13 @@ export type { IdTokenClaims } from './id-token';
 
 export {
   clearPendingAuthorization,
+  clearPortalPendingAuthorization,
   clearRefreshToken,
   readPendingAuthorization,
+  readPortalPendingAuthorization,
   readRefreshToken,
   writePendingAuthorization,
+  writePortalPendingAuthorization,
   writeRefreshToken,
 } from './token-store';
 export type { PendingAuthorization } from './token-store';

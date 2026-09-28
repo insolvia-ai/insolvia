@@ -7,6 +7,7 @@ import {
   isProduction,
   resolveAuthConfig,
   resolveEnvironment,
+  resolvePortalAuthConfig,
 } from '@/config/environment';
 
 describe('environment API base URLs', () => {
@@ -120,5 +121,40 @@ describe('resolveAuthConfig', () => {
     // Tests run without the EXPO_PUBLIC_COGNITO_* variables, so this exercises
     // the same arm an unconfigured `local` build takes.
     expect(resolveAuthConfig()).toBeNull();
+  });
+});
+
+describe('resolvePortalAuthConfig', () => {
+  const domain = 'insolvia-test.auth.example.test';
+  const portalClientId = 'test-portal-client-id-000';
+
+  it('is the same hosted domain with the portal client id', () => {
+    expect(resolvePortalAuthConfig(domain, portalClientId)).toEqual({
+      domain: `https://${domain}`,
+      clientId: portalClientId,
+    });
+  });
+
+  it('never falls back to the STAFF client id when the portal id is unset', () => {
+    // The trap this pins: a default parameter fires on an explicit
+    // `undefined`, so a portal resolver that delegated to the staff one would
+    // hand a debtor the staff app client whenever the portal variable was
+    // missing from a build.
+    const saved = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID;
+    process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID = 'test-staff-client-id-0000';
+    try {
+      expect(resolvePortalAuthConfig(domain, undefined)).toBeNull();
+      expect(resolvePortalAuthConfig(domain, '')).toBeNull();
+    } finally {
+      if (saved === undefined) {
+        delete process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID;
+      } else {
+        process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID = saved;
+      }
+    }
+  });
+
+  it('is unconfigured in this test run, which is the local default', () => {
+    expect(resolvePortalAuthConfig()).toBeNull();
   });
 });
