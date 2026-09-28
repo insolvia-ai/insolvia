@@ -74,6 +74,13 @@ def _find(admin: Api, spec: dict[str, Any]) -> str | None:
             )
             if first.get("name") != name:
                 continue
+            # v4 onward (ADR 0022): the fixture's debtor is a firm client's
+            # copy, which is what tells it from the same case seeded from v3
+            # while that pre-client row still exists.
+            if "client_id" in (spec.get("debtors") or {}).get("debtor_1", {}) and (
+                not first.get("client_id")
+            ):
+                continue
             listed = admin.get(f"/v1/cases/{case['id']}/creditors")
             if _creditor_keys(listed.get("creditors") or []) == creditors:
                 return str(case["id"])

@@ -24,6 +24,19 @@ four); type it back from the SSA's never-issued block before committing.
 version they name, into memory stores — so a fixture that would not load
 fails `scripts/dev-test.sh` there, not the next staging deploy.
 
+**Every Debtor 1 and Debtor 2 is a firm client's copy** (from `v4`,
+[ADR 0022](../docs/adr/0022-a-client-is-not-a-case.md)). A version's
+`cases.json` carries a top-level `clients` list — the firm's directory
+entries, in `POST /v1/firm/clients`'s body shape plus a `handle` — and a
+debtor names one with `"client_id": {"$ref": "clients/<handle>"}`. The loader
+derives a client's id like a case's, writes it before the case, and refuses
+a fixture whose Debtor 1 or Debtor 2 names none; `v1`–`v3` are therefore
+not loadable any more. Their rows are the pre-client data
+`services/admin` `entrypoints/purge_pre_client.py` deletes —
+`scripts/dev-aws-seed.sh` runs it before every load, and a second run
+deletes nothing. (A fixture case's `clients` in `seeds/<env>.json` are
+something else: portal logins, ADR 0023.)
+
 **Nothing here is real.** Every address ends in `.test` (RFC 2606 — it can never
 be a mailbox); every name, employer and figure is invented; every document
 describes nobody. The loader refuses a production table, and `capture` refuses
