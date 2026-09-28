@@ -58,6 +58,8 @@ src/
 │   ├── index.tsx           /            → <RequireSession><Home /></RequireSession>
 │   ├── sign-in.tsx         /sign-in     → <SignIn />   (public)
 │   ├── auth/callback.tsx   /auth/callback (path pinned by infra — see below)
+│   ├── portal/             /portal/* — the CLIENT portal (ADR 0023): own layout,
+│   │                       memory-only session, guard and frame; see below
 │   └── +not-found.tsx      the catch-all; load-bearing, see below
 ├── screens/                screen bodies the routes render
 │   └── home/index.tsx      a screen's private components live beside it
@@ -334,6 +336,17 @@ below the `<title>` and why this paragraph is here rather than in the file.
   future **native** client is what would justify `expo-auth-session`; on web it
   would buy nothing.
 
+- **`/portal` is a second app for a second principal class** (ADR 0023: a
+  debtor, signed in through the pool's portal app client). Its layout mounts
+  `PortalSessionProvider` — memory-only, refresh token included, never a flag
+  on the staff provider — and every portal file uses `usePortalSession`,
+  `usePortalApi`, `PortalShell` and `RequirePortalSession`, never the staff
+  `useSession`/`useApi`/`AppShell`/`/v1/me`; `portal-routes.test.tsx` pins
+  that. `/portal/auth/callback` and `/portal` are pinned by infra's portal
+  client exactly as `/auth/callback` is by the web client's. It is a path
+  segment, not a `(group)`, because those URLs are. The build reads
+  `EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID`; without it `/portal` says sign-in is
+  not configured and the staff app is unaffected.
 - **The dev server is pinned to port 3000.** Expo defaults to 8081, and
   `infra/envs/{dev,staging}` register `http://localhost:3000` as an
   **exact-match** Cognito allowed origin.
