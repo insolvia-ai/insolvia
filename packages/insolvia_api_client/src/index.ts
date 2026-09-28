@@ -330,6 +330,7 @@ export type {
   PermissionLevel,
   InvitePortalClientRequest,
   PortalClient,
+  PortalCaseStatus,
   PortalClientStatus,
   PortalMe,
   ProvenanceSource,

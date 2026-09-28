@@ -6,7 +6,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
-from insolvia_core.access import Accessor, may_see_case
+from insolvia_core.access import Accessor, ClientAccessor, may_see_case
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
@@ -27,6 +27,11 @@ from insolvia_core.cases import (
     encode_cursor,
     firm_key,
     partition_key,
+)
+from insolvia_core.clients import (
+    PUBLIC_STATUS_ATTRIBUTES,
+    CasePublicStatus,
+    public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor, debtor_item
 
@@ -244,6 +249,24 @@ class DynamoDbCaseStore:
         if not item:
             return None
         return case_from_item(from_attributes(item))
+
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        # A ProjectionExpression of exactly the public attributes, so the
+        # rest of the case row never leaves the table on a portal request.
+        # `status` is a DynamoDB reserved word, hence the name placeholders.
+        names = {f"#a{i}": name for i, name in enumerate(PUBLIC_STATUS_ATTRIBUTES)}
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={"PK": {"S": partition_key(client.case_id)}, "SK": {"S": "META"}},
+            ProjectionExpression=", ".join(names),
+            ExpressionAttributeNames=names,
+        )
+        item = response.get("Item")
+        if not item:
+            return None
+        return public_status_from_case_item(
+            from_attributes(item), firm_id=client.firm_id
+        )
 
     def list_for_accessor(
         self, accessor: Accessor, *, limit: int, cursor: str | None

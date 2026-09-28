@@ -63,6 +63,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from typing import Final
 
+from insolvia_core.cases import STATUSES as CASE_STATUSES
 from insolvia_core.cases import partition_key as case_partition_key
 from insolvia_core.errors import ConflictError, FieldValidationError, ValidationError
 from insolvia_core.fields import timestamp
@@ -381,3 +382,66 @@ def binding_json(binding: ClientBinding) -> dict[str, object]:
         "createdAt": binding.created_at,
         "updatedAt": binding.updated_at,
     }
+
+
+# ── The case's public status (ADR 0023 decision 4) ──────────────────
+
+
+@dataclass(frozen=True)
+class CasePublicStatus:
+    """What a CLIENT may read of their case record: its chapter and its
+    stage — and nothing else.
+
+    A PROJECTION, not a `Case`. ADR 0023 decision 4 lets a client read "the
+    case's public status (chapter, stage)" and never the confirmed case
+    record, and that is enforced by construction: the store method that
+    produces this (`CaseStore.public_status`) takes the `ClientAccessor`,
+    reads only these attributes, and returns this type — so there is no
+    `Case` in a portal route's hands to leak a district, a date or a pin
+    from, however a later route is written.
+
+    `stage` is the case's lifecycle status (`cases.STATUSES`: `intake`,
+    `ready_to_file`, `filed`) — the coarse, firm-facing state, not the case
+    overview's computed spine, which reads schedules, documents and the
+    review queue a client may not see.
+    """
+
+    chapter: int
+    stage: str
+
+
+# The case META item's attributes the projection may read. The DynamoDB
+# adapter passes exactly these as its ProjectionExpression, so the rest of the
+# row never leaves the table on a portal request.
+PUBLIC_STATUS_ATTRIBUTES: Final = ("firmId", "chapter", "status")
+
+
+def public_status_from_case_item(
+    item: Mapping[str, object], *, firm_id: str
+) -> CasePublicStatus | None:
+    """The projection, from a stored case item (`cases.case_item`'s shape).
+
+    `None` unless the item belongs to `firm_id` — the binding's firm. A
+    binding only ever names its own firm's case (the invitation route
+    resolves the case under the inviter's accessor first), so a mismatch is
+    corruption, and corruption answers "no case" rather than another firm's
+    chapter. Raises ValidationError on a row this domain did not write, as
+    `cases.case_from_item` does.
+    """
+    if item.get("firmId") != firm_id:
+        return None
+    chapter = item.get("chapter")
+    stage = item.get("status")
+    if isinstance(chapter, bool) or not isinstance(chapter, (int, str)):
+        raise ValidationError(f"stored case item is malformed: chapter is {chapter!r}")
+    if not isinstance(stage, str) or stage not in CASE_STATUSES:
+        raise ValidationError(f"stored case item is malformed: status is {stage!r}")
+    try:
+        return CasePublicStatus(chapter=int(chapter), stage=stage)
+    except ValueError as error:
+        raise ValidationError(f"stored case item is malformed: {error}") from error
+
+
+def public_status_json(status: CasePublicStatus) -> dict[str, object]:
+    """`/v1/portal/me`'s `case` block. No id — no portal URL names a case."""
+    return {"chapter": status.chapter, "stage": status.stage}

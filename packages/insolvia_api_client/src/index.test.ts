@@ -8146,28 +8146,59 @@ describe('the client portal endpoints', () => {
     expect(revoked.status).toBe('revoked');
   });
 
-  test('reads the portal identity, which names no case', async () => {
-    const { stub, client } = portalClient(() =>
-      jsonResponse(
-        {
-          subject: CLIENT_SUBJECT,
-          displayName: 'Pat Example',
-          roles: ['debtor_1'],
-          firm: { name: 'Example & Partners' },
-        },
-        200,
-      ),
-    );
+  // Copied from api/routes/portal.py::portal_me_json and
+  // core/clients.public_status_json.
+  const PORTAL_ME = {
+    subject: CLIENT_SUBJECT,
+    displayName: 'Pat Example',
+    roles: ['debtor_1'],
+    firm: { name: 'Example & Partners' },
+    case: { chapter: 13, stage: 'ready_to_file' },
+  };
+
+  test('reads the portal identity and the case status, which names no case', async () => {
+    const { stub, client } = portalClient(() => jsonResponse(PORTAL_ME, 200));
 
     const me = await client.getPortalMe();
 
-    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/portal/me`);
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/me`);
     expect(me).toEqual({
       subject: CLIENT_SUBJECT,
       displayName: 'Pat Example',
       roles: ['debtor_1'],
       firm: { name: 'Example & Partners' },
+      case: { chapter: 13, stage: 'ready_to_file' },
     });
+  });
+
+  test.each([
+    ['no case block', { ...PORTAL_ME, case: undefined }],
+    ['an unknown chapter', { ...PORTAL_ME, case: { chapter: 9, stage: 'intake' } }],
+    ['an unknown stage', { ...PORTAL_ME, case: { chapter: 7, stage: 'dismissed' } }],
+  ])('refuses a portal identity with %s', async (_label, body) => {
+    const { client } = portalClient(() => jsonResponse(body, 200));
+
+    await expect(client.getPortalMe()).rejects.toThrow();
+  });
+
+  test('a signed-in person with no live binding is a 403', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse(
+        {
+          error: 'Forbidden',
+          message: 'you do not have access to a case through the client portal',
+        },
+        403,
+      ),
+    );
+
+    const error = await rejection(client.getPortalMe());
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect((error as ApiException).statusCode).toBe(403);
   });
 
   test('a staff token on the portal is a 401', async () => {

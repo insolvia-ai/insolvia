@@ -18,6 +18,7 @@ obviously fake. This repo is public.
 
 from __future__ import annotations
 
+import inspect
 import re
 import time
 
@@ -29,6 +30,7 @@ from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.auth import CLIENT, PRINCIPAL_CLASS_ATTRIBUTE
 from insolvia_api.api.dependencies import ApiDependencies
+from insolvia_api.api.routes import portal as portal_routes
 from insolvia_api.core.config import load_config
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
@@ -156,7 +158,16 @@ def mailer():
     return InMemoryMailerClient()
 
 
-def build(firms, bindings, directory, access_log, mailer, **config: str):
+def build(
+    firms,
+    bindings,
+    directory,
+    access_log,
+    mailer,
+    *,
+    case_store: MemoryCaseStore | None = None,
+    **config: str,
+):
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -171,7 +182,7 @@ def build(firms, bindings, directory, access_log, mailer, **config: str):
             waitlist_store=MemoryWaitlistStore(),
             mailer=mailer,
             jwks_provider=StaticJwksProvider({KID: _PRIVATE_KEY.public_key()}),
-            case_store=MemoryCaseStore(),
+            case_store=case_store or MemoryCaseStore(),
             access_log=access_log,
             firm_store=firms,
             user_directory=directory,
@@ -237,7 +248,38 @@ def test_a_portal_token_reaches_portal_me_with_the_firms_name(client):
         "displayName": "Pat Example",
         "roles": ["debtor_1"],
         "firm": {"name": "Example & Partners"},
+        "case": {"chapter": 7, "stage": "intake"},
     }
+
+
+def test_the_case_block_follows_the_case_and_carries_nothing_else(client):
+    # The public status is READ, not copied onto the binding at invitation:
+    # a firm moving the case on is what the client sees next.
+    case_id = open_case(client)
+    pat = invited_subject(client, case_id)
+    moved = client.patch(
+        f"/v1/cases/{case_id}", json={"status": "ready_to_file"}, headers=staff(ALICE)
+    )
+    assert moved.status_code == 200, moved.get_json()
+
+    body = client.get("/v1/portal/me", headers=portal(pat)).get_json()
+
+    assert body["case"] == {"chapter": 7, "stage": "ready_to_file"}
+    # No id anywhere in the answer: no portal URL names a case.
+    assert case_id not in str(body)
+
+
+def test_a_binding_whose_case_is_gone_is_refused(
+    firms, bindings, directory, access_log, mailer
+):
+    cases = MemoryCaseStore()
+    app = build(firms, bindings, directory, access_log, mailer, case_store=cases)
+    client = app.test_client()
+    case_id = open_case(client)
+    pat = invited_subject(client, case_id)
+    del cases.cases[case_id]
+
+    assert client.get("/v1/portal/me", headers=portal(pat)).status_code == 403
 
 
 def test_a_portal_token_is_refused_by_the_staff_me_route(client):
@@ -610,3 +652,15 @@ def test_no_portal_route_accepts_a_staff_token(app, client):
     ]
 
     assert not refused
+
+
+def test_the_portal_reads_the_case_only_through_the_binding_projection():
+    """ADR 0023 decision 4, pinned at the source: the portal routes never
+    hand a store an `accessor=` (every staff-shaped case read takes one —
+    `CaseStore.get`, the listings) and never use the worker's accessor-less
+    read. The case reaches a client only as `CaseStore.public_status`."""
+    source = inspect.getsource(portal_routes)
+
+    assert "accessor=" not in source
+    assert "read_for_worker" not in source
+    assert ".public_status(" in source

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from insolvia_core.access import Accessor, may_see_case
+from insolvia_core.access import Accessor, ClientAccessor, may_see_case
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
@@ -11,9 +11,14 @@ from insolvia_core.cases import (
     CaseAssignment,
     CasePage,
     ClientCase,
+    case_item,
     decode_cursor,
     encode_cursor,
     listing_sort_key,
+)
+from insolvia_core.clients import (
+    CasePublicStatus,
+    public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor
 
@@ -106,6 +111,14 @@ class MemoryCaseStore:
         # authority is the accepted job, and only entrypoints compose this
         # path — never a route.
         return self.cases.get(case_id)
+
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        # Through the stored item shape, as the DynamoDB adapter reads it, so
+        # the firm check and the parse are the one function both share.
+        case = self.cases.get(client.case_id)
+        if case is None:
+            return None
+        return public_status_from_case_item(case_item(case), firm_id=client.firm_id)
 
     def list_for_accessor(
         self, accessor: Accessor, *, limit: int, cursor: str | None
