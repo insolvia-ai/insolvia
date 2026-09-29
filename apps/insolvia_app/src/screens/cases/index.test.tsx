@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -34,72 +34,8 @@ const CASE = {
   updatedAt: '2026-08-04T10:00:00.000000Z',
 };
 
-/** One active client in the firm's directory (ADR 0022), in `firm_client_json`'s shape. */
-const CLIENT = {
-  id: '00000000-0000-4000-8000-0000000c11a0',
-  status: 'active',
-  name: { given: 'Jordan', surname: 'Example' },
-  created_at: '2026-09-27T09:00:00.000000Z',
-  updated_at: '2026-09-27T09:00:00.000000Z',
-  created_by: '00000000-0000-4000-8000-00000000a11c',
-};
-
-/** A two-court slice of `GET /v1/courts`, in the API's wire shape. */
-const COURTS = {
-  releaseId: 'courts/us-bankruptcy@2026-09-24',
-  effectiveDate: '2026-09-24',
-  districts: [
-    {
-      code: 'flmb',
-      courtId: 'FLMBK',
-      name: 'Middle District of Florida',
-      state: 'FL',
-      circuit: 11,
-      website: 'https://www.flmb.uscourts.gov/',
-      divisions: [
-        {
-          code: 'tampa',
-          name: 'Tampa Division',
-          officeCode: '8',
-          officeCodeVerified: true,
-          courthouse: null,
-          counties: [{ name: 'Hillsborough', fips: '12057' }],
-        },
-        {
-          code: 'orlando',
-          name: 'Orlando Division',
-          officeCode: '6',
-          officeCodeVerified: true,
-          courthouse: null,
-          counties: [{ name: 'Orange', fips: '12095' }],
-        },
-      ],
-      caseUpload: { status: 'unverified', verifiedAt: null },
-    },
-    {
-      code: 'txsb',
-      courtId: 'TXSBK',
-      name: 'Southern District of Texas',
-      state: 'TX',
-      circuit: 5,
-      website: 'https://www.txs.uscourts.gov/',
-      divisions: [
-        {
-          code: 'houston',
-          name: 'Houston Division',
-          officeCode: null,
-          officeCodeVerified: false,
-          courthouse: null,
-          counties: [{ name: 'Harris', fips: '48201' }],
-        },
-      ],
-      caseUpload: { status: 'unverified', verifiedAt: null },
-    },
-  ],
-};
-
-/** A `/v1/me` body whose firm has set its defaults (#360). */
-function memberWithDefaults() {
+/** A `/v1/me` body whose firm grants `cases` at the given level. */
+function member(cases: string) {
   return {
     subject: CASE.createdBy,
     username: null,
@@ -109,65 +45,44 @@ function memberWithDefaults() {
     firm: {
       id: '00000000-0000-4000-8000-00000000f18a',
       name: 'Example & Partners',
-      role: 'attorney',
+      role: 'staff',
       firstName: 'Alice',
       lastName: 'Attorney',
       displayName: 'Alice Attorney',
-      isAdmin: true,
+      isAdmin: false,
       accessAllCases: true,
-      permissions: { cases: 'add_edit' },
-      defaultCourt: 'txsb',
-      defaultDivision: 'houston',
-      defaultChapter: 13,
+      permissions: { cases },
+      defaultCourt: null,
+      defaultDivision: null,
+      defaultChapter: null,
       letterhead: null,
       signatureBlock: null,
     },
   };
 }
 
-/** Picks an option in one of the registry `Select`s by its accessible names. */
-async function choose(control: string, option: string) {
-  await userEvent.press(screen.getByRole('combobox', { name: control }));
-  await userEvent.press(await screen.findByRole('option', { name: option }));
-}
-
 /**
- * `/cases` — the screen that closes issue 8.3's loop.
+ * `/cases` — the case list (issue 8.3), and the way to `/cases/new`.
  *
  * Rendered through the **real router**, so a route file that moved or stopped
  * compiling fails here. `/cases` is protected, so every test signs in first,
  * exactly as the home screen's suite does.
  *
- * What is asserted is mostly the wiring the server cannot check for us: that
- * the form sends what the API expects, that the server's per-field messages
- * reach the field they belong to, and that the list is announced rather than
- * silently swapped in.
+ * The form that opens a case moved to `/cases/new` (ADR 0022 / #354); its
+ * suite is `new.test.tsx`. What is asserted here is that the list is
+ * announced rather than silently swapped in, that each row is one well-named
+ * link, and that "New case" goes where the form now lives.
  */
 describe('the cases screen', () => {
   let browser: FakeBrowser;
   const realFetch = globalThis.fetch;
 
-  /**
-   * Signs in and renders `/cases`, returning the fetch mock typed the way the
-   * tests read it. `routeFetch` declares a single `url` parameter because that
-   * is all it dispatches on, but the calls carry an init object too — and the
-   * request body is exactly what one of these tests needs to assert.
-   */
   function signedIn(handlers: Readonly<Record<string, () => Response>>) {
-    // The registry LAST: a test's own `/v1/courts` (say, a failing one) wins,
-    // and `/v1/cases` is matched by substring so it must not swallow it.
-    const route = routeFetch({
-      '/oauth2/token': tokenEndpointResponse,
-      ...handlers,
-      ...('/v1/courts' in handlers ? {} : { '/v1/courts': () => jsonResponse(200, COURTS) }),
-      ...('/v1/firm/clients' in handlers
-        ? {}
-        : { '/v1/firm/clients': () => jsonResponse(200, { clients: [CLIENT] }) }),
-    });
+    const route = routeFetch({ '/oauth2/token': tokenEndpointResponse, ...handlers });
     const fetchMock = jest.fn((url: string, _init?: RequestInit) => route(url));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    renderRouter('src/app', { initialUrl: '/cases' });
-    return fetchMock;
+    const router = renderRouter('src/app', { initialUrl: '/cases' });
+    return { fetchMock, router };
   }
 
   beforeEach(() => {
@@ -182,6 +97,29 @@ describe('the cases screen', () => {
     jest.clearAllMocks();
   });
 
+  it('sends "New case" to the page that opens one for a client', async () => {
+    const { router } = signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
+    await screen.findByText(/No cases yet/);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'New case' }));
+
+    await waitFor(() => {
+      expect(router.getPathname()).toBe('/cases/new');
+    });
+  });
+
+  it('offers no "New case" to a colleague who may only view cases', async () => {
+    signedIn({
+      '/v1/me': () => jsonResponse(200, member('view_only')),
+      '/v1/cases': () => jsonResponse(200, { cases: [] }),
+    });
+    await screen.findByText(/No cases yet/);
+    // Settled on the membership: the avatar's name only renders once /v1/me answered.
+    await screen.findByText('Alice Attorney');
+
+    expect(screen.queryByRole('button', { name: 'New case' })).toBeNull();
+  });
+
   it('lists the cases the API returns', async () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [CASE] }) });
 
@@ -192,217 +130,6 @@ describe('the cases screen', () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
 
     expect(await screen.findByText(/No cases yet/)).toBeTruthy();
-  });
-
-  it('renders one named radio per chapter, with the label outside the circle', async () => {
-    // The regression this guards: RadioGroup.Item IS the 20dp circle (its own
-    // package tests render it self-closing), so a label nested inside it makes
-    // four circles overlap into an unreadable pile. Asserting the accessible
-    // NAME rather than the visible text is what catches it — a nested label
-    // would still render, just on top of its neighbours.
-    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
-    await screen.findByText(/No cases yet/);
-
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(4);
-
-    for (const label of ['Chapter 7', 'Chapter 13', 'Chapter 11', 'Chapter 12']) {
-      const radio = screen.getByRole('radio', { name: label });
-      // The discriminating assertion. Checking the accessible NAME alone would
-      // pass either way — react-native-web derives it from nested content just
-      // as happily as from aria-label. What only the correct structure
-      // satisfies is the label being OUTSIDE the circle.
-      expect(within(radio).queryByText(label)).toBeNull();
-      expect(screen.getByText(label)).toBeTruthy();
-    }
-  });
-
-  it('sends the chosen chapter, court, division and client to the API — never a district string', async () => {
-    const fetchMock = signedIn({
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-
-    await choose('Client', 'Example, Jordan');
-    await userEvent.press(screen.getByRole('radio', { name: /Chapter 13/ }));
-    await choose('Court', 'Middle District of Florida');
-    await choose('Division', 'Orlando Division');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    await waitFor(() => {
-      // Filtered by URL as well as method: the OAuth token exchange is also a
-      // POST, and it is the one that happens first.
-      const post = fetchMock.mock.calls.find(
-        ([url, init]) => url.includes('/v1/cases') && init?.method === 'POST',
-      );
-      expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.[1]?.body))).toEqual({
-        chapter: 13,
-        court: 'flmb',
-        division: 'orlando',
-        client_ids: [CLIENT.id],
-      });
-    });
-  });
-
-  it('offers only the chosen court’s divisions, and clears the division when the court changes', async () => {
-    signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
-    await screen.findByText(/No cases yet/);
-
-    await choose('Court', 'Southern District of Texas');
-    await userEvent.press(screen.getByRole('combobox', { name: 'Division' }));
-    expect(await screen.findByRole('option', { name: 'Houston Division' })).toBeTruthy();
-    expect(screen.queryByRole('option', { name: 'Tampa Division' })).toBeNull();
-    await userEvent.press(screen.getByRole('option', { name: 'Houston Division' }));
-
-    // A division belongs to its court: picking another court starts over.
-    await choose('Court', 'Middle District of Florida');
-    expect(screen.queryByText('Houston Division')).toBeNull();
-  });
-
-  it('preselects the firm’s default court, division and chapter', async () => {
-    const fetchMock = signedIn({
-      '/v1/me': () => jsonResponse(200, memberWithDefaults()),
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-    // The defaults have arrived once the trigger shows the division's name.
-    await screen.findByText('Houston Division');
-
-    await choose('Client', 'Example, Jordan');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    await waitFor(() => {
-      const post = fetchMock.mock.calls.find(
-        ([url, init]) => url.includes('/v1/cases') && init?.method === 'POST',
-      );
-      expect(JSON.parse(String(post?.[1]?.body))).toEqual({
-        chapter: 13,
-        court: 'txsb',
-        division: 'houston',
-        client_ids: [CLIENT.id],
-      });
-    });
-  });
-
-  it("puts the server's per-field message on the field it belongs to", async () => {
-    // The server is the source of truth for validation (ADR 0001). The screen
-    // renders what it said rather than restating the rule in a second place
-    // that can disagree with it.
-    let calls = 0;
-    signedIn({
-      '/v1/cases': () => {
-        calls += 1;
-        return calls === 1
-          ? jsonResponse(200, { cases: [] })
-          : jsonResponse(400, {
-              error: 'ValidationError',
-              fields: { court: 'Choose the bankruptcy court this case will be filed in.' },
-            });
-      },
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    expect(await screen.findByText(/Choose the bankruptcy court/)).toBeTruthy();
-  });
-
-  it('cannot open a case while the court registry is unavailable', async () => {
-    signedIn({
-      '/v1/courts': () => jsonResponse(500, { error: 'InternalError' }),
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-
-    const message = await screen.findByText(/Could not load the court registry/);
-    expect(message.props['aria-live']).toBe('assertive');
-    expect(screen.getByRole('button', { name: 'Open case' })).toBeDisabled();
-  });
-
-  it('reloads the list after opening a case', async () => {
-    let listCalls = 0;
-    signedIn({
-      '/v1/cases': () => {
-        // POST answers 201; the two GETs bracket it.
-        listCalls += 1;
-        if (listCalls === 1) return jsonResponse(200, { cases: [] });
-        if (listCalls === 2) return jsonResponse(201, CASE);
-        return jsonResponse(200, { cases: [CASE] });
-      },
-    });
-    await screen.findByText(/No cases yet/);
-
-    await choose('Client', 'Example, Jordan');
-    await choose('Court', 'Middle District of Florida');
-    await choose('Division', 'Tampa Division');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
-  });
-
-  it('with an empty directory, adds the named client first and opens the case for them', async () => {
-    // ADR 0022's minimum on this screen until the client screens land (#354):
-    // a case needs a client, so a firm with none names one here.
-    let clientCalls = 0;
-    const fetchMock = signedIn({
-      '/v1/firm/clients': () => {
-        clientCalls += 1;
-        return clientCalls === 1
-          ? jsonResponse(200, { clients: [] })
-          : jsonResponse(201, { ...CLIENT, name: { given: 'Sam', surname: 'Sample' } });
-      },
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.type(await screen.findByLabelText('Client’s first name'), 'Sam');
-    await userEvent.type(screen.getByLabelText('Client’s last name'), 'Sample');
-    await choose('Court', 'Middle District of Florida');
-    await choose('Division', 'Tampa Division');
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    await waitFor(() => {
-      const posts = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
-      const added = posts.find(([url]) => url.includes('/v1/firm/clients'));
-      const opened = posts.find(([url]) => url.includes('/v1/cases'));
-      expect(JSON.parse(String(added?.[1]?.body))).toEqual({
-        name: { given: 'Sam', surname: 'Sample' },
-      });
-      expect(JSON.parse(String(opened?.[1]?.body))).toMatchObject({ client_ids: [CLIENT.id] });
-    });
-  });
-
-  it('puts a missing client on the client field, as the server words it', async () => {
-    let calls = 0;
-    signedIn({
-      '/v1/cases': () => {
-        calls += 1;
-        return calls === 1
-          ? jsonResponse(200, { cases: [] })
-          : jsonResponse(400, {
-              error: 'ValidationError',
-              fields: { client_ids: 'Choose the client this case is for.' },
-            });
-      },
-    });
-    await screen.findByText(/No cases yet/);
-
-    await userEvent.press(screen.getByRole('button', { name: 'Open case' }));
-
-    expect(await screen.findByText('Choose the client this case is for.')).toBeTruthy();
-  });
-
-  it('cannot open a case without access to the client directory, and says why', async () => {
-    signedIn({
-      '/v1/firm/clients': () => jsonResponse(403, { error: 'ForbiddenError' }),
-      '/v1/cases': () => jsonResponse(200, { cases: [] }),
-    });
-    await screen.findByText(/No cases yet/);
-
-    const message = await screen.findByText(/Could not load your client directory/);
-    expect(message.props['aria-live']).toBe('assertive');
-    expect(screen.getByRole('button', { name: 'Open case' })).toBeDisabled();
   });
 
   it('reports a failed load without pretending the list is empty', async () => {
