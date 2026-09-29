@@ -19,7 +19,7 @@ from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
 from insolvia_core.clients import CasePublicStatus, ClientBinding
-from insolvia_core.debtors import Debtor
+from insolvia_core.debtors import Debtor, LinkOutcome
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
@@ -621,6 +621,20 @@ class DebtorStore(Protocol):
 
     def put(self, debtor: Debtor) -> None:
         """Replace the record for `debtor`'s role outright."""
+        ...
+
+    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+        """Write `debtor` — which names a `client_id` — ONLY IF no other
+        role of its case names the same client (ADR 0022: one client, one
+        role per case), and, with `create`, only if its own role is still
+        empty (`create`'s rule).
+
+        One CONDITIONAL write, not a read and then a write: two links of
+        one client to two roles of one matter, racing, must not both land,
+        or the `by-client` index lists the case twice. Answers `"written"`,
+        `"role_taken"` (the create lost its race — nothing written), or
+        `"client_taken"` (another role holds this client — nothing
+        written)."""
         ...
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...

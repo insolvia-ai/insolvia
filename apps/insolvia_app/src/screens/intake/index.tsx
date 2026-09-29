@@ -1,16 +1,23 @@
-import { ApiValidationException, staffTypedProvenance } from '@insolvia-ai/api-client';
-import type { CaseCollection, Debtor, DebtorBody, FilingRole } from '@insolvia-ai/api-client';
+import { ApiException, ApiValidationException, revisedProvenance } from '@insolvia-ai/api-client';
+import type {
+  CaseCollection,
+  Debtor,
+  DebtorBody,
+  FilingRole,
+  FirmClient,
+} from '@insolvia-ai/api-client';
 import { Field, Select, Tabs } from '@insolvia-ai/design-system';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
-import { CaseColumn } from '@/components/case-shell';
+import { CaseColumn, useCase } from '@/components/case-shell';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 import { AssetsEditor } from './assets';
+import { LinkClient, LinkedClient } from './client-panel';
 import { CollectionEditor } from './collection-editor';
 import { COLLECTION_SPECS } from './collections';
 import { isCommunityPropertyState } from './community-property';
@@ -36,6 +43,15 @@ import { DebtorFields } from './debtor-fields';
  * A joint filing is two debtor RECORDS, not a second column, which is why the
  * role picker switches between whole records rather than revealing more fields
  * — see docs/reference/case-data-model.md.
+ *
+ * **Debtor 1 and Debtor 2 are the firm's clients, copied** (ADR 0022). The
+ * role picker never mints a debtor from a save: an empty role offers to LINK
+ * a client (`client-panel.tsx`), which the server copies in, and only then
+ * do its fields appear. A non-filing spouse need not be a client, so their
+ * fields are always there and the link is optional. A linked debtor shows
+ * its client, where the two records now differ, and the two acts that
+ * resolve it. And every save keeps provenance PER FIELD
+ * (`revisedProvenance`): a copied value nobody touched stays `client`.
  *
  * Beyond the debtor, the screen is SECTIONED — one section per case
  * collection (issue #249), chosen from a picker rather than a twelfth tab,
@@ -103,6 +119,20 @@ function bodyOf(debtor: Debtor): DebtorBody {
   return body;
 }
 
+/** The `message` of a 409 body (`{"error": "ConflictError", "message": …}`). */
+function conflictMessage(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed === 'object' && parsed !== null && 'message' in parsed) {
+      const { message } = parsed as { message: unknown };
+      if (typeof message === 'string' && message !== '') return message;
+    }
+  } catch {
+    // Not JSON — fall through to the generic sentence.
+  }
+  return 'This case’s state does not allow that right now.';
+}
+
 export function Intake() {
   const theme = useTheme();
   const { call } = useApi();
@@ -129,6 +159,22 @@ export function Intake() {
     Partial<Record<FilingRole, Record<string, string>>>
   >({});
 
+  // The last record the SERVER returned for each role — what the screen was
+  // loaded with, then each save's answer. Two things read it: the client
+  // panel (the link, and `differs_from_client` as of the last save), and
+  // `persist`, which diffs the form against it so a field nobody touched
+  // keeps the provenance it arrived with (ADR 0022 — a copied field stays
+  // `client` until a person changes THAT field). A ref beside the state
+  // because `persist` is a stable callback and must read the newest one.
+  const [records, setRecordsState] = useState<Partial<Record<FilingRole, Debtor>>>({});
+  const recordsRef = useRef<Partial<Record<FilingRole, Debtor>>>({});
+  const remember = useCallback((debtor: Debtor) => {
+    recordsRef.current = { ...recordsRef.current, [debtor.filing_role]: debtor };
+    setRecordsState(recordsRef.current);
+  }, []);
+  // The linked clients' records, by id, for the panel's name and diff.
+  const [clients, setClients] = useState<Readonly<Record<string, FirmClient>>>({});
+
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // What the timer is holding, so it can be flushed rather than dropped.
   const pending = useRef<{ role: FilingRole; body: DebtorBody } | null>(null);
@@ -142,6 +188,7 @@ export function Intake() {
         setBodies(
           Object.fromEntries(result.value.map((debtor) => [debtor.filing_role, bodyOf(debtor)])),
         );
+        for (const debtor of result.value) remember(debtor);
         setLoad({ kind: 'ready' });
       } catch {
         if (!cancelled) setLoad({ kind: 'error', message: 'Could not load this intake.' });
@@ -150,19 +197,46 @@ export function Intake() {
     return () => {
       cancelled = true;
     };
-  }, [call, caseId]);
+  }, [call, caseId, remember]);
+
+  // Read each linked client once — only when the caller may see the
+  // directory, which the server signals by sending `differs_from_client` at
+  // all. A failure leaves the panel on "Linked client"; nothing depends on it.
+  const linkedIds = Object.values(records)
+    .filter((debtor) => debtor.client_id !== undefined && debtor.differs_from_client !== undefined)
+    .map((debtor) => debtor.client_id as string);
+  const missing = linkedIds.filter((id) => !(id in clients)).join(',');
+  const refreshClient = useCallback(
+    async (id: string) => {
+      try {
+        const result = await call((client) => client.getFirmClient(id));
+        if (result.ok) setClients((current) => ({ ...current, [id]: result.value }));
+      } catch {
+        // Shown as an unnamed link; the acts still work without it.
+      }
+    },
+    [call],
+  );
+  useEffect(() => {
+    for (const id of missing === '' ? [] : missing.split(',')) void refreshClient(id);
+  }, [missing, refreshClient]);
 
   const persist = useCallback(
     async (which: FilingRole, body: DebtorBody) => {
       pending.current = null;
       setSave((current) => ({ ...current, [which]: { kind: 'saving' } }));
       try {
-        // The provenance map is built from the body rather than tracked
-        // alongside it: a person typed every value on this screen, so
-        // "staff_typed on each populated field" is the whole truth, and
-        // deriving it means it cannot drift out of step with the record.
+        // Per field, against the last record the server returned: a value
+        // still what it was keeps the entry it came with — `client` on a
+        // copied field, say — and only what the preparer changed or added is
+        // `staff_typed`. Re-stamping the whole record would erase the copy's
+        // attribution on the first autosave, and the API refuses a `client`
+        // entry on a changed value, so the map has to be exactly this.
         const result = await call((client) =>
-          client.putDebtor(caseId, which, { ...body, provenance: staffTypedProvenance(body) }),
+          client.putDebtor(caseId, which, {
+            ...body,
+            provenance: revisedProvenance(body, recordsRef.current[which]),
+          }),
         );
         if (!result.ok) {
           // The session ended and useApi has already navigated. Leaving this on
@@ -170,6 +244,9 @@ export function Intake() {
           setSave((current) => ({ ...current, [which]: { kind: 'idle' } }));
           return;
         }
+        // The new baseline — and the new divergence. The form's body is NOT
+        // replaced: the preparer may have typed on while this was in flight.
+        remember(result.value);
         setFieldErrors((current) => ({ ...current, [which]: {} }));
         setSave((current) => ({ ...current, [which]: { kind: 'saved' } }));
       } catch (cause) {
@@ -193,7 +270,7 @@ export function Intake() {
         }
       }
     },
-    [call, caseId],
+    [call, caseId, remember],
   );
 
   const change = (next: DebtorBody) => {
@@ -212,13 +289,13 @@ export function Intake() {
   // Switching roles flushes first. Waiting out the debounce would mean the
   // pending edit lands under whichever role happened to be selected when the
   // timer fired — writing one debtor's name onto another's record.
-  const flush = useCallback(() => {
+  const flush = useCallback((): Promise<void> => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
     }
     const outstanding = pending.current;
-    if (outstanding !== null) void persist(outstanding.role, outstanding.body);
+    return outstanding === null ? Promise.resolve() : persist(outstanding.role, outstanding.body);
   }, [persist]);
 
   const switchRole = (next: FilingRole) => {
@@ -226,7 +303,7 @@ export function Intake() {
     // role was selected when the timer fired. Nothing shared is reset here —
     // save state and errors are keyed by role, so the flush's answer arrives at
     // the record it belongs to however late it is.
-    flush();
+    void flush();
     setRole(next);
   };
 
@@ -242,14 +319,14 @@ export function Intake() {
     if (chosen === undefined) return;
     // Leaving the debtor section is navigation like any other: the pending
     // debounce flushes rather than being dropped with the section.
-    flush();
+    void flush();
     setHandoff(null);
     setSection(chosen.value);
   };
 
   const openCollection = useCallback(
     (collection: CaseCollection, body: Record<string, unknown>) => {
-      flush();
+      void flush();
       setHandoff({ collection, body });
       setSection(collection);
     },
@@ -260,10 +337,55 @@ export function Intake() {
   // every keystroke typed in the last 800ms whenever the user navigated away —
   // back to the case list, or any in-app link — with the status region still
   // reading "Changes save automatically" as the work went.
-  useEffect(() => flush, [flush]);
+  useEffect(() => () => void flush(), [flush]);
+
+  const { matter, reload } = useCase();
+
+  /** A record the server just wrote as a whole — a link or a re-copy. It
+   * replaces the form's body as well as the baseline: the pending edit was
+   * flushed first, and what the server holds now IS the record. */
+  const adopt = (debtor: Debtor) => {
+    remember(debtor);
+    setBodies((current) => ({ ...current, [debtor.filing_role]: bodyOf(debtor) }));
+    setFieldErrors((current) => ({ ...current, [debtor.filing_role]: {} }));
+    // The case's title is its debtors' names.
+    void reload();
+  };
+
+  /** One of the panel's two acts, after the pending edit has landed — so the
+   * server compares the record the preparer sees, and no late autosave can
+   * overwrite what the act wrote. Answers a message for the panel, or null. */
+  const act = async (
+    which: FilingRole,
+    request: 'copyDebtorFromClient' | 'copyDebtorToClient',
+  ): Promise<string | null> => {
+    await flush();
+    try {
+      const result = await call((client) => client[request](caseId, which));
+      if (!result.ok) return null;
+      if (request === 'copyDebtorFromClient') {
+        adopt(result.value);
+      } else {
+        remember(result.value);
+        if (result.value.client_id !== undefined) await refreshClient(result.value.client_id);
+      }
+      return null;
+    } catch (cause) {
+      if (cause instanceof ApiValidationException) {
+        return Object.values(cause.fields)[0] ?? 'The client record could not be changed.';
+      }
+      if (cause instanceof ApiException && cause.statusCode === 409) {
+        // The case's state refused it (filed, or no client linked) — the
+        // server's sentence says which.
+        return conflictMessage(cause.body);
+      }
+      return 'Could not reach the server. Try again.';
+    }
+  };
 
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const saveState: SaveState = save[role] ?? { kind: 'idle' };
+  const record = records[role];
 
   // Looked up in the FILTERED list, not the full one: a debtor edited back
   // out of a community-property state while this section is open should stop
@@ -362,11 +484,39 @@ export function Intake() {
                     : 'Changes save automatically'}
             </Text>
 
-            <DebtorFields
-              body={bodies[role] ?? {}}
-              onChange={change}
-              errors={fieldErrors[role] ?? {}}
-            />
+            {record?.client_id !== undefined ? (
+              <LinkedClient
+                key={`${role}:${record.client_id}`}
+                debtor={record}
+                client={clients[record.client_id] ?? null}
+                filed={matter.status === 'filed'}
+                onRecopy={() => act(role, 'copyDebtorFromClient')}
+                onUpdateClient={() => act(role, 'copyDebtorToClient')}
+              />
+            ) : (
+              <LinkClient
+                key={role}
+                caseId={caseId}
+                role={role}
+                required={role !== 'non_filing_spouse'}
+                taken={Object.values(records)
+                  .filter((debtor) => debtor.filing_role !== role)
+                  .flatMap((debtor) => (debtor.client_id === undefined ? [] : [debtor.client_id]))}
+                onLinked={adopt}
+              />
+            )}
+
+            {/* Debtor 1 and Debtor 2 are the firm's clients, so their
+                fields exist only once one is linked — a save cannot mint
+                either (ADR 0022). A non-filing spouse need not be a client,
+                so their fields are always here. */}
+            {record !== undefined || role === 'non_filing_spouse' ? (
+              <DebtorFields
+                body={bodies[role] ?? {}}
+                onChange={change}
+                errors={fieldErrors[role] ?? {}}
+              />
+            ) : null}
           </Tabs.Panel>
         </Tabs.Root>
       ) : null}
