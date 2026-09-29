@@ -56,9 +56,11 @@ from insolvia_core.errors import (
     NotFoundError,
     ValidationError,
 )
+from insolvia_core.firm_clients import FirmClient, firm_client_json
 from insolvia_core.firms import (
     ADD_EDIT,
     CASES,
+    CLIENTS,
     DOCUMENTS,
     FEATURES,
     INTAKE,
@@ -73,6 +75,7 @@ from insolvia_core.ports import (
     CaseStore,
     DebtorStore,
     DocumentStore,
+    FirmStore,
 )
 
 # mcp-surface.md § Pagination: identical numbers to the API's contract, but
@@ -82,20 +85,33 @@ MAX_LIMIT: Final = 100
 DEFAULT_LIMIT: Final = 25
 
 # The entity types the generic record tools serve: every registered generic
-# collection, plus the two non-generic case children. The enum is derived
-# from the registry, never written out — "the server publishes only the types
-# its store actually implements", and a new collection registered in
+# collection, plus the non-generic case children. The enum is derived from
+# the registry, never written out — "the server publishes only the types its
+# store actually implements", and a new collection registered in
 # insolvia_core is a new enum value here without a code change.
+#
+# `clients` (ADR 0022) is the one type that is not in the case's partition:
+# a case's clients are the FIRM clients its debtors are linked to
+# (`Debtor.client_id`), read from the firm table. It is still reached only
+# through a case the caller may see — a firm-wide client list is not a tool
+# in v1 — and it is read-only: a client proposal needs a review path that
+# writes the firm table, which the candidate review does not have yet.
 DEBTORS: Final = "debtors"
 DOCUMENTS_TYPE: Final = "documents"
-ENTITY_TYPES: Final = (*COLLECTIONS, DEBTORS, DOCUMENTS_TYPE)
+CLIENTS_TYPE: Final = "clients"
+ENTITY_TYPES: Final = (*COLLECTIONS, DEBTORS, DOCUMENTS_TYPE, CLIENTS_TYPE)
 
 
 def feature_for_entity_type(entity_type: str) -> str:
     """The per-entity gate map (mcp-surface.md § Permission gates), mirroring
-    the API's routes: `document` is the documents feature, everything else in
-    a case's partition is intake."""
-    return DOCUMENTS if entity_type == DOCUMENTS_TYPE else INTAKE
+    the API's routes: `documents` is the documents feature, `clients` the
+    clients feature (`/v1/firm/clients`' gate — the first type not under
+    intake), and everything else in a case's partition is intake."""
+    if entity_type == DOCUMENTS_TYPE:
+        return DOCUMENTS
+    if entity_type == CLIENTS_TYPE:
+        return CLIENTS
+    return INTAKE
 
 
 class FirmSummary(TypedDict):
@@ -235,6 +251,10 @@ class CaseTools:
     document_store: DocumentStore
     candidate_store: CandidateStore
     access_log: AccessLog
+    # The firm table, for the one entity type that lives there: a case's
+    # clients (ADR 0022). Read by key only — `get_client` — so the MCP
+    # role's existing GetItem grant on the firm table is all it needs.
+    firm_store: FirmStore
 
     # ── shared plumbing ──────────────────────────────────────────────
 
@@ -267,11 +287,40 @@ class CaseTools:
             raise NotFoundError("case not found")
         return case
 
+    def _case_clients(self, case: Case) -> list[FirmClient]:
+        """The firm clients `case`'s debtors are linked to, in filing-role
+        order, each once — a joint case is two clients, and one client never
+        holds two roles on a case (ADR 0022's joint-case rule), but a
+        duplicate is dropped here rather than trusted away.
+
+        Resolved in the CASE's firm, which is the caller's (the case was
+        reachable). A linked id that no longer resolves is skipped, not an
+        error: the debtor's copy is still the case's data, and the tool
+        answers what exists. Archived clients are included — archiving is
+        the firm being done with a person, not the case forgetting who its
+        debtor is.
+        """
+        clients: list[FirmClient] = []
+        seen: set[str] = set()
+        for debtor in self.debtor_store.list_for_case(case.id):
+            if debtor.client_id is None or debtor.client_id in seen:
+                continue
+            seen.add(debtor.client_id)
+            client = self.firm_store.get_client(case.firm_id, debtor.client_id)
+            if client is not None:
+                clients.append(client)
+        return clients
+
     def _entity_kind_records(
-        self, case_id: str, entity_type: str
+        self, case: Case, entity_type: str
     ) -> list[dict[str, Any]]:
         """One entity type's records, serialized in the API's wire shape so
-        the two surfaces cannot drift."""
+        the two surfaces cannot drift. A client serializes as
+        `firm_client_json` — the tax id as `tax_id_last_four` only, never
+        the ref and never the value."""
+        case_id = case.id
+        if entity_type == CLIENTS_TYPE:
+            return [firm_client_json(client) for client in self._case_clients(case)]
         if entity_type == DEBTORS:
             return [
                 debtor_json(debtor)
@@ -336,7 +385,7 @@ class CaseTools:
         # because that is the dominant access pattern; a single whole-partition
         # read would be a new port method nothing else needs yet.
         counts = {
-            entity_type: len(self._entity_kind_records(case_id, entity_type))
+            entity_type: len(self._entity_kind_records(case, entity_type))
             for entity_type in ENTITY_TYPES
         }
         return GetCaseResult(case=case_json(case), recordCounts=counts)
@@ -356,8 +405,10 @@ class CaseTools:
         if cursor is not None and not isinstance(cursor, str):
             raise ValidationError("cursor is not valid")
         action = "document.read" if entity_type == DOCUMENTS_TYPE else "case.read"
-        self._reachable_case(accessor, case_id, action)
-        records = self._entity_kind_records(case_id, entity_type)
+        case = self._reachable_case(accessor, case_id, action)
+        # Not logged per client: a listing is not, matching the API's
+        # `GET /v1/firm/clients` — the case.read row above records it.
+        records = self._entity_kind_records(case, entity_type)
         page, next_cursor = _paginate(
             records,
             limit=page_limit,
@@ -382,8 +433,8 @@ class CaseTools:
         if not isinstance(record_id, str) or not record_id:
             raise ValidationError("recordId is required")
         action = "document.read" if entity_type == DOCUMENTS_TYPE else "case.read"
-        self._reachable_case(accessor, case_id, action)
-        record = self._find_record(case_id, entity_type, record_id)
+        case = self._reachable_case(accessor, case_id, action)
+        record = self._find_record(case, entity_type, record_id, accessor)
         if record is None:
             # A record id from another case does not resolve (case_id is half
             # every store key), so this is the same 404 a foreign id gets.
@@ -391,8 +442,28 @@ class CaseTools:
         return GetCaseRecordResult(record=record)
 
     def _find_record(
-        self, case_id: str, entity_type: str, record_id: str
+        self, case: Case, entity_type: str, record_id: str, accessor: Accessor
     ) -> dict[str, Any] | None:
+        case_id = case.id
+        if entity_type == CLIENTS_TYPE:
+            # Only a client this case's debtors name resolves — an id from
+            # the same firm's directory that this case does not link answers
+            # the same not_found as one from another firm. A single-record
+            # read is PII with its own subject, so it is logged under
+            # CLIENT#<id> as the API's `GET /v1/firm/clients/<id>` is;
+            # refused ones `denied`.
+            client = next(
+                (c for c in self._case_clients(case) if c.id == record_id), None
+            )
+            self.access_log.record(
+                record_access(
+                    client_id=record_id,
+                    principal=accessor.subject,
+                    action="client.read",
+                    outcome="allowed" if client is not None else "denied",
+                )
+            )
+            return firm_client_json(client) if client is not None else None
         if entity_type == DEBTORS:
             # Debtors are keyed by filing role, not id — the one type where a
             # by-id read is a scan of a ≤3-item listing.

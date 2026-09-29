@@ -18,7 +18,14 @@ from insolvia_core.cases import create_case, parse_case_creation
 from insolvia_mcp.api.server import create_asgi_app
 from starlette.testclient import TestClient
 
-from tests.conftest import FIRM_ID, SUBJECT, make_token
+from tests.conftest import (
+    FIRM_ID,
+    SUBJECT,
+    TAX_ID_REF,
+    link_client,
+    make_firm_client,
+    make_token,
+)
 
 PROTOCOL_VERSION = "2026-07-28"
 
@@ -219,6 +226,35 @@ def test_the_candidate_flow_end_to_end(client, deps) -> None:
         headers=_auth(),
     )
     assert withdrawn.json()["result"]["structuredContent"]["status"] == "withdrawn"
+
+
+def test_a_cases_clients_round_trip(client, deps) -> None:
+    # ADR 0022 PR 6: the harness reads a case's clients through the same two
+    # record tools, and the wire carries the tax id's last four only.
+    case = _seed_case(deps)
+    firm_client = make_firm_client(deps.firm_store)
+    link_client(deps.debtor_store, firm_client, case, "debtor_1")
+    listed = _call(
+        client,
+        "list_case_records",
+        {"caseId": case.id, "entityType": "clients"},
+        headers=_auth(),
+    )
+    result = listed.json()["result"]
+    assert result.get("isError") is not True
+    (record,) = result["structuredContent"]["records"]
+    assert record["id"] == firm_client.id
+    assert record["tax_id_last_four"] == "6789"
+    assert TAX_ID_REF not in listed.text
+
+    read = _call(
+        client,
+        "get_case_record",
+        {"caseId": case.id, "entityType": "clients", "recordId": firm_client.id},
+        headers=_auth(),
+    )
+    assert read.json()["result"]["structuredContent"]["record"]["id"] == firm_client.id
+    assert TAX_ID_REF not in read.text
 
 
 def test_a_domain_refusal_carries_the_error_envelope(client) -> None:
