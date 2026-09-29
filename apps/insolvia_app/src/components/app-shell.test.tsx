@@ -21,7 +21,7 @@ jest.mock('@/config/environment', () => ({
 
 const ALICE = '00000000-0000-4000-8000-00000000a11c';
 
-function me(firmAdministration: string | null) {
+function me(firmAdministration: string | null, clients = 'hidden') {
   return {
     subject: ALICE,
     username: null,
@@ -46,6 +46,7 @@ function me(firmAdministration: string | null) {
               documents: 'view_only',
               extraction_review: 'hidden',
               firm_administration: firmAdministration,
+              clients,
             },
           },
         }),
@@ -131,5 +132,26 @@ describe('the shell navigation', () => {
     await screen.findByRole('button', { name: 'Account menu' });
 
     expect(screen.queryByRole('link', { name: 'Firm' })).toBeNull();
+  });
+
+  it('shows the Clients entry to somebody granted `clients`, and it navigates', async () => {
+    // ADR 0022 / #354. Every existing firm-user row reads `clients` as
+    // hidden until an admin grants it, so the entry is the grant made visible.
+    signedIn({
+      '/v1/firm/clients': () => jsonResponse(200, { clients: [] }),
+      '/v1/me': () => jsonResponse(200, me('hidden', 'view_only')),
+    });
+
+    await userEvent.setup().press(await screen.findByRole('link', { name: 'Clients' }));
+
+    expect(await screen.findByRole('heading', { name: 'Clients' })).toBeTruthy();
+  });
+
+  it('keeps the Clients entry from somebody whose firm has not granted it', async () => {
+    signedIn({ '/v1/me': () => jsonResponse(200, me('hidden')) });
+    await screen.findByText('Alice Attorney');
+
+    expect(screen.getByRole('link', { name: 'Cases' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Clients' })).toBeNull();
   });
 });

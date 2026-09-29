@@ -25,7 +25,7 @@ import { signIn } from '../../support/sign-in';
  * SELECTOR CONTRACT with the app — role-based, by accessible name, the same
  * discipline the rest of the suite keeps:
  *
- *   - the case list and the new-case form: `support/scratch-case.ts`'s header
+ *   - the client list, record and new-case form: `support/scratch-case.ts`'s header
  *   - the case rail's link : link named "Intake"
  *   - the intake's name box: textbox named "First name"
  *   - the autosave signal  : the text "Saved"
@@ -61,7 +61,7 @@ test.describe('staging intake', () => {
     // the loader leaves an existing row alone, so the damage outlived the run.
     // `openScratchCase` finds (or, on a fresh environment, opens) the one case
     // the browser suite owns, and lands on its overview. Its header comment
-    // is the selector contract for the case list and the new-case form.
+    // is the selector contract for the client list, record and case form.
     await openScratchCase(page);
 
     // ── 2. Into its intake ────────────────────────────────────────────────
