@@ -9,6 +9,7 @@ client id, or subject ever appears here.
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 import jwt
 import pytest
@@ -22,7 +23,15 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
+from insolvia_core.cases import Case
+from insolvia_core.firm_clients import (
+    FirmClient,
+    create_firm_client,
+    debtor_from_client,
+    parse_firm_client,
+)
 from insolvia_core.firms import Firm, FirmUser
+from insolvia_core.ports import DebtorStore, FirmStore
 from insolvia_mcp.api.dependencies import McpDependencies
 from insolvia_mcp.core.config import load_config
 from insolvia_mcp.core.tools import CaseTools
@@ -38,6 +47,9 @@ COLLEAGUE = "00000000-0000-4000-8000-000000000002"
 FIRM_ID = "00000000-0000-4000-8000-00000000f1a1"
 OTHER_FIRM_ID = "00000000-0000-4000-8000-00000000f1a2"
 KID = "test-key-1"
+# A tax-id POINTER, as #382's sealed item would be addressed — fake, and
+# asserted never to appear on this surface's wire.
+TAX_ID_REF = "taxid-ref-example-0000000000000001"
 
 # One keypair for the whole suite: generation is the slow part.
 PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -129,6 +141,34 @@ def make_accessor(
     )
 
 
+def make_firm_client(
+    firm_store: FirmStore,
+    *,
+    surname: str = "Example",
+    firm_id: str = FIRM_ID,
+    with_tax_id: bool = True,
+) -> FirmClient:
+    """A client in `firm_id`'s directory, carrying a tax-id pointer the way
+    #382 will set it — so a test can prove the pointer never leaves."""
+    client = create_firm_client(
+        parse_firm_client({"name": {"given": "Pat", "surname": surname}}),
+        firm_id=firm_id,
+        created_by=SUBJECT,
+    )
+    if with_tax_id:
+        client = replace(client, tax_id_ref=TAX_ID_REF, tax_id_last_four="6789")
+    firm_store.create_client(client)
+    return client
+
+
+def link_client(
+    debtor_store: DebtorStore, client: FirmClient, case: Case, role: str
+) -> None:
+    """Copy `client` onto `case` as `role` — the debtor POST /v1/cases
+    writes, `client_id` and all."""
+    assert debtor_store.create(debtor_from_client(client, case=case, filing_role=role))
+
+
 @pytest.fixture
 def stores() -> dict[str, object]:
     return {
@@ -142,8 +182,8 @@ def stores() -> dict[str, object]:
 
 
 @pytest.fixture
-def tools(stores) -> CaseTools:
-    return CaseTools(**stores)
+def tools(stores, firm_store) -> CaseTools:
+    return CaseTools(firm_store=firm_store, **stores)
 
 
 @pytest.fixture
