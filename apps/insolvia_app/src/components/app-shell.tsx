@@ -63,8 +63,9 @@ export interface AppShellProps {
  * avatar, with the case rail as a second dark column underneath it — two
  * pieces of chrome for one navigation, and a header whose right edge kept
  * growing controls. The rail holds the app now: the wordmark at the top, the
- * three primary links, and who is signed in at the bottom. Collapsed, it is a
- * 64px strip of icons over captions with the same accessible names, and the
+ * primary links (Home, Clients, Cases, Calendar, Firm — the gated ones only
+ * for a caller whose grant permits them), and who is signed in at the
+ * bottom. Collapsed, it is a 64px strip of icons over captions with the same accessible names, and the
  * choice is remembered (`insolvia.nav`) and defaults to collapsed on a narrow
  * window.
  *
@@ -73,7 +74,7 @@ export interface AppShellProps {
  * stopped being a nav. They belong to the case, so they sit on the case —
  * `CaseShell` puts them in a strip under the case's name at the top of the
  * page, the way a repository's tabs sit on the repository and not in the
- * site's sidebar. The rail collapses to three either way.
+ * site's sidebar. The rail holds only the app's sections either way.
  *
  * **The landmarks are the point.** `role="navigation"` (the rail's nav),
  * `role="main"` and `role="contentinfo"` are what react-native-web maps to
@@ -178,6 +179,10 @@ export function AppShell({
   // colleague whose grant was withdrawn mid-session.
   const showCalendarLink =
     membership != null && permits(membership.permissions.events, 'view_only');
+  // And for the client directory (ADR 0022 / #354): `clients` at `hidden` —
+  // every existing row until an admin grants it — has no entry at all.
+  const showClientsLink =
+    membership != null && permits(membership.permissions.clients, 'view_only');
 
   const footerLink = [
     styles.footerLinkText,
@@ -187,10 +192,13 @@ export function AppShell({
   const primary: ReadonlyArray<{
     label: string;
     icon: IconName;
-    href: '/' | '/cases' | '/calendar' | '/firm';
+    href: '/' | '/clients' | '/cases' | '/calendar' | '/firm';
     show: boolean;
   }> = [
     { label: 'Home', icon: 'home', href: '/', show: true },
+    // Before Cases: a person comes into the firm before any matter does, and
+    // the client list is where a case is found by whose it is.
+    { label: 'Clients', icon: 'users', href: '/clients', show: showClientsLink },
     { label: 'Cases', icon: 'folder', href: '/cases', show: true },
     { label: 'Calendar', icon: 'calendar', href: '/calendar', show: showCalendarLink },
     { label: 'Firm', icon: 'briefcase', href: '/firm', show: showFirmLink },
@@ -269,7 +277,12 @@ export function AppShell({
                   key={entry.href}
                   label={entry.label}
                   icon={entry.icon}
-                  active={pathname === entry.href}
+                  // A section's pages are the section: `/clients/<id>` and
+                  // `/clients/new` light Clients. `/` is only ever itself.
+                  active={
+                    pathname === entry.href ||
+                    (entry.href !== '/' && pathname.startsWith(`${entry.href}/`))
+                  }
                   collapsed={collapsed}
                   onPress={() => {
                     router.push(entry.href);

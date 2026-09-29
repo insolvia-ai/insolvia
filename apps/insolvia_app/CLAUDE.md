@@ -130,8 +130,9 @@ UI comes from two places, both rendering bare RN primitives:
   app's own rows (`RailItem`, icon over caption when collapsed — the package's
   collapsed item shows no caption), its own toggle (a panel glyph), a `Tile`
   for the two identity marks and an `Icon` for a row's glyph. It holds Home,
-  Cases and Firm and collapses to three. **A case's sections are NOT in it**:
-  they were for a day and collapsed into eleven icons nobody could read. They
+  Clients, Cases, Calendar and Firm — each but Home and Cases shown only to
+  a caller whose grant permits it — and stays that short collapsed. **A
+  case's sections are NOT in it**: they were for a day and collapsed into eleven icons nobody could read. They
   are a strip of links under the case's name at the top of the page, in
   `CaseShell` — the object's tabs on the object, the app's links in the rail.
   `Icon` is three Feather paths as data URIs, deliberately not an icon font or
