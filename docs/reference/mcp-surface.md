@@ -171,7 +171,9 @@ withdraw_proposal
 The `entity_type` enum is the case-scoped entity list of the data model
 (`petition`, `debtor`, `creditor`, `claim`, `asset`, `exemption`, …). The
 server publishes only the types its store actually implements at any given
-time; the enum grows with the model, never a new tool.
+time; the enum grows with the model, never a new tool. It also carries
+`clients` — not a case-scoped entity but the case's view of the firm's client
+directory; see [Permission gates](#permission-gates).
 
 Three deliberate absences:
 
@@ -204,7 +206,25 @@ gate map, mirroring the API's routes:
 |---|---|
 | case root (via `list_cases`/`get_case`) | `cases` |
 | `document` | `documents` |
+| `clients` — the firm clients the case's debtors are linked to ([ADR 0022](../adr/0022-a-client-is-not-a-case.md)); read-only | `clients` |
 | everything else (petition, debtor, creditor, claim, asset, …) | `intake` |
+
+**`clients` is the first entity type not under `intake`**, and the one
+record type that does not live in the case's partition: a case's clients are
+the firm-table records (`insolvia_core.firm_clients`) its debtors name by
+`client_id`, served in `firm_client_json`'s shape — the tax id as
+`tax_id_last_four` only, never the ref and never the value. They are still
+reached only through a case the caller may see: a client this case does not
+link answers `not_found` whatever firm it is in, and **a firm-wide client
+list is not a tool in v1**. A single-record read (`get_case_record`) is
+access-logged as `client.read` under `CLIENT#<id>`, as the API's is; the
+listing is not, matching `GET /v1/firm/clients`. `clients` is **not
+proposable yet**: ADR 0022 has a client proposal land as a candidate like any
+other write, but accepting one means a review path that writes the firm
+table, which candidate review (8.9) does not have — the same position
+`debtors` proposals are in, which are accepted by the tool and refused at
+review. Until that path exists `propose_case_records` refuses `clients`
+rather than queueing candidates nobody can accept.
 
 **A tool the caller may not use is listed but refuses — list-visible,
 call-denied.** `tools/list` returns the same static eight tools for every
