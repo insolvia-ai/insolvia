@@ -79,7 +79,9 @@ TARGETS = ("dev", "staging")
 #: now names a registry reference (issue #360), so the marker is a launch
 #: division no fixture case (`flmb`/`tampa`, seeds/fixtures/v1..v3) uses
 #: — which is what lets a later run find the scratch case rather than open
-#: another. The suite's own writes never change it.
+#: another. The suite's own writes never change it. The browser suite keeps
+#: its own scratch case in a third court (`e2e/support/scratch-case.ts`), so
+#: neither suite ever writes to the other's case or to a fixture's.
 SCRATCH_COURT = {"court": "flnb", "division": "gainesville"}
 #: The name the registry prints for that court — what `district` reads back as.
 SCRATCH_DISTRICT = "Northern District of Florida"

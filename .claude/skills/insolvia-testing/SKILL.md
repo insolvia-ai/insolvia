@@ -163,6 +163,9 @@ found online.
   `verified-commit`. A `smoke` test needs a reason a `curl` cannot satisfy.
 - **Never make either a required PR check** — that puts staging's availability
   on every PR's critical path. Post-deploy only.
+- **Write only to the scratch case** (`support/scratch-case.ts`), never to a
+  seeded fixture case — the loader will not repair it and the next integration
+  run cannot find it. Reading a fixture case is fine.
 - **Role-based selectors only**, matching the app's accessibility contract.
 - **Never let a credential reach a file, a default, a log line, or an uploaded
   artifact.** Traces record typed values verbatim and the repo is public.
