@@ -17,8 +17,17 @@ tier does not start. The PR that introduced v3 records the assembly by hand.
 
 Fixture cases are found, not addressed: their ids are derived per target
 (seeds/README.md), so a case is the one whose chapter, court, division,
-first debtor's name and creditor list match its spec. That is also what
-tells a v3 case from the v2 case an environment still holds beside it.
+client-linked Debtor 1 and creditor list match its spec — and whose Debtor 1
+still carries the spec's name. A case that matches on everything but that
+name is REPORTED, not skipped: it is the fixture case, modified after the
+seed wrote it, and since the loader leaves an existing row alone (ADR 0021)
+no re-seed will put it back. Saying "not in this target" there sent the last
+reader to re-seed an environment that was already seeded.
+
+Why content and not the derived id: deriving it needs the case TABLE's name
+(the seeder's first input), which this tier — HTTPS to the API and nothing
+else — deliberately does not hold. And the name check is wanted either way;
+it is the thing that catches a corrupted fixture.
 """
 
 from __future__ import annotations
@@ -53,8 +62,13 @@ def _creditor_keys(items: list[dict[str, Any]]) -> list[tuple[str, str]]:
 
 
 def _find(admin: Api, spec: dict[str, Any]) -> str | None:
-    name = (spec.get("debtors") or {}).get("debtor_1", {}).get("name")
+    """This target's id for the fixture case `spec` describes: None when the
+    seed never wrote it, a failure naming the case when it was written and
+    then modified."""
+    debtor_1 = (spec.get("debtors") or {}).get("debtor_1", {})
+    name = debtor_1.get("name")
     creditors = _creditor_keys((spec.get("collections") or {}).get("creditors") or [])
+    modified: list[str] = []
     cursor: str | None = None
     while True:
         params: dict[str, str] = {"limit": "50"}
@@ -72,21 +86,29 @@ def _find(admin: Api, spec: dict[str, Any]) -> str | None:
             first = next(
                 (d for d in debtors or [] if d.get("filing_role") == "debtor_1"), {}
             )
-            if first.get("name") != name:
-                continue
             # v4 onward (ADR 0022): the fixture's debtor is a firm client's
             # copy, which is what tells it from the same case seeded from v3
             # while that pre-client row still exists.
-            if "client_id" in (spec.get("debtors") or {}).get("debtor_1", {}) and (
-                not first.get("client_id")
-            ):
+            if "client_id" in debtor_1 and not first.get("client_id"):
                 continue
             listed = admin.get(f"/v1/cases/{case['id']}/creditors")
-            if _creditor_keys(listed.get("creditors") or []) == creditors:
+            if _creditor_keys(listed.get("creditors") or []) != creditors:
+                continue
+            if first.get("name") == name:
                 return str(case["id"])
+            modified.append(f"{case['id']} (Debtor 1 is now {first.get('name')!r})")
         cursor = page.get("nextCursor")
         if not cursor:
-            return None
+            break
+    if modified:
+        pytest.fail(
+            f"fixture case '{spec.get('handle')}' was modified after seeding: "
+            f"{', '.join(modified)}; the fixture's Debtor 1 is {name!r}. The "
+            "loader leaves an existing row alone (ADR 0021), so re-seeding will "
+            "not repair it — put Debtor 1 back through the API, and find what "
+            "wrote to it: a test writes only to its own scratch case."
+        )
+    return None
 
 
 @pytest.fixture(scope="module")
