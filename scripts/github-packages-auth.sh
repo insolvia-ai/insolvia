@@ -30,7 +30,9 @@
 # It obtains such a token in this order:
 #   1. A PAT you provide via env (preferred for CI/sandbox): GITHUB_PACKAGES_TOKEN
 #      (also honors NODE_AUTH_TOKEN / NPM_TOKEN if already set).
-#   2. The GitHub CLI on a developer machine: `gh auth refresh --scopes
+#   2. The GitHub CLI's current token, if it already reads the package — no
+#      prompt, so a re-run after the first successful refresh is silent.
+#   3. The GitHub CLI on a developer machine: `gh auth refresh --scopes
 #      read:packages` ADDS the scope to your existing `gh` login, then reads the
 #      refreshed token via `gh auth token`.
 #
@@ -102,14 +104,30 @@ for var in GITHUB_PACKAGES_TOKEN NODE_AUTH_TOKEN NPM_TOKEN GH_TOKEN GITHUB_TOKEN
   fi
 done
 
+# 2) GitHub CLI, as it stands: once a login has the scope, every later run
+#    lands here — without this, each run re-prompts for a browser login.
+if have gh; then
+  gh_token="$(gh auth token 2>/dev/null || true)"
+  if token_can_read "$gh_token"; then
+    [[ "$MODE" == export ]] || ok "gh login already has ${SCOPE}."
+    emit_result "$gh_token"
+    exit 0
+  fi
+fi
+
 if [[ "$MODE" == "check" ]]; then
   err "No available token can read @insolvia-ai/design-system (need ${SCOPE})."
   err "Provide a PAT via GITHUB_PACKAGES_TOKEN, or run this script without --check to refresh via gh."
   exit 1
 fi
 
-# 2) GitHub CLI: add the scope to an existing developer login, then use its token.
-if have gh; then
+# 3) GitHub CLI: add the scope to an existing developer login, then use its token.
+#    Only with a terminal: the device flow waits for a code typed into a
+#    browser, and with no one there (an agent's shell, CI) it waits forever
+#    rather than failing — the hang this guard exists for.
+if have gh && [[ ! -t 0 ]]; then
+  warn "no terminal, so not starting 'gh auth refresh' (it would wait for a browser login forever)."
+elif have gh; then
   log "Attempting to add '${SCOPE}' to your GitHub CLI login via 'gh auth refresh'..."
   if gh auth refresh --hostname github.com --scopes "${SCOPE}" >&2; then
     gh_token="$(gh auth token 2>/dev/null || true)"
@@ -124,7 +142,7 @@ if have gh; then
   fi
 fi
 
-# 3) Nothing worked — tell the human exactly what to do (the one non-scriptable step).
+# 4) Nothing worked — tell the human exactly what to do (the one non-scriptable step).
 err "Could not obtain a token with the '${SCOPE}' scope."
 cat >&2 <<EOF
 
