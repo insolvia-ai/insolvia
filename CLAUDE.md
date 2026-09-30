@@ -86,7 +86,8 @@ before you touch anything:
 | working in any app/package/service/infra | that directory's `CLAUDE.md` |
 | running or building anything | `insolvia-scripts` skill → [`scripts/README.md`](scripts/README.md) |
 | deploying / shipping / applying to staging or prod | `insolvia-deploy` skill — **deploys run in CI, never from your CLI** |
-| hitting AWS auth / credential errors | `insolvia-aws-auth` skill |
+| hitting AWS auth / credential errors, or an AWS account other than `521762924626` | `insolvia-aws-auth` skill — never assume the `default` profile is Insolvia's |
+| **any GitHub write** (`gh pr create/merge`, `gh api` mutations, `git push`, auto-merge) or a GitHub 403 / "denied to <user>" | `insolvia-github-auth` skill — read the `GitHub:` line the SessionStart hook put in your context; **never `gh auth switch`** |
 | changing the CI deploy role's IAM | `insolvia-deploy-role-permissions` skill |
 | adding/removing a **human** IAM user or changing their groups | [`infra/envs/account-access/`](infra/envs/account-access/main.tf) — human-applied; CI holds no IAM user/group permissions at all |
 | rotating an IAM user's **MFA device** | [`docs/runbooks/iam-mfa-rotation.md`](docs/runbooks/iam-mfa-rotation.md) — a console procedure, deliberately **not** Terraform (the TOTP seed would land in state) |
