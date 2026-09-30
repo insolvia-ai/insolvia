@@ -209,6 +209,31 @@ else
     ok "git hooks installed (pre-commit: format + lint; pre-push: unit tests)"
 fi
 
+# --- root npm workspace ----------------------------------------------------
+#
+# The hooks above run `npm run format` and `npm run lint` from the ROOT, so
+# they need the root workspace's node_modules. Installing the hooks without it
+# hands a fresh clone a pre-commit that fails its first commit with
+# `prettier: command not found` — the gate installed, but unable to run.
+# Only the app's own dev-setup installs the root, and someone working on the
+# API or infra has no reason to run it — yet commits through the same hook.
+#
+# The root install reads @insolvia-ai/* from GitHub Packages, which needs a
+# read:packages token even for public packages (see .npmrc). That step can
+# be interactive (`gh auth refresh`), and it can fail for reasons this script
+# can't fix — so a failure here warns with the command to run, and never
+# aborts the rest of the toolchain.
+if [[ -x "$REPO_ROOT/node_modules/.bin/prettier" ]]; then
+  skip "root node_modules" "$REPO_ROOT/node_modules"
+elif [[ "$CHECK_ONLY" -eq 1 ]] || ! have node; then
+  warn "root node_modules is MISSING — the pre-commit hook cannot run (would: eval \"\$(./scripts/github-packages-auth.sh --export)\" && npm ci)"
+elif token_export="$("$SCRIPT_DIR/github-packages-auth.sh" --export)" &&
+  (eval "$token_export" && cd "$REPO_ROOT" && npm ci); then
+  ok "root node_modules installed (the pre-commit hook's prettier + eslint)"
+else
+  warn "root npm ci did not complete — the pre-commit hook cannot run until it does. Run: eval \"\$(./scripts/github-packages-auth.sh --export)\" && npm ci"
+fi
+
 # Docker is a daemon/GUI concern — check only, never auto-install. services/api
 # local dev (docker compose) and its Lambda image build need it.
 if have docker; then skip docker "$(command -v docker)"; else
