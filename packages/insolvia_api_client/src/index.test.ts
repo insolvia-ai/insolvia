@@ -5083,6 +5083,73 @@ describe('the firm client endpoints (ADR 0022)', () => {
       'A surname or a given name is required.',
     );
   });
+
+  const MERGED_ID = 'c11e0000-0000-4000-8000-000000000002';
+  const MERGED_JSON = {
+    ...FIRM_CLIENT_JSON,
+    id: MERGED_ID,
+    status: 'archived',
+    merged_into: FIRM_CLIENT_ID,
+  };
+
+  test('merges with a POST to the survivor carrying only merged_client_id', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ client: FIRM_CLIENT_JSON, merged: MERGED_JSON }, 200),
+    );
+
+    const result = await clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID}/merge`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      merged_client_id: MERGED_ID,
+    });
+    expect(result.client).toEqual(FIRM_CLIENT);
+    expect(result.merged.status).toBe('archived');
+    expect(result.merged.merged_into).toBe(FIRM_CLIENT_ID);
+  });
+
+  test('a merged client read on its own carries merged_into', async () => {
+    const stub = stubFetch(() => jsonResponse(MERGED_JSON, 200));
+
+    const fetched = await clientWith(stub).getFirmClient(MERGED_ID);
+
+    expect(fetched.merged_into).toBe(FIRM_CLIENT_ID);
+  });
+
+  test('a merge answer missing either client is a contract break', async () => {
+    const stub = stubFetch(() => jsonResponse({ client: FIRM_CLIENT_JSON }, 200));
+    await expect(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID)).rejects.toThrow(
+      'merged',
+    );
+  });
+
+  test('a refused merge is a 409 ApiException with the server message', async () => {
+    const message =
+      "These two clients are both debtors on the same case. Link that case's " +
+      'debtor to the right client first, then merge.';
+    const stub = stubFetch(() => jsonResponse({ error: 'ConflictError', message }, 409));
+
+    const error = await rejection(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, MERGED_ID));
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).message).toContain(message);
+  });
+
+  test('an unknown merged client is a 400 keyed merged_client_id', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ValidationError', fields: { merged_client_id: 'No such client.' } },
+        400,
+      ),
+    );
+
+    const error = await rejection(clientWith(stub).mergeFirmClient(FIRM_CLIENT_ID, 'nope'));
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.merged_client_id).toBe('No such client.');
+  });
 });
 
 describe('case assignment', () => {

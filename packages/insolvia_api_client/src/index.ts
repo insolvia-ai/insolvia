@@ -297,6 +297,7 @@ export type {
   FirmClient,
   FirmClientCase,
   FirmClientDraft,
+  FirmClientMerge,
   FirmClientStatus,
   FirmColleague,
   FirmFeature,

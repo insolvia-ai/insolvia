@@ -111,6 +111,7 @@ import type {
   FirmClient,
   FirmClientCase,
   FirmClientDraft,
+  FirmClientMerge,
   FirmClientStatus,
   FirmMembership,
   FirmRole,
@@ -1949,6 +1950,35 @@ export class InsolviaApiClient {
     return requireArrayOf(decoded, 'cases', 'FirmClientCase', firmClientCaseFromJson);
   }
 
+  /**
+   * `POST /v1/firm/clients/{survivorId}/merge` — fold `mergedId` INTO
+   * `survivorId` (ADR 0022). The survivor keeps its id; every case of the
+   * merged client — including ones the caller is not linked to — now names
+   * the survivor, the debtors' copied details unchanged; the merged client is
+   * archived with `merged_into`.
+   *
+   * Needs `clients` at `add_edit`. A 404 means the survivor is not in the
+   * caller's firm. Throws {@link ApiValidationException} on a 400 keyed
+   * `merged_client_id` (unknown client, or the same id twice), and a plain
+   * {@link ApiException} with `statusCode` **409** when either client is
+   * merged or archived, another merge involving either is in progress, or
+   * both are debtors on one case — its `message` says which. Nothing is
+   * written on any of these.
+   */
+  async mergeFirmClient(survivorId: string, mergedId: string): Promise<FirmClientMerge> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(survivorId)}/merge`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merged_client_id: mergedId }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      client: firmClientFromJson(requireObject(decoded, 'client')),
+      merged: firmClientFromJson(requireObject(decoded, 'merged')),
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Events, the calendar and the feed (issue 14.6 / #358).
   // -------------------------------------------------------------------------
@@ -3204,6 +3234,15 @@ function optionalObject(response: DecodedResponse, key: string): DecodedResponse
     json: value as JsonObject,
     path: response.path === undefined ? key : `${response.path}.${key}`,
   };
+}
+
+/** {@link optionalObject} for a member the server always sends. */
+function requireObject(response: DecodedResponse, key: string): DecodedResponse {
+  const nested = optionalObject(response, key);
+  if (nested === undefined) {
+    throw malformedField(response, key, 'object');
+  }
+  return nested;
 }
 
 /** A number field that may be absent. `NaN`/`Infinity` cannot appear in JSON. */
@@ -4524,6 +4563,7 @@ function firmClientFromJson(response: DecodedResponse): FirmClient {
     referred_by: optionalString(response, 'referred_by'),
     first_retained_at: optionalString(response, 'first_retained_at'),
     tax_id_last_four: optionalString(response, 'tax_id_last_four'),
+    merged_into: optionalString(response, 'merged_into'),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
     created_by: requireString(response, 'created_by'),
