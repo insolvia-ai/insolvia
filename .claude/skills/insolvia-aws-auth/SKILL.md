@@ -10,10 +10,13 @@ description: >-
   "No valid credential sources found", "no EC2 IMDS role found", "refreshed,
   but the refreshed credentials are still expired", "InvalidClientTokenId",
   "ExpiredToken", or Terraform/Docker/an SDK reporting no credentials while a
-  bare `aws` command works fine. Also consult it before telling the user to run
-  any `aws login` / credential-export command, so the advice is right the first
-  time. This knowledge is easy to get subtly wrong from memory — read it rather
-  than guessing.
+  bare `aws` command works fine — AND whenever `aws sts get-caller-identity`
+  shows an account other than 521762924626, or "The config profile (…) could
+  not be found": on a machine with more than one AWS account the `default`
+  profile may be someone's PERSONAL account. Also consult it before telling the
+  user to run any `aws login` / credential-export command, so the advice is
+  right the first time. This knowledge is easy to get subtly wrong from memory
+  — read it rather than guessing.
 ---
 
 # AWS authentication in the Insolvia repo
@@ -89,11 +92,13 @@ session has expired."
 **Fix:** re-authenticate, *then* export.
 
 ```bash
-aws login
+aws login ${AWS_PROFILE:+--profile "$AWS_PROFILE"}
 ```
 
 `aws login` (not `aws sso login` — this repo's config has no `sso_session`
-block). It opens a browser. After it, re-run the export from step 1.
+block). It opens a browser. After it, re-run the export from step 1. Keep the
+`--profile`: a bare `aws login` refreshes the `default` profile, which on a
+multi-account machine is the wrong account (see "The profile").
 
 ### 3. A fresh `aws login` still shows no credentials — stale env vars are shadowing it
 
@@ -132,21 +137,51 @@ circles re-running `aws login`.
 
 ## The profile
 
-Insolvia's credentials live under the **`default`** AWS profile — its own
-dedicated account (`521762924626`). So no `--profile` flag is needed for any
-command here: a bare `aws …`, and `aws configure export-credentials --format
-env` with no `--profile`, both use `default`. The repo's `scripts/dev-aws-*`
-accept an `AWS_PROFILE` / `--profile` override for anyone whose Insolvia session
-sits under a different profile name, but `default` is the assumption.
+Insolvia's account is `521762924626`. **Which profile holds it varies by
+machine**: on a single-account machine it's `default`; on a machine that also
+holds a personal AWS account, `default` is usually the *personal* one and the
+Insolvia session lives under a named profile (e.g. `insolvia`) selected by
+`AWS_PROFILE`. Every tool here honours `AWS_PROFILE` — the CLI,
+`export-credentials`, Terraform, and the `scripts/dev-aws-*` (which also take
+`--profile`) — so when it is set, bare commands are correct and no `--profile`
+flag is needed.
 
-If a command is somehow hitting the wrong account, check:
-`aws sts get-caller-identity --query Account` should print `521762924626`.
+**Check the account before anything that writes or costs money** — it is the
+one check that catches every variant of this:
+
+```bash
+aws sts get-caller-identity --query Account --output text   # must print 521762924626
+```
+
+How `AWS_PROFILE` gets set: developers with more than one account export it
+from a direnv `.envrc` above the checkout. Your Bash commands run in
+non-interactive shells that never fire direnv's prompt hook, so this repo's
+SessionStart hook (`.claude/hooks/session-accounts.sh`) loads that environment
+into every Bash command and reports the resolved account as an `AWS:` line in
+your context. **Read that line first.**
+
+If the account is wrong (or `AWS_PROFILE` is unset and `default` isn't
+Insolvia), find the profile that is, without changing any config:
+
+```bash
+for p in $(aws configure list-profiles); do
+  printf '%s ' "$p"; aws sts get-caller-identity --profile "$p" --query Account --output text 2>&1 | tail -1
+done
+```
+
+Then prefix your commands with `AWS_PROFILE=<that profile>` (env vars don't
+persist between your Bash calls) and tell the human their per-folder setup
+didn't load. If no profile maps to `521762924626`, or its session is expired,
+**stop and ask** — `aws login --profile <p>` is a browser sign-in the human does.
+Never run `aws configure set`, edit `~/.aws/config`, or `aws login` without
+`--profile` to "fix" it: that rewrites the developer's other account.
 
 ## Quick reference — the whole local flow
 
 ```bash
-# 1. Make sure the session is alive (re-login if this errors)
-aws sts get-caller-identity            # or: aws login
+# 1. Make sure the session is alive AND is Insolvia's (re-login if this errors)
+aws sts get-caller-identity --query Account --output text   # 521762924626
+# or: aws login ${AWS_PROFILE:+--profile "$AWS_PROFILE"}
 
 # 2. Bridge into the SDK/env world (only for terraform / docker / SDKs)
 eval "$(aws configure export-credentials --format env)"
