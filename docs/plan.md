@@ -222,8 +222,8 @@ order. Nothing here needs a new decision except where marked.
 
 1. **Promote** the latest green Release run to production (maintainer; the
    prod stage has never run end to end, so watch it). Prod holds no data.
-2. **ADR 0022 PR 7 — merge clients** (#354) and **PR 8 — lifecycle as data,
-   post-filing fields, archive, delete, copy** (#355 / 14.3).
+2. **ADR 0022 PR 8 — lifecycle as data, post-filing fields, archive,
+   delete, copy** (#355 / 14.3). PR 7 (merge clients, #354) is merged.
 3. **ADR 0023 PRs 3–5** — the firm-configurable questionnaire (#362), the
    questionnaire writing candidates (#363), document request checklists
    (#364). Before the first *real* invite: SES production access, the ZDR
@@ -243,7 +243,10 @@ order. Nothing here needs a new decision except where marked.
    against a local API); a seed drift report (`seed load --check` naming
    fixture fields changed after seeding) — whether the loader may repair
    them reverses ADR 0021's "existing rows are left alone", so it is the
-   maintainer's call.
+   maintainer's call. Linking a debtor to a client, and opening a case for one,
+   check the client's state by a read rather than a condition on the write,
+   so a link racing a merge's last index pass can leave a case naming the
+   merged client — make that write conditional on the client row.
 
 **How this has been built, for whoever picks it up:** one agent per PR in its
 own git worktree, committing only; the orchestrator pushes, opens the PR per
