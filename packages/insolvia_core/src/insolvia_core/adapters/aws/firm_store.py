@@ -6,13 +6,19 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_core.firm_clients import SK_PREFIX as FIRM_CLIENT_SK_PREFIX
 from insolvia_core.firm_clients import (
+    ACTIVE,
+    ARCHIVED,
+    MERGE_ATTRIBUTES,
+    MERGED_INTO,
+    MERGING_FROM,
+    MERGING_INTO,
     FirmClient,
     firm_client_from_item,
     firm_client_item,
     sorted_firm_clients,
 )
+from insolvia_core.firm_clients import SK_PREFIX as FIRM_CLIENT_SK_PREFIX
 from insolvia_core.firm_clients import sort_key as firm_client_sort_key
 from insolvia_core.firms import (
     Firm,
@@ -38,6 +44,7 @@ from insolvia_core.library_creditors import sort_key as library_creditor_sort_ke
 SUBJECT_INDEX = "by-subject"
 
 _CONDITION_FAILED = "ConditionalCheckFailedException"
+_CANCELLED = "TransactionCanceledException"
 
 
 # One converter for every row in this table — the shared recursive one.
@@ -412,15 +419,189 @@ class DynamoDbFirmStore:
         return sorted_firm_clients(clients)
 
     def update_client(self, client: FirmClient) -> FirmClient | None:
+        # An UpdateItem that SETs every attribute the record owns and REMOVEs
+        # the ones it no longer has — the whole-record save the PutItem this
+        # used to be made — but that never names the merge attributes, so a
+        # save built from a read taken before a merge claimed the row cannot
+        # erase the claim. `attribute_not_exists(mergedInto)`: a merged
+        # client is terminal (the port says why).
+        item = firm_client_item(client)
+        owned = {
+            key: value
+            for key, value in item.items()
+            if key not in ("PK", "SK") and key not in MERGE_ATTRIBUTES
+        }
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {":firm": {"S": client.firm_id}}
+        sets: list[str] = []
+        for index, (key, value) in enumerate(owned.items()):
+            names[f"#a{index}"] = key
+            values[f":a{index}"] = to_attributes({"v": value})["v"]
+            sets.append(f"#a{index} = :a{index}")
+        expression = "SET " + ", ".join(sets)
+        if "taxId" not in item:
+            names["#taxId"] = "taxId"
+            expression += " REMOVE #taxId"
+        names["#merged"] = MERGED_INTO
         try:
-            self.client.put_item(
+            self.client.update_item(
                 TableName=self.table_name,
-                Item=to_attributes(firm_client_item(client)),
-                ConditionExpression="attribute_exists(SK) AND firmId = :firm",
-                ExpressionAttributeValues={":firm": {"S": client.firm_id}},
+                Key={
+                    "PK": {"S": partition_key(client.firm_id)},
+                    "SK": {"S": firm_client_sort_key(client.id)},
+                },
+                UpdateExpression=expression,
+                ConditionExpression=(
+                    "attribute_exists(SK) AND firmId = :firm"
+                    " AND attribute_not_exists(#merged)"
+                ),
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
             )
         except ClientError as error:
             if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
                 return None
             raise
         return client
+
+    # ── Merging two clients (ADR 0022's PR 7) ───────────────────────
+    #
+    # Each step is ONE TransactWriteItems over both client rows, so the claim
+    # is taken, finished or released on both or on neither. Update actions
+    # only — the API's grant on this table already holds UpdateItem, which
+    # is what a transactional Update is authorised as.
+
+    def _transact(self, items: list[dict[str, Any]]) -> bool:
+        """Run a transaction; False when a condition refused it (or another
+        write to either row was in flight — to the caller both mean "not
+        now"), raising anything else."""
+        try:
+            self.client.transact_write_items(TransactItems=items)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CANCELLED:
+                return False
+            raise
+        return True
+
+    def _client_key(self, firm_id: str, client_id: str) -> dict[str, Any]:
+        return {
+            "PK": {"S": partition_key(firm_id)},
+            "SK": {"S": firm_client_sort_key(client_id)},
+        }
+
+    def claim_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> bool:
+        if merged_id == survivor_id:
+            return False
+        names = {
+            "#status": "status",
+            "#mergedInto": MERGED_INTO,
+            "#into": MERGING_INTO,
+            "#from": MERGING_FROM,
+        }
+        active = (
+            "attribute_exists(SK) AND firmId = :firm AND #status = :active"
+            " AND attribute_not_exists(#mergedInto)"
+        )
+        return self._transact(
+            [
+                {
+                    "Update": {
+                        "TableName": self.table_name,
+                        "Key": self._client_key(firm_id, merged_id),
+                        "UpdateExpression": "SET #into = :survivor",
+                        "ConditionExpression": (
+                            f"{active} AND attribute_not_exists(#from)"
+                            " AND (attribute_not_exists(#into) OR #into = :survivor)"
+                        ),
+                        "ExpressionAttributeNames": names,
+                        "ExpressionAttributeValues": {
+                            ":firm": {"S": firm_id},
+                            ":active": {"S": ACTIVE},
+                            ":survivor": {"S": survivor_id},
+                        },
+                    }
+                },
+                {
+                    "Update": {
+                        "TableName": self.table_name,
+                        "Key": self._client_key(firm_id, survivor_id),
+                        "UpdateExpression": "SET #from = :merged",
+                        "ConditionExpression": (
+                            f"{active} AND attribute_not_exists(#into)"
+                            " AND (attribute_not_exists(#from) OR #from = :merged)"
+                        ),
+                        "ExpressionAttributeNames": names,
+                        "ExpressionAttributeValues": {
+                            ":firm": {"S": firm_id},
+                            ":active": {"S": ACTIVE},
+                            ":merged": {"S": merged_id},
+                        },
+                    }
+                },
+            ]
+        )
+
+    def finish_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str, merged_at: str
+    ) -> FirmClient | None:
+        finished = self._transact(
+            [
+                {
+                    "Update": {
+                        "TableName": self.table_name,
+                        "Key": self._client_key(firm_id, merged_id),
+                        "UpdateExpression": (
+                            "SET #status = :archived, #mergedInto = :survivor,"
+                            " updatedAt = :now REMOVE #into"
+                        ),
+                        "ConditionExpression": "#into = :survivor",
+                        "ExpressionAttributeNames": {
+                            "#status": "status",
+                            "#mergedInto": MERGED_INTO,
+                            "#into": MERGING_INTO,
+                        },
+                        "ExpressionAttributeValues": {
+                            ":archived": {"S": ARCHIVED},
+                            ":survivor": {"S": survivor_id},
+                            ":now": {"S": merged_at},
+                        },
+                    }
+                },
+                {
+                    "Update": {
+                        "TableName": self.table_name,
+                        "Key": self._client_key(firm_id, survivor_id),
+                        "UpdateExpression": "REMOVE #from",
+                        "ConditionExpression": "#from = :merged",
+                        "ExpressionAttributeNames": {"#from": MERGING_FROM},
+                        "ExpressionAttributeValues": {":merged": {"S": merged_id}},
+                    }
+                },
+            ]
+        )
+        return self.get_client(firm_id, merged_id) if finished else None
+
+    def release_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> None:
+        # Two independent conditional removals rather than one transaction:
+        # releasing is best-effort cleanup of THIS pair's claim, and half of
+        # it already gone must not stop the other half going.
+        for key, attribute, value in (
+            (merged_id, MERGING_INTO, survivor_id),
+            (survivor_id, MERGING_FROM, merged_id),
+        ):
+            try:
+                self.client.update_item(
+                    TableName=self.table_name,
+                    Key=self._client_key(firm_id, key),
+                    UpdateExpression="REMOVE #claim",
+                    ConditionExpression="#claim = :other",
+                    ExpressionAttributeNames={"#claim": attribute},
+                    ExpressionAttributeValues={":other": {"S": value}},
+                )
+            except ClientError as error:
+                if error.response.get("Error", {}).get("Code") != _CONDITION_FAILED:
+                    raise

@@ -87,6 +87,11 @@ from typing import Final
 # client.update — a status write, not a verb of its own. These share the
 # `client.` prefix with the portal's client.invite / client.revoke, which are
 # about a portal BINDING and stay keyed by the case they bind to.
+#
+# client.merge (ADR 0022's PR 7) is written TWICE per merge, once under each
+# client's subject key — the merged one and the survivor — because "what
+# happened to this client record" must be answerable from either row. A
+# refused merge is a `denied` row under whichever id could not be reached.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -106,6 +111,7 @@ ACTIONS = (
     "client.create",
     "client.read",
     "client.update",
+    "client.merge",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row

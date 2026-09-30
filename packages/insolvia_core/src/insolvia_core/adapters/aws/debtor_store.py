@@ -6,17 +6,19 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_core.cases import partition_key
+from insolvia_core.cases import INDEX_BY_CLIENT, client_key, partition_key
 from insolvia_core.debtors import (
     FILING_ROLES,
     Debtor,
     LinkOutcome,
+    RepointOutcome,
     debtor_from_item,
     debtor_item,
     role_order,
     sort_key,
 )
 from insolvia_core.errors import ConflictError
+from insolvia_core.fields import timestamp
 
 # Derived from the one function that builds debtor sort keys, so the two cannot
 # drift. This prefix is what makes list_for_case safe to run against a case's
@@ -131,6 +133,101 @@ class DynamoDbDebtorStore:
             raise ConflictError(
                 "this case's debtors changed while the client was linked; "
                 "reload and try again"
+            ) from error
+        return "written"
+
+    def roles_for_client(self, client_id: str) -> tuple[tuple[str, str], ...]:
+        # The `by-client` index, every page, no accessor filter — the port
+        # says who may call this. Keys only are read back; the index projects
+        # the whole debtor, but `repoint_client` conditions on the item
+        # itself, so nothing here is trusted beyond "look at this role".
+        found: list[tuple[str, str]] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "IndexName": INDEX_BY_CLIENT,
+                "KeyConditionExpression": "GSI3PK = :client",
+                "ExpressionAttributeValues": {":client": {"S": client_key(client_id)}},
+                "ProjectionExpression": "caseId, filingRole",
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.query(**kwargs)
+            for raw in response.get("Items", []):
+                plain = from_attributes(raw)
+                found.append((str(plain["caseId"]), str(plain["filingRole"])))
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        return tuple(sorted(found))
+
+    def repoint_client(
+        self,
+        case_id: str,
+        filing_role: str,
+        *,
+        from_client_id: str,
+        to_client_id: str,
+    ) -> RepointOutcome:
+        """One transaction: an UpdateItem of this role that moves `clientId`
+        and `GSI3PK` — never `body` or `provenance`, so the copied identity
+        cannot change by construction — conditional on the role still naming
+        the merged client; plus `link`'s ConditionCheck on each other role
+        that it does not already name the survivor."""
+        items: list[dict[str, Any]] = [
+            {
+                "Update": {
+                    "TableName": self.table_name,
+                    "Key": {
+                        "PK": {"S": partition_key(case_id)},
+                        "SK": {"S": sort_key(filing_role)},
+                    },
+                    "UpdateExpression": (
+                        "SET clientId = :to, GSI3PK = :index, updatedAt = :now"
+                    ),
+                    "ConditionExpression": "clientId = :from",
+                    "ExpressionAttributeValues": {
+                        ":to": {"S": to_client_id},
+                        ":from": {"S": from_client_id},
+                        ":index": {"S": client_key(to_client_id)},
+                        ":now": {"S": timestamp()},
+                    },
+                }
+            }
+        ]
+        for role in FILING_ROLES:
+            if role == filing_role:
+                continue
+            items.append(
+                {
+                    "ConditionCheck": {
+                        "TableName": self.table_name,
+                        "Key": {
+                            "PK": {"S": partition_key(case_id)},
+                            "SK": {"S": sort_key(role)},
+                        },
+                        "ConditionExpression": (
+                            "attribute_not_exists(clientId) OR clientId <> :client"
+                        ),
+                        "ExpressionAttributeValues": {":client": {"S": to_client_id}},
+                    }
+                }
+            )
+        try:
+            self.client.transact_write_items(TransactItems=items)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != _CANCELLED:
+                raise
+            reasons = error.response.get("CancellationReasons") or []
+            codes = [reason.get("Code") for reason in reasons]
+            if codes and codes[0] == _CONDITION_FAILED:
+                return "absent"
+            if _CONDITION_FAILED in codes[1:]:
+                return "client_taken"
+            raise ConflictError(
+                "a case's debtors changed while the clients were being merged; "
+                "run the merge again to finish it"
             ) from error
         return "written"
 

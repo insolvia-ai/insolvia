@@ -194,6 +194,18 @@ questionnaire sends each save's map per field against the record it loaded
 that the stored record does not carry on that same, unchanged value — so
 `client` is only ever kept, never minted, by a save.
 
+**Merging two clients moves the link and nothing else.**
+`POST /v1/firm/clients/<survivor>/merge` (`insolvia_core.client_merge`)
+re-points every debtor naming the merged client — its `client_id` and its
+`by-client` entry, one conditional write per case — to the survivor, and
+archives the merged client with `merged_into`. The copied identity fields and
+their provenance are untouched: a debtor's `client` entries keep naming the
+client they were copied from, which is why a merged client is archived rather
+than deleted, and why `differs_from_client` may now show paths where the
+copy and the survivor disagree. Two clients who are both debtors on one case
+are refused (one client, one role per case); a merged client cannot be
+opened for a case, linked, edited, restored or merged again.
+
 **A case belongs to a FIRM.** `firm_id` is the tenant; `created_by` is the
 Cognito subject of whoever opened the matter and is an audit fact rather than a
 permission — it grants nothing on its own. Reaching a case means being in its

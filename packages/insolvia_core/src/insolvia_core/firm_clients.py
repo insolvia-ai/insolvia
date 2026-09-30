@@ -146,10 +146,40 @@ class FirmClient:
     # screen shows. Never the number. Server-owned; see the module docstring.
     tax_id_ref: str | None = None
     tax_id_last_four: str | None = None
+    # ADR 0022's merge (PR 7). `merged_into` is TERMINAL: set, with status
+    # `archived`, when this client was folded into the survivor it names —
+    # the record is kept, never deleted, so a debtor's provenance that still
+    # says it was copied from this client resolves to someone. The other two
+    # are the in-flight merge's claim on both clients (see `client_merge`):
+    # `merging_into` on the client being folded away, `merging_from` on the
+    # survivor. All three are server-owned and written ONLY by the store's
+    # merge methods — never by `update_client`, whose whole-record save would
+    # otherwise put back a stale copy of the claim it read.
+    merged_into: str | None = None
+    merging_into: str | None = None
+    merging_from: str | None = None
 
     @property
     def archived(self) -> bool:
         return self.status == ARCHIVED
+
+    @property
+    def merged(self) -> bool:
+        return self.merged_into is not None
+
+    def refusal_for_new_case(self) -> str | None:
+        """Why this client cannot be opened for a case (or linked to a
+        debtor) right now, or None when it can. An archived client — which
+        includes every merged one — must be restored first; a client being
+        merged away must not gain a case the merge's listing already missed,
+        or that case would be left naming a merged client."""
+        if self.merged_into is not None:
+            return "That client was merged into another client — use that one."
+        if self.merging_into is not None:
+            return "That client is being merged into another client."
+        if self.archived:
+            return "That client is archived — restore them first."
+        return None
 
 
 @dataclass(frozen=True)
@@ -249,6 +279,19 @@ def parse_firm_client(
         referred_by=referred_by,
         first_retained_at=first_retained_at,
     )
+
+
+def parse_client_merge(payload: Mapping[str, object]) -> str:
+    """`POST /v1/firm/clients/<survivor>/merge`'s body:
+    `{"merged_client_id": "<id>"}` — the client that is folded INTO the one
+    the URL names and archived. Named for what happens to it, so a reader of
+    the request cannot get the direction backwards."""
+    merged = payload.get("merged_client_id")
+    if not isinstance(merged, str) or not merged.strip():
+        raise FieldValidationError(
+            {"merged_client_id": "Choose the client to merge into this one."}
+        )
+    return merged.strip()
 
 
 def parse_client_status(payload: Mapping[str, object]) -> str:
@@ -352,7 +395,35 @@ def firm_client_item(client: FirmClient) -> dict[str, object]:
     }
     if client.tax_id_ref is not None and client.tax_id_last_four is not None:
         item["taxId"] = {"ref": client.tax_id_ref, "lastFour": client.tax_id_last_four}
+    for attribute, value in _merge_attributes(client).items():
+        if value is not None:
+            item[attribute] = value
     return item
+
+
+# The stored attributes of the merge — `FirmClient.merged_into` and the
+# in-flight claim. Named once, because the DynamoDB adapter's whole-record
+# update must leave exactly these alone.
+MERGED_INTO: Final = "mergedInto"
+MERGING_INTO: Final = "mergingInto"
+MERGING_FROM: Final = "mergingFrom"
+MERGE_ATTRIBUTES: Final = (MERGED_INTO, MERGING_INTO, MERGING_FROM)
+
+
+def _merge_attributes(client: FirmClient) -> dict[str, str | None]:
+    return {
+        MERGED_INTO: client.merged_into,
+        MERGING_INTO: client.merging_into,
+        MERGING_FROM: client.merging_from,
+    }
+
+
+def _optional_id(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("a merge pointer is not a string")
+    return value
 
 
 def _tax_id_from_item(value: object) -> tuple[str | None, str | None]:
@@ -387,6 +458,9 @@ def firm_client_from_item(item: Mapping[str, object]) -> FirmClient:
             created_by=str(item["createdBy"]),
             tax_id_ref=tax_id_ref,
             tax_id_last_four=tax_id_last_four,
+            merged_into=_optional_id(item.get(MERGED_INTO)),
+            merging_into=_optional_id(item.get(MERGING_INTO)),
+            merging_from=_optional_id(item.get(MERGING_FROM)),
             **vars(draft),
         )
     except (KeyError, ValueError) as error:
@@ -414,6 +488,11 @@ def firm_client_json(client: FirmClient) -> dict[str, object]:
     }
     if client.tax_id_last_four is not None:
         body["tax_id_last_four"] = client.tax_id_last_four
+    # The survivor a merged client was folded into, so a screen can say so
+    # and link there. The in-flight claim is not on the wire: it is a lock,
+    # not a fact about the person.
+    if client.merged_into is not None:
+        body["merged_into"] = client.merged_into
     return body
 
 

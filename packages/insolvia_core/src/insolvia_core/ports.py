@@ -19,7 +19,7 @@ from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
 from insolvia_core.clients import CasePublicStatus, ClientBinding
-from insolvia_core.debtors import Debtor, LinkOutcome
+from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
@@ -284,7 +284,53 @@ class FirmStore(Protocol):
     def update_client(self, client: FirmClient) -> FirmClient | None:
         """Write `client` back, but only over a row that still exists AND
         still belongs to `client.firm_id` — `update_user`'s two-part condition,
-        for its reason. None when either no longer holds."""
+        for its reason — AND was never merged away: a merged client is a
+        terminal record, and an edit read before the merge must not
+        un-archive it. None when any of the three no longer holds.
+
+        Writes the record's own fields ONLY. The merge attributes
+        (`firm_clients.MERGE_ATTRIBUTES`) are left exactly as stored: a
+        whole-record save built from a read taken before a merge claimed the
+        row would otherwise erase the claim."""
+        ...
+
+    # ── Merging two clients (ADR 0022's PR 7) ───────────────────────
+    #
+    # Three steps, driven by `client_merge.merge_clients`. The CLAIM is what
+    # makes "merges into and out of the same client at once" safe (the
+    # ADR's named risk): while B is being merged into A, A cannot be merged
+    # away and B cannot receive a merge, so no case can be re-pointed onto a
+    # client that is itself being emptied. Each step is ONE conditional write
+    # over BOTH rows.
+
+    def claim_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> bool:
+        """Mark `merged_id` as merging into `survivor_id` and `survivor_id`
+        as receiving from it — both, or neither — ONLY IF both rows are in
+        `firm_id`, both are `active` and not merged, `merged_id` is not
+        receiving a merge of its own, and `survivor_id` is not being merged
+        away. An existing claim for THIS SAME pair passes, so a merge that
+        stopped half-way (a timeout) can be run again to finish. False when
+        any condition fails; nothing is written then."""
+        ...
+
+    def finish_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str, merged_at: str
+    ) -> FirmClient | None:
+        """Archive `merged_id` with `merged_into = survivor_id` and release
+        both halves of the claim, in one write conditional on the claim still
+        being this pair's. The archived client, or None when the claim was
+        not there (a concurrent run of the same merge already finished it)."""
+        ...
+
+    def release_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> None:
+        """Drop this pair's claim without archiving anything — the merge was
+        refused part-way. Cases already re-pointed stay with the survivor:
+        each of them names an active client either way. A claim that is not
+        this pair's is left alone."""
         ...
 
 
@@ -635,6 +681,37 @@ class DebtorStore(Protocol):
         `"role_taken"` (the create lost its race — nothing written), or
         `"client_taken"` (another role holds this client — nothing
         written)."""
+        ...
+
+    def roles_for_client(self, client_id: str) -> tuple[tuple[str, str], ...]:
+        """Every `(case_id, filing_role)` whose debtor names `client_id` —
+        the `by-client` index, UNFILTERED by any accessor.
+
+        For the merge only, which must move every one of the merged client's
+        cases, including those the person merging is not linked to — a case
+        left behind would name an archived client. What it returns must never
+        reach a caller, not even as a count (`CaseStore.list_for_client`
+        says why). On DynamoDB the index is eventually consistent, so an
+        entry can lag a write in either direction; `repoint_client` re-checks
+        each one against the item itself."""
+        ...
+
+    def repoint_client(
+        self,
+        case_id: str,
+        filing_role: str,
+        *,
+        from_client_id: str,
+        to_client_id: str,
+    ) -> RepointOutcome:
+        """Point one debtor from one client to another — `client_id` and the
+        `by-client` entry it feeds, and NOTHING of the copied identity: a
+        filed petition still says what it said (ADR 0022).
+
+        One conditional write: only if the role still names
+        `from_client_id` (else `"absent"`), and only if no other role of the
+        case already names `to_client_id` (else `"client_taken"` — one
+        client, one role per case, `link`'s rule)."""
         ...
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...

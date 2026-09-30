@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from insolvia_core.firm_clients import FirmClient, sorted_firm_clients
+from dataclasses import replace
+
+from insolvia_core.firm_clients import (
+    ACTIVE,
+    ARCHIVED,
+    FirmClient,
+    sorted_firm_clients,
+)
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
 
@@ -150,7 +157,82 @@ class MemoryFirmStore:
 
     def update_client(self, client: FirmClient) -> FirmClient | None:
         key = (client.firm_id, client.id)
-        if key not in self.clients:
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None:
             return None
-        self.clients[key] = client
-        return client
+        # The record's own fields only: the merge attributes stay as stored,
+        # as the DynamoDB adapter's UpdateItem leaves them.
+        written = replace(
+            client,
+            merged_into=stored.merged_into,
+            merging_into=stored.merging_into,
+            merging_from=stored.merging_from,
+        )
+        self.clients[key] = written
+        return written
+
+    # ── Merging two clients ─────────────────────────────────────────
+    #
+    # The DynamoDB adapter's conditions, checked and applied in one step —
+    # nothing runs between the lines here, which is what its transactions buy.
+
+    def claim_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> bool:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if merged is None or survivor is None or merged_id == survivor_id:
+            return False
+        if not _claimable(merged, survivor_id, survivor=False):
+            return False
+        if not _claimable(survivor, merged_id, survivor=True):
+            return False
+        self.clients[(firm_id, merged_id)] = replace(merged, merging_into=survivor_id)
+        self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=merged_id)
+        return True
+
+    def finish_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str, merged_at: str
+    ) -> FirmClient | None:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if (
+            merged is None
+            or survivor is None
+            or merged.merging_into != survivor_id
+            or survivor.merging_from != merged_id
+        ):
+            return None
+        archived = replace(
+            merged,
+            status=ARCHIVED,
+            merged_into=survivor_id,
+            merging_into=None,
+            updated_at=merged_at,
+        )
+        self.clients[(firm_id, merged_id)] = archived
+        self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=None)
+        return archived
+
+    def release_client_merge(
+        self, firm_id: str, *, merged_id: str, survivor_id: str
+    ) -> None:
+        merged = self.clients.get((firm_id, merged_id))
+        survivor = self.clients.get((firm_id, survivor_id))
+        if merged is not None and merged.merging_into == survivor_id:
+            self.clients[(firm_id, merged_id)] = replace(merged, merging_into=None)
+        if survivor is not None and survivor.merging_from == merged_id:
+            self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=None)
+
+
+def _claimable(client: FirmClient, other_id: str, *, survivor: bool) -> bool:
+    """`claim_client_merge`'s condition on one row: active, never merged,
+    and not already in a merge except this same one."""
+    if client.status != ACTIVE or client.merged_into is not None:
+        return False
+    if survivor:
+        return client.merging_into is None and client.merging_from in (
+            None,
+            other_id,
+        )
+    return client.merging_from is None and client.merging_into in (None, other_id)

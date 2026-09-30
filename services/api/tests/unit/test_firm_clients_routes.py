@@ -32,6 +32,7 @@ from insolvia_api.core.config import load_config
 from insolvia_core.access_log import access_item
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
+from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.adapters.memory.user_directory import MemoryUserDirectory
@@ -147,6 +148,10 @@ def firms():
 
 @pytest.fixture
 def client(firms, access_log):
+    # One debtor store behind both the case store and the debtor-facing
+    # routes, as the real composition has one table: the merge re-points
+    # the debtors the case store wrote.
+    debtors = MemoryDebtorStore()
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -159,7 +164,8 @@ def client(firms, access_log):
             waitlist_store=MemoryWaitlistStore(),
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
-            case_store=MemoryCaseStore(),
+            case_store=MemoryCaseStore(debtors),
+            debtor_store=debtors,
             access_log=access_log,
             firm_store=firms,
             user_directory=MemoryUserDirectory(),
@@ -497,3 +503,202 @@ def test_listing_a_clients_cases_needs_the_cases_feature_too(client):
     """VIEWER may see the directory but holds no `cases` grant at all."""
     jordan = add(client).get_json()["id"]
     assert cases_of(client, jordan, VIEWER).status_code == 403
+
+
+# ── Merge (ADR 0022, PR 7) ──────────────────────────────────────────
+#
+# The domain rules and the race are insolvia_core's test_client_merge.py;
+# these pin the route: the body, the status codes, the gate and the log.
+
+
+def merge(client, survivor, merged, subject=ADMIN):
+    return client.post(
+        f"/v1/firm/clients/{survivor}/merge",
+        json={"merged_client_id": merged},
+        headers=auth(subject),
+    )
+
+
+def case_ids(client, client_id, subject=ADMIN):
+    return [
+        e["case"]["id"]
+        for e in cases_of(client, client_id, subject).get_json()["cases"]
+    ]
+
+
+def test_merging_moves_the_cases_and_archives_the_merged_client(client):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy", "surname": "Example"}).get_json()["id"]
+    theirs = open_for(client, [dupe])
+
+    response = merge(client, keep, dupe)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert set(body) == {"client", "merged"}
+    assert body["client"]["id"] == keep
+    assert body["client"]["status"] == "active"
+    assert body["merged"]["id"] == dupe
+    assert body["merged"]["status"] == "archived"
+    assert body["merged"]["merged_into"] == keep
+    assert case_ids(client, keep) == [theirs]
+    assert case_ids(client, dupe) == []
+    fetched = client.get(f"/v1/firm/clients/{dupe}", headers=auth(ADMIN))
+    assert fetched.get_json()["merged_into"] == keep
+
+
+def test_the_merge_moves_cases_the_caller_cannot_see_and_says_nothing_of_them(client):
+    """The paralegal is not on the admin's case; it must move anyway (left
+    behind, it would name an archived client), and nothing in the answer
+    counts it."""
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    hidden = open_for(client, [dupe], subject=ADMIN)
+
+    response = merge(client, keep, dupe, subject=PARALEGAL)
+
+    assert response.status_code == 200
+    assert "cases" not in str(response.get_json())
+    assert case_ids(client, keep) == [hidden]
+
+
+@pytest.mark.parametrize("merged_again_into", ["keep", "third"])
+def test_a_merged_client_cannot_be_merged_again(client, merged_again_into):
+    ids = {
+        name: add(client, name={"given": name}).get_json()["id"]
+        for name in ("keep", "dupe", "third")
+    }
+    merge(client, ids["keep"], ids["dupe"])
+
+    response = merge(client, ids[merged_again_into], ids["dupe"])
+
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "ConflictError"
+
+
+def test_a_merged_client_cannot_be_opened_for_a_new_case(client):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    merge(client, keep, dupe)
+
+    response = client.post(
+        "/v1/cases",
+        json={"chapter": 7, "court": "flmb", "division": "tampa", "client_ids": [dupe]},
+        headers=auth(ADMIN),
+    )
+
+    assert response.status_code == 400
+    assert "merged" in response.get_json()["fields"]["client_ids"]
+
+
+@pytest.mark.parametrize(
+    ("suffix", "body"),
+    [("", {"name": {"surname": "Revived"}}), ("/status", {"status": "active"})],
+)
+def test_a_merged_client_cannot_be_edited_or_restored(client, suffix, body):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    merge(client, keep, dupe)
+
+    response = client.put(
+        f"/v1/firm/clients/{dupe}{suffix}", json=body, headers=auth(ADMIN)
+    )
+
+    assert response.status_code == 409
+    fetched = client.get(f"/v1/firm/clients/{dupe}", headers=auth(ADMIN)).get_json()
+    assert fetched["status"] == "archived"
+
+
+def test_two_clients_on_one_joint_case_are_a_409_and_nothing_moves(client):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    joint = open_for(client, [keep, dupe])
+
+    response = merge(client, keep, dupe)
+
+    assert response.status_code == 409
+    assert "same case" in response.get_json()["message"]
+    assert case_ids(client, dupe) == [joint]
+    fetched = client.get(f"/v1/firm/clients/{dupe}", headers=auth(ADMIN)).get_json()
+    assert fetched["status"] == "active"
+
+
+@pytest.mark.parametrize(
+    ("body", "status"),
+    [
+        ({}, 400),
+        ({"merged_client_id": "no-such-client"}, 400),
+    ],
+)
+def test_the_merged_client_must_be_named_and_exist(client, body, status):
+    keep = add(client).get_json()["id"]
+    response = client.post(
+        f"/v1/firm/clients/{keep}/merge", json=body, headers=auth(ADMIN)
+    )
+    assert response.status_code == status
+    assert "merged_client_id" in response.get_json()["fields"]
+
+
+def test_a_client_cannot_be_merged_into_itself(client):
+    keep = add(client).get_json()["id"]
+    response = merge(client, keep, keep)
+    assert response.status_code == 400
+    assert "merged_client_id" in response.get_json()["fields"]
+
+
+def test_an_archived_client_is_a_409(client):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    client.put(
+        f"/v1/firm/clients/{dupe}/status",
+        json={"status": "archived"},
+        headers=auth(ADMIN),
+    )
+    assert merge(client, keep, dupe).status_code == 409
+
+
+def test_another_firms_clients_are_the_same_answers_as_none(client):
+    ours = add(client).get_json()["id"]
+    theirs = add(client, subject=OTHER_ADMIN).get_json()["id"]
+
+    foreign_survivor = merge(client, theirs, ours)
+    missing_survivor = merge(client, "no-such-client", ours)
+    foreign_merged = merge(client, ours, theirs)
+    missing_merged = merge(client, ours, "no-such-client")
+
+    assert foreign_survivor.status_code == missing_survivor.status_code == 404
+    assert foreign_survivor.get_json() == missing_survivor.get_json()
+    assert foreign_merged.status_code == missing_merged.status_code == 400
+    assert foreign_merged.get_json() == missing_merged.get_json()
+
+
+def test_merging_needs_add_edit_on_clients(client):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    assert merge(client, keep, dupe, subject=VIEWER).status_code == 403
+    assert merge(client, keep, dupe, subject=BLOCKED).status_code == 403
+
+
+def test_a_merge_is_logged_under_both_clients(client, access_log):
+    keep = add(client).get_json()["id"]
+    dupe = add(client, name={"given": "Jordy"}).get_json()["id"]
+    before = len(access_log.events)
+
+    merge(client, keep, dupe)
+
+    assert rows(access_log)[before:] == [
+        ("client.merge", dupe, ADMIN, "allowed"),
+        ("client.merge", keep, ADMIN, "allowed"),
+    ]
+
+
+def test_a_refused_merge_is_logged_as_denied_under_the_unreachable_id(
+    client, access_log
+):
+    keep = add(client).get_json()["id"]
+    merge(client, "no-such-client", keep)
+    merge(client, keep, "no-such-merged")
+    assert rows(access_log)[-2:] == [
+        ("client.merge", "no-such-client", ADMIN, "denied"),
+        ("client.merge", "no-such-merged", ADMIN, "denied"),
+    ]

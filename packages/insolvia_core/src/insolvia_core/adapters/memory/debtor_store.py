@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from insolvia_core.debtors import Debtor, LinkOutcome, role_order
+from insolvia_core.debtors import (
+    Debtor,
+    LinkOutcome,
+    RepointOutcome,
+    link_client,
+    role_order,
+)
 
 
 def _order(debtor: Debtor) -> tuple[int, str]:
@@ -54,6 +60,44 @@ class MemoryDebtorStore:
             ):
                 return "client_taken"
         self.debtors[key] = debtor
+        return "written"
+
+    def roles_for_client(self, client_id: str) -> tuple[tuple[str, str], ...]:
+        # The index as a filter, sparse as it is: no client, no entry.
+        return tuple(
+            sorted(
+                key
+                for key, debtor in self.debtors.items()
+                if debtor.client_id is not None and debtor.client_id == client_id
+            )
+        )
+
+    def repoint_client(
+        self,
+        case_id: str,
+        filing_role: str,
+        *,
+        from_client_id: str,
+        to_client_id: str,
+    ) -> RepointOutcome:
+        # Both of the DynamoDB transaction's conditions, checked and applied
+        # in one step. Only the link moves — `link_client` keeps every
+        # copied field and the provenance exactly as they are.
+        stored = self.debtors.get((case_id, filing_role))
+        if stored is None or stored.client_id != from_client_id:
+            return "absent"
+        for (other_case, role), other in self.debtors.items():
+            if (
+                other_case == case_id
+                and role != filing_role
+                and other.client_id == to_client_id
+            ):
+                return "client_taken"
+        if stored.case_created_at is None:
+            raise RuntimeError("a debtor naming a client has no case_created_at")
+        self.debtors[(case_id, filing_role)] = link_client(
+            stored, client_id=to_client_id, case_created_at=stored.case_created_at
+        )
         return "written"
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None:

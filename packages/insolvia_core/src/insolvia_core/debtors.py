@@ -64,6 +64,7 @@ __all__ = [
     "LinkOutcome",
     "OtherName",
     "PersonName",
+    "RepointOutcome",
     "Venue",
     "create_debtor",
     "debtor_body",
@@ -87,6 +88,13 @@ FILING_ROLES: Final = ("debtor_1", "debtor_2", "non_filing_spouse")
 # What `DebtorStore.link` answers — the conditional write behind the link
 # route's "one client, one role per case" (ADR 0022).
 LinkOutcome = Literal["written", "role_taken", "client_taken"]
+
+# What `DebtorStore.repoint_client` answers — one case's step of a client
+# merge (ADR 0022's PR 7). `absent` is "that role no longer names the merged
+# client" (an index entry that lagged behind a write), and nothing was
+# written; `client_taken` is "the survivor already holds another role of this
+# case", refused for `LinkOutcome`'s reason.
+RepointOutcome = Literal["written", "absent", "client_taken"]
 
 # B101 line 6. `other` carries the explanation the form asks for.
 VENUE_BASES: Final = ("lived_longest_180_days", "other")
