@@ -697,3 +697,199 @@ def test_a_caller_without_the_client_directory_is_not_told_how_a_client_differs(
     [debtor] = debtors_of(client, case_id)
     assert "client_id" in debtor
     assert "differs_from_client" not in debtor
+
+
+# ── Provenance survives an autosave (ADR 0022 PR 5) ─────────────
+
+
+def echo(debtor):
+    """The questionnaire's whole-record save of `debtor` as loaded — every
+    field and every provenance entry sent back as it came."""
+    server_owned = {
+        "id",
+        "case_id",
+        "filing_role",
+        "created_at",
+        "updated_at",
+        "client_id",
+        "differs_from_client",
+    }
+    return {key: value for key, value in debtor.items() if key not in server_owned}
+
+
+def test_an_untouched_copied_field_keeps_client_provenance_across_a_save(client):
+    case_id = open_case(client)
+    [loaded] = debtors_of(client, case_id)
+    body = echo(loaded)
+    # The preparer changes the given name and nothing else.
+    body["name"] = {**body["name"], "given": "Jordy"}
+    body["provenance"] = {**body["provenance"], "name.given": TYPED}
+
+    saved = put(client, case_id, **body)
+
+    assert saved.status_code == 200, saved.get_json()
+    provenance = saved.get_json()["provenance"]
+    assert provenance["name.given"] == TYPED
+    assert provenance["name.surname"] == {
+        "source": "client",
+        "client_id": loaded["client_id"],
+    }
+
+
+def test_client_provenance_on_a_changed_value_is_refused(client):
+    case_id = open_case(client)
+    [loaded] = debtors_of(client, case_id)
+    body = echo(loaded)
+    body["name"] = {**body["name"], "surname": "Retyped"}
+
+    saved = put(client, case_id, **body)
+
+    assert saved.status_code == 400
+    assert list(saved.get_json()["fields"]) == ["provenance.name.surname"]
+
+
+def test_client_provenance_the_record_never_had_cannot_be_claimed(client):
+    case_id = open_case(client)
+    [loaded] = debtors_of(client, case_id)
+    body = echo(loaded)
+    body["phone"] = "555-0100"
+    body["provenance"] = {
+        **body["provenance"],
+        "phone": {"source": "client", "client_id": loaded["client_id"]},
+    }
+
+    saved = put(client, case_id, **body)
+
+    assert saved.status_code == 400
+    assert list(saved.get_json()["fields"]) == ["provenance.phone"]
+
+
+# ── Re-copy from client, update client from this case ───────────
+
+
+def recopy(client, case_id, role="debtor_1", subject=ALICE):
+    return client.post(
+        f"/v1/cases/{case_id}/debtors/{role}/copy-from-client", headers=auth(subject)
+    )
+
+
+def copy_to_client(client, case_id, role="debtor_1", subject=ALICE):
+    return client.post(
+        f"/v1/cases/{case_id}/debtors/{role}/copy-to-client", headers=auth(subject)
+    )
+
+
+def diverged_case(client):
+    """A case whose Debtor 1 was retyped after the copy, and which carries a
+    venue answer of its own — the field re-copy must not touch."""
+    case_id = open_case(client)
+    [loaded] = debtors_of(client, case_id)
+    body = echo(loaded)
+    body["name"] = {**body["name"], "given": "Jordy"}
+    body["venue"] = {"basis": "lived_longest_180_days"}
+    body["provenance"] = {
+        **body["provenance"],
+        "name.given": TYPED,
+        "venue.basis": TYPED,
+    }
+    saved = put(client, case_id, **body)
+    assert saved.get_json()["differs_from_client"] == ["name.given"]
+    return case_id, saved.get_json()
+
+
+def file_case(client, case_id):
+    filed = client.patch(
+        f"/v1/cases/{case_id}", json={"status": "filed"}, headers=auth(ALICE)
+    )
+    assert filed.status_code == 200, filed.get_json()
+
+
+def test_recopy_restores_the_clients_values_with_client_provenance(client):
+    case_id, before = diverged_case(client)
+
+    response = recopy(client, case_id)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["id"] == before["id"]
+    assert body["name"]["given"] == "Jordan"
+    assert body["provenance"]["name.given"] == {
+        "source": "client",
+        "client_id": before["client_id"],
+    }
+    assert body["differs_from_client"] == []
+    # The case's own answer, and where it came from, are untouched.
+    assert body["venue"] == {"basis": "lived_longest_180_days"}
+    assert body["provenance"]["venue.basis"] == TYPED
+
+
+def test_recopy_empties_a_field_the_client_does_not_hold(client):
+    case_id, loaded = diverged_case(client)
+    body = echo(loaded)
+    body["email"] = "typed@example.test"
+    body["provenance"] = {**body["provenance"], "email": TYPED}
+    assert put(client, case_id, **body).status_code == 200
+
+    response = recopy(client, case_id)
+
+    assert "email" not in response.get_json()
+    assert "email" not in response.get_json()["provenance"]
+
+
+def test_recopy_is_refused_on_a_filed_case(client):
+    case_id, _ = diverged_case(client)
+    file_case(client, case_id)
+
+    response = recopy(client, case_id)
+
+    assert response.status_code == 409
+    [debtor] = debtors_of(client, case_id)
+    assert debtor["name"]["given"] == "Jordy"
+
+
+def test_recopy_needs_a_linked_client(client):
+    case_id = open_case(client)
+    assert put(client, case_id, role="non_filing_spouse").status_code == 201
+    assert recopy(client, case_id, role="non_filing_spouse").status_code == 409
+
+
+def test_update_client_copies_the_cases_values_onto_the_client(client):
+    case_id, before = diverged_case(client)
+
+    response = copy_to_client(client, case_id)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["differs_from_client"] == []
+    # The debtor is only read: its values and provenance are as they were.
+    assert body["name"] == before["name"]
+    assert body["provenance"] == before["provenance"]
+    record = client.get(
+        f"/v1/firm/clients/{before['client_id']}", headers=auth(ALICE)
+    ).get_json()
+    assert record["name"] == {"given": "Jordy", "surname": "Example"}
+
+
+def test_update_client_is_allowed_on_a_filed_case(client):
+    case_id, _ = diverged_case(client)
+    file_case(client, case_id)
+    assert copy_to_client(client, case_id).status_code == 200
+
+
+def test_update_client_is_recorded_as_a_client_update(client, access_log):
+    case_id, _ = diverged_case(client)
+    copy_to_client(client, case_id)
+    last = access_log.events[-1]
+    assert (last.action, last.outcome) == ("client.update", "allowed")
+
+
+def test_update_client_needs_clients_add_edit(client, firms):
+    case_id, _ = diverged_case(client)
+    firms.users[(FIRM_A, ALICE)] = member(
+        ALICE,
+        FIRM_A,
+        is_admin=False,
+        access_all_cases=True,
+        permissions={**default_permissions("attorney"), "clients": "view_only"},
+    )
+    assert copy_to_client(client, case_id).status_code == 403

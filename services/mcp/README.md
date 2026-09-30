@@ -71,6 +71,13 @@ in-memory stores with auth failing closed (every call 401s).
    `~/.config/insolvia/dev.env`).
 4. List tools, call `whoami`, then `list_cases` → `propose_case_records` →
    `check_proposals` against your own dev data.
+5. Clients ([ADR 0022](../../docs/adr/0022-a-client-is-not-a-case.md)):
+   `whoami` reports `permissions.clients` — `hidden` until an admin grants
+   it. With the grant, `list_case_records` with `entityType: "clients"` on a
+   seeded case answers the client each debtor is linked to, and
+   `get_case_record` with one of those ids answers that record. Check both
+   show `tax_id_last_four` and nothing else of the tax id, and that without
+   the grant both refuse `permission_denied`.
 
 If a client cannot run the browser flow, mint a token directly against the
 dev pool's MCP app client (`aws cognito-idp initiate-auth` with

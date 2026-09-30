@@ -179,7 +179,20 @@ can. One client holds at most one role per case. The copy is never synced:
 disagree) is computed on every read for a caller who may see the client
 directory, and nothing resolves it silently. The debtor item carries
 `GSI3PK CLIENT#<client_id>` / `GSI3SK <case createdAt>#<case id>`, which is
-the `by-client` index a client's case list reads.
+the `by-client` index a client's case list reads. "One client, one role" is
+the link write's own condition (a transaction that checks the case's other
+roles), not a read before it.
+
+Divergence is resolved only by one of two explicit acts, each a whole-record
+write: `POST …/debtors/<role>/copy-from-client` re-copies the client's
+identity fields with `client` provenance (refused on a `filed` case — that is
+an amendment), and `POST …/debtors/<role>/copy-to-client` writes the case's
+values onto the client record, leaving the debtor as it was. **A copied field
+keeps `client` provenance until a person changes that field**: the
+questionnaire sends each save's map per field against the record it loaded
+(the api-client's `revisedProvenance`), and the PUT refuses a `client` entry
+that the stored record does not carry on that same, unchanged value — so
+`client` is only ever kept, never minted, by a save.
 
 **A case belongs to a FIRM.** `firm_id` is the tenant; `created_by` is the
 Cognito subject of whoever opened the matter and is an audit fact rather than a

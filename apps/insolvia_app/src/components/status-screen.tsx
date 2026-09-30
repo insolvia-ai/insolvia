@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { AppShell } from '@/components/app-shell';
@@ -33,6 +33,14 @@ export interface StatusScreenProps {
    * such as the code exchange on `/auth/callback`, should not defer.
    */
   defer?: boolean;
+
+  /**
+   * The page frame. `AppShell` (the default) for the staff app; the client
+   * portal passes `PortalShell`, because the staff frame's rail and account
+   * menu read the STAFF session and must never be drawn around a debtor's
+   * page (ADR 0023).
+   */
+  shell?: ComponentType<{ children: ReactNode }>;
 }
 
 /**
@@ -72,6 +80,7 @@ export function StatusScreen({
   tone = 'progress',
   actions,
   defer = false,
+  shell: Shell = AppShell,
 }: StatusScreenProps) {
   const theme = useTheme();
   const [revealed, setRevealed] = useState(!defer);
@@ -85,11 +94,11 @@ export function StatusScreen({
   }, [revealed]);
 
   if (!revealed) {
-    return <AppShell>{null}</AppShell>;
+    return <Shell>{null}</Shell>;
   }
 
   return (
-    <AppShell>
+    <Shell>
       <Heading level={1}>{title}</Heading>
       <Text
         aria-live={tone === 'error' ? 'assertive' : 'polite'}
@@ -98,7 +107,7 @@ export function StatusScreen({
         {message}
       </Text>
       {actions}
-    </AppShell>
+    </Shell>
   );
 }
 

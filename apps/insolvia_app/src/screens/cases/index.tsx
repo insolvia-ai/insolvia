@@ -1,93 +1,34 @@
-import { ApiValidationException } from '@insolvia-ai/api-client';
-import type {
-  Case,
-  CaseChapter,
-  CourtRegistry,
-  FirmClient,
-  FirmColleague,
-} from '@insolvia-ai/api-client';
-import { Badge, Button, Field, Input, RadioGroup, Select, Table } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
-import { Link } from 'expo-router';
+import { permits } from '@insolvia-ai/api-client';
+import type { Case, FirmColleague } from '@insolvia-ai/api-client';
+import { Badge, Button, Table } from '@insolvia-ai/design-system';
+import { Link, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
-
-const CHAPTERS: readonly { readonly value: CaseChapter; readonly label: string }[] = [
-  { value: 7, label: 'Chapter 7' },
-  { value: 13, label: 'Chapter 13' },
-  { value: 11, label: 'Chapter 11' },
-  { value: 12, label: 'Chapter 12' },
-];
-
-/** How a case's own status reads, rather than the wire's snake_case. */
-const STATUS_LABEL: Record<Case['status'], string> = {
-  intake: 'In intake',
-  ready_to_file: 'Ready to file',
-  filed: 'Filed',
-};
-
-const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
-  intake: 'neutral',
-  ready_to_file: 'success',
-  filed: 'primary',
-};
 
 type ListState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly cases: readonly Case[] }
   | { readonly kind: 'error'; readonly message: string };
 
-type RegistryState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ready'; readonly registry: CourtRegistry }
-  | { readonly kind: 'error' };
-
-type ClientsState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ready'; readonly clients: readonly FirmClient[] }
-  | { readonly kind: 'error' };
-
-/** The client `Select`'s value for "a new client, named below". */
-const NEW_CLIENT = '__new_client__';
-
-/** How a client reads in the picker: "Surname, Given", or whichever half exists. */
-function clientLabel(client: FirmClient): string {
-  const { given, surname } = client.name;
-  if (surname !== undefined && given !== undefined) return `${surname}, ${given}`;
-  return surname ?? given ?? client.id;
-}
-
 /**
- * The case list, and the form that opens one — the screen that closes issue
- * 8.3's loop: sign in, `POST /v1/cases`, `GET /v1/cases`, a case on screen.
+ * `/cases` — the cases the caller may see, and the way to open another.
  *
- * Deliberately not the intake questionnaire. This creates the case *record* —
- * chapter, court and division — and nothing else; the multi-step
- * questionnaire that fills a case is 8.5, and building a thin version of it
- * here would be something 8.5 has to unpick.
- *
- * THE COURT IS PICKED, NOT TYPED (issue #360). `GET /v1/courts` is the
- * registry the server validates against, so the two `Select`s below offer
- * exactly what it will accept, and the printed district name is derived on
- * the server from the pair — the form never sends a district string. The
- * firm's defaults (`/v1/me`'s firm block) preselect the court, division and
- * chapter; the preparer changes any of them per case.
- *
- * Everything visual is ours: {@link AppShell}, {@link Heading}, and the design
- * system's `Button`, `Field`, `Select` and `RadioGroup` leaves. Chapter stays a
- * radio group even though the package has shipped `Select` since 0.4.0: with
- * four options a radio group is the better control regardless — every option is
- * visible and reachable without opening anything. The court list is ten
- * districts with up to seven divisions each, which is a `Select`'s job.
+ * The form that opens a case used to live here (issue 8.3, then #411's
+ * minimal client picker). It moved to `/cases/new` when a case became
+ * something opened FOR A CLIENT (ADR 0022 / #354): a client's record and
+ * "Add client" start cases too, and a form reached from three places is a
+ * page, not a panel on one of them. "New case" is the way in from here.
  */
 export function Cases() {
   const theme = useTheme();
+  const router = useRouter();
   const { call } = useApi();
   const membership = useMembership();
 
@@ -96,102 +37,6 @@ export function Cases() {
   // Loaded once and separately from the cases: it fails independently, and a
   // directory this screen could not fetch should cost names, not the list.
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
-  const [courts, setCourts] = useState<RegistryState>({ kind: 'loading' });
-  const [chapter, setChapter] = useState<CaseChapter>(7);
-  const [court, setCourt] = useState<string | null>(null);
-  const [division, setDivision] = useState<string | null>(null);
-  // The firm defaults are applied ONCE, when they first arrive — after that
-  // the form is the preparer's, and a membership refresh must not snap a
-  // half-filled form back to the defaults.
-  const [defaultsApplied, setDefaultsApplied] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  // A case is opened FOR A CLIENT (ADR 0022): `POST /v1/cases` requires
-  // `client_ids`. This is the minimum that keeps the form working until the
-  // client list and record screens arrive (#354) — pick an existing client,
-  // or name a new one here and it is added to the directory first.
-  const [clients, setClients] = useState<ClientsState>({ kind: 'loading' });
-  const [clientChoice, setClientChoice] = useState<string | null>(null);
-  const [newGiven, setNewGiven] = useState('');
-  const [newSurname, setNewSurname] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadClients = async () => {
-      try {
-        const result = await call((client) => client.listFirmClients());
-        if (result.ok && !cancelled) {
-          const active = result.value.filter((client) => client.status === 'active');
-          setClients({ kind: 'ready', clients: active });
-          // With nobody in the directory the only possible answer is a new
-          // client, so the form starts there rather than on an empty list.
-          if (active.length === 0) setClientChoice(NEW_CLIENT);
-        }
-      } catch {
-        // A 403 is the firm not having granted `clients`, which opening a case
-        // now needs — the message below says so rather than an empty picker.
-        if (!cancelled) setClients({ kind: 'error' });
-      }
-    };
-    void loadClients();
-    return () => {
-      cancelled = true;
-    };
-  }, [call]);
-
-  /** The chosen client's id — adding the named new client first when that is
-   * the choice. `null` when the add failed (its errors are already shown) or
-   * the session ended. */
-  const resolveClient = async (): Promise<string | null | undefined> => {
-    if (clientChoice !== NEW_CLIENT) return clientChoice ?? undefined;
-    const given = newGiven.trim();
-    const surname = newSurname.trim();
-    const added = await call((client) =>
-      client.createFirmClient({
-        name: {
-          ...(given === '' ? {} : { given }),
-          ...(surname === '' ? {} : { surname }),
-        },
-      }),
-    );
-    if (!added.ok) return null;
-    // Chosen from now on, so a retry after a case-level error does not add
-    // the same person twice.
-    setClients((current) =>
-      current.kind === 'ready'
-        ? { kind: 'ready', clients: [...current.clients, added.value] }
-        : current,
-    );
-    setClientChoice(added.value.id);
-    return added.value.id;
-  };
-
-  useEffect(() => {
-    if (defaultsApplied || membership === undefined || membership === null) return;
-    setDefaultsApplied(true);
-    if (membership.defaultChapter !== null) setChapter(membership.defaultChapter);
-    if (membership.defaultCourt !== null) setCourt(membership.defaultCourt);
-    if (membership.defaultDivision !== null) setDivision(membership.defaultDivision);
-  }, [defaultsApplied, membership]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadCourts = async () => {
-      try {
-        const result = await call((client) => client.listCourts());
-        if (result.ok && !cancelled) {
-          setCourts({ kind: 'ready', registry: result.value });
-        }
-      } catch {
-        if (!cancelled) setCourts({ kind: 'error' });
-      }
-    };
-    void loadCourts();
-    return () => {
-      cancelled = true;
-    };
-  }, [call]);
 
   const load = useCallback(async () => {
     try {
@@ -226,180 +71,25 @@ export function Cases() {
     void loadDirectory();
   }, [call]);
 
-  const submit = async () => {
-    setSubmitting(true);
-    setFieldErrors({});
-    setFormError(null);
-    let addingClient = clientChoice === NEW_CLIENT;
-    try {
-      const clientId = await resolveClient();
-      addingClient = false;
-      if (clientId === null) return;
-      // The pair goes as chosen, empty when not — the server's per-field
-      // message ("Choose the bankruptcy court…", "Choose the client this case
-      // is for.") is the validation, not a second copy of the rule here
-      // (ADR 0001).
-      const result = await call((client) =>
-        client.createCase({
-          chapter,
-          court: court ?? '',
-          division: division ?? '',
-          clientIds: clientId === undefined ? [] : [clientId],
-        }),
-      );
-      if (result.ok) {
-        await load();
-      }
-    } catch (cause) {
-      if (cause instanceof ApiValidationException) {
-        // The server is the source of truth for validation (ADR 0001), so its
-        // per-field messages are rendered as-is rather than restated here. A
-        // refused NEW client's `name` belongs to the name boxes below the
-        // picker, not to the case form's own fields.
-        setFieldErrors(
-          addingClient && cause.fields.name !== undefined
-            ? { clientName: cause.fields.name }
-            : cause.fields,
-        );
-      } else {
-        setFormError('Could not open the case. Please try again.');
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
+  // A courtesy, never a control: hidden only when the membership is KNOWN not
+  // to permit it. `/cases/new` says so itself, and the API refuses regardless.
+  const mayOpen = membership == null || permits(membership.permissions.cases, 'add_edit');
 
   return (
     <AppShell>
       <Heading level={1}>Your cases</Heading>
 
-      {/* level={2}: the screen owns the one <h1>; a heading picked for size
-          rather than structure is what produces a `heading-order` failure. */}
-      <Heading level={2}>Open a case</Heading>
-
-      <View style={styles.form}>
-        {/*
-          RadioGroup.Item IS the 20dp circle — the package's own tests render it
-          self-closing. Putting the label inside it makes four 20dp circles each
-          try to contain a word, and they overlap into an unreadable pile. The
-          label is a SIBLING; the only thing that belongs inside the Item is the
-          Indicator dot.
-
-          Two consequences that have to be handled here rather than assumed:
-          `aria-label`, because a circle containing only a dot has no accessible
-          name; and `hitSlop`, because 20dp is far under the 44dp WCAG 2.5.5
-          target this app enforces — 12 on each side takes the tappable area to
-          44 without changing the visual.
-        */}
-        <RadioGroup.Root
-          aria-label="Chapter"
-          value={String(chapter)}
-          onValueChange={(next) => setChapter(Number(next) as CaseChapter)}
-          style={styles.chapters}
-        >
-          {CHAPTERS.map((option) => (
-            <View key={option.value} style={styles.chapterOption}>
-              <RadioGroup.Item value={String(option.value)} aria-label={option.label} hitSlop={12}>
-                <RadioGroup.Indicator />
-              </RadioGroup.Item>
-              <Text
-                style={[
-                  styles.chapterLabel,
-                  { color: theme.colors.ink, fontFamily: theme.typography.body },
-                ]}
-              >
-                {option.label}
-              </Text>
-            </View>
-          ))}
-        </RadioGroup.Root>
-        {fieldErrors.chapter ? (
-          <Text
-            aria-live="assertive"
-            style={[
-              styles.error,
-              { color: theme.colors.danger, fontFamily: theme.typography.body },
-            ]}
-          >
-            {fieldErrors.chapter}
-          </Text>
-        ) : null}
-
-        {clients.kind === 'ready' ? (
-          <ClientPicker
-            clients={clients.clients}
-            choice={clientChoice}
-            onChoose={setClientChoice}
-            given={newGiven}
-            surname={newSurname}
-            onGiven={setNewGiven}
-            onSurname={setNewSurname}
-            errors={fieldErrors}
-          />
-        ) : (
-          <Text
-            aria-live={clients.kind === 'error' ? 'assertive' : 'polite'}
-            style={[styles.body, muted]}
-          >
-            {clients.kind === 'loading'
-              ? 'Loading your clients…'
-              : 'Could not load your client directory — a case is opened for a client, so ' +
-                'opening one needs access to it. Ask a firm admin to grant “Clients”.'}
-          </Text>
-        )}
-
-        {courts.kind === 'ready' ? (
-          <CourtPicker
-            registry={courts.registry}
-            court={court}
-            division={division}
-            onCourtChange={(next) => {
-              setCourt(next);
-              // A division belongs to its court; a new court starts with none.
-              setDivision(null);
-            }}
-            onDivisionChange={setDivision}
-            errors={fieldErrors}
-          />
-        ) : (
-          <Text
-            aria-live={courts.kind === 'error' ? 'assertive' : 'polite'}
-            style={[styles.body, muted]}
-          >
-            {courts.kind === 'loading'
-              ? 'Loading the court registry…'
-              : 'Could not load the court registry — a case cannot be opened until it loads.'}
-          </Text>
-        )}
-
+      {mayOpen ? (
         <View style={styles.actions}>
           {/* size="lg" (48dp): the package's md is 40dp, under the 44dp
               WCAG 2.5.5 target-size floor this app enforces. */}
-          <Button
-            size="lg"
-            onPress={submit}
-            disabled={submitting || courts.kind !== 'ready' || clients.kind !== 'ready'}
-          >
-            {submitting ? 'Opening…' : 'Open case'}
+          <Button size="lg" onPress={() => router.push('/cases/new')}>
+            New case
           </Button>
         </View>
+      ) : null}
 
-        {formError === null ? null : (
-          <Text
-            aria-live="assertive"
-            style={[
-              styles.error,
-              { color: theme.colors.danger, fontFamily: theme.typography.body },
-            ]}
-          >
-            {formError}
-          </Text>
-        )}
-      </View>
-
-      <Heading level={2}>Existing cases</Heading>
       {list.kind === 'ready' ? (
         <CaseList cases={list.cases} colleagues={colleagues} />
       ) : (
@@ -411,136 +101,6 @@ export function Cases() {
         </Text>
       )}
     </AppShell>
-  );
-}
-
-/**
- * Who the case is for (ADR 0022): an active client from the firm's directory,
- * or a new one named in two boxes. Deliberately the least that works — the
- * real front door is the client list and record (#354), which replaces this.
- * Errors are the server's: `client_ids` from the case, `clientName` from a
- * refused new client's `name`.
- */
-function ClientPicker({
-  clients,
-  choice,
-  onChoose,
-  given,
-  surname,
-  onGiven,
-  onSurname,
-  errors,
-}: {
-  clients: readonly FirmClient[];
-  choice: string | null;
-  onChoose: (choice: string) => void;
-  given: string;
-  surname: string;
-  onGiven: (value: string) => void;
-  onSurname: (value: string) => void;
-  errors: Readonly<Record<string, string>>;
-}) {
-  const options = [
-    ...clients.map((client) => ({ value: client.id, label: clientLabel(client) })),
-    { value: NEW_CLIENT, label: 'New client…' },
-  ];
-  return (
-    <>
-      <Field.Root name="client_ids" invalid={Boolean(errors.client_ids)}>
-        <Field.Label>Client</Field.Label>
-        <Select
-          options={options}
-          value={choice}
-          onValueChange={onChoose}
-          placeholder="Choose a client"
-        />
-        <Field.Description>
-          The person this case is for. Their name and contact details are copied into the case as
-          Debtor 1.
-        </Field.Description>
-        {errors.client_ids ? <Field.Error match>{errors.client_ids}</Field.Error> : null}
-      </Field.Root>
-      {choice === NEW_CLIENT ? (
-        <>
-          <Field.Root name="clientGiven" invalid={Boolean(errors.clientName)}>
-            <Field.Label>Client’s first name</Field.Label>
-            <Input value={given} onValueChange={onGiven} autoCorrect={false} />
-          </Field.Root>
-          <Field.Root name="clientName" invalid={Boolean(errors.clientName)}>
-            <Field.Label>Client’s last name</Field.Label>
-            <Input value={surname} onValueChange={onSurname} autoCorrect={false} />
-            {errors.clientName ? <Field.Error match>{errors.clientName}</Field.Error> : null}
-          </Field.Root>
-        </>
-      ) : null}
-    </>
-  );
-}
-
-/**
- * The court and division pickers, fed by the registry. Two `Select`s rather
- * than one flattened list: a district has up to seven divisions and the
- * court is the fact the preparer knows first — the division follows from the
- * debtor's county, which the registry also carries and a later screen can
- * use to suggest it.
- */
-export function CourtPicker({
-  registry,
-  court,
-  division,
-  onCourtChange,
-  onDivisionChange,
-  errors,
-  courtLabel = 'Court',
-  divisionLabel = 'Division',
-  courtField = 'court',
-  divisionField = 'division',
-}: {
-  registry: CourtRegistry;
-  court: string | null;
-  division: string | null;
-  onCourtChange: (court: string) => void;
-  onDivisionChange: (division: string) => void;
-  errors: Readonly<Record<string, string>>;
-  courtLabel?: string;
-  divisionLabel?: string;
-  /** The error-map keys, which differ between a case (`court`) and a firm default (`defaultCourt`). */
-  courtField?: string;
-  divisionField?: string;
-}) {
-  const district = registry.districts.find((d) => d.code === court);
-  const courtOptions = registry.districts.map((d) => ({ value: d.code, label: d.name }));
-  const divisionOptions = (district?.divisions ?? []).map((d) => ({
-    value: d.code,
-    label: d.name,
-  }));
-  return (
-    <>
-      <Field.Root name={courtField} invalid={Boolean(errors[courtField])}>
-        <Field.Label>{courtLabel}</Field.Label>
-        <Select
-          options={courtOptions}
-          value={court}
-          onValueChange={onCourtChange}
-          placeholder="Choose a court"
-        />
-        <Field.Description>
-          The bankruptcy court this case will be filed in, from the court registry.
-        </Field.Description>
-        {errors[courtField] ? <Field.Error match>{errors[courtField]}</Field.Error> : null}
-      </Field.Root>
-      <Field.Root name={divisionField} invalid={Boolean(errors[divisionField])}>
-        <Field.Label>{divisionLabel}</Field.Label>
-        <Select
-          options={divisionOptions}
-          value={division}
-          onValueChange={onDivisionChange}
-          placeholder={district === undefined ? 'Choose a court first' : 'Choose a division'}
-          disabled={district === undefined}
-        />
-        {errors[divisionField] ? <Field.Error match>{errors[divisionField]}</Field.Error> : null}
-      </Field.Root>
-    </>
   );
 }
 
@@ -560,7 +120,7 @@ function CaseList({
     colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject;
 
   if (cases.length === 0) {
-    return <Text style={[styles.body, muted]}>No cases yet. Open one above to get started.</Text>;
+    return <Text style={[styles.body, muted]}>No cases yet. Choose “New case” to open one.</Text>;
   }
 
   return (
@@ -617,8 +177,8 @@ function CaseList({
             <Table.Cell width={90}>{String(item.chapter)}</Table.Cell>
             <Table.Cell width={90}>{item.district}</Table.Cell>
             <Table.Cell width={140}>
-              <Badge intent={STATUS_INTENT[item.status]} size="sm">
-                {STATUS_LABEL[item.status]}
+              <Badge intent={CASE_STATUS_INTENT[item.status]} size="sm">
+                {CASE_STATUS_LABEL[item.status]}
               </Badge>
             </Table.Cell>
             <Table.Cell width={150}>
@@ -653,28 +213,5 @@ const styles = StyleSheet.create({
   },
   caseMeta: {
     fontSize: fontSizes.caption,
-  },
-  chapterLabel: {
-    fontSize: fontSizes.label,
-  },
-  chapterOption: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  chapters: {
-    // Overrides the Root's own column default — four short options read better
-    // across than stacked, and wrap when the column is narrow.
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  error: {
-    fontSize: fontSizes.label,
-  },
-  form: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    marginTop: spacing.sm,
   },
 });

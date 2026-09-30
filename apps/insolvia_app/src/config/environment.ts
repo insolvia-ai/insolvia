@@ -183,12 +183,49 @@ export function resolveAuthConfig(
   rawDomain: string | undefined = process.env.EXPO_PUBLIC_COGNITO_DOMAIN,
   rawClientId: string | undefined = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID,
 ): AuthConfig | null {
+  return authConfigFrom(rawDomain, rawClientId);
+}
+
+/**
+ * The shared body of both resolvers, with NO defaults — deliberately. A
+ * default parameter fires on an explicit `undefined` too, so the portal
+ * resolver delegating to {@link resolveAuthConfig} with an unset portal id
+ * would silently fall back to the STAFF client id and send debtors through
+ * the staff app client. `environment.test.ts` pins that it does not.
+ */
+function authConfigFrom(
+  rawDomain: string | undefined,
+  rawClientId: string | undefined,
+): AuthConfig | null {
   const domain = normalizeAuthDomain(rawDomain);
   const clientId = rawClientId?.trim() ?? '';
   if (domain === null || clientId === '') {
     return null;
   }
   return { domain, clientId };
+}
+
+/**
+ * The CLIENT PORTAL's hosted-UI configuration, or `null` when this build has
+ * none (ADR 0023).
+ *
+ * The same pool and the same hosted domain as {@link resolveAuthConfig} — the
+ * portal is a second public PKCE app client on the one pool, not a second
+ * pool — and a DIFFERENT client id: `insolvia-<env>-portal`, whose tokens the
+ * API accepts on `/v1/portal/*` and nowhere else. Nothing here is a secret for
+ * the reason given above: the id rides in every `/oauth2/authorize` URL.
+ *
+ * Separate from the staff resolver rather than a parameter on it because the
+ * two sessions differ in more than the id (ADR 0023: memory-only tokens), and
+ * a build may carry one without the other — a `local` build from before this
+ * variable existed has the staff client and no portal client, and must keep
+ * signing staff in while `/portal` says it is not configured.
+ */
+export function resolvePortalAuthConfig(
+  rawDomain: string | undefined = process.env.EXPO_PUBLIC_COGNITO_DOMAIN,
+  rawClientId: string | undefined = process.env.EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID,
+): AuthConfig | null {
+  return authConfigFrom(rawDomain, rawClientId);
 }
 
 /**

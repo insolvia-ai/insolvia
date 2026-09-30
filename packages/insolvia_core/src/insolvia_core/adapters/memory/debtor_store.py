@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from insolvia_core.debtors import Debtor, role_order
+from insolvia_core.debtors import Debtor, LinkOutcome, role_order
 
 
 def _order(debtor: Debtor) -> tuple[int, str]:
@@ -38,6 +38,23 @@ class MemoryDebtorStore:
         # record here would make this store accept writes the real one refuses,
         # and a suite running against the looser of the two proves nothing.
         self.debtors[(debtor.case_id, debtor.filing_role)] = debtor
+
+    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+        # The same two conditions the DynamoDB transaction states, checked
+        # and applied in one step — nothing else runs between them here.
+        key = (debtor.case_id, debtor.filing_role)
+        if create and key in self.debtors:
+            return "role_taken"
+        for (case_id, role), other in self.debtors.items():
+            if (
+                case_id == debtor.case_id
+                and role != debtor.filing_role
+                and other.client_id is not None
+                and other.client_id == debtor.client_id
+            ):
+                return "client_taken"
+        self.debtors[key] = debtor
+        return "written"
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None:
         return self.debtors.get((case_id, filing_role))

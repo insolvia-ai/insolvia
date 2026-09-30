@@ -212,8 +212,9 @@ app_env="$APP_DIR/.env"
 upsert_env "$app_env" EXPO_PUBLIC_INSOLVIA_ENV "local"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN "$auth_domain"
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
-# The portal's own client (ADR 0023) — the name is reserved now, the
-# (portal) route group that reads it is PR 2 of that ADR's build.
+# The portal's own client (ADR 0023), read by the app's /portal route group
+# (src/config/environment.ts, resolvePortalAuthConfig). Without it /portal
+# says "sign-in is not configured" and the staff app is unaffected.
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
 ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env and apps/insolvia_app/.env were updated."

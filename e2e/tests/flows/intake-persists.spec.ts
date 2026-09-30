@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { openScratchCase } from '../../support/scratch-case';
 import { signIn } from '../../support/sign-in';
 
 /**
@@ -24,15 +25,20 @@ import { signIn } from '../../support/sign-in';
  * SELECTOR CONTRACT with the app — role-based, by accessible name, the same
  * discipline the rest of the suite keeps:
  *
- *   - the case list's link : link named "Open intake for the chapter N case in D"
+ *   - the client list, record and new-case form: `support/scratch-case.ts`'s header
+ *   - the case rail's link : link named "Intake"
  *   - the intake's name box: textbox named "First name"
  *   - the autosave signal  : the text "Saved"
  *   - the briefing select  : combobox named "Briefing status", its options by
  *     their visible labels
  *
- * IT REUSES A CASE rather than opening one per run. A spec that creates a row
- * on every staging deploy is a spec that fills a table nobody prunes; opening
- * one only when the account has none keeps this to a single case forever.
+ * IT WRITES ONLY TO THE SUITE'S SCRATCH CASE, and reuses it rather than
+ * opening one per run. Never a seeded fixture case: the integration tier
+ * finds those by what the seed wrote, and the loader does not repair a row it
+ * finds already present (ADR 0021). Never a fresh case per run: cases and
+ * firm clients cannot be deleted, so that fills a table nobody prunes.
+ * `support/scratch-case.ts` finds-or-opens the one case, for one scratch
+ * client, per environment.
  *
  * NO SLEEPS. The autosave is debounced, so the wait is on the "Saved" signal
  * the screen renders — a condition, not a guess at the debounce interval.
@@ -47,40 +53,21 @@ test.describe('staging intake', () => {
   test('keeps a half-finished intake across a reload', async ({ page }) => {
     await signIn(page);
 
-    // ── 1. A case to work in ──────────────────────────────────────────────
+    // ── 1. A case to work in — the suite's own, never a seeded one ─────────
     //
-    // TWO HOPS, not one. A case-list row used to carry six links — one of them
-    // straight to intake — because `/cases/<id>` did not exist for it to point
-    // at. It does now, so the row has a single link to the case and the six
-    // live in the case's own rail. Reaching intake is: open the case, then
-    // choose the section.
-    await page.goto('/cases');
-    const caseLink = page.getByRole('link', { name: /^Chapter \d+ case in/ }).first();
+    // This spec used to open the FIRST case on /cases. Since ADR 0022 that is
+    // a seeded fixture case, and typing over its Debtor 1 left the fixture
+    // unrecognisable to the integration tier, which finds it by content —
+    // the loader leaves an existing row alone, so the damage outlived the run.
+    // `openScratchCase` finds (or, on a fresh environment, opens) the one case
+    // the browser suite owns, and lands on its overview. Its header comment
+    // is the selector contract for the client list, record and case form.
+    await openScratchCase(page);
 
-    if ((await caseLink.count()) === 0) {
-      // First run against a fresh environment: open one. The chapter radio
-      // defaults to 7, so only the court and division need an answer — picked
-      // from the registry (`GET /v1/courts`, issue #360), never typed. And a
-      // case is opened FOR A CLIENT (ADR 0022): name a new one, which the
-      // screen adds to the directory before opening the case.
-      await page.getByRole('combobox', { name: 'Client' }).click();
-      await page.getByRole('option', { name: 'New client…' }).click();
-      await page.getByRole('textbox', { name: 'Client’s first name' }).fill('Probe');
-      await page.getByRole('textbox', { name: 'Client’s last name' }).fill('Example');
-      await page.getByRole('combobox', { name: 'Court' }).click();
-      await page.getByRole('option', { name: 'Middle District of Florida' }).click();
-      await page.getByRole('combobox', { name: 'Division' }).click();
-      await page.getByRole('option', { name: 'Tampa Division' }).click();
-      await page.getByRole('button', { name: 'Open case' }).click();
-    }
-    await expect(
-      caseLink,
-      'the case list should offer a way into a case — its absence means either ' +
-        'the list did not load or the row link lost its accessible name',
-    ).toBeVisible();
-
-    // ── 2. Into the case, then into its intake ────────────────────────────
-    await caseLink.click();
+    // ── 2. Into its intake ────────────────────────────────────────────────
+    //
+    // TWO HOPS, not one: a case-list row has a single link, to the case, and
+    // the case's sections live in its own rail.
     const intakeLink = page.getByRole('link', { name: 'Intake' }).first();
     await expect(
       intakeLink,

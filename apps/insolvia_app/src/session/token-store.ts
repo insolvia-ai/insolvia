@@ -29,6 +29,12 @@ import { persistentStore, readFrom, removeFrom, transientStore, writeTo } from '
  */
 const REFRESH_TOKEN_KEY = 'insolvia.auth.refresh-token';
 const PENDING_AUTHORIZATION_KEY = 'insolvia.auth.pending-authorization';
+/**
+ * The client portal's attempt, under its own key (ADR 0023). A staff attempt
+ * and a portal attempt sharing one slot would let either callback consume —
+ * and discard — the other's verifier.
+ */
+const PORTAL_PENDING_AUTHORIZATION_KEY = 'insolvia.portal.pending-authorization';
 
 /** The persisted refresh token, or `null` when there is no stored session. */
 export function readRefreshToken(): string | null {
@@ -71,6 +77,11 @@ export function writePendingAuthorization(pending: PendingAuthorization): void {
   writeTo(transientStore(), PENDING_AUTHORIZATION_KEY, JSON.stringify(pending));
 }
 
+/** {@link writePendingAuthorization}, for the client portal's own attempt. */
+export function writePortalPendingAuthorization(pending: PendingAuthorization): void {
+  writeTo(transientStore(), PORTAL_PENDING_AUTHORIZATION_KEY, JSON.stringify(pending));
+}
+
 /**
  * Reads the pending attempt, or `null` if there is none or it is unreadable.
  *
@@ -81,7 +92,15 @@ export function writePendingAuthorization(pending: PendingAuthorization): void {
  * `state` check.
  */
 export function readPendingAuthorization(): PendingAuthorization | null {
-  const raw = readFrom(transientStore(), PENDING_AUTHORIZATION_KEY);
+  return parsePending(readFrom(transientStore(), PENDING_AUTHORIZATION_KEY));
+}
+
+/** {@link readPendingAuthorization}, for the client portal's own attempt. */
+export function readPortalPendingAuthorization(): PendingAuthorization | null {
+  return parsePending(readFrom(transientStore(), PORTAL_PENDING_AUTHORIZATION_KEY));
+}
+
+function parsePending(raw: string | null): PendingAuthorization | null {
   if (raw === null || raw === '') {
     return null;
   }
@@ -119,4 +138,9 @@ export function readPendingAuthorization(): PendingAuthorization | null {
  */
 export function clearPendingAuthorization(): void {
   removeFrom(transientStore(), PENDING_AUTHORIZATION_KEY);
+}
+
+/** {@link clearPendingAuthorization}, for the client portal's own attempt. */
+export function clearPortalPendingAuthorization(): void {
+  removeFrom(transientStore(), PORTAL_PENDING_AUTHORIZATION_KEY);
 }

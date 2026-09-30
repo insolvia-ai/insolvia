@@ -62,6 +62,7 @@ import {
   isUploadIncomplete,
   libraryProvenance,
   permits,
+  revisedProvenance,
   staffTypedProvenance,
   submittedAtUtc,
 } from '@insolvia-ai/api-client';
@@ -3252,6 +3253,115 @@ describe('debtors linked to firm clients (ADR 0022)', () => {
       ),
     );
     expect(Object.keys(error.fields)).toEqual(['client_id']);
+  });
+
+  test.each([
+    ['copyDebtorFromClient', 'copy-from-client'],
+    ['copyDebtorToClient', 'copy-to-client'],
+  ] as const)('%s POSTs no body to /%s and maps the debtor', async (method, act) => {
+    const recopied = { ...CLIENT_DEBTOR, differs_from_client: [] };
+    const stub = stubFetch(() => jsonResponse(recopied, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const debtor = await client[method](CLIENT_DEBTOR.case_id, 'debtor_2');
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CLIENT_DEBTOR.case_id}/debtors/debtor_2/${act}`);
+    expect(seen.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
+    expect(seen.body).toBe('');
+    expect(debtor.differs_from_client).toEqual([]);
+    expect(debtor.provenance['name.given']).toEqual({ source: 'client', client_id: CLIENT_ID_1 });
+  });
+
+  test('a re-copy refused on a filed case is a 409 ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          error: 'ConflictError',
+          message:
+            'This case is filed — re-copying would change a filed petition. Amend it instead.',
+        },
+        409,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    const error = await rejection(client.copyDebtorFromClient(CLIENT_DEBTOR.case_id, 'debtor_1'));
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+  });
+});
+
+describe('revisedProvenance', () => {
+  const COPIED = { source: 'client', client_id: CLIENT_ID_1 } as const;
+  const LOADED = {
+    name: { given: 'Sam', surname: 'Example' },
+    other_names_used: [{ id: 'alias-1', surname: 'Sample' }],
+    phone: '555-0100',
+    tax_id: { kind: 'ssn', last_four: '4321' },
+    provenance: {
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      'other_names_used[alias-1].surname': COPIED,
+      phone: COPIED,
+      tax_id: { source: 'staff_typed' },
+    },
+  } as const;
+
+  test('an untouched record keeps every entry it was loaded with', () => {
+    const { provenance: _provenance, ...body } = LOADED;
+    expect(revisedProvenance(body, LOADED)).toEqual(LOADED.provenance);
+  });
+
+  test('only the field the person changed becomes staff_typed', () => {
+    const body = { ...LOADED, provenance: undefined, name: { ...LOADED.name, given: 'Samuel' } };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      ...LOADED.provenance,
+      'name.given': { source: 'staff_typed' },
+    });
+  });
+
+  test('a field the person added is staff_typed, and a cleared one has no entry', () => {
+    const body = { name: LOADED.name, email: 'sam@example.test' };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'name.given': COPIED,
+      'name.surname': COPIED,
+      email: { source: 'staff_typed' },
+    });
+  });
+
+  test('an alias is matched by its id, not its position', () => {
+    const body = {
+      other_names_used: [
+        { id: 'alias-2', surname: 'New' },
+        { id: 'alias-1', surname: 'Sample' },
+      ],
+    };
+    expect(revisedProvenance(body, LOADED)).toEqual({
+      'other_names_used[alias-2].surname': { source: 'staff_typed' },
+      'other_names_used[alias-1].surname': COPIED,
+    });
+  });
+
+  test('a tax ID echoed as loaded keeps its entry; a number typed into it does not', () => {
+    const echoed = revisedProvenance({ tax_id: { kind: 'ssn', last_four: '4321' } }, LOADED);
+    const retyped = revisedProvenance(
+      { tax_id: { kind: 'ssn', last_four: '4321', value: '987-65-4321' } },
+      LOADED,
+    );
+    expect(echoed.tax_id).toBe(LOADED.provenance.tax_id);
+    expect(retyped.tax_id).toEqual({ source: 'staff_typed' });
+  });
+
+  test('with nothing loaded it is staffTypedProvenance', () => {
+    const body = { name: { given: 'Sam' }, phone: '555-0100' };
+    expect(revisedProvenance(body, undefined)).toEqual(staffTypedProvenance(body));
   });
 });
 
@@ -8146,28 +8256,59 @@ describe('the client portal endpoints', () => {
     expect(revoked.status).toBe('revoked');
   });
 
-  test('reads the portal identity, which names no case', async () => {
-    const { stub, client } = portalClient(() =>
-      jsonResponse(
-        {
-          subject: CLIENT_SUBJECT,
-          displayName: 'Pat Example',
-          roles: ['debtor_1'],
-          firm: { name: 'Example & Partners' },
-        },
-        200,
-      ),
-    );
+  // Copied from api/routes/portal.py::portal_me_json and
+  // core/clients.public_status_json.
+  const PORTAL_ME = {
+    subject: CLIENT_SUBJECT,
+    displayName: 'Pat Example',
+    roles: ['debtor_1'],
+    firm: { name: 'Example & Partners' },
+    case: { chapter: 13, stage: 'ready_to_file' },
+  };
+
+  test('reads the portal identity and the case status, which names no case', async () => {
+    const { stub, client } = portalClient(() => jsonResponse(PORTAL_ME, 200));
 
     const me = await client.getPortalMe();
 
-    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/portal/me`);
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/me`);
     expect(me).toEqual({
       subject: CLIENT_SUBJECT,
       displayName: 'Pat Example',
       roles: ['debtor_1'],
       firm: { name: 'Example & Partners' },
+      case: { chapter: 13, stage: 'ready_to_file' },
     });
+  });
+
+  test.each([
+    ['no case block', { ...PORTAL_ME, case: undefined }],
+    ['an unknown chapter', { ...PORTAL_ME, case: { chapter: 9, stage: 'intake' } }],
+    ['an unknown stage', { ...PORTAL_ME, case: { chapter: 7, stage: 'dismissed' } }],
+  ])('refuses a portal identity with %s', async (_label, body) => {
+    const { client } = portalClient(() => jsonResponse(body, 200));
+
+    await expect(client.getPortalMe()).rejects.toThrow();
+  });
+
+  test('a signed-in person with no live binding is a 403', async () => {
+    const { client } = portalClient(() =>
+      jsonResponse(
+        {
+          error: 'Forbidden',
+          message: 'you do not have access to a case through the client portal',
+        },
+        403,
+      ),
+    );
+
+    const error = await rejection(client.getPortalMe());
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect((error as ApiException).statusCode).toBe(403);
   });
 
   test('a staff token on the portal is a 401', async () => {

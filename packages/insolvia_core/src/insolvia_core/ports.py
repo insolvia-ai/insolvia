@@ -13,13 +13,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, TypeVar
 
-from insolvia_core.access import Accessor
+from insolvia_core.access import Accessor, ClientAccessor
 from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
 from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
-from insolvia_core.clients import ClientBinding
-from insolvia_core.debtors import Debtor
+from insolvia_core.clients import CasePublicStatus, ClientBinding
+from insolvia_core.debtors import Debtor, LinkOutcome
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
@@ -423,6 +423,22 @@ class CaseStore(Protocol):
         """
         ...
 
+    def public_status(self, client: ClientAccessor) -> CasePublicStatus | None:
+        """The bound case's chapter and stage — the CLIENT's read of a case,
+        and the only one (ADR 0023 decision 4).
+
+        Takes the `ClientAccessor`, never a case id: the case is the one the
+        verified binding names, so there is no id a route could pass in
+        wrongly. Returns the projection, never a `Case`: implementations read
+        only `clients.PUBLIC_STATUS_ATTRIBUTES` and build the result with
+        `clients.public_status_from_case_item`, which answers None unless the
+        row belongs to the binding's firm.
+
+        `get` cannot serve here — it takes an `Accessor`, which a client
+        never holds and mypy will not let one be passed as.
+        """
+        ...
+
 
 class DocumentStore(Protocol):
     """Persists document METADATA rows (issue 8.6) — never the bytes.
@@ -605,6 +621,20 @@ class DebtorStore(Protocol):
 
     def put(self, debtor: Debtor) -> None:
         """Replace the record for `debtor`'s role outright."""
+        ...
+
+    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+        """Write `debtor` — which names a `client_id` — ONLY IF no other
+        role of its case names the same client (ADR 0022: one client, one
+        role per case), and, with `create`, only if its own role is still
+        empty (`create`'s rule).
+
+        One CONDITIONAL write, not a read and then a write: two links of
+        one client to two roles of one matter, racing, must not both land,
+        or the `by-client` index lists the case twice. Answers `"written"`,
+        `"role_taken"` (the create lost its race — nothing written), or
+        `"client_taken"` (another role holds this client — nothing
+        written)."""
         ...
 
     def get(self, case_id: str, *, filing_role: str) -> Debtor | None: ...

@@ -66,7 +66,12 @@ _READ_ONLY = ToolAnnotations(read_only_hint=True)
 # destructiveHint (mcp-surface.md § Protocol posture).
 _WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False)
 
-_ENTITY_TYPE_DOC = "One of: " + ", ".join(ENTITY_TYPES) + "."
+_ENTITY_TYPE_DOC = (
+    "One of: "
+    + ", ".join(ENTITY_TYPES)
+    + ". `clients` are the firm's client records this case's debtors are "
+    "linked to (recordId is the client id; read-only, tax id last four only)."
+)
 
 
 def _accessor_or_refuse(deps: McpDependencies) -> Accessor:
@@ -96,6 +101,7 @@ def create_mcp_server(deps: McpDependencies) -> MCPServer:
         document_store=deps.document_store,
         candidate_store=deps.candidate_store,
         access_log=deps.access_log,
+        firm_store=deps.firm_store,
     )
 
     config = deps.config

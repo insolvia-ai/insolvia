@@ -22,6 +22,11 @@ from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
 from insolvia_core.access import ClientAccessor
 from insolvia_core.access_log import record_access
+from insolvia_core.clients import (
+    CasePublicStatus,
+    public_status_json,
+)
+from insolvia_core.errors import ForbiddenError
 
 from insolvia_api.api.client_auth import current_client, require_client
 from insolvia_api.api.dependencies import dependencies
@@ -29,19 +34,42 @@ from insolvia_api.api.dependencies import dependencies
 blueprint = Blueprint("portal", __name__)
 
 
-def portal_me_json(client: ClientAccessor) -> dict[str, object]:
+def portal_me_json(
+    client: ClientAccessor, status: CasePublicStatus
+) -> dict[str, object]:
     """Who the portal says you are — the fixed read policy's smallest piece.
 
     The name is the one the FIRM gave at invitation (the binding's), not
-    anything the token carries; the firm block is its name alone. Deliberately
-    no case id: see the module docstring.
+    anything the token carries; the firm block is its name alone; the case
+    block is the public status — chapter and stage — and deliberately no case
+    id: see the module docstring.
     """
     return {
         "subject": client.subject,
         "displayName": client.binding.display_name,
         "roles": list(client.roles),
         "firm": {"name": client.firm.name},
+        "case": public_status_json(status),
     }
+
+
+def _public_status(client: ClientAccessor) -> CasePublicStatus:
+    """The bound case's chapter and stage, through the projection that takes
+    the binding (`CaseStore.public_status`) — never `CaseStore.get`, which
+    takes a staff `Accessor` and returns the whole record.
+
+    A live binding whose case is gone is a 403, the same refusal as no
+    binding at all: there is no case to reach through the portal, and which
+    of the two it is belongs to the firm."""
+    store = dependencies().case_store
+    if store is None:
+        raise RuntimeError("case store is not composed")
+    status = store.public_status(client)
+    if status is None:
+        raise ForbiddenError(
+            "you do not have access to a case through the client portal"
+        )
+    return status
 
 
 @blueprint.get("/v1/portal/me")
@@ -61,4 +89,4 @@ def portal_me_route() -> ResponseReturnValue:
             case_id=client.case_id, principal=client.subject, action="portal.read"
         )
     )
-    return jsonify(portal_me_json(client)), 200
+    return jsonify(portal_me_json(client, _public_status(client))), 200

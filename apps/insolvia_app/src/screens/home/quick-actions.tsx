@@ -22,14 +22,13 @@ import { spacing } from '@/theme';
 type Open = 'task' | 'note' | 'event' | null;
 
 /**
- * The dashboard's four quick actions (issue 14.7 / #359): open a case, add a
- * task, add a note, add an event. "Add a client" is not here — 14.1's client
- * domain has not landed (#354), and this row does not invent a fifth action
- * for a feature that does not exist yet.
+ * The dashboard's quick actions (issue 14.7 / #359): add a client, open a
+ * case, add a task, add a note, add an event.
  *
- * **What is reused, and what is not.** "New case" sends the caller to the
- * existing `/cases` screen, which already carries the create-case form — a
- * second copy here would drift from it the first time either changed. "Add
+ * **What is reused, and what is not.** "Add client" and "New case" send
+ * the caller to `/clients/new` and `/cases/new` (ADR 0022 / #354), the
+ * pages that own those forms — a second copy here would drift from them the
+ * first time either changed. "Add
  * event" reuses {@link EventForm} whole, the exact component the calendar
  * screen's own "Add office event" uses, because a firm event needs no case
  * context. Tasks and notes are different: both belong to a case, and neither
@@ -50,6 +49,7 @@ export function QuickActions({ membership }: { membership: FirmMembership }) {
   const [colleagues, setColleagues] = useState<readonly FirmColleague[]>([]);
   const [casesLoaded, setCasesLoaded] = useState(false);
 
+  const mayAddClient = permits(membership.permissions.clients, 'add_edit');
   const mayOpenCase = permits(membership.permissions.cases, 'add_edit');
   const mayAddTask = permits(membership.permissions.tasks, 'add_edit');
   const mayAddNote = permits(membership.permissions.notes, 'add_edit');
@@ -87,7 +87,12 @@ export function QuickActions({ membership }: { membership: FirmMembership }) {
 
   return (
     <View style={styles.row}>
-      <Button size="lg" onPress={() => router.push('/cases')} disabled={!mayOpenCase}>
+      {mayAddClient ? (
+        <Button size="lg" intent="secondary" onPress={() => router.push('/clients/new')}>
+          Add client
+        </Button>
+      ) : null}
+      <Button size="lg" onPress={() => router.push('/cases/new')} disabled={!mayOpenCase}>
         New case
       </Button>
       {mayAddTask ? (

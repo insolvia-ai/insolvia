@@ -21,7 +21,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
-import { CourtPicker } from '@/screens/cases';
+import { CourtPicker } from '@/components/court-picker';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
@@ -51,7 +51,7 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
   { value: 'notes', label: 'Notes' },
   { value: 'events', label: 'Events and calendar' },
   { value: 'tasks', label: 'Tasks' },
-  { value: 'clients', label: 'Clients (the client list is not yet available)' },
+  { value: 'clients', label: 'Clients' },
   {
     value: 'client_portal',
     label: 'Client portal (invitations; the portal itself is not yet available)',
@@ -364,7 +364,7 @@ type RegistryState =
  * so each PATCH sends exactly the fields its button names — and a firm
  * whose defaults are unset stays unset until somebody chooses.
  *
- * The court pickers come from the case screen's `CourtPicker`, reading the
+ * The court pickers are the case form's `CourtPicker`, reading the
  * same `GET /v1/courts` the create form reads; a registry that will not load
  * costs the pickers, not the letterhead.
  */

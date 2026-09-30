@@ -400,6 +400,40 @@ def populated_paths(record: object, prefix: str = "") -> list[str]:
     return [prefix] if prefix else []
 
 
+_PATH_SEGMENT_RE: Final = re.compile(r"^([a-z][a-z0-9_]*)(?:\[([A-Za-z0-9_-]+)\])?$")
+
+
+def value_at(record: object, path: str) -> object:
+    """The value `path` addresses in `record` — the inverse of
+    `populated_paths`, so every path that walk emits resolves here to the
+    value it was emitted for. A list element is found by its `id`, never by
+    position. None when nothing is there.
+
+    Exists so a write can ask "is this field the value it was?" of two
+    records by path — `debtors.require_client_provenance_kept` — which is
+    how a copied field's `client` provenance is told apart from a claim of
+    one on a value somebody has since changed."""
+    current: object = record
+    for segment in path.split("."):
+        match = _PATH_SEGMENT_RE.match(segment)
+        if match is None or not isinstance(current, Mapping):
+            return None
+        name, element_id = match.groups()
+        current = current.get(name)
+        if element_id is not None:
+            if not isinstance(current, Sequence) or isinstance(current, (str, bytes)):
+                return None
+            current = next(
+                (
+                    element
+                    for element in current
+                    if isinstance(element, Mapping) and element.get("id") == element_id
+                ),
+                None,
+            )
+    return current
+
+
 def require_provenance(
     record: Mapping[str, object], entries: Mapping[str, ProvenanceEntry]
 ) -> None:

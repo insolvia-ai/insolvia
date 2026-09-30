@@ -343,15 +343,33 @@ describe('the dashboard', () => {
     expect(screen.queryByRole('link', { name: /Chapter 7 · NDCA/ })).toBeNull();
   });
 
-  it('sends "New case" to the existing create-case flow', async () => {
+  it('sends "New case" to the create-case page', async () => {
     const { router } = signedIn();
     await screen.findByRole('heading', { name: 'Home' });
 
     await userEvent.setup().press(screen.getByRole('button', { name: 'New case' }));
 
     await waitFor(() => {
-      expect(router.getPathname()).toBe('/cases');
+      expect(router.getPathname()).toBe('/cases/new');
     });
+  });
+
+  it('sends "Add client" to the front door, for somebody who may add clients', async () => {
+    const { router } = signedIn({ me: membership({ clients: 'add_edit' }) });
+    await screen.findByRole('heading', { name: 'Home' });
+
+    await userEvent.setup().press(await screen.findByRole('button', { name: 'Add client' }));
+
+    await waitFor(() => {
+      expect(router.getPathname()).toBe('/clients/new');
+    });
+  });
+
+  it('offers no "Add client" without `clients` at add_edit', async () => {
+    signedIn();
+    await screen.findByRole('button', { name: 'New case' });
+
+    expect(screen.queryByRole('button', { name: 'Add client' })).toBeNull();
   });
 
   it('adds a task through the quick-add sheet, to the chosen case', async () => {

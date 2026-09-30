@@ -6,7 +6,8 @@ token minted by the real pool through the PORTAL's app client, for the client
 the seed bound to the fixture case — which is the one thing a mis-published
 `/insolvia/<env>/api/auth-portal-client-id` (or none at all) would break:
 
-  - the seeded client's portal token reaches /v1/portal/me and 401s on /v1/me;
+  - the seeded client's portal token reaches /v1/portal/me — the firm's name
+    and the case's chapter and stage — and 401s on /v1/me;
   - a staff token 401s on /v1/portal/me;
   - a revoked binding 403s (and the API writes a `denied` row — the access
     log is PutItem-only, so the row itself is not readable from here);
@@ -96,6 +97,11 @@ def test_the_seeded_client_reaches_the_portal(
     assert me["roles"] == seeded_client["roles"]
     assert me["firm"] == {"name": seeded_client["firmName"]}
     assert "caseId" not in me
+    # The public status, read through the binding: chapter and stage, and
+    # nothing else of the case record (ADR 0023 decision 4).
+    assert set(me["case"]) == {"chapter", "stage"}
+    assert me["case"]["chapter"] in (7, 11, 12, 13)
+    assert me["case"]["stage"] in ("intake", "ready_to_file", "filed")
 
 
 def test_a_portal_token_is_refused_by_staff_routes(as_client: Api):

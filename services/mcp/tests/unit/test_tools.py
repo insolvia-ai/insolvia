@@ -19,7 +19,16 @@ from insolvia_core.errors import (
 from insolvia_core.firms import ADD_EDIT, VIEW_ONLY
 from insolvia_mcp.core.tools import ENTITY_TYPES, whoami
 
-from tests.conftest import COLLEAGUE, FIRM_ID, OTHER_FIRM_ID, SUBJECT, make_accessor
+from tests.conftest import (
+    COLLEAGUE,
+    FIRM_ID,
+    OTHER_FIRM_ID,
+    SUBJECT,
+    TAX_ID_REF,
+    link_client,
+    make_accessor,
+    make_firm_client,
+)
 
 ADMIN = make_accessor(is_admin=True)
 VIEWER = make_accessor(
@@ -65,6 +74,14 @@ def test_whoami_reports_the_firm_and_permissions() -> None:
     assert result["displayName"] == "Dev User"
     assert result["permissions"]["cases"] == "view_only"
     assert result["permissions"]["extraction_review"] == "hidden"
+
+
+def test_whoami_reports_the_clients_feature() -> None:
+    # ADR 0022: existing rows lack `clients` and so have it hidden — the
+    # grant is an admin's act, and whoami is where an agent learns of it.
+    assert whoami(VIEWER)["permissions"]["clients"] == "hidden"
+    granted = make_accessor(is_admin=False, permissions={"clients": VIEW_ONLY})
+    assert whoami(granted)["permissions"]["clients"] == "view_only"
 
 
 def test_whoami_reports_the_absence_of_a_firm() -> None:
@@ -229,6 +246,146 @@ def test_a_record_id_from_another_case_is_not_found(tools) -> None:
         tools.get_case_record(
             ADMIN, case_id=other.id, entity_type="creditors", record_id=entity.id
         )
+
+
+# ── a case's clients (ADR 0022) ─────────────────────────────────────
+
+CLIENT_READER = make_accessor(
+    is_admin=False,
+    access_all_cases=True,
+    # No intake at all: `clients` is the first entity type not under it.
+    permissions={"cases": VIEW_ONLY, "clients": VIEW_ONLY},
+)
+
+
+def _joint_case(tools):
+    """A case with two linked clients, plus a third client in the same firm
+    that this case does not name."""
+    case = _case(tools)
+    first = make_firm_client(tools.firm_store, surname="First")
+    second = make_firm_client(tools.firm_store, surname="Second", with_tax_id=False)
+    stranger = make_firm_client(tools.firm_store, surname="Stranger")
+    link_client(tools.debtor_store, first, case, "debtor_1")
+    link_client(tools.debtor_store, second, case, "debtor_2")
+    return case, first, second, stranger
+
+
+def test_list_case_records_answers_the_cases_linked_clients(tools) -> None:
+    case, first, second, _ = _joint_case(tools)
+    result = tools.list_case_records(ADMIN, case_id=case.id, entity_type="clients")
+    # Filing-role order, and only the clients this case's debtors name.
+    assert [record["id"] for record in result["records"]] == [first.id, second.id]
+    assert result["records"][0]["name"] == {"given": "Pat", "surname": "First"}
+    assert "nextCursor" not in result
+
+
+def test_a_client_record_carries_the_last_four_never_the_ref(tools) -> None:
+    # The tax id rule (#382, ADR 0022): last four only — never a ref, never
+    # a value — on this surface as on the API's.
+    case, first, _, _ = _joint_case(tools)
+    listed = tools.list_case_records(ADMIN, case_id=case.id, entity_type="clients")
+    read = tools.get_case_record(
+        ADMIN, case_id=case.id, entity_type="clients", record_id=first.id
+    )
+    for record in (*listed["records"], read["record"]):
+        assert TAX_ID_REF not in repr(record)
+        assert not {"tax_id", "tax_id_ref", "taxId"} & set(record)
+    assert read["record"]["tax_id_last_four"] == "6789"
+    assert "tax_id_last_four" not in listed["records"][1]
+
+
+def test_a_case_without_linked_clients_lists_none(tools) -> None:
+    case = _case(tools)
+    make_firm_client(tools.firm_store)
+    result = tools.list_case_records(ADMIN, case_id=case.id, entity_type="clients")
+    assert result["records"] == []
+
+
+def test_get_case_counts_the_linked_clients(tools) -> None:
+    case, *_ = _joint_case(tools)
+    counts = tools.get_case(ADMIN, case_id=case.id)["recordCounts"]
+    assert counts["clients"] == 2
+    assert counts["debtors"] == 2
+
+
+def test_client_reads_gate_on_clients_not_intake(tools) -> None:
+    case, first, *_ = _joint_case(tools)
+    # Intake does not admit a client read...
+    intake_only = make_accessor(
+        is_admin=False,
+        access_all_cases=True,
+        permissions={"cases": VIEW_ONLY, "intake": ADD_EDIT},
+    )
+    with pytest.raises(ForbiddenError):
+        tools.list_case_records(intake_only, case_id=case.id, entity_type="clients")
+    with pytest.raises(ForbiddenError):
+        tools.get_case_record(
+            intake_only, case_id=case.id, entity_type="clients", record_id=first.id
+        )
+    # ...and `clients` alone does, with no intake grant at all.
+    result = tools.list_case_records(
+        CLIENT_READER, case_id=case.id, entity_type="clients"
+    )
+    assert len(result["records"]) == 2
+    with pytest.raises(ForbiddenError):
+        tools.list_case_records(CLIENT_READER, case_id=case.id, entity_type="debtors")
+
+
+def test_a_client_the_case_does_not_link_is_not_found(tools) -> None:
+    # Same firm, real client — but not this case's: the same answer a
+    # client of another firm gets. There is no firm-wide client read here.
+    case, _, _, stranger = _joint_case(tools)
+    with pytest.raises(NotFoundError):
+        tools.get_case_record(
+            ADMIN, case_id=case.id, entity_type="clients", record_id=stranger.id
+        )
+
+
+def test_another_firms_case_answers_not_found_for_its_clients(tools) -> None:
+    case, first, *_ = _joint_case(tools)
+    with pytest.raises(NotFoundError):
+        tools.list_case_records(OTHER_FIRM, case_id=case.id, entity_type="clients")
+    with pytest.raises(NotFoundError):
+        tools.get_case_record(
+            OTHER_FIRM, case_id=case.id, entity_type="clients", record_id=first.id
+        )
+
+
+def test_a_client_record_read_is_logged_under_the_client(tools, stores) -> None:
+    case, first, _, stranger = _joint_case(tools)
+    tools.list_case_records(ADMIN, case_id=case.id, entity_type="clients")
+    tools.get_case_record(
+        ADMIN, case_id=case.id, entity_type="clients", record_id=first.id
+    )
+    with pytest.raises(NotFoundError):
+        tools.get_case_record(
+            ADMIN, case_id=case.id, entity_type="clients", record_id=stranger.id
+        )
+    client_rows = [
+        (event.client_id, event.action, event.outcome)
+        for event in stores["access_log"].events
+        if event.client_id is not None
+    ]
+    # The listing is not logged per client (the API's directory list is
+    # not); each single-record read is, refused ones `denied`.
+    assert client_rows == [
+        (first.id, "client.read", "allowed"),
+        (stranger.id, "client.read", "denied"),
+    ]
+
+
+def test_clients_cannot_be_proposed_yet(tools) -> None:
+    # Read-only in this revision: a client candidate needs a review path that
+    # writes the firm table, which candidate review does not have.
+    case = _case(tools)
+    with pytest.raises(FieldValidationError):
+        tools.propose_case_records(
+            ADMIN,
+            case_id=case.id,
+            proposals=[{"entityType": "clients", "payload": {"name": {}}}],
+            client_id="c",
+        )
+    assert tools.candidate_store.list_for_case(case.id) == ()
 
 
 # ── the candidate flow ──────────────────────────────────────────────

@@ -2,7 +2,8 @@ import { RequireSession } from '@/components/require-session';
 import { Cases } from '@/screens/cases';
 
 /**
- * `/cases` — the case list and the form that opens one (issue 8.3).
+ * `/cases` — the case list (issue 8.3). The form that opens a case is
+ * `/cases/new` (ADR 0022 / #354).
  *
  * The guard wraps the screen here rather than inside `Cases`: "this route
  * needs a session" belongs in `src/app/` where the routes are, and a screen
