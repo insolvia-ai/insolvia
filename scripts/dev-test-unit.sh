@@ -25,9 +25,22 @@
 # THE COMMANDS ARE THE CI COMMANDS. Each area runs the same invocation its
 # `*-pr.yml` job runs — a bare `pytest` inside the service, `npm run test
 # --workspace <pkg>` at the root — so green here is a fair predictor of a
-# green PR and a red here is not a false alarm. Lint, format and typecheck
-# are deliberately NOT run here: they are already the pre-COMMIT hooks (and
-# `npm run ci` / each service's dev-test.sh for the full gate).
+# green PR and a red here is not a false alarm.
+#
+# PYTHON AREAS ALSO RUN RUFF, because nothing else local does. The JS side's
+# prettier and eslint are pre-COMMIT hooks; the Python side never had one, so
+# `ruff check .` and `ruff format --check .` ran only in CI and in each
+# service's dev-test.sh, which nothing calls for you. PR #411 was green on
+# every local gate and the pre-push hook, then red in "Core package" on an
+# unsorted import, a long line in tests/unit/ and three unformatted files.
+# So each Python area runs exactly its `*-pr.yml` Lint and Format check
+# steps — same cwd, so the same `.` (src/, tests/, scripts, all of it) and
+# the same root ruff.toml — with the ruff its CI job installs: the venv's,
+# checked against the `ruff==` pin in the requirements-dev.txt CI installs
+# from (the API's, for core), because a venv set up before a pin bump would
+# otherwise lint by different rules and pass where CI fails. Ruff over a
+# whole service is well under a second. mypy is still NOT run here: it is
+# the slow step, and each service's dev-test.sh is the full gate.
 #
 # WHY A MISSING VENV FAILS RATHER THAN SKIPS. A hook that silently skipped
 # the suite for an area whose toolchain was not installed would be a hook
@@ -63,6 +76,9 @@ ALL_AREAS="core api admin mailer mcp api-client app portal marketing forms ci-sc
 areas_for_path() {
   case "$1" in
     packages/insolvia_core/*)                       echo "core api admin mcp" ;;
+    # core-pr.yml installs the API's pins (ruff, mypy, pytest) — a bump
+    # there re-lints and re-tests core too, as it does in CI.
+    services/api/requirements*.txt)                 echo "core api" ;;
     services/api/*)                                 echo "api" ;;
     services/admin/*)                               echo "admin" ;;
     services/mailer/*)                              echo "mailer" ;;
@@ -84,13 +100,26 @@ areas_for_path() {
 }
 
 # ── How each area runs ──────────────────────────────────────────────────────
-# Python: the service's own venv (dev-setup.sh), a bare `pytest` — which
+# Python: the service's own venv (dev-setup.sh) — ruff as the `*-pr.yml`
+# Lint and Format check steps run it, then a bare `pytest`, which
 # pyproject's `testpaths` pins to tests/unit. core has no venv of its own and
-# runs under the API's, exactly as core-pr.yml installs the API's pins.
+# runs under the API's, exactly as core-pr.yml installs the API's pins; the
+# venv's directory is therefore also where its requirements-dev.txt lives.
 python_suite() { # $1 area  $2 directory  $3 venv directory  $4 setup script
-  [[ -x "$REPO_ROOT/$3/bin/pytest" ]] ||
+  local venv="$REPO_ROOT/$3" pins="$REPO_ROOT/${3%/.venv}/requirements-dev.txt"
+  [[ -x "$venv/bin/pytest" && -x "$venv/bin/ruff" ]] ||
     die "$1: no venv at $3 — run ./$4 first (a push touching $2 must be tested, not skipped)."
-  ( cd "$REPO_ROOT/$2" && "$REPO_ROOT/$3/bin/pytest" )
+
+  local pinned installed
+  pinned="$(sed -n 's/^ruff==\([^[:space:]#]*\).*/\1/p' "$pins")"
+  installed="$("$venv/bin/ruff" --version | awk '{print $2}')"
+  [[ -n "$pinned" ]] || die "$1: no ruff== pin in ${pins#"$REPO_ROOT"/}."
+  [[ "$installed" == "$pinned" ]] ||
+    die "$1: $3 has ruff $installed but CI installs $pinned (${pins#"$REPO_ROOT"/}) — run ./$4 to re-sync."
+
+  ( cd "$REPO_ROOT/$2" && "$venv/bin/ruff" check . && "$venv/bin/ruff" format --check . ) ||
+    die "$1: ruff failed as CI's Lint / Format check would. Fix: (cd $2 && $REPO_ROOT/$3/bin/ruff check --fix . && $REPO_ROOT/$3/bin/ruff format .)"
+  ( cd "$REPO_ROOT/$2" && "$venv/bin/pytest" )
 }
 
 node_workspace_suite() { # $1 area  $2 workspace
@@ -124,11 +153,11 @@ run_area() {
 
 describe_area() {
   case "$1" in
-    core)       echo "packages/insolvia_core   pytest (API venv)" ;;
-    api)        echo "services/api             pytest" ;;
-    admin)      echo "services/admin           pytest" ;;
-    mailer)     echo "services/mailer          pytest" ;;
-    mcp)        echo "services/mcp             pytest" ;;
+    core)       echo "packages/insolvia_core   ruff check + format --check, pytest (API venv)" ;;
+    api)        echo "services/api             ruff check + format --check, pytest" ;;
+    admin)      echo "services/admin           ruff check + format --check, pytest" ;;
+    mailer)     echo "services/mailer          ruff check + format --check, pytest" ;;
+    mcp)        echo "services/mcp             ruff check + format --check, pytest" ;;
     api-client) echo "packages/insolvia_api_client  npm run test --workspace" ;;
     app)        echo "apps/insolvia_app        npm run test --workspace (jest)" ;;
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
