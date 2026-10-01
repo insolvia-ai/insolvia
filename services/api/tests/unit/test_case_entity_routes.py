@@ -14,6 +14,7 @@ import time
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from insolvia_api.adapters.memory.event_store import MemoryEventStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
@@ -118,6 +119,8 @@ def client(access_log):
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
             case_store=MemoryCaseStore(),
+            # Filing records a filed date, which regenerates deadlines.
+            event_store=MemoryEventStore(),
             firm_store=firms,
             access_log=access_log,
             # Composed so the not-shadowed test below can prove the static
@@ -146,7 +149,12 @@ def open_case(client, subject=ALICE):
 def file_case(client, case_id, subject=ALICE):
     response = client.patch(
         f"/v1/cases/{case_id}",
-        json={"status": "filed"},
+        # Filing needs its docket facts (#355).
+        json={
+            "status": "filed",
+            "filed_at": "2026-09-01",
+            "case_number": "8:26-bk-01234",
+        },
         headers=auth(subject),
     )
     assert response.status_code == 200

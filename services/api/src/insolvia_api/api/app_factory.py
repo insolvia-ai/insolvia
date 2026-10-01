@@ -18,6 +18,9 @@ from werkzeug.exceptions import HTTPException
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.api.routes.calendar import blueprint as calendar_blueprint
 from insolvia_api.api.routes.case_entities import blueprint as case_entities_blueprint
+from insolvia_api.api.routes.case_lifecycle import (
+    blueprint as case_lifecycle_blueprint,
+)
 from insolvia_api.api.routes.case_summary import blueprint as case_summary_blueprint
 from insolvia_api.api.routes.cases import blueprint as cases_blueprint
 from insolvia_api.api.routes.courts import blueprint as courts_blueprint
@@ -71,6 +74,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app = Flask(__name__)
     app.extensions["insolvia_api_dependencies"] = dependencies
     app.register_blueprint(cases_blueprint)
+    # The lifecycle's acts that are not a field edit (#355): history,
+    # archive, soft delete, copy.
+    app.register_blueprint(case_lifecycle_blueprint)
     app.register_blueprint(case_summary_blueprint)
     app.register_blueprint(liens_blueprint)
     # /v1/cases/<id>/standards — a static segment, same argument as /summary.

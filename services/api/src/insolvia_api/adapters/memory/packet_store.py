@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from insolvia_core.adapters.memory.case_store import MemoryCaseStore
-from insolvia_core.cases import Case
+from insolvia_core.cases import Case, is_filed
 
 from insolvia_api.core.packets import Packet, list_order
 
@@ -35,7 +35,7 @@ class MemoryPacketStore:
         if (
             stored_case is None
             or stored_case.updated_at != expected_updated_at
-            or (stored_case.status == "filed" and not allow_filed)
+            or (is_filed(stored_case.status) and not allow_filed)
         ):
             return False
         # Both, together — nothing can fail between these lines, which is the

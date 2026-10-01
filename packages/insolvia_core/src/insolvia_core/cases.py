@@ -227,7 +227,7 @@ class Case:
     # and 1007(c) count from — a continued meeting does not move it. Both are
     # None until somebody records them, and the smallest addition that lets
     # a deadline exist at all; the rest of the post-filing record (#355)
-    # sits below. Once filed, neither may be cleared (`apply_changes`).
+    # sits below. Once filed, `filed_at` may not be cleared (`apply_changes`).
     filed_at: str | None = None
     meeting_341_at: str | None = None
     # The funnel position while `status` is `prospect` (PROSPECT_STAGES);

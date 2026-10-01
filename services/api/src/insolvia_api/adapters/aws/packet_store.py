@@ -5,7 +5,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
-from insolvia_core.cases import Case, case_item, partition_key
+from insolvia_core.cases import FILED_STATUSES, Case, case_item, partition_key
 
 from insolvia_api.core.packets import (
     Packet,
@@ -45,9 +45,14 @@ class DynamoDbPacketStore:
         values: dict[str, Any] = {":read_at": {"S": expected_updated_at}}
         names: dict[str, str] = {}
         if not allow_filed:
-            condition += " AND #status <> :filed"
+            # Every status at or after filing (#355): a discharged or closed
+            # case is still a filed petition.
+            filed = sorted(FILED_STATUSES)
+            placeholders = [f":filed{i}" for i in range(len(filed))]
+            condition += f" AND NOT (#status IN ({', '.join(placeholders)}))"
             names["#status"] = "status"
-            values[":filed"] = {"S": "filed"}
+            for placeholder, status in zip(placeholders, filed, strict=True):
+                values[placeholder] = {"S": status}
         case_put: dict[str, Any] = {
             "TableName": self.table_name,
             "Item": to_attributes(case_item(pinned_case)),

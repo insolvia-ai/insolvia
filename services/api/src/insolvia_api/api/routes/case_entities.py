@@ -50,7 +50,7 @@ from insolvia_core.case_entities import (
     parse_entity,
     replace_entity,
 )
-from insolvia_core.cases import Case
+from insolvia_core.cases import Case, is_filed
 from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
 from insolvia_core.firms import ADD_EDIT, INTAKE, VIEW_ONLY
 from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore
@@ -138,7 +138,7 @@ def _refuse_amended_before_filed(case: Case, draft: EntityDraft[Any]) -> None:
     `ConflictError` (409) rather than a 400 — the request is well-formed, the
     resource just is not in a state that admits it, exactly `ConflictError`'s
     own docstring."""
-    if draft.amended and case.status != "filed":
+    if draft.amended and not is_filed(case.status):
         raise ConflictError(
             "amended can only be set once the case is filed — this case's "
             f"status is {case.status!r}."

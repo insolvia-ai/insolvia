@@ -360,13 +360,15 @@ def test_creating_a_case_links_its_creator(client, store):
     ] == [case_id]
 
 
-def test_create_starts_at_intake_even_if_asked_otherwise(client):
+def test_create_refuses_to_open_a_case_already_past_the_funnel(client):
     response = client.post(
         "/v1/cases",
         json=with_client(client, auth(ALICE), {**TAMPA, "status": "filed"}),
         headers=auth(ALICE),
     )
-    assert response.get_json()["status"] == "intake"
+    # A case opens retained or as a prospect (#355) — never already filed.
+    assert response.status_code == 400
+    assert set(response.get_json()["fields"]) == {"status"}
 
 
 @pytest.mark.parametrize(
