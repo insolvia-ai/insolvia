@@ -12,10 +12,12 @@ from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_CLIENT,
     INDEX_BY_FIRM,
+    STATUS_MOVED,
     Case,
     CaseAssignment,
     CasePage,
     ClientCase,
+    StatusChange,
     assignee_key,
     assignment_from_item,
     assignment_item,
@@ -26,7 +28,10 @@ from insolvia_core.cases import (
     decode_cursor,
     encode_cursor,
     firm_key,
+    listing_cursor_tag,
     partition_key,
+    status_change_from_item,
+    status_change_item,
 )
 from insolvia_core.clients import (
     PUBLIC_STATUS_ATTRIBUTES,
@@ -34,6 +39,7 @@ from insolvia_core.clients import (
     public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor, debtor_item
+from insolvia_core.errors import ConflictError
 
 # The sparse indexes in infra/modules/case_store. Which of the first two a
 # listing reads depends on the caller — see list_for_accessor. The third is a
@@ -43,6 +49,7 @@ ASSIGNEE_INDEX = INDEX_BY_ASSIGNEE
 CLIENT_INDEX = INDEX_BY_CLIENT
 
 _CONDITION_FAILED = "ConditionalCheckFailedException"
+_TRANSACTION_CANCELLED = "TransactionCanceledException"
 
 
 class DynamoDbCaseStore:
@@ -269,51 +276,84 @@ class DynamoDbCaseStore:
         )
 
     def list_for_accessor(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
+        self,
+        accessor: Accessor,
+        *,
+        limit: int,
+        cursor: str | None,
+        archived: bool = False,
     ) -> CasePage:
         if accessor.sees_every_case:
-            return self._list_by_firm(accessor, limit=limit, cursor=cursor)
-        return self._list_by_assignee(accessor, limit=limit, cursor=cursor)
+            index = FIRM_INDEX
+            condition = "GSI1PK = :key"
+            key = firm_key(accessor.firm_id)
+        else:
+            index = ASSIGNEE_INDEX
+            condition = "GSI2PK = :key"
+            key = assignee_key(accessor.subject)
+        tag = listing_cursor_tag(index, archived=archived)
+        start_key: dict[str, Any] | None = None
+        if cursor is not None:
+            # `index=` is what turns a cursor from the other listing — or the
+            # other view — into a 400 instead of a silent skip. See
+            # core/cases.decode_cursor.
+            start_key = {
+                name: {"S": value}
+                for name, value in decode_cursor(cursor, index=tag).items()
+            }
 
-    def _list_by_firm(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
-    ) -> CasePage:
-        response = self._query(
-            index=FIRM_INDEX,
-            condition="GSI1PK = :firm",
-            values={":firm": {"S": firm_key(accessor.firm_id)}},
-            limit=limit,
-            cursor=cursor,
+        # FILL THE PAGE (#355). The view is a filter over the index, so one
+        # query of `limit` rows can come back short — or empty — because the
+        # rows it read were archived or deleted. Each pass asks for at most
+        # the rows still missing, so the page never overfills, and the last
+        # pass's LastEvaluatedKey is exactly where the next page starts:
+        # every row before it was either returned or belonged to the other
+        # view.
+        found: list[Case] = []
+        while True:
+            response = self._query(
+                index=index,
+                condition=condition,
+                values={":key": {"S": key}},
+                limit=limit - len(found),
+                start_key=start_key,
+            )
+            if index == FIRM_INDEX:
+                cases = [
+                    case_from_item(from_attributes(item))
+                    for item in response.get("Items", [])
+                ]
+            else:
+                cases = self._cases_for_assignments(response, accessor)
+            found.extend(
+                case for case in cases if not case.deleted and case.archived == archived
+            )
+            start_key = response.get("LastEvaluatedKey") or None
+            if start_key is None or len(found) >= limit:
+                break
+        next_cursor = (
+            encode_cursor(
+                {name: value["S"] for name, value in start_key.items()}, index=tag
+            )
+            if start_key is not None
+            else None
         )
-        cases = tuple(
-            case_from_item(from_attributes(item)) for item in response.get("Items", [])
-        )
-        return CasePage(
-            cases=cases,
-            next_cursor=self._next_cursor(response, index=FIRM_INDEX),
-        )
+        return CasePage(cases=tuple(found), next_cursor=next_cursor)
 
-    def _list_by_assignee(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
-    ) -> CasePage:
-        response = self._query(
-            index=ASSIGNEE_INDEX,
-            condition="GSI2PK = :assignee",
-            values={":assignee": {"S": assignee_key(accessor.subject)}},
-            limit=limit,
-            cursor=cursor,
-        )
-        # The index holds ASSIGNMENTS, not cases. It could have held a
-        # projected copy of the case instead, and that was rejected: a copy
-        # goes stale the moment a district or a status changes, and the listing
-        # would show values the case detail contradicts. So this is the one
-        # read path that costs a second round trip, and it is bounded by the
-        # page size rather than by the firm's caseload.
+    def _cases_for_assignments(
+        self, response: dict[str, Any], accessor: Accessor
+    ) -> list[Case]:
+        # The by-assignee index holds ASSIGNMENTS, not cases. It could have
+        # held a projected copy of the case instead, and that was rejected: a
+        # copy goes stale the moment a district or a status changes, and the
+        # listing would show values the case detail contradicts. So this is
+        # the one read path that costs a second round trip, and it is bounded
+        # by the page size rather than by the firm's caseload.
         case_ids = [
             str(from_attributes(item)["caseId"]) for item in response.get("Items", [])
         ]
         by_id = self._cases_by_id(case_ids)
-        cases = tuple(
+        return [
             case
             for case_id in case_ids
             # Order is preserved from the index query, which is already
@@ -324,11 +364,7 @@ class DynamoDbCaseStore:
             # Belt and braces, and cheap: an assignment row for another firm's
             # case should be impossible, and if one exists it must not list.
             if case.firm_id == accessor.firm_id
-        )
-        return CasePage(
-            cases=cases,
-            next_cursor=self._next_cursor(response, index=ASSIGNEE_INDEX),
-        )
+        ]
 
     def _cases_by_id(self, case_ids: list[str]) -> dict[str, Case]:
         """The case records behind a page of assignments.
@@ -371,7 +407,7 @@ class DynamoDbCaseStore:
         condition: str,
         values: dict[str, Any],
         limit: int,
-        cursor: str | None,
+        start_key: dict[str, Any] | None,
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
             "TableName": self.table_name,
@@ -384,41 +420,112 @@ class DynamoDbCaseStore:
             "ScanIndexForward": False,
             "Limit": limit,
         }
-        if cursor is not None:
-            # `index=` is what turns a cursor from the other listing into a
-            # 400 instead of a silent skip. See core/cases.decode_cursor.
-            kwargs["ExclusiveStartKey"] = {
-                key: {"S": value}
-                for key, value in decode_cursor(cursor, index=index).items()
-            }
+        if start_key is not None:
+            kwargs["ExclusiveStartKey"] = start_key
         return dict(self.client.query(**kwargs))
 
-    @staticmethod
-    def _next_cursor(response: dict[str, Any], *, index: str) -> str | None:
-        last_key = response.get("LastEvaluatedKey")
-        if not last_key:
-            return None
-        return encode_cursor(
-            {key: value["S"] for key, value in last_key.items()}, index=index
-        )
-
-    def update(self, case: Case) -> Case | None:
+    def update(
+        self,
+        case: Case,
+        *,
+        expected_status: str | None = None,
+        status_change: StatusChange | None = None,
+    ) -> Case | None:
+        # Both halves matter. attribute_exists rejects an update to a case
+        # that has since been deleted; the firm check closes the window
+        # between the route's read and this write, so a case cannot move
+        # firms out from under a caller mid-request. The status check (#355)
+        # stops a whole-record write read before a status move from putting
+        # the old status back.
+        condition = "attribute_exists(PK) AND firmId = :firm"
+        values: dict[str, Any] = {":firm": {"S": case.firm_id}}
+        names: dict[str, str] = {}
+        if expected_status is not None:
+            condition += " AND #status = :expected"
+            values[":expected"] = {"S": expected_status}
+            names["#status"] = "status"
+        put: dict[str, Any] = {
+            "TableName": self.table_name,
+            "Item": to_attributes(case_item(case)),
+            "ConditionExpression": condition,
+            "ExpressionAttributeValues": values,
+        }
+        if names:
+            put["ExpressionAttributeNames"] = names
         try:
-            self.client.put_item(
-                TableName=self.table_name,
-                Item=to_attributes(case_item(case)),
-                # Both halves matter. attribute_exists rejects an update to a
-                # case that has since been deleted; the firm check closes the
-                # window between the route's read and this write, so a case
-                # cannot move firms out from under a caller mid-request.
-                ConditionExpression="attribute_exists(PK) AND firmId = :firm",
-                ExpressionAttributeValues={":firm": {"S": case.firm_id}},
-            )
+            if status_change is None:
+                self.client.put_item(**put)
+            else:
+                # ONE TRANSACTION: the record and its history row, so the
+                # history can never describe a move that did not land.
+                self.client.transact_write_items(
+                    TransactItems=[
+                        {"Put": put},
+                        {
+                            "Put": {
+                                "TableName": self.table_name,
+                                "Item": to_attributes(
+                                    status_change_item(status_change)
+                                ),
+                                "ConditionExpression": "attribute_not_exists(SK)",
+                            }
+                        },
+                    ]
+                )
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
-                return None
-            raise
+            code = error.response.get("Error", {}).get("Code")
+            if code not in (_CONDITION_FAILED, _TRANSACTION_CANCELLED):
+                raise
+            return self._refused_update(case, expected_status)
         return case
+
+    def _refused_update(self, case: Case, expected_status: str | None) -> Case | None:
+        """Why a conditional update failed, told apart by one consistent
+        read: gone or moved firms is None (the port's 404), a status that
+        moved underneath the caller is a 409."""
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={"PK": {"S": partition_key(case.id)}, "SK": {"S": "META"}},
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        if not item:
+            return None
+        stored = case_from_item(from_attributes(item))
+        if stored.firm_id != case.firm_id:
+            return None
+        if expected_status is not None and stored.status != expected_status:
+            raise ConflictError(STATUS_MOVED)
+        # The condition held on re-read: the transaction lost to something
+        # else (a history row at the same microsecond). Let it surface.
+        raise RuntimeError("case update was refused for an unknown reason")
+
+    def status_history(self, case_id: str) -> tuple[StatusChange, ...]:
+        changes: list[StatusChange] = []
+        start_key: dict[str, Any] | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self.table_name,
+                "KeyConditionExpression": "PK = :case AND begins_with(SK, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":case": {"S": partition_key(case_id)},
+                    ":prefix": {"S": "STATUS#"},
+                },
+                "ConsistentRead": True,
+            }
+            if start_key is not None:
+                kwargs["ExclusiveStartKey"] = start_key
+            response = self.client.query(**kwargs)
+            changes.extend(
+                status_change_from_item(from_attributes(item))
+                for item in response.get("Items", [])
+            )
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                break
+        # The sort key is the timestamp, so the query is already oldest
+        # first; sorted anyway so the two adapters agree by construction.
+        return tuple(sorted(changes, key=lambda change: change.changed_at))
 
     def assign(self, assignment: CaseAssignment) -> None:
         # Unconditional, because the port says idempotent. The firm-admin UI

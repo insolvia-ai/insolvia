@@ -400,8 +400,8 @@ class CasePublicStatus:
     `Case` in a portal route's hands to leak a district, a date or a pin
     from, however a later route is written.
 
-    `stage` is the case's lifecycle status (`cases.STATUSES`: `intake`,
-    `ready_to_file`, `filed`) — the coarse, firm-facing state, not the case
+    `stage` is the case's lifecycle status (`cases.STATUSES`: `prospect`
+    through `closed`) — the coarse, firm-facing state, not the case
     overview's computed spine, which reads schedules, documents and the
     review queue a client may not see.
     """
@@ -413,7 +413,9 @@ class CasePublicStatus:
 # The case META item's attributes the projection may read. The DynamoDB
 # adapter passes exactly these as its ProjectionExpression, so the rest of the
 # row never leaves the table on a portal request.
-PUBLIC_STATUS_ATTRIBUTES: Final = ("firmId", "chapter", "status")
+# `deletedAt` is read only to refuse: a deleted case (#355) has no status to
+# show anyone, its client included.
+PUBLIC_STATUS_ATTRIBUTES: Final = ("firmId", "chapter", "status", "deletedAt")
 
 
 def public_status_from_case_item(
@@ -428,7 +430,7 @@ def public_status_from_case_item(
     chapter. Raises ValidationError on a row this domain did not write, as
     `cases.case_from_item` does.
     """
-    if item.get("firmId") != firm_id:
+    if item.get("firmId") != firm_id or item.get("deletedAt") is not None:
         return None
     chapter = item.get("chapter")
     stage = item.get("status")

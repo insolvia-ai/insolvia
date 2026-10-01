@@ -92,6 +92,13 @@ from typing import Final
 # client's subject key — the merged one and the survivor — because "what
 # happened to this client record" must be answerable from either row. A
 # refused merge is a `denied` row under whichever id could not be reached.
+#
+# case.delete (issue 14.3 / #355) EXTENDS the tuple for document.delete's
+# reason: deleting a matter makes the whole file — its debtors, schedules and
+# documents — unreachable, and folding that into case.update would make it
+# indistinguishable from a status edit. Archiving and restoring stay
+# case.update: the case is still the firm's working record either way.
+# Copying a case is a case.read of the source and a case.create of the copy.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -112,6 +119,7 @@ ACTIONS = (
     "client.read",
     "client.update",
     "client.merge",
+    "case.delete",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row

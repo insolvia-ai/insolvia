@@ -7,13 +7,16 @@ from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_FIRM,
+    STATUS_MOVED,
     Case,
     CaseAssignment,
     CasePage,
     ClientCase,
+    StatusChange,
     case_item,
     decode_cursor,
     encode_cursor,
+    listing_cursor_tag,
     listing_sort_key,
 )
 from insolvia_core.clients import (
@@ -21,6 +24,7 @@ from insolvia_core.clients import (
     public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor
+from insolvia_core.errors import ConflictError
 
 
 class MemoryCaseStore:
@@ -42,6 +46,8 @@ class MemoryCaseStore:
         # shape the BatchGetItem does, and a subject-keyed dict cannot make
         # cross-case linkage accidentally work.
         self.assignments: dict[tuple[str, str], CaseAssignment] = {}
+        # The lifecycle history (#355), per case, in write order.
+        self.history: dict[str, list[StatusChange]] = {}
         # THE SAME TABLE, in DynamoDB: a case, its assignments and its debtors
         # share a partition, which is what lets `create` write all three in
         # one transaction and `list_for_client` read the `by-client` index the
@@ -121,7 +127,12 @@ class MemoryCaseStore:
         return public_status_from_case_item(case_item(case), firm_id=client.firm_id)
 
     def list_for_accessor(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
+        self,
+        accessor: Accessor,
+        *,
+        limit: int,
+        cursor: str | None,
+        archived: bool = False,
     ) -> CasePage:
         if accessor.sees_every_case:
             index = INDEX_BY_FIRM
@@ -136,6 +147,11 @@ class MemoryCaseStore:
                 if case.firm_id == accessor.firm_id
                 and (case.id, accessor.subject) in self.assignments
             ]
+        # The view (#355): a filter over the index, never a deleted case.
+        visible = [
+            case for case in visible if not case.deleted and case.archived == archived
+        ]
+        index = listing_cursor_tag(index, archived=archived)
 
         # Mirrors both GSIs: sorted by the same "<createdAt>#<id>" value,
         # newest first. They agree on the sort key by construction — that is
@@ -162,12 +178,28 @@ class MemoryCaseStore:
             )
         return CasePage(cases=tuple(page), next_cursor=next_cursor)
 
-    def update(self, case: Case) -> Case | None:
+    def update(
+        self,
+        case: Case,
+        *,
+        expected_status: str | None = None,
+        status_change: StatusChange | None = None,
+    ) -> Case | None:
         existing = self.cases.get(case.id)
         if existing is None or existing.firm_id != case.firm_id:
             return None
+        if expected_status is not None and existing.status != expected_status:
+            raise ConflictError(STATUS_MOVED)
+        # Both, together — the DynamoDB adapter's transaction, as dicts.
         self.cases[case.id] = case
+        if status_change is not None:
+            self.history.setdefault(case.id, []).append(status_change)
         return case
+
+    def status_history(self, case_id: str) -> tuple[StatusChange, ...]:
+        return tuple(
+            sorted(self.history.get(case_id, ()), key=lambda change: change.changed_at)
+        )
 
     def assign(self, assignment: CaseAssignment) -> None:
         # Unconditional: the port says idempotent, and the DynamoDB adapter's
