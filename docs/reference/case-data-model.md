@@ -81,10 +81,9 @@ case {
   chapter: 7 | 11 | 12 | 13
   court, division              // a reference into the court registry (below)
   district                     // the printed name, DERIVED from the reference
-  status: prospect | intake | ready_to_file | filed | discharged | dismissed | closed
-  prospect_stage                      // while status is prospect only: possible |
-                                       // consultation_scheduled | awaiting_signed_agreement |
-                                       // exhausted
+  status: intake | ready_to_file | filed | discharged | dismissed | closed
+                                       // a case STARTS retained; the funnel before it is
+                                       // the client's (below)
   filed_at, meeting_341_at            // form dates: the petition (the order for relief in a
                                        // voluntary case) and the FIRST date set for the §341
                                        // meeting — the anchors the deadline engine counts from
@@ -141,18 +140,31 @@ The case's status is its lifecycle as data (issue 14.3 / #355), owned by
 `insolvia_core.cases` (`STATUSES`, `TRANSITIONS`, `apply_changes`):
 
 ```
-prospect ──► intake ◄──► ready_to_file ──► filed ──► discharged ──► closed
-   │            ▲                            │  ▲ └──► dismissed ───► closed
-   └────────────┘ (or straight to            │  └───── closed (reopened, § 350(b))
-                   ready_to_file)            └───────► closed
+            client (prospect, prospect_stage) ──► case opened = RETAINED
+                                                     │
+intake ◄──► ready_to_file ──► filed ──► discharged ──► closed
+                                │  ▲ └──► dismissed ───► closed
+                                │  └───── closed (reopened, § 350(b))
+                                └───────► closed
 ```
 
-- **A prospect is a matter in the funnel**, with `prospect_stage` saying
-  where. Leaving the funnel for `intake` or `ready_to_file` is the
-  **retained transition**: it stamps `first_retained_at` on each filing
-  debtor's client that has none ([ADR 0022](../adr/0022-a-client-is-not-a-case.md)).
-  A case opened retained (the default) stamps it too; a non-filing spouse
-  is never stamped.
+- **The funnel is the client's, and a case starts retained** — the
+  maintainer's decision of 2026-10-01, recorded in
+  [ADR 0022](../adr/0022-a-client-is-not-a-case.md): "a prospect is a
+  client with no case yet". A firm client is a prospect while
+  `first_retained_at` is unset, and `prospect_stage` (`possible`,
+  `consultation_scheduled`, `awaiting_signed_agreement`, `exhausted`) is
+  their funnel position, set through `PUT /v1/firm/clients/<id>/prospect-stage`
+  and never by the whole-record PUT. Opening a case for the client — or
+  copying one — is the **retained transition**: one conditional write
+  (`FirmStore.mark_client_retained`) stamps `first_retained_at` when unset
+  and REMOVES the stage, which is cleared rather than kept as history (the
+  case's own status history and `lead_source` are the records). A stage
+  write is conditioned on `first_retained_at` still being absent, so the two
+  cannot interleave into a retained client with a funnel position; a stage
+  for a retained client is a 409. "Not retained" is read from the client
+  record, never from the `by-client` index, which would answer for cases
+  the caller may not see. A non-filing spouse is never stamped.
 - **Moves are forward only**, with two exceptions: `intake` ↔
   `ready_to_file`, and `closed` → `filed` (a reopened case). A filed
   petition does not go back to preparation — changing it is an amendment.

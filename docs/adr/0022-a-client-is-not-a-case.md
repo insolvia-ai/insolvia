@@ -236,3 +236,13 @@ client; ship PR 2 and PR 3 back to back, and let the app show "no client
 linked" rather than crash in between. *Merge races*: two merges into and out
 of the same client at once must not strand a case — PR 7 takes a conditional
 write on both clients' status.
+
+**2026-10-01 — the funnel is on the client (maintainer).** PR 8 first built
+#355's prospect funnel as a case status; the maintainer decided it lives on
+the client, as this ADR's Decision already says ("a prospect is a client
+with no case yet"). So a case starts at retained (`intake`) and has no
+prospect status; a firm client carries a server-owned `prospect_stage`
+while `first_retained_at` is unset, and opening (or copying) a case for them
+is the retained transition — it stamps `first_retained_at` and clears the
+stage in one conditional write. The shapes are
+[`case-data-model.md`](../reference/case-data-model.md)'s § The lifecycle.

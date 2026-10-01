@@ -218,7 +218,12 @@ reached only through a case the caller may see: a client this case does not
 link answers `not_found` whatever firm it is in, and **a firm-wide client
 list is not a tool in v1**. A single-record read (`get_case_record`) is
 access-logged as `client.read` under `CLIENT#<id>`, as the API's is; the
-listing is not, matching `GET /v1/firm/clients`. `clients` is **not
+listing is not, matching `GET /v1/firm/clients`. The prospect funnel
+(#355) is the client's, not the case's — a case's statuses start at
+`intake` — and a client reached through a case has been retained, so
+`prospect_stage` does not appear here in practice (`firm_client_json` serves
+it only for a client with no `first_retained_at`); setting it is an API
+route, not a tool. `clients` is **not
 proposable yet**: ADR 0022 has a client proposal land as a candidate like any
 other write, but accepting one means a review path that writes the firm
 table, which candidate review (8.9) does not have — the same position

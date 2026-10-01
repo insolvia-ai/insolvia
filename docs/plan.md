@@ -223,8 +223,9 @@ order. Nothing here needs a new decision except where marked.
 1. **Promote** the latest green Release run to production (maintainer; the
    prod stage has never run end to end, so watch it). Prod holds no data.
 2. ~~**ADR 0022 PR 8 — lifecycle as data, post-filing fields, archive,
-   delete, copy** (#355 / 14.3)~~ — built: the prospect funnel to closed
-   with a history row per move, the docket facts, `first_retained_at`
+   delete, copy** (#355 / 14.3)~~ — built: the prospect funnel on the
+   CLIENT (the maintainer's call, 2026-10-01 — a case starts retained), the
+   case's lifecycle from intake to closed with a history row per move, the docket facts, `first_retained_at`
    stamped by the retained transition, the archive view, admin soft delete
    of an unfiled case, and copy case naming its source in provenance
    ([`case-data-model.md`](reference/case-data-model.md) § The lifecycle).
