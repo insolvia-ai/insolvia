@@ -29,6 +29,8 @@ import {
   ApiValidationException,
   BUSINESS_TYPES,
   CASE_COLLECTIONS,
+  CASE_STATUSES,
+  CASE_TRANSITIONS,
   EXEMPTION_SETS,
   CLAIM_CLASSES,
   CONTRACT_LEASE_INTENTIONS,
@@ -47,6 +49,7 @@ import {
   PLAN_CLASSES,
   PLAN_PAYMENT_SOURCES,
   PRESUMPTION_EXEMPTIONS,
+  PROSPECT_STAGES,
   SECURED_PAYMENT_BUCKETS,
   SECURED_TREATMENTS,
   SMALL_BUSINESS_STATUSES,
@@ -59,6 +62,7 @@ import {
   MAX_DOCUMENT_BYTE_SIZE,
   isDocumentContentType,
   isDocumentKind,
+  isFiledStatus,
   isUploadIncomplete,
   libraryProvenance,
   permits,
@@ -5152,6 +5156,209 @@ describe('the firm client endpoints (ADR 0022)', () => {
   });
 });
 
+// The case lifecycle (issue 14.3 / #355), pinned against
+// services/api/src/insolvia_api/api/routes/{cases,case_lifecycle}.py and
+// packages/insolvia_core/src/insolvia_core/cases.py.
+describe('the case lifecycle (issue #355)', () => {
+  const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
+  const COPY_ID = 'c0b10000-0000-4000-8000-0000000c0b10';
+  const FILED_CASE = {
+    id: CASE_ID,
+    createdBy: SUBJECT,
+    chapter: 7,
+    district: 'Middle District of Florida',
+    court: 'flmb',
+    division: 'tampa',
+    status: 'filed',
+    createdAt: '2026-07-23T09:15:00.123456Z',
+    updatedAt: '2026-09-01T10:00:00.000000Z',
+    filedAt: '2026-09-01',
+    caseNumber: '8:26-bk-01234',
+    judge: 'Hon. Example Judge',
+    trustee: 'Example Trustee',
+    officeFileNumber: 'F-1001',
+    archivedAt: '2026-09-30T10:00:00.000000Z',
+    archivedBy: SUBJECT,
+  };
+
+  function lifecycleClient(stub: { fetch: FetchLike }): InsolviaApiClient {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('the statuses, the moves and "filed" mirror insolvia_core.cases', () => {
+    expect(CASE_STATUSES).toEqual([
+      'prospect',
+      'intake',
+      'ready_to_file',
+      'filed',
+      'discharged',
+      'dismissed',
+      'closed',
+    ]);
+    expect(PROSPECT_STAGES).toEqual([
+      'possible',
+      'consultation_scheduled',
+      'awaiting_signed_agreement',
+      'exhausted',
+    ]);
+    expect(CASE_TRANSITIONS.filed).toEqual(['discharged', 'dismissed', 'closed']);
+    expect(CASE_TRANSITIONS.closed).toEqual(['filed']);
+    expect(CASE_STATUSES.filter(isFiledStatus)).toEqual([
+      'filed',
+      'discharged',
+      'dismissed',
+      'closed',
+    ]);
+  });
+
+  test('a case maps its docket facts and archive stamp, each absent until set', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    const matter = await lifecycleClient(stub).getCase(CASE_ID);
+
+    expect(matter).toEqual(FILED_CASE);
+  });
+
+  test('a prospect maps its stage, and an unknown status is malformed', async () => {
+    const prospect = { ...FILED_CASE, status: 'prospect', prospectStage: 'possible' };
+    expect(
+      await lifecycleClient(stubFetch(() => jsonResponse(prospect, 200))).getCase(CASE_ID),
+    ).toMatchObject({ status: 'prospect', prospectStage: 'possible' });
+    await expect(
+      lifecycleClient(
+        stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'shredded' }, 200)),
+      ).getCase(CASE_ID),
+    ).rejects.toThrow();
+  });
+
+  test('createCase sends status and prospect_stage only when given', async () => {
+    const stub = stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'prospect' }, 201));
+
+    await lifecycleClient(stub).createCase({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      clientIds: [CLIENT_ID_1],
+      status: 'prospect',
+      prospectStage: 'consultation_scheduled',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      chapter: 7,
+      court: 'flmb',
+      division: 'tampa',
+      client_ids: [CLIENT_ID_1],
+      status: 'prospect',
+      prospect_stage: 'consultation_scheduled',
+    });
+  });
+
+  test('updateCase sends the docket facts snake_case, with null to clear', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    await lifecycleClient(stub).updateCase(CASE_ID, {
+      status: 'filed',
+      filedAt: '2026-09-01',
+      caseNumber: '8:26-bk-01234',
+      judge: 'Hon. Example Judge',
+      trustee: null,
+      officeFileNumber: 'F-1001',
+      prospectStage: undefined,
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      status: 'filed',
+      filed_at: '2026-09-01',
+      case_number: '8:26-bk-01234',
+      judge: 'Hon. Example Judge',
+      trustee: null,
+      office_file_number: 'F-1001',
+    });
+  });
+
+  test('listCases asks for the archive with archived=true, and never sends false', async () => {
+    const stub = stubFetch(() => jsonResponse({ cases: [FILED_CASE] }, 200));
+    const client = lifecycleClient(stub);
+
+    await client.listCases({ archived: true, limit: 10 });
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases?limit=10&archived=true`);
+    await client.listCases({ archived: false });
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases`);
+  });
+
+  test('GETs the status history oldest first, stages only where present', async () => {
+    const history = [
+      {
+        changedAt: '2026-08-01T10:00:00.000000Z',
+        changedBy: SUBJECT,
+        fromStatus: 'prospect',
+        toStatus: 'intake',
+        fromStage: 'awaiting_signed_agreement',
+      },
+      {
+        changedAt: '2026-09-01T10:00:00.000000Z',
+        changedBy: SUBJECT,
+        fromStatus: 'ready_to_file',
+        toStatus: 'filed',
+      },
+    ];
+    const stub = stubFetch(() => jsonResponse({ history }, 200));
+
+    const changes = await lifecycleClient(stub).listCaseStatusHistory(CASE_ID);
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/status-history`);
+    expect(changes).toEqual(history);
+    expect('toStage' in changes[1]!).toBe(false);
+  });
+
+  test('PUTs {archived} to archive or restore, and maps the Case', async () => {
+    const stub = stubFetch(() => jsonResponse(FILED_CASE, 200));
+
+    const archived = await lifecycleClient(stub).setCaseArchived(CASE_ID, true);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/archived`);
+    expect(JSON.parse(seen.body)).toEqual({ archived: true });
+    expect(archived.archivedBy).toBe(SUBJECT);
+  });
+
+  test('DELETEs a case for a 204, and a filed case is a 409', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    await expect(lifecycleClient(stub).deleteCase(CASE_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}`);
+
+    const refused = stubFetch(() =>
+      jsonResponse({ error: 'ConflictError', message: 'A filed case cannot be deleted.' }, 409),
+    );
+    const error = asApiException(await rejection(lifecycleClient(refused).deleteCase(CASE_ID)));
+    expect(error.statusCode).toBe(409);
+  });
+
+  test('POSTs a copy with no body and maps the new Case from the 201', async () => {
+    const copy = {
+      id: COPY_ID,
+      createdBy: SUBJECT,
+      chapter: 7,
+      district: 'Middle District of Florida',
+      court: 'flmb',
+      division: 'tampa',
+      status: 'intake',
+      createdAt: '2026-10-01T10:00:00.000000Z',
+      updatedAt: '2026-10-01T10:00:00.000000Z',
+    };
+    const stub = stubFetch(() => jsonResponse(copy, 201));
+
+    const opened = await lifecycleClient(stub).copyCase(CASE_ID);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/copy`);
+    expect(opened).toEqual(copy);
+  });
+});
+
 describe('case assignment', () => {
   const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
   const SUBJECT_ID = 'b0b00000-0000-4000-8000-00000000b0b0';
@@ -8353,7 +8560,7 @@ describe('the client portal endpoints', () => {
   test.each([
     ['no case block', { ...PORTAL_ME, case: undefined }],
     ['an unknown chapter', { ...PORTAL_ME, case: { chapter: 9, stage: 'intake' } }],
-    ['an unknown stage', { ...PORTAL_ME, case: { chapter: 7, stage: 'dismissed' } }],
+    ['an unknown stage', { ...PORTAL_ME, case: { chapter: 7, stage: 'shredded' } }],
   ])('refuses a portal identity with %s', async (_label, body) => {
     const { client } = portalClient(() => jsonResponse(body, 200));
 
