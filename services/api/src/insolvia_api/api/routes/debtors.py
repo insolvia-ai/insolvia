@@ -433,10 +433,9 @@ def _linkable_client(accessor: Accessor, case: Case, client_id: str) -> FirmClie
     _log_client(accessor, client_id, "client.read", found=client is not None)
     if client is None:
         raise FieldValidationError({"client_id": "No such client."})
-    if client.archived:
-        raise FieldValidationError(
-            {"client_id": "That client is archived — restore them first."}
-        )
+    refused = client.refusal_for_new_case()
+    if refused is not None:
+        raise FieldValidationError({"client_id": refused})
     return client
 
 

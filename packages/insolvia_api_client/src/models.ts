@@ -630,10 +630,27 @@ export interface FirmClient {
    * sealed once and entered on a case.
    */
   readonly tax_id_last_four?: string | undefined;
+  /**
+   * Present only on a client that was MERGED into another (ADR 0022): the
+   * surviving client's id. Such a client is `archived` for good — it cannot
+   * be edited, restored, merged again or opened for a case; its cases now
+   * belong to the survivor.
+   */
+  readonly merged_into?: string | undefined;
   readonly created_at: string;
   readonly updated_at: string;
   /** The subject of the firm user who created the record. */
   readonly created_by: string;
+}
+
+/**
+ * `POST /v1/firm/clients/{id}/merge`'s answer: the survivor as it now stands
+ * and the merged client, archived with `merged_into`. Deliberately no count of
+ * the cases moved — it would include cases the caller may not see.
+ */
+export interface FirmClientMerge {
+  readonly client: FirmClient;
+  readonly merged: FirmClient;
 }
 
 /**

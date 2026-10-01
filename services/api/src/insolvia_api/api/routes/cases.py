@@ -130,7 +130,10 @@ def _clients_to_open_for(
     An ARCHIVED client is refused: archiving says the firm is done with
     them, and a new matter for them starts with bringing them back — a
     visible act, rather than a case quietly opened for someone the directory
-    hides.
+    hides. A MERGED client is archived for good and is refused naming the
+    fact, and so is one being merged away right now — a case opened for it
+    mid-merge could be missed by the merge and left naming a merged client
+    (`insolvia_core.client_merge`).
     """
     accessor = current_accessor()
     firm_store = _firm_store()
@@ -147,10 +150,9 @@ def _clients_to_open_for(
         )
         if client is None:
             raise FieldValidationError({"client_ids": "No such client."})
-        if client.archived:
-            raise FieldValidationError(
-                {"client_ids": "That client is archived — restore them first."}
-            )
+        refused = client.refusal_for_new_case()
+        if refused is not None:
+            raise FieldValidationError({"client_ids": refused})
         clients.append(client)
     return clients
 

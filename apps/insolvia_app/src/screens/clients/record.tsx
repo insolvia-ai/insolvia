@@ -20,6 +20,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
 
 import { ClientForm, formFromClient, requestFromForm } from './client-form';
 import type { ClientFormState } from './client-form';
+import { MergeDialog } from './merge-dialog';
 
 type RecordState =
   | { readonly kind: 'loading' }
@@ -72,6 +73,12 @@ function otherNames(names: readonly OtherName[] | undefined): string | undefined
  * "Restore". An archived client cannot have a case opened for them — the
  * server refuses, so "Start a case" is not offered until they are restored.
  *
+ * MERGE, FROM THE DUPLICATE. "Merge into another client…" folds THIS client
+ * into one picked in `MergeDialog`, which survives; on success the screen
+ * moves to the survivor, where the cases now are. A merged client renders as
+ * "Merged", links to its survivor, and offers no action at all — the server
+ * refuses editing, restoring, re-merging or opening a case for it.
+ *
  * THE TAX ID IS THE LAST FOUR, OR NOTHING. The full value is sealed on a case
  * (#382); a client screen shows only what `tax_id_last_four` says, and
  * cannot set it.
@@ -100,6 +107,8 @@ export function ClientRecord({
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [survivorName, setSurvivorName] = useState<string | null>(null);
 
   const mayView = permits(membership.permissions.clients, 'view_only');
   const mayEdit = permits(membership.permissions.clients, 'add_edit');
@@ -124,6 +133,25 @@ export function ClientRecord({
   useEffect(() => {
     if (mayView) void load();
   }, [load, mayView]);
+
+  // A merged client names its survivor by id; the record says who that is.
+  const mergedInto = record.kind === 'ready' ? record.client.merged_into : undefined;
+  useEffect(() => {
+    setSurvivorName(null);
+    if (mergedInto === undefined) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await call((client) => client.getFirmClient(mergedInto));
+        if (result.ok && !cancelled) setSurvivorName(displayName(result.value));
+      } catch {
+        // The link still works without the name; it just reads generically.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [call, mergedInto]);
 
   useEffect(() => {
     if (!mayView || !maySeeCases) return;
@@ -183,6 +211,7 @@ export function ClientRecord({
 
   const client = record.client;
   const archived = client.status === 'archived';
+  const merged = client.merged_into !== undefined;
 
   const save = async (form: ClientFormState) => {
     setBusy(true);
@@ -266,7 +295,7 @@ export function ClientRecord({
       <View style={styles.titleRow}>
         <Heading level={1}>{displayName(client)}</Heading>
         <Badge intent={archived ? 'neutral' : 'success'} size="sm">
-          {archived ? 'Archived' : 'Active'}
+          {merged ? 'Merged' : archived ? 'Archived' : 'Active'}
         </Badge>
       </View>
 
@@ -280,7 +309,7 @@ export function ClientRecord({
               Start a case for this client
             </Button>
           ) : null}
-          {mayEdit ? (
+          {mayEdit && !merged ? (
             <>
               <Button
                 size="lg"
@@ -304,11 +333,35 @@ export function ClientRecord({
               >
                 {archived ? 'Restore' : 'Archive'}
               </Button>
+              {archived ? null : (
+                <Button
+                  size="lg"
+                  intent="secondary"
+                  disabled={busy}
+                  onPress={() => {
+                    setStatus('');
+                    setMerging(true);
+                  }}
+                >
+                  Merge into another client…
+                </Button>
+              )}
             </>
           ) : null}
         </View>
       ) : null}
-      {archived ? (
+      {client.merged_into !== undefined ? (
+        <Text style={[styles.body, muted]}>
+          {'Merged into '}
+          <Link
+            href={`/clients/${client.merged_into}`}
+            style={{ color: theme.colors.primary, fontFamily: theme.typography.body }}
+          >
+            {survivorName ?? 'the client they were merged into'}
+          </Link>
+          {' — their cases are that client’s now. This record is kept, read-only.'}
+        </Text>
+      ) : archived ? (
         <Text style={[styles.body, muted]}>
           Archived — not in the active list, and no new case can be opened for them until they are
           restored. Their cases are unchanged.
@@ -402,6 +455,18 @@ export function ClientRecord({
             </View>
           )}
         </>
+      ) : null}
+
+      {mayEdit && !archived ? (
+        <MergeDialog
+          client={client}
+          open={merging}
+          onClose={() => setMerging(false)}
+          onMerged={(survivor) => {
+            setMerging(false);
+            router.replace(`/clients/${survivor.id}`);
+          }}
+        />
       ) : null}
 
       <AlertDialog.Root

@@ -294,7 +294,11 @@ export function ClientList({ membership }: { membership: FirmMembership }) {
                     </Table.Cell>
                     <Table.Cell width={110}>
                       <Badge intent={client.status === 'active' ? 'success' : 'neutral'} size="sm">
-                        {client.status === 'active' ? 'Active' : 'Archived'}
+                        {client.status === 'active'
+                          ? 'Active'
+                          : client.merged_into !== undefined
+                            ? 'Merged'
+                            : 'Archived'}
                       </Badge>
                     </Table.Cell>
                   </Table.Row>

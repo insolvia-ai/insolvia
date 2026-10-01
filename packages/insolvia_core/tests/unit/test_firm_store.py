@@ -223,6 +223,12 @@ class FakeDynamoDb:
     def delete_item(self, **kwargs: Any) -> Any:
         return self._record("delete_item", kwargs)
 
+    def update_item(self, **kwargs: Any) -> Any:
+        return self._record("update_item", kwargs)
+
+    def transact_write_items(self, **kwargs: Any) -> Any:
+        return self._record("transact_write_items", kwargs)
+
 
 def dynamo_store(monkeypatch, fake: FakeDynamoDb) -> DynamoDbFirmStore:
     monkeypatch.setattr(aws_firm_store.boto3, "client", lambda _service: fake)
@@ -730,9 +736,87 @@ def test_a_client_round_trips_through_the_wire_format(monkeypatch):
 def test_a_client_update_is_scoped_to_the_firm(monkeypatch):
     fake = FakeDynamoDb()
     dynamo_store(monkeypatch, fake).update_client(firm_client())
-    _, kwargs = fake.calls[0]
-    assert kwargs["ConditionExpression"] == "attribute_exists(SK) AND firmId = :firm"
+    name, kwargs = fake.calls[0]
+    assert name == "update_item"
+    assert kwargs["ConditionExpression"] == (
+        "attribute_exists(SK) AND firmId = :firm AND attribute_not_exists(#merged)"
+    )
+    assert kwargs["ExpressionAttributeNames"]["#merged"] == "mergedInto"
     assert kwargs["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_client_update_never_writes_the_merge_attributes(monkeypatch):
+    """A whole-record save built from a read taken before a merge claimed the
+    row must not erase the claim — so the update names every attribute the
+    record owns and none of the merge's, even when the read carried them."""
+    fake = FakeDynamoDb()
+    stale = replace(firm_client(), merging_into="client-a", merging_from="client-b")
+    dynamo_store(monkeypatch, fake).update_client(stale)
+    _, kwargs = fake.calls[0]
+    written = {
+        name
+        for placeholder, name in kwargs["ExpressionAttributeNames"].items()
+        if placeholder.startswith("#a")
+    }
+    assert {"status", "body", "updatedAt", "firmId"} <= written
+    assert written.isdisjoint({"mergedInto", "mergingInto", "mergingFrom", "PK", "SK"})
+
+
+def test_a_client_update_without_a_tax_id_removes_it(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).update_client(firm_client())
+    _, kwargs = fake.calls[0]
+    assert kwargs["UpdateExpression"].endswith("REMOVE #taxId")
+
+
+def test_a_merge_claim_is_one_transaction_over_both_rows(monkeypatch):
+    fake = FakeDynamoDb()
+    claimed = dynamo_store(monkeypatch, fake).claim_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a"
+    )
+    [(name, kwargs)] = fake.calls
+    merged, survivor = (item["Update"] for item in kwargs["TransactItems"])
+    assert claimed is True
+    assert name == "transact_write_items"
+    assert merged["Key"]["SK"] == {"S": "FIRMCLIENT#client-b"}
+    assert merged["UpdateExpression"] == "SET #into = :survivor"
+    assert "attribute_not_exists(#from)" in merged["ConditionExpression"]
+    assert survivor["Key"]["SK"] == {"S": "FIRMCLIENT#client-a"}
+    assert survivor["UpdateExpression"] == "SET #from = :merged"
+    assert "attribute_not_exists(#into)" in survivor["ConditionExpression"]
+    for update in (merged, survivor):
+        assert "#status = :active" in update["ConditionExpression"]
+        assert "attribute_not_exists(#mergedInto)" in update["ConditionExpression"]
+        assert update["ExpressionAttributeValues"][":firm"] == {"S": FIRM_ID}
+
+
+def test_a_refused_merge_claim_is_false(monkeypatch):
+    fake = FakeDynamoDb()
+    fake.raises = ClientError(
+        {"Error": {"Code": "TransactionCanceledException"}}, "TransactWriteItems"
+    )
+    store = dynamo_store(monkeypatch, fake)
+    claimed = store.claim_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a"
+    )
+    assert claimed is False
+
+
+def test_finishing_a_merge_archives_and_releases_in_one_transaction(monkeypatch):
+    fake = FakeDynamoDb()
+    dynamo_store(monkeypatch, fake).finish_client_merge(
+        FIRM_ID, merged_id="client-b", survivor_id="client-a", merged_at="2026-09-30"
+    )
+    name, kwargs = fake.calls[0]
+    merged, survivor = (item["Update"] for item in kwargs["TransactItems"])
+    assert name == "transact_write_items"
+    assert merged["UpdateExpression"] == (
+        "SET #status = :archived, #mergedInto = :survivor, updatedAt = :now"
+        " REMOVE #into"
+    )
+    assert merged["ConditionExpression"] == "#into = :survivor"
+    assert survivor["UpdateExpression"] == "REMOVE #from"
+    assert survivor["ConditionExpression"] == "#from = :merged"
 
 
 def test_a_refused_client_update_is_none(monkeypatch):

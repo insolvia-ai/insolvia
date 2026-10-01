@@ -32,11 +32,18 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access_log import record_access
 from insolvia_core.cases import case_json
-from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.client_merge import merge_clients
+from insolvia_core.errors import (
+    ConflictError,
+    FieldValidationError,
+    NotFoundError,
+    ValidationError,
+)
 from insolvia_core.firm_clients import (
     FirmClient,
     create_firm_client,
     firm_client_json,
+    parse_client_merge,
     parse_client_status,
     parse_firm_client,
     replace_firm_client,
@@ -200,6 +207,7 @@ def update_client_route(client_id: str) -> ResponseReturnValue:
     if existing is None:
         _log(access_log, client_id, "client.update", found=False)
         raise NotFoundError(_NOT_FOUND)
+    _refuse_merged(existing)
     response = _write(store, access_log, replace_firm_client(existing, draft))
     logger.info("client updated")
     return response
@@ -218,6 +226,77 @@ def set_client_status_route(client_id: str) -> ResponseReturnValue:
     if existing is None:
         _log(access_log, client_id, "client.update", found=False)
         raise NotFoundError(_NOT_FOUND)
+    _refuse_merged(existing)
     response = _write(store, access_log, set_firm_client_status(existing, status))
     logger.info("client status changed", extra={"status": status})
     return response
+
+
+@blueprint.post("/v1/firm/clients/<client_id>/merge")
+@require_auth
+@requires(CLIENTS, ADD_EDIT)
+def merge_client_route(client_id: str) -> ResponseReturnValue:
+    """Fold another client INTO this one — `{"merged_client_id": "<id>"}`
+    (ADR 0022's PR 7). The client in the URL survives and keeps its id; the
+    merged one's cases are re-pointed here (their debtors' `client_id` and
+    `by-client` entries, one conditional write per case — the copied
+    identity untouched) and it is archived with `merged_into`, never
+    deleted. `insolvia_core.client_merge` owns the rules and the claim that
+    keeps two merges into and out of one client from stranding a case.
+
+    Answers `{"client": <survivor>, "merged": <merged, archived>}` — and no
+    count of the cases moved, which would include cases the caller may not
+    see (a count is the enumeration ADR 0009's 404 hides).
+
+    `clients >= add_edit`, like every other client write. It moves EVERY
+    case of the merged client, including ones the caller is not linked to:
+    a case left behind would name an archived client, and refusing because
+    of a case the caller cannot see would reveal it. Nothing of those cases
+    is returned.
+
+    - survivor unknown or another firm's: 404 (the anti-oracle answer);
+    - `merged_client_id` unknown, or the same id: 400 keyed to that field;
+    - either client merged, archived, in another merge, or both of them
+      debtors on one case: 409 — the request is fine, the clients' state
+      does not admit it.
+
+    Logged as `client.merge` under BOTH clients' ids — a refused one as
+    `denied` under whichever could not be reached.
+    """
+    store, access_log = _stores()
+    accessor = current_accessor()
+    merged_id = parse_client_merge(_json_body())
+    survivor = store.get_client(accessor.firm_id, client_id)
+    if survivor is None:
+        _log(access_log, client_id, "client.merge", found=False)
+        raise NotFoundError(_NOT_FOUND)
+    merged = store.get_client(accessor.firm_id, merged_id)
+    if merged is None:
+        _log(access_log, merged_id, "client.merge", found=False)
+        raise FieldValidationError({"merged_client_id": "No such client."})
+    debtor_store = dependencies().debtor_store
+    if debtor_store is None:
+        raise RuntimeError("debtor store is not composed")
+
+    result = merge_clients(store, debtor_store, survivor=survivor, merged=merged)
+    _log(access_log, merged.id, "client.merge", found=True)
+    _log(access_log, survivor.id, "client.merge", found=True)
+    # GLBA: that two records became one — no name, no id.
+    logger.info("clients merged")
+    return jsonify(
+        {
+            "client": firm_client_json(result.survivor),
+            "merged": firm_client_json(result.merged),
+        }
+    ), 200
+
+
+def _refuse_merged(client: FirmClient) -> None:
+    """A merged client is a terminal record: its edits belong on the
+    survivor, and restoring it would reopen a person the firm already
+    folded into another row. 409 — the caller can see it; its state is
+    what refuses."""
+    if client.merged_into is not None:
+        raise ConflictError(
+            "This client was merged into another client. Edit that client instead."
+        )
