@@ -113,6 +113,9 @@ describe('signing in to the portal', () => {
 
     await userEvent.press(await screen.findByRole('button', { name: 'Sign in' }));
 
+    await waitFor(() => {
+      expect(browser.navigations.at(-1) ?? '').toContain('/oauth2/authorize?');
+    });
     const authorize = new URL(browser.navigations.at(-1) ?? '');
     expect(authorize.searchParams.get('client_id')).toBe(PORTAL_CONFIG.clientId);
     expect(authorize.searchParams.get('redirect_uri')).toBe(`${TEST_ORIGIN}/portal/auth/callback`);
