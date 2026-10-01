@@ -5162,6 +5162,7 @@ describe('the firm client endpoints (ADR 0022)', () => {
 describe('the case lifecycle (issue #355)', () => {
   const CASE_ID = 'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b';
   const COPY_ID = 'c0b10000-0000-4000-8000-0000000c0b10';
+  const FIRM_CLIENT_ID_LIFECYCLE = 'c1100000-0000-4000-8000-0000000c11b0';
   const FILED_CASE = {
     id: CASE_ID,
     createdBy: SUBJECT,
@@ -5187,7 +5188,6 @@ describe('the case lifecycle (issue #355)', () => {
 
   test('the statuses, the moves and "filed" mirror insolvia_core.cases', () => {
     expect(CASE_STATUSES).toEqual([
-      'prospect',
       'intake',
       'ready_to_file',
       'filed',
@@ -5219,11 +5219,12 @@ describe('the case lifecycle (issue #355)', () => {
     expect(matter).toEqual(FILED_CASE);
   });
 
-  test('a prospect maps its stage, and an unknown status is malformed', async () => {
-    const prospect = { ...FILED_CASE, status: 'prospect', prospectStage: 'possible' };
-    expect(
-      await lifecycleClient(stubFetch(() => jsonResponse(prospect, 200))).getCase(CASE_ID),
-    ).toMatchObject({ status: 'prospect', prospectStage: 'possible' });
+  test('a prospect is not a case status: the client decodes it as malformed', async () => {
+    await expect(
+      lifecycleClient(
+        stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'prospect' }, 200)),
+      ).getCase(CASE_ID),
+    ).rejects.toThrow();
     await expect(
       lifecycleClient(
         stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'shredded' }, 200)),
@@ -5231,26 +5232,64 @@ describe('the case lifecycle (issue #355)', () => {
     ).rejects.toThrow();
   });
 
-  test('createCase sends status and prospect_stage only when given', async () => {
-    const stub = stubFetch(() => jsonResponse({ ...FILED_CASE, status: 'prospect' }, 201));
-
-    await lifecycleClient(stub).createCase({
-      chapter: 7,
-      court: 'flmb',
-      division: 'tampa',
-      clientIds: [CLIENT_ID_1],
-      status: 'prospect',
-      prospectStage: 'consultation_scheduled',
-    });
-
-    expect(JSON.parse(stub.lastRequest().body)).toEqual({
-      chapter: 7,
-      court: 'flmb',
-      division: 'tampa',
-      client_ids: [CLIENT_ID_1],
-      status: 'prospect',
+  test('a prospect CLIENT is staged with a PUT, and the stage maps back', async () => {
+    const staged = {
+      id: FIRM_CLIENT_ID_LIFECYCLE,
+      status: 'active',
+      name: { surname: 'Example' },
       prospect_stage: 'consultation_scheduled',
-    });
+      created_at: '2026-09-30T10:00:00.000000Z',
+      updated_at: '2026-10-01T10:00:00.000000Z',
+      created_by: SUBJECT,
+    };
+    const stub = stubFetch(() => jsonResponse(staged, 200));
+
+    const client = await lifecycleClient(stub).setFirmClientProspectStage(
+      FIRM_CLIENT_ID_LIFECYCLE,
+      'consultation_scheduled',
+    );
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/clients/${FIRM_CLIENT_ID_LIFECYCLE}/prospect-stage`);
+    expect(JSON.parse(seen.body)).toEqual({ prospect_stage: 'consultation_scheduled' });
+    expect(client.prospect_stage).toBe('consultation_scheduled');
+  });
+
+  test('null takes a prospect out of the funnel, sent as null', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          id: FIRM_CLIENT_ID_LIFECYCLE,
+          status: 'active',
+          name: { surname: 'Example' },
+          created_at: '2026-09-30T10:00:00.000000Z',
+          updated_at: '2026-10-01T10:00:00.000000Z',
+          created_by: SUBJECT,
+        },
+        200,
+      ),
+    );
+
+    const client = await lifecycleClient(stub).setFirmClientProspectStage(
+      FIRM_CLIENT_ID_LIFECYCLE,
+      null,
+    );
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({ prospect_stage: null });
+    expect('prospect_stage' in client).toBe(false);
+  });
+
+  test('a retained client refuses a stage with a 409', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ConflictError', message: 'This client has been retained.' }, 409),
+    );
+    const error = asApiException(
+      await rejection(
+        lifecycleClient(stub).setFirmClientProspectStage(FIRM_CLIENT_ID_LIFECYCLE, 'possible'),
+      ),
+    );
+    expect(error.statusCode).toBe(409);
   });
 
   test('updateCase sends the docket facts snake_case, with null to clear', async () => {
@@ -5263,7 +5302,7 @@ describe('the case lifecycle (issue #355)', () => {
       judge: 'Hon. Example Judge',
       trustee: null,
       officeFileNumber: 'F-1001',
-      prospectStage: undefined,
+      chapter: undefined,
     });
 
     expect(JSON.parse(stub.lastRequest().body)).toEqual({
@@ -5291,9 +5330,8 @@ describe('the case lifecycle (issue #355)', () => {
       {
         changedAt: '2026-08-01T10:00:00.000000Z',
         changedBy: SUBJECT,
-        fromStatus: 'prospect',
-        toStatus: 'intake',
-        fromStage: 'awaiting_signed_agreement',
+        fromStatus: 'intake',
+        toStatus: 'ready_to_file',
       },
       {
         changedAt: '2026-09-01T10:00:00.000000Z',
@@ -5308,7 +5346,6 @@ describe('the case lifecycle (issue #355)', () => {
 
     expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE_ID}/status-history`);
     expect(changes).toEqual(history);
-    expect('toStage' in changes[1]!).toBe(false);
   });
 
   test('PUTs {archived} to archive or restore, and maps the Case', async () => {

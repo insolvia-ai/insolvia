@@ -637,6 +637,13 @@ export interface FirmClient {
    * belong to the survivor.
    */
   readonly merged_into?: string | undefined;
+  /**
+   * Where a PROSPECT sits in the funnel (issue #355) — present only while
+   * {@link first_retained_at} is absent and a stage has been set through
+   * `setFirmClientProspectStage`. Server-owned: the whole-record PUT never
+   * sends it.
+   */
+  readonly prospect_stage?: ProspectStage | undefined;
   readonly created_at: string;
   readonly updated_at: string;
   /** The subject of the firm user who created the record. */
@@ -1025,15 +1032,15 @@ export type CaseChapter = 7 | 11 | 12 | 13;
 /**
  * A case's position in its lifecycle (issue 14.3 / #355) — mirrors
  * `insolvia_core.cases.STATUSES`, member for member and in lifecycle order:
- * a `prospect` in the funnel; `intake` and `ready_to_file`, retained and
- * being prepared; `filed`; its two outcomes `discharged` and `dismissed`; and
- * `closed`. Exported as a VALUE because the app renders it as a picker.
+ * `intake` and `ready_to_file`, retained and being prepared; `filed`; its two
+ * outcomes `discharged` and `dismissed`; and `closed`. Exported as a VALUE
+ * because the app renders it as a picker. There is no prospect CASE: the
+ * funnel before retention is the client's ({@link FirmClient.prospect_stage}).
  *
  * Which moves the server accepts is {@link CASE_TRANSITIONS}; a move off it
  * answers 409.
  */
 export const CASE_STATUSES = [
-  'prospect',
   'intake',
   'ready_to_file',
   'filed',
@@ -1068,7 +1075,6 @@ export function isFiledStatus(status: CaseStatus): boolean {
  * `ready_to_file`, and `closed` back to `filed` (a reopened case).
  */
 export const CASE_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
-  prospect: ['intake', 'ready_to_file'],
   intake: ['ready_to_file', 'filed'],
   ready_to_file: ['intake', 'filed'],
   filed: ['discharged', 'dismissed', 'closed'],
@@ -1078,9 +1084,10 @@ export const CASE_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]
 };
 
 /**
- * Where a prospect sits in the funnel — mirrors
- * `insolvia_core.cases.PROSPECT_STAGES`. Present on a case only while its
- * status is `prospect`.
+ * Where a prospect CLIENT sits in the funnel (issue #355) — mirrors
+ * `insolvia_core.firm_clients.PROSPECT_STAGES`. A client is a prospect while
+ * {@link FirmClient.first_retained_at} is absent; opening their first case
+ * retains them and clears the stage.
  */
 export const PROSPECT_STAGES = [
   'possible',
@@ -1179,8 +1186,6 @@ export interface Case {
    * rest of the meeting-anchored deadlines count from it.
    */
   readonly meeting341At?: string;
-  /** The funnel position, present only while {@link status} is `prospect`. */
-  readonly prospectStage?: ProspectStage;
   /**
    * The court's case number, as the notice of filing prints it
    * (`8:26-bk-01234`). Absent until recorded; a case cannot reach `filed`
@@ -1226,31 +1231,19 @@ export interface CreateCaseRequest {
    * 403 to a caller without `clients` at `view_only`.
    */
   readonly clientIds: readonly string[];
-  /**
-   * `intake` (retained — what the server opens at when this is omitted) or
-   * `prospect`, to open the matter in the funnel (issue #355). Any other
-   * status is a 400: a case is not born filed.
-   */
-  readonly status?: 'prospect' | 'intake' | undefined;
-  /** A prospect's opening stage; the server defaults it to `possible`. */
-  readonly prospectStage?: ProspectStage | undefined;
 }
 
-/** The `POST /v1/cases` request body, with the optional fields omitted when absent. */
+/**
+ * The `POST /v1/cases` request body — every field is required. Every case
+ * opens at `intake`: there is no status to send (issue #355).
+ */
 export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
-  const json: Record<string, unknown> = {
+  return {
     chapter: request.chapter,
     court: request.court,
     division: request.division,
     client_ids: [...request.clientIds],
   };
-  if (request.status !== undefined) {
-    json.status = request.status;
-  }
-  if (request.prospectStage !== undefined) {
-    json.prospect_stage = request.prospectStage;
-  }
-  return json;
 }
 
 /**
@@ -1337,8 +1330,6 @@ export interface UpdateCaseChanges {
   readonly filedAt?: string | null | undefined;
   /** The first § 341 date (`meeting_341_at`), `null` to clear, omit to keep. */
   readonly meeting341At?: string | null | undefined;
-  /** A prospect's funnel stage (`prospect_stage`); refused on any other status. */
-  readonly prospectStage?: ProspectStage | undefined;
   /**
    * The post-filing docket facts (issue #355), each `null` to clear and
    * omitted to keep. Reaching `filed` needs {@link filedAt} and
@@ -1383,9 +1374,6 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.meeting341At !== undefined) {
     json.meeting_341_at = changes.meeting341At;
   }
-  if (changes.prospectStage !== undefined) {
-    json.prospect_stage = changes.prospectStage;
-  }
   if (changes.caseNumber !== undefined) {
     json.case_number = changes.caseNumber;
   }
@@ -1403,9 +1391,7 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
 
 /**
  * One move in a case's lifecycle, from `GET /v1/cases/{caseId}/status-history`
- * (issue #355): who moved it, when, from what to what. A prospect's stage
- * moving within the funnel is a move too — {@link fromStage}/{@link toStage}
- * carry it, each absent outside the funnel.
+ * (issue #355): who moved it, when, from what to what.
  */
 export interface CaseStatusChange {
   readonly changedAt: string;
@@ -1413,8 +1399,6 @@ export interface CaseStatusChange {
   readonly changedBy: string;
   readonly fromStatus: CaseStatus;
   readonly toStatus: CaseStatus;
-  readonly fromStage?: ProspectStage;
-  readonly toStage?: ProspectStage;
 }
 
 // ---------------------------------------------------------------------------

@@ -56,6 +56,7 @@ import type {
   PortalClient,
   PortalClientStatus,
   PortalMe,
+  ProspectStage,
   CaseEntityRequest,
   CaseForm,
   CaseLiens,
@@ -1918,6 +1919,23 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `PUT /v1/firm/clients/{id}/prospect-stage` — place a PROSPECT in the
+   * funnel, or take them out of it with `null` (issue #355). A 409 means the
+   * client has been retained (they have a case, or a retained date); a 404
+   * that they are not in the caller's firm. Needs `clients: add_edit`.
+   */
+  async setFirmClientProspectStage(id: string, stage: ProspectStage | null): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/prospect-stage`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospect_stage: stage }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
    * `PUT /v1/firm/clients/{id}/status` — archive a client (`'archived'`) or
    * bring one back (`'active'`). A status write, never a delete: there is no
    * way to delete a client through this API (ADR 0022). Needs `clients` at
@@ -2186,8 +2204,6 @@ export class InsolviaApiClient {
         changedBy: requireString(element, 'changedBy'),
         fromStatus: requireCaseStatus(element, 'fromStatus'),
         toStatus: requireCaseStatus(element, 'toStatus'),
-        fromStage: optionalChoice(element, 'fromStage', PROSPECT_STAGES),
-        toStage: optionalChoice(element, 'toStage', PROSPECT_STAGES),
       }),
     );
   }
@@ -2795,7 +2811,6 @@ function caseFromJson(response: DecodedResponse): Case {
     ...(meeting341At === undefined ? {} : { meeting341At }),
     // The lifecycle (issue #355): each absent until set.
     ...definedMembers<Partial<Case>>({
-      prospectStage: optionalChoice(response, 'prospectStage', PROSPECT_STAGES),
       caseNumber: optionalString(response, 'caseNumber'),
       judge: optionalString(response, 'judge'),
       trustee: optionalString(response, 'trustee'),
@@ -4648,6 +4663,7 @@ function firmClientFromJson(response: DecodedResponse): FirmClient {
     first_retained_at: optionalString(response, 'first_retained_at'),
     tax_id_last_four: optionalString(response, 'tax_id_last_four'),
     merged_into: optionalString(response, 'merged_into'),
+    prospect_stage: optionalChoice(response, 'prospect_stage', PROSPECT_STAGES),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
     created_by: requireString(response, 'created_by'),
