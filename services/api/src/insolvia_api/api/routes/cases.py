@@ -1,27 +1,23 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import date
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access_log import record_access
 from insolvia_core.cases import (
-    RETAINED_STATUSES,
     CaseChanges,
     apply_changes,
     assign_case,
     case_json,
     create_case,
-    is_retained_transition,
     parse_case_creation,
     parse_case_update,
     parse_list_limit,
     status_change,
 )
 from insolvia_core.errors import FieldValidationError, NotFoundError, ValidationError
-from insolvia_core.fields import timestamp
 from insolvia_core.firm_clients import FirmClient, debtor_from_client
 from insolvia_core.firms import ADD_EDIT, CASES, CLIENTS, VIEW_ONLY
 from insolvia_core.petitions import PETITION
@@ -169,17 +165,21 @@ RETAINED_ROLES = ("debtor_1", "debtor_2")
 
 
 def stamp_first_retained(case_id: str, access_log: AccessLog) -> None:
-    """THE RETAINED TRANSITION's consequence (ADR 0022, #355): each filing
-    debtor's client gets `first_retained_at` — today, as a form date — if it
-    has none yet. Never overwritten: "first" means the earliest engagement,
-    and a hand-entered earlier date is the firm's own record of it.
+    """THE RETAINED TRANSITION (ADR 0022, #355): a case was opened (or copied)
+    for these clients, so each filing debtor's client leaves the prospect
+    funnel — `first_retained_at` set to today, as a form date, if it has none
+    yet, and `prospect_stage` removed — in the firm store's one conditional
+    write (`mark_client_retained`). Never overwritten: "first" means the
+    earliest engagement, and a hand-entered earlier date is the firm's own
+    record of it. There is no prospect CASE: the funnel is the client's,
+    by the maintainer's decision of 2026-10-01.
 
     After the case write, like the deadline hook: a stamp that fails leaves
     the case right and the client a request behind, never the reverse. It
     runs whatever the caller's `clients` grant — the server recording a fact
     about the engagement, not the caller editing a client — and each stamp
     is access-logged as the `client.update` it is. A merged client is
-    refused by `update_client` and simply not stamped.
+    refused by the store and simply not stamped.
     """
     deps = dependencies()
     if deps.debtor_store is None:
@@ -194,10 +194,12 @@ def stamp_first_retained(case_id: str, access_log: AccessLog) -> None:
         if debtor.filing_role not in RETAINED_ROLES or debtor.client_id is None:
             continue
         client = firm_store.get_client(accessor.firm_id, debtor.client_id)
-        if client is None or client.first_retained_at is not None:
+        if client is None or (
+            client.first_retained_at is not None and client.prospect_stage is None
+        ):
             continue
-        written = firm_store.update_client(
-            replace(client, first_retained_at=today, updated_at=timestamp())
+        written = firm_store.mark_client_retained(
+            accessor.firm_id, client.id, retained_on=today
         )
         access_log.record(
             record_access(
@@ -252,10 +254,8 @@ def create_case_route() -> ResponseReturnValue:
     access_log.record(
         record_access(case_id=case.id, principal=accessor.subject, action="case.create")
     )
-    # A case opened RETAINED is the engagement starting: the same stamp the
-    # prospect -> retained move makes. A prospect stamps nothing yet.
-    if case.status in RETAINED_STATUSES:
-        stamp_first_retained(case.id, access_log)
+    # Every case opens retained: opening it is the engagement starting.
+    stamp_first_retained(case.id, access_log)
 
     # GLBA: the case id and nothing about its contents. The FIRM id is not
     # logged either — a request log that accumulated tenant ids would be a
@@ -352,13 +352,11 @@ def get_case_route(case_id: str) -> ResponseReturnValue:
 @require_auth
 @requires(CASES, ADD_EDIT)
 def update_case_route(case_id: str) -> ResponseReturnValue:
-    """Change a case's chapter, court, status (and prospect stage),
+    """Change a case's chapter, court, status,
     exemption election, filed and § 341 dates, or post-filing docket facts.
 
     A STATUS MOVE is checked against the lifecycle's map and recorded in the
     case's history (`GET /v1/cases/<id>/status-history`) in the same write.
-    Leaving the prospect funnel is the retained transition, which stamps the
-    clients' `first_retained_at`.
 
     Read-modify-write. The read applies the whole access rule; the store's
     conditional write closes the gap between the two, so a case cannot move
@@ -405,8 +403,6 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
     # and the calendar a request behind, never the reverse.
     if changes.touches_deadline_anchors:
         regenerate_deadlines(updated, actor=accessor.subject)
-    if existing is not None and is_retained_transition(existing, updated):
-        stamp_first_retained(updated.id, access_log)
 
     logger.info("case updated", extra={"case_id": updated.id})
     return jsonify(case_json(updated)), 200

@@ -10,6 +10,7 @@ routes do with them: who may, what is logged, what the wire says.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -139,16 +140,13 @@ def listed(client, subject=ALICE, query=""):
     return [case["id"] for case in response.get_json()["cases"]]
 
 
-# ── The funnel to filed ────────────────────────────────────────────
+# ── Intake to filed ────────────────────────────────────────────────
 
 
-def test_a_prospect_is_funnelled_to_filed_with_its_docket_facts(client):
-    case, _ = open_case(client, status="prospect")
-    assert (case["status"], case["prospectStage"]) == ("prospect", "possible")
+def test_a_case_moves_from_intake_to_filed_with_its_docket_facts(client):
+    case, _ = open_case(client)
+    assert case["status"] == "intake"
     steps = [
-        {"prospect_stage": "consultation_scheduled"},
-        {"prospect_stage": "awaiting_signed_agreement"},
-        {"status": "intake"},
         {"status": "ready_to_file"},
         {
             **FILING,
@@ -164,7 +162,6 @@ def test_a_prospect_is_funnelled_to_filed_with_its_docket_facts(client):
 
     filed = response.get_json()
     assert filed["status"] == "filed"
-    assert "prospectStage" not in filed
     assert {key: filed[key] for key in ("caseNumber", "judge", "trustee")} == {
         "caseNumber": "8:26-bk-01234",
         "judge": "Hon. Example Judge",
@@ -177,13 +174,9 @@ def test_a_prospect_is_funnelled_to_filed_with_its_docket_facts(client):
         f"/v1/cases/{case['id']}/status-history", headers=auth(ALICE)
     ).get_json()["history"]
     assert [(h["fromStatus"], h["toStatus"]) for h in history] == [
-        ("prospect", "prospect"),
-        ("prospect", "prospect"),
-        ("prospect", "intake"),
         ("intake", "ready_to_file"),
         ("ready_to_file", "filed"),
     ]
-    assert history[0]["toStage"] == "consultation_scheduled"
     assert all(h["changedBy"] == ALICE for h in history)
 
 
@@ -211,34 +204,107 @@ def test_a_status_history_is_as_private_as_its_case(client):
     )
 
 
-# ── first_retained_at ──────────────────────────────────────────────
+# ── The prospect funnel on the client, and the retained transition ──
 
 
-def test_the_retained_transition_stamps_first_retained_at(client):
-    case, client_id = open_case(client, status="prospect")
-    assert "first_retained_at" not in get_client(client, client_id).get_json()
+def stage(client, client_id, value, subject=ALICE):
+    return client.put(
+        f"/v1/firm/clients/{client_id}/prospect-stage",
+        json={"prospect_stage": value},
+        headers=auth(subject),
+    )
 
-    patch(client, case["id"], {"status": "intake"})
 
-    stamped = get_client(client, client_id).get_json()
-    assert stamped["first_retained_at"] == date.today().isoformat()
+def test_a_case_never_opens_as_a_prospect(client):
+    # Status is not a creation field (as before #355): the funnel is the
+    # client's, and every case opens retained.
+    case, _ = open_case(client, status="prospect", prospect_stage="possible")
+    assert case["status"] == "intake"
+    assert "prospectStage" not in case
+
+
+def test_a_prospect_moves_through_the_funnel_and_opening_a_case_retains_them(
+    client,
+):
+    client_id = add_client(client, auth(ALICE))
+    for value in ("possible", "consultation_scheduled", "awaiting_signed_agreement"):
+        response = stage(client, client_id, value)
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json()["prospect_stage"] == value
+
+    client.post(
+        "/v1/cases",
+        json={**TAMPA, "client_ids": [client_id]},
+        headers=auth(ALICE),
+    )
+
+    retained = get_client(client, client_id).get_json()
+    assert retained["first_retained_at"] == date.today().isoformat()
+    assert "prospect_stage" not in retained
+
+
+def test_the_retained_transition_clears_the_stored_stage(client, firms):
+    client_id = add_client(client, auth(ALICE))
+    stage(client, client_id, "awaiting_signed_agreement")
+    open_case_for = {**TAMPA, "client_ids": [client_id]}
+    client.post("/v1/cases", json=open_case_for, headers=auth(ALICE))
+    stored = next(c for c in firms.clients.values() if c.id == client_id)
+    assert stored.prospect_stage is None
+
+
+def test_a_retained_client_takes_no_stage(client):
+    _, client_id = open_case(client)
+    response = stage(client, client_id, "possible")
+    assert response.status_code == 409
+
+
+def test_a_stage_can_be_cleared_and_an_unknown_one_is_refused(client):
+    client_id = add_client(client, auth(ALICE))
+    stage(client, client_id, "exhausted")
+    cleared = stage(client, client_id, None)
+    assert "prospect_stage" not in cleared.get_json()
+    assert stage(client, client_id, "won").status_code == 400
+
+
+def test_another_firms_client_takes_no_stage_and_the_attempt_is_logged(
+    client, access_log
+):
+    client_id = add_client(client, auth(ALICE))
+    response = stage(client, client_id, "possible", subject=CAROL)
+    assert response.status_code == 404
+    assert (access_log.events[-1].action, access_log.events[-1].outcome) == (
+        "client.update",
+        "denied",
+    )
+
+
+def test_the_whole_record_put_keeps_the_stage(client):
+    client_id = add_client(client, auth(ALICE))
+    stage(client, client_id, "consultation_scheduled")
+    edited = client.put(
+        f"/v1/firm/clients/{client_id}",
+        json={"name": {"surname": "Example"}, "lead_source": "Referral"},
+        headers=auth(ALICE),
+    )
+    assert edited.get_json()["prospect_stage"] == "consultation_scheduled"
 
 
 def test_an_earlier_retained_date_is_never_overwritten(client):
     client_id = add_client(client, auth(ALICE), first_retained_at="2020-01-02")
-    response = client.post(
-        "/v1/cases",
-        json={**TAMPA, "client_ids": [client_id], "status": "prospect"},
-        headers=auth(ALICE),
+    client.post(
+        "/v1/cases", json={**TAMPA, "client_ids": [client_id]}, headers=auth(ALICE)
     )
-    patch(client, response.get_json()["id"], {"status": "intake"})
     assert get_client(client, client_id).get_json()["first_retained_at"] == (
         "2020-01-02"
     )
 
 
-def test_a_case_opened_retained_stamps_its_client(client):
-    _, client_id = open_case(client)
+def test_a_copy_retains_its_clients_too(client, firms):
+    source, client_id = open_case(client)
+    # A firm can clear the date by hand; the copy is a new engagement.
+    stored = next(c for c in firms.clients.values() if c.id == client_id)
+    firms.clients[(stored.firm_id, stored.id)] = replace(stored, first_retained_at=None)
+    client.post(f"/v1/cases/{source['id']}/copy", headers=auth(ALICE))
     assert get_client(client, client_id).get_json()["first_retained_at"] == (
         date.today().isoformat()
     )

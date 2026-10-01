@@ -90,7 +90,7 @@ def archive_case_route(case_id: str) -> ResponseReturnValue:
     list (`false`). Idempotent, like `PUT` should be: archiving an archived
     case keeps its first stamp.
 
-    ANY STATUS may be archived — a closed case and an exhausted prospect are
+    ANY STATUS may be archived — a closed case and a dismissed one are
     the usual ones, but the firm decides what is off its desk. An archived
     case is still the firm's record: it reads, lists under `?archived=true`,
     and may be edited; leaving the working list is all archiving does.
@@ -298,8 +298,8 @@ def copy_case_route(case_id: str) -> ResponseReturnValue:
             case_id=copy.case.id, principal=accessor.subject, action="case.create"
         )
     )
-    # Opened retained, like any case opened without a status — the stamp the
-    # engagement starting makes, for clients that have none yet.
+    # Opened retained, like every case — the retained transition for its
+    # clients (`stamp_first_retained`).
     if any(d.filing_role in RETAINED_ROLES for d in copied_debtors):
         stamp_first_retained(copy.case.id, access_log)
 

@@ -360,15 +360,15 @@ def test_creating_a_case_links_its_creator(client, store):
     ] == [case_id]
 
 
-def test_create_refuses_to_open_a_case_already_past_the_funnel(client):
+@pytest.mark.parametrize("asked", ["filed", "prospect"])
+def test_create_starts_at_intake_even_if_asked_otherwise(client, asked):
     response = client.post(
         "/v1/cases",
-        json=with_client(client, auth(ALICE), {**TAMPA, "status": "filed"}),
+        json=with_client(client, auth(ALICE), {**TAMPA, "status": asked}),
         headers=auth(ALICE),
     )
-    # A case opens retained or as a prospect (#355) — never already filed.
-    assert response.status_code == 400
-    assert set(response.get_json()["fields"]) == {"status"}
+    # Every case opens retained (#355): the funnel before it is the client's.
+    assert response.get_json()["status"] == "intake"
 
 
 @pytest.mark.parametrize(

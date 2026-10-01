@@ -159,7 +159,7 @@ def create_mcp_server(deps: McpDependencies) -> MCPServer:
         description=(
             "The cases the caller may see, newest first, paginated; "
             "archived and deleted cases are not listed. Optional status "
-            "filter: prospect, intake, ready_to_file, filed, discharged, "
+            "filter: intake, ready_to_file, filed, discharged, "
             "dismissed, or closed."
         ),
     )

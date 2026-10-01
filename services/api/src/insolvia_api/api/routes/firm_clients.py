@@ -16,8 +16,10 @@ case table's `by-client` index and filtered per case (ADR 0022's PR 2).
   so single-record reads and every write append a `client.*` row keyed
   `CLIENT#<id>` (`insolvia_core.access_log`). The LIST is not logged,
   matching `GET /v1/cases`.
-- **Server-owned fields.** `status`, `created_by` and the tax-id pointer are
-  never taken from a body (`insolvia_core.firm_clients` owns why).
+- **Server-owned fields.** `status`, `created_by`, the tax-id pointer and the
+  prospect stage are never taken from the whole-record body
+  (`insolvia_core.firm_clients` owns why); status and stage have routes of
+  their own.
 
 Reaching a client is same firm AND `clients >= view_only`; the one route here
 that lists cases also needs `cases >= view_only` and applies
@@ -46,6 +48,7 @@ from insolvia_core.firm_clients import (
     parse_client_merge,
     parse_client_status,
     parse_firm_client,
+    parse_prospect_stage,
     replace_firm_client,
     set_firm_client_status,
 )
@@ -230,6 +233,52 @@ def set_client_status_route(client_id: str) -> ResponseReturnValue:
     response = _write(store, access_log, set_firm_client_status(existing, status))
     logger.info("client status changed", extra={"status": status})
     return response
+
+
+_RETAINED = "This client has been retained — the prospect funnel is behind them."
+
+
+@blueprint.put("/v1/firm/clients/<client_id>/prospect-stage")
+@require_auth
+@requires(CLIENTS, ADD_EDIT)
+def set_prospect_stage_route(client_id: str) -> ResponseReturnValue:
+    """Place a PROSPECT in the funnel — `{"prospect_stage": "<stage>"}` — or
+    take them out of it with `null` (issue 14.3 / #355, the maintainer's
+    decision of 2026-10-01: the funnel is the client's, a case starts
+    retained).
+
+    A client is a prospect while `first_retained_at` is unset; opening their
+    first case sets it and clears the stage (`POST /v1/cases`, copy). A
+    stage for a retained client is a 409, read from the record the caller
+    is already looking at — never from the client's cases, which could
+    include cases the caller may not see. The write is one UpdateItem
+    conditioned on the client still being a prospect, so a stage racing a
+    case opening is refused rather than left on a retained client. Logged
+    as `client.update`, like the status route.
+    """
+    store, access_log = _stores()
+    stage = parse_prospect_stage(_json_body())
+    firm_id = current_accessor().firm_id
+    existing = store.get_client(firm_id, client_id)
+    if existing is None:
+        _log(access_log, client_id, "client.update", found=False)
+        raise NotFoundError(_NOT_FOUND)
+    _refuse_merged(existing)
+    if not existing.prospect:
+        raise ConflictError(_RETAINED)
+
+    written = store.set_client_prospect_stage(firm_id, client_id, stage)
+    _log(access_log, client_id, "client.update", found=written is not None)
+    if written is None:
+        # The condition failed between the read and the write: retained (or
+        # merged) underneath the caller is a 409, gone is the usual 404.
+        current = store.get_client(firm_id, client_id)
+        if current is None:
+            raise NotFoundError(_NOT_FOUND)
+        _refuse_merged(current)
+        raise ConflictError(_RETAINED)
+    logger.info("client prospect stage changed", extra={"stage": stage})
+    return jsonify(firm_client_json(written)), 200
 
 
 @blueprint.post("/v1/firm/clients/<client_id>/merge")
