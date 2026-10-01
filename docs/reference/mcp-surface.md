@@ -106,7 +106,7 @@ because they are the entry points a harness reasons about.
 | Tool | Does | Requires |
 |---|---|---|
 | `whoami` | The caller's firm, name, and per-feature permissions — or the fact that they have no firm | authenticated only (the `/v1/me` of this surface) |
-| `list_cases` | The cases the caller may see, newest first, paginated | `cases: view_only` |
+| `list_cases` | The cases the caller may see, newest first, paginated — the working list: archived and deleted cases are not in it (#355) | `cases: view_only` |
 | `get_case` | One case root + petition-status summary + per-entity-type record counts | `cases: view_only` |
 | `list_case_records` | One entity type's records within one case, paginated | per entity type — see the gate table |
 | `get_case_record` | One record by id | per entity type — same table |
