@@ -10,7 +10,6 @@ import type { BadgeIntent } from '@insolvia-ai/design-system';
  * lifecycle (issue #355), so a status added there cannot ship unnamed.
  */
 export const CASE_STATUS_LABEL: Readonly<Record<Case['status'], string>> = {
-  prospect: 'Prospect',
   intake: 'In intake',
   ready_to_file: 'Ready to file',
   filed: 'Filed',
@@ -20,7 +19,6 @@ export const CASE_STATUS_LABEL: Readonly<Record<Case['status'], string>> = {
 };
 
 export const CASE_STATUS_INTENT: Readonly<Record<Case['status'], BadgeIntent>> = {
-  prospect: 'warning',
   intake: 'neutral',
   ready_to_file: 'success',
   filed: 'primary',
@@ -29,7 +27,10 @@ export const CASE_STATUS_INTENT: Readonly<Record<Case['status'], BadgeIntent>> =
   closed: 'neutral',
 };
 
-/** Where a prospect sits in the funnel, as a person says it. */
+/**
+ * Where a prospect CLIENT sits in the funnel, as a person says it (#355 —
+ * the funnel is the client's; a case starts retained).
+ */
 export const PROSPECT_STAGE_LABEL: Readonly<Record<ProspectStage, string>> = {
   possible: 'Possible',
   consultation_scheduled: 'Consultation scheduled',

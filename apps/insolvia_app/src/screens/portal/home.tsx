@@ -19,17 +19,13 @@ type State =
 
 /**
  * What each stage means to the person the case is about — the firm-facing
- * status names (`prospect` … `closed`, issue #355) are the firm's words.
+ * status names (`intake` … `closed`, issue #355) are the firm's words.
  * Exhaustive over `CaseStatus`, so a new stage cannot ship unexplained.
  * `dismissed` says only what happened and points to the firm: what a
  * dismissal means for this person is the attorney's conversation, not a
  * status line's.
  */
 const STAGES = {
-  prospect: {
-    label: 'Getting started',
-    detail: 'Your firm is reviewing your situation before taking on your case.',
-  },
   intake: {
     label: 'Preparing your case',
     detail: 'Your firm is gathering the information and documents your filing needs.',

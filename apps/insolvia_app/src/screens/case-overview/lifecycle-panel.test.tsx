@@ -148,27 +148,26 @@ describe('the lifecycle panel', () => {
     jest.clearAllMocks();
   });
 
-  it('offers a prospect its funnel stage and the retained move, and retains it', async () => {
-    const prospect = { ...caseBody(CASE_ID, { status: 'prospect' }), prospectStage: 'possible' };
-    const fetchMock = signedIn(prospect, [
+  it('offers an intake case only the moves the server allows, and sends the move', async () => {
+    const fetchMock = signedIn(caseBody(CASE_ID), [
       {
         method: 'PATCH',
         fragment: `/v1/cases/${CASE_ID}`,
-        respond: () => jsonResponse(200, caseBody(CASE_ID)),
+        respond: () => jsonResponse(200, caseBody(CASE_ID, { status: 'ready_to_file' })),
       },
     ]);
 
-    expect(await screen.findByLabelText('Funnel stage')).toBeTruthy();
     const user = userEvent.setup();
-    await user.press(screen.getByRole('button', { name: 'Move to intake' }));
+    await user.press(await screen.findByRole('button', { name: 'Mark ready to file' }));
 
     await waitFor(() => {
       expect(sent(fetchMock, 'PATCH', `/v1/cases/${CASE_ID}`)).toBeDefined();
     });
     const patch = sent(fetchMock, 'PATCH', `/v1/cases/${CASE_ID}`);
-    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ status: 'intake' });
-    // Only moves the server's map allows are offered.
-    expect(screen.queryByRole('button', { name: 'Mark filed' })).toBeNull();
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ status: 'ready_to_file' });
+    // A case starts retained: there is no funnel on it to show.
+    expect(screen.queryByLabelText('Funnel stage')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Record discharge' })).toBeNull();
   });
 
   it('files with the case number typed here, and shows the field the server names', async () => {
@@ -203,14 +202,13 @@ describe('the lifecycle panel', () => {
         {
           changedAt: '2026-08-05T10:00:00.000000Z',
           changedBy: ALICE,
-          fromStatus: 'prospect',
-          toStatus: 'intake',
-          fromStage: 'awaiting_signed_agreement',
+          fromStatus: 'intake',
+          toStatus: 'ready_to_file',
         },
       ],
     });
 
-    expect(await screen.findByText('Prospect → In intake')).toBeTruthy();
+    expect(await screen.findByText('In intake → Ready to file')).toBeTruthy();
     expect(await screen.findByText('2026-08-05 · Alice Attorney')).toBeTruthy();
   });
 

@@ -117,9 +117,6 @@ export function NewCase({ initialClientId }: { initialClientId?: string | undefi
     EMPTY_SLOT,
   ]);
   const [joint, setJoint] = useState(false);
-  // Opened in the funnel rather than retained (issue #355): the matter is a
-  // prospect the firm has not taken on yet.
-  const [prospect, setProspect] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -248,7 +245,6 @@ export function NewCase({ initialClientId }: { initialClientId?: string | undefi
           court: court ?? '',
           division: division ?? '',
           clientIds,
-          ...(prospect ? { status: 'prospect' as const } : {}),
         }),
       );
       if (result.ok) router.replace(`/cases/${result.value.id}`);
@@ -397,30 +393,6 @@ export function NewCase({ initialClientId }: { initialClientId?: string | undefi
               : 'Could not load the court registry — a case cannot be opened until it loads.'}
           </Text>
         )}
-
-        <View style={styles.checkboxRow}>
-          <Checkbox.Root
-            aria-label="Prospect — not yet retained"
-            checked={prospect}
-            onCheckedChange={setProspect}
-          >
-            <Checkbox.Indicator>✓</Checkbox.Indicator>
-          </Checkbox.Root>
-          <Text
-            aria-hidden
-            style={[
-              styles.checkboxLabel,
-              { color: theme.colors.ink, fontFamily: theme.typography.body },
-            ]}
-          >
-            Prospect — not yet retained
-          </Text>
-        </View>
-        {fieldErrors.status ? (
-          <Text aria-live="assertive" style={[styles.error, danger]}>
-            {fieldErrors.status}
-          </Text>
-        ) : null}
 
         <View style={styles.actions}>
           {/* size="lg" (48dp): the package's md is 40dp, under the 44dp

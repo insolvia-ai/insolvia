@@ -2,7 +2,6 @@ import {
   ApiException,
   ApiValidationException,
   CASE_TRANSITIONS,
-  PROSPECT_STAGES,
   isFiledStatus,
   permits,
 } from '@insolvia-ai/api-client';
@@ -11,10 +10,9 @@ import type {
   CaseStatus,
   CaseStatusChange,
   FirmColleague,
-  ProspectStage,
   UpdateCaseChanges,
 } from '@insolvia-ai/api-client';
-import { AlertDialog, Badge, Button, Field, Input, Select } from '@insolvia-ai/design-system';
+import { AlertDialog, Badge, Button, Field, Input } from '@insolvia-ai/design-system';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -22,11 +20,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { useCase } from '@/components/case-shell';
-import {
-  CASE_STATUS_INTENT,
-  CASE_STATUS_LABEL,
-  PROSPECT_STAGE_LABEL,
-} from '@/components/case-status';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -53,7 +47,6 @@ type Docket = Record<DocketKey, string>;
 
 /** What a move is called on its button — the act, not the destination. */
 const MOVE_LABEL: Readonly<Record<CaseStatus, string>> = {
-  prospect: 'Back to prospect',
   intake: 'Move to intake',
   ready_to_file: 'Mark ready to file',
   filed: 'Mark filed',
@@ -72,7 +65,9 @@ function docketOf(matter: Case): Docket {
 }
 
 /**
- * The case's lifecycle, on its overview (issue 14.3 / #355): where it sits,
+ * The case's lifecycle, on its overview (issue 14.3 / #355): where it sits
+ * between intake and closed (a case starts retained — the funnel before it
+ * is the client's, on the client record),
  * the moves it can make, its docket facts, what happened to it and when —
  * and the three acts on the matter as a whole: archive, copy, delete.
  *
@@ -229,26 +224,6 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
         </View>
       </View>
 
-      {matter.status === 'prospect' ? (
-        <Field.Root name="prospect_stage" invalid={Boolean(errors.prospect_stage)}>
-          <Field.Label>Funnel stage</Field.Label>
-          <Select
-            options={PROSPECT_STAGES.map((stage) => ({
-              value: stage,
-              label: PROSPECT_STAGE_LABEL[stage],
-            }))}
-            value={matter.prospectStage ?? 'possible'}
-            disabled={!mayEdit || busy}
-            onValueChange={(next) => {
-              if (next !== null && next !== matter.prospectStage) {
-                void save({ prospectStage: next as ProspectStage }, 'Stage saved');
-              }
-            }}
-          />
-          {errors.prospect_stage ? <Field.Error match>{errors.prospect_stage}</Field.Error> : null}
-        </Field.Root>
-      ) : null}
-
       {mayEdit && moves.length > 0 ? (
         <View style={styles.actions}>
           {moves.map((to) => (
@@ -398,9 +373,6 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
 }
 
 function describeChange(change: CaseStatusChange): string {
-  if (change.fromStatus === change.toStatus && change.toStage !== undefined) {
-    return `Funnel stage: ${PROSPECT_STAGE_LABEL[change.toStage]}`;
-  }
   return `${CASE_STATUS_LABEL[change.fromStatus]} → ${CASE_STATUS_LABEL[change.toStatus]}`;
 }
 
