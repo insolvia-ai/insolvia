@@ -29,9 +29,9 @@ type Mode =
  * the first § 341 date are the anchors every generated deadline counts from;
  * recording one here PATCHes the case, and the server regenerates the
  * case's deadlines in the same request — so the list under them fills in,
- * or moves, the moment a date is saved. Until #355 gives the case its full
- * post-filing lifecycle these two fields are the whole of it, and this is
- * where they live.
+ * or moves, the moment a date is saved. They live here, beside the
+ * deadlines they drive; the rest of the post-filing record (case number,
+ * judge, trustee) is the lifecycle panel's (#355).
  *
  * Generated deadlines name their rule and offer one control — dismiss —
  * because their dates are the rule's; hand-made events are ordinary and

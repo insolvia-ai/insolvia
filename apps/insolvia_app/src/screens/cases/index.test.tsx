@@ -126,6 +126,22 @@ describe('the cases screen', () => {
     expect(await screen.findByText(/Chapter 7 · Middle District of Florida/)).toBeTruthy();
   });
 
+  it('switches to the archive, which asks the API for archived cases', async () => {
+    // Fragment order matters: the archive's query first, the bare list after.
+    const { fetchMock } = signedIn({
+      '/v1/cases?archived=true': () => jsonResponse(200, { cases: [] }),
+      '/v1/cases': () => jsonResponse(200, { cases: [CASE] }),
+    });
+    await screen.findByText(/Chapter 7 · Middle District of Florida/);
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Archived' }));
+
+    expect(await screen.findByText(/No archived cases/)).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/v1/cases?archived=true')),
+    ).toBe(true);
+  });
+
   it('says so plainly when there are none', async () => {
     signedIn({ '/v1/cases': () => jsonResponse(200, { cases: [] }) });
 

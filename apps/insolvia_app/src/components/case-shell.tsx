@@ -1,7 +1,6 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, Debtor, PersonName } from '@insolvia-ai/api-client';
 import { Badge } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { usePathname, useRouter } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -10,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useMembership } from '@/api/me';
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { recordRecentCase } from '@/components/recent-cases';
 import { StatusScreen } from '@/components/status-screen';
 import { contentMaxWidth, fontSizes, spacing, useTheme } from '@/theme';
@@ -101,18 +101,6 @@ const SECTIONS: readonly Section[] = [
   { segment: 'packet', label: 'Filing packet' },
   { segment: 'team', label: 'Team' },
 ];
-
-const STATUS_LABEL: Record<Case['status'], string> = {
-  intake: 'In intake',
-  ready_to_file: 'Ready to file',
-  filed: 'Filed',
-};
-
-const STATUS_INTENT: Record<Case['status'], BadgeIntent> = {
-  intake: 'neutral',
-  ready_to_file: 'success',
-  filed: 'primary',
-};
 
 /**
  * A debtor's name as one string, or null when intake has not supplied one.
@@ -344,8 +332,8 @@ export function CaseShell({ caseId, children }: { caseId: string; children: Reac
                 (`alignSelf: 'flex-start'`, so it hugs its content); a box of
                 its own height is what lets the row centre it. */}
             <View style={styles.status}>
-              <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                {STATUS_LABEL[matter.status]}
+              <Badge intent={CASE_STATUS_INTENT[matter.status]} size="sm">
+                {CASE_STATUS_LABEL[matter.status]}
               </Badge>
             </View>
           </View>

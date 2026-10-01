@@ -14,6 +14,7 @@ import { NotesPanel } from '@/components/notes-panel';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
 import { EventsPanel } from './events-panel';
+import { LifecyclePanel } from './lifecycle-panel';
 import { PortalPanel } from './portal-panel';
 import { filingStages, stagesComplete } from './stages';
 import type { Stage, StageState } from './stages';
@@ -308,6 +309,9 @@ export function CaseOverview() {
               </View>
             </Section>
           ) : null}
+
+          {/* ── Lifecycle (issue 14.3 / #355) ────────────────────────────── */}
+          <LifecyclePanel colleagues={colleagues} />
 
           {/* ── Notes (issue 14.5 / #357) ───────────────────────────────── */}
           <Section title="Notes" meta={`${notes.length} on this case`}>

@@ -1,28 +1,16 @@
-import type { Case, CaseStatus, Debtor } from '@insolvia-ai/api-client';
+import { isFiledStatus } from '@insolvia-ai/api-client';
+import type { Case, Debtor } from '@insolvia-ai/api-client';
 import { Badge } from '@insolvia-ai/design-system';
-import type { BadgeIntent } from '@insolvia-ai/design-system';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { caseTitle, chapterAndDistrict } from '@/components/case-shell';
+import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { Heading } from '@/components/heading';
 import { MAX_RECENT_CASES, recentCaseIds } from '@/components/recent-cases';
 import { fontSizes, spacing, useTheme } from '@/theme';
-
-/** How a case's own status reads — mirrors `screens/cases`' mapping. */
-const STATUS_LABEL: Record<CaseStatus, string> = {
-  intake: 'In intake',
-  ready_to_file: 'Ready to file',
-  filed: 'Filed',
-};
-
-const STATUS_INTENT: Record<CaseStatus, BadgeIntent> = {
-  intake: 'neutral',
-  ready_to_file: 'success',
-  filed: 'primary',
-};
 
 interface Row {
   readonly matter: Case;
@@ -159,7 +147,7 @@ export function RecentCasesCard() {
             >
               <Link
                 href={`/cases/${matter.id}`}
-                aria-label={`${caseTitle(matter, debtors)} — ${STATUS_LABEL[matter.status]}`}
+                aria-label={`${caseTitle(matter, debtors)} — ${CASE_STATUS_LABEL[matter.status]}`}
                 style={styles.rowLink}
               >
                 <View style={styles.rowBody}>
@@ -173,14 +161,14 @@ export function RecentCasesCard() {
                   </Text>
                   <Text style={[styles.rowMeta, muted]}>
                     {chapterAndDistrict(matter)} ·{' '}
-                    {matter.status === 'filed'
+                    {isFiledStatus(matter.status)
                       ? `Filed${matter.filedAt === undefined ? '' : ` ${matter.filedAt.slice(0, 10)}`}`
                       : 'Not yet filed'}
                   </Text>
                 </View>
               </Link>
-              <Badge intent={STATUS_INTENT[matter.status]} size="sm">
-                {STATUS_LABEL[matter.status]}
+              <Badge intent={CASE_STATUS_INTENT[matter.status]} size="sm">
+                {CASE_STATUS_LABEL[matter.status]}
               </Badge>
             </View>
           ))}

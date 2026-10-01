@@ -1,4 +1,9 @@
-import { ApiException, ApiValidationException, revisedProvenance } from '@insolvia-ai/api-client';
+import {
+  ApiException,
+  ApiValidationException,
+  isFiledStatus,
+  revisedProvenance,
+} from '@insolvia-ai/api-client';
 import type {
   CaseCollection,
   Debtor,
@@ -489,7 +494,7 @@ export function Intake() {
                 key={`${role}:${record.client_id}`}
                 debtor={record}
                 client={clients[record.client_id] ?? null}
-                filed={matter.status === 'filed'}
+                filed={isFiledStatus(matter.status)}
                 onRecopy={() => act(role, 'copyDebtorFromClient')}
                 onUpdateClient={() => act(role, 'copyDebtorToClient')}
               />

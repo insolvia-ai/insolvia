@@ -1,5 +1,6 @@
 import {
   ApiValidationException,
+  isFiledStatus,
   libraryProvenance,
   staffTypedProvenance,
 } from '@insolvia-ai/api-client';
@@ -307,7 +308,7 @@ export function CollectionEditor({ caseId, spec, initialForm }: CollectionEditor
     (async () => {
       try {
         const caseResult = await call((client) => client.getCase(caseId));
-        if (!cancelled && caseResult.ok) setCaseFiled(caseResult.value.status === 'filed');
+        if (!cancelled && caseResult.ok) setCaseFiled(isFiledStatus(caseResult.value.status));
       } catch {
         // Best-effort, per above.
       }

@@ -1,3 +1,4 @@
+import { isFiledStatus } from '@insolvia-ai/api-client';
 import type { Job, Packet } from '@insolvia-ai/api-client';
 import { Badge, Button } from '@insolvia-ai/design-system';
 import type { BadgeIntent } from '@insolvia-ai/design-system';
@@ -332,7 +333,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
       try {
         const result = await call((client) => client.getCase(caseId));
         if (!cancelled && result.ok) {
-          setCaseFiled(result.value.status === 'filed');
+          setCaseFiled(isFiledStatus(result.value.status));
           setChapter(result.value.chapter);
         }
       } catch {
