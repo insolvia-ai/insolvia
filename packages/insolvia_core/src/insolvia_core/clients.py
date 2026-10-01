@@ -400,7 +400,7 @@ class CasePublicStatus:
     `Case` in a portal route's hands to leak a district, a date or a pin
     from, however a later route is written.
 
-    `stage` is the case's lifecycle status (`cases.STATUSES`: `prospect`
+    `stage` is the case's lifecycle status (`cases.STATUSES`: `intake`
     through `closed`) — the coarse, firm-facing state, not the case
     overview's computed spine, which reads schedules, documents and the
     review queue a client may not see.

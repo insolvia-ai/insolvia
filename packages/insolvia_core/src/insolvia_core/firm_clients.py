@@ -53,6 +53,38 @@ makes for `CLIENT#` versus `USER#` on the by-subject index.
   effect of an edit: the whole-record PUT keeps the stored status, so a stale
   edit form cannot un-archive a client.
 - **`created_by`.** The creating firm user's subject, stamped by the route.
+- **`prospect_stage`.** The funnel (below) has its own route, never the
+  whole-record PUT, for `status`'s reason.
+
+## The prospect funnel (issue 14.3 / #355)
+
+"A prospect is a client with no case yet" (ADR 0022) — and the funnel the
+issue asks for lives HERE, on the client, by the maintainer's decision of
+2026-10-01; a case starts at retained (`cases.STATUSES`).
+
+A client IS A PROSPECT while `first_retained_at` is unset: the firm has not
+been retained by them. `prospect_stage` says where in the funnel they are —
+`possible`, `consultation_scheduled`, `awaiting_signed_agreement`,
+`exhausted` — and is meaningful only then. Opening the client's first case
+(or copying one for them) is THE RETAINED TRANSITION: the store's
+`mark_client_retained` stamps `first_retained_at` (when unset) and REMOVES
+the stage in the same conditional UpdateItem. Cleared rather than kept as
+history: the stage is a working position, not a record of how the person
+arrived — `lead_source` and the case's own status history are the records —
+and a stale "awaiting signed agreement" on a retained client is a field a
+reader would have to know to ignore. `firm_client_json` therefore never
+serves a stage on a retained client, whatever is stored.
+
+"Has no case" is read as "not retained" — `first_retained_at` — rather than
+from the case table's `by-client` index, on purpose. The index would answer
+for cases the caller may not see, and refusing a stage because of one would
+reveal it (`client_merge`'s argument). `first_retained_at` is on the record
+the caller is already reading, and the stamp sets it whenever a case is
+opened. Setting a stage is ONE UpdateItem conditioned on
+`first_retained_at` still being absent, so a stage write racing a case
+opening cannot leave a retained client with a funnel position: either the
+stage lands first and the stamp removes it, or the stamp lands first and the
+stage write is refused (409).
 
 ## Whole-record save, snake_case wire
 
@@ -109,6 +141,14 @@ ACTIVE: Final = "active"
 ARCHIVED: Final = "archived"
 STATUSES: Final = (ACTIVE, ARCHIVED)
 
+# The prospect funnel (#355) — see the module docstring.
+PROSPECT_STAGES: Final = (
+    "possible",
+    "consultation_scheduled",
+    "awaiting_signed_agreement",
+    "exhausted",
+)
+
 # Free text in v1 (ADR 0022); a firm pick-list is 14.8's.
 MAX_LEAD_SOURCE: Final = 200
 MAX_REFERRED_BY: Final = 200
@@ -158,10 +198,20 @@ class FirmClient:
     merged_into: str | None = None
     merging_into: str | None = None
     merging_from: str | None = None
+    # The funnel position (PROSPECT_STAGES) while this client is a prospect.
+    # Server-owned like the merge attributes: written only by the store's
+    # `set_client_prospect_stage` and removed by `mark_client_retained`,
+    # never by `update_client`'s whole-record save.
+    prospect_stage: str | None = None
 
     @property
     def archived(self) -> bool:
         return self.status == ARCHIVED
+
+    @property
+    def prospect(self) -> bool:
+        """Whether the firm has yet to be retained by this person."""
+        return self.first_retained_at is None
 
     @property
     def merged(self) -> bool:
@@ -306,6 +356,22 @@ def parse_client_status(payload: Mapping[str, object]) -> str:
     return status
 
 
+def parse_prospect_stage(payload: Mapping[str, object]) -> str | None:
+    """`PUT /v1/firm/clients/<id>/prospect-stage`'s body:
+    `{"prospect_stage": "<stage>"}` to place a prospect in the funnel, or
+    `null` to take them out of it."""
+    if "prospect_stage" not in payload:
+        raise FieldValidationError({"prospect_stage": "Choose a stage, or null."})
+    stage = payload["prospect_stage"]
+    if stage is None:
+        return None
+    if not isinstance(stage, str) or stage not in PROSPECT_STAGES:
+        raise FieldValidationError(
+            {"prospect_stage": "Must be one of " + ", ".join(PROSPECT_STAGES) + "."}
+        )
+    return stage
+
+
 # ── Transitions ─────────────────────────────────────────────────────
 
 
@@ -398,6 +464,8 @@ def firm_client_item(client: FirmClient) -> dict[str, object]:
     for attribute, value in _merge_attributes(client).items():
         if value is not None:
             item[attribute] = value
+    if client.prospect_stage is not None:
+        item[PROSPECT_STAGE] = client.prospect_stage
     return item
 
 
@@ -408,6 +476,10 @@ MERGED_INTO: Final = "mergedInto"
 MERGING_INTO: Final = "mergingInto"
 MERGING_FROM: Final = "mergingFrom"
 MERGE_ATTRIBUTES: Final = (MERGED_INTO, MERGING_INTO, MERGING_FROM)
+# The funnel position (#355), server-owned for the same reason.
+PROSPECT_STAGE: Final = "prospectStage"
+# Every attribute `update_client`'s whole-record save must leave alone.
+SERVER_OWNED_ATTRIBUTES: Final = (*MERGE_ATTRIBUTES, PROSPECT_STAGE)
 
 
 def _merge_attributes(client: FirmClient) -> dict[str, str | None]:
@@ -423,6 +495,14 @@ def _optional_id(value: object) -> str | None:
         return None
     if not isinstance(value, str):
         raise ValueError("a merge pointer is not a string")
+    return value
+
+
+def _optional_stage(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in PROSPECT_STAGES:
+        raise ValueError(f"unknown prospect stage {value!r}")
     return value
 
 
@@ -461,6 +541,7 @@ def firm_client_from_item(item: Mapping[str, object]) -> FirmClient:
             merged_into=_optional_id(item.get(MERGED_INTO)),
             merging_into=_optional_id(item.get(MERGING_INTO)),
             merging_from=_optional_id(item.get(MERGING_FROM)),
+            prospect_stage=_optional_stage(item.get(PROSPECT_STAGE)),
             **vars(draft),
         )
     except (KeyError, ValueError) as error:
@@ -493,6 +574,10 @@ def firm_client_json(client: FirmClient) -> dict[str, object]:
     # not a fact about the person.
     if client.merged_into is not None:
         body["merged_into"] = client.merged_into
+    # The funnel position, only while a prospect — a stage on a retained
+    # client is meaningless, whatever a race left stored.
+    if client.prospect and client.prospect_stage is not None:
+        body["prospect_stage"] = client.prospect_stage
     return body
 
 

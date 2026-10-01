@@ -6,13 +6,15 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.fields import timestamp
 from insolvia_core.firm_clients import (
     ACTIVE,
     ARCHIVED,
-    MERGE_ATTRIBUTES,
     MERGED_INTO,
     MERGING_FROM,
     MERGING_INTO,
+    PROSPECT_STAGE,
+    SERVER_OWNED_ATTRIBUTES,
     FirmClient,
     firm_client_from_item,
     firm_client_item,
@@ -423,13 +425,14 @@ class DynamoDbFirmStore:
         # the ones it no longer has — the whole-record save the PutItem this
         # used to be made — but that never names the merge attributes, so a
         # save built from a read taken before a merge claimed the row cannot
-        # erase the claim. `attribute_not_exists(mergedInto)`: a merged
-        # client is terminal (the port says why).
+        # erase the claim — nor the prospect stage, which has writers of its
+        # own. `attribute_not_exists(mergedInto)`: a merged client is
+        # terminal (the port says why).
         item = firm_client_item(client)
         owned = {
             key: value
             for key, value in item.items()
-            if key not in ("PK", "SK") and key not in MERGE_ATTRIBUTES
+            if key not in ("PK", "SK") and key not in SERVER_OWNED_ATTRIBUTES
         }
         names: dict[str, str] = {}
         values: dict[str, Any] = {":firm": {"S": client.firm_id}}
@@ -463,6 +466,91 @@ class DynamoDbFirmStore:
                 return None
             raise
         return client
+
+    # ── The prospect funnel (issue 14.3 / #355) ─────────────────────
+
+    def _conditional_client_update(
+        self, firm_id: str, client_id: str, **kwargs: Any
+    ) -> FirmClient | None:
+        try:
+            response = self.client.update_item(
+                TableName=self.table_name,
+                Key=self._client_key(firm_id, client_id),
+                ReturnValues="ALL_NEW",
+                **kwargs,
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return None
+            raise
+        return firm_client_from_item(from_attributes(response["Attributes"]))
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        # ONE UpdateItem, conditioned on the client still being a prospect:
+        # `body.first_retained_at` absent. `mark_client_retained` sets that
+        # and removes the stage in one write of its own, so the two cannot
+        # interleave into a retained client with a funnel position.
+        names = {
+            "#stage": PROSPECT_STAGE,
+            "#updated": "updatedAt",
+            "#merged": MERGED_INTO,
+            "#body": "body",
+            "#retained": "first_retained_at",
+        }
+        values: dict[str, Any] = {
+            ":firm": {"S": firm_id},
+            ":now": {"S": timestamp()},
+        }
+        if stage is None:
+            expression = "SET #updated = :now REMOVE #stage"
+        else:
+            expression = "SET #stage = :stage, #updated = :now"
+            values[":stage"] = {"S": stage}
+        return self._conditional_client_update(
+            firm_id,
+            client_id,
+            UpdateExpression=expression,
+            ConditionExpression=(
+                "attribute_exists(SK) AND firmId = :firm"
+                " AND attribute_not_exists(#merged)"
+                " AND attribute_not_exists(#body.#retained)"
+            ),
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        # if_not_exists keeps a date already recorded — by hand, or by an
+        # earlier case — and the REMOVE takes the client out of the funnel,
+        # in the same write.
+        return self._conditional_client_update(
+            firm_id,
+            client_id,
+            UpdateExpression=(
+                "SET #body.#retained = if_not_exists(#body.#retained, :date),"
+                " #updated = :now REMOVE #stage"
+            ),
+            ConditionExpression=(
+                "attribute_exists(SK) AND firmId = :firm"
+                " AND attribute_not_exists(#merged)"
+            ),
+            ExpressionAttributeNames={
+                "#stage": PROSPECT_STAGE,
+                "#updated": "updatedAt",
+                "#merged": MERGED_INTO,
+                "#body": "body",
+                "#retained": "first_retained_at",
+            },
+            ExpressionAttributeValues={
+                ":firm": {"S": firm_id},
+                ":now": {"S": timestamp()},
+                ":date": {"S": retained_on},
+            },
+        )
 
     # ── Merging two clients (ADR 0022's PR 7) ───────────────────────
     #

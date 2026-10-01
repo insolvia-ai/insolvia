@@ -32,14 +32,15 @@ CHAPTERS = (7, 11, 12, 13)
 # THE LIFECYCLE, AS DATA (issue 14.3 / #355). One field, one vocabulary, in
 # the order a matter moves through it:
 #
-#   prospect                  a matter the firm may take — not yet retained.
-#                             Its funnel position is `prospect_stage`.
 #   intake, ready_to_file     RETAINED: the firm has the engagement and is
-#                             preparing the petition. These two kept their
-#                             names (they predate the funnel) because every
-#                             reader of "is this case being prepared" — the
-#                             app's badges, the portal, the MCP filter — says
-#                             them already, and a rename buys nothing.
+#                             preparing the petition. A case STARTS here —
+#                             there is no prospect case. The funnel before
+#                             retention belongs to the CLIENT
+#                             (`firm_clients.PROSPECT_STAGES`; the
+#                             maintainer's decision of 2026-10-01, recorded
+#                             in ADR 0022): a prospect is a client with no
+#                             case yet, and opening their first case is the
+#                             retained transition.
 #   filed                     the petition is on the court's docket.
 #   discharged, dismissed     the two OUTCOMES of a filed case.
 #   closed                    the court closed the case (after either outcome,
@@ -50,41 +51,21 @@ CHAPTERS = (7, 11, 12, 13)
 # a filed petition — re-copying a client into it, re-assembling its packet or
 # un-amending an item are as wrong there as on `filed` — so those checks read
 # `is_filed()` and never the literal.
-PROSPECT = "prospect"
 INTAKE = "intake"
 READY_TO_FILE = "ready_to_file"
 FILED = "filed"
 DISCHARGED = "discharged"
 DISMISSED = "dismissed"
 CLOSED = "closed"
-STATUSES = (PROSPECT, INTAKE, READY_TO_FILE, FILED, DISCHARGED, DISMISSED, CLOSED)
+STATUSES = (INTAKE, READY_TO_FILE, FILED, DISCHARGED, DISMISSED, CLOSED)
 
 # Every status at or after filing — the petition is a court record.
 FILED_STATUSES = frozenset({FILED, DISCHARGED, DISMISSED, CLOSED})
-# The statuses in which the firm holds the engagement before filing. Entering
-# one of these from `prospect` is THE RETAINED TRANSITION — the act that
-# stamps each client's `first_retained_at` (ADR 0022).
+# The statuses in which the firm holds the engagement before filing.
 RETAINED_STATUSES = frozenset({INTAKE, READY_TO_FILE})
-# The statuses a case may be OPENED at. Anything later would be the server
-# telling a lie on the client's behalf: a case is not born filed.
-OPENING_STATUSES = (PROSPECT, INTAKE)
-
-# The prospect funnel (#355). Meaningful only while `status` is `prospect`,
-# stored only then, and recorded in the status history like the status
-# itself. `exhausted` is the funnel's dead end — the lead went nowhere — and
-# is a stage rather than a status because the matter never left the funnel;
-# archiving it is how it leaves the firm's working list.
-PROSPECT_STAGES = (
-    "possible",
-    "consultation_scheduled",
-    "awaiting_signed_agreement",
-    "exhausted",
-)
-DEFAULT_PROSPECT_STAGE = "possible"
 
 # THE ALLOWED MOVES, and the conservative reading of an issue that names the
-# states but not the edges. Forward along the funnel, with exactly two ways
-# back:
+# states but not the edges. Forward only, with exactly two ways back:
 #
 #   - intake <-> ready_to_file. Both are "retained, preparing"; the line
 #     between them is a preparer's judgement and gets revised.
@@ -94,13 +75,10 @@ DEFAULT_PROSPECT_STAGE = "possible"
 # Everything else backwards is refused. A filed case does not return to
 # preparation — changing a filed petition is an amendment (17.4), and the
 # store's `is_filed` checks would otherwise stop protecting it the moment
-# somebody moved the status back. A retained case does not return to the
-# funnel; a wrongly retained prospect is archived or deleted instead. A
-# status set to itself is not a move and is accepted (so a client can resend
-# the whole record), and a prospect's stage may change freely within the
-# funnel.
+# somebody moved the status back. A case opened by mistake is deleted, not
+# returned to a funnel it was never in. A status set to itself is not a move
+# and is accepted (so a client can resend the whole record).
 TRANSITIONS: Mapping[str, frozenset[str]] = {
-    PROSPECT: frozenset({INTAKE, READY_TO_FILE}),
     INTAKE: frozenset({READY_TO_FILE, FILED}),
     READY_TO_FILE: frozenset({INTAKE, FILED}),
     FILED: frozenset({DISCHARGED, DISMISSED, CLOSED}),
@@ -230,9 +208,6 @@ class Case:
     # sits below. Once filed, `filed_at` may not be cleared (`apply_changes`).
     filed_at: str | None = None
     meeting_341_at: str | None = None
-    # The funnel position while `status` is `prospect` (PROSPECT_STAGES);
-    # None in every other status.
-    prospect_stage: str | None = None
     # The post-filing docket facts (POST_FILING_TEXT_FIELDS), None until
     # somebody records them.
     case_number: str | None = None
@@ -241,7 +216,7 @@ class Case:
     office_file_number: str | None = None
     # ARCHIVED: out of the firm's working list, still the firm's record. An
     # attribute rather than a status because archiving is orthogonal to the
-    # lifecycle — a closed case and an exhausted prospect are both archived,
+    # lifecycle — a closed case and a dismissed one are both archived,
     # and each must still say which it was. Who and when, together or not
     # at all.
     archived_at: str | None = None
@@ -269,8 +244,7 @@ class StatusChange:
     An item in the CASE's partition, written in the same transaction as the
     case record it describes (`CaseStore.update`), so the history cannot
     disagree with the status: a change that landed has its row, and a row
-    exists only for a change that landed. A prospect's stage moving within
-    the funnel is a change too, which is why both halves carry the stage.
+    exists only for a change that landed.
     """
 
     case_id: str
@@ -278,8 +252,6 @@ class StatusChange:
     changed_by: str
     from_status: str
     to_status: str
-    from_stage: str | None = None
-    to_stage: str | None = None
 
 
 @dataclass(frozen=True)
@@ -326,10 +298,6 @@ class CaseDraft:
     # Ids only: whether each names a client of THIS firm is the route's
     # question, answered against the firm store, not the parser's.
     client_ids: tuple[str, ...] = ()
-    # OPENING_STATUSES: `intake` (retained — the default, and what every
-    # case was opened at before the funnel) or `prospect`, with its stage.
-    status: str = INTAKE
-    prospect_stage: str | None = None
 
 
 @dataclass(frozen=True)
@@ -361,7 +329,6 @@ class CaseChanges:
     meeting_341_at: str | None = None
     clear_filed_at: bool = False
     clear_meeting_341_at: bool = False
-    prospect_stage: str | None = None
     # The post-filing text fields (POST_FILING_TEXT_FIELDS) the body named:
     # a value sets, None clears — `fields.text`'s rule that a blank box and
     # an absent value are one state. Absent from the map means unchanged.
@@ -468,20 +435,9 @@ def _refuse_typed_district(
         )
 
 
-def _parse_status(
-    value: object, errors: dict[str, str], *, allowed: tuple[str, ...] = STATUSES
-) -> str | None:
-    if not isinstance(value, str) or value not in allowed:
-        errors["status"] = "Status must be one of " + ", ".join(allowed) + "."
-        return None
-    return value
-
-
-def _parse_prospect_stage(value: object, errors: dict[str, str]) -> str | None:
-    if not isinstance(value, str) or value not in PROSPECT_STAGES:
-        errors["prospect_stage"] = (
-            "Prospect stage must be one of " + ", ".join(PROSPECT_STAGES) + "."
-        )
+def _parse_status(value: object, errors: dict[str, str]) -> str | None:
+    if not isinstance(value, str) or value not in STATUSES:
+        errors["status"] = "Status must be one of " + ", ".join(STATUSES) + "."
         return None
     return value
 
@@ -565,10 +521,10 @@ def parse_case_creation(
 ) -> CaseDraft:
     """Validate POST /v1/cases. Unknown keys are ignored.
 
-    Status is accepted only as one of OPENING_STATUSES: a case starts
-    retained (`intake`, the default) or in the funnel (`prospect`, at
-    `prospect_stage` or `possible`). Letting a client create one already
-    marked "filed" would be a lie the server told on its behalf.
+    Status is deliberately NOT accepted here: every case starts at "intake",
+    and letting a client create one already marked "filed" would be a lie the
+    server told on its behalf. There is no prospect CASE — the funnel before
+    retention is the client's (`firm_clients.PROSPECT_STAGES`).
 
     `client_ids` is REQUIRED (ADR 0022): a case is opened for a client, and a
     debtor without one is a state the store no longer produces.
@@ -583,27 +539,11 @@ def parse_case_creation(
     client_ids = (
         _parse_client_ids(payload.get("client_ids"), errors) if require_clients else ()
     )
-    status: str | None = INTAKE
-    if payload.get("status") is not None:
-        status = _parse_status(payload["status"], errors, allowed=OPENING_STATUSES)
-    prospect_stage: str | None = None
-    if status == PROSPECT:
-        prospect_stage = DEFAULT_PROSPECT_STAGE
-        if payload.get("prospect_stage") is not None:
-            prospect_stage = _parse_prospect_stage(payload["prospect_stage"], errors)
-    elif payload.get("prospect_stage") is not None:
-        errors["prospect_stage"] = "Only a prospect has a prospect stage."
     # The None checks are redundant with `errors` but they are what narrows
     # the types, and a redundant guard beats an assert that a future -O strips.
-    if errors or chapter is None or court is None or status is None:
+    if errors or chapter is None or court is None:
         raise FieldValidationError(errors)
-    return CaseDraft(
-        chapter=chapter,
-        court=court,
-        client_ids=client_ids,
-        status=status,
-        prospect_stage=prospect_stage,
-    )
+    return CaseDraft(chapter=chapter, court=court, client_ids=client_ids)
 
 
 def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
@@ -630,10 +570,6 @@ def parse_case_update(payload: Mapping[str, object]) -> CaseChanges:
         status = _parse_status(payload["status"], errors)
         if status is not None:
             changes["status"] = status
-    if "prospect_stage" in payload:
-        stage = _parse_prospect_stage(payload["prospect_stage"], errors)
-        if stage is not None:
-            changes["prospect_stage"] = stage
     texts = _parse_post_filing_texts(payload, errors)
     if texts:
         changes["texts"] = texts
@@ -706,12 +642,11 @@ def create_case(
         created_by=created_by,
         chapter=draft.chapter,
         district=draft.court.district,
-        status=draft.status,
+        status=INTAKE,
         created_at=now,
         updated_at=now,
         court=draft.court.court,
         division=draft.court.division,
-        prospect_stage=draft.prospect_stage if draft.status == PROSPECT else None,
     )
     return case, assign_case(case, subject=created_by, assigned_by=created_by)
 
@@ -748,9 +683,6 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
       (400, keyed to the missing field);
     - a filed case keeps both: clearing either would leave the deadlines
       and the docket entry with no anchor (400);
-    - `prospect_stage` exists only while the case is a prospect: it is
-      dropped when the case leaves the funnel, defaulted when it enters, and
-      refused on any other status (400).
     """
     updates: dict[str, object] = {
         name: value
@@ -786,14 +718,6 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
             )
         )
     errors: dict[str, str] = {}
-    if status == PROSPECT:
-        updates["prospect_stage"] = (
-            changes.prospect_stage or case.prospect_stage or DEFAULT_PROSPECT_STAGE
-        )
-    else:
-        if changes.prospect_stage is not None:
-            errors["prospect_stage"] = "Only a prospect has a prospect stage."
-        updates["prospect_stage"] = None
     if is_filed(status):
         # Checked on the way IN, and against a clear once there — not on
         # every edit, so a case filed before these rules existed can still
@@ -810,9 +734,9 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
 
 def status_change(before: Case, after: Case, *, changed_by: str) -> StatusChange | None:
     """The history row for a write that moved `before` to `after`, or None
-    when neither the status nor the prospect stage moved. Stamped with the
+    when the status did not move. Stamped with the
     case's own `updated_at`, so the row and the record agree on when."""
-    if before.status == after.status and before.prospect_stage == after.prospect_stage:
+    if before.status == after.status:
         return None
     return StatusChange(
         case_id=after.id,
@@ -820,15 +744,7 @@ def status_change(before: Case, after: Case, *, changed_by: str) -> StatusChange
         changed_by=changed_by,
         from_status=before.status,
         to_status=after.status,
-        from_stage=before.prospect_stage,
-        to_stage=after.prospect_stage,
     )
-
-
-def is_retained_transition(before: Case, after: Case) -> bool:
-    """Whether this write took the case out of the funnel into the firm's
-    engagement — the act that stamps a client's `first_retained_at`."""
-    return before.status == PROSPECT and after.status in RETAINED_STATUSES
 
 
 def parse_archive(payload: Mapping[str, object]) -> bool:
@@ -857,8 +773,8 @@ def deletion_refusal(case: Case) -> str | None:
     A FILED case is refused, whatever happened to it since: its petition is
     a court record the firm must be able to produce, and archiving is how a
     finished matter leaves the working list. What may be deleted is a matter
-    that never reached the court — a prospect that went nowhere, an intake
-    opened by mistake."""
+    that never reached the court — an intake opened by mistake, a matter the
+    client walked away from before filing."""
     if is_filed(case.status):
         return (
             "A filed case cannot be deleted — its petition is a court record."
@@ -990,7 +906,6 @@ def _lifecycle_attributes(case: Case) -> dict[str, str | None]:
 
 
 _LIFECYCLE_FIELDS: Mapping[str, str] = {
-    "prospectStage": "prospect_stage",
     "caseNumber": "case_number",
     "judge": "judge",
     "trustee": "trustee",
@@ -1155,7 +1070,7 @@ def case_json(case: Case) -> dict[str, object]:
         body["filedAt"] = case.filed_at
     if case.meeting_341_at is not None:
         body["meeting341At"] = case.meeting_341_at
-    # The lifecycle (#355): the funnel stage, the docket facts and the
+    # The lifecycle (#355): the docket facts and the
     # archive stamp, each absent until set. The deletion stamp never
     # reaches the wire — a deleted case is not served at all.
     for name, value in _lifecycle_attributes(case).items():
@@ -1184,25 +1099,17 @@ def status_change_item(change: StatusChange) -> dict[str, object]:
         "fromStatus": change.from_status,
         "toStatus": change.to_status,
     }
-    if change.from_stage is not None:
-        item["fromStage"] = change.from_stage
-    if change.to_stage is not None:
-        item["toStage"] = change.to_stage
     return item
 
 
 def status_change_from_item(item: Mapping[str, object]) -> StatusChange:
     try:
-        from_stage = item.get("fromStage")
-        to_stage = item.get("toStage")
         return StatusChange(
             case_id=str(item["caseId"]),
             changed_at=str(item["changedAt"]),
             changed_by=str(item["changedBy"]),
             from_status=str(item["fromStatus"]),
             to_status=str(item["toStatus"]),
-            from_stage=str(from_stage) if from_stage is not None else None,
-            to_stage=str(to_stage) if to_stage is not None else None,
         )
     except KeyError as error:
         raise ValidationError(f"stored status change is malformed: {error}") from error
@@ -1215,10 +1122,6 @@ def status_change_json(change: StatusChange) -> dict[str, object]:
         "fromStatus": change.from_status,
         "toStatus": change.to_status,
     }
-    if change.from_stage is not None:
-        body["fromStage"] = change.from_stage
-    if change.to_stage is not None:
-        body["toStage"] = change.to_stage
     return body
 
 

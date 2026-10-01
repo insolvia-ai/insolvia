@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from insolvia_core.fields import timestamp
 from insolvia_core.firm_clients import (
     ACTIVE,
     ARCHIVED,
@@ -167,6 +168,36 @@ class MemoryFirmStore:
             merged_into=stored.merged_into,
             merging_into=stored.merging_into,
             merging_from=stored.merging_from,
+            prospect_stage=stored.prospect_stage,
+        )
+        self.clients[key] = written
+        return written
+
+    # ── The prospect funnel ─────────────────────────────────────────
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        key = (firm_id, client_id)
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None or not stored.prospect:
+            return None
+        written = replace(stored, prospect_stage=stage, updated_at=timestamp())
+        self.clients[key] = written
+        return written
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        key = (firm_id, client_id)
+        stored = self.clients.get(key)
+        if stored is None or stored.merged_into is not None:
+            return None
+        written = replace(
+            stored,
+            first_retained_at=stored.first_retained_at or retained_on,
+            prospect_stage=None,
+            updated_at=timestamp(),
         )
         self.clients[key] = written
         return written

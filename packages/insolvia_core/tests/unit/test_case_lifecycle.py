@@ -1,4 +1,4 @@
-"""The case lifecycle as data (issue 14.3 / #355): the funnel and its moves,
+"""The case lifecycle as data (issue 14.3 / #355): intake to closed and its moves,
 the post-filing docket facts, the history row a move writes, archive and
 soft delete in both stores, and copy-case's provenance.
 
@@ -31,7 +31,6 @@ from insolvia_core.cases import (
     create_case,
     deletion_refusal,
     is_filed,
-    is_retained_transition,
     mark_deleted,
     parse_case_creation,
     parse_case_update,
@@ -84,43 +83,33 @@ def admin() -> Accessor:
     return Accessor(firm=firm, user=user)
 
 
-# ── Opening a case: retained by default, or a prospect ─────────────
+# ── Opening a case: always retained ─────────────────────────────────
 
 
-def test_a_case_opens_retained_unless_it_is_a_prospect():
-    assert a_case().status == "intake"
-    prospect, _ = create_case(
-        parse_case_creation({**OPENING, "status": "prospect"}),
+@pytest.mark.parametrize("asked", ["prospect", "filed", "ready_to_file"])
+def test_a_case_opens_retained_whatever_the_body_asks(asked):
+    # Status is not a creation field: the funnel before retention is the
+    # client's (firm_clients.PROSPECT_STAGES), and a case is not born filed.
+    case, _ = create_case(
+        parse_case_creation({**OPENING, "status": asked}),
         firm_id=FIRM,
         created_by=ALICE,
     )
-    assert (prospect.status, prospect.prospect_stage) == ("prospect", "possible")
+    assert case.status == "intake"
 
 
-@pytest.mark.parametrize(
-    ("payload", "field"),
-    [
-        ({"status": "filed"}, "status"),
-        ({"status": "ready_to_file"}, "status"),
-        ({"status": "prospect", "prospect_stage": "won"}, "prospect_stage"),
-        ({"prospect_stage": "possible"}, "prospect_stage"),
-    ],
-)
-def test_a_case_cannot_be_born_filed_or_staged_outside_the_funnel(payload, field):
-    with pytest.raises(FieldValidationError) as caught:
-        parse_case_creation({**OPENING, **payload})
-    assert set(caught.value.fields) == {field}
+def test_prospect_is_not_a_case_status():
+    assert "prospect" not in STATUSES
+    with pytest.raises(FieldValidationError):
+        parse_case_update({"status": "prospect"})
 
 
-# ── The funnel to filed ────────────────────────────────────────────
+# ── Intake to closed ───────────────────────────────────────────────
 
 
-def test_a_prospect_moves_through_the_funnel_to_filed_and_closed():
-    case = a_case(status="prospect", prospect_stage="possible")
+def test_a_case_moves_from_intake_to_filed_and_closed():
+    case = a_case()
     for payload in (
-        {"prospect_stage": "consultation_scheduled"},
-        {"prospect_stage": "awaiting_signed_agreement"},
-        {"status": "intake"},
         {"status": "ready_to_file"},
         {**FILING, "judge": "Hon. Example Judge", "trustee": "Example Trustee"},
         {"meeting_341_at": "2026-10-05", "office_file_number": "F-1001"},
@@ -129,7 +118,6 @@ def test_a_prospect_moves_through_the_funnel_to_filed_and_closed():
     ):
         case = moved(case, payload)
     assert case.status == "closed"
-    assert case.prospect_stage is None
     assert (case.case_number, case.judge, case.trustee, case.office_file_number) == (
         "8:26-bk-01234",
         "Hon. Example Judge",
@@ -145,9 +133,8 @@ def test_a_prospect_moves_through_the_funnel_to_filed_and_closed():
         (start, to)
         for start in STATUSES
         for to in STATUSES
-        if to != start and to not in TRANSITIONS[start] and to != "prospect"
-    ]
-    + [("intake", "prospect"), ("filed", "prospect")],
+        if to != start and to not in TRANSITIONS[start]
+    ],
 )
 def test_a_move_off_the_map_is_refused(start, to):
     case = a_case(status=start, filed_at="2026-09-01", case_number="8:26-bk-01234")
@@ -193,12 +180,6 @@ def test_a_case_filed_before_the_rule_still_takes_other_edits():
     assert moved(legacy, {"meeting_341_at": "2026-10-05"}).meeting_341_at
 
 
-def test_a_stage_is_refused_outside_the_funnel():
-    with pytest.raises(FieldValidationError) as caught:
-        moved(a_case(), {"prospect_stage": "possible"})
-    assert set(caught.value.fields) == {"prospect_stage"}
-
-
 @pytest.mark.parametrize(
     ("payload", "field"),
     [
@@ -229,52 +210,24 @@ def test_filed_means_on_the_docket_whatever_happened_since(status):
 
 
 def test_a_move_writes_a_history_row_and_an_edit_does_not():
-    before = a_case(status="prospect", prospect_stage="possible")
-    retained = moved(before, {"status": "intake"})
-    change = status_change(before, retained, changed_by=ALICE)
+    before = a_case()
+    ready = moved(before, {"status": "ready_to_file"})
+    change = status_change(before, ready, changed_by=ALICE)
     assert change is not None
-    assert (change.from_status, change.to_status) == ("prospect", "intake")
-    assert (change.from_stage, change.to_stage) == ("possible", None)
-    assert change.changed_at == retained.updated_at
-    assert (
-        status_change(retained, moved(retained, {"judge": "X"}), changed_by=ALICE)
-        is None
-    )
-
-
-def test_a_stage_move_is_a_history_row_too():
-    before = a_case(status="prospect", prospect_stage="possible")
-    after = moved(before, {"prospect_stage": "exhausted"})
-    change = status_change(before, after, changed_by=ALICE)
-    assert change is not None
-    assert change.to_stage == "exhausted"
+    assert (change.from_status, change.to_status) == ("intake", "ready_to_file")
+    assert change.changed_at == ready.updated_at
+    assert status_change(ready, moved(ready, {"judge": "X"}), changed_by=ALICE) is None
 
 
 def test_the_history_row_round_trips():
-    before = a_case(status="prospect", prospect_stage="possible")
+    before = a_case()
     change = status_change(
-        before, moved(before, {"status": "intake"}), changed_by=ALICE
+        before, moved(before, {"status": "ready_to_file"}), changed_by=ALICE
     )
     assert change is not None
     assert status_change_from_item(status_change_item(change)) == change
     with pytest.raises(ValidationError):
         status_change_from_item({"caseId": "x"})
-
-
-@pytest.mark.parametrize(
-    ("start", "to", "retained"),
-    [
-        ("prospect", "intake", True),
-        ("prospect", "ready_to_file", True),
-        ("intake", "ready_to_file", False),
-        ("ready_to_file", "intake", False),
-    ],
-)
-def test_only_leaving_the_funnel_is_the_retained_transition(start, to, retained):
-    before = a_case(
-        status=start, prospect_stage="possible" if start == "prospect" else None
-    )
-    assert is_retained_transition(before, moved(before, {"status": to})) is retained
 
 
 # ── The stored shape ───────────────────────────────────────────────
@@ -298,7 +251,7 @@ def test_the_lifecycle_round_trips_the_item_and_reaches_the_wire():
 
 def test_a_row_written_before_the_lifecycle_reads_with_none_of_it():
     item = case_item(a_case())
-    assert "prospectStage" not in item
+    assert "caseNumber" not in item
     assert "archivedAt" not in item
     assert case_from_item(item).case_number is None
 
@@ -379,18 +332,16 @@ def test_a_write_read_before_a_status_move_is_refused():
 def test_the_memory_store_keeps_the_history_with_the_write():
     store = MemoryCaseStore()
     case, assignment = create_case(
-        parse_case_creation({**OPENING, "status": "prospect"}),
-        firm_id=FIRM,
-        created_by=ALICE,
+        parse_case_creation(OPENING), firm_id=FIRM, created_by=ALICE
     )
     store.create(case, assignment)
-    after = moved(case, {"status": "intake"})
+    after = moved(case, {"status": "ready_to_file"})
     store.update(
         after,
-        expected_status="prospect",
+        expected_status="intake",
         status_change=status_change(case, after, changed_by=ALICE),
     )
-    assert [c.to_status for c in store.status_history(case.id)] == ["intake"]
+    assert [c.to_status for c in store.status_history(case.id)] == ["ready_to_file"]
 
 
 # ── Copy case ──────────────────────────────────────────────────────
@@ -526,12 +477,12 @@ def test_a_dynamo_status_move_writes_the_record_and_its_history_together(
 ):
     fake = FakeDynamoDb()
     store = dynamo_store(monkeypatch, fake)
-    before = a_case(status="prospect", prospect_stage="possible")
-    after = moved(before, {"status": "intake"})
+    before = a_case()
+    after = moved(before, {"status": "ready_to_file"})
 
     store.update(
         after,
-        expected_status="prospect",
+        expected_status="intake",
         status_change=status_change(before, after, changed_by=ALICE),
     )
 
@@ -539,7 +490,7 @@ def test_a_dynamo_status_move_writes_the_record_and_its_history_together(
     assert name == "transact_write_items"
     case_put, history_put = (item["Put"] for item in kwargs["TransactItems"])
     assert "#status = :expected" in case_put["ConditionExpression"]
-    assert case_put["ExpressionAttributeValues"][":expected"] == {"S": "prospect"}
+    assert case_put["ExpressionAttributeValues"][":expected"] == {"S": "intake"}
     assert history_put["Item"]["SK"] == {"S": f"STATUS#{after.updated_at}"}
 
 

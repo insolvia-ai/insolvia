@@ -294,10 +294,36 @@ class FirmStore(Protocol):
         terminal record, and an edit read before the merge must not
         un-archive it. None when any of the three no longer holds.
 
-        Writes the record's own fields ONLY. The merge attributes
-        (`firm_clients.MERGE_ATTRIBUTES`) are left exactly as stored: a
-        whole-record save built from a read taken before a merge claimed the
-        row would otherwise erase the claim."""
+        Writes the record's own fields ONLY. The server-owned attributes
+        (`firm_clients.SERVER_OWNED_ATTRIBUTES` — the merge claim and the
+        prospect stage) are left exactly as stored: a whole-record save built
+        from a read taken before a merge claimed the row would otherwise
+        erase the claim."""
+        ...
+
+    # ── The prospect funnel (issue 14.3 / #355) ─────────────────────
+    #
+    # Two writes, both single conditional UpdateItems, so the stage and the
+    # retained transition cannot interleave into a retained client with a
+    # funnel position (`firm_clients` module docstring).
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        """Set (or, with None, remove) the client's funnel stage — ONLY IF the
+        row exists in `firm_id`, was never merged away, and is still a
+        prospect (`first_retained_at` unset). The updated client, or None
+        when any condition failed; nothing is written then."""
+        ...
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        """THE RETAINED TRANSITION's write: set `first_retained_at` to
+        `retained_on` unless it already has a value (a hand-entered earlier
+        date is the firm's own record), and remove `prospect_stage` — in ONE
+        write, conditional on the row existing in `firm_id` and never having
+        been merged away. The updated client, or None."""
         ...
 
     # ── Merging two clients (ADR 0022's PR 7) ───────────────────────

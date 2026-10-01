@@ -95,11 +95,9 @@ def copy_case(
     """The copy of `source` that `created_by` is opening, from the source's
     debtors and collection records as read.
 
-    It opens RETAINED (`intake`), like a case opened with no status named:
-    copying a matter's data forward is preparation work, and a copy that
-    should be a prospect is the rarer case — the funnel cannot be re-entered
-    once retained, so the route refuses nothing here that the person cannot
-    correct by deleting the copy (it has never been filed)."""
+    It opens RETAINED (`intake`), as every case does — there is no prospect
+    case; the funnel is the client's (`firm_clients.PROSPECT_STAGES`), and
+    the route's retained stamp takes the copy's clients out of it."""
     now = timestamp()
     case = Case(
         id=str(uuid.uuid4()),
