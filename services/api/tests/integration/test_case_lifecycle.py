@@ -17,13 +17,36 @@ the cost of proving the copy against the real tables, and it is said here so
 nobody mistakes the rows for a leak. The status moves happen on the copy,
 never on the scratch case: a filed case cannot go back, and the scratch case
 must stay where every other spec expects it.
+
+The prospect funnel is the CLIENT's (the maintainer's decision of
+2026-10-01), and it rides on the same copy rather than on a new client: the
+scratch client's retained date is cleared by a whole-record PUT (making it a
+prospect again), staged through the real conditional UpdateItem, and then
+retained by the copy — the store's other conditional write — which stamps
+today and clears the stage. A stage on the retained client is refused. The
+scratch client ends retained, with today's date: nothing else reads it.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from tests.integration.conftest import Api
+
+# A client's whole-record fields — the PUT body, minus `first_retained_at`.
+_EDITABLE = (
+    "name",
+    "other_names_used",
+    "date_of_birth",
+    "residence_address",
+    "mailing_address",
+    "phone",
+    "mobile",
+    "email",
+    "lead_source",
+    "referred_by",
+)
 
 
 def test_docket_facts_are_recorded_and_cleared_on_the_scratch_case(
@@ -64,13 +87,28 @@ def test_an_archived_case_leaves_the_working_list_and_reads_in_the_archive(
     assert case_id in _all_ids(admin)
 
 
-def test_a_copy_moves_through_the_funnel_names_its_source_and_deletes(
-    admin: Api, scratch_case: dict[str, Any]
+def test_a_copy_retains_a_staged_prospect_moves_names_its_source_and_deletes(
+    admin: Api, scratch_client: dict[str, Any], scratch_case: dict[str, Any]
 ):
     source_id = scratch_case["id"]
+    client_url = f"/v1/firm/clients/{scratch_client['id']}"
+    current = admin.get(client_url)
+    admin.put(client_url, {k: current[k] for k in _EDITABLE if k in current})
+    staged = admin.put(
+        f"{client_url}/prospect-stage", {"prospect_stage": "awaiting_signed_agreement"}
+    )
+    assert staged["prospect_stage"] == "awaiting_signed_agreement"
+
     copy = admin.post(f"/v1/cases/{source_id}/copy", {}, expect=201)
     copy_id = copy["id"]
     try:
+        retained = admin.get(client_url)
+        assert retained["first_retained_at"] == date.today().isoformat()
+        assert "prospect_stage" not in retained
+        admin.put(
+            f"{client_url}/prospect-stage", {"prospect_stage": "possible"}, expect=409
+        )
+
         assert copy["status"] == "intake"
         debtors = admin.get(f"/v1/cases/{copy_id}/debtors")["debtors"]
         debtor_1 = next(d for d in debtors if d["filing_role"] == "debtor_1")
