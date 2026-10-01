@@ -47,11 +47,12 @@ API — which is what makes the API's calls run under ITS role, not yours.
 ## Scratch discipline
 
 Cases are only ever SOFT-deleted through the API (#355) — the rows stay — so
-a spec that opened one per run would fill a table nobody prunes. The suite keeps ONE scratch case per
-environment, found by its court and division (`SCRATCH_COURT`) and opened only
-when absent. Everything else it creates — debtors are replaced in place, documents
-are deleted — lives inside that case, and every deletion runs in teardown
-however the test ended.
+a spec that opened one per run would fill a table nobody prunes. The suite
+keeps ONE scratch case per environment, found by its court and division
+(`SCRATCH_COURT`) and opened only when absent. Everything else it creates —
+debtors are replaced in place, documents are deleted — lives inside that
+case, and every deletion runs in teardown however the test ended. The one
+exception, said where it happens: `test_case_lifecycle.py`'s copy.
 """
 
 from __future__ import annotations
