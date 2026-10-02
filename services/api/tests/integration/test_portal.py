@@ -11,7 +11,10 @@ the seed bound to the fixture case — which is the one thing a mis-published
   - a staff token 401s on /v1/portal/me;
   - a revoked binding 403s (and the API writes a `denied` row — the access
     log is PutItem-only, so the row itself is not readable from here);
-  - two bindings cannot both hold a debtor role.
+  - two bindings cannot both hold a debtor role;
+  - a section the firm switches off is gone from /v1/portal/questionnaire
+    and still on /v1/firm/questionnaire (PR 3's done-when) — and the firm's
+    config is put back as it was found before the test returns.
 
 WHO the client is comes from `seeds/<target>.json` — a fixture case's
 `clients` — exactly as the staff people do. A fixture with no client skips
@@ -154,3 +157,67 @@ def test_a_revoked_client_is_refused_until_re_invited(
         assert rebound["subject"] == subject
 
     as_client.get("/v1/portal/me")
+
+
+# ── The questionnaire (ADR 0023 PR 3 / #362) ────────────────────
+
+
+def _save_body(sections: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "sections": [
+            {
+                "id": section["id"],
+                "enabled": section["enabled"],
+                "instructions": section["instructions"],
+            }
+            for section in sections
+        ]
+    }
+
+
+def test_a_section_switched_off_is_hidden_from_the_client_and_kept_for_staff(
+    admin: Api, as_client: Api
+):
+    """The ADR's done-when for PR 3, against the deployed stack.
+
+    It changes the FIRM's config — there is no scratch firm — so it puts the
+    config back exactly as it found it before it returns: a firm that was on
+    the defaults is reset (the item deleted), one that had saved is saved
+    again with what it had."""
+    before = admin.get("/v1/firm/questionnaire")
+    target = next(
+        (s["id"] for s in before["sections"] if s["switchable"] and s["enabled"]),
+        None,
+    )
+    if target is None:
+        pytest.skip("the firm already hides every switchable section")
+    switched = [
+        {**s, "enabled": False} if s["id"] == target else s for s in before["sections"]
+    ]
+
+    admin.put("/v1/firm/questionnaire", _save_body(switched))
+    try:
+        seen_by_client = [
+            s["id"] for s in as_client.get("/v1/portal/questionnaire")["sections"]
+        ]
+        staff_view = admin.get("/v1/firm/questionnaire")["sections"]
+    finally:
+        if before["isDefault"]:
+            admin.delete("/v1/firm/questionnaire", expect=200)
+        else:
+            admin.put("/v1/firm/questionnaire", _save_body(before["sections"]))
+
+    assert target not in seen_by_client
+    assert "personal_information" in seen_by_client
+    assert [s["id"] for s in staff_view] == [s["id"] for s in before["sections"]]
+    assert {s["id"]: s["enabled"] for s in staff_view}[target] is False
+    after = admin.get("/v1/firm/questionnaire")
+    assert after["isDefault"] == before["isDefault"]
+    assert after["sections"] == before["sections"]
+
+
+def test_the_questionnaire_routes_keep_the_two_principals_apart(
+    admin: Api, as_client: Api
+):
+    as_client.get("/v1/firm/questionnaire", expect=401)
+    admin.get("/v1/portal/questionnaire", expect=401)
