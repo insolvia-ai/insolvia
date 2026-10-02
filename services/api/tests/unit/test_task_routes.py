@@ -264,7 +264,7 @@ def test_creating_a_task_answers_201_with_the_stored_record(client):
         body={
             "subject": "Get the vehicle payoff",
             "description": "Call the lender on the credit report.",
-            "dueDate": "2026-10-01",
+            "dueDate": "2099-10-01",
             "formSeries": "b106d",
         },
     )
@@ -272,7 +272,7 @@ def test_creating_a_task_answers_201_with_the_stored_record(client):
     body = response.get_json()
     assert body["subject"] == "Get the vehicle payoff"
     assert body["description"] == "Call the lender on the credit report."
-    assert body["dueDate"] == "2026-10-01"
+    assert body["dueDate"] == "2099-10-01"
     assert body["formSeries"] == "b106d"
     assert body["caseId"] == case_id
     assert body["done"] is False
