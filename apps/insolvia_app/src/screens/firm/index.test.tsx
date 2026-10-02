@@ -77,6 +77,31 @@ const FIRM_RECORD = {
   updatedAt: '2026-08-01T12:00:00.000Z',
 };
 
+const SECTION_TITLES = [
+  ['personal_information', 'Personal information'],
+  ['property', 'Property'],
+  ['debts', 'Debts'],
+  ['income', 'Income'],
+  ['expenses', 'Expenses'],
+  ['other', 'Other'],
+] as const;
+
+/** Shaped as core/questionnaire.py::questionnaire_json answers for a firm on the defaults. */
+const DEFAULT_QUESTIONNAIRE = {
+  isDefault: true,
+  updatedAt: null,
+  updatedBy: null,
+  sections: SECTION_TITLES.map(([id, title]) => ({
+    id,
+    title,
+    covers: `What ${title.toLowerCase()} covers.`,
+    switchable: id !== 'personal_information',
+    enabled: true,
+    instructions: null,
+    defaultInstructions: `Default instructions for ${title.toLowerCase()}.`,
+  })),
+};
+
 /**
  * `/firm` — the firm's own people.
  *
@@ -104,6 +129,9 @@ describe('the firm screen', () => {
     // cannot see — hence the wrapper.
     const route = routeFetch({
       '/oauth2/token': tokenEndpointResponse,
+      // BEFORE the spread, so a test's own questionnaire handler replaces
+      // this value while keeping its place ahead of the bare /v1/firm key.
+      '/v1/firm/questionnaire': () => jsonResponse(200, DEFAULT_QUESTIONNAIRE),
       ...handlers,
       '/v1/firm': () => jsonResponse(200, FIRM_RECORD),
     });
@@ -372,5 +400,96 @@ describe('the firm screen', () => {
       .getAllByRole('heading')
       .filter((node) => node.props['aria-level'] === 1);
     expect(levelOnes).toHaveLength(1);
+  });
+
+  describe('the client questionnaire (ADR 0023 PR 3)', () => {
+    it('lists every section, with a switch on each but personal information', async () => {
+      signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByRole('heading', { name: 'Client questionnaire' })).toBeTruthy();
+      for (const [, title] of SECTION_TITLES) {
+        expect(screen.getByRole('heading', { name: title })).toBeTruthy();
+      }
+      expect(screen.getByText('Always shown to clients')).toBeTruthy();
+      expect(screen.getAllByRole('switch')).toHaveLength(5);
+      expect(
+        screen.queryByRole('switch', { name: 'Show personal information to clients' }),
+      ).toBeNull();
+    });
+
+    it('saves a section switched off as the whole record', async () => {
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('switch', { name: 'Show expenses to clients' }));
+
+      expect(screen.getByText('Hidden from clients — staff only')).toBeTruthy();
+      await user.press(screen.getByRole('button', { name: 'Save questionnaire' }));
+
+      const put = fetchMock.mock.calls.find(
+        ([url, init]) => url.endsWith('/v1/firm/questionnaire') && init?.method === 'PUT',
+      );
+      const body = JSON.parse(String(put?.[1]?.body)) as {
+        sections: { id: string; enabled: boolean; instructions: string | null }[];
+      };
+      expect(body.sections.map((section) => [section.id, section.enabled])).toEqual([
+        ['personal_information', true],
+        ['property', true],
+        ['debts', true],
+        ['income', true],
+        ['expenses', false],
+        ['other', true],
+      ]);
+      // The textarea held the default in force; the server stores that as
+      // "use the default", so sending it is not a customisation.
+      expect(body.sections[4]?.instructions).toBe('Default instructions for expenses.');
+    });
+
+    it('asks before resetting to the defaults, then resets', async () => {
+      const customised = {
+        ...DEFAULT_QUESTIONNAIRE,
+        isDefault: false,
+        updatedAt: '2026-10-01T09:00:00.000000Z',
+        updatedBy: ALICE,
+      };
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+        '/v1/firm/questionnaire': () => jsonResponse(200, customised),
+      });
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Reset to defaults' }));
+
+      expect(await screen.findByText('Reset the questionnaire?')).toBeTruthy();
+      await user.press(screen.getByRole('button', { name: 'Reset' }));
+
+      const reset = fetchMock.mock.calls.find(
+        ([url, init]) => url.endsWith('/v1/firm/questionnaire') && init?.method === 'DELETE',
+      );
+      expect(reset).toBeTruthy();
+    });
+
+    it('shows a viewer the questionnaire with nothing to change', async () => {
+      signedIn({
+        '/v1/me': () =>
+          jsonResponse(
+            200,
+            membership({
+              isAdmin: false,
+              permissions: { ...ALL_ADD_EDIT, firm_administration: 'view_only' },
+            }),
+          ),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByText('Default instructions for debts.')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Save questionnaire' })).toBeNull();
+      expect(screen.queryByLabelText('Instructions for your client')).toBeNull();
+    });
   });
 });
