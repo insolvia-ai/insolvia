@@ -39,6 +39,12 @@ from insolvia_core.library_creditors import (
     library_creditor_item,
 )
 from insolvia_core.library_creditors import sort_key as library_creditor_sort_key
+from insolvia_core.questionnaire import SORT_KEY as QUESTIONNAIRE_SORT_KEY
+from insolvia_core.questionnaire import (
+    QuestionnaireConfig,
+    questionnaire_from_item,
+    questionnaire_item,
+)
 
 # The sparse index in infra/modules/firm_store — one entry per firm user,
 # keyed by their Cognito subject. See the FirmStore port for why this lookup
@@ -693,3 +699,43 @@ class DynamoDbFirmStore:
             except ClientError as error:
                 if error.response.get("Error", {}).get("Code") != _CONDITION_FAILED:
                     raise
+
+    # ── The client questionnaire's config ───────────────────────────
+
+    def _questionnaire_key(self, firm_id: str) -> dict[str, Any]:
+        return {
+            "PK": {"S": partition_key(firm_id)},
+            "SK": {"S": QUESTIONNAIRE_SORT_KEY},
+        }
+
+    def get_questionnaire(self, firm_id: str) -> QuestionnaireConfig | None:
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key=self._questionnaire_key(firm_id),
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return None if not item else questionnaire_from_item(from_attributes(item))
+
+    def put_questionnaire(self, config: QuestionnaireConfig) -> None:
+        # Unconditional: a whole-record save replacing whatever is there (the
+        # port's last-writer-wins). The firm's existence is not re-checked —
+        # the route holds an accessor resolved from an active firm, and a
+        # PutItem cannot condition on another item in the partition.
+        self.client.put_item(
+            TableName=self.table_name,
+            Item=to_attributes(questionnaire_item(config)),
+        )
+
+    def delete_questionnaire(self, firm_id: str) -> bool:
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key=self._questionnaire_key(firm_id),
+                ConditionExpression="attribute_exists(SK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return False
+            raise
+        return True
