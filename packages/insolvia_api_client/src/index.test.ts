@@ -50,6 +50,7 @@ import {
   PLAN_PAYMENT_SOURCES,
   PRESUMPTION_EXEMPTIONS,
   PROSPECT_STAGES,
+  QUESTIONNAIRE_SECTION_IDS,
   SECURED_PAYMENT_BUCKETS,
   SECURED_TREATMENTS,
   SMALL_BUSINESS_STATUSES,
@@ -8630,5 +8631,200 @@ describe('the client portal endpoints', () => {
     const error = await rejection(client.getPortalMe());
 
     expect(error).toBeInstanceOf(ApiUnauthorizedException);
+  });
+});
+
+describe('the client questionnaire (ADR 0023 PR 3)', () => {
+  function apiClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  // Copied from core/questionnaire.py::questionnaire_json, for a firm that
+  // switched `property` off and wrote its own instructions for it.
+  const FIRM_QUESTIONNAIRE = {
+    isDefault: false,
+    updatedAt: '2026-10-02T12:00:00.000000Z',
+    updatedBy: SUBJECT,
+    sections: [
+      {
+        id: 'personal_information',
+        title: 'Personal information',
+        covers:
+          'The voluntary petition: names, addresses, contact details, household and prior filings.',
+        switchable: false,
+        enabled: true,
+        instructions: null,
+        defaultInstructions:
+          'Tell us who you are and where you live. Use your full legal name as it appears on your identification, and list any other names you have used in the last eight years.',
+      },
+      {
+        id: 'property',
+        title: 'Property',
+        covers:
+          'Schedule A/B and the exemptions on Schedule C: real estate, vehicles, accounts, household goods and other assets.',
+        switchable: true,
+        enabled: false,
+        instructions: 'We will go through your property with you at the office.',
+        defaultInstructions:
+          'List everything you own or have an interest in, wherever it is: your home, vehicles, bank accounts, retirement accounts, household goods and anything else of value. An estimate of what each is worth today is enough.',
+      },
+    ],
+  };
+
+  test('mirrors the server catalogue ids, in order', () => {
+    expect(QUESTIONNAIRE_SECTION_IDS).toEqual([
+      'personal_information',
+      'property',
+      'debts',
+      'income',
+      'expenses',
+      'other',
+    ]);
+  });
+
+  test('GETs the firm questionnaire and maps every section', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(FIRM_QUESTIONNAIRE, 200));
+
+    const questionnaire = await client.getFirmQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(questionnaire).toEqual(FIRM_QUESTIONNAIRE);
+  });
+
+  test('a firm on the defaults reads null provenance', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        { ...FIRM_QUESTIONNAIRE, isDefault: true, updatedAt: null, updatedBy: null },
+        200,
+      ),
+    );
+
+    const questionnaire = await client.getFirmQuestionnaire();
+
+    expect(questionnaire.isDefault).toBe(true);
+    expect(questionnaire.updatedBy).toBeNull();
+  });
+
+  test('PUTs the whole config, sending null instructions as null', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(FIRM_QUESTIONNAIRE, 200));
+
+    await client.saveFirmQuestionnaire({
+      sections: [
+        { id: 'personal_information', enabled: true, instructions: null },
+        { id: 'property', enabled: false, instructions: 'At the office.' },
+      ],
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      sections: [
+        { id: 'personal_information', enabled: true, instructions: null },
+        { id: 'property', enabled: false, instructions: 'At the office.' },
+      ],
+    });
+  });
+
+  test('a refused save carries the per-section messages', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'validation failed: sections.personal_information.enabled',
+          fields: {
+            'sections.personal_information.enabled': 'Personal information is always on.',
+          },
+        },
+        400,
+      ),
+    );
+
+    const error = asApiValidationException(
+      await rejection(
+        client.saveFirmQuestionnaire({
+          sections: [{ id: 'personal_information', enabled: false, instructions: null }],
+        }),
+      ),
+    );
+
+    expect(error.fields).toEqual({
+      'sections.personal_information.enabled': 'Personal information is always on.',
+    });
+  });
+
+  test('DELETEs to reset to the defaults', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse(
+        { ...FIRM_QUESTIONNAIRE, isDefault: true, updatedAt: null, updatedBy: null },
+        200,
+      ),
+    );
+
+    const reset = await client.resetFirmQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(`${BASE_URL}/v1/firm/questionnaire`);
+    expect(reset.isDefault).toBe(true);
+  });
+
+  test.each([
+    ['an unknown section id', { ...FIRM_QUESTIONNAIRE.sections[0], id: 'hobbies' }],
+    ['a missing switch', { ...FIRM_QUESTIONNAIRE.sections[0], enabled: undefined }],
+  ])('refuses a firm questionnaire with %s', async (_label, section) => {
+    const { client } = apiClient(() =>
+      jsonResponse({ ...FIRM_QUESTIONNAIRE, sections: [section] }, 200),
+    );
+
+    await expect(client.getFirmQuestionnaire()).rejects.toThrow();
+  });
+
+  // Copied from core/questionnaire.py::portal_questionnaire_json.
+  const PORTAL_QUESTIONNAIRE = {
+    sections: [
+      {
+        id: 'personal_information',
+        title: 'Personal information',
+        instructions:
+          'Tell us who you are and where you live. Use your full legal name as it appears on your identification, and list any other names you have used in the last eight years.',
+      },
+      { id: 'debts', title: 'Debts', instructions: 'Bring your statements.' },
+    ],
+  };
+
+  test('GETs the portal questionnaire: the enabled sections, as the client reads them', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(PORTAL_QUESTIONNAIRE, 200));
+
+    const questionnaire = await client.getPortalQuestionnaire();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/questionnaire`);
+    expect(questionnaire).toEqual(PORTAL_QUESTIONNAIRE);
+  });
+
+  test('a revoked client reading the questionnaire is a 403', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'Forbidden',
+          message: 'you do not have access to a case through the client portal',
+        },
+        403,
+      ),
+    );
+
+    const error = asApiException(await rejection(client.getPortalQuestionnaire()));
+
+    expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
+    expect(error.statusCode).toBe(403);
   });
 });
