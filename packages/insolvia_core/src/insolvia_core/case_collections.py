@@ -122,4 +122,7 @@ RESERVED_SK_NAMESPACES: Final = (
     # (core/tasks.py), the same reasons DOCUMENT is its own prefix rather
     # than a COLLECTIONS entry.
     "TASK",
+    # The case's lifecycle history (issue 14.3 / #355) — one row per status
+    # move, written with the case record (core/cases.status_change_item).
+    "STATUS",
 )

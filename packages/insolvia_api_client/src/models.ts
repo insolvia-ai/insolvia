@@ -637,6 +637,13 @@ export interface FirmClient {
    * belong to the survivor.
    */
   readonly merged_into?: string | undefined;
+  /**
+   * Where a PROSPECT sits in the funnel (issue #355) — present only while
+   * {@link first_retained_at} is absent and a stage has been set through
+   * `setFirmClientProspectStage`. Server-owned: the whole-record PUT never
+   * sends it.
+   */
+  readonly prospect_stage?: ProspectStage | undefined;
   readonly created_at: string;
   readonly updated_at: string;
   /** The subject of the firm user who created the record. */
@@ -1023,13 +1030,72 @@ export function submittedAtUtc(confirmation: WaitlistConfirmation): Date {
 export type CaseChapter = 7 | 11 | 12 | 13;
 
 /**
- * A case's position in the filing workflow.
+ * A case's position in its lifecycle (issue 14.3 / #355) — mirrors
+ * `insolvia_core.cases.STATUSES`, member for member and in lifecycle order:
+ * `intake` and `ready_to_file`, retained and being prepared; `filed`; its two
+ * outcomes `discharged` and `dismissed`; and `closed`. Exported as a VALUE
+ * because the app renders it as a picker. There is no prospect CASE: the
+ * funnel before retention is the client's ({@link FirmClient.prospect_stage}).
  *
- * A union of string literals rather than an `enum`, because `erasableSyntaxOnly`
- * is on (see the root `tsconfig.base.json`) — the same reason
- * {@link UnauthorizedSource} in `exceptions.ts` is one.
+ * Which moves the server accepts is {@link CASE_TRANSITIONS}; a move off it
+ * answers 409.
  */
-export type CaseStatus = 'intake' | 'ready_to_file' | 'filed';
+export const CASE_STATUSES = [
+  'intake',
+  'ready_to_file',
+  'filed',
+  'discharged',
+  'dismissed',
+  'closed',
+] as const;
+export type CaseStatus = (typeof CASE_STATUSES)[number];
+
+/**
+ * The statuses at or after filing — a petition on the court's docket. Mirrors
+ * `insolvia_core.cases.FILED_STATUSES`; "is this case filed" means membership
+ * here, never `status === 'filed'`, because a discharged or closed case is
+ * still a filed petition.
+ */
+export const FILED_CASE_STATUSES: readonly CaseStatus[] = [
+  'filed',
+  'discharged',
+  'dismissed',
+  'closed',
+];
+
+/** Whether a case in `status` has a petition on the court's docket. */
+export function isFiledStatus(status: CaseStatus): boolean {
+  return FILED_CASE_STATUSES.includes(status);
+}
+
+/**
+ * The moves the server accepts from each status — mirrors
+ * `insolvia_core.cases.TRANSITIONS`, so a screen offers only moves that will
+ * land. Forward along the funnel, with two ways back: between `intake` and
+ * `ready_to_file`, and `closed` back to `filed` (a reopened case).
+ */
+export const CASE_TRANSITIONS: Readonly<Record<CaseStatus, readonly CaseStatus[]>> = {
+  intake: ['ready_to_file', 'filed'],
+  ready_to_file: ['intake', 'filed'],
+  filed: ['discharged', 'dismissed', 'closed'],
+  discharged: ['closed'],
+  dismissed: ['closed'],
+  closed: ['filed'],
+};
+
+/**
+ * Where a prospect CLIENT sits in the funnel (issue #355) — mirrors
+ * `insolvia_core.firm_clients.PROSPECT_STAGES`. A client is a prospect while
+ * {@link FirmClient.first_retained_at} is absent; opening their first case
+ * retains them and clears the stage.
+ */
+export const PROSPECT_STAGES = [
+  'possible',
+  'consultation_scheduled',
+  'awaiting_signed_agreement',
+  'exhausted',
+] as const;
+export type ProspectStage = (typeof PROSPECT_STAGES)[number];
 
 /**
  * 106C line 1 — which § 522(b) set the debtor claims (issue #346). Mirrors
@@ -1120,6 +1186,26 @@ export interface Case {
    * rest of the meeting-anchored deadlines count from it.
    */
   readonly meeting341At?: string;
+  /**
+   * The court's case number, as the notice of filing prints it
+   * (`8:26-bk-01234`). Absent until recorded; a case cannot reach `filed`
+   * without it.
+   */
+  readonly caseNumber?: string;
+  /** The assigned judge's name. Absent until recorded. */
+  readonly judge?: string;
+  /** The case trustee's name. Absent until recorded. */
+  readonly trustee?: string;
+  /** The firm's own file number for the matter. Absent until recorded. */
+  readonly officeFileNumber?: string;
+  /**
+   * When the case was archived — out of the working list
+   * (`listCases()`), into the archive (`listCases({ archived: true })`).
+   * Absent on a case in the working list.
+   */
+  readonly archivedAt?: string;
+  /** The firm user's subject who archived it; present with {@link archivedAt}. */
+  readonly archivedBy?: string;
 }
 
 /**
@@ -1147,7 +1233,10 @@ export interface CreateCaseRequest {
   readonly clientIds: readonly string[];
 }
 
-/** The `POST /v1/cases` request body — every field is required. */
+/**
+ * The `POST /v1/cases` request body — every field is required. Every case
+ * opens at `intake`: there is no status to send (issue #355).
+ */
 export function createCaseRequestToJson(request: CreateCaseRequest): Record<string, unknown> {
   return {
     chapter: request.chapter,
@@ -1167,6 +1256,11 @@ export interface ListCasesOptions {
   readonly limit?: number | undefined;
   /** An opaque pagination cursor from a previous {@link ListCasesResult.nextCursor}. */
   readonly cursor?: string | undefined;
+  /**
+   * `true` lists the ARCHIVE instead of the working list (issue #355). A
+   * cursor from one view is refused (400) by the other.
+   */
+  readonly archived?: boolean | undefined;
 }
 
 /**
@@ -1182,6 +1276,9 @@ export function listCasesQuery(options: ListCasesOptions): URLSearchParams {
   }
   if (options.cursor !== undefined) {
     params.set('cursor', options.cursor);
+  }
+  if (options.archived === true) {
+    params.set('archived', 'true');
   }
   return params;
 }
@@ -1202,7 +1299,8 @@ export interface ListCasesResult {
 
 /**
  * The `PATCH /v1/cases/{caseId}` request body: any subset of `{"chapter",
- * "court" + "division", "status"}`. An omitted key means "leave unchanged" — the client
+ * "court" + "division", "status", "prospect_stage", "exemption_set", the two
+ * dates and the four docket facts}`. An omitted key means "leave unchanged" — the client
  * must not send keys the caller did not supply, so {@link updateCaseChangesToJson}
  * omits them rather than sending `null`.
  */
@@ -1232,6 +1330,19 @@ export interface UpdateCaseChanges {
   readonly filedAt?: string | null | undefined;
   /** The first § 341 date (`meeting_341_at`), `null` to clear, omit to keep. */
   readonly meeting341At?: string | null | undefined;
+  /**
+   * The post-filing docket facts (issue #355), each `null` to clear and
+   * omitted to keep. Reaching `filed` needs {@link filedAt} and
+   * {@link caseNumber}, in this request or already stored (400 keyed to the
+   * missing one); once filed, neither may be cleared.
+   */
+  readonly caseNumber?: string | null | undefined;
+  /** The judge's name (`judge`), `null` to clear, omit to keep. */
+  readonly judge?: string | null | undefined;
+  /** The trustee's name (`trustee`), `null` to clear, omit to keep. */
+  readonly trustee?: string | null | undefined;
+  /** The firm's file number (`office_file_number`), `null` to clear, omit to keep. */
+  readonly officeFileNumber?: string | null | undefined;
 }
 
 /**
@@ -1263,7 +1374,31 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
   if (changes.meeting341At !== undefined) {
     json.meeting_341_at = changes.meeting341At;
   }
+  if (changes.caseNumber !== undefined) {
+    json.case_number = changes.caseNumber;
+  }
+  if (changes.judge !== undefined) {
+    json.judge = changes.judge;
+  }
+  if (changes.trustee !== undefined) {
+    json.trustee = changes.trustee;
+  }
+  if (changes.officeFileNumber !== undefined) {
+    json.office_file_number = changes.officeFileNumber;
+  }
   return json;
+}
+
+/**
+ * One move in a case's lifecycle, from `GET /v1/cases/{caseId}/status-history`
+ * (issue #355): who moved it, when, from what to what.
+ */
+export interface CaseStatusChange {
+  readonly changedAt: string;
+  /** A firm user's subject — resolve it with `listFirmDirectory`. */
+  readonly changedBy: string;
+  readonly fromStatus: CaseStatus;
+  readonly toStatus: CaseStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -2250,6 +2385,15 @@ export interface ProvenanceEntry {
    * archived or merged client leaves the provenance readable.
    */
   readonly client_id?: string | undefined;
+  /**
+   * The case this value was COPIED from (`POST /v1/cases/{id}/copy`, issue
+   * #355) — alongside, not instead of, the value's own {@link source}: a
+   * confirmed extraction copied forward is still that, and `document_id`
+   * still names the source case's document. A client must echo it back
+   * unchanged on a save that did not touch the value, which
+   * {@link provenanceToJson} does.
+   */
+  readonly copied_from_case_id?: string | undefined;
 }
 
 /**
@@ -2642,6 +2786,7 @@ function provenanceToJson(
         confidence: entry.confidence,
         library_creditor_id: entry.library_creditor_id,
         client_id: entry.client_id,
+        copied_from_case_id: entry.copied_from_case_id,
       },
     );
   }

@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import record_access
-from insolvia_core.cases import Case
+from insolvia_core.cases import Case, is_filed
 from insolvia_core.debtors import (
     Debtor,
     DebtorDraft,
@@ -351,7 +351,7 @@ def copy_from_client_route(case_id: str, filing_role: str) -> ResponseReturnValu
     accessor = current_accessor()
     role = parse_filing_role(filing_role)
     case = _reachable_case_or_404(accessor, case_id, "case.update")
-    if case.status == "filed":
+    if is_filed(case.status):
         raise ConflictError(
             "This case is filed — re-copying would change a filed petition. "
             "Amend it instead."

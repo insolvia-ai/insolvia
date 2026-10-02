@@ -15,6 +15,7 @@ from insolvia_core.cases import (
     parse_case_creation,
     parse_case_update,
     parse_list_limit,
+    status_change,
 )
 from insolvia_core.errors import FieldValidationError, NotFoundError, ValidationError
 from insolvia_core.firm_clients import FirmClient, debtor_from_client
@@ -40,7 +41,7 @@ MAX_REQUEST_BYTES = 64 * 1024
 OPENING_ROLES = ("debtor_1", "debtor_2")
 
 
-def _stores() -> tuple[CaseStore, AccessLog]:
+def case_stores() -> tuple[CaseStore, AccessLog]:
     """The case store and its access log, or a loud failure.
 
     Both are Optional on ApiDependencies so the existing public-route tests can
@@ -56,7 +57,7 @@ def _stores() -> tuple[CaseStore, AccessLog]:
     return deps.case_store, deps.access_log
 
 
-def _firm_store() -> FirmStore:
+def composed_firm_store() -> FirmStore:
     """The firm store, for the one thing the case routes need it for directly:
     checking that an assignment names somebody in the caller's own firm.
 
@@ -136,7 +137,7 @@ def _clients_to_open_for(
     (`insolvia_core.client_merge`).
     """
     accessor = current_accessor()
-    firm_store = _firm_store()
+    firm_store = composed_firm_store()
     clients: list[FirmClient] = []
     for client_id in client_ids:
         client = firm_store.get_client(accessor.firm_id, client_id)
@@ -155,6 +156,59 @@ def _clients_to_open_for(
             raise FieldValidationError({"client_ids": refused})
         clients.append(client)
     return clients
+
+
+# The roles a firm REPRESENTS. A non-filing spouse may be linked to a client
+# record and is still not the firm's client (ADR 0022), so the retained
+# transition never stamps them.
+RETAINED_ROLES = ("debtor_1", "debtor_2")
+
+
+def stamp_first_retained(case_id: str, access_log: AccessLog) -> None:
+    """THE RETAINED TRANSITION (ADR 0022, #355): a case was opened (or copied)
+    for these clients, so each filing debtor's client leaves the prospect
+    funnel — `first_retained_at` set to today, as a form date, if it has none
+    yet, and `prospect_stage` removed — in the firm store's one conditional
+    write (`mark_client_retained`). Never overwritten: "first" means the
+    earliest engagement, and a hand-entered earlier date is the firm's own
+    record of it. There is no prospect CASE: the funnel is the client's,
+    by the maintainer's decision of 2026-10-01.
+
+    After the case write, like the deadline hook: a stamp that fails leaves
+    the case right and the client a request behind, never the reverse. It
+    runs whatever the caller's `clients` grant — the server recording a fact
+    about the engagement, not the caller editing a client — and each stamp
+    is access-logged as the `client.update` it is. A merged client is
+    refused by the store and simply not stamped.
+    """
+    deps = dependencies()
+    if deps.debtor_store is None:
+        # Only a test composition that serves no debtor routes: every
+        # deployed one composes the debtor store (entrypoints/api_lambda.py),
+        # and with no debtor store there is no debtor to name a client.
+        return
+    accessor = current_accessor()
+    firm_store = composed_firm_store()
+    today = date.today().isoformat()
+    for debtor in deps.debtor_store.list_for_case(case_id):
+        if debtor.filing_role not in RETAINED_ROLES or debtor.client_id is None:
+            continue
+        client = firm_store.get_client(accessor.firm_id, debtor.client_id)
+        if client is None or (
+            client.first_retained_at is not None and client.prospect_stage is None
+        ):
+            continue
+        written = firm_store.mark_client_retained(
+            accessor.firm_id, client.id, retained_on=today
+        )
+        access_log.record(
+            record_access(
+                client_id=client.id,
+                principal=accessor.subject,
+                action="client.update",
+                outcome="allowed" if written is not None else "denied",
+            )
+        )
 
 
 @blueprint.post("/v1/cases")
@@ -184,7 +238,7 @@ def create_case_route() -> ResponseReturnValue:
     a caller the firm has not let see its client directory must not be able
     to read one through this route.
     """
-    store, access_log = _stores()
+    store, access_log = case_stores()
     draft = parse_case_creation(_json_body())
     accessor = current_accessor()
     clients = _clients_to_open_for(draft.client_ids, access_log)
@@ -200,6 +254,8 @@ def create_case_route() -> ResponseReturnValue:
     access_log.record(
         record_access(case_id=case.id, principal=accessor.subject, action="case.create")
     )
+    # Every case opens retained: opening it is the engagement starting.
+    stamp_first_retained(case.id, access_log)
 
     # GLBA: the case id and nothing about its contents. The FIRM id is not
     # logged either — a request log that accumulated tenant ids would be a
@@ -228,12 +284,19 @@ def list_cases_route() -> ResponseReturnValue:
     is "who saw this file". Recording enumeration properly wants the
     by-principal index that infra/modules/case_store defers, and a sentinel
     partition here would be a worse answer than none.
+
+    `?archived=true` is the ARCHIVE (#355): the archived cases instead of the
+    working list. An archived case leaves the default list, never the firm's
+    records; a deleted one is in neither.
     """
-    store, _ = _stores()
+    store, _ = case_stores()
     limit = parse_list_limit(request.args.get("limit"))
     cursor = request.args.get("cursor") or None
+    archived = _parse_archived_view(request.args.get("archived"))
 
-    page = store.list_for_accessor(current_accessor(), limit=limit, cursor=cursor)
+    page = store.list_for_accessor(
+        current_accessor(), limit=limit, cursor=cursor, archived=archived
+    )
 
     body: dict[str, object] = {"cases": [case_json(case) for case in page.cases]}
     # Absent rather than null when there is no next page — the client contract
@@ -241,6 +304,14 @@ def list_cases_route() -> ResponseReturnValue:
     if page.next_cursor is not None:
         body["nextCursor"] = page.next_cursor
     return jsonify(body), 200
+
+
+def _parse_archived_view(raw: str | None) -> bool:
+    if raw is None or raw == "" or raw == "false":
+        return False
+    if raw == "true":
+        return True
+    raise ValidationError("archived must be true or false")
 
 
 @blueprint.get("/v1/cases/<case_id>")
@@ -260,7 +331,7 @@ def get_case_route(case_id: str) -> ResponseReturnValue:
     The refused read IS recorded: someone walking case ids is exactly what the
     access log should show.
     """
-    store, access_log = _stores()
+    store, access_log = case_stores()
     accessor = current_accessor()
 
     case = store.get(case_id, accessor=accessor)
@@ -281,7 +352,11 @@ def get_case_route(case_id: str) -> ResponseReturnValue:
 @require_auth
 @requires(CASES, ADD_EDIT)
 def update_case_route(case_id: str) -> ResponseReturnValue:
-    """Change a case's chapter, district, status or exemption election.
+    """Change a case's chapter, court, status,
+    exemption election, filed and § 341 dates, or post-filing docket facts.
+
+    A STATUS MOVE is checked against the lifecycle's map and recorded in the
+    case's history (`GET /v1/cases/<id>/status-history`) in the same write.
 
     Read-modify-write. The read applies the whole access rule; the store's
     conditional write closes the gap between the two, so a case cannot move
@@ -292,16 +367,24 @@ def update_case_route(case_id: str) -> ResponseReturnValue:
     telling them it does not exist while it sits in their own listing would be
     a lie their client cannot act on.
     """
-    store, access_log = _stores()
+    store, access_log = case_stores()
     changes = parse_case_update(_json_body())
     accessor = current_accessor()
 
     existing = store.get(case_id, accessor=accessor)
+    updated = None
     if existing is not None:
         _refuse_forbidden_election(case_id, changes)
-    updated = (
-        None if existing is None else store.update(apply_changes(existing, changes))
-    )
+        # Refuses a move off the lifecycle's map (409) or a filing without
+        # its docket facts (400) before anything is written.
+        changed = apply_changes(existing, changes)
+        # Conditional on the status read above, with the history row in the
+        # same transaction — CaseStore.update says why both.
+        updated = store.update(
+            changed,
+            expected_status=existing.status,
+            status_change=status_change(existing, changed, changed_by=accessor.subject),
+        )
 
     access_log.record(
         record_access(
@@ -349,7 +432,7 @@ def list_assignees_route(case_id: str) -> ResponseReturnValue:
     job, and duplicating the display name here would be a copy that goes stale
     the moment somebody is renamed.
     """
-    store, _ = _stores()
+    store, _ = case_stores()
     accessor = current_accessor()
 
     if store.get(case_id, accessor=accessor) is None:
@@ -388,9 +471,9 @@ def assign_case_route(case_id: str, subject: str) -> ResponseReturnValue:
     A 404, not a 403: a subject in another firm and a subject that does not
     exist are the same answer, or this becomes a probe for who works where.
     """
-    store, access_log = _stores()
+    store, access_log = case_stores()
     accessor = current_accessor()
-    firm_store = _firm_store()
+    firm_store = composed_firm_store()
 
     case = store.get(case_id, accessor=accessor)
     if case is None:
@@ -428,7 +511,7 @@ def unassign_case_route(case_id: str, subject: str) -> ResponseReturnValue:
     matter" and the alternative — refusing it — would leave someone unable to
     hand a case over without asking an admin.
     """
-    store, access_log = _stores()
+    store, access_log = case_stores()
     accessor = current_accessor()
 
     if store.get(case_id, accessor=accessor) is None:

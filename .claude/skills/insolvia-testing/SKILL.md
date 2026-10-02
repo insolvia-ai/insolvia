@@ -140,7 +140,8 @@ found online.
 - **Who exists comes from `seeds/<target>.json`, by handle.** A spec that needs
   a person the fixture lacks adds them to the fixture (and the next seed
   creates them); it never invents an address or a subject.
-- **Scratch discipline.** Cases cannot be deleted through the API, so work
+- **Scratch discipline.** Cases are only soft-deleted through the API (the
+  rows stay), so work
   inside the one scratch case the conftest finds-or-opens; delete every
   document you create in teardown; leave a debtor as you found it. A spec that
   opens a case per run fills a table nobody prunes.

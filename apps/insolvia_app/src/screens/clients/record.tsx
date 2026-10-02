@@ -1,19 +1,29 @@
-import { ApiException, ApiValidationException, permits } from '@insolvia-ai/api-client';
+import {
+  ApiException,
+  ApiValidationException,
+  PROSPECT_STAGES,
+  permits,
+} from '@insolvia-ai/api-client';
 import type {
   Address,
   FirmClient,
   FirmClientCase,
   FirmMembership,
   OtherName,
+  ProspectStage,
 } from '@insolvia-ai/api-client';
-import { AlertDialog, Badge, Button } from '@insolvia-ai/design-system';
+import { AlertDialog, Badge, Button, Field, Select } from '@insolvia-ai/design-system';
 import { Link, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
+import {
+  CASE_STATUS_INTENT,
+  CASE_STATUS_LABEL,
+  PROSPECT_STAGE_LABEL,
+} from '@/components/case-status';
 import { displayName, FILING_ROLE_LABEL } from '@/components/client-names';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -78,6 +88,14 @@ function otherNames(names: readonly OtherName[] | undefined): string | undefined
  * moves to the survivor, where the cases now are. A merged client renders as
  * "Merged", links to its survivor, and offers no action at all — the server
  * refuses editing, restoring, re-merging or opening a case for it.
+ *
+ * A PROSPECT HAS A FUNNEL STAGE (issue #355 — the funnel is the client's, a
+ * case starts retained). While the client has no `first_retained_at` the
+ * record says "Prospect" and offers the stage as a `Select`; choosing one is
+ * `PUT …/prospect-stage`, and "Not in the funnel" sends `null`. Starting
+ * their first case retains them: the server stamps the date and clears the
+ * stage, and this section goes away. A 409 means that happened elsewhere,
+ * and the record reloads.
  *
  * THE TAX ID IS THE LAST FOUR, OR NOTHING. The full value is sealed on a case
  * (#382); a client screen shows only what `tax_id_last_four` says, and
@@ -212,6 +230,7 @@ export function ClientRecord({
   const client = record.client;
   const archived = client.status === 'archived';
   const merged = client.merged_into !== undefined;
+  const prospect = client.first_retained_at === undefined && !merged;
 
   const save = async (form: ClientFormState) => {
     setBusy(true);
@@ -234,6 +253,29 @@ export function ClientRecord({
         setStatus('Some answers need attention.');
       } else {
         setStatus('Could not save. Your changes are still here — try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setStage = async (next: ProspectStage | null) => {
+    setBusy(true);
+    setStatus('Saving…');
+    try {
+      const result = await call((api) => api.setFirmClientProspectStage(client.id, next));
+      if (!result.ok) {
+        setStatus('');
+        return;
+      }
+      setRecord({ kind: 'ready', client: result.value });
+      setStatus('Stage saved');
+    } catch (cause) {
+      if (cause instanceof ApiException && cause.statusCode === 409) {
+        setStatus('This client has been retained — the funnel is behind them.');
+        void load();
+      } else {
+        setStatus('Could not save the stage. Try again.');
       }
     } finally {
       setBusy(false);
@@ -297,7 +339,39 @@ export function ClientRecord({
         <Badge intent={archived ? 'neutral' : 'success'} size="sm">
           {merged ? 'Merged' : archived ? 'Archived' : 'Active'}
         </Badge>
+        {prospect ? (
+          <Badge intent="warning" size="sm">
+            Prospect
+          </Badge>
+        ) : null}
       </View>
+
+      {prospect ? (
+        <View style={styles.funnel}>
+          <Field.Root name="prospect_stage">
+            <Field.Label>Funnel stage</Field.Label>
+            <Select
+              options={[
+                { value: NOT_IN_FUNNEL, label: 'Not in the funnel' },
+                ...PROSPECT_STAGES.map((stage) => ({
+                  value: stage,
+                  label: PROSPECT_STAGE_LABEL[stage],
+                })),
+              ]}
+              value={client.prospect_stage ?? NOT_IN_FUNNEL}
+              disabled={!mayEdit || busy}
+              onValueChange={(next) => {
+                if (next === null || next === (client.prospect_stage ?? NOT_IN_FUNNEL)) return;
+                void setStage(next === NOT_IN_FUNNEL ? null : (next as ProspectStage));
+              }}
+            />
+            <Field.Description>
+              A prospect is a client the firm has not been retained by yet. Starting their first
+              case retains them.
+            </Field.Description>
+          </Field.Root>
+        </View>
+      ) : null}
 
       {editing === null ? (
         <View style={styles.actions}>
@@ -493,7 +567,11 @@ export function ClientRecord({
   );
 }
 
+/** The `Select` value for "no stage" — the API's `null`. */
+const NOT_IN_FUNNEL = 'none';
+
 const styles = StyleSheet.create({
+  funnel: { marginBottom: spacing.md, maxWidth: 420 },
   actions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   body: { fontSize: fontSizes.body, lineHeight: fontSizes.body * 1.5 },
   caseMeta: { flexGrow: 1, fontSize: fontSizes.label },

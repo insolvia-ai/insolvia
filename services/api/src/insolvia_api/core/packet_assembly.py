@@ -59,7 +59,7 @@ from insolvia_core import courts
 from insolvia_core.access_log import record_access
 from insolvia_core.assets import ASSET, AssetBody
 from insolvia_core.case_entities import CaseEntity
-from insolvia_core.cases import Case, pin_case
+from insolvia_core.cases import Case, is_filed, pin_case
 from insolvia_core.claims import CLAIM, ClaimBody
 from insolvia_core.codebtors import (
     CODEBTOR,
@@ -765,7 +765,7 @@ def completeness_problems(
         local_plan = _local_plan_form_problem(data.case)
         if local_plan is not None:
             problems.append(local_plan)
-    if data.case.status == "filed" and not options.amended_only:
+    if is_filed(data.case.status) and not options.amended_only:
         problems.append(
             PacketProblem(
                 source="case",
@@ -777,7 +777,7 @@ def completeness_problems(
                 " and assemble with amendedOnly instead.",
             )
         )
-    if options.amended_only and data.case.status != "filed":
+    if options.amended_only and not is_filed(data.case.status):
         problems.append(
             PacketProblem(
                 source="case",

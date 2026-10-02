@@ -1,6 +1,6 @@
 import { permits } from '@insolvia-ai/api-client';
 import type { Case, FirmColleague } from '@insolvia-ai/api-client';
-import { Badge, Button, Table } from '@insolvia-ai/design-system';
+import { Badge, Button, Table, Toggle, ToggleGroup } from '@insolvia-ai/design-system';
 import { Link, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -11,6 +11,9 @@ import { AppShell } from '@/components/app-shell';
 import { CASE_STATUS_INTENT, CASE_STATUS_LABEL } from '@/components/case-status';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
+
+/** Which list: the working list, or the archive (issue #355). */
+type CaseView = 'working' | 'archived';
 
 type ListState =
   | { readonly kind: 'loading' }
@@ -25,6 +28,11 @@ type ListState =
  * something opened FOR A CLIENT (ADR 0022 / #354): a client's record and
  * "Add client" start cases too, and a form reached from three places is a
  * page, not a panel on one of them. "New case" is the way in from here.
+ *
+ * TWO VIEWS (issue #355): the working list, and the archive — the cases the
+ * firm has put away, which leave the default list and never the firm's
+ * records. The API holds the two apart (`listCases({ archived })`); a deleted
+ * case is in neither.
  */
 export function Cases() {
   const theme = useTheme();
@@ -32,6 +40,7 @@ export function Cases() {
   const { call } = useApi();
   const membership = useMembership();
 
+  const [view, setView] = useState<CaseView>('working');
   const [list, setList] = useState<ListState>({ kind: 'loading' });
   // Subject -> name, so `createdBy` renders as a colleague rather than a uuid.
   // Loaded once and separately from the cases: it fails independently, and a
@@ -40,7 +49,8 @@ export function Cases() {
 
   const load = useCallback(async () => {
     try {
-      const result = await call((client) => client.listCases({}));
+      setList({ kind: 'loading' });
+      const result = await call((client) => client.listCases({ archived: view === 'archived' }));
       if (result.ok) {
         setList({ kind: 'ready', cases: result.value.cases });
       }
@@ -49,7 +59,7 @@ export function Cases() {
     } catch {
       setList({ kind: 'error', message: 'Could not load your cases.' });
     }
-  }, [call]);
+  }, [call, view]);
 
   useEffect(() => {
     void load();
@@ -90,8 +100,23 @@ export function Cases() {
         </View>
       ) : null}
 
+      <ToggleGroup.Root
+        aria-label="Show cases"
+        value={[view]}
+        // Single-select, and never empty: pressing the pressed one again
+        // reports `[]`, which keeps the current choice.
+        onValueChange={(next) => {
+          const picked = next[0] as CaseView | undefined;
+          if (picked !== undefined) setView(picked);
+        }}
+        style={styles.toggles}
+      >
+        <Toggle value="working">Working</Toggle>
+        <Toggle value="archived">Archived</Toggle>
+      </ToggleGroup.Root>
+
       {list.kind === 'ready' ? (
-        <CaseList cases={list.cases} colleagues={colleagues} />
+        <CaseList cases={list.cases} colleagues={colleagues} archived={view === 'archived'} />
       ) : (
         <Text
           aria-live={list.kind === 'error' ? 'assertive' : 'polite'}
@@ -107,9 +132,11 @@ export function Cases() {
 function CaseList({
   cases,
   colleagues,
+  archived,
 }: {
   cases: readonly Case[];
   colleagues: readonly FirmColleague[];
+  archived: boolean;
 }) {
   const theme = useTheme();
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
@@ -120,7 +147,13 @@ function CaseList({
     colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject;
 
   if (cases.length === 0) {
-    return <Text style={[styles.body, muted]}>No cases yet. Choose “New case” to open one.</Text>;
+    return (
+      <Text style={[styles.body, muted]}>
+        {archived
+          ? 'No archived cases. A case archived from its overview appears here.'
+          : 'No cases yet. Choose “New case” to open one.'}
+      </Text>
+    );
   }
 
   return (
@@ -196,6 +229,7 @@ function CaseList({
 }
 
 const styles = StyleSheet.create({
+  toggles: { alignSelf: 'flex-start', marginBottom: spacing.md },
   actions: {
     flexDirection: 'row',
     marginTop: spacing.xs,

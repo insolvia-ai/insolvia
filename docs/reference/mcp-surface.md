@@ -106,7 +106,7 @@ because they are the entry points a harness reasons about.
 | Tool | Does | Requires |
 |---|---|---|
 | `whoami` | The caller's firm, name, and per-feature permissions — or the fact that they have no firm | authenticated only (the `/v1/me` of this surface) |
-| `list_cases` | The cases the caller may see, newest first, paginated | `cases: view_only` |
+| `list_cases` | The cases the caller may see, newest first, paginated — the working list: archived and deleted cases are not in it (#355) | `cases: view_only` |
 | `get_case` | One case root + petition-status summary + per-entity-type record counts | `cases: view_only` |
 | `list_case_records` | One entity type's records within one case, paginated | per entity type — see the gate table |
 | `get_case_record` | One record by id | per entity type — same table |
@@ -218,7 +218,12 @@ reached only through a case the caller may see: a client this case does not
 link answers `not_found` whatever firm it is in, and **a firm-wide client
 list is not a tool in v1**. A single-record read (`get_case_record`) is
 access-logged as `client.read` under `CLIENT#<id>`, as the API's is; the
-listing is not, matching `GET /v1/firm/clients`. `clients` is **not
+listing is not, matching `GET /v1/firm/clients`. The prospect funnel
+(#355) is the client's, not the case's — a case's statuses start at
+`intake` — and a client reached through a case has been retained, so
+`prospect_stage` does not appear here in practice (`firm_client_json` serves
+it only for a client with no `first_retained_at`); setting it is an API
+route, not a tool. `clients` is **not
 proposable yet**: ADR 0022 has a client proposal land as a candidate like any
 other write, but accepting one means a review path that writes the firm
 table, which candidate review (8.9) does not have — the same position

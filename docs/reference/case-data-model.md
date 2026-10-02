@@ -81,12 +81,18 @@ case {
   chapter: 7 | 11 | 12 | 13
   court, division              // a reference into the court registry (below)
   district                     // the printed name, DERIVED from the reference
-  status: intake | ready_to_file | filed
+  status: intake | ready_to_file | filed | discharged | dismissed | closed
+                                       // a case STARTS retained; the funnel before it is
+                                       // the client's (below)
   filed_at, meeting_341_at            // form dates: the petition (the order for relief in a
                                        // voluntary case) and the FIRST date set for the §341
                                        // meeting — the anchors the deadline engine counts from
-                                       // (issue 14.6 / #358); the rest of the post-filing
-                                       // lifecycle is #355
+                                       // (issue 14.6 / #358)
+  case_number, judge, trustee         // the docket's facts, typed from the notice of filing
+                                       // until 17.2 reads them from the court (#355)
+  office_file_number                  // the firm's own number for the matter
+  archived_at, archived_by            // out of the working list, still the firm's record
+  deleted_at, deleted_by              // soft delete — see "The lifecycle" below
   exemption_set: state_and_federal_nonbankruptcy | federal   // 106C line 1
   is_amended, ch13_supplement_date                           // the header box on every form
   form_revisions: { <form>: <revision> }
@@ -127,6 +133,76 @@ court ("Middle District of Florida" — the B101 dropdown's own spelling),
 written from the reference on every write and never typed. A case written
 before the registry existed carries its typed `district` and no reference;
 it still reads and prints, and is asked for a court on its next edit.
+
+## The lifecycle
+
+The case's status is its lifecycle as data (issue 14.3 / #355), owned by
+`insolvia_core.cases` (`STATUSES`, `TRANSITIONS`, `apply_changes`):
+
+```
+            client (prospect, prospect_stage) ──► case opened = RETAINED
+                                                     │
+intake ◄──► ready_to_file ──► filed ──► discharged ──► closed
+                                │  ▲ └──► dismissed ───► closed
+                                │  └───── closed (reopened, § 350(b))
+                                └───────► closed
+```
+
+- **The funnel is the client's, and a case starts retained** — the
+  maintainer's decision of 2026-10-01, recorded in
+  [ADR 0022](../adr/0022-a-client-is-not-a-case.md): "a prospect is a
+  client with no case yet". A firm client is a prospect while
+  `first_retained_at` is unset, and `prospect_stage` (`possible`,
+  `consultation_scheduled`, `awaiting_signed_agreement`, `exhausted`) is
+  their funnel position, set through `PUT /v1/firm/clients/<id>/prospect-stage`
+  and never by the whole-record PUT. Opening a case for the client — or
+  copying one — is the **retained transition**: one conditional write
+  (`FirmStore.mark_client_retained`) stamps `first_retained_at` when unset
+  and REMOVES the stage, which is cleared rather than kept as history (the
+  case's own status history and `lead_source` are the records). A stage
+  write is conditioned on `first_retained_at` still being absent, so the two
+  cannot interleave into a retained client with a funnel position; a stage
+  for a retained client is a 409. "Not retained" is read from the client
+  record, never from the `by-client` index, which would answer for cases
+  the caller may not see. A non-filing spouse is never stamped.
+- **Moves are forward only**, with two exceptions: `intake` ↔
+  `ready_to_file`, and `closed` → `filed` (a reopened case). A filed
+  petition does not go back to preparation — changing it is an amendment.
+  A move off the map is a 409.
+- **"Filed" means on the docket**: `filed`, `discharged`, `dismissed` and
+  `closed` are all filed petitions (`cases.is_filed`), and every rule that
+  protects a filed petition — no re-copy from the client, no plain packet
+  re-assembly, `amended` only once filed — reads that, never the literal.
+  Reaching it needs `filed_at` and `case_number`; once there, neither may be
+  cleared.
+- **Every move is recorded**: a `STATUS#<changedAt>` row in the case's
+  partition (who, when, from and to status and stage), written in the same
+  transaction as the case — and the case write is conditioned on the status
+  it was read at, so a stale whole-record save cannot put an old status back
+  (`GET /v1/cases/<id>/status-history`).
+- **Archive** is an attribute, not a status: an archived case keeps its
+  lifecycle, leaves the working list (`GET /v1/cases`) and lists under
+  `?archived=true`. Any status may be archived; archived cases stay editable.
+- **Delete is soft, and the retention posture is this:** a firm admin may
+  delete a case that never reached the court (a filed one is refused —
+  archive it). Deleting stamps `deleted_at`/`deleted_by` and nothing else:
+  `access.may_see_case` refuses a deleted case for everyone, so it and
+  everything reached through it — debtors, schedules, documents, tasks,
+  events, the portal — answer 404, while every row and every document's bytes
+  stay where they are, under the same case-key encryption. **Documents follow
+  the case** by construction, because a document is only ever reached through
+  its case. Nothing is purged; there is no restore in the product. A purge
+  job, if ever wanted, is its own decision about retention periods (the
+  regulatory register's, like the access log's), not a side effect of this
+  one.
+- **Copy case** (`POST /v1/cases/<id>/copy`) opens a new retained case from
+  an existing one's preparation data — the chapter, court and exemption
+  election, every debtor with its client link and tax-id pointer, and every
+  generic collection — keeping record ids, so cross-references survive.
+  Not copied: status, history, docket facts, pins, documents, candidates,
+  notes, tasks, events, portal bindings. Each copied value keeps its own
+  provenance entry and gains `copied_from_case_id` (below). The module
+  docstring of `insolvia_core.case_copy` owns the list.
 
 ## Identity, and why joint debtors are two records
 
@@ -518,7 +594,8 @@ provenance: {
     extraction_id,          // the extraction_candidate.id this value came from
     confidence,
     library_creditor_id,    // the library_creditor.id this value was copied from
-    client_id               // the firm client this value was copied from
+    client_id,              // the firm client this value was copied from
+    copied_from_case_id     // the case a copied record came from (copy case, #355)
   }
 }
 ```
@@ -529,6 +606,13 @@ directory when the case was opened for that client, or when the client was
 linked to the role. A copy, never a live link — a filed petition must not
 change because the client record did — and, like `library`, outside the
 confirmation rule, because a person chose the client.
+
+`copied_from_case_id` is not a source: a record copied into a new case
+(see "The lifecycle") keeps the entry it had — a value a person confirmed
+from a document is still that, and `document_id` still names the source
+case's document — and gains the case it was copied from. Laundering every
+copied origin into one new source would lose exactly the audit the entry
+exists for.
 
 `library` (issue 13.9 / #350) names a value copied from the firm's reusable
 creditor library (`insolvia_core.library_creditors`) onto a case record — a

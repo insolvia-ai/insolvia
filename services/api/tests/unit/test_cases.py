@@ -360,12 +360,14 @@ def test_creating_a_case_links_its_creator(client, store):
     ] == [case_id]
 
 
-def test_create_starts_at_intake_even_if_asked_otherwise(client):
+@pytest.mark.parametrize("asked", ["filed", "prospect"])
+def test_create_starts_at_intake_even_if_asked_otherwise(client, asked):
     response = client.post(
         "/v1/cases",
-        json=with_client(client, auth(ALICE), {**TAMPA, "status": "filed"}),
+        json=with_client(client, auth(ALICE), {**TAMPA, "status": asked}),
         headers=auth(ALICE),
     )
+    # Every case opens retained (#355): the funnel before it is the client's.
     assert response.get_json()["status"] == "intake"
 
 

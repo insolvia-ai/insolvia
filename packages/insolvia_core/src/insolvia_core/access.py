@@ -123,4 +123,9 @@ def may_see_case(accessor: Accessor, case: Case, *, assigned: bool) -> bool:
     """
     if case.firm_id != accessor.firm_id:
         return False
+    # A DELETED case (#355) is invisible to everyone, admin included — the
+    # same answer as a case that never existed, through every read that
+    # resolves a case, and so through every child route behind one.
+    if case.deleted:
+        return False
     return accessor.sees_every_case or assigned

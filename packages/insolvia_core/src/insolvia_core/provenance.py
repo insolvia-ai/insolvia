@@ -118,6 +118,15 @@ class ProvenanceEntry:
     # the same "shape and type only" rule as `library_creditor_id`: a client
     # archived or merged after the copy leaves the provenance readable.
     client_id: str | None = None
+    # The case this value was COPIED FROM (issue 14.3 / #355's copy case) —
+    # orthogonal to `source`, on purpose. A copied value keeps the entry it
+    # had: an extracted value a person confirmed is still that, confirmed by
+    # that person, read from that document (which `document_id` names in the
+    # SOURCE case); the copy adds where the record was taken from rather than
+    # laundering every origin into one new source. Same "shape and type
+    # only" rule as the ids above: a source case deleted afterwards leaves
+    # the provenance readable.
+    copied_from_case_id: str | None = None
 
 
 def _is_utc_timestamp(value: object) -> bool:
@@ -274,6 +283,13 @@ def _parse_entry(
         errors[f"provenance.{path}.client_id"] = "client_id must be a string."
         return None
 
+    copied_from_case_id = value.get("copied_from_case_id")
+    if copied_from_case_id is not None and not isinstance(copied_from_case_id, str):
+        errors[f"provenance.{path}.copied_from_case_id"] = (
+            "copied_from_case_id must be a string."
+        )
+        return None
+
     return ProvenanceEntry(
         source=source,
         confirmed_by=confirmed_by,
@@ -284,6 +300,7 @@ def _parse_entry(
         confidence=confidence,
         library_creditor_id=library_creditor_id,
         client_id=client_id,
+        copied_from_case_id=copied_from_case_id,
     )
 
 
@@ -486,6 +503,7 @@ def provenance_json(
             ("confidence", entry.confidence),
             ("library_creditor_id", entry.library_creditor_id),
             ("client_id", entry.client_id),
+            ("copied_from_case_id", entry.copied_from_case_id),
         ):
             if value is not None:
                 member[key] = value

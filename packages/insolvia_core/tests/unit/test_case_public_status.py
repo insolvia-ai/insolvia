@@ -105,7 +105,7 @@ def test_another_firms_row_projects_to_nothing():
         {"firmId": FIRM, "status": "intake"},
         {"firmId": FIRM, "chapter": True, "status": "intake"},
         {"firmId": FIRM, "chapter": "seven", "status": "intake"},
-        {"firmId": FIRM, "chapter": 7, "status": "dismissed"},
+        {"firmId": FIRM, "chapter": 7, "status": "shredded"},
         {"firmId": FIRM, "chapter": 7},
     ],
 )

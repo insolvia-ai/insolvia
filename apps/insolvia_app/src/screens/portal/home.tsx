@@ -19,8 +19,11 @@ type State =
 
 /**
  * What each stage means to the person the case is about — the firm-facing
- * status names (`intake`, `ready_to_file`, `filed`) are the firm's words.
- * Exhaustive over `CaseStatus`, so a fourth stage cannot ship unexplained.
+ * status names (`intake` … `closed`, issue #355) are the firm's words.
+ * Exhaustive over `CaseStatus`, so a new stage cannot ship unexplained.
+ * `dismissed` says only what happened and points to the firm: what a
+ * dismissal means for this person is the attorney's conversation, not a
+ * status line's.
  */
 const STAGES = {
   intake: {
@@ -34,6 +37,18 @@ const STAGES = {
   filed: {
     label: 'Filed',
     detail: 'Your case has been filed with the bankruptcy court.',
+  },
+  discharged: {
+    label: 'Discharged',
+    detail: 'The court has granted your discharge.',
+  },
+  dismissed: {
+    label: 'Dismissed',
+    detail: 'The court has dismissed your case. Talk to your law firm about what happens next.',
+  },
+  closed: {
+    label: 'Closed',
+    detail: 'The court has closed your case.',
   },
 } as const satisfies Record<CaseStatus, { label: string; detail: string }>;
 

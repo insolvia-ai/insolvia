@@ -17,7 +17,13 @@ from insolvia_core.access import Accessor, ClientAccessor
 from insolvia_core.access_log import AccessEvent
 from insolvia_core.candidates import Candidate
 from insolvia_core.case_entities import CaseEntity, EntityKind
-from insolvia_core.cases import Case, CaseAssignment, CasePage, ClientCase
+from insolvia_core.cases import (
+    Case,
+    CaseAssignment,
+    CasePage,
+    ClientCase,
+    StatusChange,
+)
 from insolvia_core.clients import CasePublicStatus, ClientBinding
 from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
 from insolvia_core.documents import Document, StoredBlob
@@ -288,10 +294,36 @@ class FirmStore(Protocol):
         terminal record, and an edit read before the merge must not
         un-archive it. None when any of the three no longer holds.
 
-        Writes the record's own fields ONLY. The merge attributes
-        (`firm_clients.MERGE_ATTRIBUTES`) are left exactly as stored: a
-        whole-record save built from a read taken before a merge claimed the
-        row would otherwise erase the claim."""
+        Writes the record's own fields ONLY. The server-owned attributes
+        (`firm_clients.SERVER_OWNED_ATTRIBUTES` — the merge claim and the
+        prospect stage) are left exactly as stored: a whole-record save built
+        from a read taken before a merge claimed the row would otherwise
+        erase the claim."""
+        ...
+
+    # ── The prospect funnel (issue 14.3 / #355) ─────────────────────
+    #
+    # Two writes, both single conditional UpdateItems, so the stage and the
+    # retained transition cannot interleave into a retained client with a
+    # funnel position (`firm_clients` module docstring).
+
+    def set_client_prospect_stage(
+        self, firm_id: str, client_id: str, stage: str | None
+    ) -> FirmClient | None:
+        """Set (or, with None, remove) the client's funnel stage — ONLY IF the
+        row exists in `firm_id`, was never merged away, and is still a
+        prospect (`first_retained_at` unset). The updated client, or None
+        when any condition failed; nothing is written then."""
+        ...
+
+    def mark_client_retained(
+        self, firm_id: str, client_id: str, *, retained_on: str
+    ) -> FirmClient | None:
+        """THE RETAINED TRANSITION's write: set `first_retained_at` to
+        `retained_on` unless it already has a value (a hand-entered earlier
+        date is the firm's own record), and remove `prospect_stage` — in ONE
+        write, conditional on the row existing in `firm_id` and never having
+        been merged away. The updated client, or None."""
         ...
 
     # ── Merging two clients (ADR 0022's PR 7) ───────────────────────
@@ -404,7 +436,12 @@ class CaseStore(Protocol):
         ...
 
     def list_for_accessor(
-        self, accessor: Accessor, *, limit: int, cursor: str | None
+        self,
+        accessor: Accessor,
+        *,
+        limit: int,
+        cursor: str | None,
+        archived: bool = False,
     ) -> CasePage:
         """The cases this accessor may see, newest first.
 
@@ -414,21 +451,52 @@ class CaseStore(Protocol):
         they were minted against (core/cases.encode_cursor). An implementation
         MUST pass its index through to encode/decode so a permission change
         mid-pagination fails loudly instead of skipping rows.
+
+        TWO VIEWS of either index (#355): the working list (`archived=False`,
+        the default — every case not archived) and the archive
+        (`archived=True`). A deleted case is in neither. The view is part of
+        the cursor's tag, so a cursor from one view is refused by the other.
+        Both are a FILTER over the same index rather than an index of their
+        own, so an implementation keeps reading until the page is full or
+        the index is exhausted — a page is never short merely because the
+        rows it skipped were archived.
         """
         ...
 
-    def update(self, case: Case) -> Case | None:
+    def update(
+        self,
+        case: Case,
+        *,
+        expected_status: str | None = None,
+        status_change: StatusChange | None = None,
+    ) -> Case | None:
         """Write `case` back, but only if it still belongs to `case.firm_id`.
 
         Returns None if that no longer holds — closing the window between the
         route's read and this write, so a case cannot move firms underneath a
         caller mid-request.
 
+        `expected_status` (#355) is the status the caller READ. The write is a
+        whole record, so without it an edit read before a concurrent status
+        move would put the old status back — and the history would record a
+        move that no longer describes the case. When the stored status
+        differs, nothing is written and this raises `ConflictError`.
+
+        `status_change`, when given, is the history row for this write, and
+        is written in the SAME transaction: the history and the record can
+        never disagree.
+
         NO ASSIGNMENT CHECK HERE, deliberately: the route has already resolved
         the case through `get`, which applied the whole rule. Re-deriving
         linkage in the write would be a second copy of an authorization
         decision, and two copies eventually disagree.
         """
+        ...
+
+    def status_history(self, case_id: str) -> tuple[StatusChange, ...]:
+        """Every lifecycle move of one case, oldest first. Case-scoped and
+        takes no accessor — `assignees`' rule: the one caller resolved the
+        case through `get` first."""
         ...
 
     def assign(self, assignment: CaseAssignment) -> None:

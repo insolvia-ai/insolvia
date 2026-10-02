@@ -157,8 +157,10 @@ def create_mcp_server(deps: McpDependencies) -> MCPServer:
         title="List cases",
         annotations=_READ_ONLY,
         description=(
-            "The cases the caller may see, newest first, paginated. "
-            "Optional status filter: intake, ready_to_file, or filed."
+            "The cases the caller may see, newest first, paginated; "
+            "archived and deleted cases are not listed. Optional status "
+            "filter: intake, ready_to_file, filed, discharged, "
+            "dismissed, or closed."
         ),
     )
     @guarded("list_cases")

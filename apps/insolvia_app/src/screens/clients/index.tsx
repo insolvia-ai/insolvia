@@ -16,7 +16,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
 import { AppShell } from '@/components/app-shell';
-import { CASE_STATUS_LABEL } from '@/components/case-status';
+import { CASE_STATUS_LABEL, PROSPECT_STAGE_LABEL } from '@/components/case-status';
 import { sortName } from '@/components/client-names';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
@@ -26,7 +26,7 @@ type ListState =
   | { readonly kind: 'ready'; readonly clients: readonly FirmClient[] }
   | { readonly kind: 'error' };
 
-type Show = 'active' | 'archived' | 'all';
+type Show = 'active' | 'prospects' | 'archived' | 'all';
 
 /** Rows rendered before "Show more" — and so the most per-row case reads in flight at once. */
 const PAGE = 25;
@@ -64,6 +64,18 @@ function matches(client: FirmClient, query: string): boolean {
   return words.every((word) => text.includes(word));
 }
 
+/** A client the firm has not been retained by yet — the funnel's (#355). */
+function isProspect(client: FirmClient): boolean {
+  return client.first_retained_at === undefined && client.merged_into === undefined;
+}
+
+/** Whether `client` belongs in the `show` view. */
+function shown(client: FirmClient, show: Show): boolean {
+  if (show === 'all') return true;
+  if (show === 'prospects') return client.status === 'active' && isProspect(client);
+  return client.status === show;
+}
+
 /** "Tampa, FL", or whichever half exists — where a person is, at a glance. */
 function place(client: FirmClient): string {
   const { city, state } = client.residence_address ?? {};
@@ -90,8 +102,13 @@ function place(client: FirmClient): string {
  *
  * SEARCH AND FILTER ARE LOCAL. `GET /v1/firm/clients` is the whole
  * directory, archived included, already ordered by surname — so the search
- * box and the Active / Archived / All switch narrow a list already in hand,
- * with no request per keystroke.
+ * box and the Active / Prospects / Archived / All switch narrow a list
+ * already in hand, with no request per keystroke.
+ *
+ * PROSPECTS ARE CLIENTS NOT YET RETAINED (issue #355 — the funnel is the
+ * client's): an active client with no `first_retained_at`, which the server
+ * stamps when their first case is opened. That fact is on the record itself,
+ * so the filter needs no case read; the row's badge carries the funnel stage.
  *
  * Gated on `clients` (ADR 0022): `hidden` has no nav entry and gets the
  * explanation below; `view_only` sees everything and changes nothing — no
@@ -148,9 +165,7 @@ export function ClientList({ membership }: { membership: FirmMembership }) {
   const visible = useMemo(
     () =>
       list.kind === 'ready'
-        ? list.clients.filter(
-            (client) => (show === 'all' || client.status === show) && matches(client, query),
-          )
+        ? list.clients.filter((client) => shown(client, show) && matches(client, query))
         : [],
     [list, query, show],
   );
@@ -243,6 +258,7 @@ export function ClientList({ membership }: { membership: FirmMembership }) {
               style={styles.toggles}
             >
               <Toggle value="active">Active</Toggle>
+              <Toggle value="prospects">Prospects</Toggle>
               <Toggle value="archived">Archived</Toggle>
               <Toggle value="all">All</Toggle>
             </ToggleGroup.Root>
@@ -293,12 +309,25 @@ export function ClientList({ membership }: { membership: FirmMembership }) {
                       <Text style={[styles.meta, muted]}>{place(client) || '—'}</Text>
                     </Table.Cell>
                     <Table.Cell width={110}>
-                      <Badge intent={client.status === 'active' ? 'success' : 'neutral'} size="sm">
-                        {client.status === 'active'
-                          ? 'Active'
-                          : client.merged_into !== undefined
+                      <Badge
+                        intent={
+                          client.status !== 'active'
+                            ? 'neutral'
+                            : isProspect(client)
+                              ? 'warning'
+                              : 'success'
+                        }
+                        size="sm"
+                      >
+                        {client.status !== 'active'
+                          ? client.merged_into !== undefined
                             ? 'Merged'
-                            : 'Archived'}
+                            : 'Archived'
+                          : isProspect(client)
+                            ? client.prospect_stage === undefined
+                              ? 'Prospect'
+                              : PROSPECT_STAGE_LABEL[client.prospect_stage]
+                            : 'Active'}
                       </Badge>
                     </Table.Cell>
                   </Table.Row>

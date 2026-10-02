@@ -32,6 +32,11 @@ export type {
 } from './exceptions.ts';
 
 export {
+  CASE_STATUSES,
+  CASE_TRANSITIONS,
+  FILED_CASE_STATUSES,
+  PROSPECT_STAGES,
+  isFiledStatus,
   DOCUMENT_CONTENT_TYPES,
   DOCUMENT_KINDS,
   DOCUMENT_STATUSES,
@@ -274,6 +279,8 @@ export type {
   CaseChapter,
   ClientRole,
   CaseStatus,
+  CaseStatusChange,
+  ProspectStage,
   CounselingExemption,
   CounselingStatus,
   CourtDistrict,

@@ -17,6 +17,7 @@ import time
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from insolvia_api.adapters.memory.event_store import MemoryEventStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
 from insolvia_api.adapters.memory.waitlist_store import MemoryWaitlistStore
 from insolvia_api.api.app_factory import create_app
@@ -135,6 +136,8 @@ def client(access_log, firms):
             mailer=InMemoryMailerClient(),
             jwks_provider=StaticJwksProvider({KID: _PUBLIC_KEY}),
             case_store=MemoryCaseStore(debtor_store=debtors),
+            # Filing records a filed date, which regenerates deadlines.
+            event_store=MemoryEventStore(),
             firm_store=firms,
             access_log=access_log,
             debtor_store=debtors,
@@ -799,7 +802,13 @@ def diverged_case(client):
 
 def file_case(client, case_id):
     filed = client.patch(
-        f"/v1/cases/{case_id}", json={"status": "filed"}, headers=auth(ALICE)
+        f"/v1/cases/{case_id}",
+        json={
+            "status": "filed",
+            "filed_at": "2026-09-01",
+            "case_number": "8:26-bk-01234",
+        },
+        headers=auth(ALICE),
     )
     assert filed.status_code == 200, filed.get_json()
 

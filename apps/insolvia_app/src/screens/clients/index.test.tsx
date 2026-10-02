@@ -18,10 +18,15 @@ jest.mock('@/config/environment', () => ({
 
 const JORDAN = firmClient('00000000-0000-4000-8000-0000000c11a0', 'Jordan', 'Example', {
   residence_address: { city: 'Tampa', state: 'FL' },
+  first_retained_at: '2026-07-20',
 });
-const RILEY = firmClient('00000000-0000-4000-8000-0000000c11a1', 'Riley', 'Example');
+const RILEY = firmClient('00000000-0000-4000-8000-0000000c11a1', 'Riley', 'Example', {
+  first_retained_at: '2026-07-20',
+});
+// A prospect (issue #355): never retained, in the funnel.
 const SAM = firmClient('00000000-0000-4000-8000-0000000c11a2', 'Sam', 'Sample', {
   residence_address: { city: 'Orlando', state: 'FL' },
+  prospect_stage: 'consultation_scheduled',
 });
 const CASEY = firmClient('00000000-0000-4000-8000-0000000c11a3', 'Casey', 'Gone', {
   status: 'archived',
@@ -109,6 +114,17 @@ describe('the client list', () => {
     await user.press(screen.getByRole('button', { name: 'All' }));
     expect(await clientLink('Example, Jordan')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Gone, Casey' })).toBeTruthy();
+  });
+
+  it('shows the prospects — clients not yet retained — with their funnel stage', async () => {
+    signedIn();
+    await clientLink('Example, Jordan');
+
+    await userEvent.setup().press(screen.getByRole('button', { name: 'Prospects' }));
+
+    expect(await clientLink('Sample, Sam')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Example, Jordan' })).toBeNull();
+    expect(screen.getByText('Consultation scheduled')).toBeTruthy();
   });
 
   it('finds a client by any part of their name, or their city', async () => {

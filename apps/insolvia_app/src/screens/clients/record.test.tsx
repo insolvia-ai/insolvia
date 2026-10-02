@@ -47,6 +47,13 @@ function record(
         cases: overrides.cases ?? [{ filing_role: 'debtor_2', case: JOINT }],
       });
     }
+    if (url.endsWith('/prospect-stage') && init?.method === 'PUT') {
+      const { prospect_stage } = JSON.parse(String(init.body)) as {
+        prospect_stage: string | null;
+      };
+      current = { ...(current ?? {}), prospect_stage: prospect_stage ?? undefined };
+      return jsonResponse(200, current);
+    }
     if (url.endsWith('/status') && init?.method === 'PUT') {
       const { status } = JSON.parse(String(init.body)) as { status: string };
       current = { ...(current ?? {}), status };
@@ -197,6 +204,29 @@ describe('the client record', () => {
 
     expect(await screen.findByText('A date of birth cannot be in the future.')).toBeTruthy();
     expect(screen.getByText('Some answers need attention.')).toBeTruthy();
+  });
+
+  it('shows a prospect the funnel and stages them with a PUT (issue #355)', async () => {
+    const { fetchMock } = signedIn();
+    await loaded();
+    expect(screen.getByText('Prospect')).toBeTruthy();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('combobox', { name: 'Funnel stage' }));
+    await user.press(await screen.findByRole('option', { name: 'Consultation scheduled' }));
+
+    await waitFor(() => {
+      expect(bodiesOf(fetchMock, 'PUT', '/prospect-stage')).toEqual([
+        { prospect_stage: 'consultation_scheduled' },
+      ]);
+    });
+  });
+
+  it('shows no funnel for a client already retained', async () => {
+    signedIn(record({ client: { ...JORDAN, first_retained_at: '2026-07-20' } }));
+    await loaded();
+    expect(screen.queryByRole('combobox', { name: 'Funnel stage' })).toBeNull();
+    expect(screen.queryByText('Prospect')).toBeNull();
   });
 
   it('archives only after asking, and restores without', async () => {

@@ -1,5 +1,6 @@
 import { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
 import {
+  CASE_STATUSES,
   DOCUMENT_STATUSES,
   COUNSELING_EXEMPTIONS,
   COUNSELING_STATUSES,
@@ -13,6 +14,7 @@ import {
   MEANS_TEST_OUTCOMES,
   PLAN_CLASSES,
   PRESUMPTION_EXEMPTIONS,
+  PROSPECT_STAGES,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
   calendarEventDraftToJson,
@@ -54,6 +56,7 @@ import type {
   PortalClient,
   PortalClientStatus,
   PortalMe,
+  ProspectStage,
   CaseEntityRequest,
   CaseForm,
   CaseLiens,
@@ -61,6 +64,7 @@ import type {
   CaseProblem,
   CaseStandards,
   CaseStatus,
+  CaseStatusChange,
   CaseSummary,
   CaseTotals,
   ClaimLien,
@@ -444,7 +448,7 @@ export class InsolviaApiClient {
   /**
    * `PATCH /v1/cases/{caseId}` — change a subset of a case's fields.
    *
-   * `changes` may hold any subset of `{chapter, district, status}`; omitted
+   * `changes` may hold any subset of {@link UpdateCaseChanges}; omitted
    * keys mean "leave unchanged" and are never sent — see
    * {@link updateCaseChangesToJson}. Returns the updated {@link Case} on 200.
    *
@@ -1915,6 +1919,23 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `PUT /v1/firm/clients/{id}/prospect-stage` — place a PROSPECT in the
+   * funnel, or take them out of it with `null` (issue #355). A 409 means the
+   * client has been retained (they have a case, or a retained date); a 404
+   * that they are not in the caller's firm. Needs `clients: add_edit`.
+   */
+  async setFirmClientProspectStage(id: string, stage: ProspectStage | null): Promise<FirmClient> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#firmClientUrl(id)}/prospect-stage`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prospect_stage: stage }),
+    });
+    const decoded = await decodeExpected(response, 200);
+    return firmClientFromJson(decoded);
+  }
+
+  /**
    * `PUT /v1/firm/clients/{id}/status` — archive a client (`'archived'`) or
    * bring one back (`'active'`). A status write, never a delete: there is no
    * way to delete a client through this API (ADR 0022). Needs `clients` at
@@ -2164,6 +2185,78 @@ export class InsolviaApiClient {
       headers,
     });
     await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/status-history` — every lifecycle move of the
+   * case, oldest first (issue #355). A 404 is {@link getCase}'s 404.
+   */
+  async listCaseStatusHistory(caseId: string): Promise<readonly CaseStatusChange[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/status-history`,
+      { method: 'GET', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'history', 'CaseStatusChange', (element) =>
+      definedMembers<CaseStatusChange>({
+        changedAt: requireString(element, 'changedAt'),
+        changedBy: requireString(element, 'changedBy'),
+        fromStatus: requireCaseStatus(element, 'fromStatus'),
+        toStatus: requireCaseStatus(element, 'toStatus'),
+      }),
+    );
+  }
+
+  /**
+   * `PUT /v1/cases/{caseId}/archived` — archive the case (`true`) or restore
+   * it to the working list (`false`). Idempotent; returns the {@link Case}
+   * with {@link Case.archivedAt} set or absent. Any status may be archived.
+   */
+  async setCaseArchived(caseId: string, archived: boolean): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/archived`,
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived }),
+      },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return caseFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}` — soft-delete a case (issue #355): from then
+   * on every read answers 404, and nothing is removed. A FIRM ADMIN's act
+   * (403 otherwise), and refused with a 409 on a case that has been filed —
+   * archive that instead.
+   */
+  async deleteCase(caseId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}`, {
+      method: 'DELETE',
+      headers,
+    });
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/copy` — open a NEW case from this one's data
+   * (issue #355): its debtors, schedules and petition answers, each value's
+   * provenance naming the source in `copied_from_case_id`. Returns the new
+   * {@link Case} (201), opened at `intake`. A 409 means a client the source
+   * names is archived or merged, or its Debtor 1 has no client.
+   */
+  async copyCase(caseId: string): Promise<Case> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/copy`,
+      { method: 'POST', headers },
+    );
+    const decoded = await decodeExpected(response, 201);
+    return caseFromJson(decoded);
   }
 
   /** `/v1/cases/{caseId}/assignees/{subject}`, each segment encoded once. */
@@ -2658,13 +2751,9 @@ function requireCaseChapter(response: DecodedResponse, key: string): CaseChapter
   throw malformedField(response, key, 'one of 7 | 11 | 12 | 13');
 }
 
-/** A required field that must be one of the three valid case statuses. */
+/** A required field that must be one of {@link CASE_STATUSES}. */
 function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
-  const value = response.json[key];
-  if (value === 'intake' || value === 'ready_to_file' || value === 'filed') {
-    return value;
-  }
-  throw malformedField(response, key, 'one of "intake" | "ready_to_file" | "filed"');
+  return requireChoice(response, key, CASE_STATUSES);
 }
 
 function requireExemptionSet(response: DecodedResponse, key: string): ExemptionSet {
@@ -2720,6 +2809,15 @@ function caseFromJson(response: DecodedResponse): Case {
     ...(exemptionSet === undefined ? {} : { exemptionSet }),
     ...(filedAt === undefined ? {} : { filedAt }),
     ...(meeting341At === undefined ? {} : { meeting341At }),
+    // The lifecycle (issue #355): each absent until set.
+    ...definedMembers<Partial<Case>>({
+      caseNumber: optionalString(response, 'caseNumber'),
+      judge: optionalString(response, 'judge'),
+      trustee: optionalString(response, 'trustee'),
+      officeFileNumber: optionalString(response, 'officeFileNumber'),
+      archivedAt: optionalString(response, 'archivedAt'),
+      archivedBy: optionalString(response, 'archivedBy'),
+    }),
   };
 }
 
@@ -3425,6 +3523,7 @@ function requireProvenanceMap(response: DecodedResponse, key: string): Provenanc
       confidence: optionalNumber(entry, 'confidence'),
       library_creditor_id: optionalString(entry, 'library_creditor_id'),
       client_id: optionalString(entry, 'client_id'),
+      copied_from_case_id: optionalString(entry, 'copied_from_case_id'),
     });
   }
   return entries;
@@ -4564,6 +4663,7 @@ function firmClientFromJson(response: DecodedResponse): FirmClient {
     first_retained_at: optionalString(response, 'first_retained_at'),
     tax_id_last_four: optionalString(response, 'tax_id_last_four'),
     merged_into: optionalString(response, 'merged_into'),
+    prospect_stage: optionalChoice(response, 'prospect_stage', PROSPECT_STAGES),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
     created_by: requireString(response, 'created_by'),
