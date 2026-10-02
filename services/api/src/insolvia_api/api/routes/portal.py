@@ -27,6 +27,7 @@ from insolvia_core.clients import (
     public_status_json,
 )
 from insolvia_core.errors import ForbiddenError
+from insolvia_core.questionnaire import portal_questionnaire_json
 
 from insolvia_api.api.client_auth import current_client, require_client
 from insolvia_api.api.dependencies import dependencies
@@ -90,3 +91,30 @@ def portal_me_route() -> ResponseReturnValue:
         )
     )
     return jsonify(portal_me_json(client, _public_status(client))), 200
+
+
+@blueprint.get("/v1/portal/questionnaire")
+@require_client
+def portal_questionnaire_route() -> ResponseReturnValue:
+    """The questionnaire's sections as this client's firm configured them —
+    the enabled ones only, each with the instructions in force (ADR 0023
+    PR 3). A section the firm switched off is simply absent: the answer
+    says nothing about what is hidden, not even that something is.
+
+    Read from the binding's FIRM, never from anything in the request — the
+    firm id on the ClientAccessor came from the binding row. Recorded as
+    `portal.read` against the binding's case, like `/v1/portal/me`.
+    """
+    client = current_client()
+    deps = dependencies()
+    if deps.access_log is None:
+        raise RuntimeError("access log is not composed")
+    if deps.firm_store is None:
+        raise RuntimeError("firm store is not composed")
+    config = deps.firm_store.get_questionnaire(client.firm_id)
+    deps.access_log.record(
+        record_access(
+            case_id=client.case_id, principal=client.subject, action="portal.read"
+        )
+    )
+    return jsonify(portal_questionnaire_json(config)), 200

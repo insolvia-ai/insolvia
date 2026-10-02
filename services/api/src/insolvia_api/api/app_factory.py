@@ -38,6 +38,9 @@ from insolvia_api.api.routes.extraction_review import (
 )
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.firm_clients import blueprint as firm_clients_blueprint
+from insolvia_api.api.routes.firm_questionnaire import (
+    blueprint as firm_questionnaire_blueprint,
+)
 from insolvia_api.api.routes.forms_hub import blueprint as forms_hub_blueprint
 from insolvia_api.api.routes.health import blueprint as health_blueprint
 from insolvia_api.api.routes.jobs import blueprint as jobs_blueprint
@@ -99,6 +102,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     app.register_blueprint(library_creditors_blueprint)
     # /v1/firm/clients (ADR 0022) — the client directory, the same shape.
     app.register_blueprint(firm_clients_blueprint)
+    # /v1/firm/questionnaire (ADR 0023 PR 3) — which sections a firm's
+    # clients see; the client's own read is in portal_blueprint.
+    app.register_blueprint(firm_questionnaire_blueprint)
     app.register_blueprint(documents_blueprint)
     app.register_blueprint(debtors_blueprint)
     app.register_blueprint(creditor_matrix_blueprint)
