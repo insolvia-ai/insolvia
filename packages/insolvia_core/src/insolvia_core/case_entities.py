@@ -48,6 +48,7 @@ from .provenance import (
     provenance_json,
     require_provenance,
 )
+from .provenance import require_server_sources_kept as _require_kept
 
 BodyT = TypeVar("BodyT")
 
@@ -121,6 +122,21 @@ def entity_body(entity: CaseEntity[BodyT] | EntityDraft[BodyT]) -> dict[str, obj
     if not isinstance(body, dict):  # pragma: no cover - bodies are dataclasses
         raise TypeError("an entity body must be a dataclass")
     return body
+
+
+def require_server_sources_kept(
+    draft: EntityDraft[BodyT], stored: CaseEntity[BodyT] | None
+) -> None:
+    """A staff save of a record may KEEP a `client_answered` entry (ADR 0023
+    PR 4) — the autosave echoing a value the review queue accepted from the
+    debtor — and never mint one; `provenance.require_server_sources_kept`
+    is the rule. `stored` None is a create, which can keep nothing."""
+    _require_kept(
+        entity_body(draft),
+        draft.provenance,
+        stored_body=entity_body(stored) if stored is not None else None,
+        stored_entries=stored.provenance if stored is not None else None,
+    )
 
 
 def _parse_amended(payload: Mapping[str, object]) -> bool:

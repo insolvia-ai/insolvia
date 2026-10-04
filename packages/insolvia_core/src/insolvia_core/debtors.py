@@ -45,10 +45,9 @@ from .provenance import (
     ADDRESSABLE_ID_RE,
     ProvenanceEntry,
     parse_provenance,
-    populated_paths,
     provenance_json,
     require_provenance,
-    value_at,
+    require_server_sources_kept,
 )
 from .tax_ids import TaxIdInput, TaxIdRef, parse_tax_id, tax_id_json
 
@@ -412,22 +411,18 @@ def require_client_provenance_kept(draft: DebtorDraft, stored: Debtor | None) ->
     `revisedProvenance` is what sends the right map.
 
     Entries at paths the draft leaves empty describe nothing and are not
-    checked. Pure; the route passes the record it just read."""
-    body = debtor_body(draft)
-    stored_body = debtor_body(stored) if stored is not None else {}
-    populated = set(populated_paths(body))
-    errors: dict[str, str] = {}
-    for path, entry in draft.provenance.items():
-        if entry.source != "client" or path not in populated:
-            continue
-        kept = stored.provenance.get(path) if stored is not None else None
-        if kept != entry or value_at(stored_body, path) != value_at(body, path):
-            errors[f"provenance.{path}"] = (
-                "Only a value copied from the client, and unchanged since, "
-                "can say it came from the client."
-            )
-    if errors:
-        raise FieldValidationError(errors)
+    checked. Pure; the route passes the record it just read.
+
+    `client_answered` (ADR 0023 PR 4) follows the same keep-only rule: only
+    the review queue's acceptance of a portal answer mints it, so a save may
+    echo it back on an untouched value and never claim it. Both live in
+    `provenance.require_server_sources_kept`."""
+    require_server_sources_kept(
+        debtor_body(draft),
+        draft.provenance,
+        stored_body=debtor_body(stored) if stored is not None else None,
+        stored_entries=stored.provenance if stored is not None else None,
+    )
 
 
 def debtor_body(draft: DebtorDraft | Debtor) -> dict[str, object]:

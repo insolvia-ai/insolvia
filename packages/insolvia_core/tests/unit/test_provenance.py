@@ -5,6 +5,8 @@ rule could be evaded rather than just a way it could be used.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 from insolvia_core.errors import FieldValidationError
 from insolvia_core.provenance import (
@@ -13,6 +15,7 @@ from insolvia_core.provenance import (
     populated_paths,
     provenance_json,
     require_provenance,
+    require_server_sources_kept,
 )
 
 CONFIRMED = {
@@ -92,8 +95,11 @@ class TestConfirmBeforeEntry:
     """INVARIANT 2 — machine-supplied values need a human before they can be
     stored. Each test is a way of trying to get around it."""
 
-    @pytest.mark.parametrize("source", ["ai_extracted", "imported"])
+    @pytest.mark.parametrize("source", ["ai_extracted", "imported", "client_answered"])
     def test_unconfirmed_machine_value_is_rejected(self, source: str) -> None:
+        # `client_answered` (ADR 0023 PR 4) is a debtor's portal answer — not
+        # a machine, but the same rule: nothing the client types is case
+        # data until a person at the firm confirms it.
         with pytest.raises(FieldValidationError) as caught:
             parse_provenance({"name.given": {"source": source}})
         assert "provenance.name.given" in caught.value.fields
@@ -323,3 +329,40 @@ class TestLocator:
     def test_a_non_finite_confidence_is_refused(self) -> None:
         with pytest.raises(FieldValidationError):
             parse_provenance({"a": {**CONFIRMED, "confidence": float("nan")}})
+
+
+class TestServerSourcesAreKeptNeverMinted:
+    """`client_answered` (ADR 0023 PR 4) is minted only by the review queue
+    accepting a portal answer; a save may echo it on an untouched value and
+    never claim it."""
+
+    ANSWERED: ClassVar[dict[str, str]] = {
+        "source": "client_answered",
+        "confirmed_by": "00000000-0000-4000-8000-00000000a11c",
+        "confirmed_at": "2099-01-01T00:00:00.000000Z",
+        "extraction_id": "00000000-0000-4000-8000-0000000ca4d1",
+    }
+
+    def _check(self, body, entries, stored_body, stored_entries) -> None:
+        require_server_sources_kept(
+            body,
+            parse_provenance(entries),
+            stored_body=stored_body,
+            stored_entries=parse_provenance(stored_entries)
+            if stored_entries is not None
+            else None,
+        )
+
+    def test_an_unchanged_answered_value_keeps_its_entry(self) -> None:
+        entries = {"phone": self.ANSWERED}
+        self._check({"phone": "555-0100"}, entries, {"phone": "555-0100"}, entries)
+
+    def test_a_changed_value_cannot_keep_the_answered_entry(self) -> None:
+        entries = {"phone": self.ANSWERED}
+        with pytest.raises(FieldValidationError) as caught:
+            self._check({"phone": "555-0199"}, entries, {"phone": "555-0100"}, entries)
+        assert "provenance.phone" in caught.value.fields
+
+    def test_a_create_cannot_claim_the_client_answered(self) -> None:
+        with pytest.raises(FieldValidationError):
+            self._check({"phone": "555-0100"}, {"phone": self.ANSWERED}, None, None)
