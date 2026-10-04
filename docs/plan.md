@@ -171,7 +171,7 @@ above; the intake data model's old sync seam narrowed to an origin pointer
 | [`Product · AI extraction`](https://github.com/insolvia-ai/insolvia/milestone/9) — **built 2026-09-04** | M2 / P1 | 8.7–8.9 | Credit reports and pay stubs into candidate records via pipeline workers (ADR 0019 as amended: document bytes reach the API, so **ZDR gates real-firm documents**); one shared review queue with MCP; human-confirmed before case entry. |
 | [`Product · Schedules workbench`](https://github.com/insolvia-ai/insolvia/milestone/11) — **built 2026-09-23** | M3 / P2 | 13.1–13.12 | Finish the Chapter 7 data-entry surface over entities that already exist: the petition screen, a forms hub with single-form preview, category-driven assets, claims linked to collateral with derived deficiency, the Schedule C workbench over the exemptions registry, Schedules G/H, the income workbench, a means-test screen with a live verdict, a firm creditor library, the four missing filing forms (B108/B121/B2010/B2030 — two are flat PDFs, so the engine gained an overlay pass that draws on vendored pages without touching their bytes), output options, and the tax id's encrypted storage with its logged full-value read (13.12 — B121 and B101's last four print). |
 | [`Product · Practice management`](https://github.com/insolvia-ai/insolvia/milestone/12) — **14.2–14.8 built; 14.1 mostly** | — | 14.1–14.8 | The layer around the case. Merged: tasks, notes, events with sixteen cited deadline rules and Rule 9006(a) counting, the dashboard, the court registry with firm defaults, and — per [ADR 0022](adr/0022-a-client-is-not-a-case.md) — the firm client record, cases opened for clients, the client list and record screens, the debtor screen reading its client, and client records over MCP (0022 PRs 1–6). Merge clients (PR 7) and the lifecycle with post-filing fields (PR 8, 14.3) followed. |
-| [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) — **15.1 built** | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. [ADR 0023](adr/0023-client-portal-identity-and-isolation.md) accepted (a login per debtor by default, one for both on the firm's choice); PRs 1–2 merged (the `client` principal and invitations; `/portal` sign-in and landing). Left: PRs 3–5 (#362–#364). |
+| [`Product · Client portal`](https://github.com/insolvia-ai/insolvia/milestone/13) — **15.1 built** | M2 / P1 | 15.1–15.4 | The debtor fills their own questionnaire and document requests; every answer is a candidate confirmed by staff through the existing review seam. [ADR 0023](adr/0023-client-portal-identity-and-isolation.md) accepted (a login per debtor by default, one for both on the firm's choice); PRs 1–2 merged (the `client` principal and invitations; `/portal` sign-in and landing); PRs 3–4 built (the firm-configurable questionnaire, #362; answers writing candidates, #363). Left: PR 5 (#364). |
 | [`Product · Chapter 13`](https://github.com/insolvia-ai/insolvia/milestone/14) — **built 2026-09-26** | — | 16.1–16.3 | B122C-1/C-2 on the existing engine, the plan model and calculator (waterfall, feasibility, §1325(a)(4) liquidation test), Official Form 113 and the Chapter 13 packet; proven on staging by fixture v3/v4's seeded Chapter 13 case. A district whose verified plan form is local (FLSB today) is refused by name until its form is modelled. |
 | [`Product · Filing and after`](https://github.com/insolvia-ai/insolvia/milestone/15) — **17.1 decided, 17.4 built** | — | 17.1–17.4 | [ADR 0024](adr/0024-electronic-filing-path.md) (accepted, reversed from its draft): Insolvia files automatically from its own infrastructure under the attorney's CM/ECF login, with per-filing attorney approval, a signed authorization and an isolated credential vault — the court-rules risk is recorded as knowingly accepted. Its PR 1 (court registry) and PR 2 (matrix by court) are merged. Amendments (17.4) merged as #402. The import spike's finding (#389) is **parked** by the maintainer — no importer is scheduled. Court-notice intake (#369) follows ADR 0024's filed-state capture. |
 
@@ -231,9 +231,22 @@ order. Nothing here needs a new decision except where marked.
    ([`case-data-model.md`](reference/case-data-model.md) § The lifecycle).
    ADR 0022's series is complete. No Terraform change: the history rows and
    the archive view live in the case table and its existing indexes.
-3. **ADR 0023 PRs 4–5** — the questionnaire writing candidates (#363),
-   document request checklists (#364). Before the first *real* invite: SES
-   production access, the ZDR item (ADR 0019), and the custom auth domain.
+3. **ADR 0023 PR 5** — document request checklists (#364). Before the first
+   *real* invite: SES production access, the ZDR item (ADR 0019), and the
+   custom auth domain.
+   ~~PR 4, the questionnaire writing candidates (#363)~~ — built: an
+   18-question first catalogue (`insolvia_core.questions`; personal
+   information in full bar the tax id, a few whole-record questions per
+   switchable section), `GET/POST/PUT/DELETE /v1/portal/answers` writing
+   pending candidates with a `question` locator (edit and withdraw while
+   pending), the review queue labelling a client row with its question and
+   the binding's display name, and acceptance minting a new provenance
+   source `client_answered` under the confirmation rule — not `client`,
+   which ADR 0022 had already taken for directory copies
+   ([`case-data-model.md`](reference/case-data-model.md) § Answers from the
+   client portal). The portal questionnaire is `/portal/questionnaire`, one
+   section at a time. No Terraform change. Next for the catalogue: the
+   SOFA, Schedule I's monthly figures, household and dependents.
    ~~PR 3, the firm-configurable questionnaire (#362)~~ — built: a six-section
    catalogue with stable ids (`insolvia_core.questionnaire`; personal
    information always on), one config item per firm in the firm table (absent
