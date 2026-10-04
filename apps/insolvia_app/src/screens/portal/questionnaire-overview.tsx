@@ -1,5 +1,6 @@
 import type { PortalQuestionnaire } from '@insolvia-ai/api-client';
-import { Card } from '@insolvia-ai/design-system';
+import { Button, Card } from '@insolvia-ai/design-system';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -19,13 +20,14 @@ type State =
  * off never arrives, so this screen has nothing to hide and says nothing
  * about it.
  *
- * Read-only for now: the questions themselves, and the answers they write,
- * are #363. Its own request rather than part of `/v1/portal/me`, so a
- * questionnaire that will not load costs this card and not the landing
- * screen.
+ * The questions, and the answers they write, are on `/portal/questionnaire`
+ * (#363), which the button opens. Its own request rather than part of
+ * `/v1/portal/me`, so a questionnaire that will not load costs this card and
+ * not the landing screen.
  */
 export function QuestionnaireOverview({ firmName }: { firmName: string }) {
   const theme = useTheme();
+  const router = useRouter();
   const { call } = usePortalApi();
   const [state, setState] = useState<State>({ kind: 'loading' });
 
@@ -65,6 +67,15 @@ export function QuestionnaireOverview({ firmName }: { firmName: string }) {
               </View>
             ))}
           </View>
+          {state.questionnaire.sections.length === 0 ? null : (
+            <Button
+              size="lg"
+              style={styles.start}
+              onPress={() => router.push('/portal/questionnaire')}
+            >
+              Answer your questionnaire
+            </Button>
+          )}
         </>
       ) : (
         <Text
@@ -94,5 +105,8 @@ const styles = StyleSheet.create({
   },
   sections: {
     gap: spacing.md,
+  },
+  start: {
+    alignSelf: 'flex-start',
   },
 });
