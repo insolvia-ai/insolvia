@@ -339,7 +339,7 @@ def test_getting_an_unknown_task_is_404(client):
 def test_patch_edits_only_the_named_fields(client):
     case_id = open_case(client)
     task = add_task(
-        client, case_id, body={"subject": "x", "dueDate": "2026-10-01"}
+        client, case_id, body={"subject": "x", "dueDate": "2099-10-01"}
     ).get_json()
     response = client.patch(
         f"/v1/cases/{case_id}/tasks/{task['id']}",
@@ -349,7 +349,7 @@ def test_patch_edits_only_the_named_fields(client):
     assert response.status_code == 200
     body = response.get_json()
     assert body["subject"] == "Renamed"
-    assert body["dueDate"] == "2026-10-01"
+    assert body["dueDate"] == "2099-10-01"
 
 
 def test_patch_with_no_fields_is_a_400(client):
@@ -364,7 +364,7 @@ def test_patch_with_no_fields_is_a_400(client):
 def test_patch_clears_a_due_date_with_explicit_null(client):
     case_id = open_case(client)
     task = add_task(
-        client, case_id, body={"subject": "x", "dueDate": "2026-10-01"}
+        client, case_id, body={"subject": "x", "dueDate": "2099-10-01"}
     ).get_json()
     response = client.patch(
         f"/v1/cases/{case_id}/tasks/{task['id']}",
@@ -577,12 +577,12 @@ def test_assigned_to_me_sorts_by_due_date_then_undated_last(client):
     add_task(
         client,
         case_id,
-        body={"subject": "Later", "assigneeSubject": ALICE, "dueDate": "2026-12-01"},
+        body={"subject": "Later", "assigneeSubject": ALICE, "dueDate": "2099-12-01"},
     )
     add_task(
         client,
         case_id,
-        body={"subject": "Soonest", "assigneeSubject": ALICE, "dueDate": "2026-10-01"},
+        body={"subject": "Soonest", "assigneeSubject": ALICE, "dueDate": "2099-10-01"},
     )
 
     response = client.get("/v1/me/tasks", headers=auth(ALICE))

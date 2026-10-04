@@ -56,7 +56,7 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
   { value: 'clients', label: 'Clients' },
   {
     value: 'client_portal',
-    label: 'Client portal (invitations; the portal itself is not yet available)',
+    label: 'Client portal (inviting clients to their case)',
   },
   { value: 'firm_administration', label: 'Firm administration' },
 ];
