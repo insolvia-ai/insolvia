@@ -51,6 +51,7 @@ import {
   PRESUMPTION_EXEMPTIONS,
   PROSPECT_STAGES,
   QUESTIONNAIRE_SECTION_IDS,
+  PROVENANCE_SOURCES,
   SECURED_PAYMENT_BUCKETS,
   SECURED_TREATMENTS,
   SMALL_BUSINESS_STATUSES,
@@ -8787,7 +8788,8 @@ describe('the client questionnaire (ADR 0023 PR 3)', () => {
     await expect(client.getFirmQuestionnaire()).rejects.toThrow();
   });
 
-  // Copied from core/questionnaire.py::portal_questionnaire_json.
+  // Copied from core/questions.py::portal_sections_json (each section's
+  // questions trimmed to one, verbatim).
   const PORTAL_QUESTIONNAIRE = {
     sections: [
       {
@@ -8795,8 +8797,51 @@ describe('the client questionnaire (ADR 0023 PR 3)', () => {
         title: 'Personal information',
         instructions:
           'Tell us who you are and where you live. Use your full legal name as it appears on your identification, and list any other names you have used in the last eight years.',
+        questions: [
+          {
+            id: 'personal_information.legal_name',
+            text: 'What is your full legal name?',
+            repeats: false,
+            perDebtor: true,
+            inputs: [
+              { key: 'given', label: 'First name', type: 'text', required: true },
+              { key: 'middle', label: 'Middle name', type: 'text', required: false },
+              { key: 'surname', label: 'Last name', type: 'text', required: true },
+              {
+                key: 'suffix',
+                label: 'Suffix',
+                type: 'text',
+                required: false,
+                help: 'Jr., Sr., III',
+              },
+            ],
+            help: "As it appears on your driver's license or other identification.",
+          },
+        ],
       },
-      { id: 'debts', title: 'Debts', instructions: 'Bring your statements.' },
+      {
+        id: 'debts',
+        title: 'Debts',
+        instructions: 'Bring your statements.',
+        questions: [
+          {
+            id: 'debts.creditor',
+            text: 'Who do you owe money to?',
+            repeats: true,
+            perDebtor: false,
+            inputs: [
+              {
+                key: 'name',
+                label: 'Name of the person or company',
+                type: 'text',
+                required: true,
+              },
+              { key: 'address', label: 'Their address', type: 'address', required: false },
+            ],
+            help: 'Add each person or company you owe, including debts you dispute. Use the name and address on their latest statement or letter.',
+          },
+        ],
+      },
     ],
   };
 
@@ -8826,5 +8871,216 @@ describe('the client questionnaire (ADR 0023 PR 3)', () => {
 
     expect(error).not.toBeInstanceOf(ApiUnauthorizedException);
     expect(error.statusCode).toBe(403);
+  });
+
+  test('refuses a question with an input type the client cannot render', async () => {
+    const [first] = PORTAL_QUESTIONNAIRE.sections;
+    const broken = {
+      sections: [
+        {
+          ...first,
+          questions: [
+            {
+              ...first?.questions[0],
+              inputs: [{ key: 'x', label: 'X', type: 'slider', required: false }],
+            },
+          ],
+        },
+      ],
+    };
+    const { client } = apiClient(() => jsonResponse(broken, 200));
+
+    await expect(client.getPortalQuestionnaire()).rejects.toThrow();
+  });
+});
+
+describe('the client questionnaire answers (ADR 0023 PR 4)', () => {
+  function apiClient(respond: () => Response) {
+    const stub = stubFetch(respond);
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+    return { stub, client };
+  }
+
+  // Copied from core/questions.py::answer_json.
+  const ANSWER = {
+    id: '00000000-0000-4000-8000-0000000a45e1',
+    questionId: 'personal_information.legal_name',
+    sectionId: 'personal_information',
+    filingRole: 'debtor_1',
+    value: { given: 'Patricia', surname: 'Example' },
+    status: 'pending',
+    createdAt: '2099-01-01T00:00:00.000000Z',
+    updatedAt: '2099-01-01T00:00:00.000000Z',
+  };
+
+  test('GETs the client’s own answers', async () => {
+    const { stub, client } = apiClient(() => jsonResponse({ answers: [ANSWER] }, 200));
+
+    const answers = await client.listPortalAnswers();
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('GET');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers`);
+    expect(answers).toEqual([ANSWER]);
+  });
+
+  test('POSTs an answer, leaving filingRole off when not given', async () => {
+    const { stub, client } = apiClient(() => jsonResponse(ANSWER, 201));
+
+    const created = await client.createPortalAnswer({
+      questionId: 'personal_information.legal_name',
+      value: { given: 'Patricia', surname: 'Example' },
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers`);
+    expect(seen.headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(seen.body)).toEqual({
+      questionId: 'personal_information.legal_name',
+      value: { given: 'Patricia', surname: 'Example' },
+    });
+    expect(created).toEqual(ANSWER);
+  });
+
+  test('POSTs the filing role when a two-role client names it', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse({ ...ANSWER, filingRole: 'debtor_2' }, 201),
+    );
+
+    await client.createPortalAnswer({
+      questionId: 'personal_information.legal_name',
+      filingRole: 'debtor_2',
+      value: { given: 'Sam', surname: 'Example' },
+    });
+
+    expect(JSON.parse(stub.lastRequest().body)).toEqual({
+      questionId: 'personal_information.legal_name',
+      filingRole: 'debtor_2',
+      value: { given: 'Sam', surname: 'Example' },
+    });
+  });
+
+  test('a refused answer names the box to fix', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'validation failed: value.surname',
+          fields: { 'value.surname': 'This is required.' },
+        },
+        400,
+      ),
+    );
+
+    const error = asApiValidationException(
+      await rejection(
+        client.createPortalAnswer({
+          questionId: 'personal_information.legal_name',
+          value: { given: 'Patricia' },
+        }),
+      ),
+    );
+
+    expect(error.fields).toEqual({ 'value.surname': 'This is required.' });
+  });
+
+  test('PUTs a changed value to the answer', async () => {
+    const { stub, client } = apiClient(() =>
+      jsonResponse({ ...ANSWER, value: { given: 'Pat', surname: 'Example' } }, 200),
+    );
+
+    const updated = await client.updatePortalAnswer(ANSWER.id, {
+      given: 'Pat',
+      surname: 'Example',
+    });
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('PUT');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers/${ANSWER.id}`);
+    expect(JSON.parse(seen.body)).toEqual({ value: { given: 'Pat', surname: 'Example' } });
+    expect(updated.value).toEqual({ given: 'Pat', surname: 'Example' });
+  });
+
+  test('a reviewed answer refuses a change with a 409', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          error: 'Conflict',
+          message: 'this answer has already been reviewed (status: accepted)',
+        },
+        409,
+      ),
+    );
+
+    const error = asApiException(await rejection(client.updatePortalAnswer(ANSWER.id, {})));
+
+    expect(error.statusCode).toBe(409);
+  });
+
+  test('DELETEs to withdraw', async () => {
+    const { stub, client } = apiClient(() => jsonResponse({ ...ANSWER, status: 'withdrawn' }, 200));
+
+    const withdrawn = await client.withdrawPortalAnswer(ANSWER.id);
+
+    const seen = stub.lastRequest();
+    expect(seen.method).toBe('DELETE');
+    expect(seen.url).toBe(`${BASE_URL}/v1/portal/answers/${ANSWER.id}`);
+    expect(withdrawn.status).toBe('withdrawn');
+  });
+
+  test('the review queue maps a client answer’s question and display name', async () => {
+    const { client } = apiClient(() =>
+      jsonResponse(
+        {
+          candidates: [
+            {
+              id: ANSWER.id,
+              entityType: 'debtors',
+              status: 'pending',
+              payload: { name: { given: 'Patricia', surname: 'Example' } },
+              origin: { channel: 'client', clientId: 'exampleportalclient', subject: SUBJECT },
+              createdAt: ANSWER.createdAt,
+              updatedAt: ANSWER.updatedAt,
+              locator: {
+                kind: 'question',
+                section_id: 'personal_information',
+                question_id: 'personal_information.legal_name',
+                filing_role: 'debtor_1',
+              },
+              question: {
+                id: 'personal_information.legal_name',
+                sectionId: 'personal_information',
+                sectionTitle: 'Personal information',
+                text: 'What is your full legal name?',
+                filingRole: 'debtor_1',
+              },
+              client: { displayName: 'Pat Example' },
+            },
+          ],
+        },
+        200,
+      ),
+    );
+
+    const [candidate] = await client.listExtractionCandidates(
+      'a3f1e9d0-4b2c-4d1e-9a7f-6c8e0d1f2a3b',
+    );
+
+    expect(candidate?.question).toEqual({
+      id: 'personal_information.legal_name',
+      sectionId: 'personal_information',
+      sectionTitle: 'Personal information',
+      text: 'What is your full legal name?',
+      filingRole: 'debtor_1',
+    });
+    expect(candidate?.client).toEqual({ displayName: 'Pat Example' });
+    expect(candidate?.locatorPage).toBeUndefined();
+  });
+
+  test('client_answered is a provenance source', () => {
+    expect(PROVENANCE_SOURCES).toContain('client_answered');
   });
 });
