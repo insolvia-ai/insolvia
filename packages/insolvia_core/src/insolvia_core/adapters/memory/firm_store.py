@@ -11,6 +11,11 @@ from insolvia_core.firm_clients import (
 )
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.questionnaire import (
+    QuestionnaireConfig,
+    questionnaire_from_item,
+    questionnaire_item,
+)
 
 
 class MemoryFirmStore:
@@ -33,6 +38,10 @@ class MemoryFirmStore:
         self.library_creditors: dict[tuple[str, str], LibraryCreditor] = {}
         # And again for the client directory (ADR 0022).
         self.clients: dict[tuple[str, str], FirmClient] = {}
+        # The questionnaire config, held as the STORED ITEM rather than the
+        # dataclass, so a suite running here round-trips the item shape the
+        # DynamoDB adapter writes. Keyed by firm: one item per partition.
+        self.questionnaires: dict[str, dict[str, object]] = {}
 
     # ── Firms ───────────────────────────────────────────────────────
 
@@ -254,6 +263,18 @@ class MemoryFirmStore:
             self.clients[(firm_id, merged_id)] = replace(merged, merging_into=None)
         if survivor is not None and survivor.merging_from == merged_id:
             self.clients[(firm_id, survivor_id)] = replace(survivor, merging_from=None)
+
+    # ── The client questionnaire's config ───────────────────────────
+
+    def get_questionnaire(self, firm_id: str) -> QuestionnaireConfig | None:
+        item = self.questionnaires.get(firm_id)
+        return None if item is None else questionnaire_from_item(item)
+
+    def put_questionnaire(self, config: QuestionnaireConfig) -> None:
+        self.questionnaires[config.firm_id] = questionnaire_item(config)
+
+    def delete_questionnaire(self, firm_id: str) -> bool:
+        return self.questionnaires.pop(firm_id, None) is not None
 
 
 def _claimable(client: FirmClient, other_id: str, *, survivor: bool) -> bool:

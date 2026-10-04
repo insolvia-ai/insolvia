@@ -30,6 +30,7 @@ from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
+from insolvia_core.questionnaire import QuestionnaireConfig
 from insolvia_core.tasks import Task
 from insolvia_core.tax_ids import Envelope, SealedTaxId
 
@@ -363,6 +364,30 @@ class FirmStore(Protocol):
         refused part-way. Cases already re-pointed stay with the survivor:
         each of them names an active client either way. A claim that is not
         this pair's is left alone."""
+        ...
+
+    # ── The client questionnaire's config (ADR 0023 PR 3 / #362) ───
+    #
+    # One item per firm (`questionnaire.SORT_KEY`), and ABSENT IS A STATE:
+    # it means the catalogue's defaults. Reset deletes the item rather than
+    # writing a copy of the defaults — `insolvia_core.questionnaire` says why.
+
+    def get_questionnaire(self, firm_id: str) -> QuestionnaireConfig | None:
+        """The firm's stored config, or None for the defaults. Firm-scoped by
+        key, and strongly consistent: the staff screen reads back what it
+        just saved, and a client's next read must see a section switched off."""
+        ...
+
+    def put_questionnaire(self, config: QuestionnaireConfig) -> None:
+        """Write the firm's whole config, replacing any stored one. Last
+        writer wins, like `update_firm`: a firm's settings screen has one
+        form and a firm has a handful of admins."""
+        ...
+
+    def delete_questionnaire(self, firm_id: str) -> bool:
+        """Reset to defaults. True if a stored config was removed, False if
+        the firm was on the defaults already — either way the firm is on the
+        defaults afterwards, so a route treats both as success."""
         ...
 
 

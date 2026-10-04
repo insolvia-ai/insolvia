@@ -11,6 +11,8 @@ import { StatusScreen } from '@/components/status-screen';
 import { usePortalSession } from '@/session';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { QuestionnaireOverview } from './questionnaire-overview';
+
 type State =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly me: PortalMe }
@@ -60,7 +62,9 @@ const STAGES = {
  * comes from `GET /v1/portal/me`, whose case block is a server-side
  * projection of exactly two attributes read through the client's binding; a
  * richer screen would need a richer projection, reviewed as one. The
- * questionnaire and the document checklist arrive with #362–#364.
+ * questionnaire's sections, as the firm configured them, are their own read
+ * (`QuestionnaireOverview`, #362); its questions and the document checklist
+ * arrive with #363–#364.
  *
  * A **403** is its own state and not an error: it means the person signed in
  * fine and has no live access to a case — revoked, or never invited — and the
@@ -154,6 +158,8 @@ export function PortalHome() {
         </View>
         <Text style={[styles.detail, ink]}>{stage.detail}</Text>
       </Card.Root>
+
+      <QuestionnaireOverview firmName={me.firm.name} />
 
       <Text style={[styles.note, muted]}>
         Questions about your case? Contact {me.firm.name} directly — they can see everything you

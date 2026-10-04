@@ -24,6 +24,8 @@ import { Heading } from '@/components/heading';
 import { CourtPicker } from '@/components/court-picker';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { QuestionnaireSettings } from './questionnaire-settings';
+
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
   { value: 'attorney', label: 'Attorney' },
   { value: 'paralegal', label: 'Paralegal' },
@@ -158,6 +160,8 @@ export function Firm({ membership }: { membership: FirmMembership }) {
       <Heading level={1}>{firmName}</Heading>
 
       <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />
+
+      <QuestionnaireSettings editable={mayChange} onNotice={setNotice} />
 
       {mayReachLibrary ? <LibraryLink /> : null}
 

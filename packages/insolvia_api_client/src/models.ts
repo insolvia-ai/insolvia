@@ -801,6 +801,78 @@ export interface PortalCaseStatus {
   readonly stage: CaseStatus;
 }
 
+/**
+ * The questionnaire's sections (ADR 0023 PR 3), in the order a client works
+ * through them. Stable ids: the questionnaire's questions (#363) hang off
+ * them. `personal_information` is always on; the other five a firm may
+ * switch off for its clients.
+ */
+export const QUESTIONNAIRE_SECTION_IDS = [
+  'personal_information',
+  'property',
+  'debts',
+  'income',
+  'expenses',
+  'other',
+] as const;
+export type QuestionnaireSectionId = (typeof QUESTIONNAIRE_SECTION_IDS)[number];
+
+/** One section as a FIRM USER configures it — `GET /v1/firm/questionnaire`. */
+export interface FirmQuestionnaireSection {
+  readonly id: QuestionnaireSectionId;
+  readonly title: string;
+  /** What the section maps to on the petition and schedules — for staff. */
+  readonly covers: string;
+  /** False for `personal_information`, which is always on. */
+  readonly switchable: boolean;
+  /** Whether the firm's clients see it. Staff always do. */
+  readonly enabled: boolean;
+  /** The firm's own instructions, or `null` when the default is in force. */
+  readonly instructions: string | null;
+  readonly defaultInstructions: string;
+}
+
+/**
+ * `GET`/`PUT`/`DELETE /v1/firm/questionnaire` — EVERY section, switched off
+ * or not. `isDefault` means the firm has stored nothing (never saved, or
+ * reset); `updatedAt`/`updatedBy` are `null` then.
+ */
+export interface FirmQuestionnaire {
+  readonly isDefault: boolean;
+  readonly updatedAt: string | null;
+  /** The subject of the firm user who last saved it. */
+  readonly updatedBy: string | null;
+  readonly sections: readonly FirmQuestionnaireSection[];
+}
+
+/**
+ * `PUT /v1/firm/questionnaire` — the WHOLE config: every section exactly
+ * once. Instructions blank, `null` or identical to the default are stored
+ * as "use the default".
+ */
+export interface SaveFirmQuestionnaireRequest {
+  readonly sections: readonly {
+    readonly id: QuestionnaireSectionId;
+    readonly enabled: boolean;
+    readonly instructions: string | null;
+  }[];
+}
+
+/** One section as the CLIENT reads it — title and the instructions in force. */
+export interface PortalQuestionnaireSection {
+  readonly id: QuestionnaireSectionId;
+  readonly title: string;
+  readonly instructions: string;
+}
+
+/**
+ * `GET /v1/portal/questionnaire` — the sections this client's firm shows
+ * them, enabled ones only. Nothing says what is switched off.
+ */
+export interface PortalQuestionnaire {
+  readonly sections: readonly PortalQuestionnaireSection[];
+}
+
 /** One person linked to a case, as `GET /v1/cases/{id}/assignees` returns them. */
 export interface CaseAssignee {
   /** The colleague's Cognito subject — resolve it through the directory. */

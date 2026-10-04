@@ -583,6 +583,163 @@ def test_a_client_on_another_case_is_a_404_on_this_one(client):
     assert response.status_code == 404
 
 
+# ── The questionnaire (ADR 0023 PR 3 / #362) ────────────────────
+
+SECTIONS = ["personal_information", "property", "debts", "income", "expenses", "other"]
+
+
+def questionnaire_save(**overrides: dict[str, object]) -> dict[str, object]:
+    return {
+        "sections": [
+            {"id": section_id, "enabled": True, **overrides.get(section_id, {})}
+            for section_id in SECTIONS
+        ]
+    }
+
+
+def client_section_ids(client, subject: str) -> list[str]:
+    response = client.get("/v1/portal/questionnaire", headers=portal(subject))
+    assert response.status_code == 200, response.get_json()
+    return [section["id"] for section in response.get_json()["sections"]]
+
+
+def test_a_client_of_a_firm_that_configured_nothing_sees_every_section(client):
+    pat = invited_subject(client, open_case(client))
+
+    response = client.get("/v1/portal/questionnaire", headers=portal(pat))
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert [s["id"] for s in body["sections"]] == SECTIONS
+    assert set(body["sections"][0]) == {"id", "title", "instructions"}
+
+
+def test_a_section_switched_off_is_gone_for_the_client_and_kept_for_staff(client):
+    # The ADR's done-when for PR 3, in-process.
+    pat = invited_subject(client, open_case(client))
+    saved = client.put(
+        "/v1/firm/questionnaire",
+        json=questionnaire_save(expenses={"enabled": False}),
+        headers=staff(ALICE),
+    )
+    assert saved.status_code == 200, saved.get_json()
+
+    seen_by_client = client_section_ids(client, pat)
+    staff_view = client.get("/v1/firm/questionnaire", headers=staff(ALICE)).get_json()
+
+    assert "expenses" not in seen_by_client
+    assert [s["id"] for s in staff_view["sections"]] == SECTIONS
+    assert [s["enabled"] for s in staff_view["sections"]] == [
+        True,
+        True,
+        True,
+        True,
+        False,
+        True,
+    ]
+    assert staff_view["isDefault"] is False
+    assert staff_view["updatedBy"] == ALICE
+
+
+def test_the_firms_instructions_reach_its_client(client):
+    pat = invited_subject(client, open_case(client))
+    client.put(
+        "/v1/firm/questionnaire",
+        json=questionnaire_save(debts={"instructions": "Bring your statements."}),
+        headers=staff(ALICE),
+    )
+
+    body = client.get("/v1/portal/questionnaire", headers=portal(pat)).get_json()
+
+    assert body["sections"][2] == {
+        "id": "debts",
+        "title": "Debts",
+        "instructions": "Bring your statements.",
+    }
+
+
+def test_reset_to_defaults_shows_the_client_every_section_again(client):
+    pat = invited_subject(client, open_case(client))
+    client.put(
+        "/v1/firm/questionnaire",
+        json=questionnaire_save(other={"enabled": False}),
+        headers=staff(ALICE),
+    )
+
+    reset = client.delete("/v1/firm/questionnaire", headers=staff(ALICE))
+
+    assert reset.status_code == 200
+    assert reset.get_json()["isDefault"] is True
+    assert client_section_ids(client, pat) == SECTIONS
+
+
+def test_resetting_a_firm_already_on_the_defaults_is_not_an_error(client):
+    response = client.delete("/v1/firm/questionnaire", headers=staff(ALICE))
+
+    assert response.status_code == 200
+    assert response.get_json()["isDefault"] is True
+
+
+def test_another_firms_config_does_not_reach_this_firms_client(client):
+    pat = invited_subject(client, open_case(client))
+
+    client.put(
+        "/v1/firm/questionnaire",
+        json=questionnaire_save(property={"enabled": False}),
+        headers=staff(CAROL),
+    )
+
+    assert client_section_ids(client, pat) == SECTIONS
+
+
+def test_personal_information_cannot_be_switched_off_through_the_api(client):
+    response = client.put(
+        "/v1/firm/questionnaire",
+        json=questionnaire_save(personal_information={"enabled": False}),
+        headers=staff(ALICE),
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["fields"] == {
+        "sections.personal_information.enabled": "Personal information is always on."
+    }
+
+
+@pytest.mark.parametrize(
+    ("method", "body"),
+    [("get", None), ("put", questionnaire_save()), ("delete", None)],
+)
+def test_the_questionnaire_config_is_a_firm_administration_setting(
+    client, method, body
+):
+    # BOB is a paralegal on the role defaults: firm_administration hidden.
+    response = client.open(
+        "/v1/firm/questionnaire", method=method, json=body, headers=staff(BOB)
+    )
+
+    assert response.status_code == 403
+
+
+def test_reading_the_questionnaire_is_on_the_access_log_as_the_client(
+    client, access_log
+):
+    pat = invited_subject(client, open_case(client))
+
+    client.get("/v1/portal/questionnaire", headers=portal(pat))
+
+    assert actions(access_log)[-1] == ("portal.read", "allowed", pat)
+
+
+def test_a_revoked_client_cannot_read_the_questionnaire(client):
+    case_id = open_case(client)
+    pat = invited_subject(client, case_id)
+    client.delete(f"/v1/cases/{case_id}/portal/clients/{pat}", headers=staff(ALICE))
+
+    response = client.get("/v1/portal/questionnaire", headers=portal(pat))
+
+    assert response.status_code == 403
+
+
 # ── Disjointness, over the whole URL map ────────────────────────
 
 # Routes that authenticate nobody by design — each has its reason in its own

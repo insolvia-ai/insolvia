@@ -46,6 +46,23 @@ const PORTAL_ME = {
   case: { chapter: 13, stage: 'intake' },
 };
 
+// Shaped as core/questionnaire.py::portal_questionnaire_json answers for a
+// firm that switched Expenses off and wrote its own Debts instructions.
+const PORTAL_QUESTIONNAIRE = {
+  sections: [
+    {
+      id: 'personal_information',
+      title: 'Personal information',
+      instructions: 'Tell us who you are and where you live.',
+    },
+    {
+      id: 'debts',
+      title: 'Debts',
+      instructions: 'Bring your last statement from each lender.',
+    },
+  ],
+};
+
 describe('the portal routes', () => {
   it('are declared at exactly the paths infra registers', () => {
     // `portal_callback_urls` and `portal_logout_urls` in
@@ -68,7 +85,9 @@ describe('the portal routes', () => {
       ...['_layout.tsx', 'index.tsx', 'sign-in.tsx', path.join('auth', 'callback.tsx')].map((f) =>
         path.join(APP_DIR, 'portal', f),
       ),
-      ...['home.tsx', 'sign-in.tsx', 'auth-callback.tsx'].map((f) => path.join(__dirname, f)),
+      ...['home.tsx', 'sign-in.tsx', 'auth-callback.tsx', 'questionnaire-overview.tsx'].map((f) =>
+        path.join(__dirname, f),
+      ),
     ];
     for (const file of files) {
       const source = readFileSync(file, 'utf8');
@@ -140,6 +159,7 @@ describe('signing in to the portal', () => {
         '/oauth2/token': () =>
           tokenEndpointResponse({ idToken: fakeJwt({ email: 'client@example.test' }) }),
         '/v1/portal/me': () => jsonResponse(200, PORTAL_ME),
+        '/v1/portal/questionnaire': () => jsonResponse(200, PORTAL_QUESTIONNAIRE),
       }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -153,6 +173,12 @@ describe('signing in to the portal', () => {
     expect(screen.getAllByText('Example & Partners').length).toBeGreaterThan(0);
     expect(screen.getByText('Chapter 13')).toBeTruthy();
     expect(screen.getByText('Preparing your case')).toBeTruthy();
+    // The questionnaire's sections, as the firm configured them: what the
+    // server sent and nothing else — a section switched off never arrives.
+    expect(await screen.findByRole('heading', { name: 'Your questionnaire' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Debts' })).toBeTruthy();
+    expect(screen.getByText('Bring your last statement from each lender.')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Expenses' })).toBeNull();
     // The portal token went to the portal route, and to nothing staff-side.
     const urls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(urls.some((url) => url.endsWith('/v1/portal/me'))).toBe(true);

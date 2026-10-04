@@ -44,6 +44,12 @@ from insolvia_core.library_creditors import (
     create_library_creditor,
     parse_library_creditor,
 )
+from insolvia_core.questionnaire import (
+    SECTION_IDS,
+    build_config,
+    parse_questionnaire_update,
+    questionnaire_item,
+)
 
 FIRM_ID = "00000000-0000-4000-8000-00000000f18a"
 OTHER_FIRM_ID = "00000000-0000-4000-8000-00000000f18b"
@@ -862,3 +868,85 @@ def test_the_directory_query_reads_only_client_rows_and_every_page(monkeypatch):
     assert kwargs["KeyConditionExpression"] == "PK = :firm AND begins_with(SK, :prefix)"
     assert kwargs["ExpressionAttributeValues"][":prefix"] == {"S": "FIRMCLIENT#"}
     assert fake.calls[1][1]["ExclusiveStartKey"] == {"PK": {"S": "x"}}
+
+
+# ── The client questionnaire's config (ADR 0023 PR 3 / #362) ───────
+
+
+def questionnaire(firm_id: str = FIRM_ID, *, other: bool = False):
+    body = {
+        "sections": [{"id": s, "enabled": other or s != "other"} for s in SECTION_IDS]
+    }
+    return build_config(
+        parse_questionnaire_update(body), firm_id=firm_id, updated_by=ALICE
+    )
+
+
+def test_a_firm_with_no_questionnaire_config_reads_none():
+    assert MemoryFirmStore().get_questionnaire(FIRM_ID) is None
+
+
+def test_a_questionnaire_config_is_read_within_its_firm():
+    store = MemoryFirmStore()
+    saved = questionnaire()
+
+    store.put_questionnaire(saved)
+
+    assert store.get_questionnaire(FIRM_ID) == saved
+    assert store.get_questionnaire(OTHER_FIRM_ID) is None
+
+
+def test_a_questionnaire_save_replaces_the_stored_one():
+    store = MemoryFirmStore()
+    store.put_questionnaire(questionnaire())
+
+    store.put_questionnaire(questionnaire(other=True))
+
+    config = store.get_questionnaire(FIRM_ID)
+    assert config is not None
+    assert config.sections["other"].enabled is True
+
+
+def test_resetting_the_questionnaire_twice_reports_the_truth():
+    store = MemoryFirmStore()
+    store.put_questionnaire(questionnaire())
+
+    assert store.delete_questionnaire(FIRM_ID) is True
+    assert store.delete_questionnaire(FIRM_ID) is False
+    assert store.get_questionnaire(FIRM_ID) is None
+
+
+def test_the_questionnaire_is_written_under_its_own_key(monkeypatch):
+    fake = FakeDynamoDb()
+    store = dynamo_store(monkeypatch, fake)
+
+    store.put_questionnaire(questionnaire())
+
+    name, kwargs = fake.calls[0]
+    assert name == "put_item"
+    assert kwargs["Item"]["PK"] == {"S": f"FIRM#{FIRM_ID}"}
+    assert kwargs["Item"]["SK"] == {"S": "QUESTIONNAIRE"}
+    assert kwargs["Item"]["sections"]["M"]["other"] == {
+        "M": {"enabled": {"BOOL": False}}
+    }
+
+
+def test_the_questionnaire_round_trips_through_the_wire_format(monkeypatch):
+    config = questionnaire()
+    fake = FakeDynamoDb(
+        {"get_item": {"Item": to_attributes(questionnaire_item(config))}}
+    )
+    store = dynamo_store(monkeypatch, fake)
+
+    assert store.get_questionnaire(FIRM_ID) == config
+    assert fake.calls[0][1]["ConsistentRead"] is True
+    assert fake.calls[0][1]["Key"]["SK"] == {"S": "QUESTIONNAIRE"}
+
+
+def test_resetting_a_firm_already_on_the_defaults_is_false(monkeypatch):
+    fake = FakeDynamoDb()
+    fake.raises = conditional_check_failed()
+    store = dynamo_store(monkeypatch, fake)
+
+    assert store.delete_questionnaire(FIRM_ID) is False
+    assert fake.calls[0][1]["ConditionExpression"] == "attribute_exists(SK)"

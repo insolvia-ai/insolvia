@@ -15,6 +15,7 @@ import {
   PLAN_CLASSES,
   PRESUMPTION_EXEMPTIONS,
   PROSPECT_STAGES,
+  QUESTIONNAIRE_SECTION_IDS,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
   calendarEventDraftToJson,
@@ -56,6 +57,12 @@ import type {
   PortalClient,
   PortalClientStatus,
   PortalMe,
+  FirmQuestionnaire,
+  FirmQuestionnaireSection,
+  PortalQuestionnaire,
+  PortalQuestionnaireSection,
+  QuestionnaireSectionId,
+  SaveFirmQuestionnaireRequest,
   ProspectStage,
   CaseEntityRequest,
   CaseForm,
@@ -1507,6 +1514,58 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `GET /v1/firm/questionnaire` — which questionnaire sections the firm's
+   * clients see, and the instructions they read (ADR 0023 PR 3). Every
+   * section, switched off or not: staff always see all of them.
+   *
+   * `firm_administration` at `view_only`, like {@link getFirm}.
+   */
+  async getFirmQuestionnaire(): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'GET',
+      headers,
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `PUT /v1/firm/questionnaire` — save the whole config, every section once.
+   * Answers with what was stored, normalised (blank instructions read back
+   * as `null`). `firm_administration` at `add_edit`. Throws
+   * {@link ApiValidationException} on a 400, keyed `sections.<id>.<field>`.
+   */
+  async saveFirmQuestionnaire(request: SaveFirmQuestionnaireRequest): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sections: request.sections.map((section) => ({
+          id: section.id,
+          enabled: section.enabled,
+          instructions: section.instructions,
+        })),
+      }),
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `DELETE /v1/firm/questionnaire` — reset to the defaults: every section
+   * on, every instruction the catalogue's. Idempotent; answers with the
+   * default view. `firm_administration` at `add_edit`.
+   */
+  async resetFirmQuestionnaire(): Promise<FirmQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/questionnaire`, {
+      method: 'DELETE',
+      headers,
+    });
+    return firmQuestionnaireFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
    * `GET /v1/firm/directory` — everyone in the caller's firm, as names.
    *
    * Available to anyone who can view cases, not only administrators, because
@@ -1757,6 +1816,33 @@ export class InsolviaApiClient {
         chapter: requireCaseChapter(matter, 'chapter'),
         stage: requireCaseStatus(matter, 'stage'),
       },
+    };
+  }
+
+  /**
+   * `GET /v1/portal/questionnaire` — the CLIENT side (ADR 0023 PR 3): the
+   * sections this client's firm shows them, in order, each with the
+   * instructions in force. A section the firm switched off is absent. Called
+   * with a portal session's token, like {@link getPortalMe}.
+   */
+  async getPortalQuestionnaire(): Promise<PortalQuestionnaire> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/questionnaire`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      sections: requireArrayOf(
+        decoded,
+        'sections',
+        'PortalQuestionnaireSection',
+        (section): PortalQuestionnaireSection => ({
+          id: requireQuestionnaireSectionId(section, 'id'),
+          title: requireString(section, 'title'),
+          instructions: requireString(section, 'instructions'),
+        }),
+      ),
     };
   }
 
@@ -2754,6 +2840,36 @@ function requireCaseChapter(response: DecodedResponse, key: string): CaseChapter
 /** A required field that must be one of {@link CASE_STATUSES}. */
 function requireCaseStatus(response: DecodedResponse, key: string): CaseStatus {
   return requireChoice(response, key, CASE_STATUSES);
+}
+
+function requireQuestionnaireSectionId(
+  response: DecodedResponse,
+  key: string,
+): QuestionnaireSectionId {
+  return requireChoice(response, key, QUESTIONNAIRE_SECTION_IDS);
+}
+
+/** The staff view of the questionnaire config — every section. */
+function firmQuestionnaireFromJson(response: DecodedResponse): FirmQuestionnaire {
+  return {
+    isDefault: requireBoolean(response, 'isDefault'),
+    updatedAt: requireNullableString(response, 'updatedAt'),
+    updatedBy: requireNullableString(response, 'updatedBy'),
+    sections: requireArrayOf(
+      response,
+      'sections',
+      'FirmQuestionnaireSection',
+      (section): FirmQuestionnaireSection => ({
+        id: requireQuestionnaireSectionId(section, 'id'),
+        title: requireString(section, 'title'),
+        covers: requireString(section, 'covers'),
+        switchable: requireBoolean(section, 'switchable'),
+        enabled: requireBoolean(section, 'enabled'),
+        instructions: requireNullableString(section, 'instructions'),
+        defaultInstructions: requireString(section, 'defaultInstructions'),
+      }),
+    ),
+  };
 }
 
 function requireExemptionSet(response: DecodedResponse, key: string): ExemptionSet {
