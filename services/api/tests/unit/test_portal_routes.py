@@ -611,7 +611,8 @@ def test_a_client_of_a_firm_that_configured_nothing_sees_every_section(client):
     assert response.status_code == 200
     body = response.get_json()
     assert [s["id"] for s in body["sections"]] == SECTIONS
-    assert set(body["sections"][0]) == {"id", "title", "instructions"}
+    # PR 4 adds each section's questions — nothing staff-facing.
+    assert set(body["sections"][0]) == {"id", "title", "instructions", "questions"}
 
 
 def test_a_section_switched_off_is_gone_for_the_client_and_kept_for_staff(client):
@@ -651,7 +652,8 @@ def test_the_firms_instructions_reach_its_client(client):
 
     body = client.get("/v1/portal/questionnaire", headers=portal(pat)).get_json()
 
-    assert body["sections"][2] == {
+    debts = {k: v for k, v in body["sections"][2].items() if k != "questions"}
+    assert debts == {
         "id": "debts",
         "title": "Debts",
         "instructions": "Bring your statements.",
