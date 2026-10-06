@@ -34,7 +34,13 @@ const ENTITY_LABELS: Record<string, string> = {
   pay_period_records: 'Pay period',
   assets: 'Asset',
   income_summaries: 'Income summary',
+  // A client's portal answer about a debtor's own fields (ADR 0023 PR 4).
+  debtors: 'Debtor details',
+  expenses: 'Expense',
+  contract_leases: 'Lease or contract',
 };
+
+const ROLE_LABELS = { debtor_1: 'Debtor 1', debtor_2: 'Debtor 2' } as const;
 
 function entityLabel(entityType: string): string {
   return ENTITY_LABELS[entityType] ?? entityType.replace(/_/g, ' ');
@@ -313,6 +319,18 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
     const parts: string[] = [];
     if (candidate.origin.channel === 'extraction') {
       parts.push(`Extracted by ${candidate.origin.clientId}`);
+    } else if (candidate.origin.channel === 'client') {
+      // ADR 0023: "From the client", with the name the FIRM gave at
+      // invitation — the server reads it from the binding, never a token.
+      parts.push(
+        candidate.client === undefined
+          ? 'From the client'
+          : `From the client, ${candidate.client.displayName}`,
+      );
+      if (candidate.question !== undefined) {
+        parts.push(candidate.question.sectionTitle);
+        parts.push(`for ${ROLE_LABELS[candidate.question.filingRole]}`);
+      }
     } else {
       parts.push('Proposed by an agent');
     }
@@ -331,10 +349,10 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
       <Heading level={1}>Extraction review</Heading>
       <Text style={[styles.body, muted]}>
         Nothing extracted enters the case until a person confirms it. Each record below was read
-        from a document or proposed by an agent — check it against its source, then accept it,
-        correct it, or reject it. Accepted records land in the case marked as machine-read and
-        confirmed by you; rejections and corrections are kept, because they are how extraction gets
-        better.
+        from a document, proposed by an agent, or answered by the client in their portal — check it
+        against its source, then accept it, correct it, or reject it. Accepted records land in the
+        case marked with where they came from and confirmed by you; rejections and corrections are
+        kept, because they are how extraction gets better.
       </Text>
       {!mayReview ? (
         <Text style={[styles.body, muted]}>
@@ -380,6 +398,9 @@ export function ExtractionReview({ caseId }: { readonly caseId: string }) {
                   ) : null}
                 </View>
                 <Text style={[styles.cardMeta, muted]}>{sourceLine(candidate)}</Text>
+                {candidate.question !== undefined ? (
+                  <Text style={[styles.body, ink]}>{`Question: “${candidate.question.text}”`}</Text>
+                ) : null}
 
                 {editing ? (
                   <View style={styles.fields}>

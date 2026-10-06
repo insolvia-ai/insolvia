@@ -9,8 +9,9 @@ re-deriving it:
 
 1. Every populated field carries a provenance entry. A record with a value and
    no entry for it is rejected — otherwise rule 2 is evaded by omitting the key.
-2. A field whose source is machine-supplied and whose ``confirmed_at`` is null
-   cannot exist on a case record. Not "should not": the write is rejected.
+2. A field whose source is machine-supplied — or a debtor's portal answer,
+   ``client_answered`` — and whose ``confirmed_at`` is null cannot exist on a
+   case record. Not "should not": the write is rejected.
 
 Together those make "nothing extracted enters the case until a human confirms
 it" a property of the store rather than a promise about the UI.
@@ -58,8 +59,30 @@ from insolvia_core.errors import FieldValidationError
 # with `client_id` naming the record it came from. Never a live reference: a
 # filed petition must not change because the client record did, and
 # divergence is computed on read (`firm_clients.differs_from_client`).
-SOURCES: Final = ("staff_typed", "ai_extracted", "imported", "library", "client")
+#
+# `client_answered` is the sixth (ADR 0023 PR 4 / #363): a value the DEBTOR
+# gave through the client portal's questionnaire, which a person at the firm
+# then accepted through the review queue. Not `client`, which ADR 0022 had
+# already given a different meaning — a copy of the firm's own directory
+# record, chosen by staff and outside the confirmation rule. An answer is
+# the opposite on both counts: the debtor's own say-so, and subject to the
+# confirmation rule exactly as `ai_extracted` is. Overloading one name with
+# both would lose the one distinction an audit of a petition needs ("did the
+# firm copy this, or did the debtor tell us?"). `extraction_id` names the
+# candidate it was accepted from; that candidate names the question.
+SOURCES: Final = (
+    "staff_typed",
+    "ai_extracted",
+    "imported",
+    "library",
+    "client",
+    "client_answered",
+)
 MACHINE_SOURCES: Final = frozenset({"ai_extracted", "imported"})
+# Every source invariant 2 covers: the machine-supplied ones, and a debtor's
+# answer — a value that reaches a case record only through a person's
+# confirmation (ADR 0023 § Writes).
+CONFIRMATION_REQUIRED: Final = MACHINE_SOURCES | {"client_answered"}
 
 # A dotted field path, with embedded list elements addressed by their id in
 # brackets: `name.surname`, `other_names_used[3f9c…].surname`.
@@ -237,7 +260,9 @@ def _parse_entry(
     # Both halves are required: `confirmed_at` is the moment and `confirmed_by`
     # is the person, and a confirmation with no one attached to it cannot be
     # audited, which is the entire point of recording it.
-    if source in MACHINE_SOURCES and (confirmed_at is None or confirmed_by is None):
+    if source in CONFIRMATION_REQUIRED and (
+        confirmed_at is None or confirmed_by is None
+    ):
         errors[f"provenance.{path}"] = (
             f"A {source} value must be confirmed by a person before it can be stored."
         )
@@ -483,6 +508,57 @@ def require_provenance(
                 for path in missing
             }
         )
+
+
+# Sources the SERVER mints and a whole-record save may only KEEP: `client`
+# (only the copy routes write it — debtors.require_client_provenance_kept)
+# and `client_answered` (only the review queue's acceptance of a portal
+# answer writes it, ADR 0023). A staff save that claimed either on a value
+# would be a person attributing their own typing to someone else.
+KEEP_ONLY_SOURCES: Final = frozenset({"client", "client_answered"})
+
+_KEEP_ONLY_MESSAGES: Final = {
+    "client": (
+        "Only a value copied from the client, and unchanged since, "
+        "can say it came from the client."
+    ),
+    "client_answered": (
+        "Only a value accepted from the client's own answer, and unchanged "
+        "since, can say the client answered it."
+    ),
+}
+
+
+def require_server_sources_kept(
+    body: Mapping[str, object],
+    entries: Mapping[str, ProvenanceEntry],
+    *,
+    stored_body: Mapping[str, object] | None,
+    stored_entries: Mapping[str, ProvenanceEntry] | None,
+) -> None:
+    """A save may KEEP a `KEEP_ONLY_SOURCES` entry, never mint one.
+
+    Legitimate in exactly one shape: the entry the stored record already
+    carries at that path, on the value that path already holds — an autosave
+    echoing back a field nobody touched (the api-client's
+    `revisedProvenance`). Anything else is refused, not silently downgraded:
+    a caller that believes it saved one thing must not find another stored.
+    Entries at paths `body` leaves empty describe nothing and are not
+    checked. `stored_body` None is a create, where nothing can be kept."""
+    populated = set(populated_paths(body))
+    errors: dict[str, str] = {}
+    for path, entry in entries.items():
+        if entry.source not in KEEP_ONLY_SOURCES or path not in populated:
+            continue
+        kept = stored_entries.get(path) if stored_entries is not None else None
+        if (
+            stored_body is None
+            or kept != entry
+            or value_at(stored_body, path) != value_at(body, path)
+        ):
+            errors[f"provenance.{path}"] = _KEEP_ONLY_MESSAGES[entry.source]
+    if errors:
+        raise FieldValidationError(errors)
 
 
 def provenance_json(

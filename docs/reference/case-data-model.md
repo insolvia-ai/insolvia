@@ -588,7 +588,7 @@ per-field, carried on every record as a map keyed by field path:
 ```
 provenance: {
   "<field_path>": {
-    source: staff_typed | ai_extracted | imported | library | client,
+    source: staff_typed | ai_extracted | imported | library | client | client_answered,
     confirmed_by, confirmed_at,
     document_id, locator,
     extraction_id,          // the extraction_candidate.id this value came from
@@ -606,6 +606,19 @@ directory when the case was opened for that client, or when the client was
 linked to the role. A copy, never a live link — a filed petition must not
 change because the client record did — and, like `library`, outside the
 confirmation rule, because a person chose the client.
+
+`client_answered` ([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md),
+issue #363) is the debtor's own say-so: a value they gave through the
+client portal's questionnaire, which a person at the firm accepted through
+the review queue. It is **not** `client`, though the ADR first called it
+that: `client` already meant "copied from the firm's directory, chosen by
+staff, no confirmation", and an answer is the opposite on both counts —
+so it gets its own name and sits **under the confirmation rule** below,
+with `ai_extracted` and `imported`. `extraction_id` names the candidate it
+was accepted from, and the candidate names the question. Like `client`, it
+is **keep-only** on a whole-record save: a save may echo the entry on a
+value nobody touched and is refused if it claims one
+(`provenance.require_server_sources_kept`).
 
 `copied_from_case_id` is not a source: a record copied into a new case
 (see "The lifecycle") keeps the entry it had — a value a person confirmed
@@ -637,7 +650,8 @@ every write path inherits them rather than each endpoint remembering:**
 
 `imported` is subject to the same confirmation requirement as `ai_extracted`.
 Machine-supplied is machine-supplied; the source system does not change who is
-signing the form.
+signing the form. So is `client_answered`: nothing a debtor types is case
+data until someone at the firm confirms it.
 
 Together those make "nothing extracted enters the case until a human confirms
 it" a property of the store rather than a promise about the UI. Unconfirmed
@@ -647,7 +661,7 @@ output therefore lives outside the case entirely:
 extraction_candidate {
   id, case_id, kind, payload,                  // payload mirrors its target entity
   document_id,                                 // optional — an MCP proposal has no source document
-  origin: { channel: mcp | extraction,         // which surface wrote this row, and as whom —
+  origin: { channel: mcp | extraction | client, // which surface wrote this row, and as whom —
             client_id, subject },              // from the verified token, never an argument
   confidence, locator,
   status: pending | accepted | corrected | rejected | withdrawn,
@@ -675,6 +689,61 @@ admission rule; issues 8.7-8.9).
 Corrections and rejections are retained after review — and so are
 withdrawals. They are the only measurement of extraction (and agent) quality
 we will ever get, and deleting them on accept throws that away.
+
+### Answers from the client portal
+
+The third writer ([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md)
+PR 4, issue #363) is the debtor, answering the portal questionnaire. Its
+rows are the same `extraction_candidate`, in the same queue:
+
+- `origin = {channel: client, client_id: <the portal app client>, subject}`,
+  from the verified portal token.
+- `locator = {kind: question, section_id, question_id, filing_role}` — a
+  QUESTION, not a page. `section_id` is one of
+  `insolvia_core.questionnaire`'s section ids; `question_id` one of
+  `insolvia_core.questions`' (both are stable contracts: added to, never
+  renamed); `filing_role` is who the answer is for, bounded by the
+  binding's roles. The locator stays on the candidate; it is not copied
+  into provenance, whose `locator` means a place on a page.
+- `payload` is a fragment of the target's own body shape, built from the
+  question's inputs and validated by the target's own parse function. A
+  question names its target: `debtors` (the debtor's own fields — name,
+  other names, both addresses, phone, mobile, email) or one generic
+  collection (one new record per answer: an asset, a creditor, an
+  employment, an expense, a contract or lease).
+- **Edit-while-pending.** The client may change (`PUT`) or withdraw
+  (`DELETE`) their own `pending` row; once staff have acted, the row is
+  immutable and a change is a new candidate. That is also the
+  questionnaire's resume state — there is no second draft store. A
+  non-repeating question takes one pending answer per client and role at a
+  time; a client holds at most 200 pending answers.
+
+**Acceptance.** A record answer is accepted exactly as an extracted record
+is: a new record, its fields `client_answered` with the confirmation pair
+and `extraction_id`, `staff_typed` where the reviewer corrected them. An
+employment's `debtor_id` and an expense's `household_id` are filled from
+the case at acceptance (the answering debtor; the main household), on the
+staff side — the portal never reads case records, so it knows no record
+ids. A **debtor answer is merged into that debtor's record**, which exists
+from the case's opening (ADR 0022): the answered paths are minted
+`client_answered` (or `staff_typed` where corrected), every other field
+keeps its entry, and an appended other name is added by its id rather than
+replacing the list. A Debtor 2 not yet linked is a 409.
+
+**What the client reads.** Only their own rows (`origin.subject == self`),
+in sections the firm still shows, as `{questionId, sectionId, filingRole,
+value, status}` — never the corrected payload, the reviewer or the
+resulting record id. A section switched off stops taking answers and hides
+its answers from the client; staff keep reviewing them.
+
+**What the first catalogue leaves out**, on purpose: the tax id (a sealed
+item — a candidate payload is no place for the digits); anything that is a
+second record's meaning (a claim needs its creditor, so `debts.creditor`
+asks for the creditor alone, not the amount or class); and anything that
+is the attorney's judgement rather than the debtor's fact (venue, credit
+counselling status, exemptions, intentions, priority, the means test).
+The SOFA, Schedule I's monthly figures and the household and dependents
+are the next to add.
 
 ## Documents and locators
 

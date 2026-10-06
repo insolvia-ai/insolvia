@@ -49,6 +49,7 @@ from insolvia_core.case_entities import (
     entity_json,
     parse_entity,
     replace_entity,
+    require_server_sources_kept,
 )
 from insolvia_core.cases import Case, is_filed
 from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
@@ -184,6 +185,9 @@ def create_entity_route(case_id: str, collection: str) -> ResponseReturnValue:
     # reached the case.
     kind = _kind(collection)
     draft = parse_entity(kind, _json_body())
+    # A new record keeps nothing, so it can claim no server-minted source —
+    # `client_answered` comes only from accepting a portal answer.
+    require_server_sources_kept(draft, None)
     case = _reachable_case_or_404(accessor, case_id, "case.update")
     _refuse_amended_before_filed(case, draft)
 
@@ -246,6 +250,7 @@ def put_entity_route(
     _refuse_amended_before_filed(case, draft)
 
     stored = _entity_or_404(case_id, kind, entity_id)
+    require_server_sources_kept(draft, stored)
     if "amended" not in payload:
         # `amended` is not body data, so "whole, not partial" does not reach
         # it: a PUT that says nothing about it leaves the stored flag alone.

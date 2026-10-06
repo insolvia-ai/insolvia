@@ -858,11 +858,97 @@ export interface SaveFirmQuestionnaireRequest {
   }[];
 }
 
-/** One section as the CLIENT reads it — title and the instructions in force. */
+/** One section as the CLIENT reads it — title, the instructions in force,
+ * and (ADR 0023 PR 4) its questions in order. */
 export interface PortalQuestionnaireSection {
   readonly id: QuestionnaireSectionId;
   readonly title: string;
   readonly instructions: string;
+  readonly questions: readonly PortalQuestion[];
+}
+
+/**
+ * What one answer box holds — `insolvia_core.questions.INPUT_TYPES`.
+ * `money` is a decimal string (`"1200.00"`), never a number; `whole_number`
+ * is a JSON integer; `date` is `YYYY-MM-DD`; `address` is a
+ * {@link PortalAnswerAddress}.
+ */
+export const PORTAL_INPUT_TYPES = [
+  'text',
+  'long_text',
+  'date',
+  'money',
+  'whole_number',
+  'address',
+] as const;
+
+/** See {@link PORTAL_INPUT_TYPES}. */
+export type PortalInputType = (typeof PORTAL_INPUT_TYPES)[number];
+
+/** An `address` input's value. Every member optional, as on every form. */
+export interface PortalAnswerAddress {
+  readonly line1?: string;
+  readonly line2?: string;
+  readonly city?: string;
+  readonly state?: string;
+  readonly postal_code?: string;
+  readonly county?: string;
+}
+
+/** One box of a question. `key` is the key in the answer's `value`. */
+export interface PortalQuestionInput {
+  readonly key: string;
+  readonly label: string;
+  readonly type: PortalInputType;
+  readonly required: boolean;
+  readonly help?: string;
+}
+
+/**
+ * One question as the portal renders it (`insolvia_core.questions`). Where
+ * the answer lands in the case is the server's business and is not sent.
+ * `repeats`: many answers (each vehicle), else one live answer at a time —
+ * a second while the first is pending is a 409; change the first instead.
+ * `perDebtor`: answered for a filing role.
+ */
+export interface PortalQuestion {
+  readonly id: string;
+  readonly text: string;
+  readonly help?: string;
+  readonly repeats: boolean;
+  readonly perDebtor: boolean;
+  readonly inputs: readonly PortalQuestionInput[];
+}
+
+/** An answer's value: input key → that input's value. */
+export type PortalAnswerValue = Readonly<Record<string, unknown>>;
+
+/**
+ * A client's own answer, as `/v1/portal/answers` returns it — the value
+ * they gave and where it stands. An answer is a candidate in the firm's
+ * review queue: `pending` until a person at the firm accepts (`accepted` /
+ * `corrected`) or rejects it, or the client withdraws it. Only `pending`
+ * may be changed or withdrawn.
+ */
+export interface PortalAnswer {
+  readonly id: string;
+  readonly questionId: string;
+  readonly sectionId: QuestionnaireSectionId;
+  readonly filingRole: ClientRole;
+  readonly value: PortalAnswerValue;
+  readonly status: CandidateStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * `POST /v1/portal/answers`. `filingRole` may be left out by a client who
+ * holds one role; a client holding both must say which.
+ */
+export interface CreatePortalAnswerRequest {
+  readonly questionId: string;
+  readonly filingRole?: ClientRole | undefined;
+  readonly value: PortalAnswerValue;
 }
 
 /**
@@ -1964,6 +2050,23 @@ export interface ExtractionCandidate {
   readonly correctedPayload?: Readonly<Record<string, unknown>>;
   /** The case record acceptance created. */
   readonly resultingRecordId?: string;
+  /**
+   * For a client's portal answer (origin channel `client`): the question it
+   * answers, in the words the client read, and the debtor it is for.
+   */
+  readonly question?: CandidateQuestion;
+  /** For a client's portal answer: who the FIRM says gave it — the name
+   * on the invitation, never anything the client's token says. */
+  readonly client?: { readonly displayName: string };
+}
+
+/** The question a client-answered candidate answers. */
+export interface CandidateQuestion {
+  readonly id: string;
+  readonly sectionId: QuestionnaireSectionId;
+  readonly sectionTitle: string;
+  readonly text: string;
+  readonly filingRole: ClientRole;
 }
 
 /** What a reviewer may do with one pending candidate. */
@@ -2399,6 +2502,14 @@ export interface TaxIdEntry {
  * directory when the case was opened for that client, or when the client was
  * linked to the role — a human's choice, like `library`, so no confirmation.
  * See {@link ProvenanceEntry.client_id}.
+ *
+ * `client_answered` (ADR 0023 PR 4) is a value the DEBTOR gave through the
+ * client portal, which a person at the firm accepted through the review
+ * queue — confirmed, like `ai_extracted`, and named apart from `client`
+ * because "the firm copied this" and "the debtor told us" are different
+ * facts on a petition. Only the review queue mints it; a save may echo it
+ * back on an untouched value ({@link revisedProvenance} does) and never
+ * claim it.
  */
 export const PROVENANCE_SOURCES = [
   'staff_typed',
@@ -2406,6 +2517,7 @@ export const PROVENANCE_SOURCES = [
   'imported',
   'library',
   'client',
+  'client_answered',
 ] as const;
 
 /** Who supplied a value. See {@link PROVENANCE_SOURCES}. */

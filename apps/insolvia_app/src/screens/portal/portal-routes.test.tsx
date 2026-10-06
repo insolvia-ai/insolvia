@@ -54,11 +54,13 @@ const PORTAL_QUESTIONNAIRE = {
       id: 'personal_information',
       title: 'Personal information',
       instructions: 'Tell us who you are and where you live.',
+      questions: [],
     },
     {
       id: 'debts',
       title: 'Debts',
       instructions: 'Bring your last statement from each lender.',
+      questions: [],
     },
   ],
 };
@@ -82,12 +84,21 @@ describe('the portal routes', () => {
     // The structural half of "a second SessionProvider": every file under the
     // portal's routes and screens reads the PORTAL session only.
     const files = [
-      ...['_layout.tsx', 'index.tsx', 'sign-in.tsx', path.join('auth', 'callback.tsx')].map((f) =>
-        path.join(APP_DIR, 'portal', f),
-      ),
-      ...['home.tsx', 'sign-in.tsx', 'auth-callback.tsx', 'questionnaire-overview.tsx'].map((f) =>
-        path.join(__dirname, f),
-      ),
+      ...[
+        '_layout.tsx',
+        'index.tsx',
+        'sign-in.tsx',
+        'questionnaire.tsx',
+        path.join('auth', 'callback.tsx'),
+      ].map((f) => path.join(APP_DIR, 'portal', f)),
+      ...[
+        'home.tsx',
+        'sign-in.tsx',
+        'auth-callback.tsx',
+        'questionnaire-overview.tsx',
+        'questionnaire.tsx',
+        'answer-form.ts',
+      ].map((f) => path.join(__dirname, f)),
     ];
     for (const file of files) {
       const source = readFileSync(file, 'utf8');

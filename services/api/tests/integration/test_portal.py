@@ -221,3 +221,114 @@ def test_the_questionnaire_routes_keep_the_two_principals_apart(
 ):
     as_client.get("/v1/firm/questionnaire", expect=401)
     admin.get("/v1/portal/questionnaire", expect=401)
+
+
+# ── The answers (ADR 0023 PR 4 / #363) ──────────────────────────
+#
+# The seeded client is bound to a FIXTURE case — the only case a client
+# exists for — so this writes nothing the suite cannot take back: it answers
+# a RECORD question (a new row, not a change to the fixture's debtor),
+# accepts it as the firm's admin, and deletes the record it made before it
+# returns. The candidate rows themselves stay, `accepted` and `withdrawn`:
+# the queue is retained by design (case-data-model.md — corrections,
+# rejections and withdrawals are the quality signal), and has no delete.
+
+# Record questions, in preference order, with an answer that describes
+# nobody, and the collection each one's record lands in.
+_RECORD_ANSWERS = (
+    ("other.lease", "contract_leases", {"counterparty_name": "Integration Lessor"}),
+    ("debts.creditor", "creditors", {"name": "Integration Creditor"}),
+    ("property.bank_account", "assets", {"description": "Integration Bank, checking"}),
+)
+
+
+def _answerable(as_client: Api) -> tuple[str, str, dict[str, Any]]:
+    asked = {
+        question["id"]
+        for section in as_client.get("/v1/portal/questionnaire")["sections"]
+        for question in section["questions"]
+    }
+    for question_id, collection, value in _RECORD_ANSWERS:
+        if question_id in asked:
+            return question_id, collection, value
+    pytest.skip("the firm shows none of the record questions this test answers")
+
+
+def test_an_answer_reaches_the_case_only_through_the_review_queue(
+    admin: Api, as_client: Api, seeded_client: dict[str, Any]
+):
+    """The ADR's done-when for PR 4: the client answers; the answer is a
+    pending candidate and nothing in the case; staff accept it through the
+    queue; the record carries `client_answered` provenance."""
+    case_id = _fixture_case_id(admin, str(seeded_client["email"]))
+    question_id, collection, value = _answerable(as_client)
+    listing = f"/v1/cases/{case_id}/{collection}"
+    before = {r["id"] for r in admin.get(listing)[collection]}
+
+    answer = as_client.post(
+        "/v1/portal/answers", {"questionId": question_id, "value": value}
+    )
+    record_id: str | None = None
+    try:
+        assert answer["status"] == "pending"
+        # Nothing reached the case.
+        assert {r["id"] for r in admin.get(listing)[collection]} == before
+        # Staff see it, from the client, with its question.
+        queue = admin.get(
+            f"/v1/cases/{case_id}/extraction/candidates", status="pending"
+        )["candidates"]
+        [row] = [c for c in queue if c["id"] == answer["id"]]
+        assert row["origin"]["channel"] == "client"
+        assert row["question"]["id"] == question_id
+        assert row["client"]["displayName"] == seeded_client["displayName"]
+
+        reviewed = admin.post(
+            f"/v1/cases/{case_id}/extraction/candidates/{answer['id']}/review",
+            {"action": "accept"},
+            expect=200,
+        )
+        record = reviewed["record"]
+        record_id = str(record["id"])
+        entries = list(record["provenance"].values())
+        assert {entry["source"] for entry in entries} == {"client_answered"}
+        assert all(entry["extraction_id"] == answer["id"] for entry in entries)
+        assert all(entry["confirmed_by"] and entry["confirmed_at"] for entry in entries)
+        # The client sees where it stands, and can no longer change it.
+        mine = {
+            a["id"]: a["status"] for a in as_client.get("/v1/portal/answers")["answers"]
+        }
+        assert mine[answer["id"]] == "accepted"
+        as_client.put(
+            f"/v1/portal/answers/{answer['id']}", {"value": value}, expect=409
+        )
+    finally:
+        if record_id is not None:
+            admin.delete(f"{listing}/{record_id}", expect=(200, 204))
+        else:
+            as_client.delete(f"/v1/portal/answers/{answer['id']}", expect=(200, 409))
+
+
+def test_a_pending_answer_can_be_changed_and_withdrawn(as_client: Api):
+    question_id, _, value = _answerable(as_client)
+    key = next(iter(value))
+    answer = as_client.post(
+        "/v1/portal/answers", {"questionId": question_id, "value": value}
+    )
+
+    changed = as_client.put(
+        f"/v1/portal/answers/{answer['id']}", {"value": {key: "Changed answer"}}
+    )
+    withdrawn = as_client.delete(f"/v1/portal/answers/{answer['id']}", expect=200)
+
+    assert changed["status"] == "pending"
+    assert changed["value"][key] == "Changed answer"
+    assert withdrawn["status"] == "withdrawn"
+
+
+def test_the_answer_routes_keep_the_two_principals_apart(admin: Api):
+    admin.get("/v1/portal/answers", expect=401)
+    admin.post(
+        "/v1/portal/answers",
+        {"questionId": "other.lease", "value": {"counterparty_name": "X"}},
+        expect=401,
+    )

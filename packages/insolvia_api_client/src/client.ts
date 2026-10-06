@@ -15,6 +15,7 @@ import {
   PLAN_CLASSES,
   PRESUMPTION_EXEMPTIONS,
   PROSPECT_STAGES,
+  PORTAL_INPUT_TYPES,
   QUESTIONNAIRE_SECTION_IDS,
   SIGNATURE_PAGES_MODES,
   addFirmUserRequestToJson,
@@ -61,6 +62,11 @@ import type {
   FirmQuestionnaireSection,
   PortalQuestionnaire,
   PortalQuestionnaireSection,
+  PortalQuestion,
+  PortalAnswer,
+  PortalAnswerValue,
+  CreatePortalAnswerRequest,
+  CandidateQuestion,
   QuestionnaireSectionId,
   SaveFirmQuestionnaireRequest,
   ProspectStage,
@@ -1841,9 +1847,82 @@ export class InsolviaApiClient {
           id: requireQuestionnaireSectionId(section, 'id'),
           title: requireString(section, 'title'),
           instructions: requireString(section, 'instructions'),
+          questions: requireArrayOf(section, 'questions', 'PortalQuestion', portalQuestionFromJson),
         }),
       ),
     };
+  }
+
+  /**
+   * `GET /v1/portal/answers` — the CLIENT's own answers, every status: the
+   * questionnaire's resume state (ADR 0023 PR 4). Only this client's, and
+   * only in sections the firm still shows. Portal token, like
+   * {@link getPortalMe}.
+   */
+  async listPortalAnswers(): Promise<readonly PortalAnswer[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/answers`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'answers', 'PortalAnswer', portalAnswerFromJson);
+  }
+
+  /**
+   * `POST /v1/portal/answers` — answer one question. The answer is a
+   * candidate in the firm's review queue, never case data. Throws
+   * {@link ApiValidationException} on a 400, keyed `value.<input key>`,
+   * `questionId` (not in this client's questionnaire — including a section
+   * the firm switched off) or `filingRole`; a plain {@link ApiException}
+   * with 409 when a one-answer question already has a pending answer
+   * (change that one with {@link updatePortalAnswer}).
+   */
+  async createPortalAnswer(request: CreatePortalAnswerRequest): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/answers`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        questionId: request.questionId,
+        ...(request.filingRole === undefined ? {} : { filingRole: request.filingRole }),
+        value: request.value,
+      }),
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `PUT /v1/portal/answers/{answerId}` — change a PENDING answer's value.
+   * 409 once the firm has reviewed it (a change is then a new answer); 404
+   * for anything that is not this client's own.
+   */
+  async updatePortalAnswer(answerId: string, value: PortalAnswerValue): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalAnswerUrl(answerId), {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `DELETE /v1/portal/answers/{answerId}` — withdraw a PENDING answer. The
+   * row is kept, `withdrawn`; 409 once reviewed, 404 if not this client's.
+   */
+  async withdrawPortalAnswer(answerId: string): Promise<PortalAnswer> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#portalAnswerUrl(answerId), {
+      method: 'DELETE',
+      headers,
+    });
+    return portalAnswerFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `/v1/portal/answers/{answerId}`, with the id encoded once. */
+  #portalAnswerUrl(answerId: string): string {
+    return `${this.#baseUrl}/v1/portal/answers/${encodeURIComponent(answerId)}`;
   }
 
   /** `/v1/cases/{caseId}/portal/clients/{subject}`, each segment encoded once. */
@@ -3099,7 +3178,19 @@ function candidateFromJson(response: DecodedResponse): ExtractionCandidate {
   if (response.json.correctedPayload !== undefined) {
     correctedPayload = childObject(response, 'correctedPayload').json;
   }
+  // A client's portal answer (ADR 0023 PR 4) names its question and who
+  // the firm says gave it.
+  const question =
+    response.json.question === undefined
+      ? undefined
+      : candidateQuestionFromJson(childObject(response, 'question'));
+  const client =
+    response.json.client === undefined
+      ? undefined
+      : { displayName: requireString(childObject(response, 'client'), 'displayName') };
   return {
+    ...(question === undefined ? {} : { question }),
+    ...(client === undefined ? {} : { client }),
     id: requireString(response, 'id'),
     entityType: requireString(response, 'entityType'),
     status: requireCandidateStatus(response, 'status'),
@@ -4470,6 +4561,54 @@ function requireClientRoles(response: DecodedResponse, key: string): readonly Cl
     throw malformedField(response, key, 'ClientRole[] (non-empty)');
   }
   return roles as readonly ClientRole[];
+}
+
+function requireClientRole(response: DecodedResponse, key: string): ClientRole {
+  return requireChoice(response, key, CLIENT_ROLES);
+}
+
+function portalQuestionFromJson(response: DecodedResponse): PortalQuestion {
+  const help = optionalString(response, 'help');
+  return {
+    id: requireString(response, 'id'),
+    text: requireString(response, 'text'),
+    ...(help === undefined ? {} : { help }),
+    repeats: requireBoolean(response, 'repeats'),
+    perDebtor: requireBoolean(response, 'perDebtor'),
+    inputs: requireArrayOf(response, 'inputs', 'PortalQuestionInput', (input) => {
+      const inputHelp = optionalString(input, 'help');
+      return {
+        key: requireString(input, 'key'),
+        label: requireString(input, 'label'),
+        type: requireChoice(input, 'type', PORTAL_INPUT_TYPES),
+        required: requireBoolean(input, 'required'),
+        ...(inputHelp === undefined ? {} : { help: inputHelp }),
+      };
+    }),
+  };
+}
+
+function portalAnswerFromJson(response: DecodedResponse): PortalAnswer {
+  return {
+    id: requireString(response, 'id'),
+    questionId: requireString(response, 'questionId'),
+    sectionId: requireQuestionnaireSectionId(response, 'sectionId'),
+    filingRole: requireClientRole(response, 'filingRole'),
+    value: childObject(response, 'value').json,
+    status: requireCandidateStatus(response, 'status'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+  };
+}
+
+function candidateQuestionFromJson(response: DecodedResponse): CandidateQuestion {
+  return {
+    id: requireString(response, 'id'),
+    sectionId: requireQuestionnaireSectionId(response, 'sectionId'),
+    sectionTitle: requireString(response, 'sectionTitle'),
+    text: requireString(response, 'text'),
+    filingRole: requireClientRole(response, 'filingRole'),
+  };
 }
 
 function portalClientFromJson(response: DecodedResponse): PortalClient {

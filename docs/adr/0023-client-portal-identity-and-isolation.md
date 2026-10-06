@@ -94,11 +94,11 @@ otherwise:
    every `/v1/portal/` route uses `@require_client` and no other route
    accepts the portal client id.
 5. **Writes: candidates through the existing seam, provenance source
-   `client`.** Every answer is `create_candidate` with
+   `client_answered`.** Every answer is `create_candidate` with
    `origin = {channel: "client", client_id, subject}` from the verified
    token (`ORIGIN_CHANNELS` gains `client`), validated by the same parse
    functions, reviewed through the same `extraction_review` routes.
-   Acceptance mints provenance `source: client`, under the same
+   Acceptance mints provenance `source: client_answered`, under the same
    unconfirmed-cannot-exist invariant as `ai_extracted` and `imported` (a
    `case-data-model.md` amendment in #363's PR). The client may edit or
    withdraw a candidate **while pending** (the proposer rule `withdraw`
@@ -223,8 +223,15 @@ every service (`insolvia_core.access_log`), the client included.
 | 1 | **infra+core+api (#361, build half): the portal client and the `client` principal.** Portal app client in `modules/auth` (three envs), SSM/env plumbing, verify profile + `@require_client` + `ClientAccessor`, the binding store, invitation create/revoke/resend routes, `client_portal` feature, `ORIGIN_CHANNELS += client`, access-log actions, mailer invite message, `GET /v1/portal/me`, the disjointness architecture test, seeded clients, the binding's `roles` and one-active-binding-per-role rule. | M | On dev and staging: the seeded client's portal token reaches `/v1/portal/me` and 401s on `/v1/me`; a staff token 401s on `/v1/portal/me`; a revoked binding 403s with a `denied` row. |
 | 2 | **app (#361, build half): the `(portal)` route group.** Portal sign-in, callback, memory-only session, guard, a landing screen with the case's public status; firm-side "Invite client" panel on the case overview behind `client_portal` (a joint case offers each debtor, or one for both); an e2e flow as the seeded client. | M | Staging e2e: the seeded client signs in and sees their firm's name and the case's stage, nothing else. |
 | 3 | **core+api+app (#362): firm-configurable questionnaire.** Section catalogue (personal information always on; property, debts, income, expenses, other switchable), firm-level config with instructions and reset-to-defaults, staff UI on the firm screen, `GET /v1/portal/questionnaire`. | M | A staging firm switches a section off and its client no longer sees it, while staff still can. |
-| 4 | **core+api+app (#363): the questionnaire, writing candidates.** Question-to-field catalogue, `POST/PUT/DELETE /v1/portal/answers` (edit-while-pending), the review queue's client origin and question, acceptance minting `source: client`, `case-data-model.md` amended. | L | Staging: an invited client completes the questionnaire and a paralegal confirms answers through the review queue; no path from the client into case data skips review. |
+| 4 | **core+api+app (#363): the questionnaire, writing candidates.** Question-to-field catalogue, `POST/PUT/DELETE /v1/portal/answers` (edit-while-pending), the review queue's client origin and question, acceptance minting `source: client_answered`, `case-data-model.md` amended. | L | Staging: an invited client completes the questionnaire and a paralegal confirms answers through the review queue; no path from the client into case data skips review. |
 | 5 | **core+api+app (#364): document request checklists.** Firm-defined lists with the shipped default, per-case request items with status, `POST /v1/portal/documents` against a request, `complete` satisfies the request, auto-extraction skipped for the `client` channel, progress on the case overview. | M | Staging: a case shows requested documents arrived vs outstanding, and a client upload satisfies its request. |
+
+**2026-10-06 — the source is `client_answered` (maintainer).** This ADR
+first named it `client`, but ADR 0022, accepted after it, gave `client` to a
+value copied from the firm's client directory — a source outside the
+confirmation rule. An accepted answer is the opposite, so it takes its own
+name under the rule; the channel stays `client`. The shapes are
+[`case-data-model.md`](../reference/case-data-model.md)'s answers section.
 
 **Risks.** SES sandbox and the ZDR gate bound real use. One invitation
 template serves two audiences. ESSENTIALS has no threat protection for a
