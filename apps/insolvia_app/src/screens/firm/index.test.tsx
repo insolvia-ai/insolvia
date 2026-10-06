@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -102,6 +102,20 @@ const DEFAULT_QUESTIONNAIRE = {
   })),
 };
 
+/** Shaped as core/document_requests.py::checklist_json answers for a firm on the default. */
+const CHECKLIST_ITEM = {
+  title: 'Bank statements',
+  kind: 'bank_statement',
+  description: 'Six months.',
+};
+const DEFAULT_CHECKLIST = {
+  isDefault: true,
+  updatedAt: null,
+  updatedBy: null,
+  items: [CHECKLIST_ITEM],
+  defaultItems: [CHECKLIST_ITEM],
+};
+
 /**
  * `/firm` — the firm's own people.
  *
@@ -132,6 +146,7 @@ describe('the firm screen', () => {
       // BEFORE the spread, so a test's own questionnaire handler replaces
       // this value while keeping its place ahead of the bare /v1/firm key.
       '/v1/firm/questionnaire': () => jsonResponse(200, DEFAULT_QUESTIONNAIRE),
+      '/v1/firm/document-checklist': () => jsonResponse(200, DEFAULT_CHECKLIST),
       ...handlers,
       '/v1/firm': () => jsonResponse(200, FIRM_RECORD),
     });
@@ -490,6 +505,54 @@ describe('the firm screen', () => {
       expect(await screen.findByText('Default instructions for debts.')).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Save questionnaire' })).toBeNull();
       expect(screen.queryByLabelText('Instructions for your client')).toBeNull();
+    });
+  });
+
+  describe('the document checklist (ADR 0023 PR 5)', () => {
+    it('lists the default checklist and saves the whole list with an added entry', async () => {
+      const fetchMock = signedIn({
+        '/v1/me': () => jsonResponse(200, membership()),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+      const user = userEvent.setup();
+
+      expect(await screen.findByRole('heading', { name: 'Document checklist' })).toBeTruthy();
+      expect(await screen.findByText('Your firm uses the default checklist.')).toBeTruthy();
+      expect(screen.getByDisplayValue('Bank statements')).toBeTruthy();
+
+      await user.press(screen.getByRole('button', { name: 'Add a document' }));
+      const titles = screen.getAllByLabelText('Document');
+      await user.type(titles[titles.length - 1]!, 'Lease');
+      await user.press(screen.getByRole('button', { name: 'Save checklist' }));
+
+      await waitFor(() => {
+        const put = fetchMock.mock.calls.find(
+          ([url, init]) => url.endsWith('/v1/firm/document-checklist') && init?.method === 'PUT',
+        );
+        expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+          items: [
+            { title: 'Bank statements', kind: 'bank_statement', description: 'Six months.' },
+            { title: 'Lease', kind: 'other' },
+          ],
+        });
+      });
+    });
+
+    it('shows a viewer the checklist with nothing to change', async () => {
+      signedIn({
+        '/v1/me': () =>
+          jsonResponse(
+            200,
+            membership({
+              isAdmin: false,
+              permissions: { ...ALL_ADD_EDIT, firm_administration: 'view_only' },
+            }),
+          ),
+        '/v1/firm/users': () => jsonResponse(200, { users: [] }),
+      });
+
+      expect(await screen.findByRole('heading', { name: 'Bank statements' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Save checklist' })).toBeNull();
     });
   });
 });
