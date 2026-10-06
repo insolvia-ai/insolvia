@@ -26,6 +26,7 @@ from insolvia_core.cases import (
 )
 from insolvia_core.clients import CasePublicStatus, ClientBinding
 from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
+from insolvia_core.document_requests import DocumentChecklist, DocumentRequest
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
@@ -388,6 +389,26 @@ class FirmStore(Protocol):
         """Reset to defaults. True if a stored config was removed, False if
         the firm was on the defaults already — either way the firm is on the
         defaults afterwards, so a route treats both as success."""
+        ...
+
+    # ── The document request checklist (ADR 0023 PR 5 / #364) ──────
+    #
+    # The questionnaire's shape exactly: one item per firm
+    # (`document_requests.CHECKLIST_SORT_KEY`), absent is the shipped
+    # default, reset deletes.
+
+    def get_document_checklist(self, firm_id: str) -> DocumentChecklist | None:
+        """The firm's stored checklist, or None for the default. Strongly
+        consistent, for `get_questionnaire`'s reason."""
+        ...
+
+    def put_document_checklist(self, checklist: DocumentChecklist) -> None:
+        """Write the firm's whole checklist, replacing any stored one. Last
+        writer wins."""
+        ...
+
+    def delete_document_checklist(self, firm_id: str) -> bool:
+        """Reset to the default. True if a stored checklist was removed."""
         ...
 
 
@@ -1086,4 +1107,37 @@ class TaskStore(Protocol):
         """Remove the record. True if this call removed it, False if there
         was nothing there — so two concurrent deletes cannot both report
         success."""
+        ...
+
+
+class DocumentRequestStore(Protocol):
+    """Persists a case's document requests (ADR 0023 PR 5 / #364) — child
+    items of the case, beside its documents.
+
+    TaskStore's rules, for TaskStore's reasons: no accessor here (a staff
+    route resolves the case through `CaseStore.get` first, a portal route
+    takes the case id from the client's verified binding), and the case id
+    is half the key, so a request id from another case does not resolve.
+    """
+
+    def create(self, request: DocumentRequest) -> None:
+        """Store a new record; MUST raise on an existing (case, id)."""
+        ...
+
+    def get(self, case_id: str, request_id: str) -> DocumentRequest | None: ...
+
+    def update(self, request: DocumentRequest) -> DocumentRequest | None:
+        """Write `request` back over a row that still exists, or None.
+        Last writer wins: the one concurrent pair that matters — two uploads
+        completing against one request — re-reads before each write, and
+        `document_requests.satisfy` is idempotent."""
+        ...
+
+    def list_for_case(self, case_id: str) -> tuple[DocumentRequest, ...]:
+        """Every request of one case, in `document_requests.list_order`. All
+        of them — progress is computed from this list."""
+        ...
+
+    def delete(self, case_id: str, request_id: str) -> bool:
+        """Remove the record. True if this call removed it."""
         ...

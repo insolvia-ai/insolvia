@@ -148,6 +148,24 @@ STATUS_PENDING: Final = "pending"
 STATUS_STORED: Final = "stored"
 STATUSES: Final = (STATUS_PENDING, STATUS_STORED)
 
+# WHO PUT THE BYTES HERE, as a class of principal (ADR 0023 decision 6).
+#
+#   staff   a firm user, through /v1/cases/<case_id>/documents — and every
+#           row written before the portal existed, which is why a row with no
+#           `channel` attribute reads as this.
+#   client  the debtor, through /v1/portal/documents, against one of the
+#           case's document requests.
+#
+# The CHANNEL rather than the uploader's subject, because both questions it
+# answers are about the class: whether the upload is auto-extracted (a
+# client's is not until ADR 0019's ZDR launch-checklist item closes —
+# api/routes/documents.py::_trigger_extraction), and whether a client may
+# see the row at all (their own uploads only, never staff's). The same word
+# `candidates.ORIGIN_CHANNELS` uses for where a candidate came from.
+CHANNEL_STAFF: Final = "staff"
+CHANNEL_CLIENT: Final = "client"
+CHANNELS: Final = (CHANNEL_STAFF, CHANNEL_CLIENT)
+
 
 @dataclass(frozen=True)
 class StoredBlob:
@@ -240,6 +258,12 @@ class Document:
     # `confirm_document`, which is the one place that has seen the object.
     status: str = STATUS_PENDING
     etag: str | None = None
+    # Defaulted for the same reason as `status`: every row that predates the
+    # portal was a staff upload against no request. `request_id` names the
+    # case's document request (`document_requests.DocumentRequest`) this
+    # upload answers; completing the upload is what marks it received.
+    channel: str = CHANNEL_STAFF
+    request_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -339,8 +363,16 @@ def _parse_file_name(value: object, errors: dict[str, str]) -> str | None:
     return file_name
 
 
-def parse_document_upload(payload: Mapping[str, object]) -> DocumentDraft:
+def parse_document_upload(
+    payload: Mapping[str, object], *, kind: str | None = None
+) -> DocumentDraft:
     """Validate POST /v1/cases/<case_id>/documents. Unknown keys are ignored.
+
+    `kind`, when given, is the kind the SERVER decided, and any `kind` in the
+    payload is ignored: a client's upload takes its kind from the document
+    request it satisfies (ADR 0023 decision 6), never from the client's word.
+    `requestId` is not parsed here — whether it names a request of this case
+    is a store read, which is the route's.
 
     Every check here runs BEFORE an upload URL exists. That ordering is the
     point of the endpoint: once a presigned PUT is in a client's hands the only
@@ -362,7 +394,7 @@ def parse_document_upload(payload: Mapping[str, object]) -> DocumentDraft:
             "values extracted FROM a document, not the document itself."
         )
 
-    kind = _parse_kind(payload.get("kind"), errors)
+    kind = _parse_kind(payload.get("kind") if kind is None else kind, errors)
     file_name = _parse_file_name(payload.get("fileName"), errors)
     content_type = _parse_content_type(payload.get("contentType"), errors)
     byte_size = _parse_byte_size(payload.get("byteSize"), errors)
@@ -409,12 +441,19 @@ def object_key(case_id: str, document_id: str) -> str:
 
 
 def create_document(
-    draft: DocumentDraft, *, case_id: str, uploaded_by: str
+    draft: DocumentDraft,
+    *,
+    case_id: str,
+    uploaded_by: str,
+    channel: str = CHANNEL_STAFF,
+    request_id: str | None = None,
 ) -> Document:
     """Stamp a draft with server-generated identity and its storage location.
 
     `uploaded_by` comes from the verified token and `case_id` from a case the
     caller was just shown to own; neither is ever read from the request body.
+    `channel` is the route's to say — the portal's says `client` — and
+    `request_id` is one the route resolved inside this case.
 
     `uploaded_at` records when the upload was AUTHORISED, which is the only
     moment this server observes. There is no completion callback in this issue,
@@ -441,6 +480,8 @@ def create_document(
         storage_ref=object_key(case_id, document_id),
         uploaded_by=uploaded_by,
         uploaded_at=_timestamp(),
+        channel=channel,
+        request_id=request_id,
     )
 
 
@@ -516,7 +557,10 @@ def document_item(document: Document) -> dict[str, str | int]:
         "uploadedBy": document.uploaded_by,
         "uploadedAt": document.uploaded_at,
         "status": document.status,
+        "channel": document.channel,
     }
+    if document.request_id is not None:
+        item["requestId"] = document.request_id
     # Omitted rather than written empty. DynamoDB has no empty-string type
     # worth using here, and "the attribute is absent" is the honest encoding of
     # "nothing has looked at this object yet" — which is exactly what a pending
@@ -549,6 +593,10 @@ def document_from_item(item: Mapping[str, str | int]) -> Document:
             # dev table has such rows today.
             status=str(item.get("status", STATUS_PENDING)),
             etag=str(item["etag"]) if "etag" in item else None,
+            # The same reading as `status`: a row from before the portal was
+            # a staff upload against no request.
+            channel=str(item.get("channel", CHANNEL_STAFF)),
+            request_id=str(item["requestId"]) if "requestId" in item else None,
         )
     except (KeyError, ValueError) as error:
         raise ValidationError(f"stored document item is malformed: {error}") from error
@@ -579,11 +627,32 @@ def document_json(document: Document) -> dict[str, object]:
     file the user can open and a file that is not there. `byteSize` changes
     meaning with it: on a pending record it is what the client said it would
     send, on a stored one it is what S3 counted.
+
+    `channel` and `requestId` are staff's: the case's document list marks an
+    upload as the client's, and ties it to the request it answers. A client
+    never reads this shape — `portal_document_json` is theirs.
     """
     return {
         "id": document.id,
         "caseId": document.case_id,
         "kind": document.kind,
+        "fileName": document.file_name,
+        "contentType": document.content_type,
+        "byteSize": document.byte_size,
+        "uploadedAt": document.uploaded_at,
+        "status": document.status,
+        "channel": document.channel,
+        "requestId": document.request_id,
+    }
+
+
+def portal_document_json(document: Document) -> dict[str, object]:
+    """A CLIENT's view of their own upload (ADR 0023 decision 4, "their own
+    uploads' metadata"). No `caseId` — no portal answer names the case — and
+    no channel, which on a client's own upload is always theirs."""
+    return {
+        "id": document.id,
+        "requestId": document.request_id,
         "fileName": document.file_name,
         "contentType": document.content_type,
         "byteSize": document.byte_size,

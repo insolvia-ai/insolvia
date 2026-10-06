@@ -6,6 +6,12 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.document_requests import (
+    CHECKLIST_SORT_KEY,
+    DocumentChecklist,
+    checklist_from_item,
+    checklist_item,
+)
 from insolvia_core.fields import timestamp
 from insolvia_core.firm_clients import (
     ACTIVE,
@@ -732,6 +738,44 @@ class DynamoDbFirmStore:
             self.client.delete_item(
                 TableName=self.table_name,
                 Key=self._questionnaire_key(firm_id),
+                ConditionExpression="attribute_exists(SK)",
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == _CONDITION_FAILED:
+                return False
+            raise
+        return True
+
+    # ── The document request checklist ──────────────────────────────
+    #
+    # The questionnaire's three methods, item for item.
+
+    def _checklist_key(self, firm_id: str) -> dict[str, Any]:
+        return {
+            "PK": {"S": partition_key(firm_id)},
+            "SK": {"S": CHECKLIST_SORT_KEY},
+        }
+
+    def get_document_checklist(self, firm_id: str) -> DocumentChecklist | None:
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key=self._checklist_key(firm_id),
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return None if not item else checklist_from_item(from_attributes(item))
+
+    def put_document_checklist(self, checklist: DocumentChecklist) -> None:
+        self.client.put_item(
+            TableName=self.table_name,
+            Item=to_attributes(checklist_item(checklist)),
+        )
+
+    def delete_document_checklist(self, firm_id: str) -> bool:
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key=self._checklist_key(firm_id),
                 ConditionExpression="attribute_exists(SK)",
             )
         except ClientError as error:
