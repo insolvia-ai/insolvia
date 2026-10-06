@@ -751,7 +751,14 @@ are the next to add.
 document { id, case_id, kind, file_name, content_type, byte_size, page_count,
            uploaded_by, uploaded_at, storage_ref, sha256,
            status,                               // pending | stored
-           etag }                                // set once the bytes are seen
+           etag,                                 // set once the bytes are seen
+           channel,                              // staff | client (ADR 0023)
+           request_id }                          // the document_request it answers
+
+document_request { id, case_id, title, kind, description,
+                   status,                       // requested | received | waived
+                   document_ids,                 // completed uploads against it
+                   created_at, created_by, updated_at, received_at }
 
 locator  { document_id, page,                    // 1-based
            region: { x, y, width, height } }     // fractions of the page box,
@@ -790,6 +797,21 @@ carrying an `upload=unconfirmed` tag after a day, which is safe only because
 confirmation is the one thing that clears it. Pending rows are returned by the
 listing like any other — a document whose upload failed is something the user
 needs to see and retry, not something to hide.
+
+**A client's upload is a document awaiting staff, not case data**
+([ADR 0023](../adr/0023-client-portal-identity-and-isolation.md) decision 6).
+It is the same record through the same two steps, with `channel: client` and
+the `request_id` of the case's `document_request` it answers; its `kind` is
+the request's, never the client's word. Nothing in it is a value about the
+debtor's affairs, so confirm-before-entry is untouched: what the document
+*says* reaches the case only through extraction and review, exactly as a
+staff upload's does — and a client's upload is not even auto-extracted until
+ADR 0019's ZDR item closes; a firm user asks for it. A `document_request` is a
+copy of an entry on the firm's checklist (`insolvia_core.document_requests`),
+so a firm editing its list never rewrites what a client was already asked.
+Its `received` status is set only by a completed upload against it — never
+by hand — so the case's "arrived against outstanding" can always be traced to
+a document.
 
 ## Storage validation is not filing completeness
 
