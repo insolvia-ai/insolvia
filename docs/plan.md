@@ -231,9 +231,8 @@ order. Nothing here needs a new decision except where marked.
    ([`case-data-model.md`](reference/case-data-model.md) § The lifecycle).
    ADR 0022's series is complete. No Terraform change: the history rows and
    the archive view live in the case table and its existing indexes.
-3. **ADR 0023 PR 5** — document request checklists (#364). Before the first
-   *real* invite: SES production access, the ZDR item (ADR 0019), and the
-   custom auth domain.
+3. **ADR 0023 is built (PRs 1–5).** Before the first *real* invite: SES
+   production access, the ZDR item (ADR 0019), and the custom auth domain.
    ~~PR 4, the questionnaire writing candidates (#363)~~ — built: an
    18-question first catalogue (`insolvia_core.questions`; personal
    information in full bar the tax id, a few whole-record questions per
@@ -247,6 +246,19 @@ order. Nothing here needs a new decision except where marked.
    client portal). The portal questionnaire is `/portal/questionnaire`, one
    section at a time. No Terraform change. Next for the catalogue: the
    SOFA, Schedule I's monthly figures, household and dependents.
+   ~~PR 5, document request checklists (#364)~~ — built: a shipped default
+   checklist and a firm's own (`insolvia_core.document_requests`; one item
+   per firm, absent is the default, reset deletes it) under
+   `/v1/firm/document-checklist`; a case's requests as copies of checklist
+   entries, seeded by the explicit staff act "Request the checklist" (not on
+   case open), with status requested / received / waived and the case
+   overview's arrived-vs-outstanding; `POST /v1/portal/documents` against a
+   request through the same presigned PUT and `complete`, which marks the
+   request received; a client's upload (`channel: client`) is never
+   auto-extracted ([`case-data-model.md`](reference/case-data-model.md)
+   § Documents and locators). No Terraform change: the rows sit in the case
+   and firm tables under the API's existing grants, and the portal is the
+   app's own origin, already in the bucket's CORS.
    ~~PR 3, the firm-configurable questionnaire (#362)~~ — built: a six-section
    catalogue with stable ids (`insolvia_core.questionnaire`; personal
    information always on), one config item per firm in the firm table (absent
@@ -271,7 +283,11 @@ order. Nothing here needs a new decision except where marked.
    against a local API); a seed drift report (`seed load --check` naming
    fixture fields changed after seeding) — whether the loader may repair
    them reverses ADR 0021's "existing rows are left alone", so it is the
-   maintainer's call. Linking a debtor to a client, and opening a case for one,
+   maintainer's call. The portal integration tests write to the seeded
+   client's fixture case (bindings, answers, requests) and clean up, but
+   accepted and withdrawn answers stay in its review queue on every staging
+   run — seed a portal client bound to a scratch case of its own instead.
+   Linking a debtor to a client, and opening a case for one,
    check the client's state by a read rather than a condition on the write,
    so a link racing a merge's last index pass can leave a case naming the
    merged client — make that write conditional on the client row.

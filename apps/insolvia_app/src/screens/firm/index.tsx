@@ -24,6 +24,7 @@ import { Heading } from '@/components/heading';
 import { CourtPicker } from '@/components/court-picker';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { DocumentChecklistSettings } from './document-checklist-settings';
 import { QuestionnaireSettings } from './questionnaire-settings';
 
 const ROLES: readonly { readonly value: FirmRole; readonly label: string }[] = [
@@ -162,6 +163,8 @@ export function Firm({ membership }: { membership: FirmMembership }) {
       <FirmDetails editable={mayChange} onNotice={setNotice} onRenamed={setFirmName} />
 
       <QuestionnaireSettings editable={mayChange} onNotice={setNotice} />
+
+      <DocumentChecklistSettings editable={mayChange} onNotice={setNotice} />
 
       {mayReachLibrary ? <LibraryLink /> : null}
 

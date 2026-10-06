@@ -8,6 +8,9 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_request_store import (
+    DynamoDbDocumentRequestStore,
+)
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
@@ -170,6 +173,9 @@ app = create_app(
         # Case tasks (issue #356 / 14.4): rows in the case table, no second
         # table to provision.
         task_store=DynamoDbTaskStore(config.case_table_name),
+        # A case's document requests (ADR 0023 PR 5 / #364): the case table
+        # again.
+        document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),
         # The client portal's bindings (ADR 0023): one store over BOTH tables
         # already named above — its writes are one transaction across them.
         client_binding_store=DynamoDbClientBindingStore(

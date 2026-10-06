@@ -186,6 +186,25 @@ import type {
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
+// Document request checklists (ADR 0023 PR 5) — their own import, so the
+// section reads as one unit.
+import { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES, newChecklistItemToJson } from './models.ts';
+import type {
+  ApplyChecklistResult,
+  CaseDocumentRequests,
+  ChecklistItem,
+  CreatePortalDocumentRequest,
+  CreatePortalDocumentResult,
+  DocumentRequest,
+  DocumentRequestProgress,
+  FirmDocumentChecklist,
+  NewChecklistItem,
+  PortalDocumentRequest,
+  PortalDocumentRequests,
+  PortalUpload,
+  SaveDocumentChecklistRequest,
+  UploadPortalDocumentOptions,
+} from './models.ts';
 
 /**
  * The subset of the platform `fetch` this client uses. Injectable so tests
@@ -816,6 +835,7 @@ export class InsolviaApiClient {
       // signature, so a declared size that disagrees with the body is a 403
       // with nothing in it to explain why.
       byteSize: options.file.size,
+      ...(options.requestId === undefined ? {} : { requestId: options.requestId }),
     });
 
     // The raw transport, NOT #protectedHeaders. A presigned URL carries its own
@@ -839,6 +859,221 @@ export class InsolviaApiClient {
     }
 
     return this.completeDocument(caseId, created.document.id);
+  }
+
+  // ── Document request checklists (ADR 0023 PR 5 / #364) ────────────
+
+  /**
+   * `GET /v1/firm/document-checklist` — the documents the firm asks every
+   * client for, and the shipped default beside them. `firm_administration`
+   * at `view_only`.
+   */
+  async getFirmDocumentChecklist(): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('GET');
+  }
+
+  /**
+   * `PUT /v1/firm/document-checklist` — save the whole list. Throws
+   * {@link ApiValidationException} on a 400, keyed `items.<index>.<field>`.
+   * `firm_administration` at `add_edit`.
+   */
+  async saveFirmDocumentChecklist(
+    request: SaveDocumentChecklistRequest,
+  ): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('PUT', { items: request.items.map(newChecklistItemToJson) });
+  }
+
+  /** `DELETE /v1/firm/document-checklist` — back to the shipped default. Idempotent. */
+  async resetFirmDocumentChecklist(): Promise<FirmDocumentChecklist> {
+    return this.#checklistCall('DELETE');
+  }
+
+  async #checklistCall(
+    method: 'GET' | 'PUT' | 'DELETE',
+    body?: Record<string, unknown>,
+  ): Promise<FirmDocumentChecklist> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/firm/document-checklist`, {
+      method,
+      headers: body === undefined ? headers : { ...headers, 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    return firmDocumentChecklistFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `/v1/cases/{caseId}/document-requests`. */
+  #documentRequestsUrl(caseId: string): string {
+    return `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/document-requests`;
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/document-requests` — every request of the case,
+   * in the order asked, with arrived-vs-outstanding progress. `documents` at
+   * `view_only`.
+   */
+  async listDocumentRequests(caseId: string): Promise<CaseDocumentRequests> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#documentRequestsUrl(caseId), {
+      method: 'GET',
+      headers,
+    });
+    return caseDocumentRequestsFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `POST /v1/cases/{caseId}/document-requests` — ask for one more document. 201. */
+  async addDocumentRequest(caseId: string, item: NewChecklistItem): Promise<DocumentRequest> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(this.#documentRequestsUrl(caseId), {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(newChecklistItemToJson(item)),
+    });
+    return documentRequestFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/document-requests/from-checklist` — request
+   * every entry of the firm's checklist the case has not already asked for.
+   * Safe to repeat; `added` says how many this call created.
+   */
+  async applyDocumentChecklist(caseId: string): Promise<ApplyChecklistResult> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#documentRequestsUrl(caseId)}/from-checklist`, {
+      method: 'POST',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return { ...caseDocumentRequestsFromJson(decoded), added: requireNumber(decoded, 'added') };
+  }
+
+  /**
+   * `PATCH /v1/cases/{caseId}/document-requests/{requestId}` — waive or
+   * reopen. `received` is not settable: a completed upload is what
+   * receives a request.
+   */
+  async setDocumentRequestStatus(
+    caseId: string,
+    requestId: string,
+    status: 'requested' | 'waived',
+  ): Promise<DocumentRequest> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#documentRequestsUrl(caseId)}/${encodeURIComponent(requestId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      },
+    );
+    return documentRequestFromJson(await decodeExpected(response, 200));
+  }
+
+  /** `DELETE /v1/cases/{caseId}/document-requests/{requestId}` — 204; its documents stay. */
+  async deleteDocumentRequest(caseId: string, requestId: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#documentRequestsUrl(caseId)}/${encodeURIComponent(requestId)}`,
+      { method: 'DELETE', headers },
+    );
+    await expectNoContent(response, 204);
+  }
+
+  /**
+   * `GET /v1/portal/document-requests` — the CLIENT side: what the firm
+   * asked this client for, each with their own uploads against it, and the
+   * progress. Called with a portal session's token.
+   */
+  async getPortalDocumentRequests(): Promise<PortalDocumentRequests> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/document-requests`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return {
+      requests: requireArrayOf(
+        decoded,
+        'requests',
+        'PortalDocumentRequest',
+        (item): PortalDocumentRequest => ({
+          id: requireString(item, 'id'),
+          title: requireString(item, 'title'),
+          kind: requireString(item, 'kind'),
+          description: requireNullableString(item, 'description'),
+          status: requireChoice(item, 'status', DOCUMENT_REQUEST_STATUSES),
+          uploads: requireArrayOf(item, 'uploads', 'PortalUpload', portalUploadFromJson),
+        }),
+      ),
+      progress: documentRequestProgressFromJson(childObject(decoded, 'progress')),
+    };
+  }
+
+  /**
+   * `POST /v1/portal/documents` — step one of a client's upload, against
+   * one request. Prefer {@link uploadPortalDocument}, which runs all three
+   * steps for the reason {@link uploadDocument} gives.
+   */
+  async createPortalDocument(
+    request: CreatePortalDocumentRequest,
+  ): Promise<CreatePortalDocumentResult> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/portal/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.requestId,
+        fileName: request.fileName,
+        contentType: request.contentType,
+        byteSize: request.byteSize,
+      }),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return {
+      document: portalUploadFromJson(childObject(decoded, 'document')),
+      upload: uploadFromJson(childObject(decoded, 'upload')),
+    };
+  }
+
+  /**
+   * `POST /v1/portal/documents/{documentId}/complete` — confirm the PUT;
+   * this is what marks the request received. 409 when the bytes never
+   * arrived ({@link isUploadIncomplete}).
+   */
+  async completePortalDocument(documentId: string): Promise<PortalUpload> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/portal/documents/${encodeURIComponent(documentId)}/complete`,
+      { method: 'POST', headers },
+    );
+    const decoded = await decodeExpected(response, 200);
+    return portalUploadFromJson(childObject(decoded, 'document'));
+  }
+
+  /**
+   * A client's upload end to end — create, PUT, complete — exactly as
+   * {@link uploadDocument} runs the staff one, and leaving a pending record
+   * on a partial failure for the same reason.
+   */
+  async uploadPortalDocument(options: UploadPortalDocumentOptions): Promise<PortalUpload> {
+    const created = await this.createPortalDocument({
+      requestId: options.requestId,
+      fileName: options.fileName,
+      contentType: options.contentType,
+      byteSize: options.file.size,
+    });
+    const uploaded = await this.#fetch(created.upload.url, {
+      method: created.upload.method,
+      headers: { ...created.upload.headers },
+      body: options.file,
+    });
+    if (!uploaded.ok) {
+      throw new ApiException({
+        statusCode: uploaded.status,
+        body: await uploaded.text(),
+        message: `the presigned upload failed with status ${uploaded.status}`,
+      });
+    }
+    return this.completePortalDocument(created.document.id);
   }
 
   /**
@@ -3341,6 +3576,8 @@ function documentFromJson(response: DecodedResponse): Document {
     byteSize: requireNumber(response, 'byteSize'),
     uploadedAt: requireString(response, 'uploadedAt'),
     status: requireDocumentStatus(response, 'status'),
+    channel: requireChoice(response, 'channel', DOCUMENT_CHANNELS),
+    requestId: requireNullableString(response, 'requestId'),
   };
 }
 
@@ -3351,6 +3588,71 @@ function uploadFromJson(response: DecodedResponse): DocumentUpload {
     method: requireString(response, 'method'),
     headers: requireStringRecord(response, 'headers'),
     expiresAt: requireString(response, 'expiresAt'),
+  };
+}
+
+/** `documents.portal_document_json` — a client's own upload, no case id. */
+function portalUploadFromJson(response: DecodedResponse): PortalUpload {
+  return {
+    id: requireString(response, 'id'),
+    requestId: requireNullableString(response, 'requestId'),
+    fileName: requireString(response, 'fileName'),
+    contentType: requireString(response, 'contentType'),
+    byteSize: requireNumber(response, 'byteSize'),
+    uploadedAt: requireString(response, 'uploadedAt'),
+    status: requireDocumentStatus(response, 'status'),
+  };
+}
+
+function checklistItemFromJson(response: DecodedResponse): ChecklistItem {
+  return {
+    title: requireString(response, 'title'),
+    kind: requireString(response, 'kind'),
+    description: requireNullableString(response, 'description'),
+  };
+}
+
+/** `document_requests.checklist_json`. */
+function firmDocumentChecklistFromJson(response: DecodedResponse): FirmDocumentChecklist {
+  return {
+    isDefault: requireBoolean(response, 'isDefault'),
+    updatedAt: requireNullableString(response, 'updatedAt'),
+    updatedBy: requireNullableString(response, 'updatedBy'),
+    items: requireArrayOf(response, 'items', 'ChecklistItem', checklistItemFromJson),
+    defaultItems: requireArrayOf(response, 'defaultItems', 'ChecklistItem', checklistItemFromJson),
+  };
+}
+
+/** `document_requests.request_json`. */
+function documentRequestFromJson(response: DecodedResponse): DocumentRequest {
+  return {
+    id: requireString(response, 'id'),
+    caseId: requireString(response, 'caseId'),
+    title: requireString(response, 'title'),
+    kind: requireString(response, 'kind'),
+    description: requireNullableString(response, 'description'),
+    status: requireChoice(response, 'status', DOCUMENT_REQUEST_STATUSES),
+    documentIds: requireStringArray(response, 'documentIds'),
+    createdAt: requireString(response, 'createdAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    receivedAt: requireNullableString(response, 'receivedAt'),
+  };
+}
+
+function documentRequestProgressFromJson(response: DecodedResponse): DocumentRequestProgress {
+  return {
+    total: requireNumber(response, 'total'),
+    received: requireNumber(response, 'received'),
+    outstanding: requireNumber(response, 'outstanding'),
+    waived: requireNumber(response, 'waived'),
+  };
+}
+
+/** `document_requests.requests_json` — the requests and their progress. */
+function caseDocumentRequestsFromJson(response: DecodedResponse): CaseDocumentRequests {
+  return {
+    requests: requireArrayOf(response, 'requests', 'DocumentRequest', documentRequestFromJson),
+    progress: documentRequestProgressFromJson(childObject(response, 'progress')),
   };
 }
 

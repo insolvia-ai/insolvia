@@ -12,6 +12,7 @@ from insolvia_core.ports import (
     ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
+    DocumentRequestStore,
     DocumentStore,
     FirmStore,
     JwksProvider,
@@ -118,6 +119,9 @@ class ApiDependencies:
     # Case tasks (issue #356 / 14.4): the same "nothing to provision"
     # argument again — task rows are child items of the case partition.
     task_store: TaskStore | None = None
+    # A case's document requests (ADR 0023 PR 5 / #364): child items of the
+    # case partition once more — nothing to provision.
+    document_request_store: DocumentRequestStore | None = None
     # The client portal's bindings (ADR 0023): which case a portal subject
     # may reach. Spans the firm table and the case table — both already
     # configured — so, like the stores above, nothing new to provision.

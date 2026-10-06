@@ -13,6 +13,7 @@ import { Heading } from '@/components/heading';
 import { NotesPanel } from '@/components/notes-panel';
 import { contentMaxWidth, fontSizes, railBreakpoint, spacing, useTheme } from '@/theme';
 
+import { DocumentRequestsPanel } from './document-requests-panel';
 import { EventsPanel } from './events-panel';
 import { LifecyclePanel } from './lifecycle-panel';
 import { PortalPanel } from './portal-panel';
@@ -323,6 +324,9 @@ export function CaseOverview() {
 
           {/* ── Tasks (issue #356 / 14.4) ──────────────────────────────── */}
           <TasksPanel caseId={caseId} />
+
+          {/* ── Requested documents (ADR 0023 PR 5 / #364) ─────────────── */}
+          <DocumentRequestsPanel caseId={caseId} />
 
           {/* ── Client portal (ADR 0023 / #361) ─────────────────────────── */}
           {mayViewPortal ? (

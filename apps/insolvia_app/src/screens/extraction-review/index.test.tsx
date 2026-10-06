@@ -117,6 +117,8 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response {
               byteSize: 2048,
               uploadedAt: '2026-09-04T09:00:00.000000Z',
               status: 'stored',
+              channel: 'staff',
+              requestId: null,
             },
           ],
         }))

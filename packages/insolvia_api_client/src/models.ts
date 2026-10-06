@@ -2233,11 +2233,23 @@ export interface Document {
   readonly uploadedAt: string;
   /** Whether the bytes are known to be in the bucket. */
   readonly status: DocumentStatus;
+  /**
+   * Who uploaded it, as a class: a firm user, or the client through the
+   * portal (ADR 0023). A client's upload is never auto-extracted.
+   */
+  readonly channel: DocumentChannel;
+  /** The case's {@link DocumentRequest} this upload answers, or `null`. */
+  readonly requestId: string | null;
 }
+
+/** {@link Document.channel}'s two values — `documents.CHANNELS` server-side. */
+export const DOCUMENT_CHANNELS = ['staff', 'client'] as const;
+export type DocumentChannel = (typeof DOCUMENT_CHANNELS)[number];
 
 /**
  * The `POST /v1/cases/{caseId}/documents` request body: `{"kind", "fileName",
- * "contentType", "byteSize"}`, all four required.
+ * "contentType", "byteSize"}`, all four required, and `requestId` when the
+ * upload answers one of the case's document requests.
  *
  * `contentType` and `byteSize` are validated here and then **bound into the
  * presigned signature**, so they are not merely declarations: an upload whose
@@ -2257,9 +2269,14 @@ export interface CreateDocumentRequest {
   readonly contentType: DocumentContentType;
   /** The exact size of the bytes to be uploaded, 1..{@link MAX_DOCUMENT_BYTE_SIZE}. */
   readonly byteSize: number;
+  /**
+   * The case's document request this upload answers. Completing the upload
+   * marks it received. A waived request is refused (400 on `requestId`).
+   */
+  readonly requestId?: string;
 }
 
-/** The `POST /v1/cases/{caseId}/documents` request body, verbatim — no field is optional. */
+/** The `POST /v1/cases/{caseId}/documents` request body; `requestId` omitted when absent. */
 export function createDocumentRequestToJson(
   request: CreateDocumentRequest,
 ): Record<string, unknown> {
@@ -2268,6 +2285,7 @@ export function createDocumentRequestToJson(
     fileName: request.fileName,
     contentType: request.contentType,
     byteSize: request.byteSize,
+    ...(request.requestId === undefined ? {} : { requestId: request.requestId }),
   };
 }
 
@@ -2365,6 +2383,149 @@ export interface UploadDocumentOptions {
    * {@link isDocumentContentType} at the picker, where the user can choose a
    * different file.
    */
+  readonly contentType: DocumentContentType;
+  /** The case's document request this upload answers, if any. */
+  readonly requestId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Document request checklists (ADR 0023 PR 5 / #364). The contract lives in
+// `packages/insolvia_core/src/insolvia_core/document_requests.py` (the
+// shapes), `services/api/.../routes/document_requests.py` (staff) and
+// `.../routes/portal_documents.py` (the client).
+// ---------------------------------------------------------------------------
+
+/** A request's three statuses. `received` is never set by hand. */
+export const DOCUMENT_REQUEST_STATUSES = ['requested', 'received', 'waived'] as const;
+export type DocumentRequestStatus = (typeof DOCUMENT_REQUEST_STATUSES)[number];
+
+/** One document a firm asks for — a checklist entry. */
+export interface ChecklistItem {
+  readonly title: string;
+  /** The kind an upload against it is filed under. */
+  readonly kind: string;
+  readonly description: string | null;
+}
+
+/**
+ * `GET`/`PUT`/`DELETE /v1/firm/document-checklist`. `isDefault` means the
+ * firm has stored nothing and the shipped default is in force;
+ * `defaultItems` is that default, always present, so a screen can offer it.
+ */
+export interface FirmDocumentChecklist {
+  readonly isDefault: boolean;
+  readonly updatedAt: string | null;
+  readonly updatedBy: string | null;
+  readonly items: readonly ChecklistItem[];
+  readonly defaultItems: readonly ChecklistItem[];
+}
+
+/** One entry of a checklist save, or one ad-hoc request. */
+export interface NewChecklistItem {
+  readonly title: string;
+  readonly kind: DocumentKind;
+  /** Omitted from the body when absent. */
+  readonly description?: string;
+}
+
+/** `PUT /v1/firm/document-checklist` — the WHOLE list (at most 40). */
+export interface SaveDocumentChecklistRequest {
+  readonly items: readonly NewChecklistItem[];
+}
+
+/** The wire shape of one checklist entry or ad-hoc request. */
+export function newChecklistItemToJson(item: NewChecklistItem): Record<string, unknown> {
+  return {
+    title: item.title,
+    kind: item.kind,
+    ...(item.description === undefined ? {} : { description: item.description }),
+  };
+}
+
+/** One document asked of a case's client — the staff view. */
+export interface DocumentRequest {
+  readonly id: string;
+  readonly caseId: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly description: string | null;
+  readonly status: DocumentRequestStatus;
+  /** The completed uploads against it, in the order they completed. */
+  readonly documentIds: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** When the first upload against it completed; kept if it is reopened. */
+  readonly receivedAt: string | null;
+}
+
+/** Arrived against outstanding. `total` excludes waived requests. */
+export interface DocumentRequestProgress {
+  readonly total: number;
+  readonly received: number;
+  readonly outstanding: number;
+  readonly waived: number;
+}
+
+/** `GET /v1/cases/{caseId}/document-requests`. */
+export interface CaseDocumentRequests {
+  readonly requests: readonly DocumentRequest[];
+  readonly progress: DocumentRequestProgress;
+}
+
+/** `POST .../document-requests/from-checklist` — the list after, and how many it added. */
+export interface ApplyChecklistResult extends CaseDocumentRequests {
+  readonly added: number;
+}
+
+/** A CLIENT's own upload, as the portal shows it — no case id. */
+export interface PortalUpload {
+  readonly id: string;
+  readonly requestId: string | null;
+  readonly fileName: string;
+  readonly contentType: string;
+  readonly byteSize: number;
+  readonly uploadedAt: string;
+  readonly status: DocumentStatus;
+}
+
+/** One request as the CLIENT reads it, with their own uploads against it. */
+export interface PortalDocumentRequest {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly description: string | null;
+  readonly status: DocumentRequestStatus;
+  readonly uploads: readonly PortalUpload[];
+}
+
+/** `GET /v1/portal/document-requests`. */
+export interface PortalDocumentRequests {
+  readonly requests: readonly PortalDocumentRequest[];
+  readonly progress: DocumentRequestProgress;
+}
+
+/**
+ * `POST /v1/portal/documents` — no `kind`: the server files the upload
+ * under its request's kind.
+ */
+export interface CreatePortalDocumentRequest {
+  readonly requestId: string;
+  readonly fileName: string;
+  readonly contentType: DocumentContentType;
+  readonly byteSize: number;
+}
+
+/** The `POST /v1/portal/documents` 201 response. */
+export interface CreatePortalDocumentResult {
+  readonly document: PortalUpload;
+  readonly upload: DocumentUpload;
+}
+
+/** Everything {@link InsolviaApiClient.uploadPortalDocument} needs. */
+export interface UploadPortalDocumentOptions {
+  readonly requestId: string;
+  readonly file: Blob;
+  readonly fileName: string;
   readonly contentType: DocumentContentType;
 }
 

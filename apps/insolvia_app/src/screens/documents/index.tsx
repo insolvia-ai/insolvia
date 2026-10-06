@@ -25,7 +25,7 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * picker's options and the type cannot drift — a kind added to the API is a
  * compile error here until it is named.
  */
-const KIND_LABELS: Record<DocumentKind, string> = {
+export const KIND_LABELS: Record<DocumentKind, string> = {
   credit_report: 'Credit report',
   pay_stub: 'Pay stub',
   bank_statement: 'Bank statement',
@@ -494,6 +494,7 @@ function DocumentRow({
       <Text style={[styles.meta, muted]}>
         {kindLabel(entry.kind)} · {formatSize(entry.byteSize)}
         {pending ? ' expected' : ''} · added {entry.uploadedAt.slice(0, 10)}
+        {entry.channel === 'client' ? ' · from the client' : ''}
       </Text>
 
       {pending ? (
@@ -603,7 +604,7 @@ function summarise(documents: readonly Document[]): string {
  * before looking it up and falls back to the wire spelling rather than to
  * "Unknown".
  */
-function kindLabel(kind: string): string {
+export function kindLabel(kind: string): string {
   return isDocumentKind(kind) ? KIND_LABELS[kind] : kind.replace(/_/g, ' ');
 }
 

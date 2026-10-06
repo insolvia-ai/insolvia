@@ -11,6 +11,7 @@ import { StatusScreen } from '@/components/status-screen';
 import { usePortalSession } from '@/session';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { DocumentsNeeded } from './documents-needed';
 import { QuestionnaireOverview } from './questionnaire-overview';
 
 type State =
@@ -160,6 +161,8 @@ export function PortalHome() {
       </Card.Root>
 
       <QuestionnaireOverview firmName={me.firm.name} />
+
+      <DocumentsNeeded firmName={me.firm.name} />
 
       <Text style={[styles.note, muted]}>
         Questions about your case? Contact {me.firm.name} directly — they can see everything you

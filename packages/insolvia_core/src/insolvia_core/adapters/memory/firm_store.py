@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from insolvia_core.document_requests import (
+    DocumentChecklist,
+    checklist_from_item,
+    checklist_item,
+)
 from insolvia_core.fields import timestamp
 from insolvia_core.firm_clients import (
     ACTIVE,
@@ -42,6 +47,8 @@ class MemoryFirmStore:
         # dataclass, so a suite running here round-trips the item shape the
         # DynamoDB adapter writes. Keyed by firm: one item per partition.
         self.questionnaires: dict[str, dict[str, object]] = {}
+        # The document checklist, held the same way for the same reason.
+        self.document_checklists: dict[str, dict[str, object]] = {}
 
     # ── Firms ───────────────────────────────────────────────────────
 
@@ -275,6 +282,18 @@ class MemoryFirmStore:
 
     def delete_questionnaire(self, firm_id: str) -> bool:
         return self.questionnaires.pop(firm_id, None) is not None
+
+    # ── The document request checklist ──────────────────────────────
+
+    def get_document_checklist(self, firm_id: str) -> DocumentChecklist | None:
+        item = self.document_checklists.get(firm_id)
+        return None if item is None else checklist_from_item(item)
+
+    def put_document_checklist(self, checklist: DocumentChecklist) -> None:
+        self.document_checklists[checklist.firm_id] = checklist_item(checklist)
+
+    def delete_document_checklist(self, firm_id: str) -> bool:
+        return self.document_checklists.pop(firm_id, None) is not None
 
 
 def _claimable(client: FirmClient, other_id: str, *, survivor: bool) -> bool:

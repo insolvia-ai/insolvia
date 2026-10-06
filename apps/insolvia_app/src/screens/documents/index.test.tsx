@@ -38,6 +38,8 @@ function document(overrides: Record<string, unknown> = {}) {
     byteSize: 2048,
     uploadedAt: '2026-08-04T10:00:00.000000Z',
     status: 'stored',
+    channel: 'staff',
+    requestId: null,
     ...overrides,
   };
 }

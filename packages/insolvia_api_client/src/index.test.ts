@@ -1926,6 +1926,8 @@ const PENDING_DOCUMENT = {
   byteSize: 24,
   uploadedAt: '2026-07-28T11:02:03.456Z',
   status: 'pending',
+  channel: 'staff',
+  requestId: null,
 };
 
 /** The same record after completion: `stored`, with the size S3 counted. */

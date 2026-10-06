@@ -377,3 +377,25 @@ export type {
   WaitlistConfirmation,
   WaitlistSubmission,
 } from './models.ts';
+
+// Document request checklists (ADR 0023 PR 5 / #364) — one block, so the
+// section reads as a unit.
+export { DOCUMENT_CHANNELS, DOCUMENT_REQUEST_STATUSES, newChecklistItemToJson } from './models.ts';
+export type {
+  ApplyChecklistResult,
+  CaseDocumentRequests,
+  ChecklistItem,
+  CreatePortalDocumentRequest,
+  CreatePortalDocumentResult,
+  DocumentChannel,
+  DocumentRequest,
+  DocumentRequestProgress,
+  DocumentRequestStatus,
+  FirmDocumentChecklist,
+  NewChecklistItem,
+  PortalDocumentRequest,
+  PortalDocumentRequests,
+  PortalUpload,
+  SaveDocumentChecklistRequest,
+  UploadPortalDocumentOptions,
+} from './models.ts';
