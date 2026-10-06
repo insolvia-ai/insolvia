@@ -7,6 +7,9 @@ from insolvia_core.adapters.aws.case_store import DynamoDbCaseStore
 from insolvia_core.adapters.aws.client_binding_store import DynamoDbClientBindingStore
 from insolvia_core.adapters.aws.debtor_store import DynamoDbDebtorStore
 from insolvia_core.adapters.aws.document_blobs import S3DocumentBlobStore
+from insolvia_core.adapters.aws.document_request_store import (
+    DynamoDbDocumentRequestStore,
+)
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
@@ -23,6 +26,9 @@ from insolvia_core.adapters.memory.client_binding_store import (
 )
 from insolvia_core.adapters.memory.debtor_store import MemoryDebtorStore
 from insolvia_core.adapters.memory.document_blobs import MemoryDocumentBlobStore
+from insolvia_core.adapters.memory.document_request_store import (
+    MemoryDocumentRequestStore,
+)
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.task_store import MemoryTaskStore
@@ -37,6 +43,7 @@ from insolvia_core.ports import (
     ClientBindingStore,
     DebtorStore,
     DocumentBlobStore,
+    DocumentRequestStore,
     DocumentStore,
     FirmStore,
     JwksProvider,
@@ -170,6 +177,7 @@ case_entity_store: CaseEntityStore
 tax_id_store: TaxIdStore
 tax_id_cipher: TaxIdCipher
 task_store: TaskStore
+document_request_store: DocumentRequestStore
 if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
@@ -185,6 +193,8 @@ if config.case_table_name and config.case_access_log_table_name:
     tax_id_cipher = KmsTaxIdCipher(case_key_alias(config.case_table_name))
     # Likewise: case tasks (issue #356 / 14.4) are child items too.
     task_store = DynamoDbTaskStore(config.case_table_name)
+    # And a case's document requests (ADR 0023 PR 5 / #364).
+    document_request_store = DynamoDbDocumentRequestStore(config.case_table_name)
 else:
     debtor_store = MemoryDebtorStore()
     # ONE debtor store for both: opening a case writes its debtors through
@@ -197,6 +207,7 @@ else:
     # The deterministic local key — never composed beside a real table.
     tax_id_cipher = LocalTaxIdCipher()
     task_store = MemoryTaskStore()
+    document_request_store = MemoryDocumentRequestStore()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -301,6 +312,7 @@ app = create_app(
         event_store=event_store,
         calendar_token_store=calendar_token_store,
         task_store=task_store,
+        document_request_store=document_request_store,
         client_binding_store=client_binding_store,
     )
 )

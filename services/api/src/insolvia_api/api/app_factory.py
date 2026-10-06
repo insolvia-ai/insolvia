@@ -28,6 +28,9 @@ from insolvia_api.api.routes.creditor_matrix import (
     blueprint as creditor_matrix_blueprint,
 )
 from insolvia_api.api.routes.debtors import blueprint as debtors_blueprint
+from insolvia_api.api.routes.document_requests import (
+    blueprint as document_requests_blueprint,
+)
 from insolvia_api.api.routes.documents import blueprint as documents_blueprint
 from insolvia_api.api.routes.events import blueprint as events_blueprint
 from insolvia_api.api.routes.exemption_analysis import (
@@ -54,6 +57,9 @@ from insolvia_api.api.routes.notes import blueprint as notes_blueprint
 from insolvia_api.api.routes.packets import blueprint as packets_blueprint
 from insolvia_api.api.routes.plan import blueprint as plan_blueprint
 from insolvia_api.api.routes.portal import blueprint as portal_blueprint
+from insolvia_api.api.routes.portal_documents import (
+    blueprint as portal_documents_blueprint,
+)
 from insolvia_api.api.routes.portal_invitations import (
     blueprint as portal_invitations_blueprint,
 )
@@ -106,6 +112,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # clients see; the client's own read is in portal_blueprint.
     app.register_blueprint(firm_questionnaire_blueprint)
     app.register_blueprint(documents_blueprint)
+    # /v1/firm/document-checklist and /v1/cases/<id>/document-requests (ADR
+    # 0023 PR 5) — the client's side is portal_documents_blueprint.
+    app.register_blueprint(document_requests_blueprint)
     app.register_blueprint(debtors_blueprint)
     app.register_blueprint(creditor_matrix_blueprint)
     # /v1/cases/<id>/notes — same static-segment argument (issue 14.5 / #357),
@@ -143,6 +152,7 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # under /v1/cases/<id>/portal/..., static segments that beat
     # /<collection> for the same Werkzeug-ranking reason as the rest.
     app.register_blueprint(portal_blueprint)
+    app.register_blueprint(portal_documents_blueprint)
     app.register_blueprint(portal_invitations_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(me_blueprint)

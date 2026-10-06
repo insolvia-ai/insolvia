@@ -75,7 +75,13 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.access import Accessor
 from insolvia_core.access_log import record_access
+from insolvia_core.document_requests import (
+    DocumentRequest,
+    accepts_uploads,
+    satisfy,
+)
 from insolvia_core.documents import (
+    CHANNEL_CLIENT,
     UPLOAD_TAG,
     Document,
     confirm_document,
@@ -84,12 +90,18 @@ from insolvia_core.documents import (
     expiry_timestamp,
     parse_document_upload,
 )
-from insolvia_core.errors import ConflictError, NotFoundError, ValidationError
+from insolvia_core.errors import (
+    ConflictError,
+    FieldValidationError,
+    NotFoundError,
+    ValidationError,
+)
 from insolvia_core.firms import ADD_EDIT, DOCUMENTS, VIEW_ONLY
 from insolvia_core.ports import (
     AccessLog,
     CaseStore,
     DocumentBlobStore,
+    DocumentRequestStore,
     DocumentStore,
 )
 
@@ -264,7 +276,7 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
     POST .../complete, which is what turns the row `stored` and stops the
     bucket reaping the object a day later.
     """
-    _, document_store, blobs, _ = _stores()
+    _, document_store, _, _ = _stores()
     accessor = current_accessor()
 
     # Body BEFORE ownership, which looks backwards and is deliberate. The body
@@ -272,10 +284,16 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
     # case — a 400 says "your JSON is wrong", not "that case exists". Doing it
     # first keeps the access log honest: an entry there means the case was
     # actually reached, not that someone sent a malformed request at it.
-    draft = parse_document_upload(_json_body())
+    body = _json_body()
+    draft = parse_document_upload(body)
+    request_id = _parse_request_id(body)
     _reachable_case_or_404(accessor, case_id, "document.create")
+    if request_id is not None:
+        open_request_or_400(case_id, request_id)
 
-    document = create_document(draft, case_id=case_id, uploaded_by=accessor.subject)
+    document = create_document(
+        draft, case_id=case_id, uploaded_by=accessor.subject, request_id=request_id
+    )
 
     # The ROW FIRST, then the capability, and the order matters. If the mint
     # fails after the row is written, the case shows a document whose bytes
@@ -285,12 +303,7 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
     # it again. The bucket's own comments take the same position: the case
     # store is the record of what should be there.
     document_store.create(document)
-    upload_url = blobs.upload_url(
-        document.storage_ref,
-        content_type=document.content_type,
-        byte_size=document.byte_size,
-        expires_in=UPLOAD_URL_TTL_SECONDS,
-    )
+    upload = upload_block(document)
 
     # GLBA: ids and the declared kind. NEVER the file name — a client's own
     # file names are routinely "jane-smith-2023-tax-return.pdf", which is both
@@ -300,23 +313,31 @@ def create_document_route(case_id: str) -> ResponseReturnValue:
         "document created",
         extra={"case_id": case_id, "document_id": document.id, "kind": document.kind},
     )
-    return (
-        jsonify(
-            {
-                "document": document_json(document),
-                "upload": {
-                    "url": upload_url,
-                    "method": "PUT",
-                    "headers": {
-                        "Content-Type": document.content_type,
-                        TAGGING_HEADER: UPLOAD_TAG,
-                    },
-                    "expiresAt": expiry_timestamp(UPLOAD_URL_TTL_SECONDS),
-                },
-            }
+    return jsonify({"document": document_json(document), "upload": upload}), 201
+
+
+def upload_block(document: Document) -> dict[str, object]:
+    """Mint the PUT capability for a just-written row, and describe it: the
+    URL, the verb, the headers the signature demands, and when it stops
+    working. Shared with the portal's upload route, so a client's upload is
+    the same capability — same bucket, same key scheme, same signed tag, and
+    no encryption header (the bucket's default is the case key) — as a
+    staff one."""
+    _, _, blobs, _ = _stores()
+    return {
+        "url": blobs.upload_url(
+            document.storage_ref,
+            content_type=document.content_type,
+            byte_size=document.byte_size,
+            expires_in=UPLOAD_URL_TTL_SECONDS,
         ),
-        201,
-    )
+        "method": "PUT",
+        "headers": {
+            "Content-Type": document.content_type,
+            TAGGING_HEADER: UPLOAD_TAG,
+        },
+        "expiresAt": expiry_timestamp(UPLOAD_URL_TTL_SECONDS),
+    }
 
 
 @blueprint.post("/v1/cases/<case_id>/documents/<document_id>/complete")
@@ -391,8 +412,72 @@ def complete_document_route(case_id: str, document_id: str) -> ResponseReturnVal
             "byte_size": confirmed.byte_size,
         },
     )
+    satisfy_request(confirmed)
     _trigger_extraction(confirmed, accepted_by=accessor.subject)
     return jsonify({"document": document_json(confirmed)}), 200
+
+
+# ── Document requests (ADR 0023 PR 5 / #364) ────────────────────────
+#
+# An upload may name one of its case's document requests, and completing it
+# is what marks that request received. The staff route above and the
+# portal's (`routes/portal_documents.py`) share these two helpers, so "a
+# completed upload satisfies its request" has one implementation for both
+# principal classes. Neither takes an accessor: each caller has already
+# established the case — a staff route through `CaseStore.get`, the portal
+# through the client's binding.
+
+
+def _request_store() -> DocumentRequestStore:
+    store = dependencies().document_request_store
+    if store is None:
+        raise RuntimeError("the document request store is not composed")
+    return store
+
+
+def _parse_request_id(body: dict[str, object]) -> str | None:
+    value = body.get("requestId")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise FieldValidationError({"requestId": "Must be a document request id."})
+    return value
+
+
+def open_request_or_400(case_id: str, request_id: str) -> DocumentRequest:
+    """The case's request `request_id`, if it still takes uploads.
+
+    A 400 on the `requestId` field rather than a 404: the case is already
+    reached, so there is no id to hide, and the caller's mistake is a body
+    field. A request of ANOTHER case does not resolve here (the case id is
+    half the key) and reads exactly like one that never existed."""
+    request = _request_store().get(case_id, request_id)
+    if request is None:
+        raise FieldValidationError({"requestId": "No such document request."})
+    if not accepts_uploads(request):
+        raise FieldValidationError({"requestId": "This document is no longer needed."})
+    return request
+
+
+def satisfy_request(document: Document) -> None:
+    """A completed upload marks its request received. Not best-effort, unlike
+    extraction: the request's status IS the point of a client's upload, and
+    a failure here fails the complete call, which the caller retries — the
+    whole route is idempotent, and so is `satisfy`. A request deleted since
+    the upload began is simply gone; the document stays on the case."""
+    if document.request_id is None:
+        return
+    store = _request_store()
+    request = store.get(document.case_id, document.request_id)
+    if request is None:
+        return
+    satisfied = satisfy(request, document.id)
+    if satisfied is not request:
+        store.update(satisfied)
+        logger.info(
+            "document request satisfied",
+            extra={"case_id": document.case_id, "request_id": request.id},
+        )
 
 
 def _trigger_extraction(document: Document, *, accepted_by: str) -> None:
@@ -408,7 +493,16 @@ def _trigger_extraction(document: Document, *, accepted_by: str) -> None:
     one-active-job-per-(case, kind, document) idempotency rule the accept
     endpoint applies holds here, so a re-confirmed upload does not queue a
     second run.
+
+    A CLIENT'S UPLOAD IS NEVER AUTO-EXTRACTED (ADR 0023 decision 6): until
+    ADR 0019's zero-data-retention launch-checklist item closes, sending a
+    debtor's own upload to the model is an act for someone holding the
+    engagement letter, so a firm user requests it explicitly through the
+    jobs endpoint. The portal's complete route calls this function too, and
+    this is the line that makes that a no-op.
     """
+    if document.channel == CHANNEL_CLIENT:
+        return
     if document.kind not in EXTRACTABLE_DOCUMENT_KINDS:
         return
     deps = dependencies()
