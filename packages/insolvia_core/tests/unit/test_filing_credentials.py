@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from insolvia_core.access_log import ACTIONS, access_item
+from insolvia_core.access_log import ACTIONS, access_item, record_access
 from insolvia_core.adapters.aws.dynamo import from_attributes
 from insolvia_core.adapters.aws.filing_credentials import (
     DynamoDbFilingCredentialStore,
@@ -422,6 +422,23 @@ def test_the_item_round_trips() -> None:
 
 def test_the_access_actions_are_registered() -> None:
     assert {"credential.enrol", "credential.revoke", "credential.open"} <= set(ACTIONS)
+
+
+def test_the_approval_rows_are_case_rows_carrying_the_filing() -> None:
+    # ADR 0024 PR 6: approve / void / consume are keyed by the CASE and join
+    # the credential.open rows on `filingId`.
+    assert {"filing.approve", "filing.void", "filing.consume"} <= set(ACTIONS)
+    event = record_access(
+        case_id="case-1",
+        principal="attorney-1",
+        action="filing.void",
+        purpose="changed",
+        filing_id=FILING,
+    )
+    item = access_item(event)
+    assert item["PK"] == "CASE#case-1"
+    assert item["filingId"] == FILING
+    assert item["purpose"] == "changed"
 
 
 # ── Guardrail 2: no current authorization, no credential ────────
