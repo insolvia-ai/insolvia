@@ -150,6 +150,8 @@ import type {
   JobStatus,
   LibraryCreditor,
   LibraryCreditorDraft,
+  FilingCredential,
+  FilingCredentialEnrolment,
   CalendarEvent,
   CalendarEventDraft,
   CalendarFeedToken,
@@ -2265,6 +2267,63 @@ export class InsolviaApiClient {
       method: 'DELETE',
       headers,
     });
+    await expectNoContent(response, 204);
+  }
+
+  // -------------------------------------------------------------------------
+  // The caller's own CM/ECF credential (ADR 0024, guardrail 3).
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /v1/me/filing-credentials` — the caller's OWN credentials in the
+   * vault, as status views: never a password, never a seed. Needs
+   * `electronic_filing` at `view_only` (hidden for every role by default).
+   */
+  async listFilingCredentials(): Promise<readonly FilingCredential[]> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-credentials`, {
+      method: 'GET',
+      headers,
+    });
+    const decoded = await decodeExpected(response, 200);
+    return requireArrayOf(decoded, 'credentials', 'FilingCredential', filingCredentialFromJson);
+  }
+
+  /**
+   * `POST /v1/me/filing-credentials` — seal and store one credential for the
+   * caller. The server answers the status view; nothing sent is echoed.
+   * Throws {@link ApiValidationException} on a 400 (per field: `login`,
+   * `password`, `totp_seed`, `courts`) and a 409 when that login is already
+   * enrolled. Needs `electronic_filing` at `add_edit`.
+   */
+  async enrolFilingCredential(enrolment: FilingCredentialEnrolment): Promise<FilingCredential> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, unknown> = {
+      login: enrolment.login,
+      password: enrolment.password,
+      totp_seed: enrolment.totp_seed,
+    };
+    if (enrolment.courts !== undefined) body.courts = enrolment.courts;
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-credentials`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const decoded = await decodeExpected(response, 201);
+    return filingCredentialFromJson(decoded);
+  }
+
+  /**
+   * `DELETE /v1/me/filing-credentials/{id}` — revoke: the server DESTROYS the
+   * sealed credential, and the filing worker can no longer open it. A 404
+   * means the caller has no such credential.
+   */
+  async revokeFilingCredential(id: string): Promise<void> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/me/filing-credentials/${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers },
+    );
     await expectNoContent(response, 204);
   }
 
@@ -5044,6 +5103,7 @@ const FIRM_FEATURES = [
   'tasks',
   'clients',
   'client_portal',
+  'electronic_filing',
   'firm_administration',
 ] as const;
 
@@ -5255,6 +5315,17 @@ function libraryNoticePartyFromJson(response: DecodedResponse): NoticeParty {
     name: optionalString(response, 'name'),
     address: libraryAddress(response, 'address'),
     account_last4: optionalString(response, 'account_last4'),
+  };
+}
+
+function filingCredentialFromJson(response: DecodedResponse): FilingCredential {
+  return {
+    id: requireString(response, 'id'),
+    login: requireString(response, 'login'),
+    courts: requireStringArray(response, 'courts'),
+    status: requireChoice(response, 'status', ['active'] as const),
+    created_at: requireString(response, 'created_at'),
+    updated_at: requireString(response, 'updated_at'),
   };
 }
 

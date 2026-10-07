@@ -3872,6 +3872,7 @@ describe('the firm block on /v1/me', () => {
     tasks: 'add_edit',
     clients: 'hidden',
     client_portal: 'hidden',
+    electronic_filing: 'hidden',
     firm_administration: 'add_edit',
   };
 
@@ -4630,6 +4631,7 @@ describe('the firm user endpoints', () => {
       tasks: 'hidden',
       clients: 'add_edit',
       client_portal: 'hidden',
+      electronic_filing: 'hidden',
       firm_administration: 'hidden',
     },
     status: 'active',
@@ -4926,6 +4928,121 @@ describe('the library creditor endpoints', () => {
       name: { source: 'library', library_creditor_id: CREDITOR_ID },
       'address.line1': { source: 'library', library_creditor_id: CREDITOR_ID },
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The caller's own CM/ECF credential (ADR 0024, guardrail 3). Fake values
+// only: FAKE-ECF-USER, a fake password, a seed that is obviously not one.
+// ---------------------------------------------------------------------------
+
+describe('the filing credential endpoints', () => {
+  const CREDENTIAL_ID = 'c0ffee00-0000-4000-8000-000000000001';
+  const CREDENTIAL_JSON = {
+    id: CREDENTIAL_ID,
+    login: 'FAKE-ECF-USER',
+    courts: ['txsb'],
+    status: 'active',
+    created_at: '2026-07-23T09:15:00.123Z',
+    updated_at: '2026-07-23T09:15:00.123Z',
+  };
+
+  test('GETs /v1/me/filing-credentials and maps the status views', async () => {
+    const stub = stubFetch(() => jsonResponse({ credentials: [CREDENTIAL_JSON] }, 200));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const credentials = await client.listFilingCredentials();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(credentials).toEqual([CREDENTIAL_JSON]);
+  });
+
+  test('POSTs the enrolment snake_case, omits absent courts, maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDENTIAL_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const enrolled = await client.enrolFilingCredential({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+    });
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials`);
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+    });
+    expect(enrolled).toEqual(CREDENTIAL_JSON);
+  });
+
+  test('sends courts when given', async () => {
+    const stub = stubFetch(() => jsonResponse(CREDENTIAL_JSON, 201));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await client.enrolFilingCredential({
+      login: 'FAKE-ECF-USER',
+      password: 'FAKE-ECF-PASSWORD',
+      totp_seed: 'FAKEFAKEFAKEFAKE',
+      courts: ['txsb'],
+    });
+
+    expect(JSON.parse(stub.lastRequest().body as string).courts).toEqual(['txsb']);
+  });
+
+  test('a 400 surfaces the per-field messages', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'validation failed', fields: { totp_seed: 'Enter the authenticator key.' } },
+        400,
+      ),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    const error = await client
+      .enrolFilingCredential({ login: 'FAKE-ECF-USER', password: 'x', totp_seed: 'x' })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiValidationException);
+    expect((error as ApiValidationException).fields.totp_seed).toBe('Enter the authenticator key.');
+  });
+
+  test('DELETEs /v1/me/filing-credentials/{id} and resolves on 204', async () => {
+    const stub = stubFetch(() => new Response(null, { status: 204 }));
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.revokeFilingCredential(CREDENTIAL_ID)).resolves.toBeUndefined();
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-credentials/${CREDENTIAL_ID}`);
+  });
+
+  test('a status other than active is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ credentials: [{ ...CREDENTIAL_JSON, status: 'revoked' }] }, 200),
+    );
+    const client = new InsolviaApiClient(BASE_URL, {
+      fetch: stub.fetch,
+      accessToken: () => ACCESS_TOKEN,
+    });
+
+    await expect(client.listFilingCredentials()).rejects.toThrow(/status/);
   });
 });
 
