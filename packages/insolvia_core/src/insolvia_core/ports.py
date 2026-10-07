@@ -28,6 +28,7 @@ from insolvia_core.clients import CasePublicStatus, ClientBinding
 from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
 from insolvia_core.document_requests import DocumentChecklist, DocumentRequest
 from insolvia_core.documents import Document, StoredBlob
+from insolvia_core.filing_credentials import FilingCredential
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
@@ -935,6 +936,60 @@ class TaxIdStore(Protocol):
         ...
 
     def get(self, case_id: str, ref: str) -> SealedTaxId | None: ...
+
+
+class FilingCredentialSealer(Protocol):
+    """SEALS an attorney's CM/ECF credential under the vault key
+    (insolvia_core.filing_credentials; ADR 0024, guardrail 3). The API's
+    half — and the whole of what the API may do with that key.
+
+    A separate port from `FilingCredentialOpener`, not one cipher with two
+    methods, and that split is the point: the key policy refuses the API's
+    role Decrypt, and the API's composition root holds no object that could
+    even ask. A route that tried to open a credential would not type-check.
+    """
+
+    def seal(self, plaintext: str, *, context: Mapping[str, str]) -> Envelope: ...
+
+
+class FilingCredentialOpener(Protocol):
+    """OPENS a sealed credential — the filing worker's half (ADR 0024 PR 7).
+    Must refuse (raise) under any context but the one it was sealed with,
+    exactly as `TaxIdCipher.open` must."""
+
+    def open(self, envelope: Envelope, *, context: Mapping[str, str]) -> str: ...
+
+
+class FilingCredentialStore(Protocol):
+    """Persists the vault's items (insolvia_core.filing_credentials) in the
+    dedicated `insolvia-<env>-filing-credentials` table.
+
+    Every method is keyed by the attorney (`firm_id`, `attorney_id`): the
+    item's partition IS the attorney, so a credential id that belongs to
+    somebody else is simply not found — the ownership check and the lookup
+    are the same key.
+    """
+
+    def create(self, credential: FilingCredential) -> None:
+        """Write a NEW item; raise (RuntimeError) if the id is taken — ids are
+        server-minted uuid4s, so a collision means the minting is broken.
+        Never a replace: rotation is revoke-then-enrol (`enrol_credential`)."""
+        ...
+
+    def get(
+        self, firm_id: str, attorney_id: str, credential_id: str
+    ) -> FilingCredential | None:
+        """Strongly consistent: the worker's re-check before the final
+        submit must see a revoke that happened a second ago."""
+        ...
+
+    def list_for_attorney(
+        self, firm_id: str, attorney_id: str
+    ) -> tuple[FilingCredential, ...]: ...
+
+    def delete(self, firm_id: str, attorney_id: str, credential_id: str) -> bool:
+        """Destroy the item. True when one existed."""
+        ...
 
 
 class ClientBindingStore(Protocol):

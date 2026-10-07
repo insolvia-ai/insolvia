@@ -18,6 +18,10 @@
 #   • the case store via modules/case_store — the same module staging and prod
 #     instantiate, so local development exercises the real encrypted path
 #     rather than an approximation of it;
+#   • the filing-credential vault via modules/filing_credentials (ADR 0024)
+#     — its key, its table and the filing worker's role, so the key policy
+#     that keeps Decrypt to the worker is exercised here, not first met on
+#     staging;
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet);
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
@@ -147,6 +151,36 @@ module "firm_store" {
   deletion_protection    = false
   tags                   = local.common_tags
 }
+
+# ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
+# The same module staging and prod instantiate — the real dedicated key, its
+# real key policy and the real filing worker's role — so the sealed
+# round-trip and the key policy's refusal are exercised against AWS on a
+# laptop, as ADR 0024 § Three environments requires, not against a stub.
+#
+# Two dev-only differences, both stated in the module:
+#   • api_role_name is null. There is no Lambda here; the developer's own
+#     principal runs the local API and seals through the key's root
+#     delegation. The key policy's deny refuses THAT principal Decrypt too —
+#     an admin — which is the dev proof that only the worker can open.
+#   • worker_assumable_by names the developer, so "the worker's role opens"
+#     is proved by assuming the real role (services/api/scripts/
+#     dev-filing-vault-proof.sh). The module refuses this outside dev-*.
+module "filing_credentials" {
+  source = "../../modules/filing_credentials"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
+  api_role_name               = null
+  worker_assumable_by         = [var.aws_principal_arn]
+  point_in_time_recovery      = false
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
+
 # ── Case documents ──────────────────────────────────────────────
 # The same module staging and prod instantiate, encrypting under the same case
 # key, so local development exercises the real bucket policy — TLS-only,
@@ -314,7 +348,8 @@ module "audit_trail" {
 
   project                     = "insolvia"
   environment                 = local.environment
-  data_resource_arns          = [module.case_store.table_arn]
+  data_resource_arns          = [module.case_store.table_arn, module.filing_credentials.table_arn]
+  include_management_events   = true
   retention_days              = 90
   key_deletion_window_in_days = 7
   tags                        = local.common_tags

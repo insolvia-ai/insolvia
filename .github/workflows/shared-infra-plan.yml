@@ -85,3 +85,19 @@ jobs:
         run: |
           terraform -chdir=infra/envs/${{ matrix.env }} init -backend=false
           terraform -chdir=infra/envs/${{ matrix.env }} validate
+
+      # `terraform test` for every module that carries a tests/ directory
+      # (today modules/filing_credentials, whose tests pin the vault key's
+      # policy whole — ADR 0024 PR 4). Offline: those tests mock the AWS
+      # provider. Run in the `staging` leg only — once is enough, and that
+      # leg is a required check, so a broken pin cannot merge.
+      - name: Module tests
+        if: steps.filter.outputs.run == 'true' && matrix.env == 'staging'
+        run: |
+          for tests in infra/modules/*/tests; do
+            module="$(dirname "$tests")"
+            echo "::group::terraform test $module"
+            terraform -chdir="$module" init -backend=false -input=false
+            terraform -chdir="$module" test
+            echo "::endgroup::"
+          done

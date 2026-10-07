@@ -335,6 +335,8 @@ export type {
   Letterhead,
   LibraryCreditor,
   LibraryCreditorDraft,
+  FilingCredential,
+  FilingCredentialEnrolment,
   ListCasesOptions,
   ListCasesResult,
   ListMyTasksOptions,

@@ -99,6 +99,21 @@ from typing import Final
 # indistinguishable from a status edit. Archiving and restoring stay
 # case.update: the case is still the firm's working record either way.
 # Copying a case is a case.read of the source and a case.create of the copy.
+#
+# The credential vault (ADR 0024, guardrail 3) adds three, and they are the
+# second family NOT keyed by a case: `credential.enrol`, `credential.revoke`
+# and `credential.open` name an attorney's CM/ECF credential, so the row's
+# subject is `CREDENTIAL#<credential_id>` and "who has used this login" is
+# one partition read. The principal is the attorney — on enrol and revoke
+# because they are the only person who may, on open because the worker acts
+# on their per-filing approval (packet assembly's "recorded against the
+# preparer whose accept caused the run"). `credential.open` carries two
+# extra members: `purpose` (sign-in, or the re-check before the final
+# submit) and `filing_id`, the filing it was opened for — ADR 0024's "an
+# application row naming the attorney, the filing, and the purpose".
+# Written by exactly one module, insolvia_core.filing_credentials. No
+# credential.read: the status view opens nothing and is the attorney
+# looking at their own settings, as GET /v1/me is.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -120,6 +135,9 @@ ACTIONS = (
     "client.update",
     "client.merge",
     "case.delete",
+    "credential.enrol",
+    "credential.revoke",
+    "credential.open",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -143,6 +161,7 @@ OUTCOMES = ("allowed", "denied")
 # The subject-key prefixes. A row is about exactly one of these.
 CASE_SUBJECT: Final = "CASE"
 CLIENT_SUBJECT: Final = "CLIENT"
+CREDENTIAL_SUBJECT: Final = "CREDENTIAL"
 
 
 @dataclass(frozen=True)
@@ -157,7 +176,8 @@ class AccessEvent:
     recorded_at: str
     event_id: str
     # Only `taxid.read` sets these (see ACTIONS): the debtor whose identifier
-    # was opened, and the form it was opened for. Absent on every other row,
+    # was opened, and the form it was opened for. `credential.open` sets
+    # `purpose` too — why the credential was opened. Absent on every other row,
     # and absent means absent — the item omits them rather than storing a
     # null, so the log's older rows and the new ones read the same.
     filing_role: str | None = None
@@ -165,6 +185,9 @@ class AccessEvent:
     # Only `client.invite` / `client.revoke` set this: the binding's filing
     # roles, canonical order, comma-joined (`debtor_1,debtor_2`).
     roles: str | None = None
+    # Only `credential.open` sets this: the filing the credential was opened
+    # for (ADR 0024).
+    filing_id: str | None = None
 
     def _id_under(self, prefix: str) -> str | None:
         head, _, rest = self.subject_key.partition("#")
@@ -180,29 +203,44 @@ class AccessEvent:
         """The firm client this row is about, or None on a case row."""
         return self._id_under(CLIENT_SUBJECT)
 
+    @property
+    def credential_id(self) -> str | None:
+        """The filing credential this row is about (ADR 0024), or None."""
+        return self._id_under(CREDENTIAL_SUBJECT)
+
 
 def record_access(
     *,
     case_id: str | None = None,
     client_id: str | None = None,
+    credential_id: str | None = None,
     principal: str,
     action: str,
     outcome: str = "allowed",
     filing_role: str | None = None,
     purpose: str | None = None,
     roles: tuple[str, ...] | None = None,
+    filing_id: str | None = None,
 ) -> AccessEvent:
-    """One access-log row about exactly one subject — a case (`case_id`) or a
-    firm client (`client_id`). Naming both, or neither, is a programming
-    error: a row about two things answers neither "who saw this case" nor
-    "who saw this client"."""
-    if (case_id is None) == (client_id is None):
-        raise ValueError("an access event names exactly one of case_id, client_id")
-    subject_key = (
-        f"{CASE_SUBJECT}#{case_id}"
-        if case_id is not None
-        else f"{CLIENT_SUBJECT}#{client_id}"
-    )
+    """One access-log row about exactly one subject — a case (`case_id`), a
+    firm client (`client_id`) or a filing credential (`credential_id`).
+    Naming more than one, or none, is a programming error: a row about two
+    things answers neither "who saw this case" nor "who saw this client"."""
+    subjects = [
+        (prefix, value)
+        for prefix, value in (
+            (CASE_SUBJECT, case_id),
+            (CLIENT_SUBJECT, client_id),
+            (CREDENTIAL_SUBJECT, credential_id),
+        )
+        if value is not None
+    ]
+    if len(subjects) != 1:
+        raise ValueError(
+            "an access event names exactly one of case_id, client_id, credential_id"
+        )
+    prefix, value = subjects[0]
+    subject_key = f"{prefix}#{value}"
     recorded_at = (
         datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     )
@@ -216,6 +254,7 @@ def record_access(
         filing_role=filing_role,
         purpose=purpose,
         roles=",".join(roles) if roles else None,
+        filing_id=filing_id,
     )
 
 
@@ -243,10 +282,14 @@ def access_item(event: AccessEvent) -> dict[str, str]:
         item["caseId"] = event.case_id
     if event.client_id is not None:
         item["clientId"] = event.client_id
+    if event.credential_id is not None:
+        item["credentialId"] = event.credential_id
     if event.filing_role is not None:
         item["filingRole"] = event.filing_role
     if event.purpose is not None:
         item["purpose"] = event.purpose
     if event.roles is not None:
         item["roles"] = event.roles
+    if event.filing_id is not None:
+        item["filingId"] = event.filing_id
     return item

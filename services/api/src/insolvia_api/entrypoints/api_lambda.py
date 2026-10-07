@@ -12,6 +12,12 @@ from insolvia_core.adapters.aws.document_request_store import (
     DynamoDbDocumentRequestStore,
 )
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingCredentialStore,
+    KmsCredentialSealer,
+    filing_credentials_key_alias,
+    filing_credentials_table_name,
+)
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
@@ -173,6 +179,16 @@ app = create_app(
         # Case tasks (issue #356 / 14.4): rows in the case table, no second
         # table to provision.
         task_store=DynamoDbTaskStore(config.case_table_name),
+        # The filing-credential vault (ADR 0024, guardrail 3): its OWN
+        # table and key, both named from the case table's name
+        # (infra/modules/filing_credentials keeps them one local), so no
+        # environment variable. Seal-only — no opener is composed here.
+        filing_credential_store=DynamoDbFilingCredentialStore(
+            filing_credentials_table_name(config.case_table_name)
+        ),
+        filing_credential_sealer=KmsCredentialSealer(
+            filing_credentials_key_alias(config.case_table_name)
+        ),
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
         document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),

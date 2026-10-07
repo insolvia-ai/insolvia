@@ -39,6 +39,9 @@ from insolvia_api.api.routes.exemption_analysis import (
 from insolvia_api.api.routes.extraction_review import (
     blueprint as extraction_review_blueprint,
 )
+from insolvia_api.api.routes.filing_credentials import (
+    blueprint as filing_credentials_blueprint,
+)
 from insolvia_api.api.routes.filing_set import blueprint as filing_set_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.firm_clients import blueprint as firm_clients_blueprint
@@ -101,6 +104,9 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # collection.
     app.register_blueprint(plan_blueprint)
     app.register_blueprint(firm_blueprint)
+    # The attorney's own CM/ECF credential (ADR 0024, guardrail 3) —
+    # under /v1/me because the owner is always the token's subject.
+    app.register_blueprint(filing_credentials_blueprint)
     # The court registry (issue #360): read-only, every member.
     app.register_blueprint(courts_blueprint)
     # /v1/firm/creditors — a static segment under the same firm-scoped

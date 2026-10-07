@@ -128,6 +128,15 @@ CLIENT_PORTAL: Final = "client_portal"
 # feature existed lacks it and so has it `hidden` (`permission_for`) — the
 # maintainer's choice: existing users reach clients only by an admin's grant.
 CLIENTS: Final = "clients"
+# Electronic filing (ADR 0024): today, enrolling and revoking one's own CM/ECF
+# credential in the vault (guardrail 3); with PRs 5-7, the authorization and
+# the per-filing approval. HIDDEN BY DEFAULT for every role, CLIENT_PORTAL's
+# reasoning and then some: it is the path that will submit a court filing
+# under an attorney's signature, it is unfinished until PRs 5-8 land, and so
+# nobody holds it by job title — an admin grants it, attorney by attorney.
+# Holding it lets a user manage THEIR OWN credential only; nothing here lets
+# anyone, admin included, enrol, read or revoke somebody else's.
+ELECTRONIC_FILING: Final = "electronic_filing"
 FEATURES: Final = (
     CASES,
     INTAKE,
@@ -139,6 +148,7 @@ FEATURES: Final = (
     TASKS,
     CLIENTS,
     CLIENT_PORTAL,
+    ELECTRONIC_FILING,
     FIRM_ADMINISTRATION,
 )
 
@@ -423,6 +433,8 @@ def default_permissions(role: str) -> dict[str, str]:
             CLIENTS: VIEW_ONLY,
             # Fail-closed default (ADR 0023), like NOTES above.
             CLIENT_PORTAL: HIDDEN,
+            # Fail-closed default (ADR 0024) — see ELECTRONIC_FILING.
+            ELECTRONIC_FILING: HIDDEN,
             FIRM_ADMINISTRATION: HIDDEN,
         }
     return {
@@ -443,6 +455,8 @@ def default_permissions(role: str) -> dict[str, str]:
         # feature before its screens exist, and an invitation admits a member
         # of the public, so nobody holds it by job title.
         CLIENT_PORTAL: HIDDEN,
+        # Hidden for every role (ADR 0024) — see ELECTRONIC_FILING.
+        ELECTRONIC_FILING: HIDDEN,
         # Never a default, for any role. Managing the firm's users is what
         # `is_admin` is, and a second route to it that arrives with a job title
         # would make "who can add users here" unanswerable without reading two

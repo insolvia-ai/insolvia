@@ -59,6 +59,12 @@ const FEATURES: readonly { readonly value: FirmFeature; readonly label: string }
     value: 'client_portal',
     label: 'Client portal (inviting clients to their case)',
   },
+  {
+    // ADR 0024: today, enrolling one's OWN court filing login on /account;
+    // the filing itself arrives with later PRs, which the label says.
+    value: 'electronic_filing',
+    label: 'Electronic filing (their own court login; filing not yet available)',
+  },
   { value: 'firm_administration', label: 'Firm administration' },
 ];
 

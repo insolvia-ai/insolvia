@@ -11,6 +11,12 @@ from insolvia_core.adapters.aws.document_request_store import (
     DynamoDbDocumentRequestStore,
 )
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
+from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingCredentialStore,
+    KmsCredentialSealer,
+    filing_credentials_key_alias,
+    filing_credentials_table_name,
+)
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
@@ -30,6 +36,10 @@ from insolvia_core.adapters.memory.document_request_store import (
     MemoryDocumentRequestStore,
 )
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
+from insolvia_core.adapters.memory.filing_credentials import (
+    LocalCredentialSealer,
+    MemoryFilingCredentialStore,
+)
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
@@ -45,6 +55,8 @@ from insolvia_core.ports import (
     DocumentBlobStore,
     DocumentRequestStore,
     DocumentStore,
+    FilingCredentialSealer,
+    FilingCredentialStore,
     FirmStore,
     JwksProvider,
     TaskStore,
@@ -178,6 +190,8 @@ tax_id_store: TaxIdStore
 tax_id_cipher: TaxIdCipher
 task_store: TaskStore
 document_request_store: DocumentRequestStore
+filing_credential_store: FilingCredentialStore
+filing_credential_sealer: FilingCredentialSealer
 if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
@@ -195,6 +209,16 @@ if config.case_table_name and config.case_access_log_table_name:
     task_store = DynamoDbTaskStore(config.case_table_name)
     # And a case's document requests (ADR 0023 PR 5 / #364).
     document_request_store = DynamoDbDocumentRequestStore(config.case_table_name)
+    # The filing-credential vault (ADR 0024), on THIS MACHINE's real
+    # vault table and key (infra/envs/dev). The developer's principal
+    # seals through the key's root delegation and is refused Decrypt by
+    # its key policy, exactly as the deployed API's role is.
+    filing_credential_store = DynamoDbFilingCredentialStore(
+        filing_credentials_table_name(config.case_table_name)
+    )
+    filing_credential_sealer = KmsCredentialSealer(
+        filing_credentials_key_alias(config.case_table_name)
+    )
 else:
     debtor_store = MemoryDebtorStore()
     # ONE debtor store for both: opening a case writes its debtors through
@@ -208,6 +232,8 @@ else:
     tax_id_cipher = LocalTaxIdCipher()
     task_store = MemoryTaskStore()
     document_request_store = MemoryDocumentRequestStore()
+    filing_credential_store = MemoryFilingCredentialStore()
+    filing_credential_sealer = LocalCredentialSealer()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -314,5 +340,7 @@ app = create_app(
         task_store=task_store,
         document_request_store=document_request_store,
         client_binding_store=client_binding_store,
+        filing_credential_store=filing_credential_store,
+        filing_credential_sealer=filing_credential_sealer,
     )
 )

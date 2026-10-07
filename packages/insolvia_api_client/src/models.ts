@@ -91,6 +91,7 @@ export type FirmFeature =
   | 'tasks'
   | 'clients'
   | 'client_portal'
+  | 'electronic_filing'
   | 'firm_administration';
 
 /**
@@ -510,6 +511,37 @@ export function updateFirmUserRequestToJson(
   if (request.status !== undefined) body.status = request.status;
   if (request.signatureBlock !== undefined) body.signatureBlock = request.signatureBlock;
   return body;
+}
+
+/**
+ * One of the caller's own CM/ECF credentials in the vault (ADR 0024,
+ * guardrail 3) — `GET /v1/me/filing-credentials`, gated by
+ * `electronic_filing`. THE STATUS VIEW, and all a client ever receives: no
+ * password, no TOTP seed, nothing sealed. Snake_case, as
+ * `insolvia_core.filing_credentials.credential_json` writes it.
+ */
+export interface FilingCredential {
+  readonly id: string;
+  /** The PACER username. */
+  readonly login: string;
+  /** Court codes (`txsb`, …) the attorney says they e-file in. */
+  readonly courts: readonly string[];
+  /** `active` is the only stored status: revoking DELETES the credential. */
+  readonly status: 'active';
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
+/**
+ * The `POST /v1/me/filing-credentials` body. The ONE place the password and
+ * TOTP seed cross a client, sealed on arrival and never echoed back.
+ */
+export interface FilingCredentialEnrolment {
+  readonly login: string;
+  readonly password: string;
+  /** The authenticator key PACER shows at MFA enrolment (base32). */
+  readonly totp_seed: string;
+  readonly courts?: readonly string[] | undefined;
 }
 
 /**

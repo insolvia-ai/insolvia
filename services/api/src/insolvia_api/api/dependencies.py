@@ -14,6 +14,8 @@ from insolvia_core.ports import (
     DocumentBlobStore,
     DocumentRequestStore,
     DocumentStore,
+    FilingCredentialSealer,
+    FilingCredentialStore,
     FirmStore,
     JwksProvider,
     TaskStore,
@@ -128,6 +130,16 @@ class ApiDependencies:
     # Optional for the same test-convenience reason; the portal and
     # invitation routes raise rather than degrade when it is absent.
     client_binding_store: ClientBindingStore | None = None
+    # The filing-credential vault (ADR 0024, guardrail 3): its own table
+    # and its own key, both named from the case table's name
+    # (adapters/aws/filing_credentials) so, once again, nothing new to
+    # configure. A SEALER AND NO OPENER, on purpose: the API enrols and
+    # can never open what it stored — there is deliberately no field
+    # here a route could reach an opener through, and the key policy
+    # refuses this service's role Decrypt besides. The opener belongs to
+    # services/filing (ADR 0024 PR 7).
+    filing_credential_store: FilingCredentialStore | None = None
+    filing_credential_sealer: FilingCredentialSealer | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

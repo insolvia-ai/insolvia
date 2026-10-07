@@ -434,6 +434,31 @@ module "firm_store" {
   deletion_protection    = true
   tags                   = local.common_tags
 }
+
+# ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
+# The vault: attorneys' CM/ECF password and TOTP seed, sealed under a key
+# only the filing worker's role may decrypt — the module says how the key
+# policy makes that a property of the key rather than of IAM. The API seals;
+# it never opens. The worker's role is created here, ahead of services/filing
+# (PR 7), because the key policy must name it.
+#
+# Protections ON and the full 30-day key window — but note what losing this
+# store means, which is different from the case store: every attorney has to
+# re-enrol, nothing a client gave us is lost. PITR is still on, so an
+# accidental revoke-everything is recoverable without asking attorneys again.
+module "filing_credentials" {
+  source = "../../modules/filing_credentials"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
+  api_role_name               = module.api_service.lambda_role_name
+  point_in_time_recovery      = true
+  deletion_protection         = true
+  key_deletion_window_in_days = 30
+  tags                        = local.common_tags
+}
 # ── Case documents ──────────────────────────────────────────────
 # Takes the case store's key rather than minting one: one key protects one
 # case, rows and documents alike, and the deploy role's data-plane deny is
@@ -572,9 +597,16 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with. The case document bucket
-  # joins this list when 8.6 lands.
-  data_resource_arns = [module.case_store.table_arn]
+  # The case table, and its indexes via starts_with; the filing-credential
+  # vault's table (ADR 0024, guardrail 3).
+  data_resource_arns = [
+    module.case_store.table_arn,
+    module.filing_credentials.table_arn,
+  ]
+
+  # The vault KEY's seals and opens are management events (the module's
+  # selector note) — this is what puts them in the retained record.
+  include_management_events = true
 
   retention_days = 365
   tags           = local.common_tags
