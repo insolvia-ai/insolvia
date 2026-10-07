@@ -288,6 +288,49 @@ def as_user(base_url: str, tokens: dict[str, str]):
     return _as
 
 
+def _sign_in_now(fixture: dict[str, Any], handle: str) -> dict[str, str]:
+    person = seeded_users(fixture).get(handle)
+    if person is None:
+        pytest.fail(f"no fixture person with handle '{handle}'")
+    try:
+        return sign_in(
+            pool_id=_required("INTEGRATION_AUTH_POOL_ID"),
+            client_id=_required("INTEGRATION_AUTH_CLIENT_ID"),
+            email=str(person["email"]),
+            password=_required("E2E_TEST_USER_PASSWORD"),
+        )
+    except SignInError as refusal:
+        pytest.fail(f"could not sign in as '{handle}': {refusal}")
+
+
+@pytest.fixture
+def fresh_sign_in(fixture: dict[str, Any]):
+    """`fresh_sign_in("admin")` — a NEW SRP sign-in, now, returning Cognito's
+    whole `AuthenticationResult` (access, ID and refresh tokens).
+
+    For the acts that need a recent `auth_time` (ADR 0024: signing the
+    filing authorization, approving a filing). The session-scoped `tokens`
+    above were minted when the run started and may be older than those
+    windows by the time a test reaches them; this is the suite's equivalent
+    of the app's `prompt=login` — a real password typed at the real pool,
+    which is the thing `auth_time` records."""
+
+    def _fresh(handle: str) -> dict[str, str]:
+        return _sign_in_now(fixture, handle)
+
+    return _fresh
+
+
+@pytest.fixture
+def fresh_as_user(base_url: str, fresh_sign_in):
+    """`fresh_as_user("admin")` — the API, signed in as that person just now."""
+
+    def _as(handle: str) -> Api:
+        return Api(base_url, fresh_sign_in(handle)["AccessToken"])
+
+    return _as
+
+
 @pytest.fixture(scope="session")
 def anonymous(base_url: str) -> Api:
     """The API with no token at all — for the routes that must refuse."""

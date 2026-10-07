@@ -39,14 +39,33 @@ def _revoke_leftovers(api: Api) -> None:
             api.delete(f"{PATH}/{credential['id']}", expect=(204, 404))
 
 
+AUTHORIZATION = "/v1/me/filing-authorization"
+
+
 @pytest.fixture
-def admin(as_user) -> Iterator[Api]:
+def admin(fresh_as_user) -> Iterator[Api]:
     """The seeded admin — admins hold every feature, `electronic_filing`
-    included, which is hidden for everybody else by default."""
-    api = as_user("admin")
+    included, which is hidden for everybody else by default.
+
+    Signed in JUST NOW, and holding a current signed authorization
+    (guardrail 2 is a precondition of enrolment — test_filing_authorization
+    owns proving that). If this fixture had to sign, it withdraws on the way
+    out, so the account is left as it was found."""
+    api = fresh_as_user("admin")
+    signed_here = False
+    if not api.get(AUTHORIZATION)["current"]:
+        text = api.get(AUTHORIZATION)["text"]
+        api.post(
+            AUTHORIZATION,
+            {"text_version": text["version"], "text_digest": text["digest"]},
+            expect=201,
+        )
+        signed_here = True
     _revoke_leftovers(api)
     yield api
     _revoke_leftovers(api)
+    if signed_here:
+        api.delete(AUTHORIZATION, expect=200)
 
 
 def _enrolment() -> dict[str, Any]:
