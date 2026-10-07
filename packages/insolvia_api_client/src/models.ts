@@ -2100,6 +2100,108 @@ export interface FilingSet {
 }
 
 /**
+ * One packet file as the assembly worker measured it — what an approval
+ * binds each document to (ADR 0024 build PR 6).
+ */
+export interface FilingApprovalFile {
+  readonly byteSize: number;
+  /** Absent for the creditor matrix (a text file). */
+  readonly pageCount?: number;
+  /** SHA-256 of the file's bytes, lower-case hex; absent on a packet assembled before PR 6. */
+  readonly sha256?: string;
+}
+
+/** One document of what an approval would cover, in docket order. */
+export interface FilingApprovalDocument {
+  /** 1-based docket position. */
+  readonly position: number;
+  readonly key: string;
+  readonly title: string;
+  readonly fileName: string;
+  readonly source: 'packet' | 'outside';
+  readonly handling: FilingDocumentHandling;
+  /** Absent for a document prepared outside Insolvia. */
+  readonly file?: FilingApprovalFile;
+  readonly note?: string;
+}
+
+/**
+ * WHAT THE ATTORNEY IS SHOWN, and approves: the court, the documents in
+ * docket order with their sizes and digests, the checklist, the fee
+ * handling, and `digest` over all of it plus the case record behind it
+ * (`services/api core/filing_approval.py` defines it). Approve by posting
+ * back exactly this `digest` — the server refuses any other.
+ */
+export interface FilingApprovalBasis {
+  /** `insolvia-filing-approval/1` — what the digest covers, by name. */
+  readonly scheme: string;
+  readonly digest: string;
+  /** False while any `blockers` remain. */
+  readonly ready: boolean;
+  /** Checklist ids still `missing`, plus `filed` and `file_digests`. */
+  readonly blockers: readonly string[];
+  readonly court?: { readonly code: string; readonly name: string; readonly divisionName?: string };
+  readonly registryRelease: string;
+  readonly packet?: {
+    readonly id: string;
+    readonly createdAt: string;
+    readonly sha256: string;
+    readonly byteSize: number;
+  };
+  readonly documents: readonly FilingApprovalDocument[];
+  readonly checklist: readonly FilingChecklistItem[];
+  /** Today always the hand-back: Insolvia enters no card details. */
+  readonly fee: {
+    readonly handling: 'hand_back_at_payment';
+    readonly verified: boolean;
+    readonly detail: string;
+    readonly deadline?: string;
+  };
+  /** How recent the sign-in must be to approve (seconds). */
+  readonly signInMaxAgeSeconds: number;
+  /** How long an approval waits for the filing worker before expiring (seconds). */
+  readonly approvalTtlSeconds: number;
+}
+
+/**
+ * `pending` until the filing worker uses it (`consumed`, once), or it is
+ * `voided`, or it lapses (`expired`).
+ */
+export type FilingApprovalStatus = 'pending' | 'consumed' | 'voided' | 'expired';
+
+/** Why an approval was voided. `changed`: the filing set is not what was approved. */
+export type FilingApprovalVoidReason = 'changed' | 'superseded' | 'cancelled' | 'enqueue_failed';
+
+/** A case's current approval. */
+export interface FilingApproval {
+  readonly id: string;
+  readonly filingId: string;
+  readonly status: FilingApprovalStatus;
+  readonly digest: string;
+  /** The approving attorney's subject — always the login's owner. */
+  readonly approvedBy: string;
+  readonly approvedAt: string;
+  readonly expiresAt: string;
+  readonly credentialId: string;
+  readonly court: string;
+  readonly division: string;
+  readonly packetId: string;
+  readonly consumedAt?: string;
+  readonly voidedAt?: string;
+  readonly voidReason?: FilingApprovalVoidReason;
+}
+
+/**
+ * `GET`/`POST`/`DELETE /v1/cases/{caseId}/filing-approval` (ADR 0024,
+ * guardrail 1): what would be approved, and the case's current approval
+ * (absent when there has never been one).
+ */
+export interface FilingApprovalView {
+  readonly basis: FilingApprovalBasis;
+  readonly approval?: FilingApproval;
+}
+
+/**
  * `GET /v1/cases/{caseId}/forms/{form}/preview` — the creditor-matrix
  * route's own 200-either-way contract, applied to one form: a short-lived
  * download URL (`problems` empty), or every reason it could not render yet

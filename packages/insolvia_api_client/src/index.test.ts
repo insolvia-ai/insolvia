@@ -5150,6 +5150,181 @@ describe('the filing authorization endpoints', () => {
   });
 });
 
+describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
+  const CASE = 'c0000000-0000-4000-8000-000000000001';
+  const DIGEST = 'a'.repeat(64);
+  // _view's exact shape (services/api api/routes/filing_approval.py):
+  // camelCase, optional members absent, never null.
+  const BASIS_JSON = {
+    scheme: 'insolvia-filing-approval/1',
+    digest: DIGEST,
+    ready: true,
+    blockers: [],
+    court: { code: 'flmb', name: 'Middle District of Florida', divisionName: 'Tampa Division' },
+    registryRelease: 'courts/us-bankruptcy@2026-09-24',
+    packet: {
+      id: 'p0000000-0000-4000-8000-000000000001',
+      createdAt: '2099-01-15T12:00:00.000Z',
+      sha256: 'b'.repeat(64),
+      byteSize: 123456,
+    },
+    documents: [
+      {
+        position: 1,
+        key: 'form/b101',
+        title: 'B101 — Voluntary Petition',
+        fileName: '01-b101.pdf',
+        source: 'packet',
+        handling: 'file',
+        file: { byteSize: 4096, pageCount: 9, sha256: 'c'.repeat(64) },
+      },
+      {
+        position: 2,
+        key: 'creditor_matrix',
+        title: 'Creditor matrix',
+        fileName: 'creditor-matrix.txt',
+        source: 'packet',
+        handling: 'file',
+        file: { byteSize: 19, sha256: 'd'.repeat(64) },
+      },
+      {
+        position: 3,
+        key: 'signature_instrument',
+        title: 'Declaration for E-Filing',
+        fileName: 'signature-instrument.pdf',
+        source: 'outside',
+        handling: 'own_event',
+        note: 'Signed in wet ink.',
+      },
+    ],
+    checklist: [{ id: 'court', status: 'ready', title: 'Court and division', detail: 'Tampa.' }],
+    fee: {
+      handling: 'hand_back_at_payment',
+      verified: false,
+      detail: 'Handed back at the payment step.',
+      deadline: 'Paid at filing.',
+    },
+    signInMaxAgeSeconds: 300,
+    approvalTtlSeconds: 3600,
+  };
+  const APPROVAL_JSON = {
+    id: 'e0000000-0000-4000-8000-000000000001',
+    filingId: 'f0000000-0000-4000-8000-000000000001',
+    status: 'pending',
+    digest: DIGEST,
+    approvedBy: 'a0000000-0000-4000-8000-000000000001',
+    approvedAt: '2099-01-15T12:00:00.000Z',
+    expiresAt: '2099-01-15T13:00:00.000Z',
+    credentialId: 'd0000000-0000-4000-8000-000000000001',
+    court: 'flmb',
+    division: 'tampa',
+    packetId: 'p0000000-0000-4000-8000-000000000001',
+  };
+
+  function client(stub: ReturnType<typeof stubFetch>) {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('GETs the basis, and no approval when there is none', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(view).toEqual({ basis: BASIS_JSON });
+    expect(view.approval).toBeUndefined();
+  });
+
+  test('POSTs the digest it was shown and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: APPROVAL_JSON }, 201));
+
+    const view = await client(stub).approveFiling(CASE, { digest: DIGEST });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({ digest: DIGEST });
+    expect(view.approval).toEqual(APPROVAL_JSON);
+  });
+
+  test('names the login only when asked, snake_case', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: APPROVAL_JSON }, 201));
+
+    await client(stub).approveFiling(CASE, { digest: DIGEST, credentialId: 'cred-1' });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      digest: DIGEST,
+      credential_id: 'cred-1',
+    });
+  });
+
+  test('a stale sign-in is an ApiReauthenticationRequiredException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ReauthenticationRequired', message: 'sign in again to continue' },
+        403,
+      ),
+    );
+
+    const error = await client(stub)
+      .approveFiling(CASE, { digest: DIGEST })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiReauthenticationRequiredException);
+  });
+
+  test('a filing set with a blocker is a 409 ApiException carrying the body', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'FilingSetNotReady', message: 'not ready: packet.', blockers: ['packet'] },
+        409,
+      ),
+    );
+
+    const error = await client(stub)
+      .approveFiling(CASE, { digest: DIGEST })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).body).toContain('FilingSetNotReady');
+  });
+
+  test('a voided approval decodes its reason', async () => {
+    const voided = {
+      ...APPROVAL_JSON,
+      status: 'voided',
+      voidedAt: '2099-01-15T12:05:00.000Z',
+      voidReason: 'changed',
+    };
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: voided }, 200));
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(view.approval?.status).toBe('voided');
+    expect(view.approval?.voidReason).toBe('changed');
+  });
+
+  test('DELETEs to cancel', async () => {
+    const cancelled = { ...APPROVAL_JSON, status: 'voided', voidReason: 'cancelled' };
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON, approval: cancelled }, 200));
+
+    const view = await client(stub).cancelFilingApproval(CASE);
+
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/cases/${CASE}/filing-approval`);
+    expect(view.approval?.voidReason).toBe('cancelled');
+  });
+
+  test('an unknown status is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, approval: { ...APPROVAL_JSON, status: 'filed' } }, 200),
+    );
+
+    await expect(client(stub).getFilingApproval(CASE)).rejects.toThrow(/status/);
+  });
+});
+
 describe('the firm client endpoints (ADR 0022)', () => {
   const FIRM_CLIENT_ID = 'c11e0000-0000-4000-8000-000000000001';
   const CREATOR = 'a11c0000-0000-4000-8000-00000000a11c';

@@ -79,6 +79,10 @@ import type {
   CaseForm,
   FilingChecklistItem,
   FilingDocument,
+  FilingApproval,
+  FilingApprovalBasis,
+  FilingApprovalDocument,
+  FilingApprovalView,
   FilingSet,
   FilingSetBasis,
   FilingSetCheck,
@@ -1703,6 +1707,69 @@ export class InsolviaApiClient {
       { method: 'GET', headers },
     );
     return filingSetFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/filing-approval` — what an approval of this
+   * case's filing would cover (ADR 0024, guardrail 1: the court, the
+   * documents in docket order with sizes and digests, the checklist, the fee
+   * handling, and the digest over it all) and the case's current approval.
+   * An approval whose filing set has changed since comes back `voided`
+   * (`changed`). Needs `electronic_filing` at `view_only`.
+   */
+  async getFilingApproval(caseId: string): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      { method: 'GET', headers },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `POST /v1/cases/{caseId}/filing-approval` — approve exactly the filing
+   * set the caller was shown, named by its `digest`. Throws
+   * {@link ApiReauthenticationRequiredException} when the sign-in is not
+   * recent (sign in again with a forced prompt, then retry); a 409 means the
+   * filing set changed since it was shown, has a blocker (`FilingSetNotReady`,
+   * with `blockers`), or is already being filed; a 403 that the caller holds
+   * no login of their own for this court, or no current authorization.
+   * `credentialId` is needed only when the caller has two logins for the
+   * court. Needs `electronic_filing` at `add_edit`.
+   */
+  async approveFiling(
+    caseId: string,
+    approval: { readonly digest: string; readonly credentialId?: string },
+  ): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, string> = { digest: approval.digest };
+    if (approval.credentialId !== undefined) {
+      body.credential_id = approval.credentialId;
+    }
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `DELETE /v1/cases/{caseId}/filing-approval` — cancel the pending
+   * approval before the filing worker uses it. A 409 means nothing is
+   * pending. Needs `electronic_filing` at `view_only`: stopping a filing only
+   * ever takes authority away.
+   */
+  async cancelFilingApproval(caseId: string): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-approval`,
+      { method: 'DELETE', headers },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
   }
 
   /**
@@ -3981,6 +4048,118 @@ function filingSetFromJson(response: DecodedResponse): FilingSet {
       'FilingChecklistItem',
       filingChecklistItemFromJson,
     ),
+  });
+}
+
+function filingApprovalDocumentFromJson(response: DecodedResponse): FilingApprovalDocument {
+  const file = optionalObject(response, 'file');
+  return definedMembers<FilingApprovalDocument>({
+    position: requireNumber(response, 'position'),
+    key: requireString(response, 'key'),
+    title: requireString(response, 'title'),
+    fileName: requireString(response, 'fileName'),
+    source: requireOneOf(response, 'source', ['packet', 'outside']),
+    handling: requireOneOf(response, 'handling', ['file', 'own_event', 'restricted', 'not_filed']),
+    file:
+      file === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingApprovalDocument['file']>>({
+            byteSize: requireNumber(file, 'byteSize'),
+            pageCount: optionalNumber(file, 'pageCount'),
+            sha256: optionalString(file, 'sha256'),
+          }),
+    note: optionalString(response, 'note'),
+  });
+}
+
+function filingApprovalBasisFromJson(response: DecodedResponse): FilingApprovalBasis {
+  const court = optionalObject(response, 'court');
+  const packet = optionalObject(response, 'packet');
+  const fee = requireObject(response, 'fee');
+  return definedMembers<FilingApprovalBasis>({
+    scheme: requireString(response, 'scheme'),
+    digest: requireString(response, 'digest'),
+    ready: requireBoolean(response, 'ready'),
+    blockers: requireStringArray(response, 'blockers'),
+    court:
+      court === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingApprovalBasis['court']>>({
+            code: requireString(court, 'code'),
+            name: requireString(court, 'name'),
+            divisionName: optionalString(court, 'divisionName'),
+          }),
+    registryRelease: requireString(response, 'registryRelease'),
+    packet:
+      packet === undefined
+        ? undefined
+        : {
+            id: requireString(packet, 'id'),
+            createdAt: requireString(packet, 'createdAt'),
+            sha256: requireString(packet, 'sha256'),
+            byteSize: requireNumber(packet, 'byteSize'),
+          },
+    documents: requireArrayOf(
+      response,
+      'documents',
+      'FilingApprovalDocument',
+      filingApprovalDocumentFromJson,
+    ),
+    checklist: requireArrayOf(
+      response,
+      'checklist',
+      'FilingChecklistItem',
+      filingChecklistItemFromJson,
+    ),
+    fee: definedMembers<FilingApprovalBasis['fee']>({
+      handling: requireOneOf(fee, 'handling', ['hand_back_at_payment']),
+      verified: requireBoolean(fee, 'verified'),
+      detail: requireString(fee, 'detail'),
+      deadline: optionalString(fee, 'deadline'),
+    }),
+    signInMaxAgeSeconds: requireNumber(response, 'signInMaxAgeSeconds'),
+    approvalTtlSeconds: requireNumber(response, 'approvalTtlSeconds'),
+  });
+}
+
+function filingApprovalFromJson(response: DecodedResponse): FilingApproval {
+  const voidReason = optionalString(response, 'voidReason');
+  return definedMembers<FilingApproval>({
+    id: requireString(response, 'id'),
+    filingId: requireString(response, 'filingId'),
+    status: requireOneOf(response, 'status', ['pending', 'consumed', 'voided', 'expired']),
+    digest: requireString(response, 'digest'),
+    approvedBy: requireString(response, 'approvedBy'),
+    approvedAt: requireString(response, 'approvedAt'),
+    expiresAt: requireString(response, 'expiresAt'),
+    credentialId: requireString(response, 'credentialId'),
+    court: requireString(response, 'court'),
+    division: requireString(response, 'division'),
+    packetId: requireString(response, 'packetId'),
+    consumedAt: optionalString(response, 'consumedAt'),
+    voidedAt: optionalString(response, 'voidedAt'),
+    voidReason:
+      voidReason === undefined
+        ? undefined
+        : requireOneOf(response, 'voidReason', [
+            'changed',
+            'superseded',
+            'cancelled',
+            'enqueue_failed',
+          ]),
+  });
+}
+
+/**
+ * Decodes a {@link FilingApprovalView} — `_view` in services/api
+ * api/routes/filing_approval.py: `approval` absent, never null, when the
+ * case has none.
+ */
+function filingApprovalViewFromJson(response: DecodedResponse): FilingApprovalView {
+  const approval = optionalObject(response, 'approval');
+  return definedMembers<FilingApprovalView>({
+    basis: filingApprovalBasisFromJson(requireObject(response, 'basis')),
+    approval: approval === undefined ? undefined : filingApprovalFromJson(approval),
   });
 }
 
