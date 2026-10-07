@@ -533,6 +533,43 @@ export interface FilingCredential {
 }
 
 /**
+ * The filing authorization's text as it ships (ADR 0024, guardrail 2):
+ * render `text` exactly, and sign by posting back `version` and `digest` —
+ * the server refuses any other pair, so a stale screen cannot sign a text
+ * the attorney never saw.
+ */
+export interface FilingAuthorizationText {
+  /** e.g. `2026-10-07-draft`. */
+  readonly version: string;
+  /** SHA-256 of `text`'s UTF-8 bytes, lower-case hex. */
+  readonly digest: string;
+  readonly text: string;
+}
+
+/** The caller's signature, as `GET /v1/me/filing-authorization` shows it. */
+export interface FilingAuthorizationSignature {
+  readonly id: string;
+  readonly text_version: string;
+  readonly text_digest: string;
+  readonly signed_at: string;
+}
+
+/**
+ * `GET`/`POST /v1/me/filing-authorization` — the text, and the caller's
+ * signature over it. `current` is false with no signature, and false with a
+ * signature over an OLDER text version (`signature.text_version !==
+ * current_version`): a new version invalidates older signatures, and nothing
+ * can be enrolled or filed until it is signed. Snake_case, as
+ * `insolvia_core.filing_authorization.authorization_json` writes it.
+ */
+export interface FilingAuthorizationStatus {
+  readonly text: FilingAuthorizationText;
+  readonly current_version: string;
+  readonly current: boolean;
+  readonly signature: FilingAuthorizationSignature | null;
+}
+
+/**
  * The `POST /v1/me/filing-credentials` body. The ONE place the password and
  * TOTP seed cross a client, sealed on arrival and never echoed back.
  */

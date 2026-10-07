@@ -100,6 +100,21 @@ export class ApiUnauthorizedException extends ApiException {
   }
 }
 
+/**
+ * A 403 `{"error": "ReauthenticationRequired"}` — the caller is signed in,
+ * but not RECENTLY enough for this act (ADR 0024: signing the filing
+ * authorization; approving a filing). The token is fine and a refresh will
+ * not help — Cognito keeps the original `auth_time` across refreshes — so the
+ * remedy is a fresh sign-in at the hosted page (`prompt=login`), not a
+ * permission and not a retry.
+ */
+export class ApiReauthenticationRequiredException extends ApiException {
+  constructor(options: ApiExceptionOptions) {
+    super(options);
+    this.name = 'ApiReauthenticationRequiredException';
+  }
+}
+
 /** Options accepted by {@link ApiValidationException}. */
 export interface ApiValidationExceptionOptions {
   readonly statusCode: number;

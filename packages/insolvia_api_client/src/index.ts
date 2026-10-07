@@ -23,7 +23,12 @@
 export { InsolviaApiClient, isUploadIncomplete } from './client.ts';
 export type { AccessTokenProvider, FetchLike, InsolviaApiClientOptions } from './client.ts';
 
-export { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
+export {
+  ApiException,
+  ApiReauthenticationRequiredException,
+  ApiUnauthorizedException,
+  ApiValidationException,
+} from './exceptions.ts';
 export type {
   ApiExceptionOptions,
   ApiUnauthorizedExceptionOptions,
@@ -337,6 +342,9 @@ export type {
   LibraryCreditorDraft,
   FilingCredential,
   FilingCredentialEnrolment,
+  FilingAuthorizationSignature,
+  FilingAuthorizationStatus,
+  FilingAuthorizationText,
   ListCasesOptions,
   ListCasesResult,
   ListMyTasksOptions,

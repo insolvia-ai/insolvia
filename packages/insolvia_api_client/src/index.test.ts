@@ -25,6 +25,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ApiException,
+  ApiReauthenticationRequiredException,
   ApiUnauthorizedException,
   ApiValidationException,
   BUSINESS_TYPES,
@@ -5043,6 +5044,109 @@ describe('the filing credential endpoints', () => {
     });
 
     await expect(client.listFilingCredentials()).rejects.toThrow(/status/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The written filing authorization (ADR 0024, guardrail 2).
+// ---------------------------------------------------------------------------
+
+describe('the filing authorization endpoints', () => {
+  const TEXT = {
+    version: '2026-10-07-draft',
+    digest: 'c526ac3fdfc34b9b2a03a42818b0e94eebad131472387fc516f0282b15fe3ce5',
+    text: 'DRAFT, pending review.\n\nAuthorization to file under my CM/ECF login\n',
+  };
+  // authorization_json's exact shape, with the text beside it.
+  const SIGNED_JSON = {
+    text: TEXT,
+    current_version: TEXT.version,
+    current: true,
+    signature: {
+      id: 'a0700000-0000-4000-8000-000000000001',
+      text_version: TEXT.version,
+      text_digest: TEXT.digest,
+      signed_at: '2100-01-01T00:01:00.000000Z',
+    },
+  };
+  const UNSIGNED_JSON = {
+    text: TEXT,
+    current_version: TEXT.version,
+    current: false,
+    signature: null,
+  };
+
+  function client(stub: ReturnType<typeof stubFetch>) {
+    return new InsolviaApiClient(BASE_URL, { fetch: stub.fetch, accessToken: () => ACCESS_TOKEN });
+  }
+
+  test('GETs /v1/me/filing-authorization and maps the unsigned view', async () => {
+    const stub = stubFetch(() => jsonResponse(UNSIGNED_JSON, 200));
+
+    const status = await client(stub).getFilingAuthorization();
+
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+    expect(stub.lastRequest().method).toBe('GET');
+    expect(status).toEqual(UNSIGNED_JSON);
+  });
+
+  test('POSTs the version and digest it was shown, snake_case, and maps the 201', async () => {
+    const stub = stubFetch(() => jsonResponse(SIGNED_JSON, 201));
+
+    const signed = await client(stub).signFilingAuthorization(TEXT);
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      text_version: TEXT.version,
+      text_digest: TEXT.digest,
+    });
+    expect(signed).toEqual(SIGNED_JSON);
+  });
+
+  test('a stale sign-in is an ApiReauthenticationRequiredException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ReauthenticationRequired', message: 'sign in again to continue' },
+        403,
+      ),
+    );
+
+    const error = await client(stub)
+      .signFilingAuthorization(TEXT)
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiReauthenticationRequiredException);
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(403);
+  });
+
+  test('any other 403 stays a plain ApiException', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ error: 'ForbiddenError', message: 'feature not granted' }, 403),
+    );
+
+    const error = await client(stub)
+      .getFilingAuthorization()
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect(error).not.toBeInstanceOf(ApiReauthenticationRequiredException);
+  });
+
+  test('DELETEs /v1/me/filing-authorization and resolves to how many were destroyed', async () => {
+    const stub = stubFetch(() => jsonResponse({ credentials_revoked: 2 }, 200));
+
+    await expect(client(stub).withdrawFilingAuthorization()).resolves.toBe(2);
+    expect(stub.lastRequest().method).toBe('DELETE');
+    expect(stub.lastRequest().url).toBe(`${BASE_URL}/v1/me/filing-authorization`);
+  });
+
+  test('a signature without its digest is refused as malformed', async () => {
+    const { text_digest: _dropped, ...partial } = SIGNED_JSON.signature;
+    const stub = stubFetch(() => jsonResponse({ ...SIGNED_JSON, signature: partial }, 200));
+
+    await expect(client(stub).getFilingAuthorization()).rejects.toThrow(/text_digest/);
   });
 });
 
