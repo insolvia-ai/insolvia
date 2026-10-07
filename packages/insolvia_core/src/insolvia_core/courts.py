@@ -75,6 +75,20 @@ SSN_STATEMENT_HANDLINGS: Final = ("own_event", "not_filed", "with_petition")
 # model, not a fact to record here.
 CHAPTER_13_PLAN_FORMS: Final = ("official", "local")
 
+# The documents a filing set is made of, as `opening.docket_order` and
+# `opening.file_names` name them (ADR 0024 build PR 3): an official form by
+# its series id, the creditor matrix, the court's signature instrument or
+# matrix certification when it is a document of its own, and a local form by
+# the id its `local_forms` entry carries. The vocabulary is closed so a
+# misspelt key fails the load rather than silently leaving a document out
+# of a court's order.
+_DOCUMENT_KEY_RE: Final = re.compile(
+    r"^(?:form/b[0-9a-z]+|creditor_matrix|signature_instrument"
+    r"|matrix_certification|local_form/[A-Za-z0-9-]+)$"
+)
+# A court-prescribed upload name: a plain file name, never a path.
+_FILE_NAME_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(?:pdf|txt)\Z")
+
 _CODE_RE: Final = re.compile(r"^[a-z]{4}$")
 _DIVISION_CODE_RE: Final = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 _FIPS_RE: Final = re.compile(r"^\d{5}$")
@@ -211,6 +225,15 @@ class Opening:
     ssn_statement: Fact[str]
     local_forms: tuple[LocalForm, ...]
     fee_rule: Fact[FeeRule]
+    # ADR 0024 build PR 3. The order a Chapter 7 individual opening's
+    # documents are docketed in, as document keys (`_DOCUMENT_KEY_RE`), and
+    # any upload names the court prescribes for them. A release compiled
+    # before the facts existed carries neither key and loads both as
+    # unverified-and-unknown (`_predates`); a consumer reads a null
+    # value as "use the documented common default" — the filing set's is
+    # the packet's own order and names.
+    docket_order: Fact[tuple[str, ...]]
+    file_names: Fact[Mapping[str, str]]
 
 
 @dataclass(frozen=True)
@@ -514,6 +537,52 @@ def _local_forms(
     return tuple(forms)
 
 
+def _predates(added: str) -> str:
+    """The note on a fact a release predates (unverified, no value)."""
+    return f"not recorded in this release — the fact was added on {added}"
+
+
+def _docket_order(
+    raw: Mapping[str, object], where: str, facts: _Facts
+) -> Fact[tuple[str, ...]]:
+    if "docket_order" not in raw:
+        return Fact(None, "unverified", None, None, _predates("2026-10-06"))
+    value, fact = facts.raw(raw, "docket_order")
+    order: tuple[str, ...] | None = None
+    if value is not None:
+        dw = f"{where} docket_order"
+        if not isinstance(value, list) or not value:
+            raise _fail(dw, "value must be a non-empty list of document keys")
+        for key in value:
+            if not isinstance(key, str) or not _DOCUMENT_KEY_RE.match(key):
+                raise _fail(dw, f"{key!r} is not a document key")
+        if len(set(value)) != len(value):
+            raise _fail(dw, "a document key appears twice")
+        order = tuple(value)
+    return Fact(order, fact.status, fact.source, fact.verified_at, fact.note)
+
+
+def _file_names(
+    raw: Mapping[str, object], where: str, facts: _Facts
+) -> Fact[Mapping[str, str]]:
+    if "file_names" not in raw:
+        return Fact(None, "unverified", None, None, _predates("2026-10-06"))
+    value, fact = facts.mapping(raw, "file_names")
+    names: dict[str, str] | None = None
+    if value is not None:
+        nw = f"{where} file_names"
+        names = {}
+        for key, name in value.items():
+            if not _DOCUMENT_KEY_RE.match(key):
+                raise _fail(nw, f"{key!r} is not a document key")
+            if not isinstance(name, str) or not _FILE_NAME_RE.match(name):
+                raise _fail(nw, f"{name!r} is not a plain .pdf/.txt file name")
+            names[key] = name
+        if len(set(names.values())) != len(names):
+            raise _fail(nw, "two documents share a file name")
+    return Fact(names, fact.status, fact.source, fact.verified_at, fact.note)
+
+
 def _opening(raw: object, where: str, facts: _Facts) -> Opening:
     if not isinstance(raw, dict):
         raise _fail(where, "opening is not an object")
@@ -561,6 +630,8 @@ def _opening(raw: object, where: str, facts: _Facts) -> Opening:
         fee_rule=Fact(
             fee, fee_fact.status, fee_fact.source, fee_fact.verified_at, fee_fact.note
         ),
+        docket_order=_docket_order(raw, where, opening_facts),
+        file_names=_file_names(raw, where, opening_facts),
     )
 
 
@@ -570,13 +641,7 @@ def _chapter_13_plan(
     """The `chapter_13_plan` fact, or unverified-and-unknown when a release
     predates it (see `CourtDistrict.chapter_13_plan`)."""
     if "chapter_13_plan" not in raw:
-        return Fact(
-            None,
-            "unverified",
-            None,
-            None,
-            "not recorded in this release — the fact was added on 2026-09-26",
-        )
+        return Fact(None, "unverified", None, None, _predates("2026-09-26"))
     value, fact = facts.mapping(raw, "chapter_13_plan")
     plan: Chapter13PlanForm | None = None
     if value is not None:
