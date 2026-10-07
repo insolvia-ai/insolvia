@@ -95,6 +95,22 @@ export interface SessionUser {
   readonly email: string | null;
   /** The `sub` claim — a stable Cognito user id, not an email. */
   readonly subject: string | null;
+  /**
+   * When the person last actually signed in (the ID token's `auth_time`,
+   * epoch seconds) — NOT when the token was refreshed. A hint for screens
+   * that need a recent sign-in; the API decides. `null` when unknown.
+   */
+  readonly authenticatedAt: number | null;
+}
+
+/** Options for {@link SessionContextValue.signIn}. */
+export interface SignInOptions {
+  /**
+   * Ask for the password again even if the hosted page still has a session
+   * (`prompt=login`), so the next tokens carry a fresh `auth_time`. For acts
+   * the API requires a recent sign-in for (ADR 0024).
+   */
+  readonly reauthenticate?: boolean;
 }
 
 /** The outcome of handling the hosted UI's redirect back to `/auth/callback`. */
@@ -142,7 +158,7 @@ export interface SessionContextValue {
    * Leaves for the hosted UI. `returnTo` is the in-app path to land on
    * afterwards; it survives the round trip in `sessionStorage`.
    */
-  signIn(returnTo?: string | null): Promise<void>;
+  signIn(returnTo?: string | null, options?: SignInOptions): Promise<void>;
 
   /**
    * Both legs, always (ADR 0007): clears the in-memory tokens **and** the
@@ -249,7 +265,11 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
     }
 
     const claims = readIdTokenClaims(tokens.idToken);
-    setUser({ email: claims.email, subject: claims.subject });
+    setUser({
+      email: claims.email,
+      subject: claims.subject,
+      authenticatedAt: claims.authTime,
+    });
     setStatus('signed-in');
     setRestoring(false);
     setError(null);
@@ -343,7 +363,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
   }, [refresh]);
 
   const signIn = useCallback(
-    async (returnTo?: string | null): Promise<void> => {
+    async (returnTo?: string | null, options?: SignInOptions): Promise<void> => {
       if (config === null) {
         setError('Sign-in is not configured for this environment.');
         return;
@@ -366,6 +386,7 @@ export function SessionProvider({ children, config: configOverride }: SessionPro
             redirectUri: callbackUrlFor(origin),
             state,
             codeChallenge: challenge,
+            prompt: options?.reauthenticate === true ? 'login' : undefined,
           }),
         );
       } catch {

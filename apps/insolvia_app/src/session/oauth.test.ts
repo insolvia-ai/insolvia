@@ -66,6 +66,21 @@ describe('the authorize URL', () => {
     });
   });
 
+  it('sends no prompt unless one is asked for', () => {
+    expect(queryOf(built).prompt).toBeUndefined();
+  });
+
+  it('forces the password again with prompt=login when asked (ADR 0024)', () => {
+    const forced = authorizeUrl(TEST_AUTH_CONFIG, {
+      redirectUri: callbackUrlFor(TEST_ORIGIN),
+      state: 'test-state-value',
+      codeChallenge: 'test-code-challenge',
+      prompt: 'login',
+    });
+    expect(queryOf(forced).prompt).toBe('login');
+    expect(queryOf(forced).code_challenge_method).toBe('S256');
+  });
+
   it('requests the redirect path infra registers, exactly', () => {
     // `web_callback_urls` is "${origin}/auth/callback" and Cognito matches it
     // with no wildcards at all — no host, path or port pattern.

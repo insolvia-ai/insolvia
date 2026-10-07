@@ -33,6 +33,18 @@ const CREDENTIAL = {
   updated_at: '2026-07-23T09:15:00.123Z',
 };
 
+const SIGNED_AUTHORIZATION = {
+  text: { version: '2026-10-07-draft', digest: 'f'.repeat(64), text: 'DRAFT.' },
+  current_version: '2026-10-07-draft',
+  current: true,
+  signature: {
+    id: 'a0700000-0000-4000-8000-000000000001',
+    text_version: '2026-10-07-draft',
+    text_digest: 'f'.repeat(64),
+    signed_at: '2100-01-01T00:01:00.000000Z',
+  },
+};
+
 function membership(electronicFiling: 'hidden' | 'view_only' | 'add_edit') {
   return {
     subject: ALICE,
@@ -70,6 +82,8 @@ describe('the court filing login', () => {
   ) {
     const route = routeFetch({
       '/oauth2/token': tokenEndpointResponse,
+      // Signed: guardrail 2 is filing-authorization.test.tsx's subject.
+      '/v1/me/filing-authorization': () => jsonResponse(200, SIGNED_AUTHORIZATION),
       '/v1/me/filing-credentials': () => jsonResponse(200, { credentials }),
       '/v1/me': () => jsonResponse(200, membership(level)),
     });

@@ -140,7 +140,7 @@ export function PortalSessionProvider({
       refreshToken: tokens.refreshToken ?? previousRefreshToken,
     };
     const claims = readIdTokenClaims(tokens.idToken);
-    setUser({ email: claims.email, subject: claims.subject });
+    setUser({ email: claims.email, subject: claims.subject, authenticatedAt: claims.authTime });
     setStatus('signed-in');
     setError(null);
   }, []);

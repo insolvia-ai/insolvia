@@ -113,6 +113,13 @@ export interface AuthorizeUrlParams {
   readonly redirectUri: string;
   readonly state: string;
   readonly codeChallenge: string;
+  /**
+   * `'login'` forces the hosted page to ask for the password again even over
+   * a live session (OIDC `prompt=login`; Cognito honours it in MANAGED LOGIN
+   * only, which every environment's pool uses). For the acts the API wants a
+   * fresh `auth_time` for — signing the filing authorization (ADR 0024).
+   */
+  readonly prompt?: 'login' | undefined;
 }
 
 /**
@@ -131,6 +138,7 @@ export function authorizeUrl(config: AuthConfig, params: AuthorizeUrlParams): st
     state: params.state,
     code_challenge: params.codeChallenge,
     code_challenge_method: CODE_CHALLENGE_METHOD,
+    ...(params.prompt === undefined ? {} : { prompt: params.prompt }),
   });
   return `${config.domain}/oauth2/authorize?${query}`;
 }
