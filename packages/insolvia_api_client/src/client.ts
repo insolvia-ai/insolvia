@@ -1,4 +1,9 @@
-import { ApiException, ApiUnauthorizedException, ApiValidationException } from './exceptions.ts';
+import {
+  ApiException,
+  ApiReauthenticationRequiredException,
+  ApiUnauthorizedException,
+  ApiValidationException,
+} from './exceptions.ts';
 import {
   CASE_STATUSES,
   DOCUMENT_STATUSES,
@@ -152,6 +157,8 @@ import type {
   LibraryCreditorDraft,
   FilingCredential,
   FilingCredentialEnrolment,
+  FilingAuthorizationStatus,
+  FilingAuthorizationText,
   CalendarEvent,
   CalendarEventDraft,
   CalendarFeedToken,
@@ -2328,6 +2335,58 @@ export class InsolviaApiClient {
   }
 
   // -------------------------------------------------------------------------
+  // The caller's written filing authorization (ADR 0024, guardrail 2).
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /v1/me/filing-authorization` — the text to read (version, digest,
+   * body) and the caller's signature over it. Needs `electronic_filing` at
+   * `view_only`.
+   */
+  async getFilingAuthorization(): Promise<FilingAuthorizationStatus> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'GET',
+      headers,
+    });
+    return filingAuthorizationFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
+   * `POST /v1/me/filing-authorization` — sign the text the caller was shown,
+   * named by the `version` and `digest` it came with. Throws
+   * {@link ApiReauthenticationRequiredException} when the caller's sign-in is
+   * not recent (minutes, not the session's age): sign in again with a forced
+   * prompt, then retry. A 409 means the text changed, or it is already
+   * signed. Needs `electronic_filing` at `add_edit`.
+   */
+  async signFilingAuthorization(
+    text: Pick<FilingAuthorizationText, 'version' | 'digest'>,
+  ): Promise<FilingAuthorizationStatus> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text_version: text.version, text_digest: text.digest }),
+    });
+    return filingAuthorizationFromJson(await decodeExpected(response, 201));
+  }
+
+  /**
+   * `DELETE /v1/me/filing-authorization` — withdraw the signature, which
+   * DESTROYS every filing credential the caller holds. Resolves to how many
+   * were destroyed. A 404 means nothing was signed.
+   */
+  async withdrawFilingAuthorization(): Promise<number> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(`${this.#baseUrl}/v1/me/filing-authorization`, {
+      method: 'DELETE',
+      headers,
+    });
+    return requireNumber(await decodeExpected(response, 200), 'credentials_revoked');
+  }
+
+  // -------------------------------------------------------------------------
   // The firm's client directory (ADR 0022 / #353).
   // -------------------------------------------------------------------------
 
@@ -3075,6 +3134,19 @@ function errorFor(statusCode: number, body: string): ApiException {
       body,
       source: 'server',
       message: parsed.kind === 'object' ? envelopeMessage(parsed.value) : undefined,
+    });
+  }
+  if (
+    statusCode === 403 &&
+    parsed.kind === 'object' &&
+    parsed.value.error === 'ReauthenticationRequired'
+  ) {
+    // Status AND code: a 403 is otherwise a missing permission, and only this
+    // one has a remedy the app can start itself (a fresh sign-in).
+    return new ApiReauthenticationRequiredException({
+      statusCode,
+      body,
+      message: envelopeMessage(parsed.value),
     });
   }
   if (parsed.kind === 'object') {
@@ -5326,6 +5398,29 @@ function filingCredentialFromJson(response: DecodedResponse): FilingCredential {
     status: requireChoice(response, 'status', ['active'] as const),
     created_at: requireString(response, 'created_at'),
     updated_at: requireString(response, 'updated_at'),
+  };
+}
+
+function filingAuthorizationFromJson(response: DecodedResponse): FilingAuthorizationStatus {
+  const text = requireObject(response, 'text');
+  const signature = response.json.signature === null ? null : requireObject(response, 'signature');
+  return {
+    text: {
+      version: requireString(text, 'version'),
+      digest: requireString(text, 'digest'),
+      text: requireString(text, 'text'),
+    },
+    current_version: requireString(response, 'current_version'),
+    current: requireBoolean(response, 'current'),
+    signature:
+      signature === null
+        ? null
+        : {
+            id: requireString(signature, 'id'),
+            text_version: requireString(signature, 'text_version'),
+            text_digest: requireString(signature, 'text_digest'),
+            signed_at: requireString(signature, 'signed_at'),
+          },
   };
 }
 

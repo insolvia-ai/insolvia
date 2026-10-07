@@ -25,8 +25,19 @@ type Notice = { readonly tone: 'saved' | 'error'; readonly message: string };
  * else exists to show. So both fields are cleared the moment the enrolment
  * is accepted, and there is no "show my saved password": changing it is
  * revoke, then enrol again.
+ *
+ * NO FORM WITHOUT A SIGNED AUTHORIZATION (ADR 0024, guardrail 2): the API
+ * refuses an enrolment until the attorney's filing authorization is current,
+ * so the form is replaced by a pointer to it until then (`authorized`, from
+ * `CourtFiling`).
  */
-export function FilingCredentials({ canChange }: { readonly canChange: boolean }) {
+export function FilingCredentials({
+  canChange,
+  authorized,
+}: {
+  readonly canChange: boolean;
+  readonly authorized: boolean;
+}) {
   const theme = useTheme();
   const { call } = useApi();
   const [credentials, setCredentials] = useState<readonly FilingCredential[] | null>(null);
@@ -145,7 +156,13 @@ export function FilingCredentials({ canChange }: { readonly canChange: boolean }
             </View>
           ))}
 
-      {canChange ? (
+      {canChange && !authorized ? (
+        <Text style={[styles.body, muted]}>
+          Sign the filing authorization above before storing your court login.
+        </Text>
+      ) : null}
+
+      {canChange && authorized ? (
         <>
           <Field.Root name="login" invalid={Boolean(fieldErrors.login)}>
             <Field.Label>PACER username</Field.Label>

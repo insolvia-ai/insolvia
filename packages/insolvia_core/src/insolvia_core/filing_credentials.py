@@ -51,14 +51,26 @@ does. The enrolment request is the one place the seed crosses a client
 (ADR 0024: "the screen that collects the TOTP seed is the one place the seed
 crosses a client"), and nothing echoes it back.
 
-## Where PR 5 (guardrail 2) attaches
+## The written authorization (guardrail 2)
 
-"The vault refuses a credential with no current authorization." Two seams,
-both marked `ADR 0024 PR 5` below: `enrol_credential` takes the
-authorization reference and stores it on the item (None until PR 5 makes
-it required), and `is_openable` is the ONE predicate `open_credential`
-consults — PR 5 adds "and its authorization is current" there, and every
-caller inherits it.
+"The vault refuses a credential with no current authorization, and
+withdrawing the authorization revokes the credential." Three places, and
+`insolvia_core.filing_authorization` owns what "current" means:
+
+- `enrol_credential` reads the attorney's current authorization and refuses
+  (AuthorizationRequiredError, 403) without one; the credential records the
+  signature it was enrolled under as `authorization_ref`.
+- `is_openable` — the ONE predicate `open_credential` consults — is false
+  unless the attorney's authorization is current NOW. Not "was current at
+  enrolment": a withdrawal, or a new text version nobody has signed yet,
+  stops every open, including the worker's re-check before the final submit.
+  A credential with no `authorization_ref` (enrolled before guardrail 2
+  existed, in dev) never opens.
+- `withdraw_authorization` deletes the current authorization FIRST — from
+  that write on, nothing opens — and then destroys every credential the
+  attorney holds, one logged `credential.revoke` each. An enrolment racing
+  the withdrawal can leave one item behind; it can never open (the check
+  above), and revoking it is one tap.
 """
 
 from __future__ import annotations
@@ -73,7 +85,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final
 
 from insolvia_core import courts
-from insolvia_core.errors import ConflictError, FieldValidationError
+from insolvia_core.errors import (
+    ConflictError,
+    FieldValidationError,
+    ForbiddenError,
+    NotFoundError,
+)
+from insolvia_core.filing_authorization import FilingAuthorization, is_current
 
 from .access_log import record_access
 from .fields import mapping as _mapping
@@ -83,6 +101,7 @@ from .tax_ids import Envelope
 if TYPE_CHECKING:
     from .ports import (
         AccessLog,
+        FilingAuthorizationStore,
         FilingCredentialOpener,
         FilingCredentialSealer,
         FilingCredentialStore,
@@ -91,6 +110,7 @@ if TYPE_CHECKING:
 __all__ = [
     "CREDENTIAL_PURPOSE",
     "CREDENTIAL_STATUSES",
+    "AuthorizationRequiredError",
     "CredentialSecret",
     "CredentialUnavailableError",
     "Enrolment",
@@ -107,6 +127,7 @@ __all__ = [
     "partition_key",
     "revoke_credential",
     "sort_key",
+    "withdraw_authorization",
 ]
 
 # The one value the key policy and both IAM grants condition on
@@ -116,8 +137,8 @@ __all__ = [
 CREDENTIAL_PURPOSE: Final = "filing-credential"
 
 # `active` is the only stored status today: revocation deletes the item
-# rather than flagging it (module docstring). PR 5's authorization
-# withdrawal revokes the same way. The field exists so a later state — a
+# rather than flagging it (module docstring). Withdrawing the authorization
+# revokes the same way. The field exists so a later state — a
 # credential the court has locked, say — has somewhere to live without a
 # shape change.
 CREDENTIAL_STATUSES: Final = ("active",)
@@ -170,9 +191,17 @@ class FilingCredential:
     envelope: Envelope = field(repr=False)
     created_at: str
     updated_at: str
-    # ADR 0024 PR 5: the signed authorization this credential stands on.
-    # None until PR 5 makes enrolment require one.
+    # The signature (filing_authorization) this credential was enrolled
+    # under — provenance, and a precondition: `is_openable` refuses a
+    # credential without one. None only on items enrolled before guardrail
+    # 2 existed, which therefore never open.
     authorization_ref: str | None = None
+
+
+class AuthorizationRequiredError(ForbiddenError):
+    """Enrolment without a current signed authorization (guardrail 2). A
+    403: it is a fact about the caller's own account, and the remedy is
+    theirs — read and sign the authorization first."""
 
 
 class CredentialUnavailableError(Exception):
@@ -372,7 +401,7 @@ def enrol_credential(
     sealer: FilingCredentialSealer,
     store: FilingCredentialStore,
     access_log: AccessLog,
-    authorization_ref: str | None = None,
+    authorizations: FilingAuthorizationStore,
 ) -> FilingCredential:
     """Seal and store one credential for the signed-in attorney.
 
@@ -386,9 +415,17 @@ def enrol_credential(
     that silently replaced a sealed secret would be a second write path to
     the one item revocation exists to destroy.
 
-    ADR 0024 PR 5: `authorization_ref` becomes required, and this function
-    refuses an enrolment whose authorization is not current.
+    Refused first, before anything is sealed, when the attorney has no
+    CURRENT signed authorization (AuthorizationRequiredError): "the vault
+    refuses a credential with no current authorization".
     """
+    authorization = authorizations.get_current(firm_id, attorney_id)
+    if authorization is None or not is_current(
+        authorization, firm_id=firm_id, attorney_id=attorney_id
+    ):
+        raise AuthorizationRequiredError(
+            "Sign the filing authorization before storing a court login."
+        )
     if any(
         existing.login.lower() == enrolment.login.lower()
         for existing in store.list_for_attorney(firm_id, attorney_id)
@@ -415,7 +452,7 @@ def enrol_credential(
         envelope=envelope,
         created_at=now,
         updated_at=now,
-        authorization_ref=authorization_ref,
+        authorization_ref=authorization.authorization_id,
     )
     store.create(credential)
     access_log.record(
@@ -464,15 +501,25 @@ def revoke_credential(
 # ── The open (the filing worker) ────────────────────────────────
 
 
-def is_openable(credential: FilingCredential) -> bool:
-    """THE ONE PREDICATE `open_credential` consults before it decrypts.
-
-    ADR 0024 PR 5 adds: "and its authorization is current". ADR 0024 PR 7's
-    worker calls `open_credential` again immediately before the final
-    submit, so whatever this says is re-checked at that moment, not only
-    when the run starts.
+def is_openable(
+    credential: FilingCredential, authorization: FilingAuthorization | None
+) -> bool:
+    """THE ONE PREDICATE `open_credential` consults before it decrypts:
+    the credential is active, was enrolled under a signature, and its
+    attorney's authorization (the `AUTHORIZATION` item, read at this moment)
+    is current. ADR 0024 PR 7's worker calls `open_credential` again
+    immediately before the final submit, so whatever this says is re-checked
+    at that moment, not only when the run starts.
     """
-    return credential.status == "active"
+    return (
+        credential.status == "active"
+        and credential.authorization_ref is not None
+        and is_current(
+            authorization,
+            firm_id=credential.firm_id,
+            attorney_id=credential.attorney_id,
+        )
+    )
 
 
 def open_credential(
@@ -484,6 +531,7 @@ def open_credential(
     purpose: str,
     opener: FilingCredentialOpener,
     store: FilingCredentialStore,
+    authorizations: FilingAuthorizationStore,
     access_log: AccessLog,
 ) -> CredentialSecret:
     """THE PLAINTEXT — and the one place it is produced. The filing worker's
@@ -507,7 +555,9 @@ def open_credential(
         )
     )
     credential = store.get(firm_id, attorney_id, credential_id)
-    if credential is None or not is_openable(credential):
+    if credential is None or not is_openable(
+        credential, authorizations.get_current(firm_id, attorney_id)
+    ):
         raise CredentialUnavailableError(credential_id)
     plaintext = opener.open(
         credential.envelope,
@@ -521,3 +571,54 @@ def open_credential(
     return CredentialSecret(
         password=str(document["password"]), totp_seed=str(document["totp_seed"])
     )
+
+
+# ── Withdrawing the authorization (guardrail 2) ─────────────────
+
+
+def withdraw_authorization(
+    *,
+    firm_id: str,
+    attorney_id: str,
+    authorizations: FilingAuthorizationStore,
+    store: FilingCredentialStore,
+    access_log: AccessLog,
+) -> int:
+    """WITHDRAW, AND THAT REVOKES. Returns how many credentials it destroyed.
+
+    The order is the guarantee. The `AUTHORIZATION` item goes first, so from
+    that write on `is_openable` is false for every credential this attorney
+    holds — before any of them is deleted, and whatever happens to the
+    deletes. Then each credential is destroyed through `revoke_credential`,
+    one `credential.revoke` row each, and one `authorization.withdraw` row
+    closes it.
+
+    No re-authentication: withdrawing only ever takes authority away, and a
+    withdrawal that is hard to make is a weaker guardrail, not a stronger
+    one. NotFoundError when there is nothing to withdraw (the route answers
+    404). A stale signature — over an older text version — can be withdrawn
+    too; it still stands behind stored logins.
+    """
+    authorization = authorizations.get_current(firm_id, attorney_id)
+    if authorization is None or not authorizations.withdraw(
+        authorization, withdrawn_at=_timestamp()
+    ):
+        raise NotFoundError("no filing authorization to withdraw")
+    destroyed = 0
+    for credential in store.list_for_attorney(firm_id, attorney_id):
+        if revoke_credential(
+            credential.credential_id,
+            firm_id=firm_id,
+            attorney_id=attorney_id,
+            store=store,
+            access_log=access_log,
+        ):
+            destroyed += 1
+    access_log.record(
+        record_access(
+            authorization_id=authorization.authorization_id,
+            principal=attorney_id,
+            action="authorization.withdraw",
+        )
+    )
+    return destroyed

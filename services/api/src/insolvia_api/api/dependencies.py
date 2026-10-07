@@ -14,6 +14,7 @@ from insolvia_core.ports import (
     DocumentBlobStore,
     DocumentRequestStore,
     DocumentStore,
+    FilingAuthorizationStore,
     FilingCredentialSealer,
     FilingCredentialStore,
     FirmStore,
@@ -140,6 +141,10 @@ class ApiDependencies:
     # services/filing (ADR 0024 PR 7).
     filing_credential_store: FilingCredentialStore | None = None
     filing_credential_sealer: FilingCredentialSealer | None = None
+    # The attorney's signed authorization (ADR 0024, guardrail 2): items in
+    # the SAME vault table, the attorney's own partition — "stored with the
+    # credential" — so again nothing new to configure.
+    filing_authorization_store: FilingAuthorizationStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

@@ -12,6 +12,7 @@ from insolvia_core.adapters.aws.document_request_store import (
 )
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
     KmsCredentialSealer,
     filing_credentials_key_alias,
@@ -38,6 +39,7 @@ from insolvia_core.adapters.memory.document_request_store import (
 from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.filing_credentials import (
     LocalCredentialSealer,
+    MemoryFilingAuthorizationStore,
     MemoryFilingCredentialStore,
 )
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
@@ -55,6 +57,7 @@ from insolvia_core.ports import (
     DocumentBlobStore,
     DocumentRequestStore,
     DocumentStore,
+    FilingAuthorizationStore,
     FilingCredentialSealer,
     FilingCredentialStore,
     FirmStore,
@@ -192,6 +195,7 @@ task_store: TaskStore
 document_request_store: DocumentRequestStore
 filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
+filing_authorization_store: FilingAuthorizationStore
 if config.case_table_name and config.case_access_log_table_name:
     case_store = DynamoDbCaseStore(config.case_table_name)
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
@@ -219,6 +223,9 @@ if config.case_table_name and config.case_access_log_table_name:
     filing_credential_sealer = KmsCredentialSealer(
         filing_credentials_key_alias(config.case_table_name)
     )
+    filing_authorization_store = DynamoDbFilingAuthorizationStore(
+        filing_credentials_table_name(config.case_table_name)
+    )
 else:
     debtor_store = MemoryDebtorStore()
     # ONE debtor store for both: opening a case writes its debtors through
@@ -234,6 +241,7 @@ else:
     document_request_store = MemoryDocumentRequestStore()
     filing_credential_store = MemoryFilingCredentialStore()
     filing_credential_sealer = LocalCredentialSealer()
+    filing_authorization_store = MemoryFilingAuthorizationStore()
 
 # The pipeline pair (ADR 0018). The store rides the case-table condition
 # above — a job is a child item of the case partition, so whichever table the
@@ -342,5 +350,6 @@ app = create_app(
         client_binding_store=client_binding_store,
         filing_credential_store=filing_credential_store,
         filing_credential_sealer=filing_credential_sealer,
+        filing_authorization_store=filing_authorization_store,
     )
 )

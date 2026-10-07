@@ -27,9 +27,17 @@ export interface IdTokenClaims {
   readonly email: string | null;
   /** The `sub` claim — the stable Cognito user id. */
   readonly subject: string | null;
+  /**
+   * `auth_time`, epoch seconds: when the person last typed their password at
+   * the hosted page. Cognito keeps it across refreshes, so it is the age of
+   * the SIGN-IN, not of the token. A display hint only (it drives whether a
+   * screen offers "sign in again" first) — the API checks the access token's
+   * own `auth_time` and is the only judge. `null` when absent.
+   */
+  readonly authTime: number | null;
 }
 
-const NO_CLAIMS: IdTokenClaims = { email: null, subject: null };
+const NO_CLAIMS: IdTokenClaims = { email: null, subject: null, authTime: null };
 
 /**
  * Decodes the payload of a JWT and returns the claims used for display.
@@ -80,7 +88,12 @@ export function readIdTokenClaims(idToken: string | null | undefined): IdTokenCl
   return {
     email: stringClaim(claims.email),
     subject: stringClaim(claims.sub),
+    authTime: epochClaim(claims.auth_time),
   };
+}
+
+function epochClaim(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function stringClaim(value: unknown): string | null {

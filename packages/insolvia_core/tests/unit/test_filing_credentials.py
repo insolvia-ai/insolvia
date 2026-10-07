@@ -33,12 +33,20 @@ from insolvia_core.adapters.memory.access_log import MemoryAccessLog
 from insolvia_core.adapters.memory.filing_credentials import (
     LocalCredentialOpener,
     LocalCredentialSealer,
+    MemoryFilingAuthorizationStore,
     MemoryFilingCredentialStore,
 )
 from insolvia_core.adapters.memory.tax_id_cipher import LOCAL_MASTER_KEY
-from insolvia_core.errors import ConflictError, FieldValidationError
+from insolvia_core.errors import ConflictError, FieldValidationError, NotFoundError
+from insolvia_core.filing_authorization import (
+    TEXT_VERSION,
+    FilingAuthorization,
+    sign_authorization,
+    text_json,
+)
 from insolvia_core.filing_credentials import (
     CREDENTIAL_PURPOSE,
+    AuthorizationRequiredError,
     CredentialSecret,
     CredentialUnavailableError,
     FilingCredential,
@@ -47,10 +55,12 @@ from insolvia_core.filing_credentials import (
     credential_json,
     encryption_context,
     enrol_credential,
+    is_openable,
     list_credentials,
     open_credential,
     parse_enrolment,
     revoke_credential,
+    withdraw_authorization,
 )
 
 from tests import paths
@@ -62,6 +72,9 @@ OTHER_ATTORNEY = "00000000-0000-4000-8000-00000000b771"
 FILING = "filing-0001"
 LOGIN = "FAKE-ECF-USER"
 PASSWORD = "FAKE-ECF-PASSWORD-not-a-real-one"
+# A far-future sign-in instant (2100-01-01T00:00:00Z), so no test depends on
+# today's clock.
+SIGNED_IN_AT = 4_102_444_800
 
 
 def fresh_seed() -> str:
@@ -73,11 +86,39 @@ class Vault:
     """The memory composition: what the API holds (sealer, store, log) and,
     separately, what only the worker will (opener)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, signed: tuple[str, ...] = (ATTORNEY, OTHER_ATTORNEY)) -> None:
         self.sealer = LocalCredentialSealer()
         self.opener = LocalCredentialOpener()
         self.store = MemoryFilingCredentialStore()
+        self.authorizations = MemoryFilingAuthorizationStore()
         self.log = MemoryAccessLog()
+        # Guardrail 2 is a precondition of every enrolment, so the vault
+        # these tests share starts with both attorneys' authorizations
+        # signed — and the log emptied, so each test's rows are its own.
+        # test_filing_authorization owns what signing does.
+        for attorney in signed:
+            self.sign(attorney)
+        self.log.events.clear()
+
+    def sign(self, attorney: str = ATTORNEY) -> FilingAuthorization:
+        return sign_authorization(
+            {"text_version": TEXT_VERSION, "text_digest": text_json()["digest"]},
+            firm_id=FIRM,
+            attorney_id=attorney,
+            authenticated_at=SIGNED_IN_AT,
+            now=SIGNED_IN_AT + 30,
+            store=self.authorizations,
+            access_log=self.log,
+        )
+
+    def withdraw(self, attorney: str = ATTORNEY) -> int:
+        return withdraw_authorization(
+            firm_id=FIRM,
+            attorney_id=attorney,
+            authorizations=self.authorizations,
+            store=self.store,
+            access_log=self.log,
+        )
 
     def enrol(
         self, *, seed: str, login: str = LOGIN, attorney: str = ATTORNEY
@@ -89,6 +130,7 @@ class Vault:
             sealer=self.sealer,
             store=self.store,
             access_log=self.log,
+            authorizations=self.authorizations,
         )
 
     def open(
@@ -102,6 +144,7 @@ class Vault:
             purpose="sign_in",
             opener=self.opener,
             store=self.store,
+            authorizations=self.authorizations,
             access_log=self.log,
         )
 
@@ -379,6 +422,111 @@ def test_the_item_round_trips() -> None:
 
 def test_the_access_actions_are_registered() -> None:
     assert {"credential.enrol", "credential.revoke", "credential.open"} <= set(ACTIONS)
+
+
+# ── Guardrail 2: no current authorization, no credential ────────
+
+
+def test_enrolment_without_a_signed_authorization_is_refused_before_sealing() -> None:
+    vault = Vault(signed=())
+    with pytest.raises(AuthorizationRequiredError):
+        vault.enrol(seed=fresh_seed())
+    assert vault.store.items == {}
+    assert vault.log.events == []
+
+
+def test_the_credential_records_the_signature_it_was_enrolled_under() -> None:
+    vault = Vault()
+    credential = vault.enrol(seed=fresh_seed())
+    current = vault.authorizations.get_current(FIRM, ATTORNEY)
+    assert current is not None
+    assert credential.authorization_ref == current.authorization_id
+    assert credential_item(credential)["authorizationRef"] == current.authorization_id
+
+
+def test_withdrawing_destroys_every_credential_and_the_next_open_fails() -> None:
+    vault = Vault()
+    first = vault.enrol(seed=fresh_seed())
+    second = vault.enrol(seed=fresh_seed(), login=f"{LOGIN}-2")
+    assert vault.withdraw() == 2
+    assert vault.store.items == {}
+    assert vault.authorizations.get_current(FIRM, ATTORNEY) is None
+    with pytest.raises(CredentialUnavailableError):
+        vault.open(first.credential_id)
+    actions = [(e.action, e.credential_id) for e in vault.log.events]
+    assert actions[2:] == [
+        ("credential.revoke", first.credential_id),
+        ("credential.revoke", second.credential_id),
+        ("authorization.withdraw", None),
+        ("credential.open", first.credential_id),
+    ]
+
+
+def test_withdrawal_marks_the_history_record_and_keeps_it() -> None:
+    vault = Vault()
+    current = vault.authorizations.get_current(FIRM, ATTORNEY)
+    assert current is not None
+    vault.withdraw()
+    kept = vault.authorizations.history[current.authorization_id]
+    assert kept.status == "withdrawn"
+    assert kept.withdrawn_at is not None
+    assert kept.text_digest == current.text_digest
+
+
+def test_a_credential_that_outlived_its_withdrawal_still_does_not_open() -> None:
+    """The race: an enrolment that lands after the withdrawal's deletes. The
+    authorization is gone first, so the straggler can never open."""
+    vault = Vault()
+    credential = vault.enrol(seed=fresh_seed())
+    vault.withdraw()
+    vault.store.create(credential)
+    with pytest.raises(CredentialUnavailableError):
+        vault.open(credential.credential_id)
+
+
+def test_another_attorneys_withdrawal_leaves_mine_alone() -> None:
+    vault = Vault()
+    mine = vault.enrol(seed=fresh_seed())
+    vault.enrol(seed=fresh_seed(), attorney=OTHER_ATTORNEY)
+    assert vault.withdraw(OTHER_ATTORNEY) == 1
+    assert vault.open(mine.credential_id).password == PASSWORD
+
+
+def test_withdrawing_with_nothing_signed_is_not_found() -> None:
+    vault = Vault(signed=())
+    with pytest.raises(NotFoundError):
+        vault.withdraw()
+
+
+def test_a_credential_from_before_guardrail_2_never_opens() -> None:
+    vault = Vault()
+    credential = vault.enrol(seed=fresh_seed())
+    legacy = replace(credential, authorization_ref=None)
+    vault.store.items[(FIRM, ATTORNEY, credential.credential_id)] = legacy
+    assert not is_openable(legacy, vault.authorizations.get_current(FIRM, ATTORNEY))
+    with pytest.raises(CredentialUnavailableError):
+        vault.open(credential.credential_id)
+
+
+def test_a_new_text_version_stops_opens_and_enrolments_until_it_is_signed() -> None:
+    """A signature over an older text is not current: the stored login is
+    kept but cannot open, nothing new enrols, and signing the new version
+    restores it — without re-entering the PACER password."""
+    vault = Vault()
+    credential = vault.enrol(seed=fresh_seed())
+    held = vault.authorizations.current[(FIRM, ATTORNEY)]
+    vault.authorizations.current[(FIRM, ATTORNEY)] = replace(
+        held, text_version="2026-01-01-older"
+    )
+    with pytest.raises(CredentialUnavailableError):
+        vault.open(credential.credential_id)
+    with pytest.raises(AuthorizationRequiredError):
+        vault.enrol(seed=fresh_seed(), login=f"{LOGIN}-2")
+
+    vault.sign()
+
+    assert vault.open(credential.credential_id).password == PASSWORD
+    assert vault.authorizations.history[held.authorization_id].status == "superseded"
 
 
 # ── The AWS adapters, with the transports faked at the client ───

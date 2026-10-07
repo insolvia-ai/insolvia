@@ -33,11 +33,14 @@ src/insolvia_core/
 ├── fields.py          the shared field parsers those entities are built from
 ├── provenance.py      per-field provenance: parsing and the confirm-before-entry invariants
 ├── tax_ids.py         the debtor's SSN/ITIN: shape rules, the sealed item, the logged full-value read
-├── filing_credentials.py  the CM/ECF credential vault (ADR 0024): enrol, status, revoke, the logged open
+├── filing_credentials.py  the CM/ECF credential vault (ADR 0024): enrol, status, revoke, the logged open, withdrawal
+├── filing_authorization.py  the attorney's written authorization (ADR 0024 guardrail 2): the versioned text, sign, "current"
+├── agreements/        versioned legal-ish texts shipped in the wheel (filing-authorization/<version>.txt) — append-only
 ├── ports.py           FirmStore · UserDirectory · JwksProvider · CaseStore ·
 │                      DocumentStore · DocumentBlobStore · DebtorStore ·
 │                      CaseEntityStore · AccessLog · TaxIdStore · TaxIdCipher ·
-│                      FilingCredentialStore · FilingCredentialSealer · FilingCredentialOpener
+│                      FilingCredentialStore · FilingCredentialSealer · FilingCredentialOpener ·
+│                      FilingAuthorizationStore
 └── adapters/
     ├── envelope.py  the AES-GCM half of the tax-id envelope both ciphers share
     ├── aws/     DynamoDB stores · Cognito directory · JWKS fetcher · S3 blobs · the KMS tax-id cipher

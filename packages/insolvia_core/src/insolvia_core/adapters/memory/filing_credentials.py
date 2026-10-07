@@ -10,8 +10,11 @@ stores, exactly as the deployed one cannot.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
+from insolvia_core.errors import ConflictError
+from insolvia_core.filing_authorization import FilingAuthorization
 from insolvia_core.filing_credentials import FilingCredential
 from insolvia_core.tax_ids import Envelope
 
@@ -69,3 +72,48 @@ class MemoryFilingCredentialStore:
 
     def delete(self, firm_id: str, attorney_id: str, credential_id: str) -> bool:
         return self.items.pop((firm_id, attorney_id, credential_id), None) is not None
+
+
+class MemoryFilingAuthorizationStore:
+    """FilingAuthorizationStore in memory: the current item per attorney,
+    and the history keyed by signature id — the two item kinds the
+    DynamoDB adapter writes."""
+
+    def __init__(self) -> None:
+        self.current: dict[tuple[str, str], FilingAuthorization] = {}
+        self.history: dict[str, FilingAuthorization] = {}
+
+    def get_current(self, firm_id: str, attorney_id: str) -> FilingAuthorization | None:
+        return self.current.get((firm_id, attorney_id))
+
+    def put_current(
+        self,
+        authorization: FilingAuthorization,
+        *,
+        replacing: FilingAuthorization | None,
+    ) -> None:
+        key = (authorization.firm_id, authorization.attorney_id)
+        held = self.current.get(key)
+        held_id = held.authorization_id if held is not None else None
+        wanted_id = replacing.authorization_id if replacing is not None else None
+        if held_id != wanted_id:
+            raise ConflictError("the authorization changed while signing")
+        self.current[key] = authorization
+        self.history[authorization.authorization_id] = authorization
+        if replacing is not None:
+            self.history[replacing.authorization_id] = replace(
+                replacing, status="superseded"
+            )
+
+    def withdraw(
+        self, authorization: FilingAuthorization, *, withdrawn_at: str
+    ) -> bool:
+        key = (authorization.firm_id, authorization.attorney_id)
+        held = self.current.get(key)
+        if held is None or held.authorization_id != authorization.authorization_id:
+            return False
+        del self.current[key]
+        self.history[authorization.authorization_id] = replace(
+            authorization, status="withdrawn", withdrawn_at=withdrawn_at
+        )
+        return True

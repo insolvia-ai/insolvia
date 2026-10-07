@@ -58,6 +58,8 @@ from typing import Any
 
 import jwt
 
+from insolvia_core.errors import ForbiddenError
+
 # Cognito signs with RS256 and only RS256. Listing it explicitly is what stops
 # an attacker downgrading to `none`, or to HS256 with the public key as the
 # shared secret.
@@ -132,6 +134,13 @@ class Principal:
     client_id: str
     scopes: tuple[str, ...]
     expires_at: int | None
+    # `auth_time`: when the person last actually signed in (typed a password
+    # at the pool), in epoch seconds. NOT the token's age — Cognito keeps the
+    # original `auth_time` on every token a refresh mints, which is exactly
+    # why it can answer "did they just re-authenticate?" when `iat` cannot.
+    # None when the token carries no usable claim; `require_recent_
+    # authentication` treats that as stale, never as fresh.
+    authenticated_at: int | None = None
 
 
 def settings_or_raise(issuer_url: str | None, client_id: str | None) -> AuthSettings:
@@ -330,6 +339,7 @@ def verify_access_token_for_clients(
         client_id=client_id,
         scopes=_scopes(claims.get("scope")),
         expires_at=expires_at if isinstance(expires_at, int) else None,
+        authenticated_at=_auth_time(claims),
     )
 
 
@@ -364,7 +374,16 @@ def principal_from_claims(
         client_id=client_id,
         scopes=_scopes(claims.get("scope")),
         expires_at=expires_at if isinstance(expires_at, int) else None,
+        authenticated_at=_auth_time(claims),
     )
+
+
+def _auth_time(claims: Mapping[str, Any]) -> int | None:
+    raw = claims.get("auth_time")
+    # `bool` is an `int` subclass; `"auth_time": true` is not a time.
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+        return None
+    return raw
 
 
 def _scopes(raw: Any) -> tuple[str, ...]:
@@ -372,6 +391,59 @@ def _scopes(raw: Any) -> tuple[str, ...]:
     if not isinstance(raw, str):
         return ()
     return tuple(raw.split())
+
+
+# ── Recent authentication (ADR 0024, guardrails 1 and 2) ────────────
+#
+# "Signs after re-authenticating" and "approves each filing, re-
+# authenticating at approval time" are the same check: the token's
+# `auth_time` — when the person last typed their password at the pool — is
+# no more than a few minutes old. NOT the token's `iat` and not the session's
+# age: Cognito copies the original `auth_time` into every token a refresh
+# mints, so an hour-old session with a just-refreshed token is still an
+# hour-old sign-in, and is refused. The app forces a fresh sign-in with
+# `prompt=login` on the authorize request (managed login only, which every
+# environment's pool uses — infra/modules/auth's `managed_login_version`).
+#
+# The window is the caller's to choose, per act. Guardrail 2's signature
+# uses `SIGNATURE_MAX_AGE_SECONDS`; PR 6's approval chooses its own.
+
+# Clock skew tolerated in the other direction: an `auth_time` this far in
+# the future (the pool's clock ahead of the API's) is still accepted, and one
+# further ahead is refused, because a time from the future is not a sign-in
+# that happened.
+AUTH_TIME_SKEW_SECONDS = 60
+
+
+class ReauthenticationRequiredError(ForbiddenError):
+    """The caller is signed in, but not RECENTLY enough for this act.
+
+    A 403, not a 401, on purpose: the token is valid and the session is fine
+    for everything else; a 401 would send the app's refresh-and-retry loop
+    round, and a refresh cannot help — it keeps `auth_time`. The API answers
+    `{"error": "ReauthenticationRequired"}` so the client knows the remedy
+    is a fresh sign-in (`prompt=login`), not a missing permission.
+    """
+
+
+def require_recent_authentication(
+    authenticated_at: int | None, *, now: float, max_age_seconds: int
+) -> int:
+    """`authenticated_at` (a Principal's `auth_time`) if it is within
+    `max_age_seconds` of `now`, else ReauthenticationRequiredError.
+
+    Refuses a missing time (never assume fresh), one older than the window,
+    and one more than AUTH_TIME_SKEW_SECONDS in the future. Pure: `now` is
+    an argument so the boundary is testable to the second.
+    """
+    if max_age_seconds <= 0:
+        raise ValueError("max_age_seconds must be positive")
+    if authenticated_at is None:
+        raise ReauthenticationRequiredError("sign in again to continue")
+    age = now - authenticated_at
+    if age > max_age_seconds or age < -AUTH_TIME_SKEW_SECONDS:
+        raise ReauthenticationRequiredError("sign in again to continue")
+    return authenticated_at
 
 
 # ── Google Workspace ID tokens (issue #209) ─────────────────────────

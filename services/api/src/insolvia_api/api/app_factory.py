@@ -5,6 +5,7 @@ import time
 
 from flask import Flask, Response, g, jsonify, request
 from flask.typing import ResponseReturnValue
+from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.errors import (
     ApiError,
     ConflictError,
@@ -235,6 +236,19 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     def conflict_error(error: ConflictError) -> ResponseReturnValue:
         # Same specific-before-general placement as the two below.
         return jsonify({"error": "ConflictError", "message": str(error)}), 409
+
+    @app.errorhandler(ReauthenticationRequiredError)
+    def reauthentication_required(
+        error: ReauthenticationRequiredError,
+    ) -> ResponseReturnValue:
+        # A ForbiddenError, registered above it for the same most-specific
+        # reason. Its own `error` code because its remedy differs from every
+        # other 403's: not a permission to ask an admin for, but a fresh
+        # sign-in (`prompt=login`) the client can start itself (ADR 0024).
+        return (
+            jsonify({"error": "ReauthenticationRequired", "message": str(error)}),
+            403,
+        )
 
     @app.errorhandler(ForbiddenError)
     def forbidden_error(error: ForbiddenError) -> ResponseReturnValue:

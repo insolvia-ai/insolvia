@@ -13,6 +13,7 @@ from insolvia_core.adapters.aws.document_request_store import (
 )
 from insolvia_core.adapters.aws.document_store import DynamoDbDocumentStore
 from insolvia_core.adapters.aws.filing_credentials import (
+    DynamoDbFilingAuthorizationStore,
     DynamoDbFilingCredentialStore,
     KmsCredentialSealer,
     filing_credentials_key_alias,
@@ -188,6 +189,10 @@ app = create_app(
         ),
         filing_credential_sealer=KmsCredentialSealer(
             filing_credentials_key_alias(config.case_table_name)
+        ),
+        # The signed authorization (guardrail 2), in the same vault table.
+        filing_authorization_store=DynamoDbFilingAuthorizationStore(
+            filing_credentials_table_name(config.case_table_name)
         ),
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.

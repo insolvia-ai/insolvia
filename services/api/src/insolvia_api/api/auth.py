@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import time
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
@@ -77,6 +78,7 @@ from insolvia_core.auth import (
     AuthSettings,
     bearer_token,
     key_id,
+    require_recent_authentication,
     settings_or_raise,
     verify_access_token,
 )
@@ -172,6 +174,23 @@ def current_principal() -> Principal:
     if principal is None:
         raise RuntimeError("current_principal() requires @require_auth on the view")
     return cast("Principal", principal)
+
+
+def require_fresh_sign_in(max_age_seconds: int) -> int:
+    """The caller's `auth_time`, if they signed in within `max_age_seconds`;
+    otherwise ReauthenticationRequiredError (403 `ReauthenticationRequired`).
+
+    For the acts ADR 0024 requires a fresh sign-in for — signing the filing
+    authorization (guardrail 2) and approving a filing (guardrail 1, PR 6).
+    The rule is `insolvia_core.auth.require_recent_authentication`; this is
+    the request's clock and principal applied to it. Call it inside a view
+    behind `@require_auth`.
+    """
+    return require_recent_authentication(
+        current_principal().authenticated_at,
+        now=time.time(),
+        max_age_seconds=max_age_seconds,
+    )
 
 
 def resolve_accessor() -> Accessor | None:

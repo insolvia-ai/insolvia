@@ -27,6 +27,7 @@ export type {
   SessionProviderProps,
   SessionStatus,
   SessionUser,
+  SignInOptions,
 } from './session-provider';
 
 // The client portal's session (ADR 0023): a second provider, memory-only —
