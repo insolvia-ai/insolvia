@@ -475,6 +475,25 @@ module "firm_store" {
   deletion_protection    = false
   tags                   = local.common_tags
 }
+
+# ── Filing credentials (ADR 0024, guardrail 3) ──────────────────
+# The vault — the module says how its key policy keeps Decrypt to the filing
+# worker's role alone. Staging is where the maintainer enrols the courts'
+# TRAINING-database logins (ADR 0024 § Three environments), through the same
+# enrolment screen; never seeded. Disposable like the rest of staging.
+module "filing_credentials" {
+  source = "../../modules/filing_credentials"
+
+  project                     = "insolvia"
+  environment                 = local.environment
+  table_kms_key_arn           = module.case_store.kms_key_arn
+  access_log_table_arn        = module.case_store.access_log_table_arn
+  api_role_name               = module.api_service.lambda_role_name
+  point_in_time_recovery      = false
+  deletion_protection         = false
+  key_deletion_window_in_days = 7
+  tags                        = local.common_tags
+}
 # ── Case documents ──────────────────────────────────────────────
 # Takes the case store's key rather than minting one: one key protects one
 # case, rows and documents alike, and the deploy role's data-plane deny is
@@ -622,9 +641,16 @@ module "audit_trail" {
   project     = "insolvia"
   environment = local.environment
 
-  # The case table, and its indexes via starts_with. The case document bucket
-  # joins this list when 8.6 lands.
-  data_resource_arns = [module.case_store.table_arn]
+  # The case table, and its indexes via starts_with; the filing-credential
+  # vault's table (ADR 0024, guardrail 3).
+  data_resource_arns = [
+    module.case_store.table_arn,
+    module.filing_credentials.table_arn,
+  ]
+
+  # The vault KEY's seals and opens are management events (the module's
+  # selector note) — this is what puts them in the retained record.
+  include_management_events = true
 
   retention_days = 90
   tags           = local.common_tags

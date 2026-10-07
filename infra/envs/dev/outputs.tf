@@ -33,6 +33,21 @@ output "case_kms_key_alias" {
   value       = module.case_store.kms_key_alias
 }
 
+output "filing_credentials_table_name" {
+  description = "This machine's filing-credential vault table. Nothing needs it configured — the API derives it from CASE_TABLE_NAME — printed for the dev proof."
+  value       = module.filing_credentials.table_name
+}
+
+output "filing_credentials_key_alias" {
+  description = "Alias of this machine's vault key — only the filing worker's role may Decrypt under it."
+  value       = module.filing_credentials.kms_key_alias
+}
+
+output "filing_worker_role_arn" {
+  description = "This machine's filing worker role. Assumable by the developer in dev only, to prove the worker's open."
+  value       = module.filing_credentials.worker_role_arn
+}
+
 output "auth_user_pool_id" {
   description = "This machine's Cognito user pool ID."
   value       = module.auth.user_pool_id

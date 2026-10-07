@@ -262,9 +262,11 @@ resource "aws_cloudtrail" "audit" {
   enable_log_file_validation    = true
   enable_logging                = true
 
-  # Management events are deliberately excluded. They would double the volume
+  # Management events are excluded by default. They would double the volume
   # to say things the Terraform diff already says, and this trail's job is the
-  # data plane.
+  # data plane — EXCEPT that KMS key use is a management event, so a root
+  # holding the filing-credential vault opts in (include_management_events,
+  # the second selector below).
   advanced_event_selector {
     name = "Case data access"
 
@@ -279,6 +281,31 @@ resource "aws_cloudtrail" "audit" {
     field_selector {
       field       = "resources.ARN"
       starts_with = var.data_resource_arns
+    }
+  }
+
+  # KMS key use (ADR 0024, guardrail 3: "CloudTrail data events on the key").
+  # CloudTrail does not classify KMS cryptographic calls — Decrypt,
+  # GenerateDataKey — as DATA events; they are MANAGEMENT events, and an
+  # advanced selector can only EXCLUDE kms.amazonaws.com from management
+  # events, never select it alone. So the only way to retain a record of
+  # every open of the credential vault past Event History's 90 days is to
+  # record management events. The record is the point: each Decrypt event
+  # carries the encryption context — firm, attorney, credential — and the
+  # calling principal, so "who opened which attorney's credential" is
+  # answerable from AWS's side as well as from the application's row. It
+  # also retains the escape hatches modules/filing_credentials names
+  # (PutKeyPolicy, UpdateAssumeRolePolicy), which until now lived only in
+  # Event History.
+  dynamic "advanced_event_selector" {
+    for_each = var.include_management_events ? [1] : []
+    content {
+      name = "Management events, including KMS key use"
+
+      field_selector {
+        field  = "eventCategory"
+        equals = ["Management"]
+      }
     }
   }
 

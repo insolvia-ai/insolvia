@@ -980,6 +980,44 @@ data "aws_iam_policy_document" "github_permissions" {
     }
   }
 
+  # The filing-credential vault (ADR 0024, guardrail 3) — attorneys' CM/ECF
+  # passwords and TOTP seeds. Its key policy ALREADY denies Decrypt to every
+  # principal but the filing worker's role, this one included, so on the day
+  # this lands the statement adds nothing the key does not already say.
+  #
+  # It exists for the day after. The pipeline holds kms:PutKeyPolicy
+  # (EncryptionKeyManagement above), so it could rewrite the vault key's
+  # policy and drop that deny; an identity-policy deny it cannot edit
+  # (DenySelfPrivilegeEscalation) is what keeps even that pipeline unable to
+  # open a credential ITSELF. Same shape, same alias-laziness trade, and the
+  # same mid-string wildcard as DenyCaseDataDecryption above — the pattern
+  # must track modules/filing_credentials' `alias/${local.name}`.
+  #
+  # NOT REQUIRED FOR THE VAULT TO DEPLOY. Every permission the deploy needs to
+  # create the key, its alias, the table and the worker's role is already
+  # held (EncryptionKeyCreate/Management, EncryptionKeyAliases,
+  # WaitlistTableManagement's table/insolvia-*, ServiceRoleManagement's
+  # role/insolvia-*). This is hardening, applied by a human like every change
+  # here; staging deploys with or without it.
+  statement {
+    sid    = "DenyFilingCredentialDecryption"
+    effect = "Deny"
+    actions = [
+      "kms:Decrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:ReEncryptFrom",
+      "kms:ReEncryptTo",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "ForAnyValue:StringLike"
+      variable = "kms:ResourceAliases"
+      values   = ["alias/insolvia-*-filing-credentials"]
+    }
+  }
+
   # An audit log the pipeline can erase is not an audit log. Terraform may
   # create, configure and tag the trail's bucket, but never remove what has
   # been written to it — including versioned overwrites, which are the obvious
