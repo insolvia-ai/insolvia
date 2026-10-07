@@ -266,3 +266,101 @@ def test_a_local_plan_form_without_a_title_fails_the_load(tmp_path: Path):
     (release_dir / "districts" / "flsb.json").write_text(json.dumps(real))
     with pytest.raises(ValueError, match="needs a title"):
         courts.load_registry(tmp_path / "regulatory")
+
+
+# --- The filing set's two facts (ADR 0024 build PR 3) -----------------------
+
+
+def test_every_district_states_its_docket_order_and_file_names(release):
+    # The latest release carries both keys on every record, so "unknown" is
+    # something the record SAYS, never a key someone forgot.
+    root = Path(courts.__file__).parent / "regulatory/courts/us-bankruptcy"
+    districts = root / release.release_id.split("@")[1] / "districts"
+    for path in sorted(districts.glob("*.json")):
+        opening = json.loads(path.read_text())["opening"]
+        assert "docket_order" in opening, path.name
+        assert "file_names" in opening, path.name
+    for district in release.districts:
+        for fact in (district.opening.docket_order, district.opening.file_names):
+            # Nothing is guessed: an unverified answer carries no value, and
+            # every one says why (the filing set shows the note).
+            assert fact.verified or fact.value is None, district.code
+            assert fact.note, district.code
+
+
+@pytest.mark.parametrize("release_id", ["2026-09-24", "2026-09-26", "2026-09-26+2"])
+def test_a_release_before_the_filing_set_facts_loads_them_as_unknown(release_id):
+    earlier = courts.get(f"courts/us-bankruptcy@{release_id}")
+    for district in earlier.districts:
+        assert district.opening.docket_order.value is None
+        assert not district.opening.docket_order.verified
+        assert district.opening.file_names.value is None
+        assert "2026-10-06" in district.opening.file_names.note
+
+
+def test_the_filing_set_release_adds_only_the_two_opening_facts():
+    before = courts.get("courts/us-bankruptcy@2026-09-26+2")
+    after = courts.get("courts/us-bankruptcy@2026-10-06")
+    for old, new in zip(before.districts, after.districts, strict=True):
+        opening = dataclasses.replace(
+            new.opening,
+            docket_order=old.opening.docket_order,
+            file_names=old.opening.file_names,
+        )
+        assert dataclasses.replace(new, opening=opening) == old, old.code
+
+
+def _filing_set_release(tmp_path: Path, mutate) -> Path:
+    here = Path(courts.__file__).parent / "regulatory/courts/us-bankruptcy/2026-10-06"
+    release_dir = tmp_path / "regulatory" / "courts" / "us-bankruptcy" / "2026-10-06"
+    (release_dir / "districts").mkdir(parents=True)
+    (release_dir / "manifest.json").write_text((here / "manifest.json").read_text())
+    real = json.loads((here / "districts" / "txwb.json").read_text())
+    mutate(real["opening"])
+    (release_dir / "districts" / "txwb.json").write_text(json.dumps(real))
+    return tmp_path / "regulatory"
+
+
+def test_a_docket_order_with_an_unknown_document_key_fails_the_load(tmp_path: Path):
+    def mutate(opening):
+        opening["docket_order"]["value"] = ["form/b101", "the petition"]
+
+    with pytest.raises(ValueError, match="not a document key"):
+        courts.load_registry(_filing_set_release(tmp_path, mutate))
+
+
+def test_a_docket_order_naming_a_document_twice_fails_the_load(tmp_path: Path):
+    def mutate(opening):
+        opening["docket_order"]["value"] = ["form/b101", "form/b101"]
+
+    with pytest.raises(ValueError, match="appears twice"):
+        courts.load_registry(_filing_set_release(tmp_path, mutate))
+
+
+@pytest.mark.parametrize("name", ["../petition.pdf", "petition.exe", "petition.pdf\n"])
+def test_a_file_name_that_is_not_a_plain_upload_name_fails_the_load(
+    tmp_path: Path, name: str
+):
+    def mutate(opening):
+        opening["file_names"]["value"] = {"form/b101": name}
+
+    with pytest.raises(ValueError, match=r"plain \.pdf/\.txt file name"):
+        courts.load_registry(_filing_set_release(tmp_path, mutate))
+
+
+def test_a_well_formed_docket_order_and_file_names_load(tmp_path: Path):
+    def mutate(opening):
+        opening["docket_order"]["value"] = ["form/b101", "creditor_matrix"]
+        opening["file_names"]["value"] = {
+            "form/b101": "Petition.pdf",
+            "creditor_matrix": "Creditor.txt",
+        }
+
+    (loaded,) = courts.load_registry(_filing_set_release(tmp_path, mutate))
+    txwb = loaded.district("txwb")
+    assert txwb is not None
+    assert txwb.opening.docket_order.value == ("form/b101", "creditor_matrix")
+    assert txwb.opening.file_names.value == {
+        "form/b101": "Petition.pdf",
+        "creditor_matrix": "Creditor.txt",
+    }

@@ -268,7 +268,19 @@ order. Nothing here needs a new decision except where marked.
    card on the portal landing screen. No Terraform change: the item sits in
    the firm partition under the API's existing grant. #363 hangs its
    questions off the section ids.
-4. **ADR 0024 PRs 3–11** — the filing set and checklist per court, then the
+4. **ADR 0024 PRs 4–11.** ~~PR 3, the filing set and checklist~~ — built:
+   `GET /v1/cases/<id>/filing-set` (`core/filing_set.py`) lists the packet's
+   documents in the court's docket order under its upload names, checks each
+   file for size (the court's cap, else the strictest any launch court
+   records), a text layer and US-letter pages against measurements the
+   assembly worker now stores on the packet record (counts only — B121 is a
+   part), marks B121 restricted or not filed per the registry, and builds a
+   checklist from the record (what is missing and where to fix it; the
+   court's signature instrument, local forms, fee and registration; every
+   unverified registry fact as "confirm"). The registry's `@2026-10-06`
+   release adds `opening.docket_order` and `opening.file_names` — unverified
+   with no value in all ten districts, so the packet's own order and names
+   apply. The packet screen shows both. No Terraform change. Next: the
    credential vault, the written authorization, per-filing approval, the
    filing worker with a local fake CM/ECF, filed-state capture, the Case
    Upload file, per-court drivers verified on training databases, and the fee

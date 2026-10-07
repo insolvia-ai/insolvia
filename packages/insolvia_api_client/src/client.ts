@@ -72,6 +72,11 @@ import type {
   ProspectStage,
   CaseEntityRequest,
   CaseForm,
+  FilingChecklistItem,
+  FilingDocument,
+  FilingSet,
+  FilingSetBasis,
+  FilingSetCheck,
   CaseLiens,
   CaseMeansTest,
   CaseProblem,
@@ -1671,6 +1676,24 @@ export class InsolviaApiClient {
     );
     const decoded = await decodeExpected(response, 200);
     return requireArrayOf(decoded, 'forms', 'CaseForm', caseFormFromJson);
+  }
+
+  /**
+   * `GET /v1/cases/{caseId}/filing-set` — the filing set and hand-off
+   * checklist for the case's court (ADR 0024 build PR 3): the documents in
+   * the court's docket order and upload names, each checked against the
+   * court's size, text-layer and page-size rules, and a checklist saying
+   * what is ready, what is missing and why, and where in the app to fix it.
+   * Files nothing. Like {@link getCase}, a 404 means the case is unknown
+   * *or* not the caller's.
+   */
+  async getCaseFilingSet(caseId: string): Promise<FilingSet> {
+    const headers = await this.#protectedHeaders();
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filing-set`,
+      { method: 'GET', headers },
+    );
+    return filingSetFromJson(await decodeExpected(response, 200));
   }
 
   /**
@@ -3746,6 +3769,87 @@ function caseFormFromJson(response: DecodedResponse): CaseForm {
     metric: metric === undefined ? undefined : formMetricFromJson(metric),
     problems: requireArrayOf(response, 'problems', 'CaseProblem', caseProblemFromJson),
     openTaskCount: requireNumber(response, 'openTaskCount'),
+  });
+}
+
+function requireOneOf<const T extends string>(
+  response: DecodedResponse,
+  key: string,
+  allowed: readonly T[],
+): T {
+  const value = requireString(response, key);
+  if (!(allowed as readonly string[]).includes(value)) {
+    throw malformedField(response, key, allowed.map((a) => `'${a}'`).join(' | '));
+  }
+  return value as T;
+}
+
+const FILING_SET_BASES: readonly FilingSetBasis[] = ['court', 'court_unverified', 'default'];
+
+function filingSetCheckFromJson(response: DecodedResponse): FilingSetCheck {
+  return {
+    check: requireOneOf(response, 'check', ['size', 'text_layer', 'page_size']),
+    outcome: requireOneOf(response, 'outcome', ['pass', 'fail', 'warn', 'unmeasured']),
+    message: requireString(response, 'message'),
+  };
+}
+
+function filingDocumentFromJson(response: DecodedResponse): FilingDocument {
+  return definedMembers<FilingDocument>({
+    key: requireString(response, 'key'),
+    title: requireString(response, 'title'),
+    fileName: requireString(response, 'fileName'),
+    source: requireOneOf(response, 'source', ['packet', 'outside']),
+    handling: requireOneOf(response, 'handling', ['file', 'own_event', 'restricted', 'not_filed']),
+    checks: requireArrayOf(response, 'checks', 'FilingSetCheck', filingSetCheckFromJson),
+    note: optionalString(response, 'note'),
+  });
+}
+
+function filingChecklistItemFromJson(response: DecodedResponse): FilingChecklistItem {
+  return definedMembers<FilingChecklistItem>({
+    id: requireString(response, 'id'),
+    status: requireOneOf(response, 'status', ['ready', 'missing', 'action', 'confirm']),
+    title: requireString(response, 'title'),
+    detail: requireString(response, 'detail'),
+    link: optionalString(response, 'link'),
+  });
+}
+
+/**
+ * Decodes a {@link FilingSet} — `filing_set_json` in
+ * services/api api/routes/filing_set.py: `court`, `court.divisionName` and
+ * `packet` absent, never null, when there is none.
+ */
+function filingSetFromJson(response: DecodedResponse): FilingSet {
+  const court = optionalObject(response, 'court');
+  const packet = optionalObject(response, 'packet');
+  return definedMembers<FilingSet>({
+    court:
+      court === undefined
+        ? undefined
+        : definedMembers<NonNullable<FilingSet['court']>>({
+            code: requireString(court, 'code'),
+            name: requireString(court, 'name'),
+            divisionName: optionalString(court, 'divisionName'),
+          }),
+    registryRelease: requireString(response, 'registryRelease'),
+    filingMethod: requireOneOf(response, 'filingMethod', ['hand_off']),
+    packet:
+      packet === undefined
+        ? undefined
+        : { id: requireString(packet, 'id'), createdAt: requireString(packet, 'createdAt') },
+    orderBasis: requireOneOf(response, 'orderBasis', FILING_SET_BASES),
+    namesBasis: requireOneOf(response, 'namesBasis', FILING_SET_BASES),
+    maxBytes: requireNumber(response, 'maxBytes'),
+    maxBytesBasis: requireOneOf(response, 'maxBytesBasis', FILING_SET_BASES),
+    documents: requireArrayOf(response, 'documents', 'FilingDocument', filingDocumentFromJson),
+    checklist: requireArrayOf(
+      response,
+      'checklist',
+      'FilingChecklistItem',
+      filingChecklistItemFromJson,
+    ),
   });
 }
 

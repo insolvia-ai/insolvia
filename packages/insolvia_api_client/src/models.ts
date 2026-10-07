@@ -1944,6 +1944,92 @@ export interface CaseForm {
   readonly openTaskCount: number;
 }
 
+/** Which of the three file checks a {@link FilingSetCheck} is. */
+export type FilingSetCheckName = 'size' | 'text_layer' | 'page_size';
+
+/**
+ * A check's result. `unmeasured` means nobody has measured the file — no
+ * filing-set packet yet, a packet from before measurement, or a document
+ * prepared outside Insolvia — never "it passed".
+ */
+export type FilingSetCheckOutcome = 'pass' | 'fail' | 'warn' | 'unmeasured';
+
+export interface FilingSetCheck {
+  readonly check: FilingSetCheckName;
+  readonly outcome: FilingSetCheckOutcome;
+  readonly message: string;
+}
+
+/**
+ * How a document reaches the docket: uploaded as listed (`file`), as an
+ * event of its own, under the court's restricted SSN-statement event
+ * (B121), or not at all (B121 in a court that takes the number on its
+ * opening screen instead).
+ */
+export type FilingDocumentHandling = 'file' | 'own_event' | 'restricted' | 'not_filed';
+
+/** One document of the filing set, in the court's docket order. */
+export interface FilingDocument {
+  /** `form/<x>`, `creditor_matrix`, `signature_instrument` or `matrix_certification`. */
+  readonly key: string;
+  readonly title: string;
+  /** The name to upload it under — the packet zip's own unless the court prescribes one. */
+  readonly fileName: string;
+  /** `packet`: in Insolvia's packet zip. `outside`: prepared outside Insolvia. */
+  readonly source: 'packet' | 'outside';
+  readonly handling: FilingDocumentHandling;
+  readonly checks: readonly FilingSetCheck[];
+  /** Absent when there is nothing to add. */
+  readonly note?: string;
+}
+
+/**
+ * A checklist line's state. `action` is a step the attorney takes outside
+ * Insolvia; `confirm` is a court fact the registry has not verified.
+ */
+export type ChecklistItemStatus = 'ready' | 'missing' | 'action' | 'confirm';
+
+export interface FilingChecklistItem {
+  readonly id: string;
+  readonly status: ChecklistItemStatus;
+  readonly title: string;
+  readonly detail: string;
+  /**
+   * An app segment under `/cases/{caseId}/` (`''` is the case overview) —
+   * absent when the step happens outside Insolvia.
+   */
+  readonly link?: string;
+}
+
+/** Where a per-court figure came from: the court (verified or not), or the common default. */
+export type FilingSetBasis = 'court' | 'court_unverified' | 'default';
+
+/**
+ * `GET /v1/cases/{caseId}/filing-set` (ADR 0024 build PR 3) — the documents
+ * the attorney files, in the court's docket order and names, each checked
+ * against the court's file rules, and the hand-off checklist built from the
+ * case record. Files nothing; carries no tax identifier.
+ */
+export interface FilingSet {
+  /** Absent when the case names no court from the registry. */
+  readonly court?: {
+    readonly code: string;
+    readonly name: string;
+    readonly divisionName?: string;
+  };
+  readonly registryRelease: string;
+  /** Always `hand_off` until a court's filing driver is verified. */
+  readonly filingMethod: 'hand_off';
+  /** The filing-set packet the checks judged; absent when none is assembled. */
+  readonly packet?: { readonly id: string; readonly createdAt: string };
+  readonly orderBasis: FilingSetBasis;
+  readonly namesBasis: FilingSetBasis;
+  readonly maxBytes: number;
+  readonly maxBytesBasis: FilingSetBasis;
+  readonly documents: readonly FilingDocument[];
+  readonly checklist: readonly FilingChecklistItem[];
+}
+
 /**
  * `GET /v1/cases/{caseId}/forms/{form}/preview` — the creditor-matrix
  * route's own 200-either-way contract, applied to one form: a short-lived
