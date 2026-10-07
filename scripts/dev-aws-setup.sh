@@ -93,6 +93,12 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
     ! grep -q "^AUTH_CLIENT_IDS=" "$REPO_ROOT/services/mcp/.env"; then
     die "services/mcp/.env is missing or stale. Run setup without --check."
   fi
+  if [[ ! -f "$REPO_ROOT/services/filing/.env" ]] ||
+    ! grep -q "^CASE_TABLE_NAME=$case_table\$" "$REPO_ROOT/services/filing/.env" ||
+    ! grep -q "^FILING_QUEUE_URL=$filing_queue_url\$" "$REPO_ROOT/services/filing/.env" ||
+    ! grep -q "^FILING_WORKER_ROLE_ARN=" "$REPO_ROOT/services/filing/.env"; then
+    die "services/filing/.env is missing or stale. Run setup without --check."
+  fi
   ok "Per-machine AWS resources and services/api/.env are ready."
   exit 0
 fi
@@ -118,6 +124,7 @@ google_admin_client_id="$(jq -r '.google_admin_client_id.value' <<<"$outputs")"
 job_queue_url="$(jq -r '.job_queue_url.value' <<<"$outputs")"
 filing_queue_url="$(jq -r '.filing_queue_url.value' <<<"$outputs")"
 mcp_auth_client_ids="$(jq -r '.mcp_auth_client_ids.value' <<<"$outputs")"
+filing_worker_role_arn="$(jq -r '.filing_worker_role_arn.value' <<<"$outputs")"
 
 # ── Wire services/api at the real table ─────────────────────────
 # Mechanism (chosen after reading services/api/docker-compose.yml): docker
@@ -154,7 +161,7 @@ upsert_env "$api_env" CASE_DOCUMENT_BUCKET "$document_bucket"
 # insolvia_api.entrypoints.worker_poller` (same .env) runs them.
 upsert_env "$api_env" JOB_QUEUE_URL "$job_queue_url"
 # The filing queue (ADR 0024 PR 6): an attorney's approval puts its one
-# filing job here. Nothing consumes it until services/filing (PR 7).
+# filing job here; services/filing's local poller consumes it.
 upsert_env "$api_env" FILING_QUEUE_URL "$filing_queue_url"
 upsert_env "$api_env" INSOLVIA_ENV "local"
 upsert_env "$api_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
@@ -202,6 +209,27 @@ upsert_env "$mcp_env" INSOLVIA_ENV "local"
 upsert_env "$mcp_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
 upsert_env "$mcp_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
 
+# ── Wire services/filing at the same resources (ADR 0024 PR 7) ──
+# The filing worker reads the case table (the approval, the record its digest
+# is computed over, the packet), writes its filing record and the receipt,
+# opens the vault and consumes the filing queue. Locally it runs as the
+# filing worker's ROLE, not as the developer: FILING_WORKER_ROLE_ARN is what
+# the poller assumes (infra/envs/dev trusts this machine's principal to), so
+# a laptop run is held to the role's real grants and the vault key's policy.
+# FILING_SUBMISSIONS_ENABLED is the local stand-in for the kill switch — on,
+# because the only court a laptop can reach is the fake (core/fence.py);
+# FAKE_CMECF_URL is set by services/filing/scripts/dev-up.sh at run time.
+filing_env="$REPO_ROOT/services/filing/.env"
+upsert_env "$filing_env" CASE_TABLE_NAME "$case_table"
+upsert_env "$filing_env" CASE_ACCESS_LOG_TABLE_NAME "$access_log_table"
+upsert_env "$filing_env" CASE_DOCUMENT_BUCKET "$document_bucket"
+upsert_env "$filing_env" FILING_QUEUE_URL "$filing_queue_url"
+upsert_env "$filing_env" FILING_WORKER_ROLE_ARN "$filing_worker_role_arn"
+upsert_env "$filing_env" FILING_SUBMISSIONS_ENABLED "true"
+upsert_env "$filing_env" INSOLVIA_ENV "local"
+upsert_env "$filing_env" AWS_PROFILE "$AWS_PROFILE_VALUE"
+upsert_env "$filing_env" AWS_DEFAULT_REGION "$AWS_REGION_VALUE"
+
 # ── Wire the Expo app at the same pool ──────────────────────────
 # The app reads these two at BUILD time, not runtime: Expo inlines only
 # `EXPO_PUBLIC_*`-prefixed variables into the bundle, and it loads them from
@@ -225,7 +253,7 @@ upsert_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID "$web_client_id"
 # says "sign-in is not configured" and the staff app is unaffected.
 upsert_env "$app_env" EXPO_PUBLIC_COGNITO_PORTAL_CLIENT_ID "$portal_client_id"
 
-ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env and apps/insolvia_app/.env were updated."
+ok "AWS development resources are ready; services/api/.env, services/admin/.env, services/mcp/.env, services/filing/.env and apps/insolvia_app/.env were updated."
 
 # If setup is reapplied while the API container is already running, replace it
 # so it picks up the new table name and the freshly exported credentials —

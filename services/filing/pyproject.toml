@@ -1,0 +1,44 @@
+[project]
+name = "insolvia-filing"
+version = "0.1.0"
+description = "The Insolvia filing worker — files an approved case on CM/ECF, one SQS job at a time (ADR 0024)"
+requires-python = ">=3.12"
+# Runtime dependencies are pinned in requirements.txt, mailer-style; the
+# Docker image and CI install from there rather than from this metadata.
+dependencies = []
+
+[tool.pytest.ini_options]
+# Three roots, each for a reason (services/filing/CLAUDE.md):
+#   src            — this service;
+#   ../api/src     — the filing set and its approval digest, which live in the
+#                    API's core beside the forms engine they are computed
+#                    from, and which this worker must compute IDENTICALLY
+#                    (README, "Why the worker imports insolvia_api.core");
+#   fake           — the fake CM/ECF server, a dev/CI fixture that is never
+#                    copied into the image.
+pythonpath = ["src", "../api/src", "fake"]
+testpaths = ["tests/unit"]
+# --strict-markers / --strict-config: same guards as services/api's
+# pyproject, for the same reasons.
+addopts = "-q --strict-markers --strict-config"
+markers = []
+
+# Strict static type checking (mirrors the CI `mypy` step). Scoped to `src`
+# and the fake; the API's core arrives through mypy_path and is checked by its
+# own unit, not twice here.
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src:../api/src:fake"
+files = ["src", "fake"]
+
+[[tool.mypy.overrides]]
+# The API's core is type-checked by services/api's own gate; here its types
+# are USED (silently followed), not re-reported.
+module = ["insolvia_api.*"]
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship no type information.
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true

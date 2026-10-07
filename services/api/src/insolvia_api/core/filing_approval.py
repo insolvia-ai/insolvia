@@ -112,17 +112,20 @@ from insolvia_core.filing_credentials import (
 )
 
 from .filing_set import FilingDocument, FilingSet, build_filing_set
-from .packet_assembly import CaseData
+from .packet_assembly import CaseData, read_case_data
 from .packets import Packet, PacketPart
 
 if TYPE_CHECKING:
+    from insolvia_core.cases import Case
     from insolvia_core.ports import (
         AccessLog,
+        CaseEntityStore,
+        DebtorStore,
         FilingAuthorizationStore,
         FilingCredentialStore,
     )
 
-    from .ports import FilingApprovalStore, FilingQueue
+    from .ports import FilingApprovalStore, FilingQueue, PacketStore
 
 # What the digest covers, by name — see the module docstring. A change to
 # `approval_basis`'s document is a new scheme.
@@ -409,6 +412,29 @@ def approval_basis(
         filing_set=filing_set,
         fee=fee,
         blockers=_blockers(data, filing_set),
+    )
+
+
+def basis_for_case(
+    case: Case,
+    *,
+    debtor_store: DebtorStore,
+    entity_store: CaseEntityStore,
+    packet_store: PacketStore,
+    as_of: date,
+) -> tuple[CaseData, ApprovalBasis]:
+    """`approval_basis` over the stores as they stand — the ONE composition
+    of it. The approval routes call this, and so does the filing worker
+    (services/filing) when it consumes the approval and again immediately
+    before the final submit: the same reads, the same registry release for
+    `as_of`, the same digest, or the worker would void approvals the API
+    just made."""
+    data = read_case_data(case, debtor_store=debtor_store, entity_store=entity_store)
+    return data, approval_basis(
+        data,
+        packets=packet_store.list_for_case(case.id),
+        release=courts.resolve(as_of),
+        as_of=as_of,
     )
 
 

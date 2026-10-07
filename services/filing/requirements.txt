@@ -1,0 +1,26 @@
+# The filing worker's runtime set. Deliberately small: the CM/ECF session is
+# driven with the standard library's http.client behind the environment host
+# fence (core/fence.py, adapters/http/fenced_client.py), so there is no HTTP
+# library here whose own connection pool could open a socket the fence never
+# saw. PR 10's per-court drivers bring the headless browser, and with it the
+# same fence on the browser's request routing.
+#
+# Same explicit pin as services/api, same reason: the Lambda runtime bundles a
+# boto3 whose version drifts under us.
+boto3==1.40.66
+# insolvia_core's token module and tax-id envelope import these by name; the
+# pins stay aligned with every other Python service.
+PyJWT[crypto]==2.13.0
+cryptography==50.0.1
+# The API's core — the filing set and the approval digest this worker must
+# compute byte-for-byte as the API does — renders and measures PDFs, and the
+# receipt this worker files with the case is drawn the same way. MUST equal
+# services/api/requirements.txt's pin: two copies of the forms engine on two
+# pypdf versions could disagree about a digest. tests/unit/test_packaging.py
+# compares the two lines.
+pypdf==6.16.2
+# The shared domain (ADR 0012): the vault's open, the access log, the case
+# stores and their adapters. A local path resolved against the CURRENT WORKING
+# DIRECTORY — every installer must run from this directory (CI's
+# working-directory does; the Dockerfile cd's here first).
+../../packages/insolvia_core

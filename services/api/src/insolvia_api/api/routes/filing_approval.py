@@ -42,7 +42,6 @@ from typing import Final
 
 from flask import Blueprint, Response, jsonify, request
 from flask.typing import ResponseReturnValue
-from insolvia_core import courts
 from insolvia_core.access_log import record_access
 from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.cases import Case
@@ -64,14 +63,14 @@ from insolvia_api.core.filing_approval import (
     FilingApproval,
     FilingQueueUnavailableError,
     FilingSetNotReadyError,
-    approval_basis,
     approval_json,
     approve_filing,
+    basis_for_case,
     basis_json,
     cancel_approval,
     current_approval,
 )
-from insolvia_api.core.packet_assembly import CaseData, read_case_data
+from insolvia_api.core.packet_assembly import CaseData
 from insolvia_api.core.ports import FilingApprovalStore, PacketStore
 
 logger = logging.getLogger(__name__)
@@ -159,15 +158,12 @@ def _case(deps: _Stores, case_id: str) -> Case:
 
 
 def _basis(deps: _Stores, case: Case) -> tuple[CaseData, ApprovalBasis]:
-    data = read_case_data(
-        case, debtor_store=deps.debtor_store, entity_store=deps.entity_store
-    )
-    today = datetime.now(UTC).date()
-    return data, approval_basis(
-        data,
-        packets=deps.packet_store.list_for_case(case.id),
-        release=courts.resolve(today),
-        as_of=today,
+    return basis_for_case(
+        case,
+        debtor_store=deps.debtor_store,
+        entity_store=deps.entity_store,
+        packet_store=deps.packet_store,
+        as_of=datetime.now(UTC).date(),
     )
 
 
