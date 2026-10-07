@@ -133,6 +133,7 @@ from insolvia_api.core.form_projections.b122c2 import files_b122c2
 from insolvia_api.core.form_templates import FormRelease, resolve_form
 from insolvia_api.core.jobs import Job, JobError
 from insolvia_api.core.packets import PACKET_CONTENT_TYPE, new_packet, packet_json
+from insolvia_api.core.pdf_measure import measure_parts
 
 if TYPE_CHECKING:
     from datetime import date
@@ -236,6 +237,14 @@ def chapter_form_series(chapter: int) -> tuple[str, ...]:
     """The unconditional form set a chapter files, before the per-case
     conditions `packet_form_series` applies."""
     return CHAPTER_13_FORM_SERIES if chapter == 13 else PACKET_FORM_SERIES
+
+
+def part_file_name(position: int, form: str) -> str:
+    """A form's name inside the packet zip — its position in the case's own
+    filed set (`packet_form_series`, 1-based) and its short form key. The
+    filing set (core/filing_set.py) uses the same name as its documented
+    default upload name, so the zip and the checklist cannot disagree."""
+    return f"{position:02d}-{form}.pdf"
 
 
 # The one fixed zip timestamp (1980-01-01, DOS epoch): determinism demands a
@@ -1226,7 +1235,7 @@ def assemble(
             # mode (e.g. "only" on a form with no signature line) — it
             # simply contributes nothing to this print, not a problem.
             continue
-        parts.append((f"{position:02d}-{release.form}.pdf", stamped))
+        parts.append((part_file_name(position, release.form), stamped))
     if problems:
         return tuple(problems)
 
@@ -1379,6 +1388,9 @@ def run_packet_assembly(
         creditor_count=outcome.creditor_count,
         created_by=job.created_by,
         options=options,
+        # What each file measures, for the filing set's PDF checks (ADR
+        # 0024 build PR 3) — taken now because nothing reads the bytes back.
+        parts=measure_parts(outcome.parts),
     )
     # Bytes first, record second: an object with no record is invisible and
     # harmless (nothing lists the bucket); a record with no object would be a

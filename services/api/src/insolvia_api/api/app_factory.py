@@ -39,6 +39,7 @@ from insolvia_api.api.routes.exemption_analysis import (
 from insolvia_api.api.routes.extraction_review import (
     blueprint as extraction_review_blueprint,
 )
+from insolvia_api.api.routes.filing_set import blueprint as filing_set_blueprint
 from insolvia_api.api.routes.firm import blueprint as firm_blueprint
 from insolvia_api.api.routes.firm_clients import blueprint as firm_clients_blueprint
 from insolvia_api.api.routes.firm_questionnaire import (
@@ -137,6 +138,8 @@ def create_app(dependencies: ApiDependencies) -> Flask:
     # /v1/cases/<id>/forms[/<form>/preview] — same static-segment argument
     # (issue 13.2 / #343).
     app.register_blueprint(forms_hub_blueprint)
+    # /v1/cases/<id>/filing-set — the hand-off checklist (ADR 0024 PR 3).
+    app.register_blueprint(filing_set_blueprint)
     # /v1/cases/<id>/extraction/... — same static-segment argument (8.9).
     app.register_blueprint(extraction_review_blueprint)
     # /v1/cases/<id>/events and /v1/firm/events (issue 14.6 / #358) — static
