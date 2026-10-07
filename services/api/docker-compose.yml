@@ -63,6 +63,10 @@ services:
       # (`python -m insolvia_api.entrypoints.worker_poller`, same .env);
       # unset composes the in-memory queue, which records and runs nothing.
       JOB_QUEUE_URL: ${JOB_QUEUE_URL:-}
+      # The filing queue (ADR 0024 PR 6): an approval's one filing job lands
+      # on this machine's real queue (no consumer until PR 7). Unset composes
+      # the in-memory queue, which records the job and sends nothing.
+      FILING_QUEUE_URL: ${FILING_QUEUE_URL:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}

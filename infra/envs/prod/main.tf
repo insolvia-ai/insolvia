@@ -459,6 +459,32 @@ module "filing_credentials" {
   key_deletion_window_in_days = 30
   tags                        = local.common_tags
 }
+
+# ── The filing queue (ADR 0024 PR 6, guardrail 1) ───────────────
+# Where the attorney's per-filing approval puts a filing job — the API's
+# role may send and nothing else, the filing worker's role (created by
+# module.filing_credentials above) may consume and never send. No consumer
+# until services/filing (PR 7): jobs wait, and expire with their approval.
+module "filing_queue" {
+  source = "../../modules/filing_queue"
+
+  project          = "insolvia"
+  environment      = local.environment
+  api_role_name    = module.api_service.lambda_role_name
+  worker_role_name = module.filing_credentials.worker_role_name
+  tags             = local.common_tags
+}
+
+# Into the API's SSM namespace, job-queue-url's way: the deploy workflow's
+# get-parameters-by-path step derives it into FILING_QUEUE_URL with no
+# workflow change.
+resource "aws_ssm_parameter" "filing_queue_url" {
+  name  = "/insolvia/${local.environment}/api/filing-queue-url"
+  type  = "String"
+  value = module.filing_queue.queue_url
+  tags  = local.common_tags
+}
+
 # ── Case documents ──────────────────────────────────────────────
 # Takes the case store's key rather than minting one: one key protects one
 # case, rows and documents alike, and the deploy role's data-plane deny is

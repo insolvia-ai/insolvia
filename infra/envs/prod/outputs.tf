@@ -62,6 +62,11 @@ output "jobs_queue_url" {
   value       = module.job_pipeline.queue_url
 }
 
+output "filing_queue_url" {
+  description = "Production filing queue URL (ADR 0024 PR 6) — also published to SSM as filing-queue-url for the API."
+  value       = module.filing_queue.queue_url
+}
+
 output "auth_user_pool_id" {
   description = "Production Cognito user pool ID."
   value       = module.auth.user_pool_id

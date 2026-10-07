@@ -22,6 +22,10 @@
 #     — its key, its table and the filing worker's role, so the key policy
 #     that keeps Decrypt to the worker is exercised here, not first met on
 #     staging;
+#   • the filing queue via modules/filing_queue (ADR 0024 PR 6) — the queue
+#     an attorney's approval puts a filing job on, so the dev proof
+#     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
+#     per-machine queue;
 #   • a Cognito pool via modules/auth, prepping local auth work (outputs
 #     only — nothing consumes it yet);
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
@@ -181,6 +185,21 @@ module "filing_credentials" {
   tags                        = local.common_tags
 }
 
+# ── The filing queue (ADR 0024 PR 6) ────────────────────────────
+# Where an approval puts a filing job — the real queue, per machine, as
+# job_pipeline's is. No API role here (the developer sends, playing the API
+# as for the vault); the consume grant lands on this machine's filing worker
+# role, which the dev proof does not need yet and PR 7's local poller will.
+module "filing_queue" {
+  source = "../../modules/filing_queue"
+
+  project          = "insolvia"
+  environment      = local.environment
+  api_role_name    = null
+  worker_role_name = module.filing_credentials.worker_role_name
+  tags             = local.common_tags
+}
+
 # ── Case documents ──────────────────────────────────────────────
 # The same module staging and prod instantiate, encrypting under the same case
 # key, so local development exercises the real bucket policy — TLS-only,
@@ -331,6 +350,16 @@ resource "aws_ssm_parameter" "job_queue_url" {
   name  = "/insolvia/${local.environment}/api/job-queue-url"
   type  = "String"
   value = module.job_pipeline.queue_url
+  tags  = local.common_tags
+}
+
+# The filing queue's URL, same namespace-parity reasoning. A developer
+# consumes the filing_queue_url output, which dev-aws-setup.sh writes into
+# services/api/.env as FILING_QUEUE_URL.
+resource "aws_ssm_parameter" "filing_queue_url" {
+  name  = "/insolvia/${local.environment}/api/filing-queue-url"
+  type  = "String"
+  value = module.filing_queue.queue_url
   tags  = local.common_tags
 }
 
