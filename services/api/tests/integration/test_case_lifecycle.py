@@ -29,7 +29,7 @@ scratch client ends retained, with today's date: nothing else reads it.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, datetime
 from typing import Any
 
 from tests.integration.conftest import Api
@@ -99,11 +99,15 @@ def test_a_copy_retains_a_staged_prospect_moves_names_its_source_and_deletes(
     )
     assert staged["prospect_stage"] == "awaiting_signed_agreement"
 
+    # The API stamps the retained date in UTC; the machine running this may
+    # be on another calendar day, and a run can straddle UTC midnight.
+    before = datetime.now(UTC).date().isoformat()
     copy = admin.post(f"/v1/cases/{source_id}/copy", {}, expect=201)
+    after = datetime.now(UTC).date().isoformat()
     copy_id = copy["id"]
     try:
         retained = admin.get(client_url)
-        assert retained["first_retained_at"] == date.today().isoformat()
+        assert retained["first_retained_at"] in {before, after}
         assert "prospect_stage" not in retained
         admin.put(
             f"{client_url}/prospect-stage", {"prospect_stage": "possible"}, expect=409
