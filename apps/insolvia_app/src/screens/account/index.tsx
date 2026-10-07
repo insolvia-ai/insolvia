@@ -10,6 +10,8 @@ import { AppShell } from '@/components/app-shell';
 import { Heading } from '@/components/heading';
 import { MePanel } from '@/components/me-panel';
 import { useSession } from '@/session';
+
+import { FilingCredentials } from './filing-credentials';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
 type Notice = { readonly tone: 'saved' | 'error'; readonly message: string };
@@ -142,6 +144,14 @@ export function Account({ membership }: { membership: FirmMembership }) {
       </Text>
 
       {permits(membership.permissions.events, 'view_only') ? <CalendarFeed /> : null}
+
+      {/* ADR 0024's credential vault — only for a member an admin has granted
+          `electronic_filing`, hidden for every role by default. */}
+      {permits(membership.permissions.electronic_filing, 'view_only') ? (
+        <FilingCredentials
+          canChange={permits(membership.permissions.electronic_filing, 'add_edit')}
+        />
+      ) : null}
 
       {/* Collapsed, and last. It was on the home screen while the pipeline was
           the product; see the component for why it survives at all. */}
