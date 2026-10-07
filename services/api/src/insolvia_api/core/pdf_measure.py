@@ -18,6 +18,7 @@ its text is the debtor's full Social Security number.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import re
 from typing import Final
@@ -64,9 +65,13 @@ def measure_part(name: str, content: bytes) -> PacketPart:
     A PDF that cannot be parsed is measured as zero pages: the filing set
     then reports it as having no text layer and no letter pages to vouch
     for, which fails it — the right answer for a file a court's own reader
-    may refuse too."""
+    may refuse too.
+
+    Every part also gets the SHA-256 of its bytes — the per-document digest
+    the attorney's approval binds to (core/filing_approval.py)."""
+    digest = hashlib.sha256(content).hexdigest()
     if not name.lower().endswith(".pdf"):
-        return PacketPart(name=name, byte_size=len(content))
+        return PacketPart(name=name, byte_size=len(content), sha256=digest)
     try:
         reader = PdfReader(io.BytesIO(content))
         pages = list(reader.pages)
@@ -80,6 +85,7 @@ def measure_part(name: str, content: bytes) -> PacketPart:
             non_letter_pages=0,
             pages_without_text=0,
             unreadable=True,
+            sha256=digest,
         )
     return PacketPart(
         name=name,
@@ -87,6 +93,7 @@ def measure_part(name: str, content: bytes) -> PacketPart:
         page_count=len(pages),
         non_letter_pages=non_letter,
         pages_without_text=without_text,
+        sha256=digest,
     )
 
 

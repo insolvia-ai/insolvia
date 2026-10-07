@@ -16,6 +16,7 @@ from insolvia_core.cases import Case
 from insolvia_api.core.calendar_feed import CalendarToken
 from insolvia_api.core.events import Event, EventScope
 from insolvia_api.core.extraction import ExtractionModelResult, ExtractionRequest
+from insolvia_api.core.filing_approval import FilingApproval
 from insolvia_api.core.jobs import Job
 from insolvia_api.core.mail import OutboundEmail
 from insolvia_api.core.packets import Packet
@@ -239,6 +240,73 @@ class JobQueue(Protocol):
     """
 
     def enqueue(self, job: Job) -> None: ...
+
+
+class FilingApprovalStore(Protocol):
+    """Persists the attorney's per-filing approvals (core/filing_approval.py;
+    ADR 0024, guardrail 1) — child items of the case partition, beside ONE
+    pointer item naming the case's current approval.
+
+    Every write is conditional; the conditions ARE the guardrail: one live
+    approval per case, used once, never after expiry or a change."""
+
+    def current(self, case_id: str) -> FilingApproval | None:
+        """The approval the pointer names, strongly consistent, or None."""
+        ...
+
+    def get(self, case_id: str, approval_id: str) -> FilingApproval | None:
+        """One approval by id, strongly consistent — the consume reads this."""
+        ...
+
+    def create(
+        self,
+        approval: FilingApproval,
+        *,
+        replacing: FilingApproval | None,
+        voided_at: str,
+    ) -> None:
+        """Store `approval` and point the case at it, atomically.
+
+        `replacing` is the current approval the caller read (None: there was
+        none). The write is conditional on the pointer still naming it, and,
+        when it is `pending`, voids it (`superseded`, `voided_at`) in the
+        same transaction — conditional on it still being pending. A race
+        lost raises ConflictError and writes nothing."""
+        ...
+
+    def consume(
+        self,
+        case_id: str,
+        approval_id: str,
+        *,
+        digest: str,
+        now: int,
+        consumed_at: str,
+    ) -> bool:
+        """`pending` → `consumed`, conditional on status `pending`, the stored
+        digest equalling `digest`, and `expiresAt > now`. True when this call
+        made the write; False for every other outcome (the single-use
+        property: of two callers, exactly one gets True)."""
+        ...
+
+    def void(
+        self, case_id: str, approval_id: str, *, reason: str, voided_at: str
+    ) -> bool:
+        """`pending` → `voided` with `reason`, conditional on `pending`. True
+        when this call made the write."""
+        ...
+
+
+class FilingQueue(Protocol):
+    """Hands an approved filing to the filing worker (ADR 0024, its own SQS
+    queue — infra/modules/filing_queue).
+
+    One method, and its argument is the APPROVAL, not a message: the body
+    is `core/filing_approval.filing_job_message`'s, so no caller can put
+    anything else on the queue, and the only caller is `approve_filing`
+    (tests/unit/test_filing_approval.py reads every call site)."""
+
+    def enqueue(self, approval: FilingApproval) -> None: ...
 
 
 class Mailer(Protocol):

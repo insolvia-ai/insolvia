@@ -10,6 +10,7 @@ pull request, not a filing. Every identifier is fake; this repo is public.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 from dataclasses import replace
@@ -28,7 +29,13 @@ from insolvia_api.core.packet_assembly import (
     packet_form_series,
     run_packet_assembly,
 )
-from insolvia_api.core.packets import Packet, PacketPart, is_filing_set
+from insolvia_api.core.packets import (
+    Packet,
+    PacketPart,
+    is_filing_set,
+    packet_from_item,
+    packet_item,
+)
 from insolvia_api.core.pdf_measure import measure_part
 from insolvia_core import courts
 from pypdf import PdfWriter
@@ -120,9 +127,27 @@ def test_a_landscape_letter_page_is_letter():
     assert measure_part("wide.pdf", _blank_pdf(792, 612)).non_letter_pages == 0
 
 
-def test_a_text_file_is_a_size_only():
-    part = measure_part(MATRIX_FILE_NAME, b"ACME BANK\nPO BOX 1\n")
-    assert part == PacketPart(name=MATRIX_FILE_NAME, byte_size=19)
+def test_a_text_file_is_a_size_and_a_digest_only():
+    content = b"ACME BANK\nPO BOX 1\n"
+    part = measure_part(MATRIX_FILE_NAME, content)
+    assert part == PacketPart(
+        name=MATRIX_FILE_NAME,
+        byte_size=19,
+        sha256=hashlib.sha256(content).hexdigest(),
+    )
+
+
+def test_every_part_carries_the_digest_of_its_own_bytes(packet):
+    # ADR 0024 PR 6: the per-document digest the approval binds to.
+    for part in packet.parts:
+        assert part.sha256 is not None
+        assert len(part.sha256) == 64, part.name
+    assert len({part.sha256 for part in packet.parts}) == len(packet.parts)
+
+
+def test_a_part_digest_survives_the_stored_item(packet):
+    stored = packet_from_item(packet_item(packet))
+    assert [p.sha256 for p in stored.parts] == [p.sha256 for p in packet.parts]
 
 
 def test_bytes_that_are_not_a_pdf_are_unreadable():
