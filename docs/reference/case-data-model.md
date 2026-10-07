@@ -127,8 +127,10 @@ validated on write against the `courts/us-bankruptcy` series in
 whose record shape [ADR 0024](../adr/0024-electronic-filing-path.md)
 specifies: identity, divisions with their CM/ECF office code and the FIPS
 counties they serve, the court's PDF and creditor-matrix rules, the signature
-instrument and B121 handling, Case Upload status, and a source with a date on
-every fact. `district` survives as the printed name the registry gives the
+instrument and B121 handling, the docket order and upload names for an
+opening (unknown in every launch court today, so the filing set uses the
+packet's own — `services/api` `core/filing_set.py`), Case Upload status, and
+a source with a date on every fact. `district` survives as the printed name the registry gives the
 court ("Middle District of Florida" — the B101 dropdown's own spelling),
 written from the reference on every write and never typed. A case written
 before the registry existed carries its typed `district` and no reference;
