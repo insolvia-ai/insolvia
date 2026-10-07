@@ -598,7 +598,7 @@ def _submitted(
     assert filing is not None
     page_ref: str | None = None
     try:
-        ref = confirmation_ref(filing.case_id)
+        ref = confirmation_ref(filing.case_id, filing.filing_id)
         deps.blobs.put_bytes(
             ref, content=confirmation.page, content_type=CONFIRMATION_CONTENT_TYPE
         )

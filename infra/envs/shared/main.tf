@@ -145,8 +145,11 @@ module "email" {
 # and its own repository, per the ADR's release-cadence argument: the MCP
 # surface churns while harnesses are verified, and each of those deploys
 # must not redeploy the API the app depends on.
+# `filing` is the filing worker (services/filing, ADR 0024): its own image
+# because it is the only principal that opens the credential vault, and
+# its image carries no web layer and no fake court.
 locals {
-  container_repositories = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp"])
+  container_repositories = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp", "filing"])
 }
 
 resource "aws_ecr_repository" "service" {

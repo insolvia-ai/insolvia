@@ -22,6 +22,7 @@ The case's `status=filed`, its court case number and the pin freeze are ADR
 from __future__ import annotations
 
 import io
+import re
 import textwrap
 import uuid
 from dataclasses import replace
@@ -33,8 +34,8 @@ from insolvia_core.documents import (
     Document,
     DocumentDraft,
     create_document,
-    object_key,
 )
+from insolvia_core.errors import ValidationError
 from pypdf import PdfWriter
 
 from .filings import Confirmation, Filing
@@ -49,10 +50,28 @@ _HEIGHT: Final = 792.0
 _MARGIN: Final = 72.0
 
 
-def confirmation_ref(case_id: str) -> str:
-    """Where the verbatim confirmation page is stored: a fresh object under
-    the case, named by uuid only (documents.object_key's no-PII rule)."""
-    return object_key(case_id, str(uuid.uuid4()))
+_UUID_RE: Final = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z"
+)
+
+
+def filing_object_key(case_id: str, filing_id: str, object_id: str) -> str:
+    """Where a filing's own objects live: cases/<case>/filings/<filing>/<id>.
+
+    A prefix of its own, as packets have (`packets.packet_object_key`), so the
+    worker's write grant is `cases/*/filings/*` and can never touch an
+    uploaded source document (cases/<case>/<id>) or a packet. Server-minted
+    uuids only, checked rather than sanitised — documents.object_key's
+    no-PII-in-a-key rule."""
+    for value in (case_id, filing_id, object_id):
+        if not _UUID_RE.match(value):
+            raise ValidationError("object keys are built from server-minted uuids only")
+    return f"cases/{case_id}/filings/{filing_id}/{object_id}"
+
+
+def confirmation_ref(case_id: str, filing_id: str) -> str:
+    """Where the verbatim confirmation page is stored."""
+    return filing_object_key(case_id, filing_id, str(uuid.uuid4()))
 
 
 def render_receipt(filing: Filing, confirmation: Confirmation) -> bytes:
@@ -116,4 +135,8 @@ def receipt_document(filing: Filing, content: bytes) -> Document:
         case_id=filing.case_id,
         uploaded_by=filing.attorney_id,
     )
-    return replace(document, status=STATUS_STORED)
+    return replace(
+        document,
+        status=STATUS_STORED,
+        storage_ref=filing_object_key(filing.case_id, filing.filing_id, document.id),
+    )

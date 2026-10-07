@@ -189,7 +189,7 @@ module "filing_credentials" {
 # Where an approval puts a filing job — the real queue, per machine, as
 # job_pipeline's is. No API role here (the developer sends, playing the API
 # as for the vault); the consume grant lands on this machine's filing worker
-# role, which the dev proof does not need yet and PR 7's local poller will.
+# role, which services/filing's local poller assumes.
 module "filing_queue" {
   source = "../../modules/filing_queue"
 
@@ -225,6 +225,34 @@ module "case_documents" {
   # A developer's bucket must be destroyable without emptying it by hand.
   force_destroy = true
   tags          = local.common_tags
+}
+
+# ── The filing worker (ADR 0024 PR 7) ───────────────────────────
+# The same module staging and prod instantiate, with no Lambda
+# (ecr_repository_url = null): its grants on the case table, the documents
+# bucket and the kill switch attach to this machine's filing worker role all
+# the same, because services/filing's local poller ASSUMES that role
+# (FILING_WORKER_ROLE_ARN in services/filing/.env) — so a laptop run is held
+# to exactly what the deployed worker holds. The kill switch parameter exists
+# for parity; locally the worker reads FILING_SUBMISSIONS_ENABLED instead.
+module "filing_worker" {
+  source = "../../modules/filing_worker"
+
+  project                    = "insolvia"
+  environment                = local.environment
+  ecr_repository_url         = null
+  worker_role_name           = module.filing_credentials.worker_role_name
+  worker_role_arn            = module.filing_credentials.worker_role_arn
+  queue_arn                  = module.filing_queue.queue_arn
+  dlq_name                   = module.filing_queue.dlq_name
+  case_table_arn             = module.case_store.table_arn
+  case_table_name            = module.case_store.table_name
+  case_access_log_table_name = module.case_store.access_log_table_name
+  case_kms_key_arn           = module.case_store.kms_key_arn
+  case_document_bucket_arn   = module.case_documents.bucket_arn
+  case_document_bucket_name  = module.case_documents.bucket_name
+  alarms_topic_arn           = null
+  tags                       = local.common_tags
 }
 
 
