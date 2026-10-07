@@ -8,9 +8,9 @@ class MemoryFilingQueue:
 
     Records the exact WIRE message — `filing_job_message`'s dict — so a test
     asserts what would actually cross the seam, MemoryJobQueue's rule. It
-    files nothing; nothing consumes a filing job until services/filing (ADR
-    0024 PR 7). `fail` makes the next enqueue raise, for the enqueue-failed
-    path."""
+    files nothing — services/filing's unit tier reads these messages and runs
+    them through the worker (ADR 0024 PR 7). `fail` makes the next enqueue
+    raise, for the enqueue-failed path."""
 
     def __init__(self) -> None:
         self.messages: list[dict[str, object]] = []

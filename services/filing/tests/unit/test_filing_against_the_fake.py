@@ -71,6 +71,9 @@ def test_the_receipt_and_the_courts_page_are_stored_with_the_case(filing):
     page = filing.api.deps.blobs.get_bytes(stored.confirmation.page_ref)
     assert page is not None
     assert stored.confirmation.case_number.encode() in page
+    prefix = f"cases/{filing.case_id}/filings/{approval.filing_id}/"
+    assert receipt.storage_ref.startswith(prefix)
+    assert stored.confirmation.page_ref.startswith(prefix)
 
 
 def test_every_document_the_court_received_is_the_approved_bytes(filing):
