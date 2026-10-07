@@ -487,6 +487,11 @@ header owns the reasoning; the facts a reader needs here:
 - **ci-trust's `DenyFilingCredentialDecryption`** (alias-matched, like
   `DenyCaseDataDecryption`) keeps the pipeline unable to open a credential even
   if it rewrote the key policy. It is hardening; the deploy needs no new grant.
+- **The signed authorization (guardrail 2) lives in the same table**, in the
+  attorney's partition (`SK = AUTHORIZATION` for the one in force,
+  `AUTHORIZATION#<id>` for each signature's history), and uses only the verbs
+  both roles already hold — the API's Put/Get/Delete, the worker's GetItem —
+  so it changed nothing in this module.
 - **Dev** passes `worker_assumable_by = [the developer]` so the open can be
   proved by assuming the real role (`services/api/scripts/dev-filing-vault-proof.sh`);
   a precondition refuses that list in any environment not named `dev-*`.
