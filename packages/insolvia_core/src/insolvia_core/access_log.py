@@ -114,6 +114,16 @@ from typing import Final
 # Written by exactly one module, insolvia_core.filing_credentials. No
 # credential.read: the status view opens nothing and is the attorney
 # looking at their own settings, as GET /v1/me is.
+#
+# The written authorization (ADR 0024, guardrail 2) adds two more, the third
+# family not keyed by a case: `authorization.sign` and
+# `authorization.withdraw`, subject `AUTHORIZATION#<authorization_id>` —
+# the signature's own id, whose history item holds the version and digest.
+# The principal is the attorney, the only person who may do either. A
+# withdrawal also writes one `credential.revoke` row per credential it
+# destroys, so "who ended this login" reads the same either way it ended.
+# Written by insolvia_core.filing_authorization (sign) and
+# insolvia_core.filing_credentials (withdraw), and nowhere else.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -138,6 +148,8 @@ ACTIONS = (
     "credential.enrol",
     "credential.revoke",
     "credential.open",
+    "authorization.sign",
+    "authorization.withdraw",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -162,6 +174,7 @@ OUTCOMES = ("allowed", "denied")
 CASE_SUBJECT: Final = "CASE"
 CLIENT_SUBJECT: Final = "CLIENT"
 CREDENTIAL_SUBJECT: Final = "CREDENTIAL"
+AUTHORIZATION_SUBJECT: Final = "AUTHORIZATION"
 
 
 @dataclass(frozen=True)
@@ -208,12 +221,18 @@ class AccessEvent:
         """The filing credential this row is about (ADR 0024), or None."""
         return self._id_under(CREDENTIAL_SUBJECT)
 
+    @property
+    def authorization_id(self) -> str | None:
+        """The filing authorization this row is about (ADR 0024), or None."""
+        return self._id_under(AUTHORIZATION_SUBJECT)
+
 
 def record_access(
     *,
     case_id: str | None = None,
     client_id: str | None = None,
     credential_id: str | None = None,
+    authorization_id: str | None = None,
     principal: str,
     action: str,
     outcome: str = "allowed",
@@ -223,7 +242,8 @@ def record_access(
     filing_id: str | None = None,
 ) -> AccessEvent:
     """One access-log row about exactly one subject — a case (`case_id`), a
-    firm client (`client_id`) or a filing credential (`credential_id`).
+    firm client (`client_id`), a filing credential (`credential_id`) or a filing
+    authorization (`authorization_id`).
     Naming more than one, or none, is a programming error: a row about two
     things answers neither "who saw this case" nor "who saw this client"."""
     subjects = [
@@ -232,12 +252,14 @@ def record_access(
             (CASE_SUBJECT, case_id),
             (CLIENT_SUBJECT, client_id),
             (CREDENTIAL_SUBJECT, credential_id),
+            (AUTHORIZATION_SUBJECT, authorization_id),
         )
         if value is not None
     ]
     if len(subjects) != 1:
         raise ValueError(
-            "an access event names exactly one of case_id, client_id, credential_id"
+            "an access event names exactly one of case_id, client_id, "
+            "credential_id, authorization_id"
         )
     prefix, value = subjects[0]
     subject_key = f"{prefix}#{value}"
@@ -284,6 +306,8 @@ def access_item(event: AccessEvent) -> dict[str, str]:
         item["clientId"] = event.client_id
     if event.credential_id is not None:
         item["credentialId"] = event.credential_id
+    if event.authorization_id is not None:
+        item["authorizationId"] = event.authorization_id
     if event.filing_role is not None:
         item["filingRole"] = event.filing_role
     if event.purpose is not None:

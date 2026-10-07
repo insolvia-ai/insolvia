@@ -28,6 +28,7 @@ from insolvia_core.clients import CasePublicStatus, ClientBinding
 from insolvia_core.debtors import Debtor, LinkOutcome, RepointOutcome
 from insolvia_core.document_requests import DocumentChecklist, DocumentRequest
 from insolvia_core.documents import Document, StoredBlob
+from insolvia_core.filing_authorization import FilingAuthorization
 from insolvia_core.filing_credentials import FilingCredential
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
@@ -989,6 +990,43 @@ class FilingCredentialStore(Protocol):
 
     def delete(self, firm_id: str, attorney_id: str, credential_id: str) -> bool:
         """Destroy the item. True when one existed."""
+        ...
+
+
+class FilingAuthorizationStore(Protocol):
+    """Persists attorneys' signed authorizations (insolvia_core.
+    filing_authorization; ADR 0024, guardrail 2) in the vault's table,
+    in the attorney's own partition beside their credentials.
+
+    Two kinds of item (the module docstring): THE CURRENT ONE at a fixed key,
+    and one history record per signature.
+    """
+
+    def get_current(self, firm_id: str, attorney_id: str) -> FilingAuthorization | None:
+        """The `AUTHORIZATION` item, strongly consistent — the worker's
+        re-check before the final submit must see a withdrawal that happened
+        a second ago."""
+        ...
+
+    def put_current(
+        self,
+        authorization: FilingAuthorization,
+        *,
+        replacing: FilingAuthorization | None,
+    ) -> None:
+        """Make `authorization` the current one and write its history record.
+
+        `replacing` is what the caller read as current (None for "there was
+        none"); the write is conditional on that still being so, and a race
+        lost raises ConflictError. A replaced record's history item becomes
+        `superseded`."""
+        ...
+
+    def withdraw(
+        self, authorization: FilingAuthorization, *, withdrawn_at: str
+    ) -> bool:
+        """Delete the `AUTHORIZATION` item if it is still `authorization`,
+        and mark its history record `withdrawn`. True when it was."""
         ...
 
 

@@ -1,0 +1,21 @@
+DRAFT, pending review by Insolvia's maintainer and by counsel. This text has not been reviewed by a lawyer, it is not legal advice, and it must not be signed by a real attorney or used with a real court login until a reviewed version replaces it.
+
+Authorization to file under my CM/ECF login
+
+I am the attorney signed in to Insolvia. By signing this authorization I allow Insolvia to submit bankruptcy filings to the federal courts' CM/ECF systems under my own PACER and CM/ECF login, on the terms below.
+
+1. What I authorize. Insolvia may sign in to CM/ECF as me, using the PACER username, password and authenticator key I store with Insolvia, and generate the one-time code my authenticator would show at that moment. Insolvia may then submit a filing that I have prepared in Insolvia, in a court I have told Insolvia I am registered to e-file in.
+
+2. One filing at a time, and only after I approve it. Insolvia may submit a filing only after I have reviewed it in Insolvia and approved that specific filing, after signing in again at the time of approval. My approval covers exactly what I was shown: the court and division, every document, the case-opening data, the docket order and the fee handling. If any of it changes after I approve, my approval no longer applies and Insolvia must ask me again. Each approval is used once and expires.
+
+3. What Insolvia may not do. Insolvia may not submit anything I have not approved, may not use my login for any other purpose (including searching, viewing or downloading court records other than the confirmations of filings I approved), and may not give my login to anyone. Nobody at my firm and nobody at Insolvia can read my password or authenticator key back; only Insolvia's filing service can open them, and every time it does, Insolvia records that it did, for which filing and why.
+
+4. The filings are mine. A filing made through my login is signed by me. I remain responsible for its contents and for my compliance with the Federal Rules of Bankruptcy Procedure, each court's local rules and administrative procedures, and the PACER and CM/ECF terms of use.
+
+5. The risk I am accepting. Several courts' local rules and procedures forbid a filer from sharing their login with any other person, and treat filing agents with their own PACER accounts as the only approved way for someone else to file under an attorney's credentials. The PACER terms of use also govern my account. Storing my login with Insolvia and letting Insolvia submit filings under it may be treated as sharing my login, even with this authorization and my approval of each filing. If a court reaches that view, it may sanction me or suspend or revoke my e-filing privileges. Insolvia has not obtained a legal opinion that this practice is permitted. I have considered these rules for each court I file in, and I accept this risk.
+
+6. Withdrawing this authorization. I can withdraw this authorization at any time, from my account in Insolvia. Withdrawing it immediately destroys every court login I have stored with Insolvia, and Insolvia will submit nothing further under them. Filings already submitted before I withdraw are not undone. To let Insolvia file for me again I must sign a new authorization and store my login again.
+
+7. Changes to these terms. If Insolvia changes this text, my authorization stops applying until I read and sign the new version, and until then Insolvia will submit nothing under my login.
+
+Insolvia records my signature with the version of this text, a fingerprint (SHA-256 digest) of exactly these words, the time I signed and the time I last signed in.

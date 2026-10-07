@@ -13,6 +13,7 @@ parameter and no `.env` line, in any of the three environments.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any, Final
 
 import boto3
@@ -23,6 +24,14 @@ from insolvia_core.adapters.envelope import (
     open_with_data_key,
     seal_with_data_key,
     wrapped_key_bytes,
+)
+from insolvia_core.errors import ConflictError
+from insolvia_core.filing_authorization import (
+    CURRENT_SORT_KEY,
+    FilingAuthorization,
+    authorization_from_item,
+    authorization_item,
+    history_sort_key,
 )
 from insolvia_core.filing_credentials import (
     FilingCredential,
@@ -178,3 +187,116 @@ class DynamoDbFilingCredentialStore:
             ReturnValues="ALL_OLD",
         )
         return bool(response.get("Attributes"))
+
+
+def _condition_failed(error: ClientError) -> bool:
+    code: object = error.response.get("Error", {}).get("Code")
+    return code == "ConditionalCheckFailedException"
+
+
+class DynamoDbFilingAuthorizationStore:
+    """FilingAuthorizationStore over the SAME vault table, in the attorney's
+    partition: `SK = AUTHORIZATION` (the current one, at a fixed key the
+    worker's GetItem-only grant can read) and `SK = AUTHORIZATION#<id>` (the
+    history). PutItem, GetItem and DeleteItem only — exactly the verbs the
+    API's grant on this table already holds (infra/modules/
+    filing_credentials), so guardrail 2 needs no IAM change.
+
+    Not transactional, and the write ORDER is what makes that safe:
+    `put_current` writes the current item first (a lost race fails there,
+    before any history exists), and `withdraw` deletes it first (from that
+    write on nothing can open, whatever happens to the history update).
+    """
+
+    def __init__(self, table_name: str, *, client: Any = None) -> None:
+        self.table_name = table_name
+        self.client = client if client is not None else boto3.client("dynamodb")
+
+    def _item(
+        self, authorization: FilingAuthorization, sort_key_value: str
+    ) -> dict[str, Any]:
+        item = {
+            "PK": partition_key(authorization.firm_id, authorization.attorney_id),
+            **authorization_item(authorization, sort_key=sort_key_value),
+        }
+        return to_attributes(item)
+
+    def get_current(self, firm_id: str, attorney_id: str) -> FilingAuthorization | None:
+        response = self.client.get_item(
+            TableName=self.table_name,
+            Key={
+                "PK": {"S": partition_key(firm_id, attorney_id)},
+                "SK": {"S": CURRENT_SORT_KEY},
+            },
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        return authorization_from_item(from_attributes(item)) if item else None
+
+    def put_current(
+        self,
+        authorization: FilingAuthorization,
+        *,
+        replacing: FilingAuthorization | None,
+    ) -> None:
+        condition: dict[str, Any]
+        if replacing is None:
+            condition = {"ConditionExpression": "attribute_not_exists(SK)"}
+        else:
+            condition = {
+                "ConditionExpression": "authorizationId = :held",
+                "ExpressionAttributeValues": {
+                    ":held": {"S": replacing.authorization_id}
+                },
+            }
+        try:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=self._item(authorization, CURRENT_SORT_KEY),
+                **condition,
+            )
+        except ClientError as error:
+            if _condition_failed(error):
+                raise ConflictError("the authorization changed") from error
+            raise
+        self.client.put_item(
+            TableName=self.table_name,
+            Item=self._item(
+                authorization, history_sort_key(authorization.authorization_id)
+            ),
+            ConditionExpression="attribute_not_exists(SK)",
+        )
+        if replacing is not None:
+            self.client.put_item(
+                TableName=self.table_name,
+                Item=self._item(
+                    replace(replacing, status="superseded"),
+                    history_sort_key(replacing.authorization_id),
+                ),
+            )
+
+    def withdraw(
+        self, authorization: FilingAuthorization, *, withdrawn_at: str
+    ) -> bool:
+        pk = partition_key(authorization.firm_id, authorization.attorney_id)
+        try:
+            self.client.delete_item(
+                TableName=self.table_name,
+                Key={"PK": {"S": pk}, "SK": {"S": CURRENT_SORT_KEY}},
+                ConditionExpression="authorizationId = :held",
+                ExpressionAttributeValues={
+                    ":held": {"S": authorization.authorization_id}
+                },
+            )
+        except ClientError as error:
+            if _condition_failed(error):
+                return False
+            raise
+        self.client.put_item(
+            TableName=self.table_name,
+            Item=self._item(
+                replace(authorization, status="withdrawn", withdrawn_at=withdrawn_at),
+                history_sort_key(authorization.authorization_id),
+            ),
+        )
+        return True
