@@ -1,0 +1,167 @@
+name: Filing · Deploy · Production
+
+# PROMOTES the image staging validated — it does not build one. Same
+# promotion contract as api-prod.yml for the image (the `sha-<commit>` tag
+# resolved to an immutable digest); the worker has no alias, like the
+# pipeline worker in api-prod.yml, because a queue consumer has no router to
+# protect. The normal way in is release.yml (`gated: true`); a direct dispatch
+# brings its own verified-commit check and insolvia-production approval.
+#
+# PRODUCTION FILES NOTHING. The kill switch is created off, and the fence
+# allows no production court host until ADR 0024 PR 10 verifies a district —
+# two independent reasons every job hands back before a credential is opened.
+#
+# This workflow applies no Terraform — prod infra applies as the first leg of
+# an approved release (release.yml → infra-prod.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+
+  workflow_call:
+    inputs:
+      sha:
+        description: "Commit to deploy (default: main HEAD). Must have deployed green to staging."
+        required: false
+        type: string
+      force:
+        description: "Skip the staging-green check (emergency only)"
+        required: false
+        default: false
+        type: boolean
+      gated:
+        description: "The caller already holds this run's insolvia-production approval — do not ask for a second one."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  # Reading the insolvia/staging-release commit status.
+  statuses: read
+
+jobs:
+  # Resolve + verify once, with no credentials and no environment — a commit
+  # that never passed staging is rejected BEFORE anyone is asked to approve.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: commit
+        uses: ./.github/actions/verified-commit
+        with:
+          sha: ${{ inputs.sha }}
+          force: ${{ inputs.force }}
+
+  # The human gate, and ONLY for a direct dispatch — api-prod.yml's comment
+  # owns the null-comparison subtlety.
+  approve:
+    needs: resolve
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.gated != true }}
+    runs-on: ubuntu-latest
+    environment: insolvia-production
+    steps:
+      - run: echo "Production deploy of ${{ needs.resolve.outputs.sha }} approved."
+
+  # `!cancelled() && !failure()` rather than `success()`: when the release
+  # pipeline calls this, `approve` is SKIPPED, and the default would silently
+  # skip the deploy behind it.
+  deploy:
+    needs: [resolve, approve]
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: insolvia-terraform-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Read prod infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/prod init -input=false
+          tf() { terraform -chdir=infra/envs/prod output -raw "$1"; }
+          {
+            echo "repo=$(tf filing_ecr_repository_url)"
+            echo "function=$(tf filing_worker_function_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - id: image
+        uses: ./.github/actions/promote-image
+        with:
+          repository-url: ${{ steps.tf.outputs.repo }}
+          sha: ${{ needs.resolve.outputs.sha }}
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          IMAGE_URI: ${{ steps.image.outputs.image-uri }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$IMAGE_URI"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # The worker has no endpoint, so the smoke test is one invocation with a
+      # record that is not a filing job: the image boots, its configuration
+      # loads (a deployed worker REFUSES to start without its kill switch
+      # parameter, or with a fake court configured), the whole composition
+      # constructs, and the run answers `dropped` — writing nothing, opening
+      # nothing, contacting no court.
+      - name: Smoke test the worker
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          echo '{"Records":[{"body":"deploy-smoke: not a filing job"}]}' > smoke.json
+          aws lambda invoke \
+            --function-name "$FUNCTION" \
+            --payload fileb://smoke.json \
+            --cli-read-timeout 120 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json response.json
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::The filing worker raised on its smoke invocation."
+            exit 1
+          fi
+          jq -e '.outcomes == ["dropped"]' response.json > /dev/null
+
+      - name: Move the prod marker tag
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          # The from-scratch-apply seed — api-prod.yml's comment owns it.
+          manifest="$(aws ecr batch-get-image \
+            --repository-name "${REPO#*/}" \
+            --image-ids "imageDigest=$DIGEST" \
+            --query 'images[0].imageManifest' --output text)"
+          aws ecr put-image \
+            --repository-name "${REPO#*/}" \
+            --image-tag prod \
+            --image-manifest "$manifest" >/dev/null 2>&1 || \
+            echo "::notice::\`prod\` tag already points at this digest."

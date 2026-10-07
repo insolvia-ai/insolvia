@@ -1,0 +1,115 @@
+name: Filing · Deploy · Staging
+
+# Steady-state deploy for the filing worker (services/filing, ADR 0024 PR 7):
+# push a fresh image, point the Lambda at it, smoke-test it. The Lambda has
+# no alias and no SSM-derived environment, unlike the API's and the MCP
+# server's: it is a queue consumer (no router to protect — job_pipeline's
+# reasoning), and its environment is four table/bucket names and the kill
+# switch's parameter name, which Terraform owns outright
+# (infra/modules/filing_worker).
+#
+# Staging's worker reaches NO court: the fence (services/filing core/fence.py)
+# allows no staging host until ADR 0024 PR 10 verifies a training database,
+# the fake is never deployed, and the kill switch is created off. Every job
+# hands back before a credential is opened.
+#
+# The FIRST deploy in a fresh environment needs the image-before-apply
+# bootstrap at the top of infra/modules/filing_worker/main.tf:
+#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-shared-filing)
+#   2. scripts/bootstrap-ecr-images.sh staging filing
+#   3. terraform apply   (full)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: insolvia-terraform-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: insolvia-staging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.10"
+          # The wrapper interposes on stdout, which corrupts the
+          # `terraform output -raw` command substitutions below.
+          terraform_wrapper: false
+
+      - name: Read staging infra outputs
+        id: tf
+        run: |
+          terraform -chdir=infra/envs/staging init
+          {
+            echo "repo=$(terraform -chdir=infra/envs/staging output -raw filing_ecr_repository_url)"
+            echo "function=$(terraform -chdir=infra/envs/staging output -raw filing_worker_function_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ECR
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin "${REPO%%/*}"
+
+      - name: Build and push image
+        env:
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          # `sha-<sha>` is the immutable identity production promotes by
+          # digest; `staging` is the from-scratch-apply seed. Context is the
+          # repo root: the image installs packages/insolvia_core and copies
+          # services/api/src (services/filing/Dockerfile).
+          docker build --target lambda -f services/filing/Dockerfile \
+            -t "$REPO:sha-${{ github.sha }}" \
+            -t "$REPO:staging" \
+            .
+          docker push "$REPO:sha-${{ github.sha }}"
+          docker push "$REPO:staging"
+
+      - name: Update Lambda code
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+          REPO: ${{ steps.tf.outputs.repo }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION" \
+            --image-uri "$REPO:sha-${{ github.sha }}"
+          aws lambda wait function-updated --function-name "$FUNCTION"
+
+      # The worker has no endpoint, so the smoke test is one invocation with a
+      # record that is not a filing job: the image boots, its configuration
+      # loads (a deployed worker REFUSES to start without its kill switch
+      # parameter, or with a fake court configured), the whole composition
+      # constructs, and the run answers `dropped` — writing nothing, opening
+      # nothing, contacting no court.
+      - name: Smoke test the worker
+        env:
+          FUNCTION: ${{ steps.tf.outputs.function }}
+        run: |
+          echo '{"Records":[{"body":"deploy-smoke: not a filing job"}]}' > smoke.json
+          aws lambda invoke \
+            --function-name "$FUNCTION" \
+            --payload fileb://smoke.json \
+            --cli-read-timeout 120 \
+            response.json > invoke-meta.json
+          cat invoke-meta.json response.json
+          if jq -e '.FunctionError' invoke-meta.json > /dev/null; then
+            echo "::error::The filing worker raised on its smoke invocation."
+            exit 1
+          fi
+          jq -e '.outcomes == ["dropped"]' response.json > /dev/null

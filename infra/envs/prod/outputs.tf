@@ -265,3 +265,18 @@ output "mcp_client_ids" {
   description = "MCP harness app client ids — the service's token allowlist (#261)."
   value       = module.auth.mcp_client_ids
 }
+
+output "filing_ecr_repository_url" {
+  description = "ECR repository holding the filing worker image (services/filing, ADR 0024 PR 7)."
+  value       = module.filing_worker.ecr_repository_url
+}
+
+output "filing_worker_function_name" {
+  description = "The filing worker Lambda (deploy target of filing-<env>.yml)."
+  value       = module.filing_worker.function_name
+}
+
+output "filing_kill_switch_parameter" {
+  description = "The filing kill switch: \"true\" lets the worker submit. Created off; flipped by hand only."
+  value       = module.filing_worker.kill_switch_parameter
+}

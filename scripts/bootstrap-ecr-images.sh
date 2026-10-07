@@ -41,9 +41,10 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin jobs mailer marketing mcp   (default: all
-#                six; `jobs` is the pipeline worker image — ADR 0018, `mcp`
-#                the remote MCP server — ADR 0016)
+#   service ...  any of: api admin jobs mailer marketing mcp filing
+#                (default: all seven; `jobs` is the pipeline worker image —
+#                ADR 0018, `mcp` the remote MCP server — ADR 0016, `filing`
+#                the filing worker — ADR 0024)
 #   --dispatch   after pushing, re-run the matching deploy workflows
 #                (<service>-<env>.yml; jobs rides api-<env>.yml)
 #   --yes        skip the confirmation prompt
@@ -105,6 +106,7 @@ ecr_component() {
     mailer)    printf 'mailer' ;;
     marketing) printf 'marketing' ;;
     mcp)       printf 'mcp' ;;
+    filing)    printf 'filing' ;;
     *)         die "no ECR component mapping for service '$1'" ;;
   esac
 }
@@ -125,7 +127,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|jobs|mailer|marketing|mcp) SERVICES+=("$arg") ;;
+    api|admin|jobs|mailer|marketing|mcp|filing) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -134,7 +136,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing mcp)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing mcp filing)
 
 require_command aws
 require_command docker
@@ -227,6 +229,15 @@ build_mcp() {
   # packages/insolvia_core by relative path (ADR 0016).
   docker build --platform "$PLATFORM" --target lambda \
     -f "$REPO_ROOT/services/mcp/Dockerfile" \
+    -t "$1:$ENV" "$REPO_ROOT"
+}
+
+build_filing() {
+  # The filing worker (ADR 0024): repo-root context — the image installs
+  # packages/insolvia_core and copies services/api/src (its Dockerfile's
+  # header). The fake CM/ECF is never in it.
+  docker build --platform "$PLATFORM" --target lambda \
+    -f "$REPO_ROOT/services/filing/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
 
