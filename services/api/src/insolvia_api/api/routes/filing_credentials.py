@@ -19,6 +19,11 @@ service's role Decrypt besides. Nothing these routes return contains the
 password, the seed or the envelope — `credential_json` is the only
 serializer, and its key set is pinned in core's tests.
 
+NO CREDENTIAL WITHOUT A SIGNED AUTHORIZATION (guardrail 2). Enrolment
+answers 403 until the caller has signed the current text at
+`/v1/me/filing-authorization` (below), and withdrawing that signature
+destroys every credential they hold.
+
 Every response is `Cache-Control: no-store`: the enrolment's request body is
 the one place a TOTP seed crosses a client, and nothing in front of this
 service should be invited to keep any of the exchange.
@@ -28,26 +33,42 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Final
 
 from flask import Blueprint, Response, jsonify, request
 from flask.typing import ResponseReturnValue
 from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.filing_authorization import (
+    SIGNATURE_MAX_AGE_SECONDS,
+    FilingAuthorization,
+    authorization_json,
+    current_authorization,
+    sign_authorization,
+    text_json,
+)
 from insolvia_core.filing_credentials import (
     credential_json,
     enrol_credential,
     list_credentials,
     parse_enrolment,
     revoke_credential,
+    withdraw_authorization,
 )
 from insolvia_core.firms import ADD_EDIT, ELECTRONIC_FILING, VIEW_ONLY
 from insolvia_core.ports import (
     AccessLog,
+    FilingAuthorizationStore,
     FilingCredentialSealer,
     FilingCredentialStore,
 )
 
-from insolvia_api.api.auth import current_accessor, require_auth, requires
+from insolvia_api.api.auth import (
+    current_accessor,
+    require_auth,
+    require_fresh_sign_in,
+    requires,
+)
 from insolvia_api.api.dependencies import dependencies
 
 logger = logging.getLogger(__name__)
@@ -118,6 +139,7 @@ def enrol_filing_credential() -> ResponseReturnValue:
         sealer=sealer,
         store=store,
         access_log=access_log,
+        authorizations=_authorization_store(),
     )
     # Metadata only (GLBA, and this is a court credential besides): that an
     # enrolment happened, never the login, never the subject.
@@ -147,3 +169,100 @@ def revoke_filing_credential(credential_id: str) -> ResponseReturnValue:
         raise NotFoundError("filing credential not found")
     logger.info("filing credential revoked")
     return _no_store(Response(status=204))
+
+
+# ── The written authorization (ADR 0024, guardrail 2) ───────────
+#
+# `/v1/me/filing-authorization`: the text to read, the caller's signature
+# over it, and its withdrawal. Same owner rule as the credentials — the
+# signer is the token's subject, always — and the same feature gate.
+#
+# SIGNING NEEDS A FRESH SIGN-IN: `require_fresh_sign_in` refuses an
+# `auth_time` older than SIGNATURE_MAX_AGE_SECONDS with a 403
+# `ReauthenticationRequired`, and the domain function checks it again, so
+# the rule holds for any future caller too. WITHDRAWING DOES NOT, and is
+# gated at VIEW_ONLY rather than ADD_EDIT: it only ever takes authority
+# away, so an attorney an admin has since restricted can still withdraw.
+
+
+def _authorization_store() -> FilingAuthorizationStore:
+    store = dependencies().filing_authorization_store
+    if store is None:
+        raise RuntimeError("the filing authorization store is not composed")
+    return store
+
+
+def _authorization_view(authorization: FilingAuthorization | None) -> Response:
+    accessor = current_accessor()
+    return _no_store(
+        jsonify(
+            {
+                "text": text_json(),
+                **authorization_json(
+                    authorization,
+                    firm_id=accessor.firm_id,
+                    attorney_id=accessor.subject,
+                ),
+            }
+        )
+    )
+
+
+@blueprint.get("/v1/me/filing-authorization")
+@require_auth
+@requires(ELECTRONIC_FILING, VIEW_ONLY)
+def read_filing_authorization() -> ResponseReturnValue:
+    """The text as it ships (version, digest, body) and the caller's
+    signature, with `current` saying whether it is over that text."""
+    accessor = current_accessor()
+    return _authorization_view(
+        current_authorization(
+            firm_id=accessor.firm_id,
+            attorney_id=accessor.subject,
+            store=_authorization_store(),
+        )
+    )
+
+
+@blueprint.post("/v1/me/filing-authorization")
+@require_auth
+@requires(ELECTRONIC_FILING, ADD_EDIT)
+def sign_filing_authorization() -> ResponseReturnValue:
+    """SIGN — `{text_version, text_digest}`, the pair the client rendered.
+    201 with the view; 403 ReauthenticationRequired for a stale sign-in;
+    409 for a text that is not the one that ships, or a second signature."""
+    _, _, access_log = _vault()
+    accessor = current_accessor()
+    fresh = require_fresh_sign_in(SIGNATURE_MAX_AGE_SECONDS)
+    signed = sign_authorization(
+        _json_body(),
+        firm_id=accessor.firm_id,
+        attorney_id=accessor.subject,
+        authenticated_at=fresh,
+        now=time.time(),
+        store=_authorization_store(),
+        access_log=access_log,
+    )
+    logger.info("filing authorization signed")
+    response = _authorization_view(signed)
+    response.status_code = 201
+    return response
+
+
+@blueprint.delete("/v1/me/filing-authorization")
+@require_auth
+@requires(ELECTRONIC_FILING, VIEW_ONLY)
+def withdraw_filing_authorization() -> ResponseReturnValue:
+    """WITHDRAW, which destroys every stored login. 200 with how many were
+    destroyed; 404 when nothing is signed."""
+    store, _, access_log = _vault()
+    accessor = current_accessor()
+    destroyed = withdraw_authorization(
+        firm_id=accessor.firm_id,
+        attorney_id=accessor.subject,
+        authorizations=_authorization_store(),
+        store=store,
+        access_log=access_log,
+    )
+    logger.info("filing authorization withdrawn")
+    return _no_store(jsonify({"credentials_revoked": destroyed}))
