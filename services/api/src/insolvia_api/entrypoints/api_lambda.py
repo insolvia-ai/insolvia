@@ -31,6 +31,10 @@ from insolvia_api.adapters.aws.event_store import (
     DynamoDbCalendarTokenStore,
     DynamoDbEventStore,
 )
+from insolvia_api.adapters.aws.filing_approval_store import (
+    DynamoDbFilingApprovalStore,
+)
+from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -41,7 +45,7 @@ from insolvia_api.api.app_factory import create_app
 from insolvia_api.api.dependencies import ApiDependencies
 from insolvia_api.core.config import load_config
 from insolvia_api.core.logging import configure_logging
-from insolvia_api.core.ports import JobQueue, Mailer
+from insolvia_api.core.ports import FilingQueue, JobQueue, Mailer
 
 configure_logging()
 
@@ -130,6 +134,13 @@ job_queue: JobQueue | None = None
 if config.job_queue_url:
     job_queue = SqsJobQueue(config.job_queue_url)
 
+# The filing queue (ADR 0024 PR 6), job_queue's shape and for its reason: an
+# in-memory queue in a Lambda would record an approval no filing worker ever
+# sees, so absence composes None and approving answers 503.
+filing_queue: FilingQueue | None = None
+if config.filing_queue_url:
+    filing_queue = SqsFilingQueue(config.filing_queue_url)
+
 app = create_app(
     ApiDependencies(
         config=config,
@@ -194,6 +205,10 @@ app = create_app(
         filing_authorization_store=DynamoDbFilingAuthorizationStore(
             filing_credentials_table_name(config.case_table_name)
         ),
+        # The per-filing approval (guardrail 1): child items of the case
+        # partition, and the filing worker's own queue — Optional, above.
+        filing_approval_store=DynamoDbFilingApprovalStore(config.case_table_name),
+        filing_queue=filing_queue,
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
         document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),

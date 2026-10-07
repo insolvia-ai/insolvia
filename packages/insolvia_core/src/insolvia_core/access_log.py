@@ -124,6 +124,19 @@ from typing import Final
 # destroys, so "who ended this login" reads the same either way it ended.
 # Written by insolvia_core.filing_authorization (sign) and
 # insolvia_core.filing_credentials (withdraw), and nowhere else.
+#
+# The per-filing approval (ADR 0024, guardrail 1) adds three, keyed by the
+# CASE again — an approval is an act on one matter, and "who approved filing
+# this case, and what became of it" is one partition read: `filing.approve`,
+# `filing.void` and `filing.consume`. Each carries `filing_id` — the approval's
+# own filing id, the same member `credential.open` carries, so the approval,
+# its consumption and every open of the attorney's login for it join on one
+# value. `purpose` says why on the two that need it: on `filing.void` the
+# reason (`changed`, `superseded`, `cancelled`, `enqueue_failed`), on a
+# denied `filing.approve` the refusal. The principal is the attorney on
+# approve and consume (the worker consumes on their approval, as it opens
+# their login), and whoever's act caused a void. Written by services/api's
+# core/filing_approval.py, and nowhere else.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -150,6 +163,9 @@ ACTIONS = (
     "credential.open",
     "authorization.sign",
     "authorization.withdraw",
+    "filing.approve",
+    "filing.void",
+    "filing.consume",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row
@@ -198,8 +214,8 @@ class AccessEvent:
     # Only `client.invite` / `client.revoke` set this: the binding's filing
     # roles, canonical order, comma-joined (`debtor_1,debtor_2`).
     roles: str | None = None
-    # Only `credential.open` sets this: the filing the credential was opened
-    # for (ADR 0024).
+    # `credential.open` and the three `filing.*` rows set this: the filing
+    # the row is about (ADR 0024).
     filing_id: str | None = None
 
     def _id_under(self, prefix: str) -> str | None:

@@ -29,6 +29,8 @@ from insolvia_api.core.config import AppConfig
 from insolvia_api.core.ports import (
     CalendarTokenStore,
     EventStore,
+    FilingApprovalStore,
+    FilingQueue,
     JobQueue,
     JobStore,
     Mailer,
@@ -145,6 +147,15 @@ class ApiDependencies:
     # the SAME vault table, the attorney's own partition — "stored with the
     # credential" — so again nothing new to configure.
     filing_authorization_store: FilingAuthorizationStore | None = None
+    # The per-filing approval (ADR 0024, guardrail 1): the records are child
+    # items of the case partition — nothing new to provision — and the QUEUE
+    # is the filing worker's own (FILING_QUEUE_URL). None is a legitimate
+    # deployed state for the queue, as for job_queue: the image can roll out
+    # ahead of the infra, and approving then answers 503 rather than
+    # recording an approval no worker will ever see. The approval route is
+    # the ONLY reader of `filing_queue` (tests/unit/test_filing_approval.py).
+    filing_approval_store: FilingApprovalStore | None = None
+    filing_queue: FilingQueue | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

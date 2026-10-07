@@ -118,6 +118,11 @@ class FilingDocument:
     handling: Handling
     checks: tuple[Check, ...]
     note: str = ""
+    # The packet file this document IS, as the assembly worker measured it
+    # (size, pages, and the SHA-256 the per-filing approval binds to — ADR
+    # 0024 PR 6). None for a document prepared outside Insolvia, and for a
+    # packet document the latest packet does not contain.
+    part: PacketPart | None = None
 
 
 @dataclass(frozen=True)
@@ -342,6 +347,7 @@ def build_filing_set(
                     " event, which keeps it off the public docket — never"
                     " inside the petition PDF."
                 )
+        part = measured.get(default_name)
         documents.append(
             FilingDocument(
                 key=series_id,
@@ -350,12 +356,13 @@ def build_filing_set(
                 source="packet",
                 handling=handling,
                 checks=_checks(
-                    measured.get(default_name),
+                    part,
                     packet=packet,
                     max_bytes=max_bytes,
                     text_required=text_required,
                 ),
                 note=note,
+                part=part,
             )
         )
     documents.append(
@@ -371,6 +378,7 @@ def build_filing_set(
                 max_bytes=max_bytes,
                 text_required=None,
             ),
+            part=measured.get(MATRIX_FILE_NAME),
         )
     )
     if district is not None:

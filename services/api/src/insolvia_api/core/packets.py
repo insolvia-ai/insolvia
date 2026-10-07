@@ -68,7 +68,15 @@ class PacketPart:
 
     Counts and sizes only, never content: B121 is a part. The page facts are
     None for a part that is not a PDF (the creditor matrix's `.txt`).
-    `unreadable` marks a PDF the measurement could not parse."""
+    `unreadable` marks a PDF the measurement could not parse.
+
+    `sha256` is the digest of the file's own bytes (ADR 0024 build PR 6):
+    what the attorney's per-filing approval is bound to, per document, and
+    what anyone can check one extracted file against. A digest discloses
+    nothing about B121's content. None on a packet assembled before it was
+    recorded — an approval refuses such a packet and asks for a re-assembly
+    (core/filing_approval.py), rather than vouching for bytes it cannot
+    name."""
 
     name: str
     byte_size: int
@@ -76,6 +84,7 @@ class PacketPart:
     non_letter_pages: int | None = None
     pages_without_text: int | None = None
     unreadable: bool = False
+    sha256: str | None = None
 
 
 def packet_part_item(part: PacketPart) -> dict[str, object]:
@@ -90,6 +99,8 @@ def packet_part_item(part: PacketPart) -> dict[str, object]:
         body["pagesWithoutText"] = part.pages_without_text
     if part.unreadable:
         body["unreadable"] = True
+    if part.sha256 is not None:
+        body["sha256"] = part.sha256
     return body
 
 
@@ -117,6 +128,9 @@ def _parts_from_item(raw: object) -> tuple[PacketPart, ...]:
         byte_size = _optional_count(entry, "byteSize")
         if byte_size is None:
             raise ValueError("a part has no byteSize")
+        digest = entry.get("sha256")
+        if digest is not None and not isinstance(digest, str):
+            raise ValueError("a part's sha256 is not a string")
         parts.append(
             PacketPart(
                 name=str(entry["name"]),
@@ -125,6 +139,7 @@ def _parts_from_item(raw: object) -> tuple[PacketPart, ...]:
                 non_letter_pages=_optional_count(entry, "nonLetterPages"),
                 pages_without_text=_optional_count(entry, "pagesWithoutText"),
                 unreadable=bool(entry.get("unreadable", False)),
+                sha256=digest,
             )
         )
     return tuple(parts)

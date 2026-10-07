@@ -72,6 +72,10 @@ from insolvia_api.adapters.aws.event_store import (
     DynamoDbCalendarTokenStore,
     DynamoDbEventStore,
 )
+from insolvia_api.adapters.aws.filing_approval_store import (
+    DynamoDbFilingApprovalStore,
+)
+from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.job_queue import SqsJobQueue
 from insolvia_api.adapters.aws.job_store import DynamoDbJobStore
 from insolvia_api.adapters.aws.mailer_client import SigV4MailerClient
@@ -81,6 +85,10 @@ from insolvia_api.adapters.memory.event_store import (
     MemoryCalendarTokenStore,
     MemoryEventStore,
 )
+from insolvia_api.adapters.memory.filing_approval_store import (
+    MemoryFilingApprovalStore,
+)
+from insolvia_api.adapters.memory.filing_queue import MemoryFilingQueue
 from insolvia_api.adapters.memory.job_queue import MemoryJobQueue
 from insolvia_api.adapters.memory.job_store import MemoryJobStore
 from insolvia_api.adapters.memory.mailer_client import InMemoryMailerClient
@@ -93,6 +101,8 @@ from insolvia_api.core.logging import configure_logging
 from insolvia_api.core.ports import (
     CalendarTokenStore,
     EventStore,
+    FilingApprovalStore,
+    FilingQueue,
     JobQueue,
     JobStore,
     Mailer,
@@ -263,6 +273,23 @@ if config.job_queue_url:
 else:
     job_queue = MemoryJobQueue()
 
+# The per-filing approval (ADR 0024 PR 6): the records ride the case-table
+# group like the job store; the queue follows the job queue's shape — with
+# FILING_QUEUE_URL set (dev-aws-setup.sh writes this machine's real filing
+# queue) an approval's job lands on real SQS and waits there, since nothing
+# consumes it until services/filing (PR 7); unset, the memory queue records
+# it and sends nothing.
+filing_approval_store: FilingApprovalStore
+if config.case_table_name and config.case_access_log_table_name:
+    filing_approval_store = DynamoDbFilingApprovalStore(config.case_table_name)
+else:
+    filing_approval_store = MemoryFilingApprovalStore()
+filing_queue: FilingQueue
+if config.filing_queue_url:
+    filing_queue = SqsFilingQueue(config.filing_queue_url)
+else:
+    filing_queue = MemoryFilingQueue()
+
 # Assembled packets (issue #96): the record rides the case table like the job
 # store; the API side only reads it. The memory fallback shares the memory
 # case store because its `create` is a transaction over both — and in that
@@ -351,5 +378,7 @@ app = create_app(
         filing_credential_store=filing_credential_store,
         filing_credential_sealer=filing_credential_sealer,
         filing_authorization_store=filing_authorization_store,
+        filing_approval_store=filing_approval_store,
+        filing_queue=filing_queue,
     )
 )

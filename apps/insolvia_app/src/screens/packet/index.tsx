@@ -18,6 +18,7 @@ import {
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { FilingApprovalPanel } from './filing-approval-panel';
 import { FilingSetPanel } from './filing-set-panel';
 
 /**
@@ -660,6 +661,8 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
       )}
 
       <FilingSetPanel caseId={caseId} reloadKey={filingSetKey} />
+
+      <FilingApprovalPanel caseId={caseId} reloadKey={filingSetKey} />
 
       <Heading level={2}>AI review</Heading>
       <Text style={[styles.body, muted]}>

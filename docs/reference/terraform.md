@@ -21,6 +21,9 @@ infra/
 │   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated
 │   │                         #   KMS key only the filing worker's role may decrypt,
 │   │                         #   its table, that role, the API's seal-only grant
+│   ├── filing_queue/         # the filing worker's own queue (ADR 0024 PR 6): SQS
+│   │                         #   + DLQ, the API's send-only and the worker's
+│   │                         #   consume-only grants; no consumer until PR 7
 │   ├── job_pipeline/         # async jobs (ADR 0018): SQS queue + DLQ + the
 │   │                         #   image-packaged worker Lambda + alarms; the
 │   │                         #   worker half is optional (absent in dev)
@@ -507,6 +510,32 @@ terraform -chdir=infra/envs/dev apply -var=enable_audit_trail=true ...
 — so a change to this module is exercised before staging meets it, rather
 than after. Turn it back off and re-apply to remove it.
 
+## Filing queue (`infra/modules/filing_queue/`)
+
+ADR 0024's guardrail 1 says approval is the only producer of a filing job;
+this is where the job goes — `insolvia-<env>-filing` and its `-dlq`, the
+filing worker's own queue (ADR 0018's pattern, not the case-job pipeline's
+queue). The module's header owns the reasoning; the facts:
+
+- **Two grants, both by role NAME and both pinned whole by `terraform test`**:
+  the API's role may `sqs:SendMessage` and nothing else
+  (`insolvia-<env>-filing-enqueue`); the filing worker's role
+  (`insolvia-<env>-filing-role`, from `modules/filing_credentials`) may
+  receive, delete, change visibility and read attributes, and never send
+  (`insolvia-<env>-filing-consume`). In code the one sender is
+  `adapters/aws/filing_queue.py` and its one caller the approval
+  (`tests/unit/test_filing_approval.py` reads the source tree to keep it so).
+- **The message is ids only** — approval, filing and case id — so SSE-SQS is
+  enough, for `job_pipeline`'s reason.
+- **Retention is two approval lifetimes (2 h)** and the visibility timeout
+  15 minutes: an approval expires after an hour, so an older job can never be
+  consumed. DLQ 14 days, `maxReceiveCount = 3`.
+- **No consumer, no event source mapping** until `services/filing` (PR 7):
+  approved jobs wait and expire.
+- The URL reaches the API as `/insolvia/<env>/api/filing-queue-url` →
+  `FILING_QUEUE_URL`; dev publishes the same parameter and
+  `scripts/dev-aws-setup.sh` writes the output into `services/api/.env`.
+
 ## Per-machine development environment (`infra/envs/dev/`)
 
 One instance of this env exists **per developer machine**. A UUID generated
@@ -550,6 +579,11 @@ What it owns is deliberately only what local dev consumes today:
   staging/prod — the real key policy and the real filing worker's role, which
   in dev alone also trusts the developer, so the seal-only/open-only split is
   provable on a laptop (`services/api/scripts/dev-filing-vault-proof.sh`).
+- **Filing queue** via the same `modules/filing_queue` (no API role — the
+  developer sends, playing the API): the local API's approval enqueues onto
+  `insolvia-dev-<short-id>-filing` (`FILING_QUEUE_URL` in
+  `services/api/.env`), where the job waits; the approval's guarantees are
+  proved against it by `services/api/scripts/dev-filing-approval-proof.sh`.
 
 No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
 and no IAM beyond the filing worker's role above — the developer's own

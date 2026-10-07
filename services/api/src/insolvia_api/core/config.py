@@ -79,6 +79,7 @@ class AppConfig:
     auth_user_pool_id: str | None = None
     case_document_bucket: str | None = None
     job_queue_url: str | None = None
+    filing_queue_url: str | None = None
     anthropic_api_key: str | None = None
     mailer_api_url: str | None = None
     unsubscribe_secret: str | None = None
@@ -143,6 +144,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
     the enqueue, and POST /v1/cases/<id>/jobs answers 503 when no queue is
     composed at all — accepting work that can never run would be a lie the
     status read repeats forever.
+    FILING_QUEUE_URL is the filing worker's own SQS queue (ADR 0024 PR 6;
+    infra/modules/filing_queue, published as /insolvia/<env>/api/filing-
+    queue-url and derived the same way). The attorney's approval is its one
+    producer. Locally it is this machine's real dev queue; unset, the Lambda
+    composes no filing queue and approving answers 503 (an approval nothing
+    could ever act on is not recorded), and the plain dev server composes the
+    in-memory queue, which records the job and sends nothing.
     ANTHROPIC_API_KEY is the Anthropic API key the AI petition-review worker
     calls Claude with (issue #97, ADR 0019 — extraction 8.7 will share it).
     The SDK's own variable name, so a maintainer's exported key and the
@@ -200,6 +208,7 @@ def load_config(environ: Mapping[str, str] | None = None) -> AppConfig:
         auth_user_pool_id=source.get("AUTH_USER_POOL_ID") or None,
         case_document_bucket=source.get("CASE_DOCUMENT_BUCKET") or None,
         job_queue_url=source.get("JOB_QUEUE_URL") or None,
+        filing_queue_url=source.get("FILING_QUEUE_URL") or None,
         anthropic_api_key=source.get("ANTHROPIC_API_KEY") or None,
         mailer_api_url=source.get("MAILER_API_URL") or None,
         unsubscribe_secret=source.get("UNSUBSCRIBE_SECRET") or None,

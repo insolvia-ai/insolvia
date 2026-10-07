@@ -88,6 +88,11 @@ output "job_queue_url" {
   value       = module.job_pipeline.queue_url
 }
 
+output "filing_queue_url" {
+  description = "This machine's filing queue (FILING_QUEUE_URL for the local API — ADR 0024 PR 6). No consumer until PR 7."
+  value       = module.filing_queue.queue_url
+}
+
 output "admin_audit_table_name" {
   description = "This machine's append-only admin audit table (#213)."
   value       = aws_dynamodb_table.admin_audit.name
