@@ -234,12 +234,15 @@ class _Run:
     def hand_back(self, reason: str, *, court_said: str | None = None) -> FilingResult:
         current = self.filing
         assert current is not None
-        self._move(
+        if not self._move(
             "handed_back",
             hand_back=hand_back_note(
                 reason, stage=current.state, court_said=court_said
             ),
-        )
+        ):
+            # Something else moved the record first (a redelivery that found
+            # this attempt dead): it decided, not this run.
+            return FilingResult("noop", current.filing_id, "race")
         self.deps.access_log.record(
             record_access(
                 case_id=current.case_id,
@@ -256,13 +259,14 @@ class _Run:
     ) -> FilingResult:
         current = self.filing
         assert current is not None
-        self._move(
+        if not self._move(
             "outcome_unknown",
             unknown_reason=reason,
             hand_back=outcome_unknown_note(
                 reason, stage=current.state, court_said=court_said
             ),
-        )
+        ):
+            return FilingResult("noop", current.filing_id, "race")
         self.deps.access_log.record(
             record_access(
                 case_id=current.case_id,
