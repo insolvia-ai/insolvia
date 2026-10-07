@@ -18,6 +18,9 @@ infra/
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
 │   │                         #   insolvia-<env>-audit under its own key
+│   ├── filing_credentials/   # the CM/ECF credential vault (ADR 0024): a dedicated
+│   │                         #   KMS key only the filing worker's role may decrypt,
+│   │                         #   its table, that role, the API's seal-only grant
 │   ├── job_pipeline/         # async jobs (ADR 0018): SQS queue + DLQ + the
 │   │                         #   image-packaged worker Lambda + alarms; the
 │   │                         #   worker half is optional (absent in dev)
@@ -450,10 +453,43 @@ lifecycle rule or a bucket deletion remains open to it. Real immutability is S3
 Object Lock, which is deliberately not here yet.
 
 **Scope and cost.** Data events bill per event, so the selector names the case
-table specifically rather than "all DynamoDB tables"; the case document bucket
-joins `data_resource_arns` when 8.6 lands. Management events are excluded —
-they would double the volume to say what the Terraform diff already says.
-Retention is 90 days on staging and a year on prod.
+table (and the filing-credential vault's table) specifically rather than "all
+DynamoDB tables". Management events are off by default — they would double the
+volume to say what the Terraform diff already says — **except** that KMS
+`Decrypt`/`GenerateDataKey` ARE management events, and a selector can only
+exclude KMS, never select it alone. So every root holding the vault sets
+`include_management_events = true`: it is the only way to retain each seal and
+open of the vault key (with its encryption context) past Event History's 90
+days. Retention is 90 days on staging and a year on prod.
+
+## Filing-credential vault (`infra/modules/filing_credentials/`)
+
+ADR 0024's guardrail 3: an attorney's PACER password and TOTP seed, sealed
+under a **dedicated key** in a **dedicated table**
+(`insolvia-<env>-filing-credentials`, alias of the same name). The module's
+header owns the reasoning; the facts a reader needs here:
+
+- **The key policy, not IAM, keeps Decrypt to the filing worker's role**
+  (`insolvia-<env>-filing-role`): an explicit `Deny kms:Decrypt` to every
+  principal whose `aws:PrincipalArn` is not that role — the API's role, the
+  deploy role, every admin — plus a deny of `ReEncrypt*`/`CreateGrant` to
+  everyone and of any `Decrypt` outside the vault's encryption-context
+  purpose. The API's role is allowed `kms:GenerateDataKey` alone: it seals
+  and can never open. `terraform test` in the module pins the whole document.
+- **The worker's role is created here**, ahead of `services/filing` (ADR 0024
+  PR 7), because KMS refuses a key policy naming a principal that does not
+  exist. It holds GetItem on the vault, Decrypt on its key, and PutItem on the
+  case access log; PR 7 adds its queue and case grants.
+- **The table is encrypted at rest under the case key**, not the vault key:
+  DynamoDB decrypts a CMK table AS THE CALLER, so a vault-key table would need
+  a Decrypt carve-out for the API in the very policy whose point is that only
+  the worker decrypts.
+- **ci-trust's `DenyFilingCredentialDecryption`** (alias-matched, like
+  `DenyCaseDataDecryption`) keeps the pipeline unable to open a credential even
+  if it rewrote the key policy. It is hardening; the deploy needs no new grant.
+- **Dev** passes `worker_assumable_by = [the developer]` so the open can be
+  proved by assuming the real role (`services/api/scripts/dev-filing-vault-proof.sh`);
+  a precondition refuses that list in any environment not named `dev-*`.
 
 **Locally** it is off by default: a per-developer trail bills to record a
 developer reading their own synthetic cases. It can still be stood up on a
@@ -505,9 +541,14 @@ What it owns is deliberately only what local dev consumes today:
   API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in
   `services/api/.env`) and the worker poller consumes it — the pipeline's
   local story, ADR 0018.
+- **Filing-credential vault** via the same `modules/filing_credentials` as
+  staging/prod — the real key policy and the real filing worker's role, which
+  in dev alone also trusts the developer, so the seal-only/open-only split is
+  provable on a laptop (`services/api/scripts/dev-filing-vault-proof.sh`).
 
 No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
-and no IAM — the developer's own credentials are the principal. The stack is
+and no IAM beyond the filing worker's role above — the developer's own
+credentials are the principal. The stack is
 **seeded, not empty**: `scripts/dev-aws-seed.sh` converges it on
 `seeds/dev.json` — the dev account's firm and the fixture case it names, whose
 sample documents are copied server-side out of the shared fixture bucket
