@@ -18,6 +18,8 @@ import {
 import { openDownload } from '@/screens/documents/browser';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { FilingSetPanel } from './filing-set-panel';
+
 /**
  * How often a running assembly is polled. Assembly takes seconds to a couple
  * of minutes; two seconds keeps the wait honest without hammering the API.
@@ -287,6 +289,9 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
   // with the plan. Chapter 7 until the case reads, which is what the screen
   // said before a Chapter 13 packet could be assembled at all.
   const [chapter, setChapter] = useState(7);
+  // Bumped on every successful assembly so the filing set re-reads the new
+  // packet's file checks (ADR 0024 PR 3).
+  const [filingSetKey, setFilingSetKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -356,6 +361,7 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
         }
         setAssembly({ phase: 'idle' });
         setActivity('Packet assembled. It is ready to download below.');
+        setFilingSetKey((key) => key + 1);
         void load();
         return;
       }
@@ -652,6 +658,8 @@ export function FilingPacket({ caseId }: { readonly caseId: string }) {
           {list.kind === 'loading' ? 'Loading…' : `${list.message} Reload the page to try again.`}
         </Text>
       )}
+
+      <FilingSetPanel caseId={caseId} reloadKey={filingSetKey} />
 
       <Heading level={2}>AI review</Heading>
       <Text style={[styles.body, muted]}>

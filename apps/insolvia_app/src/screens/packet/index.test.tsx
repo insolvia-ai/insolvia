@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -66,6 +66,56 @@ function job(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** A filing set as `filing_set_json` renders it — TXWB, no packet yet. */
+function filingSetBody(overrides: Record<string, unknown> = {}) {
+  return {
+    registryRelease: 'courts/us-bankruptcy@2026-10-06',
+    filingMethod: 'hand_off',
+    orderBasis: 'default',
+    namesBasis: 'default',
+    maxBytes: 52428800,
+    maxBytesBasis: 'court_unverified',
+    court: { code: 'txwb', name: 'Western District of Texas', divisionName: 'Austin Division' },
+    documents: [
+      {
+        key: 'form/b101',
+        title: 'Official Form 101 — Voluntary Petition for Individuals Filing for Bankruptcy',
+        fileName: '01-b101.pdf',
+        source: 'packet',
+        handling: 'file',
+        checks: [{ check: 'size', outcome: 'unmeasured', message: 'Assemble the packet first.' }],
+      },
+      {
+        key: 'form/b121',
+        title: 'Official Form 121 — Statement About Your Social Security Numbers',
+        fileName: '02-b121.pdf',
+        source: 'packet',
+        handling: 'not_filed',
+        checks: [{ check: 'size', outcome: 'unmeasured', message: 'Assemble the packet first.' }],
+        note: 'This court does not take B121. Do not upload this file.',
+      },
+    ],
+    checklist: [
+      {
+        id: 'packet',
+        status: 'missing',
+        title: 'Filing packet',
+        detail: 'No filing-set packet has been assembled.',
+        link: 'packet',
+      },
+      {
+        id: 'case_data:petitions',
+        status: 'missing',
+        title: 'Case data: petitions',
+        detail: 'The petition has not been entered yet.',
+        link: 'petition',
+      },
+      { id: 'fee', status: 'confirm', title: 'Filing fee', detail: 'Not recorded for this court.' },
+    ],
+    ...overrides,
+  };
+}
+
 interface ApiStub {
   /** `GET /v1/cases/<id>/packets`, called again after a successful assembly. */
   list?: Answer;
@@ -77,6 +127,8 @@ interface ApiStub {
   url?: Answer;
   /** `GET .../forms` — the output-options panel's forms-subset checklist. */
   forms?: Answer;
+  /** `GET .../filing-set` — the filing set and checklist panel. */
+  filingSet?: Answer;
   /** The case record's status — `filed` is what offers an amendment. */
   caseStatus?: 'intake' | 'filed';
   /** The case record's chapter — 13 assembles the Chapter 13 set (#367). */
@@ -106,6 +158,9 @@ function respond(stub: ApiStub, url: string, init?: RequestInit): Response | Pro
   }
   if (url.endsWith('/packets')) {
     return (stub.list ?? (() => jsonResponse(200, { packets: [] })))();
+  }
+  if (url.endsWith('/filing-set')) {
+    return (stub.filingSet ?? (() => jsonResponse(200, filingSetBody())))();
   }
   if (url.endsWith('/forms')) {
     return (stub.forms ?? (() => jsonResponse(200, { forms: [] })))();
@@ -629,5 +684,74 @@ describe('the filing packet screen', () => {
     expect(
       screen.getByRole('button', { name: 'Assemble the Chapter 7 filing packet for this case' }),
     ).toBeEnabled();
+  });
+
+  // ── The filing set and checklist (ADR 0024 PR 3) ──────────────
+
+  it('shows the filing set for the case’s court, in order, with each file’s checks', async () => {
+    signedIn({});
+
+    expect(await screen.findByText('Filing set and checklist')).toBeTruthy();
+    expect(screen.getByText(/^Western District of Texas, Austin Division\./)).toBeTruthy();
+    expect(screen.getByText('1. 01-b101.pdf')).toBeTruthy();
+    expect(screen.getByText('2. 02-b121.pdf')).toBeTruthy();
+    // B121 says how it is handled in this court, not just that it exists.
+    expect(screen.getByText('Not filed in this court')).toBeTruthy();
+    expect(screen.getByText(/Do not upload this file/)).toBeTruthy();
+    expect(screen.getAllByText('Size: unmeasured')).toHaveLength(2);
+    expect(screen.getByText(/docket order and file names are not on record/)).toBeTruthy();
+  });
+
+  it('lists the checklist with each item’s status and a link to fix it', async () => {
+    signedIn({});
+
+    expect(await screen.findByText('Case data: petitions')).toBeTruthy();
+    expect(screen.getByText('The petition has not been entered yet.')).toBeTruthy();
+    expect(screen.getAllByText('Missing')).toHaveLength(2);
+    expect(screen.getByText('Confirm')).toBeTruthy();
+    const fix = screen.getByRole('link', { name: 'Go to fix: Case data: petitions' });
+    expect(fix.props.href).toBe(`/cases/${CASE_ID}/petition`);
+    // A step outside Insolvia has no link.
+    expect(screen.queryByRole('link', { name: 'Go to fix: Filing fee' })).toBeNull();
+  });
+
+  it('re-reads the filing set after a packet is assembled', async () => {
+    let settled = false;
+    const fetchMock = signedIn({
+      accept: () => jsonResponse(202, job()),
+      status: () => {
+        settled = true;
+        return jsonResponse(
+          200,
+          job({ status: 'succeeded', attempts: 1, result: { outcome: 'assembled' } }),
+        );
+      },
+      filingSet: () =>
+        jsonResponse(
+          200,
+          filingSetBody(
+            settled ? { packet: { id: PACKET_ID, createdAt: '2026-09-03T10:00:00.123Z' } } : {},
+          ),
+        ),
+    });
+    await screen.findByText('Filing set and checklist');
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Assemble the Chapter 7 filing packet for this case' }),
+    );
+    await screen.findByText('Packet assembled. It is ready to download below.');
+
+    const reads = () =>
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/filing-set')).length;
+    await waitFor(() => {
+      expect(reads()).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it('says so when the filing set cannot load, and the rest of the screen still works', async () => {
+    signedIn({ filingSet: () => jsonResponse(500, { error: 'internal', message: 'boom' }) });
+
+    expect(await screen.findByText(/Could not load the filing set/)).toBeTruthy();
+    expect(screen.getByText(/No packet has been assembled yet/)).toBeTruthy();
   });
 });
