@@ -152,7 +152,11 @@ class FilingDeps:
     http: Callable[[], HttpClient]
     # The local composition's fake driver; None everywhere deployed.
     fake_driver: DriverFactory | None = None
+    # The record's clock: claims, leases, the approval's expiry.
     clock: Callable[[], float] = time.time
+    # The COURT's clock — a TOTP code is valid for the court's 30-second step,
+    # which is wall time whatever the record's clock says.
+    wall_clock: Callable[[], float] = time.time
     lease_seconds: int = DEFAULT_LEASE_SECONDS
 
 
@@ -569,8 +573,8 @@ def _sign_in(run: _Run, session: CourtSession) -> None:
     of THIS frame and nothing else: the TOTP is computed inside the court's
     ask (`totp_at` at that moment), and both die when this returns."""
     login, password, seed = run.open_secret(PURPOSE_SIGN_IN)
-    clock = run.deps.clock
-    session.sign_in(login, password, lambda: totp_at(seed, clock()))
+    wall_clock = run.deps.wall_clock
+    session.sign_in(login, password, lambda: totp_at(seed, wall_clock()))
 
 
 def _chapter(run: _Run) -> int:

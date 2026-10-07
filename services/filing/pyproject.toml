@@ -20,7 +20,12 @@ pythonpath = ["src", "../api/src", "fake"]
 testpaths = ["tests/unit"]
 # --strict-markers / --strict-config: same guards as services/api's
 # pyproject, for the same reasons.
-addopts = "-q --strict-markers --strict-config"
+# --import-mode=importlib, and no tests/__init__.py: the end-to-end tests
+# build their case with services/api's OWN reference case and approval world
+# (tests/conftest.py puts services/api on the path and imports them from the
+# API's `tests` package — one owner of the reference case). A `tests` package
+# here would shadow that one; tests/conftest.py is this unit's map instead.
+addopts = "-q --strict-markers --strict-config --import-mode=importlib"
 markers = []
 
 # Strict static type checking (mirrors the CI `mypy` step). Scoped to `src`

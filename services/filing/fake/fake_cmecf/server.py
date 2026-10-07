@@ -132,7 +132,7 @@ class FakeCmEcf:
         self.totp_seed = base64.b32encode(secrets.token_bytes(20)).decode("ascii")
         self.slow_seconds = slow_seconds
         self.hang_seconds = hang_seconds
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._state = _State(fault=fault)
         self._server = ThreadingHTTPServer(("127.0.0.1", port), _handler_for(self))
         self._server.daemon_threads = True
