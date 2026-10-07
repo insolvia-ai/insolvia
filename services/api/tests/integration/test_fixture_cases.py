@@ -170,3 +170,26 @@ def test_the_chapter_13_plan_is_feasible_and_passes_1325a4(
     assert plan["feasibility"]["feasible"] is True
     assert plan["bestInterests"]["passes"] is True
     assert plan["commitmentPeriod"]["months"] == 60
+
+
+def test_every_fixture_case_is_served_its_courts_filing_set_and_checklist(
+    admin: Api, fixture_cases: dict[str, tuple[str, dict]]
+) -> None:
+    # ADR 0024 PR 3. Read-only like everything here: the route renders and
+    # writes nothing. The fixture cases have no assembled packet in this tier
+    # (see the module docstring), so the file checks read "unmeasured" — what
+    # this proves is the seeded court reference resolving against the
+    # registry and the record-built checklist coming back whole.
+    for handle, (case_id, spec) in fixture_cases.items():
+        filing_set = admin.get(f"/v1/cases/{case_id}/filing-set")
+        assert filing_set["court"]["code"] == spec.get("court"), handle
+        assert filing_set["filingMethod"] == "hand_off", handle
+        keys = [document["key"] for document in filing_set["documents"]]
+        assert keys[0] == "form/b101", handle
+        assert "creditor_matrix" in keys, handle
+        b121 = next(d for d in filing_set["documents"] if d["key"] == "form/b121")
+        assert b121["handling"] in ("restricted", "not_filed"), handle
+        checklist = {item["id"]: item for item in filing_set["checklist"]}
+        for required in ("court", "packet", "ssn_statement", "filing_method"):
+            assert required in checklist, (handle, required)
+        assert checklist["court"]["status"] == "ready", handle
