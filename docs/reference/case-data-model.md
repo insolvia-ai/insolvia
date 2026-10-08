@@ -89,7 +89,14 @@ case {
                                        // meeting — the anchors the deadline engine counts from
                                        // (issue 14.6 / #358)
   case_number, judge, trustee         // the docket's facts, typed from the notice of filing
-                                       // until 17.2 reads them from the court (#355)
+                                       // until 17.2 reads them from the court (#355);
+                                       // case_number and filed_at are WRITTEN by an
+                                       // electronic filing too (ADR 0024 PR 8, below)
+  caseNumberKey                       // STORED ONLY, derived: `flmb:6:26-bk-10000` — the
+                                       // court plus the number read into office, year,
+                                       // type and sequence (judge initials dropped), the
+                                       // key court notices are matched on (#369);
+                                       // insolvia_core.case_numbers
   office_file_number                  // the firm's own number for the matter
   archived_at, archived_by            // out of the working list, still the firm's record
   deleted_at, deleted_by              // soft delete — see "The lifecycle" below
@@ -177,6 +184,16 @@ intake ◄──► ready_to_file ──► filed ──► discharged ──►
   re-assembly, `amended` only once filed — reads that, never the literal.
   Reaching it needs `filed_at` and `case_number`; once there, neither may be
   cleared.
+- **An electronic filing moves the case itself** (ADR 0024 PR 8): the filing
+  worker's `filed` writes the case's `status=filed`, the court's number and
+  the petition date (the date the court printed, never converted to UTC) in
+  ONE transaction with the filing record and a history row whose
+  `changedBy` is `filing-worker` and `filingId` the filing; the attorney's
+  resolution of a hand-back as filed does the same with their own subject.
+  Only the lifecycle attributes are written, so a concurrent edit is never
+  put back. A filing resolved as *not filed* frees the case for a new
+  approval; nothing else does (`insolvia_core.filings`, services/api
+  `core/filing_outcome.py`).
 - **Every move is recorded**: a `STATUS#<changedAt>` row in the case's
   partition (who, when, from and to status and stage), written in the same
   transaction as the case — and the case write is conditioned on the status

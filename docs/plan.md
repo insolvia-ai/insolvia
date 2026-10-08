@@ -292,7 +292,14 @@ order. Nothing here needs a new decision except where marked.
    and the kill switch (created off), stop-and-hand-back, and receipt capture
    into the case; the reference case files end to end against the fake on a
    laptop as the worker's role. Every real court hands back until PR 10. PR 8
-   decides when a hand-back frees a case for a new approval.
+   — filed-state capture — is built: the worker's `filed` files the case
+   (status, the court's number, the petition date, a history row naming the
+   filing) in one transaction; the attorney resolves a hand-back or an
+   unknown outcome as filed (the same move) or not filed (the one thing that
+   frees the case for a new approval — refused over a captured court
+   confirmation or a possibly-live attempt); the case stores a normalized
+   `caseNumberKey` for #369's matcher. Proved on a laptop against real dev
+   AWS by `dev-filing-proof.sh`.
 5. **Court-notice intake** (#369), once filed-state capture exists.
 6. **Small follow-ups found on the way:** a Chapter 13 packet is named
    `chapter7-packet.zip`; B113 § 3.1's current-installment column prints
