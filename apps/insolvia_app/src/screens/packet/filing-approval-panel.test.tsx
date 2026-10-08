@@ -1,4 +1,4 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import type { AuthConfig } from '@/config/environment';
@@ -196,6 +196,9 @@ describe('the filing approval panel', () => {
     await user.press(await screen.findByRole('button', { name: 'Sign in again to approve' }));
 
     expect(screen.queryByRole('button', { name: 'Approve filing' })).toBeNull();
+    await waitFor(() => {
+      expect(browser.navigations.at(-1) ?? '').toContain('/oauth2/authorize?');
+    });
     const authorize = browser.navigations.at(-1) ?? '';
     expect(authorize.startsWith(`${TEST_AUTH_CONFIG.domain}/oauth2/authorize?`)).toBe(true);
     expect(authorize).toContain('prompt=login');
