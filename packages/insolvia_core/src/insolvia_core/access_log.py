@@ -145,7 +145,16 @@ from typing import Final
 # court did) — and `filing.hand_back`, a run stopped before the final submit,
 # `purpose` the reason. Its reads of the case record for the approval's
 # digest are ordinary `case.read` rows with `purpose` `filing_digest`.
-# Written by services/filing's core/worker.py, and nowhere else.
+# Written by services/filing's core/worker.py, and nowhere else. Since ADR
+# 0024 PR 8 a `filing.submit` with `purpose` `case_filed` also records the
+# capture that filed the CASE (`filed` when the case was already filed by
+# hand and only the record moved).
+#
+# Filed-state capture (ADR 0024 PR 8) adds one: `filing.resolve`, the
+# attorney's answer to a hand-back or an unknown outcome — keyed by the case,
+# carrying `filing_id`, principal the attorney, `purpose` the outcome
+# (`filed` / `not_filed`) or, denied, the refusal. Written by services/api's
+# core/filing_outcome.py, and nowhere else.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -177,6 +186,7 @@ ACTIONS = (
     "filing.consume",
     "filing.submit",
     "filing.hand_back",
+    "filing.resolve",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row

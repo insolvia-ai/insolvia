@@ -17,6 +17,7 @@ from insolvia_core.ports import (
     FilingAuthorizationStore,
     FilingCredentialSealer,
     FilingCredentialStore,
+    FilingStore,
     FirmStore,
     JwksProvider,
     TaskStore,
@@ -156,6 +157,11 @@ class ApiDependencies:
     # the ONLY reader of `filing_queue` (tests/unit/test_filing_approval.py).
     filing_approval_store: FilingApprovalStore | None = None
     filing_queue: FilingQueue | None = None
+    # The filing worker's records (ADR 0024 PR 8; insolvia_core.filings),
+    # child items of the case partition again. The API READS them for the
+    # approval screen and writes exactly one thing onto them: the attorney's
+    # resolution of a hand-back (core/filing_outcome.py) — never a state.
+    filing_store: FilingStore | None = None
     # None means "this deployment cannot verify tokens" (issue #79). It is a
     # fail-CLOSED default, not a permissive one: api/auth.py answers 401 on
     # every protected route when it is absent, and the Lambda entrypoint

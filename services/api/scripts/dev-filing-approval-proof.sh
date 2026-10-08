@@ -100,6 +100,7 @@ sys.path[:0] = [os.path.join(os.getcwd(), "src"), os.getcwd()]
 from tests.unit.test_packet_assembly import reference_case_data  # noqa: E402
 
 from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprovalStore  # noqa: E402
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore  # noqa: E402
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue  # noqa: E402
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore  # noqa: E402
 from insolvia_api.core.filing_approval import (  # noqa: E402
@@ -177,6 +178,7 @@ vault_table = filing_credentials_table_name(case_table)
 credentials = DynamoDbFilingCredentialStore(vault_table)
 authorizations = DynamoDbFilingAuthorizationStore(vault_table)
 approvals = DynamoDbFilingApprovalStore(case_table)
+filings = DynamoDbFilingStore(case_table)
 queue = SqsFilingQueue(queue_url)
 sqs = boto3.client("sqs")
 deps = PacketAssemblyDeps(
@@ -299,6 +301,7 @@ def approve(*, signed_in_ago: int = 0):
         credentials=credentials,
         authorizations=authorizations,
         approvals=approvals,
+        filings=filings,
         queue=queue,
         access_log=access_log,
     )

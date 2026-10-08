@@ -29,7 +29,7 @@ import ast
 import base64
 import json
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 import pytest
@@ -69,11 +69,13 @@ from insolvia_api.core.packet_assembly import (
 )
 from insolvia_core import courts
 from insolvia_core.adapters.memory.access_log import MemoryAccessLog
+from insolvia_core.adapters.memory.document_store import MemoryDocumentStore
 from insolvia_core.adapters.memory.filing_credentials import (
     LocalCredentialSealer,
     MemoryFilingAuthorizationStore,
     MemoryFilingCredentialStore,
 )
+from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
 from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.errors import ConflictError, ValidationError
 from insolvia_core.filing_authorization import (
@@ -129,8 +131,10 @@ class World:
     credentials: MemoryFilingCredentialStore
     authorizations: MemoryFilingAuthorizationStore
     approvals: MemoryFilingApprovalStore
+    filings: MemoryFilingStore
     queue: MemoryFilingQueue
     log: MemoryAccessLog
+    documents: MemoryDocumentStore = field(default_factory=MemoryDocumentStore)
 
     @property
     def firm_id(self) -> str:
@@ -213,6 +217,7 @@ class World:
             credentials=self.credentials,
             authorizations=self.authorizations,
             approvals=self.approvals,
+            filings=self.filings,
             queue=self.queue,
             access_log=self.log,
         )
@@ -248,6 +253,7 @@ def make_world(*, signed: bool = True, enrolled: bool = True) -> World:
         credentials=MemoryFilingCredentialStore(),
         authorizations=MemoryFilingAuthorizationStore(),
         approvals=MemoryFilingApprovalStore(),
+        filings=MemoryFilingStore(deps.case_store),
         queue=MemoryFilingQueue(),
         log=MemoryAccessLog(),
     )

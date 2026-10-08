@@ -9,6 +9,18 @@
             job
     DELETE  cancel a pending approval before the filing worker uses it
 
+and, under `/v1/cases/<id>/filings/<filing_id>/resolution` (ADR 0024 PR 8):
+
+    POST    the attorney's answer to a hand-back or an unknown outcome —
+            `{outcome: "filed" | "not_filed", docket_checked: true,
+            case_number?, filed_at?, confirmation_document_id?}`;
+            core/filing_outcome.py is the rule. 200 with the same view.
+
+The view carries `filing` — the current approval's filing record, as the
+worker left it (`insolvia_core.filings.filing_json`) — once the worker has
+claimed it: its state, the court's confirmation, the hand-back note, the
+receipt document and the resolution.
+
 THE GATES, in the order they run: `@require_auth`; `cases` view (the case is
 resolved under the caller's accessor, an undistinguishing 404 otherwise, the
 read recorded); `electronic_filing` — hidden for every role until an admin
@@ -36,6 +48,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
@@ -46,8 +59,15 @@ from insolvia_core.access_log import record_access
 from insolvia_core.auth import ReauthenticationRequiredError
 from insolvia_core.cases import Case
 from insolvia_core.errors import NotFoundError, ValidationError
+from insolvia_core.filings import filing_json
 from insolvia_core.firms import ADD_EDIT, CASES, ELECTRONIC_FILING, VIEW_ONLY
-from insolvia_core.ports import AccessLog, CaseEntityStore, CaseStore, DebtorStore
+from insolvia_core.ports import (
+    AccessLog,
+    CaseEntityStore,
+    CaseStore,
+    DebtorStore,
+    FilingStore,
+)
 
 from insolvia_api.api.auth import (
     current_accessor,
@@ -70,12 +90,21 @@ from insolvia_api.core.filing_approval import (
     cancel_approval,
     current_approval,
 )
+from insolvia_api.core.filing_outcome import (
+    ResolutionRefusedError,
+    parse_resolution,
+    resolve_filing,
+)
 from insolvia_api.core.packet_assembly import CaseData
 from insolvia_api.core.ports import FilingApprovalStore, PacketStore
 
 logger = logging.getLogger(__name__)
 
 blueprint = Blueprint("filing_approval", __name__)
+
+# The resolution route's clock — a seam so the unit tier can stand at a
+# far-future date the fixtures name (the lease, the petition-date window).
+resolution_clock: Callable[[], float] = time.time
 
 # A digest and maybe a credential id. The cap refuses anything else first.
 MAX_REQUEST_BYTES: Final = 1024
@@ -95,6 +124,20 @@ def _not_ready(error: FilingSetNotReadyError) -> ResponseReturnValue:
     )
 
 
+@blueprint.errorhandler(ResolutionRefusedError)
+def _resolution_refused(error: ResolutionRefusedError) -> ResponseReturnValue:
+    return (
+        jsonify(
+            {
+                "error": "ResolutionRefused",
+                "message": str(error),
+                "reason": error.reason,
+            }
+        ),
+        409,
+    )
+
+
 @blueprint.errorhandler(FilingQueueUnavailableError)
 def _queue_unavailable(error: FilingQueueUnavailableError) -> ResponseReturnValue:
     logger.error("filing queue send failed; the approval was voided")
@@ -108,6 +151,7 @@ class _Stores:
     entity_store: CaseEntityStore
     packet_store: PacketStore
     approvals: FilingApprovalStore
+    filings: FilingStore
     access_log: AccessLog
 
 
@@ -120,10 +164,11 @@ def _stores() -> _Stores:
         or deps.packet_store is None
         or deps.access_log is None
         or deps.filing_approval_store is None
+        or deps.filing_store is None
     ):
         raise RuntimeError(
-            "case, debtor, entity, packet and approval stores and the access"
-            " log are not composed"
+            "case, debtor, entity, packet, approval and filing stores and the"
+            " access log are not composed"
         )
     return _Stores(
         case_store=deps.case_store,
@@ -131,6 +176,7 @@ def _stores() -> _Stores:
         entity_store=deps.case_entity_store,
         packet_store=deps.packet_store,
         approvals=deps.filing_approval_store,
+        filings=deps.filing_store,
         access_log=deps.access_log,
     )
 
@@ -168,11 +214,18 @@ def _basis(deps: _Stores, case: Case) -> tuple[CaseData, ApprovalBasis]:
 
 
 def _view(
-    basis: ApprovalBasis, approval: FilingApproval | None, *, now: float
+    deps: _Stores,
+    basis: ApprovalBasis,
+    approval: FilingApproval | None,
+    *,
+    now: float,
 ) -> dict[str, object]:
     body: dict[str, object] = {"basis": basis_json(basis)}
     if approval is not None:
         body["approval"] = approval_json(approval, now=now)
+        filing = deps.filings.get(approval.case_id, approval.filing_id)
+        if filing is not None:
+            body["filing"] = filing_json(filing)
     return body
 
 
@@ -193,7 +246,7 @@ def read_filing_approval(case_id: str) -> ResponseReturnValue:
         approvals=deps.approvals,
         access_log=deps.access_log,
     )
-    return _no_store(jsonify(_view(basis, approval, now=now)))
+    return _no_store(jsonify(_view(deps, basis, approval, now=now)))
 
 
 @blueprint.post("/v1/cases/<case_id>/filing-approval")
@@ -254,12 +307,13 @@ def approve_filing_route(case_id: str) -> ResponseReturnValue:
         credentials=vault.filing_credential_store,
         authorizations=vault.filing_authorization_store,
         approvals=deps.approvals,
+        filings=deps.filings,
         queue=vault.filing_queue,
         access_log=deps.access_log,
     )
     # Metadata only: that an approval happened, never who or which case.
     logger.info("filing approved and queued")
-    return _no_store(jsonify(_view(basis, approval, now=now)), 201)
+    return _no_store(jsonify(_view(deps, basis, approval, now=now)), 201)
 
 
 @blueprint.delete("/v1/cases/<case_id>/filing-approval")
@@ -282,4 +336,53 @@ def cancel_filing_approval(case_id: str) -> ResponseReturnValue:
         access_log=deps.access_log,
     )
     logger.info("filing approval cancelled")
-    return _no_store(jsonify(_view(basis, voided, now=now)))
+    return _no_store(jsonify(_view(deps, basis, voided, now=now)))
+
+
+@blueprint.post("/v1/cases/<case_id>/filings/<filing_id>/resolution")
+@require_auth
+@requires(CASES, ADD_EDIT)
+@requires(ELECTRONIC_FILING, ADD_EDIT)
+def resolve_filing_route(case_id: str, filing_id: str) -> ResponseReturnValue:
+    """Record what the court's docket shows for a handed-back or
+    unknown-outcome filing (ADR 0024 PR 8). `cases` add/edit, because a
+    `filed` outcome moves the case through its lifecycle as a PATCH would;
+    the attorney check (only the filing's own) is the domain function's.
+    No fresh sign-in: nothing here reaches a court (core/filing_outcome.py
+    says why that is safe)."""
+    deps = _stores()
+    documents = dependencies().document_store
+    if documents is None:
+        raise RuntimeError("the document store is not composed")
+    if request.content_length and request.content_length > MAX_REQUEST_BYTES:
+        raise ValidationError("request body exceeds 1 KiB")
+    case = _case(deps, case_id)
+    filing = deps.filings.get(case.id, filing_id)
+    if filing is None:
+        raise NotFoundError("filing not found")
+    resolution = parse_resolution(request.get_json(silent=True))
+    accessor = current_accessor()
+    now = resolution_clock()
+    resolve_filing(
+        resolution,
+        filing=filing,
+        case=case,
+        principal=accessor.subject,
+        now=now,
+        filings=deps.filings,
+        documents=documents,
+        access_log=deps.access_log,
+    )
+    # Metadata only: that a resolution happened and which way, never who.
+    logger.info("filing resolved: %s", resolution.outcome)
+    fresh = deps.case_store.get(case.id, accessor=accessor) or case
+    _, basis = _basis(deps, fresh)
+    approval = current_approval(
+        fresh.id,
+        basis=basis,
+        principal=accessor.subject,
+        now=now,
+        approvals=deps.approvals,
+        access_log=deps.access_log,
+    )
+    return _no_store(jsonify(_view(deps, basis, approval, now=now)))

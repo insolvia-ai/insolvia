@@ -200,8 +200,9 @@ def make_filing_world(court: FakeCmEcf) -> FilingWorld:
         api=api,
         court=court,
         credential_id=credential.credential_id,
-        # The same table: filing the record files the case in one write.
-        filings=MemoryFilingStore(api.deps.case_store),
+        # The same table as the API's world: filing the record files the case
+        # in one write, and the approval sees the record.
+        filings=api.filings,
     )
 
 

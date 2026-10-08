@@ -18,6 +18,7 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_key_alias,
     filing_credentials_table_name,
 )
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
@@ -42,6 +43,7 @@ from insolvia_core.adapters.memory.filing_credentials import (
     MemoryFilingAuthorizationStore,
     MemoryFilingCredentialStore,
 )
+from insolvia_core.adapters.memory.filing_store import MemoryFilingStore
 from insolvia_core.adapters.memory.firm_store import MemoryFirmStore
 from insolvia_core.adapters.memory.task_store import MemoryTaskStore
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
@@ -60,6 +62,7 @@ from insolvia_core.ports import (
     FilingAuthorizationStore,
     FilingCredentialSealer,
     FilingCredentialStore,
+    FilingStore,
     FirmStore,
     JwksProvider,
     TaskStore,
@@ -302,6 +305,18 @@ else:
         raise RuntimeError("memory packet store needs the memory case store")
     packet_store = MemoryPacketStore(case_store)
 
+# The filing records (ADR 0024 PR 8): written by services/filing, read here,
+# and a hand-back's resolution written onto them — in one transaction with
+# the case when it files it, which is why the memory fallback shares the
+# memory case store, exactly as the packet store does.
+filing_store: FilingStore
+if config.case_table_name and config.case_access_log_table_name:
+    filing_store = DynamoDbFilingStore(config.case_table_name)
+else:
+    if not isinstance(case_store, MemoryCaseStore):  # pragma: no cover - guard
+        raise RuntimeError("memory filing store needs the memory case store")
+    filing_store = MemoryFilingStore(case_store)
+
 # The review queue (8.9): candidate rows ride the case table like the job
 # store — this machine's real dev table, or the in-memory group with the
 # rest of the memory stores.
@@ -380,5 +395,6 @@ app = create_app(
         filing_authorization_store=filing_authorization_store,
         filing_approval_store=filing_approval_store,
         filing_queue=filing_queue,
+        filing_store=filing_store,
     )
 )
