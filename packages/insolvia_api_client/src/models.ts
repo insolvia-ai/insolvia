@@ -1622,11 +1622,20 @@ export function updateCaseChangesToJson(changes: UpdateCaseChanges): Record<stri
  */
 export interface CaseStatusChange {
   readonly changedAt: string;
-  /** A firm user's subject — resolve it with `listFirmDirectory`. */
+  /**
+   * A firm user's subject — resolve it with `listFirmDirectory` — or
+   * {@link FILING_WORKER_ACTOR} when the filing worker filed the case
+   * (ADR 0024 PR 8).
+   */
   readonly changedBy: string;
   readonly fromStatus: CaseStatus;
   readonly toStatus: CaseStatus;
+  /** The electronic filing that made this move; absent on a person's edit. */
+  readonly filingId?: string;
 }
+
+/** `changedBy` when the filing worker moved the case (services/api `cases.FILING_WORKER_ACTOR`). */
+export const FILING_WORKER_ACTOR = 'filing-worker';
 
 // ---------------------------------------------------------------------------
 // Events, the calendar and the feed — mirrors
@@ -2199,7 +2208,100 @@ export interface FilingApproval {
 export interface FilingApprovalView {
   readonly basis: FilingApprovalBasis;
   readonly approval?: FilingApproval;
+  /** The approval's filing, once the filing worker has claimed it (ADR 0024 PR 8). */
+  readonly filing?: FilingRecord;
 }
+
+/**
+ * The filing worker's states (`insolvia_core.filings`). `handed_back`,
+ * `outcome_unknown` and `filed` are terminal; the first two are what the
+ * attorney resolves.
+ */
+export type FilingState =
+  | 'claimed'
+  | 'signed_in'
+  | 'uploading'
+  | 'at_final_submit'
+  | 'submitted'
+  | 'filed'
+  | 'handed_back'
+  | 'outcome_unknown';
+
+/** Why the worker stopped and what the attorney does next, in words. */
+export interface FilingHandBack {
+  readonly reason: string;
+  /** The state it stopped in. */
+  readonly stage: string;
+  readonly title: string;
+  readonly action: string;
+  /** The court's own message, when there was one. */
+  readonly courtSaid?: string;
+  readonly link: string;
+}
+
+/** What the court's confirmation screen said. */
+export interface FilingConfirmation {
+  readonly caseNumber: string;
+  /** The court's own timestamp, as printed. */
+  readonly filedAt: string;
+  readonly docketEntries: readonly string[];
+  readonly receiptNumber?: string;
+  readonly feeDue?: string;
+}
+
+/** `filed`: the court has it. `not_filed`: it does not — the case is free to approve again. */
+export type FilingResolutionOutcome = 'filed' | 'not_filed';
+
+/** The attorney's recorded answer to a hand-back. */
+export interface FilingResolution {
+  readonly outcome: FilingResolutionOutcome;
+  readonly resolvedBy: string;
+  readonly resolvedAt: string;
+  /** When they confirmed they checked the court's docket. */
+  readonly docketCheckedAt: string;
+  readonly caseNumber?: string;
+  /** The petition date, `YYYY-MM-DD`. */
+  readonly filedAt?: string;
+  readonly confirmationDocumentId?: string;
+}
+
+/** One filing record, as `GET .../filing-approval` serves it. */
+export interface FilingRecord {
+  readonly filingId: string;
+  readonly approvalId: string;
+  /** The attorney whose login it used — the only one who may resolve it. */
+  readonly attorneyId: string;
+  readonly state: FilingState;
+  readonly court: string;
+  readonly claimedAt: string;
+  readonly updatedAt: string;
+  readonly history: readonly { readonly state: FilingState; readonly at: string }[];
+  /** Whether the attorney may still resolve it. */
+  readonly resolvable: boolean;
+  readonly driver?: string;
+  readonly handBack?: FilingHandBack;
+  readonly unknownReason?: string;
+  readonly confirmation?: FilingConfirmation;
+  /** The stored court-filing receipt, a case document. */
+  readonly receiptDocumentId?: string;
+  readonly followUps?: readonly string[];
+  readonly resolution?: FilingResolution;
+}
+
+/**
+ * `POST /v1/cases/{caseId}/filings/{filingId}/resolution`'s body. The
+ * attorney must have checked the court's docket; `filed` needs the number
+ * and petition date the docket shows.
+ */
+export type FilingResolutionRequest =
+  | {
+      readonly outcome: 'filed';
+      readonly caseNumber: string;
+      /** `YYYY-MM-DD`. */
+      readonly filedAt: string;
+      readonly confirmationDocumentId?: string;
+    }
+  | { readonly outcome: 'not_filed' };
 
 /**
  * `GET /v1/cases/{caseId}/forms/{form}/preview` — the creditor-matrix

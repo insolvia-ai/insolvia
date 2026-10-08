@@ -38,6 +38,7 @@ export type {
 
 export {
   CASE_STATUSES,
+  FILING_WORKER_ACTOR,
   CASE_TRANSITIONS,
   FILED_CASE_STATUSES,
   PROSPECT_STAGES,
@@ -201,6 +202,13 @@ export type {
   FilingApprovalStatus,
   FilingApprovalView,
   FilingApprovalVoidReason,
+  FilingConfirmation,
+  FilingHandBack,
+  FilingRecord,
+  FilingResolution,
+  FilingResolutionOutcome,
+  FilingResolutionRequest,
+  FilingState,
   FilingChecklistItem,
   FilingDocument,
   FilingDocumentHandling,
