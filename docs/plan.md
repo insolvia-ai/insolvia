@@ -286,7 +286,13 @@ order. Nothing here needs a new decision except where marked.
    Upload file, per-court drivers verified on training databases, and the fee
    decision (**open question for the maintainer**: how filing fees are paid).
    No production filing until PRs 4–8 are live and one district's driver is
-   verified.
+   verified. PR 7 — the filing worker (`services/filing`) and the fake CM/ECF
+   — is built: the state machine with conditional writes, TOTP at the court's
+   ask, the environment host fence (no court host anywhere but the local fake)
+   and the kill switch (created off), stop-and-hand-back, and receipt capture
+   into the case; the reference case files end to end against the fake on a
+   laptop as the worker's role. Every real court hands back until PR 10. PR 8
+   decides when a hand-back frees a case for a new approval.
 5. **Court-notice intake** (#369), once filed-state capture exists.
 6. **Small follow-ups found on the way:** a Chapter 13 packet is named
    `chapter7-packet.zip`; B113 § 3.1's current-installment column prints

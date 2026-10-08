@@ -15,6 +15,11 @@ output "dlq_url" {
 
 # The rendered grants, exposed so tests/filing_queue.tftest.hcl can pin them
 # whole. Policies are not secrets; they are in every plan already.
+output "dlq_name" {
+  description = "The dead-letter queue's name — the filing worker's DLQ-depth alarm (modules/filing_worker) watches it."
+  value       = aws_sqs_queue.filing_dlq.name
+}
+
 output "enqueue_policy" {
   description = "The API role's send grant, as rendered."
   value       = local.enqueue_policy

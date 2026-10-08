@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Per-machine `.env` files for THIS checkout — including git worktrees.
 #
-# `scripts/dev-aws-setup.sh` writes this machine's dev-AWS wiring into four
+# `scripts/dev-aws-setup.sh` writes this machine's dev-AWS wiring into five
 # gitignored files (`services/api/.env`, `services/admin/.env`,
-# `services/mcp/.env`, `apps/insolvia_app/.env`), and every `dev-up.sh` reads
+# `services/mcp/.env`, `services/filing/.env`, `apps/insolvia_app/.env`), and
+# every `dev-up.sh` reads
 # one of them. They are per-machine state, so they are ignored — and a git
 # worktree checks out TRACKED files only, so it starts with none of them. The
 # symptom is not an error: the app's dev server boots with no Cognito config

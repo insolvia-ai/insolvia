@@ -42,7 +42,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp"])
+  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp", "filing"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -498,8 +498,8 @@ module "filing_credentials" {
 # ── The filing queue (ADR 0024 PR 6, guardrail 1) ───────────────
 # Where the attorney's per-filing approval puts a filing job — the API's
 # role may send and nothing else, the filing worker's role (created by
-# module.filing_credentials above) may consume and never send. No consumer
-# until services/filing (PR 7): jobs wait, and expire with their approval.
+# module.filing_credentials above) may consume and never send. Its consumer
+# is module.filing_worker below (services/filing, ADR 0024 PR 7).
 module "filing_queue" {
   source = "../../modules/filing_queue"
 
@@ -550,6 +550,36 @@ module "case_documents" {
   # by hand first. Prod inverts this.
   force_destroy = true
   tags          = local.common_tags
+}
+
+# ── The filing worker (ADR 0024 PR 7) ───────────────────────────
+# services/filing's Lambda on the filing queue, under the role
+# module.filing_credentials created for it. Staging has NO fake court (the
+# fake is dev/CI only — services/filing/README.md says why) and no verified
+# training database yet (ADR 0024 PR 10), so the fence allows no host here and
+# every job hands back before a credential is opened. The kill switch is
+# created off. First apply in a fresh account: the image bootstrap at the top
+# of modules/filing_worker/main.tf.
+module "filing_worker" {
+  source = "../../modules/filing_worker"
+
+  project                    = "insolvia"
+  environment                = local.environment
+  insolvia_env               = "staging"
+  ecr_repository_url         = data.aws_ecr_repository.service["filing"].repository_url
+  image_tag                  = local.environment
+  worker_role_name           = module.filing_credentials.worker_role_name
+  worker_role_arn            = module.filing_credentials.worker_role_arn
+  queue_arn                  = module.filing_queue.queue_arn
+  dlq_name                   = module.filing_queue.dlq_name
+  case_table_arn             = module.case_store.table_arn
+  case_table_name            = module.case_store.table_name
+  case_access_log_table_name = module.case_store.access_log_table_name
+  case_kms_key_arn           = module.case_store.kms_key_arn
+  case_document_bucket_arn   = module.case_documents.bucket_arn
+  case_document_bucket_name  = module.case_documents.bucket_name
+  alarms_topic_arn           = module.api_service.alarms_topic_arn
+  tags                       = local.common_tags
 }
 
 # Publish the case table name into the API's SSM config namespace, env-level

@@ -41,8 +41,12 @@ name: Release
 #                   legs around them, they are placed here only because the
 #                   chain must be linear (see NO concurrency group below).
 #   4. marketing  — its SSR waitlist action POSTs to the API.
-#   5. app        — the client, last: it should never be the first thing that
+#   5. app        — the client: it should never be the first thing that
 #                   expects a new API.
+#   6. filing     — the filing worker (ADR 0024 PR 7), a queue consumer that
+#                   nothing waits on; at the end because new legs go there
+#                   (below), and because it reads the API's approvals, never
+#                   the reverse.
 #
 # SHARED INFRA is the very first leg, ahead of even the staging apply, because
 # both env roots resolve shared's resources (the wildcard cert, the container
@@ -147,6 +151,7 @@ jobs:
       mailer: ${{ steps.f.outputs.mailer }}
       marketing: ${{ steps.f.outputs.marketing }}
       mcp: ${{ steps.f.outputs.mcp }}
+      filing: ${{ steps.f.outputs.filing }}
       shared: ${{ steps.f.outputs.shared }}
     steps:
       - uses: actions/checkout@v5
@@ -194,7 +199,7 @@ jobs:
           # Every leg, admin included — it was once missing from this list, so
           # an `all=true` dispatch deployed everything except admin.
           all_legs() {
-            for s in admin api app mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
+            for s in admin api app filing mailer marketing mcp shared; do echo "$s=true" >> "$GITHUB_OUTPUT"; done
           }
 
           # Deploy everything when we cannot know what staging is missing.
@@ -243,6 +248,12 @@ jobs:
           # packages/insolvia_core is baked into the mcp image too (ADR 0016's
           # "a core change redeploys three services" consequence).
           emit mcp       '^(services/mcp/|packages/insolvia_core/|infra/envs/staging/|infra/modules/mcp_service/|\.github/workflows/(mcp-staging|release)\.yml)'
+          # The filing worker's image carries packages/insolvia_core AND the
+          # API's source (the approval digest and the filing set it must
+          # compute exactly as the API does — services/filing/README.md), so
+          # a change to either redeploys it; and the API's unit tier, whose
+          # reference case its tests file.
+          emit filing    '^(services/filing/|services/api/src/|packages/insolvia_core/|infra/envs/staging/|infra/modules/(filing_worker|filing_queue|filing_credentials)/|\.github/workflows/(filing-staging|release)\.yml)'
           # apps/ and packages/ are named app-by-app rather than as whole
           # directories: marketing has its own line above, and the Python
           # packages/insolvia_core belongs to the api leg — a broad ^apps/ or
@@ -339,6 +350,15 @@ jobs:
     uses: ./.github/workflows/app-staging.yml
     secrets: inherit
 
+  # The filing worker (ADR 0024 PR 7) — at the END of the chain, per the
+  # header's rule; `api` listed because its approvals are what the worker
+  # consumes.
+  filing:
+    needs: [changes, infra, api, app]
+    if: ${{ !cancelled() && !failure() && needs.infra.result == 'success' && needs.changes.outputs.filing == 'true' }}
+    uses: ./.github/workflows/filing-staging.yml
+    secrets: inherit
+
   # ── RECORD: durable evidence that staging validated this commit ──────────
   #
   # Two artifacts, both consumed later and both surviving this run:
@@ -366,7 +386,7 @@ jobs:
   # that deploys staging, so no deploy can move a `staging` marker tag between
   # the read and the copy.
   record:
-    needs: [changes, infra, mailer, api, admin, mcp, marketing, app]
+    needs: [changes, infra, mailer, api, admin, mcp, marketing, app, filing]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     concurrency:
@@ -423,6 +443,7 @@ jobs:
             echo "mailer=$(basename "$(tf mailer_ecr_repository_url)")"
             echo "marketing=$(basename "$(tf marketing_ecr_repository_url)")"
             echo "mcp=$(basename "$(tf mcp_ecr_repository_url)")"
+            echo "filing=$(basename "$(tf filing_ecr_repository_url)")"
           } >> "$GITHUB_OUTPUT"
 
       - name: Ensure every service has a sha-tagged image for this commit
@@ -435,6 +456,7 @@ jobs:
             ${{ steps.tf.outputs.mailer }}
             ${{ steps.tf.outputs.marketing }}
             ${{ steps.tf.outputs.mcp }}
+            ${{ steps.tf.outputs.filing }}
         run: |
           set -euo pipefail
           for repo in $REPOS; do
@@ -538,7 +560,7 @@ jobs:
           {
             echo "### :rocket: Promotion approved"
             echo
-            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → admin → mcp → marketing → app."
+            echo "Shipping \`${GITHUB_SHA:0:7}\` to production: infra, then mailer → api → admin → mcp → marketing → app → filing."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── PRODUCTION ───────────────────────────────────────────────────────────
@@ -629,6 +651,18 @@ jobs:
     needs: [prod-infra, prod-marketing]
     if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-marketing'].result == 'success' }}
     uses: ./.github/workflows/app-prod.yml
+    with:
+      sha: ${{ github.sha }}
+      gated: true
+    secrets: inherit
+
+  # The filing worker, last — the staging chain's order. Production files
+  # nothing yet: its kill switch is created off and its fence allows no court
+  # host until ADR 0024 PR 10.
+  prod-filing:
+    needs: [prod-infra, prod-app]
+    if: ${{ !cancelled() && needs['prod-infra'].result == 'success' && needs['prod-app'].result == 'success' }}
+    uses: ./.github/workflows/filing-prod.yml
     with:
       sha: ${{ github.sha }}
       gated: true

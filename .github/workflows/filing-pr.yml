@@ -1,0 +1,86 @@
+name: Filing · PR
+
+# No `on.pull_request.paths:` filter, deliberately — see
+# `.github/actions/changed-paths/action.yml`. This job is intended as a
+# required status check on `protect-main` (added post-merge via
+# scripts/update-ruleset.sh), so it must trigger and report on *every* PR;
+# the `steps.filter` guard below is what keeps an unrelated PR cheap.
+# Re-adding a `paths:` filter would silently deadlock every PR that does not
+# touch these paths.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  filing:
+    name: Filing worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/filing
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the guard can diff against the PR base commit.
+          fetch-depth: 0
+
+      - id: filter
+        uses: ./.github/actions/changed-paths
+        with:
+          paths: |
+            services/filing/**
+            # The shared domain this service installs from a local path
+            # (ADR 0012) — a core change must re-run this suite and image.
+            packages/insolvia_core/**
+            # The API's source, which the worker imports for the approval
+            # digest and the filing set and which ships inside its image
+            # (services/filing/README.md) — and the API's unit tier, whose
+            # reference case and approval world this suite files.
+            services/api/src/**
+            services/api/tests/unit/**
+            services/api/requirements.txt
+            # Shared root lint config — a rule change must re-lint this service.
+            ruff.toml
+            .github/workflows/filing-pr.yml
+            .github/actions/changed-paths/action.yml
+
+      - uses: actions/setup-python@v6
+        if: steps.filter.outputs.run == 'true'
+        with:
+          # Matches the Lambda base image (public.ecr.aws/lambda/python:3.12)
+          # and pyproject's requires-python.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.filter.outputs.run == 'true'
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        if: steps.filter.outputs.run == 'true'
+        run: ruff check .
+
+      - name: Format check
+        if: steps.filter.outputs.run == 'true'
+        run: ruff format --check .
+
+      - name: Type check
+        if: steps.filter.outputs.run == 'true'
+        run: mypy
+
+      # Includes the whole worker against the fake CM/ECF on 127.0.0.1 —
+      # in-process, loopback only, the only host the local fence allows.
+      - name: Test
+        if: steps.filter.outputs.run == 'true'
+        run: pytest
+
+      # Packaging check: the exact image the deploy workflows ship must build.
+      # Context is the repo root because the image installs
+      # packages/insolvia_core and copies services/api/src (see the Dockerfile
+      # header).
+      - name: Build Lambda image
+        if: steps.filter.outputs.run == 'true'
+        working-directory: ${{ github.workspace }}
+        run: docker build --target lambda -f services/filing/Dockerfile -t insolvia-filing-pr-check .

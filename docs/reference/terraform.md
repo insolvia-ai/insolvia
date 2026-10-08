@@ -23,7 +23,11 @@ infra/
 │   │                         #   its table, that role, the API's seal-only grant
 │   ├── filing_queue/         # the filing worker's own queue (ADR 0024 PR 6): SQS
 │   │                         #   + DLQ, the API's send-only and the worker's
-│   │                         #   consume-only grants; no consumer until PR 7
+│   │                         #   consume-only grants
+│   ├── filing_worker/        # the filing worker (ADR 0024 PR 7): image Lambda +
+│   │                         #   event source mapping + alarms (absent in dev),
+│   │                         #   the kill switch, and every grant the worker
+│   │                         #   role holds on case data, pinned whole
 │   ├── job_pipeline/         # async jobs (ADR 0018): SQS queue + DLQ + the
 │   │                         #   image-packaged worker Lambda + alarms; the
 │   │                         #   worker half is optional (absent in dev)
@@ -530,11 +534,39 @@ queue). The module's header owns the reasoning; the facts:
 - **Retention is two approval lifetimes (2 h)** and the visibility timeout
   15 minutes: an approval expires after an hour, so an older job can never be
   consumed. DLQ 14 days, `maxReceiveCount = 3`.
-- **No consumer, no event source mapping** until `services/filing` (PR 7):
-  approved jobs wait and expire.
+- **The consumer is `services/filing`** — the event source mapping is
+  `modules/filing_worker`'s (below), batch size 1.
 - The URL reaches the API as `/insolvia/<env>/api/filing-queue-url` →
   `FILING_QUEUE_URL`; dev publishes the same parameter and
   `scripts/dev-aws-setup.sh` writes the output into `services/api/.env`.
+
+## Filing worker (`infra/modules/filing_worker/`)
+
+`services/filing` as `insolvia-<env>-filing-worker`, an image Lambda from the
+shared `insolvia-shared-filing` repository, consuming the filing queue at batch
+size 1 and at most two concurrent invocations. The module header owns the
+reasoning; the facts:
+
+- **Every grant the worker role holds on case data is here, pinned whole by
+  `terraform test`** (`insolvia-<env>-filing-worker-access` on
+  `insolvia-<env>-filing-role`): `GetItem`/`Query` and `PutItem`/`UpdateItem`
+  on the case table (no index, no delete, no batch, no transaction); the case
+  key through DynamoDB and S3 only; `s3:GetObject` on `cases/*/packets/*` and
+  `s3:PutObject` on `cases/*/filings/*`; `ssm:GetParameter` on the kill
+  switch. The vault's grants stay `filing_credentials`', the queue's
+  `filing_queue`'s.
+- **The kill switch** is `/insolvia/<env>/filing/submissions-enabled`, created
+  `"false"` in every environment; Terraform ignores its value after that, so a
+  human flips it without a deploy and no apply reverts the flip.
+- **The Lambda's timeout (600 s) is the worker's claim lease** and sits under
+  the queue's 900-second visibility timeout.
+- **Three alarms** on the API's topic: DLQ depth, worker errors, and any
+  `outcome_unknown` (a log metric filter) — the one state nobody may retry.
+- **Dev**: the grants and the kill switch, no Lambda (`ecr_repository_url =
+  null`); the local poller assumes the role.
+- **First apply in a fresh environment** needs the image bootstrap:
+  `scripts/bootstrap-ecr-images.sh <env> filing` after `shared` has created the
+  repository.
 
 ## Per-machine development environment (`infra/envs/dev/`)
 
@@ -582,8 +614,13 @@ What it owns is deliberately only what local dev consumes today:
 - **Filing queue** via the same `modules/filing_queue` (no API role — the
   developer sends, playing the API): the local API's approval enqueues onto
   `insolvia-dev-<short-id>-filing` (`FILING_QUEUE_URL` in
-  `services/api/.env`), where the job waits; the approval's guarantees are
-  proved against it by `services/api/scripts/dev-filing-approval-proof.sh`.
+  `services/api/.env`); the approval's guarantees are proved against it by
+  `services/api/scripts/dev-filing-approval-proof.sh`.
+- **Filing worker** via the same `modules/filing_worker`, without its Lambda:
+  the grants attach to this machine's filing worker role, which
+  `services/filing`'s local poller assumes (`FILING_WORKER_ROLE_ARN` in
+  `services/filing/.env`); `services/filing/scripts/dev-filing-proof.sh`
+  files the reference case end to end against the fake CM/ECF that way.
 
 No ECR/Lambda/API Gateway (local dev runs the API via compose, not Lambda),
 and no IAM beyond the filing worker's role above — the developer's own

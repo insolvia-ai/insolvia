@@ -203,9 +203,9 @@ locals {
   # FROM THE VAULT: read a credential's item (its status is re-checked
   # immediately before the final submit — ADR 0024), open its envelope, and
   # append the access row. No Put/Update/Delete on the vault: the worker
-  # never enrols or revokes. Its queue, case reads and logs arrive with the
-  # service in PR 7, attached from those modules' sides as case_store does
-  # for the pipeline worker.
+  # never enrols or revokes. Its queue grant is modules/filing_queue's; its
+  # case-table, bucket, kill-switch and log grants are modules/filing_worker's
+  # (ADR 0024 PR 7), pinned whole by that module's test.
   worker_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

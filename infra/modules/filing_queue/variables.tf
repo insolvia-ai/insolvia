@@ -33,10 +33,12 @@ variable "worker_role_name" {
 
 variable "visibility_timeout_seconds" {
   description = <<-EOT
-    How long a received filing job stays hidden before redelivery. PR 7 sets
-    it against the filing worker's own timeout; until then 900 (Lambda's
-    maximum) — inside the approval's one-hour lifetime, so three attempts can
-    all still find their approval consumable.
+    How long a received filing job stays hidden before redelivery: 900, above
+    the filing worker's 600-second timeout (modules/filing_worker), so a
+    message is never redelivered while its attempt can still be running —
+    and inside the approval's one-hour lifetime, so three deliveries can all
+    still find their approval. A redelivery after a dead attempt resumes
+    through the filing record and never files twice.
   EOT
   type        = number
   default     = 900

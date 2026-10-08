@@ -137,6 +137,15 @@ from typing import Final
 # approve and consume (the worker consumes on their approval, as it opens
 # their login), and whoever's act caused a void. Written by services/api's
 # core/filing_approval.py, and nowhere else.
+#
+# The filing worker (ADR 0024 PR 7) adds two, keyed by the case and carrying
+# `filing_id`, principal the approving attorney (the worker acts on their
+# approval): `filing.submit` — the final submit, `purpose` its result
+# (`submitted`, or `outcome_unknown:<reason>` when nobody can know what the
+# court did) — and `filing.hand_back`, a run stopped before the final submit,
+# `purpose` the reason. Its reads of the case record for the approval's
+# digest are ordinary `case.read` rows with `purpose` `filing_digest`.
+# Written by services/filing's core/worker.py, and nowhere else.
 ACTIONS = (
     "case.create",
     "case.read",
@@ -166,6 +175,8 @@ ACTIONS = (
     "filing.approve",
     "filing.void",
     "filing.consume",
+    "filing.submit",
+    "filing.hand_back",
 )
 
 # Whether the caller got the data. A denied read is the more interesting row

@@ -67,7 +67,7 @@ die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_reset" "$*" >&2; exit 1; }
 
 # Every area, in the order they run. Python first because a core change is
 # the most common reason for a broad run and its suites are the fastest.
-ALL_AREAS="core api admin mailer mcp api-client app portal marketing forms ci-scripts"
+ALL_AREAS="core api admin mailer mcp filing api-client app portal marketing forms ci-scripts"
 
 # ── Which areas a path can break ────────────────────────────────────────────
 # One line per path family; an area listed twice is run once. Kept broad on
@@ -75,14 +75,18 @@ ALL_AREAS="core api admin mailer mcp api-client app portal marketing forms ci-sc
 # PR after the push that was supposed to catch it.
 areas_for_path() {
   case "$1" in
-    packages/insolvia_core/*)                       echo "core api admin mcp" ;;
+    packages/insolvia_core/*)                       echo "core api admin mcp filing" ;;
     # core-pr.yml installs the API's pins (ruff, mypy, pytest) — a bump
     # there re-lints and re-tests core too, as it does in CI.
-    services/api/requirements*.txt)                 echo "core api" ;;
+    services/api/requirements*.txt)                 echo "core api filing" ;;
+    # The filing worker imports the API's source (the approval digest, the
+    # filing set) and files the API unit tier's reference case.
+    services/api/src/*|services/api/tests/unit/*)   echo "api filing" ;;
     services/api/*)                                 echo "api" ;;
     services/admin/*)                               echo "admin" ;;
     services/mailer/*)                              echo "mailer" ;;
     services/mcp/*)                                 echo "mcp" ;;
+    services/filing/*)                              echo "filing" ;;
     forms/*)                                        echo "forms api" ;;
     .github/scripts/*|.github/workflows/release.yml) echo "ci-scripts" ;;
     packages/insolvia_api_client/*)                 echo "api-client app" ;;
@@ -91,7 +95,7 @@ areas_for_path() {
     apps/insolvia_marketing/*)                      echo "marketing" ;;
     package.json|package-lock.json|tsconfig.base.json|eslint.base.js)
                                                     echo "api-client app" ;;
-    ruff.toml)                                      echo "core api admin mailer mcp" ;;
+    ruff.toml)                                      echo "core api admin mailer mcp filing" ;;
     # A change to the runner itself is proven by running every suite; a
     # change to the hook config is proven by the hook firing at all.
     scripts/dev-test-unit.sh)                       echo "$ALL_AREAS" ;;
@@ -141,6 +145,7 @@ run_area() {
     admin)      python_suite admin services/admin services/admin/.venv services/admin/scripts/dev-setup.sh ;;
     mailer)     python_suite mailer services/mailer services/mailer/.venv services/mailer/scripts/dev-setup.sh ;;
     mcp)        python_suite mcp services/mcp services/mcp/.venv services/mcp/scripts/dev-setup.sh ;;
+    filing)     python_suite filing services/filing services/filing/.venv services/filing/scripts/dev-setup.sh ;;
     api-client) node_workspace_suite api-client @insolvia-ai/api-client ;;
     app)        node_workspace_suite app apps/insolvia_app ;;
     portal)     node_standalone_suite portal apps/insolvia_admin apps/insolvia_admin/scripts/dev-setup.sh ;;
@@ -158,6 +163,7 @@ describe_area() {
     admin)      echo "services/admin           ruff check + format --check, pytest" ;;
     mailer)     echo "services/mailer          ruff check + format --check, pytest" ;;
     mcp)        echo "services/mcp             ruff check + format --check, pytest" ;;
+    filing)     echo "services/filing          ruff check + format --check, pytest (the fake court in-process)" ;;
     api-client) echo "packages/insolvia_api_client  npm run test --workspace" ;;
     app)        echo "apps/insolvia_app        npm run test --workspace (jest)" ;;
     portal)     echo "apps/insolvia_admin      npm test (own lockfile)" ;;
