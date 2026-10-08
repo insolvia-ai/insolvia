@@ -2,6 +2,7 @@ import {
   ApiException,
   ApiValidationException,
   CASE_TRANSITIONS,
+  FILING_WORKER_ACTOR,
   isFiledStatus,
   permits,
 } from '@insolvia-ai/api-client';
@@ -9,6 +10,7 @@ import type {
   Case,
   CaseStatus,
   CaseStatusChange,
+  Document,
   FirmColleague,
   UpdateCaseChanges,
 } from '@insolvia-ai/api-client';
@@ -91,6 +93,7 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
 
   const [docket, setDocket] = useState<Docket>(() => docketOf(matter));
   const [history, setHistory] = useState<readonly CaseStatusChange[] | null>(null);
+  const [receipts, setReceipts] = useState<readonly Document[]>([]);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -117,11 +120,41 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
     void loadHistory();
   }, [loadHistory]);
 
+  // The court-filing receipt the filing worker stores with the case (ADR
+  // 0024 PR 8): a `court_notice` document, shown once the case is filed.
+  const filed = isFiledStatus(matter.status);
+  useEffect(() => {
+    if (!filed) return;
+    let live = true;
+    void (async () => {
+      try {
+        const result = await call((client) => client.listDocuments(caseId));
+        if (live && result.ok) {
+          setReceipts(
+            result.value.filter(
+              (d) =>
+                d.status === 'stored' &&
+                d.kind === 'court_notice' &&
+                d.fileName === RECEIPT_FILE_NAME,
+            ),
+          );
+        }
+      } catch {
+        // The receipt line is a convenience; the documents screen lists it too.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [call, caseId, filed]);
+
   const muted = { color: theme.colors.muted, fontFamily: theme.typography.body };
   const ink = { color: theme.colors.ink, fontFamily: theme.typography.body };
 
   const nameOf = (subject: string) =>
-    colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject;
+    subject === FILING_WORKER_ACTOR
+      ? 'Insolvia’s filing service'
+      : (colleagues.find((colleague) => colleague.subject === subject)?.displayName ?? subject);
 
   /** The docket fields as a PATCH: what changed, blanks as `null` (clear). */
   const docketChanges = (): UpdateCaseChanges => {
@@ -224,6 +257,28 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
         </View>
       </View>
 
+      {filed && matter.caseNumber !== undefined ? (
+        <View style={styles.filedSummary}>
+          <Text style={[styles.rowTitle, ink]} selectable>
+            {`Case ${matter.caseNumber}${matter.filedAt !== undefined ? `, filed ${matter.filedAt}` : ''}`}
+          </Text>
+          {receipts.length > 0 ? (
+            <View style={styles.actions}>
+              <Text style={[styles.body, muted]}>
+                The court-filing receipt is stored with the case’s documents.
+              </Text>
+              <Button
+                size="lg"
+                intent="secondary"
+                onPress={() => router.push(`/cases/${caseId}/documents`)}
+              >
+                View the receipt
+              </Button>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {mayEdit && moves.length > 0 ? (
         <View style={styles.actions}>
           {moves.map((to) => (
@@ -304,7 +359,9 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
             >
               <Text style={[styles.rowTitle, ink]}>{describeChange(change)}</Text>
               <Text style={[styles.rowMeta, muted]}>
-                {`${change.changedAt.slice(0, 10)} · ${nameOf(change.changedBy)}`}
+                {`${change.changedAt.slice(0, 10)} · ${nameOf(change.changedBy)}${
+                  change.filingId !== undefined ? ' · electronic filing' : ''
+                }`}
               </Text>
             </View>
           ))}
@@ -372,6 +429,9 @@ export function LifecyclePanel({ colleagues }: { colleagues: readonly FirmCollea
   );
 }
 
+/** The worker's receipt (services/filing core/receipt.RECEIPT_FILE_NAME). */
+const RECEIPT_FILE_NAME = 'court-filing-receipt.pdf';
+
 function describeChange(change: CaseStatusChange): string {
   return `${CASE_STATUS_LABEL[change.fromStatus]} → ${CASE_STATUS_LABEL[change.toStatus]}`;
 }
@@ -382,6 +442,7 @@ function serverMessage(cause: ApiException, fallback: string): string {
 }
 
 const styles = StyleSheet.create({
+  filedSummary: { gap: spacing.xs, marginTop: spacing.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   badges: { flexDirection: 'row', gap: spacing.xs },
   body: { fontSize: fontSizes.body, lineHeight: fontSizes.body * 1.5 },

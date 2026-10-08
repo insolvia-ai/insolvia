@@ -212,6 +212,56 @@ describe('the lifecycle panel', () => {
     expect(await screen.findByText('2026-08-05 · Alice Attorney')).toBeTruthy();
   });
 
+  it('a case the filing service filed shows its number, the receipt and who filed it', async () => {
+    signedIn(
+      {
+        ...caseBody(CASE_ID, { status: 'filed' }),
+        caseNumber: '6:99-bk-10000',
+        filedAt: '2099-01-15',
+      },
+      [
+        {
+          method: 'GET',
+          fragment: `/v1/cases/${CASE_ID}/documents`,
+          respond: () =>
+            jsonResponse(200, {
+              documents: [
+                {
+                  id: 'd1',
+                  caseId: CASE_ID,
+                  kind: 'court_notice',
+                  fileName: 'court-filing-receipt.pdf',
+                  contentType: 'application/pdf',
+                  byteSize: 4096,
+                  uploadedAt: '2099-01-15T12:03:00.000Z',
+                  status: 'stored',
+                  channel: 'staff',
+                  requestId: null,
+                },
+              ],
+            }),
+        },
+      ],
+      {
+        history: [
+          {
+            changedAt: '2099-01-15T12:03:00.000000Z',
+            changedBy: 'filing-worker',
+            fromStatus: 'ready_to_file',
+            toStatus: 'filed',
+            filingId: 'f1',
+          },
+        ],
+      },
+    );
+
+    expect(await screen.findByText('Case 6:99-bk-10000, filed 2099-01-15')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'View the receipt' })).toBeTruthy();
+    expect(
+      await screen.findByText('2099-01-15 · Insolvia’s filing service · electronic filing'),
+    ).toBeTruthy();
+  });
+
   it('archives the case with a PUT', async () => {
     const fetchMock = signedIn(caseBody(CASE_ID), [
       {
