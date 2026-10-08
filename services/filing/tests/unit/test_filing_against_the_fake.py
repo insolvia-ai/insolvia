@@ -17,13 +17,13 @@ import threading
 
 import pytest
 from fake_cmecf import FAULTS
+from insolvia_core.filings import STATES
 from insolvia_filing.core.drivers.base import (
     CourtConfirmation,
     CourtDriver,
     CourtSession,
 )
 from insolvia_filing.core.drivers.fake import FakeCmEcfDriver
-from insolvia_filing.core.filings import STATES
 
 # ── 1. end to end ───────────────────────────────────────────────
 

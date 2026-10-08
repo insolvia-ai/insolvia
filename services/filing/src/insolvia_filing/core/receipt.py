@@ -15,8 +15,9 @@ Two things are stored, under the case:
   PDF library joins the image. It is Insolvia's record of the court's
   answer, and says so on the page.
 
-The case's `status=filed`, its court case number and the pin freeze are ADR
-0024 PR 8, which reads the filing record this module's caller writes.
+The case's `status=filed` and its court case number are written by the
+worker's capture in the same transaction as the record's `filed`
+(worker._capture, ADR 0024 PR 8).
 """
 
 from __future__ import annotations
@@ -36,9 +37,8 @@ from insolvia_core.documents import (
     create_document,
 )
 from insolvia_core.errors import ValidationError
+from insolvia_core.filings import Confirmation, Filing
 from pypdf import PdfWriter
-
-from .filings import Confirmation, Filing
 
 RECEIPT_KIND: Final = "court_notice"
 RECEIPT_CONTENT_TYPE: Final = "application/pdf"
@@ -121,6 +121,20 @@ def render_receipt(filing: Filing, confirmation: Confirmation) -> bytes:
     return out.getvalue()
 
 
+# The receipt document's id is DERIVED from the filing's (uuid5 under this
+# namespace) rather than minted: one filing has one receipt, and a redelivered
+# job that finishes a capture finds the first run's row by id instead of
+# writing a second receipt (worker._store_receipt). Still a uuid, so
+# `filing_object_key`'s server-minted-uuids-only check holds. The namespace
+# is a fixed random uuid; changing it would orphan nothing but would let a
+# capture in flight across the deploy write a second row — so never change it.
+_RECEIPT_NAMESPACE: Final = uuid.UUID("5d0f5e4e-2f58-4a7e-9a0b-4f3c1f8e2b61")
+
+
+def receipt_document_id(filing_id: str) -> str:
+    return str(uuid.uuid5(_RECEIPT_NAMESPACE, f"receipt:{filing_id}"))
+
+
 def receipt_document(filing: Filing, content: bytes) -> Document:
     """The receipt's Document record — written by the worker with its bytes,
     so it is born `stored` (the packet's pattern: no presigned upload, nothing
@@ -135,8 +149,10 @@ def receipt_document(filing: Filing, content: bytes) -> Document:
         case_id=filing.case_id,
         uploaded_by=filing.attorney_id,
     )
+    document_id = receipt_document_id(filing.filing_id)
     return replace(
         document,
+        id=document_id,
         status=STATUS_STORED,
-        storage_ref=filing_object_key(filing.case_id, filing.filing_id, document.id),
+        storage_ref=filing_object_key(filing.case_id, filing.filing_id, document_id),
     )

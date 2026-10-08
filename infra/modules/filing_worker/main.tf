@@ -70,19 +70,35 @@ locals {
         }
       },
       {
-        # WRITE three kinds of item in the case partition, every one
+        # WRITE five kinds of item in the case partition, every one
         # conditional: the approval's consume (UpdateItem — pending →
         # consumed, or voided when the digest no longer matches), the
         # FILING#<id> record (PutItem — claimed once, then each transition
-        # conditional on its state and attempt), and the receipt's DOCUMENT#
-        # item (PutItem). Honest about the limit, as modules/case_store's MCP
-        # grant is: IAM cannot fence a write to a SORT-KEY namespace
-        # (dynamodb:LeadingKeys is partition keys only), so "those three
-        # only" is a property of services/filing's code, held by its
-        # architecture test. What the omissions buy: no DeleteItem, no
-        # BatchWriteItem, no TransactWriteItems — the worker cannot delete a
-        # row, and cannot make the transactional writes that create a case or
-        # an approval.
+        # conditional on its state and attempt), the receipt's DOCUMENT#
+        # item (PutItem), and — ADR 0024 PR 8, in ONE transaction with the
+        # record's move to `filed` — the case's META (UpdateItem of `status`,
+        # `filedAt`, `caseNumber`, `caseNumberKey` and `updatedAt` only,
+        # conditional on the status the worker read) and its STATUS#
+        # history row (PutItem, conditional on not existing).
+        #
+        # PR 8 adds NO action: IAM authorizes each item of a
+        # TransactWriteItems as the PutItem / UpdateItem it is — there is no
+        # separate transaction action to grant (DynamoDB's "Using IAM with
+        # transactions"; `dynamodb:EnclosingOperation` is the only
+        # transaction-specific key). Which also means the grant never stopped
+        # this role from writing a transaction, whatever an earlier version of
+        # this comment said.
+        #
+        # Honest about the limit, as modules/case_store's MCP grant is: IAM
+        # cannot fence a write to a SORT-KEY namespace (dynamodb:LeadingKeys
+        # is partition keys only) or to one item's attributes when the same
+        # statement must Put whole items, so "those five only, those
+        # attributes only" is a property of the code — services/filing writes
+        # nothing but through insolvia_core.adapters.aws.filing_store and the
+        # API's approval and document stores, and the case update's attribute
+        # list is pinned by packages/insolvia_core tests/unit/test_filings.py.
+        # What the omissions buy: no DeleteItem, no BatchWriteItem — the
+        # worker cannot delete a row.
         Sid      = "FilingRecordWrite"
         Effect   = "Allow"
         Action   = ["dynamodb:PutItem", "dynamodb:UpdateItem"]

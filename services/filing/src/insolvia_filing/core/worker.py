@@ -71,8 +71,19 @@ from insolvia_api.core.filing_approval import (
 from insolvia_api.core.filing_set import FilingDocument
 from insolvia_api.core.packets import Packet
 from insolvia_core.access_log import record_access
-from insolvia_core.errors import ValidationError
+from insolvia_core.case_numbers import parse_case_number, petition_date
+from insolvia_core.cases import FILING_WORKER_ACTOR, file_case, is_filed
+from insolvia_core.errors import ApiError, ValidationError
 from insolvia_core.filing_credentials import CredentialUnavailableError, open_credential
+from insolvia_core.filings import (
+    BEFORE_SUBMIT,
+    TERMINAL,
+    Confirmation,
+    FiledCase,
+    Filing,
+    Step,
+    may_transition,
+)
 
 from .config import DEFAULT_LEASE_SECONDS
 from .drivers.base import (
@@ -87,14 +98,6 @@ from .drivers.base import (
     resolve_driver,
 )
 from .fence import HostFence, HostNotAllowedError
-from .filings import (
-    BEFORE_SUBMIT,
-    TERMINAL,
-    Confirmation,
-    Filing,
-    Step,
-    may_transition,
-)
 from .hand_back import hand_back_note, outcome_unknown_note
 from .receipt import (
     CONFIRMATION_CONTENT_TYPE,
@@ -107,6 +110,7 @@ from .totp import totp_at
 
 if TYPE_CHECKING:
     from insolvia_api.core.ports import FilingApprovalStore, PacketStore
+    from insolvia_core.documents import Document
     from insolvia_core.ports import (
         AccessLog,
         CaseEntityStore,
@@ -117,9 +121,10 @@ if TYPE_CHECKING:
         FilingAuthorizationStore,
         FilingCredentialOpener,
         FilingCredentialStore,
+        FilingStore,
     )
 
-    from .ports import FilingStore, HttpClient, KillSwitch
+    from .ports import HttpClient, KillSwitch
 
 logger = logging.getLogger(__name__)
 
@@ -198,10 +203,14 @@ class _Run:
 
     # ── the record ──────────────────────────────────────────────
 
-    def _move(self, state: str, **changes: object) -> bool:
+    def _move(
+        self, state: str, *, filed_case: FiledCase | None = None, **changes: object
+    ) -> bool:
         """Advance the record to `state`, conditional on the state and the
-        attempt this run last saw. False when anything else moved first —
-        the caller stops, touching nothing further."""
+        attempt this run last saw — and, with `filed_case`, file the case in
+        the same transaction (ADR 0024 PR 8). False when anything else moved
+        first — the caller decides what that means, touching nothing until
+        it has re-read."""
         current = self.filing
         assert current is not None
         if not may_transition(current.state, state):
@@ -214,7 +223,9 @@ class _Run:
             history=(*current.history, Step(state=state, at=now)),
             **changes,  # type: ignore[arg-type]
         )
-        if not self.deps.filings.transition(moved, expected_state=current.state):
+        if not self.deps.filings.transition(
+            moved, expected_state=current.state, filed_case=filed_case
+        ):
             logger.warning(
                 "filing transition lost a race; stopping",
                 extra={"filing_id": current.filing_id, "to": state},
@@ -638,26 +649,126 @@ def _submitted(
     return _capture(run)
 
 
+# How many times `_capture` re-reads a case that moved between its read and
+# its write before it leaves the filing for a person (`case_not_recorded`).
+# A person editing the case's status at the same moment is the only thing
+# that moves it; three reads outlast any honest race.
+CAPTURE_ATTEMPTS: Final = 3
+
+
+class _CaseNotRecordedError(Exception):
+    """The court's confirmation cannot be written onto the case."""
+
+
 def _capture(run: _Run) -> FilingResult:
-    """submitted -> filed: the receipt, stored with the case. Touches no
-    court, so a redelivery may finish it; if it cannot, the record keeps the
-    court's case number and ends outcome_unknown for a human to reconcile."""
+    """submitted -> filed: the receipt stored with the case, and THE CASE
+    FILED (ADR 0024 PR 8) — `status=filed`, the court's case number and the
+    petition date, with a history row naming this filing — in the same
+    conditional write that moves the record to `filed`.
+
+    Touches no court, so a redelivery may finish it, and every step is
+    idempotent: the receipt document's id is derived from the filing
+    (`receipt_document`), so a second run finds the first run's row instead
+    of writing another; the transaction lands once, because the record's
+    condition is `submitted` and this attempt.
+
+    A case that is ALREADY filed (a person recorded it by hand first) is
+    left exactly as they wrote it — the record alone moves to `filed`. A
+    case that moved underneath the write is read again, up to
+    CAPTURE_ATTEMPTS times. Anything that stops the case being recorded —
+    a receipt that cannot be stored, a confirmation whose number or date
+    cannot be read, a case that keeps moving — ends `outcome_unknown` with
+    the court's confirmation kept, so the attorney resolves it as filed
+    (core/filing_outcome in the API) and can never record it as not filed."""
     deps = run.deps
     filing = run.filing
     assert filing is not None
     assert filing.confirmation is not None
     try:
-        content = render_receipt(filing, filing.confirmation)
-        document = receipt_document(filing, content)
-        deps.blobs.put_bytes(
-            document.storage_ref, content=content, content_type=RECEIPT_CONTENT_TYPE
-        )
-        deps.document_store.create(document)
+        document = _store_receipt(run)
     except Exception:
         logger.exception(
             "could not store the filing receipt", extra={"filing_id": filing.filing_id}
         )
         return run.outcome_unknown("capture_interrupted")
-    if not run._move("filed", receipt_document_id=document.id):
-        return FilingResult("noop", filing.filing_id, "race")
-    return FilingResult("filed", filing.filing_id)
+    for _ in range(CAPTURE_ATTEMPTS):
+        try:
+            filed_case = _filed_case(run)
+        except _CaseNotRecordedError:
+            return run.outcome_unknown("case_not_recorded")
+        if run._move("filed", receipt_document_id=document.id, filed_case=filed_case):
+            deps.access_log.record(
+                record_access(
+                    case_id=filing.case_id,
+                    principal=filing.attorney_id,
+                    action="filing.submit",
+                    purpose="case_filed" if filed_case is not None else "filed",
+                    filing_id=filing.filing_id,
+                )
+            )
+            return FilingResult("filed", filing.filing_id)
+        stored = deps.filings.get(filing.case_id, filing.filing_id)
+        if (
+            stored is None
+            or stored.state != filing.state
+            or stored.attempt_id != filing.attempt_id
+        ):
+            # The record moved: whoever moved it decided.
+            return FilingResult("noop", filing.filing_id, "race")
+        # The record is still ours, so the CASE moved under the write: read
+        # it again.
+    return run.outcome_unknown("case_not_recorded")
+
+
+def _store_receipt(run: _Run) -> Document:
+    """The receipt PDF and its Document row — once. A redelivery that finds
+    the row reuses it (the bytes were written before the row was)."""
+    deps = run.deps
+    filing = run.filing
+    assert filing is not None
+    assert filing.confirmation is not None
+    content = render_receipt(filing, filing.confirmation)
+    document = receipt_document(filing, content)
+    existing = deps.document_store.get(filing.case_id, document.id)
+    if existing is not None:
+        return existing
+    deps.blobs.put_bytes(
+        document.storage_ref, content=content, content_type=RECEIPT_CONTENT_TYPE
+    )
+    deps.document_store.create(document)
+    return document
+
+
+def _filed_case(run: _Run) -> FiledCase | None:
+    """The case half of the `filed` write, read now: None when there is no
+    case to move (it is already filed, or gone); _CaseNotRecordedError when
+    the confirmation cannot be written onto it."""
+    deps = run.deps
+    filing = run.filing
+    assert filing is not None
+    confirmation = filing.confirmation
+    assert confirmation is not None
+    case = deps.case_store.read_for_worker(filing.case_id)
+    if case is None or case.deleted or is_filed(case.status):
+        return None
+    filed_on = petition_date(confirmation.filed_at)
+    if (
+        filed_on is None
+        or parse_case_number(confirmation.case_number, require_office=True) is None
+    ):
+        logger.warning(
+            "the court's confirmation cannot be recorded on the case",
+            extra={"filing_id": filing.filing_id},
+        )
+        raise _CaseNotRecordedError
+    try:
+        after, change = file_case(
+            case,
+            case_number=confirmation.case_number,
+            filed_at=filed_on,
+            changed_by=FILING_WORKER_ACTOR,
+            filing_id=filing.filing_id,
+        )
+    except ApiError as refused:
+        raise _CaseNotRecordedError from refused
+    return FiledCase(case=after, expected_status=case.status, status_change=change)

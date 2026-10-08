@@ -1,34 +1,14 @@
 """The filing worker's own ports. The stores it shares with the API come from
 `insolvia_core.ports` (cases, debtors, entities, documents, blobs, the vault,
-the access log) and from `insolvia_api.core.ports` (packets, approvals)."""
+the access log, and — since ADR 0024 PR 8, when the API began resolving
+hand-backs on them — the filing records themselves) and from
+`insolvia_api.core.ports` (packets, approvals)."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol
-
-from .filings import Filing
-
-
-class FilingStore(Protocol):
-    """The filing records (core/filings.py). Every write is conditional."""
-
-    def get(self, case_id: str, filing_id: str) -> Filing | None:
-        """Strongly consistent."""
-        ...
-
-    def claim(self, filing: Filing) -> bool:
-        """Create the record, conditional on there being none. True when this
-        call created it — of two racing consumers, exactly one."""
-        ...
-
-    def transition(self, filing: Filing, *, expected_state: str) -> bool:
-        """Write `filing` (its new state, its history, its outcome members),
-        conditional on the stored record still being in `expected_state` AND
-        still carrying `filing.attempt_id`. True when this call made the
-        write; False when anything else moved first."""
-        ...
 
 
 class KillSwitch(Protocol):

@@ -40,6 +40,7 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_key_alias,
     filing_credentials_table_name,
 )
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 from insolvia_core.cases import assign_case
@@ -54,7 +55,6 @@ from insolvia_core.filing_credentials import (
     withdraw_authorization,
 )
 from insolvia_core.tax_ids import TaxIdInput, store_tax_id
-from insolvia_filing.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_filing.adapters.http.fenced_client import FencedHttpClient
 from insolvia_filing.core.config import load_config
 from insolvia_filing.core.drivers.fake import FakeCmEcfDriver
@@ -234,7 +234,7 @@ boto3.DEFAULT_SESSION = role
 os.environ["FAKE_CMECF_URL"] = court.base_url
 worker: FilingDeps = compose(load_config())
 worker_sqs = role.client("sqs")
-worker_filings = DynamoDbFilingStore(TABLE, resource=role.resource("dynamodb"))
+worker_filings = DynamoDbFilingStore(TABLE, client=role.client("dynamodb"))
 boto3.DEFAULT_SESSION = dev
 
 

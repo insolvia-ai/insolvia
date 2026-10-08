@@ -54,17 +54,17 @@ from insolvia_core.adapters.memory.filing_credentials import (  # noqa: E402
     LocalCredentialOpener,
     LocalCredentialSealer,
 )
+from insolvia_core.adapters.memory.filing_store import MemoryFilingStore  # noqa: E402
 from insolvia_core.filing_credentials import (  # noqa: E402
     enrol_credential,
     parse_enrolment,
 )
+from insolvia_core.filings import Filing, Step  # noqa: E402
 from insolvia_filing.adapters.http.fenced_client import FencedHttpClient  # noqa: E402
-from insolvia_filing.adapters.memory.filing_store import MemoryFilingStore  # noqa: E402
 from insolvia_filing.adapters.memory.kill_switch import StaticKillSwitch  # noqa: E402
 from insolvia_filing.core.drivers.base import CourtDriver  # noqa: E402
 from insolvia_filing.core.drivers.fake import FakeCmEcfDriver  # noqa: E402
 from insolvia_filing.core.fence import fence_for  # noqa: E402
-from insolvia_filing.core.filings import Filing, Step  # noqa: E402
 from insolvia_filing.core.worker import (  # noqa: E402
     FilingDeps,
     FilingResult,
@@ -196,7 +196,13 @@ def make_filing_world(court: FakeCmEcf) -> FilingWorld:
         access_log=api.log,
         authorizations=api.authorizations,
     )
-    return FilingWorld(api=api, court=court, credential_id=credential.credential_id)
+    return FilingWorld(
+        api=api,
+        court=court,
+        credential_id=credential.credential_id,
+        # The same table: filing the record files the case in one write.
+        filings=MemoryFilingStore(api.deps.case_store),
+    )
 
 
 @pytest.fixture
