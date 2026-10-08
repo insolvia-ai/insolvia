@@ -67,6 +67,15 @@ REGISTRY="$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
 # mismatch — hence forcing the platform on every build below.
 PLATFORM=linux/amd64
 
+# Lambda takes a single image manifest, never an image index. Docker Desktop's
+# containerd image store (the default on new installs) pushes an OCI index with
+# a provenance attestation for every `docker build`, and CreateFunction answers
+# "The image manifest, config or layer media type ... is not supported" — the
+# classic store CI's runners use pushes a plain manifest, which is why the
+# deploy workflows never hit it. So every build below turns attestations off,
+# and the push step checks what ECR actually received.
+BUILD_FLAGS=(--platform "$PLATFORM" --provenance=false --sbom=false)
+
 log()  { printf '\033[1;34m[bootstrap]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[ ok ]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
@@ -197,7 +206,7 @@ build_api() {
   # other stage is the local development server). Context is the REPO ROOT:
   # the image installs the shared packages/insolvia_core by relative path
   # (see services/api/Dockerfile's header).
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/api/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -205,7 +214,7 @@ build_api() {
 build_admin() {
   # Same repo-root-context rule as build_api — the image installs the shared
   # packages/insolvia_core by relative path.
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/admin/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -214,20 +223,20 @@ build_jobs() {
   # The pipeline worker (ADR 0018): services/api's Dockerfile, `worker`
   # target — same source tree as the api image, its own image and repo so
   # worker-only dependencies never land in the request path's image.
-  docker build --platform "$PLATFORM" --target worker \
+  docker build "${BUILD_FLAGS[@]}" --target worker \
     -f "$REPO_ROOT/services/api/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
 
 build_mailer() {
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -t "$1:$ENV" "$REPO_ROOT/services/mailer"
 }
 
 build_mcp() {
   # Same repo-root-context rule as build_api — the image installs the shared
   # packages/insolvia_core by relative path (ADR 0016).
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/mcp/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -236,7 +245,7 @@ build_filing() {
   # The filing worker (ADR 0024): repo-root context — the image installs
   # packages/insolvia_core and copies services/api/src (its Dockerfile's
   # header). The fake CM/ECF is never in it.
-  docker build --platform "$PLATFORM" --target lambda \
+  docker build "${BUILD_FLAGS[@]}" --target lambda \
     -f "$REPO_ROOT/services/filing/Dockerfile" \
     -t "$1:$ENV" "$REPO_ROOT"
 }
@@ -252,7 +261,7 @@ build_marketing() {
   NODE_AUTH_TOKEN="$(gh auth token)" npm ci --prefix "$dir" ||
     die "npm ci failed. If it was a 403, run: gh auth refresh -s read:packages"
   npm run build --prefix "$dir"
-  docker build --platform "$PLATFORM" -t "$1:$ENV" "$dir"
+  docker build "${BUILD_FLAGS[@]}" -t "$1:$ENV" "$dir"
 }
 
 for svc in "${SERVICES[@]}"; do
@@ -274,7 +283,13 @@ for svc in "${SERVICES[@]}"; do
 
   "build_$svc" "$image"
   docker push "$image:$ENV"
-  ok "pushed $image:$ENV"
+  media_type="$(aws ecr describe-images --repository-name "${image##*/}" \
+    --image-ids imageTag="$ENV" --query 'imageDetails[0].imageManifestMediaType' --output text)"
+  case "$media_type" in
+    *index* | *manifest.list*)
+      die "$image:$ENV was pushed as an image index ($media_type); Lambda refuses it. Check that this Docker honours --provenance=false." ;;
+  esac
+  ok "pushed $image:$ENV ($media_type)"
 done
 
 # ── optionally re-run the deploys ──────────────────────────────────
