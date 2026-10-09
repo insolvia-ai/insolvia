@@ -17,8 +17,17 @@ from insolvia_core.cases import (
     parse_list_limit,
     status_change,
 )
-from insolvia_core.errors import FieldValidationError, NotFoundError, ValidationError
-from insolvia_core.firm_clients import FirmClient, debtor_from_client
+from insolvia_core.errors import (
+    ClientUnavailableError,
+    FieldValidationError,
+    NotFoundError,
+    ValidationError,
+)
+from insolvia_core.firm_clients import (
+    FirmClient,
+    debtor_from_client,
+    refusal_for_refused_link,
+)
 from insolvia_core.firms import ADD_EDIT, CASES, CLIENTS, VIEW_ONLY
 from insolvia_core.petitions import PETITION
 from insolvia_core.ports import AccessLog, CaseStore, FirmStore
@@ -135,6 +144,11 @@ def _clients_to_open_for(
     fact, and so is one being merged away right now — a case opened for it
     mid-merge could be missed by the merge and left naming a merged client
     (`insolvia_core.client_merge`).
+
+    This read is for the message. What decides is `CaseStore.create`'s
+    condition on each client's row, in the case's own transaction: a merge
+    that claims the client after this read refuses the write, and the route
+    answers the same 400.
     """
     accessor = current_accessor()
     firm_store = composed_firm_store()
@@ -250,7 +264,21 @@ def create_case_route() -> ResponseReturnValue:
         debtor_from_client(client, case=case, filing_role=role)
         for client, role in zip(clients, OPENING_ROLES, strict=False)
     ]
-    store.create(case, assignment, debtors)
+    try:
+        store.create(case, assignment, debtors)
+    except ClientUnavailableError as refused:
+        # The transaction's condition on a client row: a merge claimed (or
+        # someone archived) the client after `_clients_to_open_for` read it.
+        # Nothing was written; answer the read check's own 400.
+        raise FieldValidationError(
+            {
+                "client_ids": refusal_for_refused_link(
+                    composed_firm_store().get_client(
+                        accessor.firm_id, refused.client_id
+                    )
+                )
+            }
+        ) from refused
     access_log.record(
         record_access(case_id=case.id, principal=accessor.subject, action="case.create")
     )

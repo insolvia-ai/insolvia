@@ -151,7 +151,7 @@ def client(firms, access_log):
     # One debtor store behind both the case store and the debtor-facing
     # routes, as the real composition has one table: the merge re-points
     # the debtors the case store wrote.
-    debtors = MemoryDebtorStore()
+    debtors = MemoryDebtorStore(firm_store=firms)
     app = create_app(
         ApiDependencies(
             config=load_config(

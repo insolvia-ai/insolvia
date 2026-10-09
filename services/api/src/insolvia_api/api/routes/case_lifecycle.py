@@ -35,11 +35,13 @@ from insolvia_core.cases import (
 )
 from insolvia_core.debtors import Debtor
 from insolvia_core.errors import (
+    ClientUnavailableError,
     ConflictError,
     ForbiddenError,
     NotFoundError,
     ValidationError,
 )
+from insolvia_core.firm_clients import refusal_for_refused_link
 from insolvia_core.firms import ADD_EDIT, CASES, CLIENTS, VIEW_ONLY
 from insolvia_core.ports import AccessLog
 
@@ -191,7 +193,10 @@ def _refuse_uncopyable_clients(
     client read is access-logged as a `client.read`.
 
     409, not 400: the request is fine — the SOURCE is in a state that cannot
-    be copied until somebody restores or re-links a client."""
+    be copied until somebody restores or re-links a client.
+
+    A read, for the message: `CaseStore.create`'s condition on each client's
+    row is what decides, and the route answers the same 409 when it refuses."""
     accessor = current_accessor()
     firm_store = composed_firm_store()
     if not any(
@@ -292,7 +297,18 @@ def copy_case_route(case_id: str) -> ResponseReturnValue:
         copied_debtors.append(debtor)
     for entity in copy.entities:
         deps.case_entity_store.create(entity)
-    store.create(copy.case, copy.assignment, copied_debtors)
+    try:
+        store.create(copy.case, copy.assignment, copied_debtors)
+    except ClientUnavailableError as refused:
+        # A client the check above passed was claimed by a merge (or
+        # archived) before the case's transaction landed — its condition on
+        # the client row refused it. The rows already written are the
+        # unreachable kind the docstring describes; answer the check's 409.
+        raise ConflictError(
+            refusal_for_refused_link(
+                composed_firm_store().get_client(accessor.firm_id, refused.client_id)
+            )
+        ) from refused
     access_log.record(
         record_access(
             case_id=copy.case.id, principal=accessor.subject, action="case.create"

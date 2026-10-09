@@ -31,6 +31,7 @@ from insolvia_core.firm_clients import (
     debtor_from_client,
     differs_from_client,
     recopy_from_client,
+    refusal_for_refused_link,
 )
 from insolvia_core.firms import ADD_EDIT, CLIENTS, INTAKE, VIEW_ONLY
 from insolvia_core.ports import (
@@ -295,7 +296,10 @@ def link_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
 
     The one-role check is the WRITE's condition, not a read before it
     (`DebtorStore.link`): two links of one client to two roles of one case,
-    racing, cannot both land.
+    racing, cannot both land. So is the client's own state: the read below
+    gives the clear message, and the write's condition on the client row
+    refuses a link a merge's claim overtook (`insolvia_core.client_merge`)
+    with the same 400.
     """
     _, debtor_store, _, _, _ = _stores()
     accessor = current_accessor()
@@ -307,11 +311,11 @@ def link_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
     stored = debtor_store.get(case_id, filing_role=role)
     if stored is None:
         fresh = debtor_from_client(client, case=case, filing_role=role)
-        outcome = debtor_store.link(fresh, create=True)
+        outcome = debtor_store.link(fresh, create=True, firm_id=case.firm_id)
         if outcome == "written":
             _log_saved(case_id, fresh.id, role)
             return jsonify(_debtor_view(accessor, case, fresh, client=client)), 201
-        _refuse_client_taken(outcome)
+        _refuse_refused_link(outcome, case, client.id)
         # Lost the create race: somebody filled the role first, so this
         # becomes a move of the link on the record they wrote.
         stored = debtor_store.get(case_id, filing_role=role)
@@ -319,7 +323,11 @@ def link_client_route(case_id: str, filing_role: str) -> ResponseReturnValue:
             raise RuntimeError("debtor vanished between a refused create and a read")
 
     linked = link_client(stored, client_id=client.id, case_created_at=case.created_at)
-    _refuse_client_taken(debtor_store.link(linked, create=False))
+    _refuse_refused_link(
+        debtor_store.link(linked, create=False, firm_id=case.firm_id),
+        case,
+        client.id,
+    )
     _log_saved(case_id, linked.id, role)
     return jsonify(_debtor_view(accessor, case, linked, client=client)), 200
 
@@ -439,11 +447,20 @@ def _linkable_client(accessor: Accessor, case: Case, client_id: str) -> FirmClie
     return client
 
 
-def _refuse_client_taken(outcome: LinkOutcome) -> None:
+def _refuse_refused_link(outcome: LinkOutcome, case: Case, client_id: str) -> None:
+    """Raise the field error for a refused link; return for `written` and
+    `role_taken` (the caller handles a lost create race)."""
     if outcome == "client_taken":
         raise FieldValidationError(
             {"client_id": "That client is already another debtor on this case."}
         )
+    if outcome == "client_unavailable":
+        # The write's condition on the client row refused it: a merge (or an
+        # archive) landed after `_linkable_client`'s read. Re-read for the
+        # read check's own words — not access-logged again, the route already
+        # logged this client's read and nothing is returned from this one.
+        reread = _firm_store().get_client(case.firm_id, client_id)
+        raise FieldValidationError({"client_id": refusal_for_refused_link(reread)})
 
 
 def _client_id_of(payload: dict[str, object]) -> str:
