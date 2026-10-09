@@ -34,6 +34,22 @@ class ConflictError(ApiError):
     """
 
 
+class ClientUnavailableError(ConflictError):
+    """A write that links a debtor to a firm client was refused by its
+    condition on the CLIENT ROW: the client was archived, merged, or claimed
+    by a merge between the route's read and the write
+    (`insolvia_core.client_merge` owns why that matters).
+
+    A ConflictError, so a caller that does not catch it answers 409. The
+    routes do catch it — they re-read the client and answer the same field
+    error their read check gives, so the race and the plain case read alike.
+    `client_id` says which client refused, never what about it."""
+
+    def __init__(self, client_id: str) -> None:
+        super().__init__("that client can no longer be linked to a case")
+        self.client_id = client_id
+
+
 class ForbiddenError(ApiError):
     """The caller is authenticated, and still may not do this.
 

@@ -152,7 +152,13 @@ app = create_app(
         # until the first token arrives — an unauthenticated request path
         # never touches the network.
         jwks_provider=CognitoJwksProvider(config.auth_issuer_url),
-        case_store=DynamoDbCaseStore(config.case_table_name),
+        # With the FIRM table: opening a case conditions each debtor's link
+        # on its client's row, in the case's own transaction — the merge
+        # race (insolvia_core.client_merge). The debtor store's link, below,
+        # the same.
+        case_store=DynamoDbCaseStore(
+            config.case_table_name, firm_table_name=config.firm_table_name
+        ),
         access_log=DynamoDbAccessLog(config.case_access_log_table_name),
         # Its own table, not the case table — read on every authenticated
         # request, with a grant of its own (infra/modules/firm_store).
@@ -163,8 +169,11 @@ app = create_app(
         document_store=DynamoDbDocumentStore(config.case_table_name),
         document_blobs=S3DocumentBlobStore(config.case_document_bucket),
         # Same table as the case store, deliberately: a debtor is stored in
-        # its case's partition, so this needs no configuration of its own.
-        debtor_store=DynamoDbDebtorStore(config.case_table_name),
+        # its case's partition. The firm table is the client row `link`
+        # conditions on.
+        debtor_store=DynamoDbDebtorStore(
+            config.case_table_name, firm_table_name=config.firm_table_name
+        ),
         # The sealed tax ids (issue 13.12 / #382): items in the case table,
         # data keys under the case KEY — whose alias is derived from the
         # table's name (case_key_alias says why that is a derivation and not

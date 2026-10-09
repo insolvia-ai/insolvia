@@ -72,6 +72,50 @@ _to_attributes = to_attributes
 _from_attributes = from_attributes
 
 
+def client_linkable_check(
+    table_name: str, *, firm_id: str, client_id: str
+) -> dict[str, Any]:
+    """The TransactWriteItems ConditionCheck that a write LINKING a debtor to
+    `client_id` carries on the client's own row in the firm table — the
+    write's condition, not a read before it, so a merge's claim cannot land
+    between the two (`insolvia_core.client_merge` owns the race).
+
+    `FirmClient.refusal_for_new_case` as a condition expression: the row
+    exists in this firm, is active (which excludes archived, and every merged
+    client is archived), was never merged, and is not being merged away. A
+    client RECEIVING a merge (`mergingFrom`) passes — the merge moves cases
+    onto it, so a case linked to it is where the merge would put it anyway.
+    A missing row evaluates against an empty item and fails, as it should.
+
+    Owned here, beside `claim_client_merge`'s condition on the same row, so
+    the two cannot drift; the case and debtor stores import it. The API's
+    grant on this table holds `dynamodb:ConditionCheckItem` for it
+    (infra/modules/firm_store)."""
+    return {
+        "ConditionCheck": {
+            "TableName": table_name,
+            "Key": {
+                "PK": {"S": partition_key(firm_id)},
+                "SK": {"S": firm_client_sort_key(client_id)},
+            },
+            "ConditionExpression": (
+                "attribute_exists(SK) AND firmId = :firm AND #status = :active"
+                " AND attribute_not_exists(#mergedInto)"
+                " AND attribute_not_exists(#mergingInto)"
+            ),
+            "ExpressionAttributeNames": {
+                "#status": "status",
+                "#mergedInto": MERGED_INTO,
+                "#mergingInto": MERGING_INTO,
+            },
+            "ExpressionAttributeValues": {
+                ":firm": {"S": firm_id},
+                ":active": {"S": ACTIVE},
+            },
+        }
+    }
+
+
 class DynamoDbFirmStore:
     """FirmStore backed by DynamoDB.
 
@@ -568,8 +612,9 @@ class DynamoDbFirmStore:
     #
     # Each step is ONE TransactWriteItems over both client rows, so the claim
     # is taken, finished or released on both or on neither. Update actions
-    # only — the API's grant on this table already holds UpdateItem, which
-    # is what a transactional Update is authorised as.
+    # only — the API's grant on this table holds UpdateItem, which is what a
+    # transactional Update is authorised as. (`client_linkable_check` above
+    # is the other half of the protocol, the link's condition on these rows.)
 
     def _transact(self, items: list[dict[str, Any]]) -> bool:
         """Run a transaction; False when a condition refused it (or another

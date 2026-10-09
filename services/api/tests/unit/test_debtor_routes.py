@@ -32,7 +32,7 @@ from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 from insolvia_core.firms import Firm, FirmUser, default_permissions
 
-from tests.unit.opening import add_client, with_client
+from tests.unit.opening import add_client, claim_merge_after_read, with_client
 
 ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_EXAMPLE00"
 CLIENT_ID = "exampleappclientid000000"
@@ -122,7 +122,7 @@ def firms():
 def client(access_log, firms):
     # One debtor store for both: opening a case writes its debtors through
     # the case store (ADR 0022), and the debtor routes must see them.
-    debtors = MemoryDebtorStore()
+    debtors = MemoryDebtorStore(firm_store=firms)
     app = create_app(
         ApiDependencies(
             config=load_config(
@@ -640,6 +640,46 @@ def test_one_client_holds_one_role_per_case(client):
     assert response.status_code == 400
     assert "client_id" in response.get_json()["fields"]
     assert [d["filing_role"] for d in debtors_of(client, case_id)] == ["debtor_1"]
+
+
+def test_a_link_a_merge_claimed_after_the_read_is_refused(client, firms, monkeypatch):
+    """The race `insolvia_core.client_merge` names: the route reads the
+    client while it is active, a merge of it claims both rows, then the
+    link's write. The write's condition on the client row refuses it with
+    the read check's own 400, and the case gains no debtor."""
+    case_id = open_case(client)
+    sam = add_client(client, auth(ALICE), name={"given": "Sam"})
+    survivor = add_client(client, auth(ALICE), name={"given": "Samuel"})
+    claim_merge_after_read(
+        monkeypatch, firms, firm_id=FIRM_A, merged_id=sam, survivor_id=survivor
+    )
+
+    response = link(client, case_id, "debtor_2", sam)
+
+    assert response.status_code == 400
+    assert response.get_json()["fields"] == {
+        "client_id": "That client is being merged into another client."
+    }
+    assert [d["filing_role"] for d in debtors_of(client, case_id)] == ["debtor_1"]
+
+
+def test_moving_a_link_onto_a_client_a_merge_claimed_is_refused(
+    client, firms, monkeypatch
+):
+    case_id = open_case(client)
+    [original] = debtors_of(client, case_id)
+    sam = add_client(client, auth(ALICE), name={"given": "Sam"})
+    survivor = add_client(client, auth(ALICE), name={"given": "Samuel"})
+    claim_merge_after_read(
+        monkeypatch, firms, firm_id=FIRM_A, merged_id=sam, survivor_id=survivor
+    )
+
+    response = link(client, case_id, "debtor_1", sam)
+
+    assert response.status_code == 400
+    assert "client_id" in response.get_json()["fields"]
+    [after] = debtors_of(client, case_id)
+    assert after["client_id"] == original["client_id"]
 
 
 def test_another_firms_client_cannot_be_linked(client):

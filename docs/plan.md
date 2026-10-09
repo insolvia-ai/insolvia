@@ -313,10 +313,6 @@ order. Nothing here needs a new decision except where marked.
    client's fixture case (bindings, answers, requests) and clean up, but
    accepted and withdrawn answers stay in its review queue on every staging
    run — seed a portal client bound to a scratch case of its own instead.
-   Linking a debtor to a client, and opening a case for one,
-   check the client's state by a read rather than a condition on the write,
-   so a link racing a merge's last index pass can leave a case naming the
-   merged client — make that write conditional on the client row.
 
 **How this has been built, for whoever picks it up:** one agent per PR in its
 own git worktree, committing only; the orchestrator pushes, opens the PR per

@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 
 from insolvia_core.access import Accessor, ClientAccessor, may_see_case
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.adapters.aws.firm_store import client_linkable_check
 from insolvia_core.cases import (
     INDEX_BY_ASSIGNEE,
     INDEX_BY_CLIENT,
@@ -39,7 +40,7 @@ from insolvia_core.clients import (
     public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor, debtor_item
-from insolvia_core.errors import ConflictError
+from insolvia_core.errors import ClientUnavailableError, ConflictError
 
 # The sparse indexes in infra/modules/case_store. Which of the first two a
 # listing reads depends on the caller — see list_for_accessor. The third is a
@@ -59,10 +60,19 @@ class DynamoDbCaseStore:
     execution role in AWS, or in local dev the short-lived credentials
     scripts/dev-up.sh exports from the developer's AWS profile. There is no
     local emulator: `infra/envs/dev` provisions this machine's real table.
+
+    `firm_table_name` is the FIRM table: with it, `create` conditions every
+    debtor's link on its client's row (`firm_store.client_linkable_check`),
+    so a case cannot be opened for a client a merge has claimed since the
+    route read it. The API composes it. A composition that opens no case
+    leaves it None — and so does the seed loader, which links only the
+    clients it has just written itself, and whose role holds no
+    ConditionCheckItem on the firm table (infra/envs/ci-trust).
     """
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self, table_name: str, *, firm_table_name: str | None = None) -> None:
         self.table_name = table_name
+        self.firm_table_name = firm_table_name
         self.client = boto3.client("dynamodb")
 
     def create(
@@ -81,43 +91,75 @@ class DynamoDbCaseStore:
         #
         # attribute_not_exists(PK) makes the write fail rather than silently
         # overwrite if a uuid4 ever collided, or if a retry replayed a create.
+        #
+        # And, with the firm table composed, a ConditionCheck on each linked
+        # client's row — LAST, one per distinct client (a transaction may
+        # not touch one item twice), so their cancellation reasons are the
+        # tail of the list and say which client refused.
         for debtor in debtors:
             if debtor.case_id != case.id:
                 raise RuntimeError("a debtor written with a case must belong to it")
-        self.client.transact_write_items(
-            TransactItems=[
+        firm_table = self.firm_table_name
+        clients = (
+            []
+            if firm_table is None
+            else list(
+                dict.fromkeys(d.client_id for d in debtors if d.client_id is not None)
+            )
+        )
+        items: list[dict[str, Any]] = [
+            {
+                "Put": {
+                    "TableName": self.table_name,
+                    "Item": to_attributes(case_item(case)),
+                    "ConditionExpression": "attribute_not_exists(PK)",
+                }
+            },
+            {
+                "Put": {
+                    "TableName": self.table_name,
+                    "Item": to_attributes(assignment_item(assignment)),
+                    # SK, not PK: the case's own META item shares this
+                    # partition and is written in the same transaction, so
+                    # conditioning on PK would refuse the pair outright.
+                    "ConditionExpression": "attribute_not_exists(SK)",
+                }
+            },
+            *(
                 {
                     "Put": {
                         "TableName": self.table_name,
-                        "Item": to_attributes(case_item(case)),
-                        "ConditionExpression": "attribute_not_exists(PK)",
-                    }
-                },
-                {
-                    "Put": {
-                        "TableName": self.table_name,
-                        "Item": to_attributes(assignment_item(assignment)),
-                        # SK, not PK: the case's own META item shares this
-                        # partition and is written in the same transaction, so
-                        # conditioning on PK would refuse the pair outright.
+                        "Item": to_attributes(debtor_item(debtor)),
+                        # SK for the assignment's reason; it is also
+                        # DebtorStore.create's own guard, so a role can
+                        # exist at most once however it was written.
                         "ConditionExpression": "attribute_not_exists(SK)",
                     }
-                },
-                *(
-                    {
-                        "Put": {
-                            "TableName": self.table_name,
-                            "Item": to_attributes(debtor_item(debtor)),
-                            # SK for the assignment's reason; it is also
-                            # DebtorStore.create's own guard, so a role can
-                            # exist at most once however it was written.
-                            "ConditionExpression": "attribute_not_exists(SK)",
-                        }
-                    }
-                    for debtor in debtors
-                ),
-            ]
-        )
+                }
+                for debtor in debtors
+            ),
+            *(
+                client_linkable_check(
+                    firm_table, firm_id=case.firm_id, client_id=client_id
+                )
+                for client_id in clients
+                if firm_table is not None
+            ),
+        ]
+        try:
+            self.client.transact_write_items(TransactItems=items)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") != _TRANSACTION_CANCELLED:
+                raise
+            reasons = error.response.get("CancellationReasons") or []
+            codes = [reason.get("Code") for reason in reasons]
+            if len(codes) == len(items) and clients:
+                for client_id, code in zip(
+                    clients, codes[-len(clients) :], strict=True
+                ):
+                    if code == "ConditionalCheckFailed":
+                        raise ClientUnavailableError(client_id) from error
+            raise
 
     def list_for_client(
         self, client_id: str, *, accessor: Accessor

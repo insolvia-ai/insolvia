@@ -171,7 +171,9 @@ if (
     and config.case_access_log_table_name
     and config.firm_table_name
 ):
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     firm_store = DynamoDbFirmStore(config.firm_table_name)
 else:
@@ -189,7 +191,9 @@ if (
     and config.case_access_log_table_name
     and config.case_document_bucket
 ):
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
     document_store = DynamoDbDocumentStore(config.case_table_name)
     document_blobs = S3DocumentBlobStore(config.case_document_bucket)
@@ -210,9 +214,15 @@ filing_credential_store: FilingCredentialStore
 filing_credential_sealer: FilingCredentialSealer
 filing_authorization_store: FilingAuthorizationStore
 if config.case_table_name and config.case_access_log_table_name:
-    case_store = DynamoDbCaseStore(config.case_table_name)
+    case_store = DynamoDbCaseStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     access_log = DynamoDbAccessLog(config.case_access_log_table_name)
-    debtor_store = DynamoDbDebtorStore(config.case_table_name)
+    # The firm table is the client row a link conditions on (the merge
+    # race, insolvia_core.client_merge) — the deployed composition's.
+    debtor_store = DynamoDbDebtorStore(
+        config.case_table_name, firm_table_name=config.firm_table_name
+    )
     # The same table again: the generic collections (issue #249) are child
     # items of their case's partition, so the dev table already holds them.
     case_entity_store = DynamoDbCaseEntityStore(config.case_table_name)
@@ -240,7 +250,9 @@ if config.case_table_name and config.case_access_log_table_name:
         filing_credentials_table_name(config.case_table_name)
     )
 else:
-    debtor_store = MemoryDebtorStore()
+    # Composed with the firm store, whose client rows a link (and a case
+    # open, through the shared store) conditions on.
+    debtor_store = MemoryDebtorStore(firm_store=firm_store)
     # ONE debtor store for both: opening a case writes its debtors through
     # the case store (ADR 0022), and the debtor routes must see them — the
     # shared-table property the DynamoDB pair has by construction.
