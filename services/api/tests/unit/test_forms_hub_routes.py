@@ -10,6 +10,7 @@ fake; this repo is public.
 from __future__ import annotations
 
 import io
+import re
 import time
 
 import jwt
@@ -377,6 +378,8 @@ def test_the_preview_is_access_logged(client, stores):
 # ── The tax id's full-value read (issue 13.12 / #382) ────────────
 # 987-65-4321 is from the SSA's never-issued advertising block.
 
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
 
 def add_debtor_1_with_a_tax_id(client, case_id):
     response = client.put(
@@ -408,7 +411,15 @@ def test_previewing_b121_performs_the_logged_read_against_the_caller(client, sto
     fields = PdfReader(io.BytesIO(content)).get_fields()
     assert fields is not None
     assert fields["Debtor1a.SSNum"].value == "987-65-4321"
-    assert "987" not in str(response.get_json())
+    body = str(response.get_json())
+    for spelling in ("987654321", "987-65-4321", "987 65 4321"):
+        assert spelling not in body
+    # The last four, alone or behind any mask (`***-**-4321`, `XXX-XX-4321`,
+    # "ending 4321"). The preview URL carries two random UUIDs, which can
+    # spell any short run of digits — a bare "987" check failed about one run
+    # in seventy — so they are struck out first. What remains has no run of
+    # four digits but the year.
+    assert "4321" not in UUID.sub("<uuid>", body)
 
 
 def test_previewing_any_other_form_never_opens_the_envelope(client, stores):
