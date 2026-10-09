@@ -150,6 +150,8 @@ class FilingWorld:
             authorizations=api.authorizations,
             opener=LocalCredentialOpener(),
             access_log=api.log,
+            tax_id_store=api.deps.tax_id_store,
+            tax_id_cipher=api.deps.tax_id_cipher,
             kill_switch=self.kill_switch,
             fence=fence,
             http=lambda: FencedHttpClient(fence, timeout=REQUEST_TIMEOUT),

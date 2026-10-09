@@ -16,10 +16,11 @@ PACKAGE = Path(__file__).resolve().parents[2] / "src" / "insolvia_filing"
 # What of services/api this worker may import, and why — README, "Why the
 # worker imports insolvia_api.core". Each is the API's ONE owner of a fact the
 # worker must reproduce exactly: the approval's digest and consume, the filing
-# set, the packet record, the drawing primitives, and the stores of the
-# approval and the packet.
+# set, the Case Upload file (ADR 0024 PR 9), the packet record, the drawing
+# primitives, and the stores of the approval and the packet.
 ALLOWED_API = {
     "insolvia_api.core",
+    "insolvia_api.core.case_upload",
     "insolvia_api.core.filing_approval",
     "insolvia_api.core.filing_set",
     "insolvia_api.core.packets",

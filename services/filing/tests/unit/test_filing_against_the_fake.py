@@ -84,7 +84,9 @@ def test_every_document_the_court_received_is_the_approved_bytes(filing):
 
     filing.run(body)
 
-    assert filing.court.uploads == len(
+    # Every filed packet document, plus the Case Upload file the fake court
+    # opens the case from (test_case_upload_against_the_fake.py).
+    assert filing.court.uploads == 1 + len(
         [d for d in packet_files if d.handling != "not_filed"]
     )
 
@@ -205,6 +207,10 @@ class CrashingDriver:
     @property
     def base_urls(self):
         return self._inner.base_urls
+
+    @property
+    def case_upload(self):
+        return self._inner.case_upload
 
     def start(self, http):
         return CrashingSession(self._inner.start(http), self._at)

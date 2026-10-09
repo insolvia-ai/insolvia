@@ -74,6 +74,13 @@ HAND_BACK_REASONS: Final[Mapping[str, Reason]] = {
         "The court takes it as part of the opening filing and Insolvia does not"
         " hold it." + _FROM_CHECKLIST,
     ),
+    "case_upload_invalid": Reason(
+        "The Case Upload file could not be built from this case",
+        "Debtor.txt failed the court's specification (or a fact it needs — a"
+        " tax id, the county, the division's office code — is missing), so the"
+        " worker stopped before signing in. Nothing reached the court."
+        + _FROM_CHECKLIST,
+    ),
     "document_mismatch": Reason(
         "A stored document no longer matches what you approved",
         "Its bytes do not have the digest the approval was bound to; nothing"

@@ -28,6 +28,13 @@ STOPS, and a stop is final:
     approved packet, each checked against the SHA-256 the approval bound.
     A document prepared outside Insolvia that must go in WITH the petition
     → handed_back; one the court takes as its own event → a follow-up.
+    When the driver opens the case by Case Upload (`driver.case_upload`),
+    Debtor.txt is built here too (services/api core/case_upload.py): each
+    debtor's sealed tax id opened through a logged `taxid.read` (purpose
+    `case_upload`, principal the approving attorney), the file validated
+    against the AO spec, held in memory, uploaded FIRST, and never stored.
+    A file that cannot be built or does not validate → handed_back
+    (`case_upload_invalid`) before the credential is opened.
  9. OPEN the credential (`sign_in`), sign in (TOTP computed as the court asks),
     → signed_in; open the case → uploading; upload.
 10. RE-CHECK, immediately before the final submit: the kill switch, the
@@ -60,6 +67,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Final
 
+from insolvia_api.core import case_upload as case_upload_package
 from insolvia_api.core.filing_approval import (
     ApprovalBasis,
     ApprovalUnavailableError,
@@ -122,6 +130,8 @@ if TYPE_CHECKING:
         FilingCredentialOpener,
         FilingCredentialStore,
         FilingStore,
+        TaxIdCipher,
+        TaxIdStore,
     )
 
     from .ports import HttpClient, KillSwitch
@@ -151,6 +161,11 @@ class FilingDeps:
     authorizations: FilingAuthorizationStore
     opener: FilingCredentialOpener
     access_log: AccessLog
+    # The sealed tax ids, opened only for the Case Upload file (purpose
+    # `case_upload`) — under the role's Decrypt grant fenced to the tax-id
+    # encryption context (infra/modules/filing_worker, TaxIdOpen).
+    tax_id_store: TaxIdStore
+    tax_id_cipher: TaxIdCipher
     kill_switch: KillSwitch
     fence: HostFence
     # A fresh, fenced HTTP client per run (one session's cookies).
@@ -317,6 +332,59 @@ class _Run:
             as_of=today,
         )
         return basis
+
+    def case_upload(self) -> FilingFile:
+        """Debtor.txt, built now from the stores — the records the
+        approval's digest binds — with the full SSNs from the logged read.
+        In memory only: returned to the caller for the upload, never stored,
+        never logged. A file that cannot be built or does not validate is a
+        stop; the problems name fields, never values, and only their codes
+        are logged."""
+        deps = self.deps
+        approval = self.approval
+        case = deps.case_store.read_for_worker(approval.case_id)
+        deps.access_log.record(
+            record_access(
+                case_id=approval.case_id,
+                principal=approval.attorney_id,
+                action="case.read",
+                outcome="allowed" if case is not None else "denied",
+                purpose=case_upload_package.TAX_ID_PURPOSE,
+                filing_id=approval.filing_id,
+            )
+        )
+        if case is None:
+            raise _StopError("approval_unavailable")
+        try:
+            built = case_upload_package.case_upload_file(
+                case,
+                principal=approval.attorney_id,
+                as_of=datetime.fromtimestamp(deps.clock(), UTC).date(),
+                debtor_store=deps.debtor_store,
+                entity_store=deps.entity_store,
+                tax_id_store=deps.tax_id_store,
+                tax_id_cipher=deps.tax_id_cipher,
+                access_log=deps.access_log,
+            )
+        except case_upload_package.CaseUploadError as refused:
+            logger.info(
+                "case upload file refused",
+                extra={
+                    "filing_id": approval.filing_id,
+                    "problems": sorted(
+                        {f"{p.record}.{p.field}:{p.code}" for p in refused.problems}
+                    ),
+                },
+            )
+            raise _StopError("case_upload_invalid") from None
+        return FilingFile(
+            position=0,
+            key=case_upload_package.DOCUMENT_KEY,
+            file_name=built.file_name,
+            handling=case_upload_package.DOCUMENT_KEY,
+            content=built.content,
+            sha256=built.sha256,
+        )
 
     def open_secret(self, purpose: str) -> tuple[str, str, str]:
         """(login, password, seed) — or a stop. The `credential.open` row is
@@ -534,6 +602,8 @@ def _file(run: _Run) -> FilingResult:
 
     # 8. the documents, checked against the approval.
     files, follow_ups = run.files(basis)
+    if driver.case_upload:
+        files = [run.case_upload(), *files]
     joint = _joint(run)
 
     # 9. sign in, open, upload.

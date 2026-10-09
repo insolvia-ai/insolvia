@@ -31,6 +31,8 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_table_name,
 )
 from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
+from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
+from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
 
 from ..adapters.aws.kill_switch import SsmKillSwitch
 from ..adapters.http.fenced_client import FencedHttpClient
@@ -85,6 +87,10 @@ def compose(config: FilingConfig) -> FilingDeps:
         authorizations=DynamoDbFilingAuthorizationStore(vault),
         opener=KmsCredentialOpener(filing_credentials_key_alias(table)),
         access_log=DynamoDbAccessLog(access_log_table),
+        # The Case Upload file's tax-id read (ADR 0024 PR 9): the case key by
+        # its alias, Decrypt only, under the tax-id encryption context.
+        tax_id_store=DynamoDbTaxIdStore(table),
+        tax_id_cipher=KmsTaxIdCipher(case_key_alias(table)),
         kill_switch=kill_switch,
         fence=fence,
         http=lambda: FencedHttpClient(fence, timeout=timeout),
