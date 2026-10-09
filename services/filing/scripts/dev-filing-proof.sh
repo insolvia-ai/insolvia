@@ -18,7 +18,9 @@
 #
 #   1. FILES END TO END: approve -> one ids-only message on the real queue ->
 #      the worker (as its role) receives it, consumes the approval, opens the
-#      fake login through the vault key, signs in with a real TOTP, uploads,
+#      fake login through the vault key, signs in with a real TOTP, uploads
+#      (Debtor.txt first, built with each debtor's sealed tax id opened
+#      through the role's TaxIdOpen grant — ADR 0024 PR 9),
 #      re-checks, marks, submits ONCE, and stores the receipt with the case.
 #   2. A REDELIVERED JOB (the same body sent again) is a no-op: still one
 #      submission.
@@ -26,7 +28,8 @@
 #      never retried — still one submission.
 #   4. EVERY FAULT MODE ends handed_back or outcome_unknown, with a reason.
 #   5. THE ROLE IS NARROW: it cannot read an uploaded source document, delete
-#      a row, or decrypt anything but a vault envelope.
+#      a row, seal a tax id, or decrypt the case key under any context but
+#      the tax-id envelope's.
 #
 # WHAT IS LEFT BEHIND: one case partition per scenario under the fake firm,
 # its packet and receipt in the dev bucket — the PR 6 proof's cost, cleared by
