@@ -976,6 +976,26 @@ def test_the_worker_stores_the_packet_and_pins_the_case_together():
     )
 
 
+@pytest.mark.parametrize(
+    ("case_data", "file_name"),
+    [
+        (reference_case_data, "chapter7-packet.zip"),
+        (reference_chapter_13_case_data, "chapter13-packet.zip"),
+    ],
+)
+def test_the_worker_names_the_packet_by_the_cases_chapter(case_data, file_name):
+    data = case_data()
+    deps = build_deps(data)
+
+    result = run_packet_assembly(accept_job(data.case.id), deps, today=TODAY)
+
+    assert result["outcome"] == "assembled"
+    assert result["packet"]["fileName"] == file_name
+    stored = deps.packet_store.get(data.case.id, result["packet"]["id"])
+    assert stored is not None
+    assert stored.file_name == file_name
+
+
 def test_the_worker_performs_the_logged_read_for_b121_only():
     """B121's number reaches the packet through the audited full-value read
     (issue 13.12 / #382): one `taxid.read` row per debtor, naming the

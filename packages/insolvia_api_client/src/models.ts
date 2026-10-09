@@ -1927,7 +1927,7 @@ export interface Packet {
   readonly caseId: string;
   /** The pipeline job whose run produced it. */
   readonly jobId: string;
-  /** The download name — always `chapter7-packet.zip`. */
+  /** The download name — the case's chapter: `chapter7-packet.zip` or `chapter13-packet.zip`. */
   readonly fileName: string;
   /** Always `application/zip`. */
   readonly contentType: string;

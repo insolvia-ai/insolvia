@@ -1380,6 +1380,7 @@ def run_packet_assembly(
     content = packet_zip(outcome.parts)
     packet = new_packet(
         case_id=case.id,
+        chapter=case.chapter,
         job_id=job.id,
         byte_size=len(content),
         sha256=hashlib.sha256(content).hexdigest(),

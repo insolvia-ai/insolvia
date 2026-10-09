@@ -145,6 +145,7 @@ def store_packet(stores, case_id):
     record and the pins written together."""
     packet = new_packet(
         case_id=case_id,
+        chapter=7,
         job_id="00000000-0000-4000-8000-00000000c0de",
         byte_size=3,
         sha256="cd" * 32,

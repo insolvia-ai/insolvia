@@ -7,9 +7,9 @@ import pytest
 from insolvia_api.core.form_overlay import OutputOptions
 from insolvia_api.core.packets import (
     PACKET_CONTENT_TYPE,
-    PACKET_FILE_NAME,
     list_order,
     new_packet,
+    packet_file_name,
     packet_from_item,
     packet_item,
     packet_json,
@@ -24,6 +24,7 @@ JOB_ID = "99999999-8888-4777-8666-555555555555"
 def make_packet(**overrides):
     values = {
         "case_id": CASE_ID,
+        "chapter": 7,
         "job_id": JOB_ID,
         "byte_size": 1234,
         "sha256": "ab" * 32,
@@ -39,8 +40,32 @@ def make_packet(**overrides):
 def test_a_new_packet_derives_its_storage_ref_from_server_minted_ids():
     packet = make_packet()
     assert packet.storage_ref == f"cases/{CASE_ID}/packets/{packet.id}"
-    assert packet.file_name == PACKET_FILE_NAME
     assert packet.content_type == PACKET_CONTENT_TYPE
+
+
+@pytest.mark.parametrize(
+    ("chapter", "file_name"),
+    [(7, "chapter7-packet.zip"), (13, "chapter13-packet.zip")],
+)
+def test_a_packet_downloads_under_its_cases_chapter(chapter, file_name):
+    packet = make_packet(chapter=chapter)
+    assert packet.file_name == file_name == packet_file_name(chapter)
+    # The name is part of the record, so it survives the store round trip.
+    assert packet_from_item(packet_item(packet)).file_name == file_name
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        OutputOptions(draft_watermark=True),
+        OutputOptions(forms=("b101",)),
+        OutputOptions(amended_only=True),
+    ],
+)
+def test_a_draft_subset_or_amendment_keeps_the_chapter_name(options):
+    """Output options never rename the download: the record's options say
+    what kind of set it is, the name says only the chapter."""
+    assert make_packet(chapter=13, options=options).file_name == "chapter13-packet.zip"
 
 
 @pytest.mark.parametrize(
