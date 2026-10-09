@@ -5323,6 +5323,140 @@ describe('the per-filing approval endpoints (ADR 0024, guardrail 1)', () => {
 
     await expect(client(stub).getFilingApproval(CASE)).rejects.toThrow(/status/);
   });
+
+  // insolvia_core.filings.filing_json's exact shape (ADR 0024 PR 8).
+  const FILING_JSON = {
+    filingId: APPROVAL_JSON.filingId,
+    approvalId: APPROVAL_JSON.id,
+    attorneyId: APPROVAL_JSON.approvedBy,
+    state: 'outcome_unknown',
+    court: 'flmb',
+    claimedAt: '2099-01-15T12:00:01.000Z',
+    updatedAt: '2099-01-15T12:03:00.000Z',
+    history: [
+      { state: 'claimed', at: '2099-01-15T12:00:01.000Z' },
+      { state: 'at_final_submit', at: '2099-01-15T12:02:00.000Z' },
+      { state: 'outcome_unknown', at: '2099-01-15T12:03:00.000Z' },
+    ],
+    resolvable: true,
+    driver: 'fake-cmecf/1',
+    handBack: {
+      reason: 'capture_interrupted',
+      stage: 'submitted',
+      title: 'The court confirmed the filing, but the receipt could not be stored',
+      action: "Look the debtor up on the court's own case query.",
+      link: 'packet',
+    },
+    unknownReason: 'capture_interrupted',
+    confirmation: {
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15T12:02:30Z',
+      docketEntries: ['1 Voluntary Petition'],
+      receiptNumber: 'FAKE-1',
+      feeDue: '$338.00',
+    },
+    followUps: ['pay_fee'],
+  };
+  const FILING_PATH = `${BASE_URL}/v1/cases/${CASE}/filings/${APPROVAL_JSON.filingId}/resolution`;
+
+  test('the view decodes the filing record whole', async () => {
+    const consumed = { ...APPROVAL_JSON, status: 'consumed' };
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, approval: consumed, filing: FILING_JSON }, 200),
+    );
+
+    const view = await client(stub).getFilingApproval(CASE);
+
+    expect(view.filing).toEqual(FILING_JSON);
+  });
+
+  test('POSTs a filed resolution snake_case, always with the docket check', async () => {
+    const resolution = {
+      outcome: 'filed',
+      resolvedBy: APPROVAL_JSON.approvedBy,
+      resolvedAt: '2099-01-16T09:00:00.000Z',
+      docketCheckedAt: '2099-01-16T09:00:00.000Z',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+    };
+    const stub = stubFetch(() =>
+      jsonResponse(
+        {
+          basis: BASIS_JSON,
+          approval: APPROVAL_JSON,
+          filing: { ...FILING_JSON, resolvable: false, resolution },
+        },
+        200,
+      ),
+    );
+
+    const view = await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, {
+      outcome: 'filed',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+    });
+
+    expect(stub.lastRequest().method).toBe('POST');
+    expect(stub.lastRequest().url).toBe(FILING_PATH);
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      outcome: 'filed',
+      docket_checked: true,
+      case_number: '6:99-bk-10000',
+      filed_at: '2099-01-15',
+    });
+    expect(view.filing?.resolution).toEqual(resolution);
+  });
+
+  test('a not-filed resolution sends no filing details', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, { outcome: 'not_filed' });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toEqual({
+      outcome: 'not_filed',
+      docket_checked: true,
+    });
+  });
+
+  test('names the uploaded notice only when given', async () => {
+    const stub = stubFetch(() => jsonResponse({ basis: BASIS_JSON }, 200));
+
+    await client(stub).resolveFiling(CASE, APPROVAL_JSON.filingId, {
+      outcome: 'filed',
+      caseNumber: '6:99-bk-10000',
+      filedAt: '2099-01-15',
+      confirmationDocumentId: 'doc-1',
+    });
+
+    expect(JSON.parse(stub.lastRequest().body as string)).toMatchObject({
+      confirmation_document_id: 'doc-1',
+    });
+  });
+
+  test('a refused resolution is a 409 carrying its reason', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse(
+        { error: 'ResolutionRefused', message: 'Record it as filed.', reason: 'court_confirmed' },
+        409,
+      ),
+    );
+
+    const error = await client(stub)
+      .resolveFiling(CASE, APPROVAL_JSON.filingId, { outcome: 'not_filed' })
+      .catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiException);
+    expect((error as ApiException).statusCode).toBe(409);
+    expect((error as ApiException).body).toContain('court_confirmed');
+  });
+
+  test('an unknown filing state is refused as malformed', async () => {
+    const stub = stubFetch(() =>
+      jsonResponse({ basis: BASIS_JSON, filing: { ...FILING_JSON, state: 'lost' } }, 200),
+    );
+
+    await expect(client(stub).getFilingApproval(CASE)).rejects.toThrow(/state/);
+  });
 });
 
 describe('the firm client endpoints (ADR 0022)', () => {
@@ -5734,10 +5868,12 @@ describe('the case lifecycle (issue #355)', () => {
         toStatus: 'ready_to_file',
       },
       {
+        // The filing worker's move (ADR 0024 PR 8): no person, a filing id.
         changedAt: '2026-09-01T10:00:00.000000Z',
-        changedBy: SUBJECT,
+        changedBy: 'filing-worker',
         fromStatus: 'ready_to_file',
         toStatus: 'filed',
+        filingId: 'f0000000-0000-4000-8000-000000000001',
       },
     ];
     const stub = stubFetch(() => jsonResponse({ history }, 200));

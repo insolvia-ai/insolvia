@@ -30,6 +30,7 @@ from insolvia_core.document_requests import DocumentChecklist, DocumentRequest
 from insolvia_core.documents import Document, StoredBlob
 from insolvia_core.filing_authorization import FilingAuthorization
 from insolvia_core.filing_credentials import FilingCredential
+from insolvia_core.filings import FiledCase, Filing
 from insolvia_core.firm_clients import FirmClient
 from insolvia_core.firms import Firm, FirmUser
 from insolvia_core.library_creditors import LibraryCreditor
@@ -1233,4 +1234,47 @@ class DocumentRequestStore(Protocol):
 
     def delete(self, case_id: str, request_id: str) -> bool:
         """Remove the record. True if this call removed it."""
+        ...
+
+
+class FilingStore(Protocol):
+    """The filing records (insolvia_core.filings, ADR 0024 PR 7/8). Written
+    by the filing worker and — for a hand-back's resolution only — by the
+    API. Every write is conditional."""
+
+    def get(self, case_id: str, filing_id: str) -> Filing | None:
+        """Strongly consistent."""
+        ...
+
+    def claim(self, filing: Filing) -> bool:
+        """Create the record, conditional on there being none. True when this
+        call created it — of two racing consumers, exactly one."""
+        ...
+
+    def transition(
+        self,
+        filing: Filing,
+        *,
+        expected_state: str,
+        filed_case: FiledCase | None = None,
+    ) -> bool:
+        """Write `filing` (its new state, its history, its outcome members),
+        conditional on the stored record still being in `expected_state` AND
+        still carrying `filing.attempt_id`. With `filed_case`, the case moves
+        to `filed` and its history row is written IN THE SAME TRANSACTION,
+        conditional on the case still existing in its firm with
+        `filed_case.expected_status`. True when this call made the write;
+        False when any condition failed — and then nothing was written."""
+        ...
+
+    def resolve(
+        self,
+        filing: Filing,
+        *,
+        expected_state: str,
+        filed_case: FiledCase | None = None,
+    ) -> bool:
+        """Write `filing` carrying its `resolution`, conditional as
+        `transition` is AND on the stored record having no resolution yet —
+        a hand-back is resolved once. `filed_case` as for `transition`."""
         ...

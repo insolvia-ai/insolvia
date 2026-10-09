@@ -1,6 +1,11 @@
 """The filing record and its state machine (ADR 0024, "Idempotency — a retry
 never double-files").
 
+Written by TWO services, which is why it lives here (this package's
+admission rule): the filing worker (services/filing) claims and advances it,
+and the API reads it for the approval screen and records the attorney's
+RESOLUTION of a hand-back on it (ADR 0024 PR 8). One shape, one owner.
+
 One record per approved filing, in the case's own partition:
 
     PK  CASE#<case_id>
@@ -33,8 +38,26 @@ that claimed the record is the only one that advances it, and any other
 actor — a redelivered message finding a dead attempt — can only end it, and
 only from the state it read. Two consumers can never both submit.
 
-`filed` here is the FILING's state. The CASE's `status=filed`, its court
-case number and the pin freeze are ADR 0024 PR 8.
+`filed` here is the FILING's state. The CASE's `status=filed` is written in
+the SAME transaction as the filing's own move to `filed` (`FiledCase`, the
+store's `transition`), so the two cannot disagree.
+
+## Resolving a hand-back (ADR 0024 PR 8)
+
+`handed_back` and `outcome_unknown` end the WORKER's part; the attorney
+then says what became of the filing, once (`Resolution`, written by the
+API's core/filing_outcome.py, conditional on the record having none):
+
+- `filed`      "I filed it" (or "the court has it") — the case moves to
+               `filed` with the case number and petition date they read on
+               the docket, in the same transaction as the resolution;
+- `not_filed`  "the court has no such case" — the case is free for a new
+               approval. On `outcome_unknown` this is refused while the
+               attempt could still be live, and whenever the worker captured
+               a confirmation (the court said it docketed it).
+
+The resolution never changes `state`: what the worker did and what the
+attorney found are two facts, and the record keeps both.
 """
 
 from __future__ import annotations
@@ -43,7 +66,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final, Literal, get_args
 
-from insolvia_core.cases import partition_key
+from insolvia_core.cases import Case, StatusChange, partition_key
 from insolvia_core.errors import ValidationError
 
 FilingState = Literal[
@@ -120,6 +143,31 @@ class Confirmation:
     page_ref: str | None = None
 
 
+ResolutionOutcome = Literal["filed", "not_filed"]
+RESOLUTION_OUTCOMES: Final = get_args(ResolutionOutcome)
+# The states a person resolves: everything else is the worker's to finish.
+RESOLVABLE: Final = frozenset({"handed_back", "outcome_unknown"})
+
+
+@dataclass(frozen=True)
+class Resolution:
+    """The attorney's answer to a hand-back: what the court's docket shows.
+
+    `docket_checked_at` is when they confirmed they checked the court's own
+    docket — required for either outcome, and the reason the record can be
+    trusted to free (or file) the case. `case_number`, `filed_at` (a form
+    date — the petition date) and `confirmation_document_id` (an uploaded
+    case document, optional) are the `filed` outcome's."""
+
+    outcome: ResolutionOutcome
+    resolved_by: str
+    resolved_at: str
+    docket_checked_at: str
+    case_number: str | None = None
+    filed_at: str | None = None
+    confirmation_document_id: str | None = None
+
+
 @dataclass(frozen=True)
 class Filing:
     filing_id: str
@@ -146,6 +194,35 @@ class Filing:
     # went in: pay the fee (always, until ADR 0024 PR 11), and file any
     # document prepared outside Insolvia that the court takes as its own event.
     follow_ups: tuple[str, ...] = field(default_factory=tuple)
+    resolution: Resolution | None = None
+
+
+def is_resolvable(filing: Filing) -> bool:
+    """Whether a person may still resolve this filing."""
+    return filing.state in RESOLVABLE and filing.resolution is None
+
+
+def frees_case(filing: Filing) -> bool:
+    """Whether this filing no longer stands in the way of a new approval:
+    the attorney resolved it as never having reached the court. The ONE
+    question `approve_filing` asks of a consumed approval's filing."""
+    return (
+        filing.state in RESOLVABLE
+        and filing.resolution is not None
+        and filing.resolution.outcome == "not_filed"
+    )
+
+
+@dataclass(frozen=True)
+class FiledCase:
+    """The case half of a write that files it: the case as it will be
+    stored, the status it must still have, and the history row — written in
+    the same transaction as the filing record (`FilingStore.transition` /
+    `resolve`), so the case is `filed` exactly when its filing says so."""
+
+    case: Case
+    expected_status: str
+    status_change: StatusChange
 
 
 # ── Item shapes (one owner: both stores use these) ──────────────
@@ -180,6 +257,23 @@ def _confirmation_item(confirmation: Confirmation) -> dict[str, object]:
     return item
 
 
+def _resolution_item(resolution: Resolution) -> dict[str, object]:
+    item: dict[str, object] = {
+        "outcome": resolution.outcome,
+        "resolvedBy": resolution.resolved_by,
+        "resolvedAt": resolution.resolved_at,
+        "docketCheckedAt": resolution.docket_checked_at,
+    }
+    for key, value in (
+        ("caseNumber", resolution.case_number),
+        ("filedAt", resolution.filed_at),
+        ("confirmationDocumentId", resolution.confirmation_document_id),
+    ):
+        if value is not None:
+            item[key] = value
+    return item
+
+
 def outcome_fields(filing: Filing) -> dict[str, object]:
     """The optional members a transition may set, as stored attributes."""
     item: dict[str, object] = {}
@@ -195,6 +289,8 @@ def outcome_fields(filing: Filing) -> dict[str, object]:
         item["receiptDocumentId"] = filing.receipt_document_id
     if filing.follow_ups:
         item["followUps"] = list(filing.follow_ups)
+    if filing.resolution is not None:
+        item["resolution"] = _resolution_item(filing.resolution)
     return item
 
 
@@ -265,6 +361,23 @@ def filing_from_item(item: Mapping[str, object]) -> Filing:
             fee_due=_optional(raw_confirmation, "feeDue"),
             page_ref=_optional(raw_confirmation, "pageRef"),
         )
+    raw_resolution = item.get("resolution")
+    resolution = None
+    if isinstance(raw_resolution, Mapping):
+        outcome = _text(raw_resolution, "outcome")
+        if outcome not in RESOLUTION_OUTCOMES:
+            raise ValidationError(f"stored filing has resolution {outcome!r}")
+        resolution = Resolution(
+            outcome=outcome,  # type: ignore[arg-type]
+            resolved_by=_text(raw_resolution, "resolvedBy"),
+            resolved_at=_text(raw_resolution, "resolvedAt"),
+            docket_checked_at=_text(raw_resolution, "docketCheckedAt"),
+            case_number=_optional(raw_resolution, "caseNumber"),
+            filed_at=_optional(raw_resolution, "filedAt"),
+            confirmation_document_id=_optional(
+                raw_resolution, "confirmationDocumentId"
+            ),
+        )
     history_raw = item.get("history")
     history: list[Step] = []
     if isinstance(history_raw, Sequence) and not isinstance(history_raw, str):
@@ -295,20 +408,29 @@ def filing_from_item(item: Mapping[str, object]) -> Filing:
         confirmation=confirmation,
         receipt_document_id=_optional(item, "receiptDocumentId"),
         follow_ups=_strings(item.get("followUps")),
+        resolution=resolution,
     )
 
 
 def filing_json(filing: Filing) -> dict[str, object]:
-    """What a reader of the record sees (PR 8's status surface will serve
-    this). Ids, states and the court's own facts — nothing secret."""
+    """What a reader of the record sees — the approval screen's `filing`
+    (services/api routes/filing_approval.py). Ids, states, the court's own
+    facts and the resolution — nothing secret. `pageRef` (a storage key) is
+    dropped: the page is not served, and a key is not a client's business.
+    `resolvable` says whether the attorney may still resolve it."""
     body: dict[str, object] = {
         "filingId": filing.filing_id,
         "approvalId": filing.approval_id,
+        "attorneyId": filing.attorney_id,
         "state": filing.state,
         "court": filing.court,
         "claimedAt": filing.claimed_at,
         "updatedAt": filing.updated_at,
         "history": [{"state": s.state, "at": s.at} for s in filing.history],
+        "resolvable": is_resolvable(filing),
     }
     body.update(outcome_fields(filing))
+    confirmation = body.get("confirmation")
+    if isinstance(confirmation, dict):
+        confirmation.pop("pageRef", None)
     return body

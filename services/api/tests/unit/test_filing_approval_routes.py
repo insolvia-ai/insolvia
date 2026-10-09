@@ -131,6 +131,8 @@ class App:
                 filing_credential_store=world.credentials,
                 filing_authorization_store=world.authorizations,
                 filing_approval_store=world.approvals,
+                filing_store=world.filings,
+                document_store=world.documents,
                 filing_queue=world.queue if queue else None,
             )
         ).test_client()

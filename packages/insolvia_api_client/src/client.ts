@@ -83,6 +83,11 @@ import type {
   FilingApprovalBasis,
   FilingApprovalDocument,
   FilingApprovalView,
+  FilingConfirmation,
+  FilingHandBack,
+  FilingRecord,
+  FilingResolution,
+  FilingResolutionRequest,
   FilingSet,
   FilingSetBasis,
   FilingSetCheck,
@@ -1773,6 +1778,49 @@ export class InsolviaApiClient {
   }
 
   /**
+   * `POST /v1/cases/{caseId}/filings/{filingId}/resolution` (ADR 0024 PR 8)
+   * — record what the court's docket shows for a handed-back or
+   * unknown-outcome filing. ALWAYS sends `docket_checked: true`: call it
+   * only once the attorney has confirmed they checked the court's own
+   * docket. `filed` files the case with the number and petition date given;
+   * `not_filed` frees it for a new approval. A 403 means the caller is not
+   * the filing's attorney; a 409 (`ResolutionRefused`, with `reason`) that
+   * it is already resolved (`not_resolvable`), the court confirmed it
+   * (`court_confirmed`), or the attempt may still be live
+   * (`attempt_may_be_live`); a 400 names the field. Returns the
+   * {@link FilingApprovalView}, as `getFilingApproval` does.
+   */
+  async resolveFiling(
+    caseId: string,
+    filingId: string,
+    resolution: FilingResolutionRequest,
+  ): Promise<FilingApprovalView> {
+    const headers = await this.#protectedHeaders();
+    const body: Record<string, string | boolean> = {
+      outcome: resolution.outcome,
+      docket_checked: true,
+    };
+    if (resolution.outcome === 'filed') {
+      body.case_number = resolution.caseNumber;
+      body.filed_at = resolution.filedAt;
+      if (resolution.confirmationDocumentId !== undefined) {
+        body.confirmation_document_id = resolution.confirmationDocumentId;
+      }
+    }
+    const response = await this.#fetch(
+      `${this.#baseUrl}/v1/cases/${encodeURIComponent(caseId)}/filings/${encodeURIComponent(
+        filingId,
+      )}/resolution`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    return filingApprovalViewFromJson(await decodeExpected(response, 200));
+  }
+
+  /**
    * `GET /v1/cases/{caseId}/forms/{form}/preview` — render exactly one form
    * through the same fill engine `packet_assembly` uses, and mint a
    * short-lived URL to the PDF.
@@ -2812,6 +2860,7 @@ export class InsolviaApiClient {
         changedBy: requireString(element, 'changedBy'),
         fromStatus: requireCaseStatus(element, 'fromStatus'),
         toStatus: requireCaseStatus(element, 'toStatus'),
+        filingId: optionalString(element, 'filingId'),
       }),
     );
   }
@@ -4157,9 +4206,80 @@ function filingApprovalFromJson(response: DecodedResponse): FilingApproval {
  */
 function filingApprovalViewFromJson(response: DecodedResponse): FilingApprovalView {
   const approval = optionalObject(response, 'approval');
+  const filing = optionalObject(response, 'filing');
   return definedMembers<FilingApprovalView>({
     basis: filingApprovalBasisFromJson(requireObject(response, 'basis')),
     approval: approval === undefined ? undefined : filingApprovalFromJson(approval),
+    filing: filing === undefined ? undefined : filingRecordFromJson(filing),
+  });
+}
+
+const FILING_STATES = [
+  'claimed',
+  'signed_in',
+  'uploading',
+  'at_final_submit',
+  'submitted',
+  'filed',
+  'handed_back',
+  'outcome_unknown',
+] as const;
+
+/** Decodes a {@link FilingRecord} — `insolvia_core.filings.filing_json`. */
+function filingRecordFromJson(response: DecodedResponse): FilingRecord {
+  const handBack = optionalObject(response, 'handBack');
+  const confirmation = optionalObject(response, 'confirmation');
+  const resolution = optionalObject(response, 'resolution');
+  return definedMembers<FilingRecord>({
+    filingId: requireString(response, 'filingId'),
+    approvalId: requireString(response, 'approvalId'),
+    attorneyId: requireString(response, 'attorneyId'),
+    state: requireOneOf(response, 'state', FILING_STATES),
+    court: requireString(response, 'court'),
+    claimedAt: requireString(response, 'claimedAt'),
+    updatedAt: requireString(response, 'updatedAt'),
+    history: requireArrayOf(response, 'history', 'FilingStep', (step) => ({
+      state: requireOneOf(step, 'state', FILING_STATES),
+      at: requireString(step, 'at'),
+    })),
+    resolvable: requireBoolean(response, 'resolvable'),
+    driver: optionalString(response, 'driver'),
+    handBack:
+      handBack === undefined
+        ? undefined
+        : definedMembers<FilingHandBack>({
+            reason: requireString(handBack, 'reason'),
+            stage: requireString(handBack, 'stage'),
+            title: requireString(handBack, 'title'),
+            action: requireString(handBack, 'action'),
+            courtSaid: optionalString(handBack, 'courtSaid'),
+            link: requireString(handBack, 'link'),
+          }),
+    unknownReason: optionalString(response, 'unknownReason'),
+    confirmation:
+      confirmation === undefined
+        ? undefined
+        : definedMembers<FilingConfirmation>({
+            caseNumber: requireString(confirmation, 'caseNumber'),
+            filedAt: requireString(confirmation, 'filedAt'),
+            docketEntries: requireStringArray(confirmation, 'docketEntries'),
+            receiptNumber: optionalString(confirmation, 'receiptNumber'),
+            feeDue: optionalString(confirmation, 'feeDue'),
+          }),
+    receiptDocumentId: optionalString(response, 'receiptDocumentId'),
+    followUps: optionalStringArray(response, 'followUps'),
+    resolution:
+      resolution === undefined
+        ? undefined
+        : definedMembers<FilingResolution>({
+            outcome: requireOneOf(resolution, 'outcome', ['filed', 'not_filed']),
+            resolvedBy: requireString(resolution, 'resolvedBy'),
+            resolvedAt: requireString(resolution, 'resolvedAt'),
+            docketCheckedAt: requireString(resolution, 'docketCheckedAt'),
+            caseNumber: optionalString(resolution, 'caseNumber'),
+            filedAt: optionalString(resolution, 'filedAt'),
+            confirmationDocumentId: optionalString(resolution, 'confirmationDocumentId'),
+          }),
   });
 }
 

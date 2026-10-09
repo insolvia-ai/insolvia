@@ -30,8 +30,8 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_key_alias,
     filing_credentials_table_name,
 )
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 
-from ..adapters.aws.filing_store import DynamoDbFilingStore
 from ..adapters.aws.kill_switch import SsmKillSwitch
 from ..adapters.http.fenced_client import FencedHttpClient
 from ..adapters.memory.kill_switch import StaticKillSwitch

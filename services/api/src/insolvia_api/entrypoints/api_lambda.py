@@ -19,6 +19,7 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_key_alias,
     filing_credentials_table_name,
 )
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.firm_store import DynamoDbFirmStore
 from insolvia_core.adapters.aws.jwks_provider import CognitoJwksProvider
 from insolvia_core.adapters.aws.task_store import DynamoDbTaskStore
@@ -209,6 +210,9 @@ app = create_app(
         # partition, and the filing worker's own queue — Optional, above.
         filing_approval_store=DynamoDbFilingApprovalStore(config.case_table_name),
         filing_queue=filing_queue,
+        # The filing records (ADR 0024 PR 8): read for the approval screen,
+        # and a hand-back's resolution written onto them — the case table.
+        filing_store=DynamoDbFilingStore(config.case_table_name),
         # A case's document requests (ADR 0023 PR 5 / #364): the case table
         # again.
         document_request_store=DynamoDbDocumentRequestStore(config.case_table_name),

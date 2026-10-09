@@ -27,11 +27,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from .filings import HandBackNote
+from insolvia_core.filings import HandBackNote
 
 _FROM_CHECKLIST: Final = (
     " Nothing reached the court. File the case from the packet screen's"
-    " checklist in your own CM/ECF session."
+    " checklist in your own CM/ECF session, then record the court's case"
+    " number on this filing — or record that you have not filed it, which"
+    " lets you approve a new filing."
 )
 
 
@@ -131,7 +133,9 @@ HAND_BACK_REASONS: Final[Mapping[str, Reason]] = {
 
 _RECONCILE: Final = (
     " Look the debtor up on the court's own case query before doing anything"
-    " else; file from the checklist only if the case is not there."
+    " else, and record what it shows on this filing: the case number if the"
+    " case is there; that it is not, only once you have checked — that is"
+    " what lets a new filing be approved."
 )
 
 OUTCOME_UNKNOWN_REASONS: Final[Mapping[str, Reason]] = {
@@ -160,6 +164,12 @@ OUTCOME_UNKNOWN_REASONS: Final[Mapping[str, Reason]] = {
     "capture_interrupted": Reason(
         "The court confirmed the filing, but the receipt could not be stored",
         "The case number below is the court's own." + _RECONCILE,
+    ),
+    "case_not_recorded": Reason(
+        "The court confirmed the filing, but the case could not be marked filed",
+        "The court's confirmation is stored with the filing, but its case"
+        " number or date could not be read, or the case changed while it was"
+        " being recorded. The case number below is the court's own." + _RECONCILE,
     ),
 }
 

@@ -21,6 +21,8 @@ import { Heading } from '@/components/heading';
 import { useSession } from '@/session';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
+import { FilingRecordPanel } from './filing-resolution';
+
 type LoadState =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ready'; readonly view: FilingApprovalView }
@@ -184,7 +186,11 @@ function ApprovalBody({
     );
   }
 
-  const { basis, approval } = state.view;
+  const { basis, approval, filing } = state.view;
+  // A consumed approval stands in the way of a new one until its filing is
+  // recorded as never having reached the court (ADR 0024 PR 8) — the API's
+  // rule, mirrored so the button is only offered when it will land.
+  const freed = filing?.resolution?.outcome === 'not_filed';
   const authenticatedAt = user?.authenticatedAt ?? null;
   const freshEnough =
     !needsSignIn &&
@@ -280,6 +286,24 @@ function ApprovalBody({
         </View>
       ) : null}
 
+      {filing !== undefined ? (
+        <FilingRecordPanel
+          caseId={caseId}
+          filing={filing}
+          canResolve={canApprove && user?.subject === filing.attorneyId}
+          onResolved={(view) => {
+            setState({ kind: 'ready', view });
+            setNotice({
+              tone: 'saved',
+              message:
+                view.filing?.resolution?.outcome === 'filed'
+                  ? 'Recorded. The case is filed.'
+                  : 'Recorded. You can approve a new filing.',
+            });
+          }}
+        />
+      ) : null}
+
       <Heading level={3}>Court</Heading>
       <Text style={[styles.body, ink]}>
         {basis.court === undefined
@@ -332,7 +356,7 @@ function ApprovalBody({
         <Text style={[styles.body, ink, { color: theme.colors.danger }]}>
           {`Not ready to approve: ${blockerTitles.join('; ')}.`}
         </Text>
-      ) : canApprove && !pending && approval?.status !== 'consumed' ? (
+      ) : canApprove && !pending && (approval?.status !== 'consumed' || freed) ? (
         freshEnough ? (
           <>
             <View style={styles.agree}>

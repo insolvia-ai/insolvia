@@ -76,8 +76,10 @@ approval past `expires_at` reads as `expired` and can never be consumed.
   approval, and a new approval moves it in the same transaction that voids
   the pending one it replaces (`superseded`). Approving while the current
   approval is CONSUMED is refused: a filing is in flight, and a second
-  approval would be a second filing (PR 7/8 decide when a hand-back frees
-  the case again).
+  approval would be a second filing — until the attorney resolves a
+  handed-back or unknown-outcome filing as `not_filed` after checking the
+  docket (ADR 0024 PR 8, core/filing_outcome.py), the one thing that frees
+  the case. A filed case is refused by its blockers (`filed`) for good.
 - EXPIRES after `APPROVAL_TTL_SECONDS` (one hour; see the constant).
 
 Every approve, void and consume writes an access row keyed by the case
@@ -110,6 +112,7 @@ from insolvia_core.filing_credentials import (
     FilingCredential,
     is_openable,
 )
+from insolvia_core.filings import frees_case, is_resolvable
 
 from .filing_set import FilingDocument, FilingSet, build_filing_set
 from .packet_assembly import CaseData, read_case_data
@@ -123,6 +126,7 @@ if TYPE_CHECKING:
         DebtorStore,
         FilingAuthorizationStore,
         FilingCredentialStore,
+        FilingStore,
     )
 
     from .ports import FilingApprovalStore, FilingQueue, PacketStore
@@ -679,6 +683,7 @@ def approve_filing(
     credentials: FilingCredentialStore,
     authorizations: FilingAuthorizationStore,
     approvals: FilingApprovalStore,
+    filings: FilingStore,
     queue: FilingQueue,
     access_log: AccessLog,
 ) -> FilingApproval:
@@ -698,7 +703,8 @@ def approve_filing(
     5. no current signed authorization (403), or no openable court login of
        the caller's own for the case's court (403);
     6. a case whose current approval is already consumed — a filing in
-       flight (409).
+       flight (409) — unless that filing was resolved `not_filed`
+       (ADR 0024 PR 8); an unresolved hand-back says so (`filing_unresolved`).
     """
     case_id = data.case.id
 
@@ -757,11 +763,20 @@ def approve_filing(
         raise
     existing = approvals.current(case_id)
     if existing is not None and existing.status == "consumed":
-        refuse("filing_in_flight")
-        raise ConflictError(
-            "This case's last approval is already being filed — a second"
-            " approval would be a second filing."
-        )
+        # A consumed approval stands in the way UNLESS its filing was
+        # resolved as never having reached the court (ADR 0024 PR 8,
+        # core/filing_outcome.py) — the one thing that frees a case.
+        record = filings.get(case_id, existing.filing_id)
+        if record is None or not frees_case(record):
+            unresolved = record is not None and is_resolvable(record)
+            refuse("filing_unresolved" if unresolved else "filing_in_flight")
+            raise ConflictError(
+                "This case's last filing was handed back: record what the"
+                " court's docket shows for it before approving another."
+                if unresolved
+                else "This case's last approval is already being filed — a"
+                " second approval would be a second filing."
+            )
 
     packet = basis.filing_set.packet
     assert packet is not None  # a missing packet is a blocker above

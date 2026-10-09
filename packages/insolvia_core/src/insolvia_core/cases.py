@@ -23,6 +23,7 @@ from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 
 from insolvia_core import courts, fields
+from insolvia_core.case_numbers import case_number_key
 from insolvia_core.errors import ConflictError, FieldValidationError, ValidationError
 
 # The chapters an individual debtor can file under. 9 and 15 are municipal and
@@ -252,6 +253,16 @@ class StatusChange:
     changed_by: str
     from_status: str
     to_status: str
+    # The electronic filing that made this move (ADR 0024 PR 8) — the filing
+    # worker's `filed`, or the attorney's resolution of a hand-back. None on
+    # every move a person made through PATCH.
+    filing_id: str | None = None
+
+
+# Who `changed_by` names when the filing worker moved the case: it has no
+# person's subject, and inventing one would put a machine where the history
+# promises a who. The filing id beside it says which filing.
+FILING_WORKER_ACTOR = "filing-worker"
 
 
 @dataclass(frozen=True)
@@ -732,7 +743,9 @@ def apply_changes(case: Case, changes: CaseChanges) -> Case:
     return replace(case, updated_at=_timestamp(), **updates)  # type: ignore[arg-type]
 
 
-def status_change(before: Case, after: Case, *, changed_by: str) -> StatusChange | None:
+def status_change(
+    before: Case, after: Case, *, changed_by: str, filing_id: str | None = None
+) -> StatusChange | None:
     """The history row for a write that moved `before` to `after`, or None
     when the status did not move. Stamped with the
     case's own `updated_at`, so the row and the record agree on when."""
@@ -744,7 +757,48 @@ def status_change(before: Case, after: Case, *, changed_by: str) -> StatusChange
         changed_by=changed_by,
         from_status=before.status,
         to_status=after.status,
+        filing_id=filing_id,
     )
+
+
+def file_case(
+    case: Case,
+    *,
+    case_number: str,
+    filed_at: str,
+    changed_by: str,
+    filing_id: str,
+) -> tuple[Case, StatusChange]:
+    """The case moved to `filed` by an electronic filing (ADR 0024 PR 8):
+    the court's case number and the petition date, and the history row that
+    says which filing did it — the lifecycle's own rules, through
+    `apply_changes`, so this is the same move a person's PATCH would make
+    and is refused where theirs would be (a case already filed, a closed
+    one...: ConflictError).
+
+    The CALLER checks `is_filed` first and does not call this on a case
+    that is already filed — the filing's outcome is then recorded on the
+    filing alone and the docket facts a person entered are left as they
+    are."""
+    if is_filed(case.status):
+        raise ConflictError("This case is already filed.")
+    errors: dict[str, str] = {}
+    _parse_form_date(filed_at, "filed_at", errors)
+    if not case_number.strip():
+        errors["case_number"] = "A filed case needs its case number."
+    if errors:
+        raise FieldValidationError(errors)
+    after = apply_changes(
+        case,
+        CaseChanges(
+            status=FILED,
+            filed_at=filed_at,
+            texts={"case_number": case_number.strip()},
+        ),
+    )
+    change = status_change(case, after, changed_by=changed_by, filing_id=filing_id)
+    assert change is not None  # the status moved: not filed -> filed
+    return after, change
 
 
 def parse_archive(payload: Mapping[str, object]) -> bool:
@@ -892,7 +946,20 @@ def case_item(case: Case) -> dict[str, object]:
     for name, value in _lifecycle_attributes(case).items():
         if value is not None:
             item[name] = value
+    # THE NOTICE MATCHER'S KEY (ADR 0024 PR 8, for #369): the case number
+    # read into its parts with the court in front (`case_numbers`), derived
+    # here from the two facts it is made of — so every writer, the filing
+    # worker, a hand-back and a person's PATCH alike, stores it, and it can
+    # never describe a number the record no longer carries. Absent when the
+    # number cannot be read whole. Stored only: it is never on the wire and
+    # `case_from_item` ignores it.
+    key = case_number_key(case.court, case.case_number)
+    if key is not None:
+        item[CASE_NUMBER_KEY_ATTRIBUTE] = key
     return item
+
+
+CASE_NUMBER_KEY_ATTRIBUTE = "caseNumberKey"
 
 
 def _lifecycle_attributes(case: Case) -> dict[str, str | None]:
@@ -1099,6 +1166,8 @@ def status_change_item(change: StatusChange) -> dict[str, object]:
         "fromStatus": change.from_status,
         "toStatus": change.to_status,
     }
+    if change.filing_id is not None:
+        item["filingId"] = change.filing_id
     return item
 
 
@@ -1110,6 +1179,9 @@ def status_change_from_item(item: Mapping[str, object]) -> StatusChange:
             changed_by=str(item["changedBy"]),
             from_status=str(item["fromStatus"]),
             to_status=str(item["toStatus"]),
+            filing_id=(
+                str(item["filingId"]) if item.get("filingId") is not None else None
+            ),
         )
     except KeyError as error:
         raise ValidationError(f"stored status change is malformed: {error}") from error
@@ -1122,6 +1194,8 @@ def status_change_json(change: StatusChange) -> dict[str, object]:
         "fromStatus": change.from_status,
         "toStatus": change.to_status,
     }
+    if change.filing_id is not None:
+        body["filingId"] = change.filing_id
     return body
 
 

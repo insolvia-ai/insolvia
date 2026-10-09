@@ -50,12 +50,33 @@ the debtor up on the court's own query first. A redelivered message never
 starts a second filing: a terminal record is a no-op; `at_final_submit`
 becomes `outcome_unknown`; `submitted` finishes storing the receipt (no court
 contact); a pre-submit state is left alone inside the attempt's lease and
-handed back after it. `core/filings.py` owns the table; `core/hand_back.py`
-owns what each stop tells the attorney, every one ending at the filing-set
-checklist.
+handed back after it. `insolvia_core.filings` owns the record (it moved to
+the shared package in ADR 0024 PR 8, when the API began writing a hand-back's
+resolution onto it); `core/hand_back.py` owns what each stop tells the
+attorney, every one ending at the filing-set checklist.
 
-`filed` is the *filing's* state. The case's `status=filed`, its court case
-number and the pin freeze are ADR 0024 PR 8.
+## The case is filed in the same write (ADR 0024 PR 8)
+
+`submitted → filed` is one DynamoDB transaction: the record's own move
+(conditional on `submitted` and this attempt), the case's `status`,
+`filedAt`, `caseNumber` and `caseNumberKey` (an UpdateItem of those
+attributes only, conditional on the status the worker read), and the case's
+`STATUS#` history row naming the filing (`changedBy: "filing-worker"`,
+`filingId`). The petition date is the date the court printed on its
+confirmation, never converted to UTC (`insolvia_core.case_numbers.petition_date`);
+the number is stored as the court printed it and its match key
+(`flmb:6:26-bk-10000`) is derived for the notice matcher (#369).
+
+- **Idempotent under redelivery**: the receipt document's id is derived from
+  the filing id, so a second capture reuses the first one's row; the
+  transaction lands once.
+- **A case already filed** (somebody recorded it by hand) is left as they
+  wrote it; only the record moves.
+- **Anything that stops the case being recorded** — an unreadable number or
+  date, a case that keeps moving under the write — ends `outcome_unknown`
+  (`case_not_recorded`) with the court's confirmation kept, and the attorney
+  resolves it in the app as filed. A filing with a confirmation can never be
+  resolved as "not filed" (services/api `core/filing_outcome.py`).
 
 ## The environment host fence and the kill switch
 

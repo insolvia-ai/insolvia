@@ -19,6 +19,7 @@ from insolvia_api.adapters.aws.filing_approval_store import DynamoDbFilingApprov
 from insolvia_api.adapters.aws.filing_queue import SqsFilingQueue
 from insolvia_api.adapters.aws.packet_store import DynamoDbPacketStore
 from insolvia_api.core.filing_approval import approve_filing, basis_for_case
+from insolvia_api.core.filing_outcome import parse_resolution, resolve_filing
 from insolvia_api.core.jobs import new_job
 from insolvia_api.core.packet_assembly import (
     PACKET_ASSEMBLY_KIND,
@@ -40,9 +41,11 @@ from insolvia_core.adapters.aws.filing_credentials import (
     filing_credentials_key_alias,
     filing_credentials_table_name,
 )
+from insolvia_core.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_core.adapters.aws.tax_id_cipher import KmsTaxIdCipher, case_key_alias
 from insolvia_core.adapters.aws.tax_id_store import DynamoDbTaxIdStore
-from insolvia_core.cases import assign_case
+from insolvia_core.cases import FILING_WORKER_ACTOR, assign_case
+from insolvia_core.errors import ConflictError
 from insolvia_core.filing_authorization import (
     TEXT_VERSION,
     sign_authorization,
@@ -54,7 +57,6 @@ from insolvia_core.filing_credentials import (
     withdraw_authorization,
 )
 from insolvia_core.tax_ids import TaxIdInput, store_tax_id
-from insolvia_filing.adapters.aws.filing_store import DynamoDbFilingStore
 from insolvia_filing.adapters.http.fenced_client import FencedHttpClient
 from insolvia_filing.core.config import load_config
 from insolvia_filing.core.drivers.fake import FakeCmEcfDriver
@@ -94,6 +96,9 @@ vault = filing_credentials_table_name(TABLE)
 credentials = DynamoDbFilingCredentialStore(vault)
 authorizations = DynamoDbFilingAuthorizationStore(vault)
 approvals = DynamoDbFilingApprovalStore(TABLE)
+# The API's view of the filing records (ADR 0024 PR 8): the resolution of a
+# hand-back is the API's write, so the developer stands in for it here.
+api_filings = DynamoDbFilingStore(TABLE)
 queue = SqsFilingQueue(QUEUE)
 dev_sqs = dev.client("sqs")
 blobs = S3DocumentBlobStore(os.environ["CASE_DOCUMENT_BUCKET"])
@@ -212,6 +217,7 @@ def approve(case_id: str):
         credentials=credentials,
         authorizations=authorizations,
         approvals=approvals,
+        filings=api_filings,
         queue=queue,
         access_log=access_log,
     )
@@ -234,7 +240,7 @@ boto3.DEFAULT_SESSION = role
 os.environ["FAKE_CMECF_URL"] = court.base_url
 worker: FilingDeps = compose(load_config())
 worker_sqs = role.client("sqs")
-worker_filings = DynamoDbFilingStore(TABLE, resource=role.resource("dynamodb"))
+worker_filings = DynamoDbFilingStore(TABLE, client=role.client("dynamodb"))
 boto3.DEFAULT_SESSION = dev
 
 
@@ -273,6 +279,36 @@ def filing_of(case_id: str, approval):
     return stored
 
 
+dev_ddb = dev.client("dynamodb")
+
+
+def case_facts(case_id: str):
+    """The case as stored, its match key (read off the raw item — it is
+    never on the wire), and its lifecycle history."""
+    case = case_store.read_for_worker(case_id)
+    assert case is not None
+    item = dev_ddb.get_item(
+        TableName=TABLE,
+        Key={"PK": {"S": f"CASE#{case_id}"}, "SK": {"S": "META"}},
+        ConsistentRead=True,
+    )["Item"]
+    key = item.get("caseNumberKey", {}).get("S")
+    return case, key, case_store.status_history(case_id)
+
+
+def show_case(case_id: str) -> None:
+    case, key, history = case_facts(case_id)
+    print(
+        f"case      : status={case.status} caseNumber={case.case_number}"
+        f" filedAt={case.filed_at} caseNumberKey={key}"
+    )
+    for row in history:
+        print(
+            f"history   : {row.from_status} -> {row.to_status} by {row.changed_by}"
+            f" (filing {row.filing_id}) at {row.changed_at}"
+        )
+
+
 # ── 1. files end to end ─────────────────────────────────────────
 step("1. a ready case, approved, filed by the worker (as its role) against the fake")
 court.reset_counts()
@@ -305,6 +341,29 @@ print(
 )
 print(f"page      : {filed.confirmation.page_ref} ({len(page)} bytes)")
 print(f"follow-ups: {list(filed.follow_ups)}")
+show_case(case_id)
+case, key, history = case_facts(case_id)
+if (
+    case.status != "filed"
+    or case.case_number != filed.confirmation.case_number
+    or case.filed_at != filed.confirmation.filed_at[:10]
+    or key != f"flmb:{filed.confirmation.case_number}"
+    or [(h.to_status, h.changed_by, h.filing_id) for h in history]
+    != [("filed", FILING_WORKER_ACTOR, approval.filing_id)]
+):
+    fail("the worker's filed did not file the case, once, in the same write")
+stored_case = case_store.read_for_worker(case_id)
+assert stored_case is not None
+_, after = basis_for_case(
+    stored_case,
+    debtor_store=debtor_store,
+    entity_store=entity_store,
+    packet_store=packet_store,
+    as_of=datetime.now(UTC).date(),
+)
+print(f"approvable: blockers={list(after.blockers)} (the pins are frozen)")
+if "filed" not in after.blockers:
+    fail("a filed case could still be approved")
 
 # ── 2. a redelivered job ────────────────────────────────────────
 step("2. the same job delivered again")
@@ -325,6 +384,8 @@ print(f"outcome   : {again.outcome} ({again.reason})")
 print(f"fake court: {court.submissions} submission(s)")
 if again.outcome != "noop" or court.submissions != 1:
     fail("a redelivered job submitted again")
+if len(case_facts(case_id)[2]) != 1:
+    fail("a redelivered job wrote a second history row")
 
 
 # ── 3. a crash after the final submit ───────────────────────────
@@ -431,8 +492,76 @@ for fault, expected in EXPECTED.items():
         fail(f"{fault} did not end {expected}")
 court.set_fault("none")
 
-# ── 5. the role is narrow ───────────────────────────────────────
-step("5. what the worker's role may NOT do")
+
+# ── 5. a hand-back, resolved by the attorney ────────────────────
+def resolve(case_id: str, approval, body: dict[str, object]):
+    """The API's resolution, as the developer standing in for its role."""
+    case = case_store.read_for_worker(case_id)
+    assert case is not None
+    return resolve_filing(
+        parse_resolution({"docket_checked": True, **body}),
+        filing=filing_of(case_id, approval),
+        case=case,
+        principal=ATTORNEY,
+        now=time.time(),
+        filings=api_filings,
+        documents=documents,
+        access_log=access_log,
+    )
+
+
+step("5a. handed back (the court refused the login); the attorney files it themself")
+court.reset_counts()
+court.set_fault("bad_login")
+case_id = ready_case()
+approval = approve(case_id)
+outcome = deliver(case_id)
+court.set_fault("none")
+print(f"worker    : {outcome.outcome} ({outcome.reason})")
+by_hand = f"6:26-bk-{20000 + int(time.time()) % 10000:05d}-FAK"
+today = datetime.now(UTC).date().isoformat()
+resolved = resolve(
+    case_id, approval, {"outcome": "filed", "case_number": by_hand, "filed_at": today}
+)
+print(
+    f"resolved  : {resolved.resolution.outcome} by the attorney,"
+    f" docket checked at {resolved.resolution.docket_checked_at}"
+)
+show_case(case_id)
+case, key, history = case_facts(case_id)
+if (
+    case.status != "filed"
+    or case.case_number != by_hand
+    or key != f"flmb:{by_hand.rsplit('-', 1)[0]}"
+    or [(h.to_status, h.changed_by, h.filing_id) for h in history]
+    != [("filed", ATTORNEY, approval.filing_id)]
+):
+    fail("a hand-back resolved as filed did not file the case")
+
+step("5b. handed back; the attorney checked the docket: NOT filed; approve again")
+court.reset_counts()
+court.set_fault("bad_login")
+case_id = ready_case()
+approval = approve(case_id)
+deliver(case_id)
+court.set_fault("none")
+try:
+    approve(case_id)
+except ConflictError as refused_while_unresolved:
+    print(f"refused   : {refused_while_unresolved}")
+else:
+    fail("a second approval was made over an unresolved hand-back")
+resolve(case_id, approval, {"outcome": "not_filed"})
+second = approve(case_id)
+print(f"approved  : {second.approval_id} (a new filing, {second.filing_id})")
+outcome = deliver(case_id)
+print(f"worker    : {outcome.outcome}; fake court {court.submissions} submission(s)")
+show_case(case_id)
+if outcome.outcome != "filed" or court.submissions != 1:
+    fail("the case freed by not_filed did not file exactly once")
+
+# ── 6. the role is narrow ───────────────────────────────────────
+step("6. what the worker's role may NOT do")
 role_s3 = role.client("s3")
 role_ddb = role.client("dynamodb")
 
@@ -486,7 +615,10 @@ print(
     f"withdrew the authorization; {destroyed} fake login destroyed; fake court stopped"
 )
 print(
-    "\nALL HELD: filed end to end once as the worker's role; a redelivery and a crash"
-    " after the submit never submitted again; every fault mode stopped with a reason;"
-    " the role is refused outside its grants."
+    "\nALL HELD: filed end to end once as the worker's role, and the case filed with"
+    " the court's number, date, match key and one history row in the same write; a"
+    " redelivery and a crash after the submit never submitted again; every fault"
+    " mode stopped with a reason; a hand-back resolved as filed filed the case, and"
+    " one resolved as not filed freed it for a new approval that filed once; the"
+    " role is refused outside its grants."
 )

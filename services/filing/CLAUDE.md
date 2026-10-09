@@ -19,6 +19,14 @@ proof: `scripts/dev-filing-proof.sh`.
   retried, never handed back. Do not add a retry, a "resume from
   at_final_submit", or a catch that turns a post-mark failure into a
   hand-back. The fake counts submissions; every never-twice test asserts it.
+- **The record's `filed` files the case in the same write** (ADR 0024 PR 8,
+  `worker._capture`): a `FiledCase` on the store's `transition`, built by
+  `insolvia_core.cases.file_case` — never a second write to the case, never
+  a whole-record case Put. The record and its shape are
+  `insolvia_core.filings` now (the API writes a hand-back's resolution onto
+  it); do not grow a copy here. Anything that stops the case being recorded
+  ends `outcome_unknown` with the confirmation kept — never `filed` with the
+  case left behind.
 - **Stop, don't guess.** A screen the driver does not recognise
   (`drivers/screens.ScreenSpec`), a court message, a timeout — stop and hand
   back. No clicking forward, no altered input. Every reason the code can stop
