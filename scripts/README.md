@@ -22,7 +22,7 @@ Two layers — a shared base plus thin per-package scripts:
 | `scripts/dev-aws-reset.sh` | Per-machine AWS layer | Wipes this machine's dev **data** — waitlist, case, access-log and firm tables (delete + recreate) plus the pool's users — resources survive; `--dry-run`, `--skip-cognito`. Leaves you needing `dev-aws-seed.sh` again, which recreates the account and the firm in one run |
 | `scripts/dev-aws-destroy.sh` | Per-machine AWS layer | `terraform destroy` of this machine's dev resources + unwinds both `.env` files; the machine id is retained |
 | `scripts/dev-aws-destroy-orphan.sh` | Per-machine AWS layer | `terraform destroy` of a **previous** machine-id's leftovers — `<short-id>` from the orphaned resource names; finds that id's own state key in the bucket, destroys everything the state tracks, then deletes the state object |
-| `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, `aws configure export-credentials` helper shared by the four scripts above and `dev-up.sh` |
+| `scripts/dev-aws-common.sh` | Per-machine AWS layer (sourced) | Machine-UUID identity, per-machine state key, the `aws configure export-credentials` helper shared by the four scripts above, and the refreshed container credentials the API's and admin service's `dev-up.sh` hand their compose stacks (see **Credentials** below) |
 | `scripts/bootstrap-ecr-images.sh` | One-time env bootstrap | Seeds the ECR image(s) an environment's Image-package Lambdas need before Terraform can create them (the first-apply deadlock documented in `infra/modules/*/main.tf`); `<env> [api\|mailer\|marketing …] [--dispatch] [--yes]` |
 | `scripts/fetch-brand-fonts.sh` | Brand assets | Re-downloads the self-hosted brand faces into `apps/insolvia_app/public/fonts` — latin-subset `.woff2` for the families declared in [`brand/fonts.json`](../brand/fonts.json). **Not a build step**: the files are committed, because a build that fetches a font from a third party is a build that breaks when they do, and the app is self-hosting them precisely so a signed-in firm's page views do not reach one. Run it when a family or weight in that file changes, then `npm run tokens`. Licences ship alongside in `public/fonts/OFL.txt` — add a family here, add it there. |
 | `scripts/render-brand-marks.sh` | Brand assets | Re-cuts the **wordmark and the app icon** out of the display face — `brand/wordmark.svg`, `brand/icon.svg`, `favicon.ico` and the PWA icon set. **Not a build step**, same bargain as the fonts above: the outputs are committed, because a build that re-cuts type is a build whose logo changes when an upstream font ships a revision. Run it when `brand/fonts.json`'s `heading` family changes, when either mark's letters or the icon geometry change, or when a brand **colour** changes (the rasters bake theirs in — `npm run tokens:check` says so when it notices). Then `npm run tokens` to colour the SVGs per consumer. It builds its own throwaway venv under `.cache/`: cutting type needs a shaping engine and a rasteriser, so this is the one script here that is not stdlib-only. |
@@ -270,7 +270,8 @@ its only browser-friendly URL and everything else 404s or wants a Google
 token — and **the browsable staff UI is the portal on 3100**.
 
 **Every area owns both halves.** `dev-up.sh` knows how to start that area — the
-API's exports short-lived AWS credentials before `compose up`, the app's pins
+API's keeps its container's short-lived AWS credentials refreshed for as long as
+`compose up` runs, the app's pins
 port 3000 because Cognito registers that exact origin. `dev-down.sh` knows how
 to stop it, which is not the same as killing the process that started it:
 compose containers outlive their `up`, and a stray `npx` grandchild keeps
@@ -352,9 +353,27 @@ How it works:
   `AWS_PROFILE` override if your Insolvia session lives elsewhere). The scripts
   run `aws configure export-credentials` before every Terraform call — the
   profile uses the new `aws login` session format Terraform's SDK cannot read,
-  so the export is required, not cosmetic. The same short-lived set is what
-  `dev-up.sh` injects into the API container; credentials are never written to
-  a file.
+  so the export is required, not cosmetic.
+- **Credentials in a container** — the API's and the admin service's
+  `dev-up.sh` do **not** inject that exported set: it is a snapshot that
+  expires 15 minutes to an hour later, and every DynamoDB/Cognito call after
+  that 500s with `ExpiredTokenException` (long `dev-test-integration.sh` runs
+  died this way). Mounting `~/.aws` does not work either: the pinned boto3
+  cannot read the `login_session` profile at all, and the newer botocore that
+  can needs the `crt` extra *and* writes the rotated refresh token back into
+  `~/.aws/login/cache` — refused by a read-only mount, and a second writer
+  racing your CLI if not. Instead, while compose runs, the host re-exports
+  every 60 s (`INSOLVIA_AWS_REFRESH_SECONDS`) into
+  `~/.cache/insolvia/aws-container/<stack>/credentials.json` (0600, in a 0700
+  directory, never the repo), and the container mounts that directory
+  read-only at `/run/insolvia-aws` with a generated `AWS_CONFIG_FILE` whose
+  `credential_process` is `cat` of the file. botocore treats process
+  credentials as refreshable and re-reads before each set's `Expiration`, so
+  the container outlives any one set. The file is deleted when compose exits
+  and by `dev-down.sh`. If the `aws login` session itself ends, the refresh
+  warns in the dev-up output and the container keeps the last set until it
+  expires — `aws login --profile <p>` and the next refresh picks it up, no
+  restart. `start_container_aws_credentials` in `dev-aws-common.sh` owns this.
 - **Wiring** — setup upserts two gitignored `.env` files, and there is
   deliberately **no `.env.example` for either**: every value is an identifier
   for a resource `infra/envs/dev` creates per machine, so a copied template

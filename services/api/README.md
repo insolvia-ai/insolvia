@@ -56,9 +56,14 @@ machine) is the dev database:
 curl http://127.0.0.1:8080/health
 ```
 
-`dev-up.sh` exports short-lived credentials from your AWS profile into the
-container at `up` time and refuses to start until `dev-aws-setup.sh` has
-written `services/api/.env` (see `scripts/README.md` at the repo root).
+`dev-up.sh` refuses to start until `dev-aws-setup.sh` has written
+`services/api/.env`. It never puts AWS keys in the container's environment:
+it keeps short-lived credentials from your AWS profile refreshed in a file
+under `~/.cache/insolvia/aws-container/api`, which the container reads through
+a `credential_process` config, so a run longer than one credential lifetime
+(a long `dev-test-integration.sh`, say) keeps working. Why it is not a
+`~/.aws` mount: **Credentials in a container** in `scripts/README.md` at the
+repo root.
 
 The bare dev server still runs with zero AWS — with `WAITLIST_TABLE_NAME`
 unset it falls back to the in-memory store (each submission is logged so
