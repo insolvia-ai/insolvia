@@ -284,7 +284,8 @@ order. Nothing here needs a new decision except where marked.
    credential vault, the written authorization, per-filing approval, the
    filing worker with a local fake CM/ECF, filed-state capture, the Case
    Upload file, per-court drivers verified on training databases, and the fee
-   decision (**open question for the maintainer**: how filing fees are paid).
+   decision (**decided 2026-10-09:** the attorney pays at a hand-back at the
+   court's payment step; no card data is stored).
    No production filing until PRs 4–8 are live and one district's driver is
    verified. PR 7 — the filing worker (`services/filing`) and the fake CM/ECF
    — is built: the state machine with conditional writes, TOTP at the court's

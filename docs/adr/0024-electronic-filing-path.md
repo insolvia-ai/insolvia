@@ -153,11 +153,11 @@ checklist the hand-off path always produced, and records the result.
 every submission in that environment without a deploy, alongside the per-
 attorney revocation.
 
-**Filing fees are an open question, and card details are not stored.**
+**Filing fees are paid by the attorney at a hand-back, and card details are not stored** (decided by the maintainer, 2026-10-09; PR 11).
 CM/ECF collects the fee through pay.gov inside the session, per filing or
 per session, with short lockout windows (research §3). This ADR does **not**
 decide to store, tokenise or enter card details; that would put Insolvia in
-card-data scope and is a separate decision. Until it is made, a filing that
+card-data scope and is a separate decision, not taken. A filing that
 reaches the court's payment step is handed back at that step for the
 attorney to pay in their own session within the court's window, and cases
 filed with an installment application or a fee-waiver application proceed
@@ -469,7 +469,7 @@ In order. Sizes: S ≈ a day or two, M ≈ a week, L ≈ more.
 | 8 | **Filed-state capture** (feeds #369) — `status=filed`, `court_case_number`, `filed_at`, the stored confirmation and receipt; written by the worker, or by the attorney on a hand-back; the pins freeze | a staging case reaches `filed` from the worker, and from a manual hand-back, with a case number the notice matcher can key on | S |
 | 9 | **Case Upload package** — `debtor.txt` per the AO spec (statistics from the 106/122 projections, debtor and alias records, office and county codes from the registry), a spec validator under pytest. The full SSN comes from the sealed tax id (13.12) through a logged `taxid.read` with its own purpose | the fixture case's `debtor.txt` validates against the 80-field spec in unit tests and is accepted by at least one training database in PR 10 | M |
 | 10 | **Training-database runbook and per-court drivers** — register on PACER training and QA and each district's `ecf-train`; one driver per launch district, fingerprints captured from those sessions; the registry records per court whether the driver and Case Upload are verified, with `verified_at` | per district: the fixture case opened end to end on that court's training database by the worker, and the registry record updated. Human-supervised, outside CI. Each district S–M; all ten, L | L |
-| 11 | **Filing fees** — decide how the fee is paid when the court's payment step is reached, without storing card details unless a separate decision says so; until then the hand-back at payment stands | a written decision; the driver's behaviour at payment matches it on every verified district | S (decision) |
+| 11 | **Filing fees** — decide how the fee is paid when the court's payment step is reached, without storing card details unless a separate decision says so | **Decided 2026-10-09 (maintainer): the hand-back at payment stands.** The attorney pays in their own session within the court's window; no card data is stored, tokenised or entered. Remaining done-when: the driver's behaviour at payment matches it on every verified district (checked per district in PR 10) | S (decision) |
 | 12 | **XML case opening** (post-launch) — the IEPD package from the same projections, behind the same per-court verification | only if PR 10 shows a launch district exposes the XML menu | L |
 
 No production filing happens until PRs 4–8 are live in prod and at least one
@@ -544,7 +544,7 @@ the attorney who signs it.
   2025 document on size limits — `verified_at` is the defence, not a one-time
   transcription. PACER has said future CM/ECF versions will require PDF/A;
   the per-court flag absorbs that.
-- **Fees.** Until PR 11 decides, every fee-paid filing hands back at payment,
+- **Fees.** Every fee-paid filing hands back at payment (PR 11, decided 2026-10-09),
   and the courts' lockout windows (TXSB 48 h, GASB same day, TXNB 24 h for
   software filings) run from submission [S9, S13].
 
