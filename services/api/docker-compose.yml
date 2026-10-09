@@ -8,11 +8,12 @@
 # ${VAR:-default} substitutions below — WAITLIST_TABLE_NAME and
 # CASE_TABLE_NAME name the per-machine tables.
 #
-# AWS credentials are never written to a file: scripts/dev-up.sh exports
-# short-lived credentials from the developer's AWS profile into the shell
-# before `up` (shell env beats .env in compose substitution) and
-# force-recreates the container so it can never keep an expired set. The
-# ${VAR:-} forms below just pass that shell environment through.
+# AWS credentials are not environment values: scripts/dev-up.sh keeps a
+# refreshed process-format credentials file, and a config whose
+# credential_process reads it, in ~/.cache/insolvia/aws-container/api — the
+# directory mounted read-only below. botocore re-runs the process before each
+# set expires, so the container outlives any one set. Without dev-up.sh the
+# directory is empty and the container simply has no AWS credentials.
 services:
   api:
     build:
@@ -67,9 +68,9 @@ services:
       # on this machine's real queue (no consumer until PR 7). Unset composes
       # the in-memory queue, which records the job and sends nothing.
       FILING_QUEUE_URL: ${FILING_QUEUE_URL:-}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_CONFIG_FILE: /run/insolvia-aws/config
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    volumes:
+      - ${HOME}/.cache/insolvia/aws-container/api:/run/insolvia-aws:ro
     ports:
       - "127.0.0.1:8080:8080"

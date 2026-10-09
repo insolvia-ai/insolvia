@@ -35,7 +35,10 @@ bringing the whole system up.
 
 The suite and bare dev server run fully in-memory without
 `services/admin/.env`; `./scripts/dev-aws-setup.sh` writes it to point at this
-machine's real dev tables and pool.
+machine's real dev tables and pool. With an AWS session, `dev-up.sh` hands
+the container refreshed credentials the same way the API's does (a host-kept
+file read through `credential_process` — **Credentials in a container** in
+`scripts/README.md`); without one it starts in-memory.
 
 The seeder (`insolvia_admin.entrypoints.seed`) also lives here — the
 dev/staging fixture loader `scripts/dev-aws-seed.sh` and the staging e2e use.
