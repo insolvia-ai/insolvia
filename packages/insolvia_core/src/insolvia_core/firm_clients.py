@@ -237,6 +237,23 @@ class FirmClient:
         return None
 
 
+def refusal_for_refused_link(client: FirmClient | None) -> str:
+    """What to tell the caller when a write that links `client` (re-read
+    after the refusal) was refused by its condition on the client row —
+    the same words the read check gives, so a merge that raced the link
+    reads exactly like one that landed first. The last line covers a row
+    that changed and changed back (a merge refused and released) between
+    the write and this read."""
+    if client is None:
+        return "No such client."
+    return client.refusal_for_new_case() or LINK_RACED
+
+
+LINK_RACED: Final = (
+    "That client changed while this was being saved — reload and try again."
+)
+
+
 @dataclass(frozen=True)
 class FirmClientDraft:
     """A validated whole-record save — POST to create, PUT to replace. Holds
