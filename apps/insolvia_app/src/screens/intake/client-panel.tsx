@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useApi } from '@/api/use-api';
+import { displayName, sortName } from '@/components/client-names';
 import { Heading } from '@/components/heading';
 import { fontSizes, spacing, useTheme } from '@/theme';
 
@@ -23,14 +24,12 @@ import { fontSizes, spacing, useTheme } from '@/theme';
  * Both overwrite someone's typing, so both ask first, through `AlertDialog`
  * (an explicit choice, no tap-outside dismissal). Nothing here is
  * app-generic: the directory screens (#354 PR 4) own browsing clients.
+ *
+ * A client is named the way the directory screens name one
+ * (`@/components/client-names`): `displayName` as the panel's subject,
+ * `sortName` in the picker, whose options arrive in the directory's
+ * surname order.
  */
-
-/** How a client reads: "Given Surname", or whichever half exists. */
-export function clientName(client: Pick<FirmClient, 'name'>): string {
-  const { given, middle, surname } = client.name;
-  const joined = [given, middle, surname].filter((part) => part !== undefined && part !== '');
-  return joined.length === 0 ? 'Unnamed client' : joined.join(' ');
-}
 
 const ROOT_LABELS: Readonly<Record<string, string>> = {
   name: 'Name',
@@ -137,7 +136,7 @@ export function LinkedClient({
       ]}
     >
       <Heading level={3} size="body">
-        {client === null ? 'Linked client' : `Client: ${clientName(client)}`}
+        {client === null ? 'Linked client' : `Client: ${displayName(client)}`}
       </Heading>
 
       {differs === undefined ? (
@@ -331,7 +330,7 @@ export function LinkClient({ caseId, role, taken, required, onLinked }: LinkClie
   const options = [
     ...clients
       .filter((client) => !taken.includes(client.id))
-      .map((client) => ({ value: client.id, label: clientName(client) })),
+      .map((client) => ({ value: client.id, label: sortName(client) })),
     { value: NEW_CLIENT, label: 'New client…' },
   ];
 

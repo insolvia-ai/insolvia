@@ -487,10 +487,16 @@ describe('the intake screen', () => {
     it('names the client and shows where the case and the client disagree', async () => {
       signedIn({
         [`/v1/cases/${CASE_ID}/debtors`]: () => jsonResponse(200, { debtors: [DIVERGED] }),
-        [`/v1/firm/clients/${CLIENT_ID}`]: clientRecord,
+        // Every part of the name, so the heading is seen to read it the way
+        // the client's own record does (`displayName`) — suffix included.
+        [`/v1/firm/clients/${CLIENT_ID}`]: () =>
+          jsonResponse(200, {
+            ...CLIENT,
+            name: { given: 'Ada', middle: 'King', surname: 'Lovelace', suffix: 'Jr.' },
+          }),
       });
 
-      expect(await screen.findByText('Client: Ada Lovelace')).toBeTruthy();
+      expect(await screen.findByText('Client: Ada King Lovelace Jr.')).toBeTruthy();
       expect(screen.getByText('One field differs from the client record.')).toBeTruthy();
       expect(await screen.findByText(/This case: 555-0199 · Client: 555-0100/)).toBeTruthy();
     });
@@ -589,9 +595,12 @@ describe('the intake screen', () => {
       expect(screen.queryByLabelText('First name')).toBeNull();
 
       await user.press(await screen.findByRole('combobox', { name: 'Client' }));
-      // Debtor 1's client is already on this case, so it is not offered.
-      expect(screen.queryByRole('option', { name: 'Ada Lovelace' })).toBeNull();
-      await user.press(await screen.findByRole('option', { name: 'Grace Hopper' }));
+      // The picker names clients "Surname, Given", as every other client
+      // picker does. Debtor 1's client is already on this case, so it is not
+      // offered.
+      const option = await screen.findByRole('option', { name: 'Hopper, Grace' });
+      expect(screen.queryByRole('option', { name: 'Lovelace, Ada' })).toBeNull();
+      await user.press(option);
       await user.press(screen.getByRole('button', { name: 'Link client' }));
 
       expect(await screen.findByDisplayValue('Grace')).toBeTruthy();
