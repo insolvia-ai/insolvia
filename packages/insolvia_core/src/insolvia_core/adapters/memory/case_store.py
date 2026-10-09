@@ -24,7 +24,7 @@ from insolvia_core.clients import (
     public_status_from_case_item,
 )
 from insolvia_core.debtors import Debtor
-from insolvia_core.errors import ConflictError
+from insolvia_core.errors import ClientUnavailableError, ConflictError
 
 
 class MemoryCaseStore:
@@ -75,6 +75,14 @@ class MemoryCaseStore:
                 raise RuntimeError("a debtor written with a case must belong to it")
             if self.debtor_store.get(case.id, filing_role=debtor.filing_role):
                 raise RuntimeError(f"debtor {debtor.filing_role} already exists")
+        # The ConditionCheck on each linked client's row, against the firm
+        # store the shared debtor store is composed with (none composed: no
+        # check, the DynamoDB adapter's `firm_table_name=None`).
+        for debtor in debtors:
+            if debtor.client_id is not None and not self.debtor_store.client_linkable(
+                case.firm_id, debtor.client_id
+            ):
+                raise ClientUnavailableError(debtor.client_id)
         # All together — the transaction, as dicts. Nothing here can fail
         # between the lines, which is the property the DynamoDB adapter buys
         # with TransactWriteItems.

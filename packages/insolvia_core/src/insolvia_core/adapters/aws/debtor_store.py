@@ -6,6 +6,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 from insolvia_core.adapters.aws.dynamo import from_attributes, to_attributes
+from insolvia_core.adapters.aws.firm_store import client_linkable_check
 from insolvia_core.cases import INDEX_BY_CLIENT, client_key, partition_key
 from insolvia_core.debtors import (
     FILING_ROLES,
@@ -39,10 +40,17 @@ class DynamoDbDebtorStore:
     exactly as they do there. Both key halves come from the functions that own
     them (`partition_key` for the case's PK, `sort_key` for the role's SK),
     which is the same pair `debtor_item` writes.
+
+    `firm_table_name` is the FIRM table, which `link` conditions on: the
+    client row it links must still be linkable when the write lands
+    (`firm_store.client_linkable_check`). A composition that never links —
+    the workers, the MCP service, the filing worker — leaves it None, and
+    `link` then refuses to run rather than writing an unconditioned link.
     """
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self, table_name: str, *, firm_table_name: str | None = None) -> None:
         self.table_name = table_name
+        self.firm_table_name = firm_table_name
         self.client = boto3.client("dynamodb")
 
     def create(self, debtor: Debtor) -> bool:
@@ -75,9 +83,12 @@ class DynamoDbDebtorStore:
             Item=to_attributes(debtor_item(debtor)),
         )
 
-    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+    def link(self, debtor: Debtor, *, create: bool, firm_id: str) -> LinkOutcome:
         """One transaction: the Put of this role, plus a ConditionCheck on
-        each OTHER role's item that it does not name the same client.
+        each OTHER role's item that it does not name the same client, plus
+        one on the CLIENT'S OWN ROW in the firm table (cross-table, which a
+        transaction allows) that it is still linkable — last, so its
+        cancellation reason is the last one.
 
         FILING_ROLES caps a case at three debtor items, so "every other
         role" is two fixed keys — no query, and no lock item to keep in step
@@ -86,9 +97,17 @@ class DynamoDbDebtorStore:
         so an empty role passes. Two racing links of one client to two roles
         conflict on each other's items: DynamoDB serialises them, and the
         second fails its check (or is cancelled as a conflict, which is
-        answered as one)."""
+        answered as one). A merge's claim on the client and this link
+        conflict on the client's row the same way: whichever lands second
+        is refused."""
         if debtor.client_id is None:
             raise ValueError("link needs a debtor that names a client")
+        firm_table = self.firm_table_name
+        if firm_table is None:
+            raise RuntimeError(
+                "link needs the firm table: a link must be conditional on the "
+                "client row"
+            )
         put: dict[str, Any] = {
             "TableName": self.table_name,
             "Item": to_attributes(debtor_item(debtor)),
@@ -116,6 +135,11 @@ class DynamoDbDebtorStore:
                     }
                 }
             )
+        items.append(
+            client_linkable_check(
+                firm_table, firm_id=firm_id, client_id=debtor.client_id
+            )
+        )
         try:
             self.client.transact_write_items(TransactItems=items)
         except ClientError as error:
@@ -125,8 +149,10 @@ class DynamoDbDebtorStore:
             codes = [reason.get("Code") for reason in reasons]
             if codes and codes[0] == _CONDITION_FAILED:
                 return "role_taken"
-            if _CONDITION_FAILED in codes[1:]:
+            if _CONDITION_FAILED in codes[1:-1]:
                 return "client_taken"
+            if len(codes) == len(items) and codes[-1] == _CONDITION_FAILED:
+                return "client_unavailable"
             # A TransactionConflict: another write to one of these items was
             # in flight. Refused as "someone else is linking" rather than
             # retried — the caller reloads and sees who won.

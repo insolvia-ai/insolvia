@@ -27,6 +27,21 @@ write archives B and releases both halves together
 (`finish_client_merge`). A claim for the same pair passes again, so a merge
 that stopped half-way — a Lambda timeout — is finished by running it again.
 
+## A link racing the merge
+
+The claim also fences the OTHER writers of a debtor's client: linking a
+debtor to B (`DebtorStore.link`) and opening or copying a case for B
+(`CaseStore.create`). A link whose route read B just before the claim, and
+whose write landed after the merge's last pass over the `by-client` index,
+would leave a case naming the archived B. So neither write trusts its read:
+each carries a ConditionCheck on B's own row in the same transaction
+(`adapters.aws.firm_store.client_linkable_check` — active, never merged,
+`mergingInto` absent), and DynamoDB serialises it against the claim on that
+row. Either the link lands first, and its debtor exists before the claim —
+which is what the merge's two passes are there to find — or the claim lands
+first, and the link is refused. The routes keep their read check for its
+clear message; the condition is what decides.
+
 ## Joint cases
 
 A and B can both be debtors on one case: two records for one person, each
