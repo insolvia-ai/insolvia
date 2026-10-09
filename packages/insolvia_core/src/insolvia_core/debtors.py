@@ -85,8 +85,10 @@ __all__ = [
 FILING_ROLES: Final = ("debtor_1", "debtor_2", "non_filing_spouse")
 
 # What `DebtorStore.link` answers — the conditional write behind the link
-# route's "one client, one role per case" (ADR 0022).
-LinkOutcome = Literal["written", "role_taken", "client_taken"]
+# route's "one client, one role per case" (ADR 0022). `client_unavailable` is
+# the write's condition on the client row itself: archived, merged, or being
+# merged away when the write landed — nothing written.
+LinkOutcome = Literal["written", "role_taken", "client_taken", "client_unavailable"]
 
 # What `DebtorStore.repoint_client` answers — one case's step of a client
 # merge (ADR 0022's PR 7). `absent` is "that role no longer names the merged

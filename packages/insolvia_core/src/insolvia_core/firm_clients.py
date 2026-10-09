@@ -222,7 +222,12 @@ class FirmClient:
         debtor) right now, or None when it can. An archived client — which
         includes every merged one — must be restored first; a client being
         merged away must not gain a case the merge's listing already missed,
-        or that case would be left naming a merged client."""
+        or that case would be left naming a merged client.
+
+        A READ, for the message. The writes that link a client carry the
+        same rule as a condition on this row
+        (`adapters.aws.firm_store.client_linkable_check`), which is what
+        actually decides when a merge races the link."""
         if self.merged_into is not None:
             return "That client was merged into another client — use that one."
         if self.merging_into is not None:

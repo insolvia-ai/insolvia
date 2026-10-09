@@ -7,6 +7,7 @@ from insolvia_core.debtors import (
     link_client,
     role_order,
 )
+from insolvia_core.ports import FirmStore
 
 
 def _order(debtor: Debtor) -> tuple[int, str]:
@@ -27,10 +28,29 @@ class MemoryDebtorStore:
     "one record per role per case" is a property of this dict rather than
     something every caller has to remember, exactly as it is a property of the
     table's key schema on the other side.
+
+    `firm_store` is the DynamoDB adapter's `firm_table_name`: the store whose
+    client rows `link` (and `MemoryCaseStore.create`, which shares this
+    store) condition on. Without one, `link` refuses to run, as the
+    DynamoDB adapter's does — pass the firm store the routes are composed
+    with.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, firm_store: FirmStore | None = None) -> None:
         self.debtors: dict[tuple[str, str], Debtor] = {}
+        self.firm_store = firm_store
+
+    def client_linkable(self, firm_id: str, client_id: str) -> bool:
+        """`firm_store.client_linkable_check`'s condition, read from the
+        composed firm store: the row exists and `refusal_for_new_case` has
+        nothing to say. Evaluated in the same step as the write it guards —
+        nothing runs between them here — which is what the transaction buys
+        on the other side. True when no firm store is composed (only
+        `MemoryCaseStore.create` asks then, for the seed loader's reason)."""
+        if self.firm_store is None:
+            return True
+        client = self.firm_store.get_client(firm_id, client_id)
+        return client is not None and client.refusal_for_new_case() is None
 
     def create(self, debtor: Debtor) -> bool:
         # setdefault is the conditional write: it is the dict equivalent of
@@ -45,9 +65,17 @@ class MemoryDebtorStore:
         # and a suite running against the looser of the two proves nothing.
         self.debtors[(debtor.case_id, debtor.filing_role)] = debtor
 
-    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
-        # The same two conditions the DynamoDB transaction states, checked
-        # and applied in one step — nothing else runs between them here.
+    def link(self, debtor: Debtor, *, create: bool, firm_id: str) -> LinkOutcome:
+        # The same three conditions the DynamoDB transaction states, checked
+        # and applied in one step — nothing else runs between them here —
+        # and answered in the order its cancellation reasons are read.
+        if debtor.client_id is None:
+            raise ValueError("link needs a debtor that names a client")
+        if self.firm_store is None:
+            raise RuntimeError(
+                "link needs the firm store: a link must be conditional on the "
+                "client row"
+            )
         key = (debtor.case_id, debtor.filing_role)
         if create and key in self.debtors:
             return "role_taken"
@@ -59,6 +87,8 @@ class MemoryDebtorStore:
                 and other.client_id == debtor.client_id
             ):
                 return "client_taken"
+        if not self.client_linkable(firm_id, debtor.client_id):
+            return "client_unavailable"
         self.debtors[key] = debtor
         return "written"
 
