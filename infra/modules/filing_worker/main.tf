@@ -13,6 +13,7 @@
 #                                     the access-log append (PR 4)
 #   from modules/filing_queue         consume on the filing queue (PR 6)
 #   from THIS module                  the case table, the documents bucket,
+#                                     the tax-id open (Case Upload, PR 9),
 #                                     the kill switch, its own logs
 #
 # The narrowest role in the account (ADR 0024, Risks): a compromise of it
@@ -50,6 +51,12 @@ locals {
   kill_switch_arn  = "arn:aws:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter${local.kill_switch_name}"
 
   region = data.aws_region.current.region
+
+  # The tax-id envelope's encryption-context purpose — must equal
+  # insolvia_core.tax_ids.TAX_ID_PURPOSE and modules/case_store's
+  # `tax_id_purpose`. A rename on one side does not fail an apply; every
+  # Case Upload open starts failing with AccessDenied.
+  tax_id_purpose = "debtor-tax-id"
 
   worker_policy = jsonencode({
     Version = "2012-10-17"
@@ -110,15 +117,32 @@ locals {
       {
         # The case table's at-rest key, through DynamoDB only — the same
         # per-caller table-key need modules/case_store's api_key_actions
-        # note explains. Never a direct Decrypt, so never a tax id: this
-        # worker opens no sealed identifier (ADR 0024 PR 9's Case Upload will
-        # add that read, logged, in a diff that says so).
+        # note explains. Never a direct Decrypt — the one direct Decrypt this
+        # role holds is TaxIdOpen, next.
         Sid      = "CaseKeyThroughDynamoDb"
         Effect   = "Allow"
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = var.case_kms_key_arn
         Condition = {
           StringEquals = { "kms:ViaService" = "dynamodb.${local.region}.amazonaws.com" }
+        }
+      },
+      {
+        # OPEN a debtor's sealed tax id, for the Case Upload file (ADR 0024
+        # PR 9): Debtor.txt carries the full SSN, and the worker builds it in
+        # memory at upload time and never stores it. Decrypt ALONE (it never
+        # seals one, so no GenerateDataKey), and only under the tax-id
+        # envelope's encryption context — the same fence as
+        # modules/case_store's TaxIdKeyUse grants the API and the pipeline
+        # worker, so this cannot decrypt a case document, a packet or the
+        # vault. Every use is a `taxid.read` access row (purpose
+        # `case_upload`) written by the code before it calls KMS.
+        Sid      = "TaxIdOpen"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = var.case_kms_key_arn
+        Condition = {
+          StringEquals = { "kms:EncryptionContext:purpose" = local.tax_id_purpose }
         }
       },
       {

@@ -25,7 +25,9 @@ re-reads everything else, and either goes on or stops:
 3. The **kill switch**, the **driver** for the court (none is verified yet:
    every real court hands back), and the **host fence** for every origin the
    driver will contact — all before the credential is opened.
-4. Each packet file's bytes, checked against the SHA-256 the approval bound.
+4. Each packet file's bytes, checked against the SHA-256 the approval bound —
+   and, where the driver opens by Case Upload, `Debtor.txt` built and
+   validated (below).
 5. **Open** the credential (`credential.open`, purpose `sign_in`), sign in
    with a TOTP computed at the court's ask, open the case, upload.
 6. **Re-check** immediately before the final submit: the kill switch, the
@@ -111,6 +113,25 @@ outside `src/`, so the image never contains it, and it is never deployed:
   `FAKE_CMECF_URL` outside `local`, and `resolve_driver` refuses a composed
   fake anywhere but local.
 
+## The Case Upload file (ADR 0024 PR 9)
+
+Where the driver opens the case by Case Upload (`CourtDriver.case_upload` —
+the fake does by default; a real driver only once PR 10 verified that court's
+Case Upload on its training database), step 4 also builds `Debtor.txt` with
+the API's `core/case_upload.case_upload_file`: the AO's 80-field statistics
+record from the forms' own projections, a debtor record per debtor with the
+court registry's office and county codes, an alias record per name used.
+The full SSN comes from each debtor's sealed tax id through a logged
+`taxid.read` (purpose `case_upload`, principal the approving attorney), so
+the file is validated against the encoded spec, held in memory, uploaded
+first, and **never stored** — not in S3, not in a record, not in a log line.
+A file that cannot be built or does not validate hands back
+(`case_upload_invalid`) before the credential is opened; a court that refuses
+it (the fake refuses a statistics record whose field count NextGen does not
+accept) stops the run with the court's words (`court_message`). The fake's
+`FakeCmEcfDriver(url, case_upload=False)` is ADR 0024's screen-entry-only
+court: no Debtor.txt, no tax id opened.
+
 ## Why the worker imports `insolvia_api.core`
 
 The approval is bound to a digest of the filing set (`services/api`
@@ -123,8 +144,8 @@ not). Moving the closure into `packages/insolvia_core` would move the whole
 forms engine, which no second service otherwise needs; so the image copies
 `services/api/src` and the worker reaches exactly the modules
 `tests/unit/test_architecture.py`'s `ALLOWED_API` names — the approval, the
-filing set, the packet record, the drawing primitives, and two stores — never
-the API's web layer. The one composition both call is
+filing set, the Case Upload file, the packet record, the drawing primitives,
+and two stores — never the API's web layer. The one composition both call is
 `filing_approval.basis_for_case`. Consequence: a change under
 `services/api/src` re-runs this service's PR check and redeploys it
 (`filing-pr.yml`, `release.yml`), and `pypdf` is pinned to the API's exact
@@ -137,8 +158,10 @@ Its grants, all told: the vault (GetItem, Decrypt under the vault purpose,
 the access-log append — `filing_credentials`), the queue (consume —
 `filing_queue`), and `infra/modules/filing_worker`'s: GetItem/Query and
 PutItem/UpdateItem on the case table, the case key through DynamoDB and S3
-only, GetObject on `cases/*/packets/*`, PutObject on `cases/*/filings/*`, and
-GetParameter on the kill switch. Locally the poller assumes the same role, so
+only, Decrypt of a sealed tax id under the tax-id encryption context alone
+(`TaxIdOpen` — the Case Upload file, below), GetObject on
+`cases/*/packets/*`, PutObject on `cases/*/filings/*`, and GetParameter on the
+kill switch. Locally the poller assumes the same role, so
 a laptop run is held to exactly these.
 
 ## Three environments
