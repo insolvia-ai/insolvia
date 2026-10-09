@@ -12,7 +12,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from insolvia_core.auth import (
-    AUTH_TIME_SKEW_SECONDS,
+    CLOCK_SKEW_SECONDS,
     ReauthenticationRequiredError,
     multi_client_settings_or_raise,
     require_recent_authentication,
@@ -31,7 +31,7 @@ _PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 @pytest.mark.parametrize(
     "age",
-    [0, 1, WINDOW - 1, WINDOW, -AUTH_TIME_SKEW_SECONDS],
+    [0, 1, WINDOW - 1, WINDOW, -CLOCK_SKEW_SECONDS],
     ids=["just-now", "a-second-ago", "inside", "the-boundary", "skew-ahead"],
 )
 def test_a_sign_in_inside_the_window_is_accepted(age: int) -> None:
@@ -44,7 +44,7 @@ def test_a_sign_in_inside_the_window_is_accepted(age: int) -> None:
 
 @pytest.mark.parametrize(
     "authenticated_at",
-    [None, NOW - WINDOW - 1, NOW - 86_400, NOW + AUTH_TIME_SKEW_SECONDS + 1],
+    [None, NOW - WINDOW - 1, NOW - 86_400, NOW + CLOCK_SKEW_SECONDS + 1],
     ids=["no-auth-time", "a-second-too-old", "a-day-old", "from-the-future"],
 )
 def test_anything_else_requires_signing_in_again(authenticated_at: int | None) -> None:
