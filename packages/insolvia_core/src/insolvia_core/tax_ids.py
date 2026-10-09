@@ -68,8 +68,11 @@ fenced to DynamoDB or S3 as the calling service.
 - `read_tax_id` is the full value: it opens the envelope AND records a
   `taxid.read` access event naming who, which case, which debtor, and why
   (`purpose` — `b121` for the statement, `petition_review` for the review's
-  byte-exact re-assembly). It is called by packet assembly and the single-form
-  preview when B121 is rendered, and by nothing that answers a client: no
+  byte-exact re-assembly, `case_upload` for the court's Debtor.txt, built in
+  the filing worker's memory and never stored — services/api
+  core/case_upload.py). It is called by packet assembly and the single-form
+  preview when B121 is rendered, by the filing worker for the Case Upload
+  file, and by nothing that answers a client: no
   route returns the full value, and the MCP surface has no tool for it
   (docs/reference/mcp-surface.md).
 

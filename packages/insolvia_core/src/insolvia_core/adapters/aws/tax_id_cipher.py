@@ -40,7 +40,9 @@ class KmsTaxIdCipher:
     protection the design counts on, and the IAM grant permits these two
     verbs only with `kms:EncryptionContext:purpose = debtor-tax-id`
     (infra/modules/case_store, TaxIdKeyUse) — the API role holds both, the
-    worker role Decrypt alone, the MCP role neither.
+    pipeline worker role Decrypt alone, the filing worker role Decrypt alone
+    for the Case Upload file (infra/modules/filing_worker, TaxIdOpen), the
+    MCP role neither.
 
     `KeyId` is passed on Decrypt as well as GenerateDataKey. Decrypt does not
     need it (the wrapped blob names its key), but passing it makes "this
