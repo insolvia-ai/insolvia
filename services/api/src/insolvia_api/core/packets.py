@@ -44,10 +44,20 @@ from .form_overlay import (
     output_options_json,
 )
 
-# The download name a browser saves the packet under. One name for every
-# packet on purpose: the object key carries the identity (two server-minted
-# uuids), and the record's created_at answers "which assembly was this".
-PACKET_FILE_NAME: Final = "chapter7-packet.zip"
+
+def packet_file_name(chapter: int) -> str:
+    """The download name a browser saves the packet under: the case's
+    chapter, and nothing else — `chapter7-packet.zip`, `chapter13-packet.zip`.
+
+    One name per chapter on purpose, whatever the output options: the
+    object key carries the identity (two server-minted uuids), the record's
+    created_at answers "which assembly was this", and the recorded options
+    answer "was it a draft, a subset, an amendment". The chapter is a
+    validated integer on the case (and assembly refuses any chapter but 7
+    and 13 before a packet exists), so no human-typed value reaches the name.
+    """
+    return f"chapter{chapter}-packet.zip"
+
 
 # What a packet zip is, on the wire and in the download.
 PACKET_CONTENT_TYPE: Final = "application/zip"
@@ -220,6 +230,7 @@ def packet_object_key(case_id: str, packet_id: str) -> str:
 def new_packet(
     *,
     case_id: str,
+    chapter: int,
     job_id: str,
     byte_size: int,
     sha256: str,
@@ -240,7 +251,7 @@ def new_packet(
         id=packet_id,
         case_id=case_id,
         job_id=job_id,
-        file_name=PACKET_FILE_NAME,
+        file_name=packet_file_name(chapter),
         content_type=PACKET_CONTENT_TYPE,
         byte_size=byte_size,
         sha256=sha256,

@@ -302,11 +302,10 @@ order. Nothing here needs a new decision except where marked.
    `caseNumberKey` for #369's matcher. Proved on a laptop against real dev
    AWS by `dev-filing-proof.sh`.
 5. **Court-notice intake** (#369), once filed-state capture exists.
-6. **Small follow-ups found on the way:** a Chapter 13 packet is named
-   `chapter7-packet.zip`; B113 § 3.1's current-installment column prints
-   blank; the intake client panel and the client screens format names two
-   ways; `verify_access_token` has no `iat` leeway (a flaky first `/v1/me`
-   against a local API); a seed drift report (`seed load --check` naming
+6. **Small follow-ups found on the way:** B113 § 3.1's
+   current-installment column prints blank; the intake client panel and the
+   client screens format names two ways; `verify_access_token` has no `iat`
+   leeway (a flaky first `/v1/me` against a local API); a seed drift report (`seed load --check` naming
    fixture fields changed after seeding) — whether the loader may repair
    them reverses ADR 0021's "existing rows are left alone", so it is the
    maintainer's call. The portal integration tests write to the seeded

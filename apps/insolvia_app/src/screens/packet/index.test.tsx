@@ -250,6 +250,24 @@ describe('the filing packet screen', () => {
     ]);
   });
 
+  it('downloads a Chapter 13 packet under the name the server gave it', async () => {
+    // The API names the zip by the case's chapter; the screen never builds
+    // a name of its own, so a Chapter 13 packet must not arrive as chapter 7.
+    signedIn({
+      list: () => jsonResponse(200, { packets: [packet({ fileName: 'chapter13-packet.zip' })] }),
+    });
+    await screen.findByText('chapter13-packet.zip');
+
+    await userEvent.press(
+      screen.getByRole('button', { name: 'Download the packet assembled 2026-09-03' }),
+    );
+
+    expect(await screen.findByText('Opened chapter13-packet.zip.')).toBeTruthy();
+    expect(files.downloads).toEqual([
+      { url: 'https://bucket.example.test/read-here', fileName: 'chapter13-packet.zip' },
+    ]);
+  });
+
   it('assembles: accepts the job, polls it, and reloads the list on success', async () => {
     const assembled = packet();
     let settled = false;
