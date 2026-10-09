@@ -288,5 +288,5 @@ def test_a_filed_case_cannot_be_approved(app):
     case = app.world.case()
     app.world.deps.case_store.cases[CASE_ID] = replace(case, status="filed")
     body = app.read().get_json()["basis"]
-    assert "filed" in body["blockers"]
+    assert body["blockers"] == ["filed"]
     assert app.approve(digest=body["digest"]).status_code == 409

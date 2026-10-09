@@ -19,6 +19,9 @@ type LoadState =
   | { readonly kind: 'ready'; readonly filingSet: FilingSet }
   | { readonly kind: 'error' };
 
+/** The checklist item a filed case's filing set consists of. */
+const FILED_ITEM = 'filed';
+
 const STATUS_INTENT: Record<ChecklistItemStatus, BadgeIntent> = {
   ready: 'success',
   missing: 'danger',
@@ -114,14 +117,20 @@ export function FilingSetPanel({
 
   const { filingSet } = state;
   const courtName = filingSet.court?.name ?? 'No court set';
+  const court = `${courtName}${
+    filingSet.court?.divisionName !== undefined ? `, ${filingSet.court.divisionName}` : ''
+  }`;
+  // A filed case's checklist is its one `filed` item (core/filing_set.py):
+  // the case is on the docket, so nothing below is a step to take any more.
+  const filed = filingSet.checklist.some((item) => item.id === FILED_ITEM);
 
   return (
     <View>
       <Heading level={2}>Filing set and checklist</Heading>
       <Text style={[styles.body, muted]}>
-        {`${courtName}${
-          filingSet.court?.divisionName !== undefined ? `, ${filingSet.court.divisionName}` : ''
-        }. Automated filing is not available for this court yet: the attorney files from their own CM/ECF session, uploading the documents below in this order and under these names.`}
+        {filed
+          ? `${court}. This case is filed: the documents below are the record of what was prepared for the court, and no further filing is possible.`
+          : `${court}. Automated filing is not available for this court yet: the attorney files from their own CM/ECF session, uploading the documents below in this order and under these names.`}
       </Text>
       {filingSet.orderBasis === 'default' ? (
         <Text style={[styles.body, muted]}>
@@ -168,7 +177,7 @@ export function FilingSetPanel({
           <View role="listitem" key={item.id} style={styles.row}>
             <View style={styles.badges}>
               <Badge intent={STATUS_INTENT[item.status]} size="sm">
-                {STATUS_LABEL[item.status]}
+                {item.id === FILED_ITEM ? 'Filed' : STATUS_LABEL[item.status]}
               </Badge>
               <Text style={[styles.rowTitle, ink]}>{item.title}</Text>
             </View>
