@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 from dataclasses import replace
 
 import pytest
@@ -52,6 +53,7 @@ from tests.unit.test_packet_assembly import (
 RELEASE = courts.latest()
 DISTRICTS = [d.code for d in RELEASE.districts]
 DIVISIONS = [(d.code, v.code) for d in RELEASE.districts for v in d.divisions]
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
 @pytest.fixture(scope="module")
@@ -220,9 +222,14 @@ def test_b121_is_restricted_or_not_filed_never_public(code, packet):
 def test_the_wire_shape_never_carries_a_tax_id(code, packet):
     data = reference_case_data()
     body = json.dumps(filing_set_json(build(in_court(data, code), (packet,))))
+    # The packet's id is a random UUID, which can spell any four digits; it
+    # is struck out before the last-four check, or this fails about one
+    # module run in a thousand.
+    rest = UUID.sub("<uuid>", body).replace("2026", "").replace("2099", "")
     for digits in data.tax_ids.values():
         assert digits not in body
-        assert digits[-4:] not in body.replace("2026", "").replace("2099", "")
+        assert f"{digits[:3]}-{digits[3:5]}-{digits[5:]}" not in body
+        assert digits[-4:] not in rest
 
 
 @pytest.mark.parametrize("code", DISTRICTS)
