@@ -63,7 +63,8 @@ class CaseOpening:
     """What the opening screens need. No debtor identity crosses here in this
     PR: the fake opens a case by chapter, office and joint flag; PR 9's
     Case Upload file (and its logged tax-id read) is where a real court's
-    debtor data comes from."""
+    debtor data comes from — `CourtDriver.case_upload`, uploaded as the
+    first `FilingFile`."""
 
     court: str
     division: str
@@ -74,7 +75,12 @@ class CaseOpening:
 @dataclass(frozen=True)
 class FilingFile:
     """One document to upload, in docket order: the bytes, and the digest the
-    approval was bound to (already checked against the bytes)."""
+    approval was bound to (already checked against the bytes).
+
+    The Case Upload file is one too — position 0, key `case_upload`, built
+    in memory at upload time from records the approval's digest binds; its
+    bytes carry the full SSN, so they stay out of the repr like every
+    document's, and the file is never stored."""
 
     position: int
     key: str
@@ -117,6 +123,17 @@ class CourtDriver(Protocol):
     def base_urls(self) -> tuple[str, ...]:
         """Every origin this driver will contact. The worker checks each
         against the host fence BEFORE it opens the credential."""
+        ...
+
+    @property
+    def case_upload(self) -> bool:
+        """Whether this driver opens the case through the court's Case
+        Upload (ADR 0024 PR 9) — the worker then builds Debtor.txt, with the
+        full SSN from a logged `taxid.read`, and uploads it FIRST. A real
+        driver says True only for a court whose Case Upload PR 10 verified on
+        its training database (registry `case_upload.status`); a driver that
+        types the opening screens instead says False, and no tax id is
+        opened."""
         ...
 
     def start(self, http: HttpClient) -> CourtSession: ...

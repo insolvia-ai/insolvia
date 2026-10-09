@@ -364,6 +364,11 @@ _, after = basis_for_case(
 print(f"approvable: blockers={list(after.blockers)} (the pins are frozen)")
 if "filed" not in after.blockers:
     fail("a filed case could still be approved")
+# ADR 0024 PR 9: the fake opened the case from Debtor.txt, built by the role
+# with each debtor's tax id opened through its TaxIdOpen grant.
+print(f"case upload: {court.case_uploads} Debtor.txt accepted by the fake court")
+if court.case_uploads != 1:
+    fail("the Case Upload file did not reach the fake court")
 
 # ── 2. a redelivered job ────────────────────────────────────────
 step("2. the same job delivered again")
@@ -404,6 +409,10 @@ class CrashAfterSubmit:
     @property
     def base_urls(self):
         return self._inner.base_urls
+
+    @property
+    def case_upload(self) -> bool:
+        return self._inner.case_upload
 
     def start(self, http):
         session = self._inner.start(http)
@@ -599,6 +608,30 @@ refused(
 refused(
     "scan the case table",
     lambda: role_ddb.scan(TableName=TABLE, Limit=1),
+)
+# TaxIdOpen (PR 9) is Decrypt under the tax-id context ALONE: the role can
+# neither seal a tax id nor open a data key minted under any other context.
+role_kms = role.client("kms")
+refused(
+    "seal a tax id (GenerateDataKey under the tax-id context)",
+    lambda: role_kms.generate_data_key(
+        KeyId=case_key_alias(TABLE),
+        KeySpec="AES_256",
+        EncryptionContext={"purpose": "debtor-tax-id"},
+    ),
+)
+_other = dev.client("kms").generate_data_key(
+    KeyId=case_key_alias(TABLE),
+    KeySpec="AES_256",
+    EncryptionContext={"purpose": "not-a-tax-id"},
+)
+refused(
+    "decrypt the case key under any other context",
+    lambda: role_kms.decrypt(
+        KeyId=case_key_alias(TABLE),
+        CiphertextBlob=_other["CiphertextBlob"],
+        EncryptionContext={"purpose": "not-a-tax-id"},
+    ),
 )
 
 # ── clean up ────────────────────────────────────────────────────

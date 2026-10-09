@@ -178,6 +178,10 @@ class Misreading:
     def base_urls(self):
         return self.inner.base_urls
 
+    @property
+    def case_upload(self):
+        return self.inner.case_upload
+
     def start(self, http):
         session = self.inner.start(http)
         number = self.number

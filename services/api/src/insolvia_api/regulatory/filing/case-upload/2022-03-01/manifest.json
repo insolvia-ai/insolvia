@@ -1,0 +1,11 @@
+{
+  "series_id": "filing/case-upload",
+  "effective_date": "2022-03-01",
+  "sequence": 1,
+  "source": {
+    "url": "https://pacer.uscourts.gov/sites/default/files/files/Mar_2022_case_upload_spec.pdf",
+    "published": "2023-07-11",
+    "sha256": "818326a6caf1a652efd890ee5aabecbae2cac28ca0c667d2515889adb376ac1f"
+  },
+  "notes": "Administrative Office of the U.S. Courts, 'CM/ECF Case Upload File Specifications, Bankruptcy Release 5.3.5 and NextGen 1.5.4, 1.6.3, 1.7.0 and 1.7.1', effective March 2022, page footers dated 7/11/2023 (ADR 0024 source S22). Read 2026-10-08. spec.json transcribes every field of the three record types (stat: 80, debt: 21, alas: 8) with its number, name, the spec's Required column, its Field Length, and its Permitted values; nothing in spec.json is a field the document does not list. Where the document is ambiguous the entry says so in `ambiguities` and names the reading the builder and validator take — always the narrower one. The court's own CM/ECF configuration decides the '**' fields (spec p. 11); which ones each launch court requires is verified on its training database in ADR 0024 PR 10, not here."
+}

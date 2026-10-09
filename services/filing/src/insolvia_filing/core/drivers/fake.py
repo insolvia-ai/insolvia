@@ -69,12 +69,23 @@ _MAX_REDIRECTS: Final = 5
 
 
 class FakeCmEcfDriver:
-    def __init__(self, base_url: str) -> None:
+    """`case_upload` picks which of ADR 0024's two fake court
+    configurations this is: True (the default — what a laptop and the
+    end-to-end tests file against) opens the case with a Case Upload file
+    the fake checks the way a court does; False is the screen-entry-only
+    court, which receives no Debtor.txt and for which no tax id is opened."""
+
+    def __init__(self, base_url: str, *, case_upload: bool = True) -> None:
         self._base = base_url.rstrip("/") + "/"
+        self._case_upload = case_upload
 
     @property
     def driver_id(self) -> str:
         return DRIVER_ID
+
+    @property
+    def case_upload(self) -> bool:
+        return self._case_upload
 
     @property
     def base_urls(self) -> tuple[str, ...]:
@@ -193,7 +204,7 @@ class FakeCmEcfSession:
                 },
                 file_field=("file", file.file_name, file.content),
             )
-            self._expect(
+            _, screen = self._expect(
                 self._send(
                     HttpRequest(
                         "POST",
@@ -206,6 +217,11 @@ class FakeCmEcfSession:
                 ),
                 "upload",
             )
+            if screen.messages:
+                # The court refused this document (a Case Upload file whose
+                # field count it does not accept, say): stop, and say what
+                # it said — never alter the file and try again.
+                raise HandBackError("court_message", court_said=self._said(screen))
         _, review = self._expect(self._get("/review"), "review")
         expected = tuple(f"{f.position}|{f.file_name}|{f.sha256}" for f in files)
         if review.entries != expected:

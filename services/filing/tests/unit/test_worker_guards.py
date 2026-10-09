@@ -9,7 +9,9 @@ credential is even opened:
   - a driver whose host the fence does not allow — refused with no socket;
   - an expired approval; a message that is not a filing job, or names no
     approval of its filing;
-  - and nothing secret in a log line, a stored record or an access row.
+  - and nothing secret in a log line, a stored record or an access row —
+    the court password, the TOTP seed and codes, and the full SSN the Case
+    Upload file carries (ADR 0024 PR 9).
 """
 
 from __future__ import annotations
@@ -26,6 +28,10 @@ from insolvia_core.filing_credentials import revoke_credential
 from insolvia_filing.core.drivers.fake import FakeCmEcfDriver
 from insolvia_filing.core.totp import totp_at
 from insolvia_filing.core.worker import run_filing
+
+# The reference case's tax ids (services/api tests: REFERENCE_TAX_IDS — the
+# SSA's advertising block, never issued).
+SSNS = ("987654321", "987654322")
 
 
 class UploadHook:
@@ -44,6 +50,10 @@ class UploadHook:
     @property
     def base_urls(self):
         return self._inner.base_urls
+
+    @property
+    def case_upload(self):
+        return self._inner.case_upload
 
     def start(self, http):
         session = self._inner.start(http)
@@ -217,9 +227,24 @@ def test_no_secret_reaches_a_log_line_a_record_or_an_access_row(filing, caplog):
             caplog.text,
             json.dumps(filing.filings.items(), default=str),
             repr(filing.api.log.events),
+            json.dumps([vars(e) for e in filing.api.log.events], default=str),
+            # What the worker stored with the case: the court's confirmation
+            # page and the receipt (the packet's B121 carries the SSN by
+            # design and is not the worker's to search).
+            *(
+                content.decode("latin-1")
+                for key, content in filing.api.deps.blobs.contents.items()
+                if "/filings/" in key
+            ),
         ]
     )
     for secret in (account["password"], account["totp_seed"]):
         assert secret not in haystack
+    # The reference debtors' tax ids — in the file the court received
+    # (`case_uploads == 1`), and nowhere else.
+    assert filing.court.case_uploads == 1
+    for digits in SSNS:
+        assert digits not in haystack
+        assert f"{digits[:3]}-{digits[3:5]}-{digits[5:]}" not in haystack
     for code in codes:
         assert not re.search(rf"\b{code}\b", haystack)

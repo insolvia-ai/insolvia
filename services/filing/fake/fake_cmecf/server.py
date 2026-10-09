@@ -86,6 +86,42 @@ def _message(text: str) -> str:
     return f"<p class='message'>{html.escape(text)}</p>"
 
 
+# The statistics-record field counts NextGen 1.5.4-1.7.1 accept (the AO's
+# Case Upload spec, ADR 0024 source S22, pp. 11-12), and the court's own
+# words when the count is wrong.
+CASE_UPLOAD_STAT_COUNTS: Final = (73, 78, 80)
+CASE_UPLOAD_WRONG_COUNT: Final = (
+    'The statistics record (type "stat") in the case information file'
+    " (Debtor.txt) does not have the correct number of data items. Be sure you"
+    " are using the correct Case Upload specification for this court."
+)
+
+
+def case_upload_refusal(content: bytes) -> str | None:
+    """What the fake court says about a Debtor.txt, or None to accept it —
+    the checks a court makes before it opens anything: ASCII, a first
+    `stat` record with an accepted field count, and one or two `debt`
+    records each carrying an nnn-nn-nnnn tax id. Not the spec validator
+    (services/api core/case_upload.py is that); a court's own refusal."""
+    try:
+        lines = content.decode("ascii").split("\n")
+    except UnicodeDecodeError:
+        return "The case information file (Debtor.txt) could not be read."
+    if not lines or not lines[0].startswith("stat|"):
+        return CASE_UPLOAD_WRONG_COUNT
+    if len(lines[0].split("|")) not in CASE_UPLOAD_STAT_COUNTS:
+        return CASE_UPLOAD_WRONG_COUNT
+    debtors = [line.split("|") for line in lines if line.startswith("debt|")]
+    if len(debtors) not in (1, 2):
+        return "The case information file (Debtor.txt) has no debtor record."
+    for debtor in debtors:
+        ssn = debtor[7] if len(debtor) > 7 else ""
+        digits = ssn.replace("-", "")
+        if len(ssn) != 11 or not digits.isdigit() or ssn[3] != "-" or ssn[6] != "-":
+            return "A debtor record's SSN/ITIN is not in nnn-nn-nnnn format."
+    return None
+
+
 LOGIN_FORM: Final = (
     "<form action='/login' method='post'>"
     "<input name='login'><input name='password' type='password'>"
@@ -111,6 +147,9 @@ class _State:
     fault: str = "none"
     submissions: int = 0
     uploads: int = 0
+    # Case Upload files (Debtor.txt) the court ACCEPTED — the count only;
+    # the fake keeps no byte of one (it carries the full SSN).
+    case_uploads: int = 0
     sign_ins: int = 0
     case_numbers: list[str] = field(default_factory=list)
     sessions: dict[str, _Session] = field(default_factory=dict)
@@ -157,6 +196,11 @@ class FakeCmEcf:
             return self._state.uploads
 
     @property
+    def case_uploads(self) -> int:
+        with self._lock:
+            return self._state.case_uploads
+
+    @property
     def fault(self) -> str:
         with self._lock:
             return self._state.fault
@@ -171,6 +215,7 @@ class FakeCmEcf:
         with self._lock:
             self._state.submissions = 0
             self._state.uploads = 0
+            self._state.case_uploads = 0
             self._state.sign_ins = 0
             self._state.case_numbers.clear()
             self._state.sessions.clear()
@@ -181,6 +226,7 @@ class FakeCmEcf:
                 "fault": self._state.fault,
                 "submissions": self._state.submissions,
                 "uploads": self._state.uploads,
+                "caseUploads": self._state.case_uploads,
                 "signIns": self._state.sign_ins,
                 "caseNumbers": list(self._state.case_numbers),
             }
@@ -356,14 +402,15 @@ def _handler_for(court: FakeCmEcf) -> type[BaseHTTPRequestHandler]:
                 else:
                     self._send(404, _page("Not Found", ""))
 
-        def _upload_page(self, session: _Session) -> bytes:
+        def _upload_page(self, session: _Session, message: str | None = None) -> bytes:
             listed = "".join(
                 f"<li>{position}. {html.escape(name)} ({size} bytes)</li>"
                 for position, name, _, size in session.uploads
             )
             return _page(
                 "Upload Documents",
-                f"<ol id='uploaded'>{listed}</ol>"
+                (_message(message) if message else "")
+                + f"<ol id='uploaded'>{listed}</ol>"
                 "<form action='/upload' method='post' enctype='multipart/form-data'>"
                 "<input name='position'><input name='event'><input name='file_name'>"
                 "<input name='file' type='file'><button>Upload</button></form>"
@@ -490,11 +537,22 @@ def _handler_for(court: FakeCmEcf) -> type[BaseHTTPRequestHandler]:
             fields, content = _parse_multipart(
                 self.headers.get("Content-Type", ""), raw
             )
+            refusal = (
+                case_upload_refusal(content)
+                if fields.get("event") == "case_upload"
+                else None
+            )
             with court._lock:
                 session = self._session()
                 if session is None or not session.opened:
                     self._redirect("/login")
                     return
+                if refusal is not None:
+                    page = self._upload_page(session, message=refusal)
+                    self._send(200, page)
+                    return
+                if fields.get("event") == "case_upload":
+                    court._state.case_uploads += 1
                 session.uploads.append(
                     (
                         int(fields.get("position", "0")),

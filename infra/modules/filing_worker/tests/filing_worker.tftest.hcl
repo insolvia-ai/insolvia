@@ -75,6 +75,17 @@ run "the_worker_grant_is_pinned" {
           }
         },
         {
+          # ADR 0024 PR 9: the Case Upload file's tax-id read — Decrypt only,
+          # fenced to the tax-id envelope's encryption context.
+          Sid      = "TaxIdOpen"
+          Effect   = "Allow"
+          Action   = ["kms:Decrypt"]
+          Resource = "arn:aws:kms:us-east-1:111122223333:key/case-key"
+          Condition = {
+            StringEquals = { "kms:EncryptionContext:purpose" = "debtor-tax-id" }
+          }
+        },
+        {
           Sid      = "PacketRead"
           Effect   = "Allow"
           Action   = ["s3:GetObject"]

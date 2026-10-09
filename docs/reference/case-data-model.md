@@ -365,9 +365,13 @@ argument. The shape it settled on:
 - **Two reads.** The last four are on the plain record and travel with every
   debtor read (screens, B101, the generic routes, the MCP record tools). The
   full value is `tax_ids.read_tax_id`: it writes a `taxid.read` row — who,
-  which case, which debtor (`filing_role`), why (`purpose`: `b121`, or
-  `petition_review` for the review's byte-exact re-assembly) — and is called
-  by nothing that answers a client. B121 is the only form that prints it.
+  which case, which debtor (`filing_role`), why (`purpose`: `b121`,
+  `petition_review` for the review's byte-exact re-assembly, or `case_upload`
+  when the filing worker builds the court's Case Upload file, `Debtor.txt`)
+  — and is called by nothing that answers a client. B121 is the only form
+  that prints it. `Debtor.txt` (ADR 0024 PR 9, `services/api`
+  `core/case_upload.py`) carries it too, and is therefore generated on demand
+  in the worker's memory at upload time and never stored.
 - **Provenance is one entry, at `tax_id`.** The kind and the digits are one
   identifier entered in one act, and the last-four echo a client sends to
   keep a stored number carries no fact of its own.
