@@ -73,10 +73,11 @@ ALGORITHMS = ("RS256",)
 TOKEN_USE_ACCESS = "access"
 
 # Clock skew tolerated between the issuer's clock and this verifier's, in
-# seconds, wherever a token's time is compared with now: the token's own
-# `iat`/`nbf`/`exp` (`_decode_verified_claims`) and the sign-in's `auth_time`
+# seconds, wherever a token's time is compared with now: a Cognito access
+# token's own `iat`/`nbf`/`exp` (`_decode_verified_claims`), a Google ID
+# token's (`verify_google_id_token`), and the sign-in's `auth_time`
 # (`require_recent_authentication`). A minute absorbs NTP-synchronised drift
-# with room to spare and is small next to Cognito's one-hour access-token
+# with room to spare and is small next to either issuer's one-hour token
 # lifetime, so it extends `exp` by at most this much and no further.
 CLOCK_SKEW_SECONDS = 60
 
@@ -488,7 +489,9 @@ def require_recent_authentication(
 #   - `email_verified` is true and `email` present: the audit trail records
 #     who provisioned what by address, and an unverified address is not an
 #     identity.
-#   - `exp`/`iat` via PyJWT, `sub` present — same rules as the profile above.
+#   - `exp`/`iat`/`nbf` via PyJWT with the same CLOCK_SKEW_SECONDS leeway,
+#     `sub` present — same rules as the profile above. Google's clock running
+#     a moment ahead of ours would otherwise refuse a staff sign-in at random.
 
 GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 
@@ -557,6 +560,9 @@ def verify_google_id_token(
                 "verify_nbf": True,
                 "verify_signature": True,
             },
+            # Same leeway as the Cognito profile, on iat/nbf (future) and exp
+            # (past) alike — see CLOCK_SKEW_SECONDS.
+            leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError(AuthFailureReason.EXPIRED) from exc
