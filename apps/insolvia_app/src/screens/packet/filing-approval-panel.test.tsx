@@ -126,6 +126,7 @@ describe('the filing approval panel', () => {
     readonly signedInSecondsAgo: number;
     readonly level?: 'hidden' | 'view_only' | 'add_edit';
     readonly write?: (init: RequestInit) => Response;
+    readonly filingSet?: Record<string, unknown>;
   }) {
     const idToken = fakeJwt({
       email: TEST_EMAIL,
@@ -153,6 +154,7 @@ describe('the filing approval panel', () => {
           maxBytesBasis: 'default',
           documents: [],
           checklist: [],
+          ...options.filingSet,
         });
       }
       if (url.endsWith('/debtors')) return jsonResponse(200, { debtors: [] });
@@ -298,6 +300,47 @@ describe('the filing approval panel', () => {
 
     expect(await screen.findByText('Not ready to approve: Filing packet.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Approve filing' })).toBeNull();
+  });
+
+  it('a filed case says it is filed, once, with its case number and date — no data problem', async () => {
+    // `core/filing_set.py`: a filed case's checklist is this one item, and
+    // `filed` is its approval's only blocker.
+    const filedItem = {
+      id: 'filed',
+      status: 'ready',
+      title: 'This case is filed',
+      detail:
+        'Case number 26-10001. Filed 2026-10-01. No further filing is possible from this filing set: the documents above are the record of what was prepared for the court.',
+    };
+    render({
+      view: { basis: basis({ ready: false, blockers: ['filed'], checklist: [filedItem] }) },
+      filingSet: {
+        court: { code: 'flmb', name: 'Middle District of Florida', divisionName: 'Tampa Division' },
+        checklist: [filedItem],
+      },
+      signedInSecondsAgo: 10,
+    });
+
+    // The filing set panel: the filed state, not the hand-off instructions.
+    expect(
+      await screen.findByText(
+        'Middle District of Florida, Tampa Division. This case is filed: the documents below are the record of what was prepared for the court, and no further filing is possible.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/files from their own CM\/ECF session/)).toBeNull();
+    expect(screen.getAllByText('Filed').length).toBe(1);
+
+    // The approval panel: filed, with the docket facts, and nothing to approve.
+    expect(
+      await screen.findByText('This case is filed. There is nothing to approve.'),
+    ).toBeTruthy();
+    expect(screen.getAllByText(/Case number 26-10001\. Filed 2026-10-01\./).length).toBe(2);
+    expect(screen.queryByText(/Not ready to approve/)).toBeNull();
+    expect(screen.queryByText(/Case data/)).toBeNull();
+    expect(screen.queryByText(`Approval fingerprint ${DIGEST}`)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Approve filing' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sign in again to approve' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Go to fix/ })).toBeNull();
   });
 
   it('view_only sees the approval but is not offered approving', async () => {
