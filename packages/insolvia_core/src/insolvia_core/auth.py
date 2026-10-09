@@ -30,7 +30,12 @@ Every check below is load-bearing:
   same key and would otherwise sail through; it is not an authorization
   credential and is not what this API accepts.
 - **`client_id`** equals the configured app client.
-- **`exp`**, plus `nbf`/`iat` when present. PyJWT enforces these.
+- **`exp`**, plus `nbf`/`iat` when present. PyJWT enforces these, with
+  `CLOCK_SKEW_SECONDS` of leeway either way: an `iat` or `nbf` up to that far
+  ahead of this clock is accepted (Cognito's clock ahead of ours — otherwise
+  a token used the instant it is minted is refused at random), and an `exp`
+  at most that far behind it. One constant, shared with the `auth_time`
+  check below, so the two cannot drift apart.
 - **`sub`** is present and non-empty — it is the principal's identity, and a
   token without one authenticates nobody.
 
@@ -66,6 +71,14 @@ from insolvia_core.errors import ForbiddenError
 ALGORITHMS = ("RS256",)
 
 TOKEN_USE_ACCESS = "access"
+
+# Clock skew tolerated between the issuer's clock and this verifier's, in
+# seconds, wherever a token's time is compared with now: the token's own
+# `iat`/`nbf`/`exp` (`_decode_verified_claims`) and the sign-in's `auth_time`
+# (`require_recent_authentication`). A minute absorbs NTP-synchronised drift
+# with room to spare and is small next to Cognito's one-hour access-token
+# lifetime, so it extends `exp` by at most this much and no further.
+CLOCK_SKEW_SECONDS = 60
 
 _BEARER_PREFIX = "bearer"
 
@@ -258,6 +271,9 @@ def _decode_verified_claims(
                 "verify_nbf": True,
                 "verify_signature": True,
             },
+            # Applies to iat and nbf (how far in the future) and exp (how far
+            # in the past) alike — see CLOCK_SKEW_SECONDS.
+            leeway=CLOCK_SKEW_SECONDS,
         )
     except jwt.ExpiredSignatureError as exc:
         raise AuthenticationError(AuthFailureReason.EXPIRED) from exc
@@ -408,11 +424,10 @@ def _scopes(raw: Any) -> tuple[str, ...]:
 # The window is the caller's to choose, per act. Guardrail 2's signature
 # uses `SIGNATURE_MAX_AGE_SECONDS`; PR 6's approval chooses its own.
 
-# Clock skew tolerated in the other direction: an `auth_time` this far in
-# the future (the pool's clock ahead of the API's) is still accepted, and one
-# further ahead is refused, because a time from the future is not a sign-in
-# that happened.
-AUTH_TIME_SKEW_SECONDS = 60
+# Clock skew tolerated in the other direction is CLOCK_SKEW_SECONDS: an
+# `auth_time` that far in the future (the pool's clock ahead of the API's) is
+# still accepted, and one further ahead is refused, because a time from the
+# future is not a sign-in that happened.
 
 
 class ReauthenticationRequiredError(ForbiddenError):
@@ -433,7 +448,7 @@ def require_recent_authentication(
     `max_age_seconds` of `now`, else ReauthenticationRequiredError.
 
     Refuses a missing time (never assume fresh), one older than the window,
-    and one more than AUTH_TIME_SKEW_SECONDS in the future. Pure: `now` is
+    and one more than CLOCK_SKEW_SECONDS in the future. Pure: `now` is
     an argument so the boundary is testable to the second.
     """
     if max_age_seconds <= 0:
@@ -441,7 +456,7 @@ def require_recent_authentication(
     if authenticated_at is None:
         raise ReauthenticationRequiredError("sign in again to continue")
     age = now - authenticated_at
-    if age > max_age_seconds or age < -AUTH_TIME_SKEW_SECONDS:
+    if age > max_age_seconds or age < -CLOCK_SKEW_SECONDS:
         raise ReauthenticationRequiredError("sign in again to continue")
     return authenticated_at
 
