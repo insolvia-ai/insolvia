@@ -465,6 +465,31 @@ def _problem_items(problems: tuple[PacketProblem, ...]) -> list[ChecklistItem]:
     return items
 
 
+def _filed_item(data: CaseData) -> ChecklistItem:
+    """The filed case's one checklist line: the court's case number and the
+    petition date where they are recorded, and that nothing more is filed
+    from here."""
+    case = data.case
+    facts = [
+        f"Case number {case.case_number}."
+        if case.case_number
+        else "No case number is recorded yet.",
+        f"Filed {case.filed_at}."
+        if case.filed_at
+        else "No filing date is recorded yet.",
+    ]
+    return ChecklistItem(
+        id="filed",
+        status="ready",
+        title="This case is filed",
+        detail=" ".join(facts)
+        + " No further filing is possible from this filing set: the documents"
+        " above are the record of what was prepared for the court. To change a"
+        " filed schedule, mark the changed items amended and assemble an"
+        " amendment.",
+    )
+
+
 def _confirm_or(fact: courts.Fact[T], status: ItemStatus) -> ItemStatus:
     return status if fact.verified else "confirm"
 
@@ -481,16 +506,16 @@ def _checklist(
     case = data.case
     items: list[ChecklistItem] = []
 
+    # 0. A filed case is ONE state, not a hand-off with a problem in it.
+    # Every step below is about getting the case onto the court's docket,
+    # which has happened — and `completeness_problems` refuses a filed case
+    # outright (its packet is pinned, never re-assembled), which would read
+    # here as a "case data" gap the attorney has nothing to fix for. So the
+    # checklist is this one item; the documents above stay, as the record
+    # of what was prepared. The approval's `filed` blocker is what refuses a
+    # second filing (`filing_approval._blockers`).
     if is_filed(case.status):
-        items.append(
-            ChecklistItem(
-                id="filed",
-                status="ready",
-                title="The case is marked filed",
-                detail="This filing set is the record of what was prepared for"
-                " the court.",
-            )
-        )
+        return (_filed_item(data),)
 
     # 1. The court.
     if district is None or division is None:
