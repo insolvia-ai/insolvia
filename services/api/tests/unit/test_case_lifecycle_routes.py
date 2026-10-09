@@ -29,7 +29,7 @@ from insolvia_core.adapters.memory.jwks_provider import StaticJwksProvider
 from insolvia_core.adapters.memory.tax_id_cipher import LocalTaxIdCipher
 from insolvia_core.adapters.memory.tax_id_store import MemoryTaxIdStore
 
-from tests.unit.opening import add_client
+from tests.unit.opening import add_client, claim_merge_after_read
 from tests.unit.test_cases import (
     _PUBLIC_KEY,
     ALICE,
@@ -52,8 +52,10 @@ TYPED = {"source": "staff_typed"}
 
 
 @pytest.fixture
-def debtors():
-    return MemoryDebtorStore()
+def debtors(firms):
+    # Composed with the firm store, as the API is: a link and a case open
+    # are conditional on the client row (the merge race).
+    return MemoryDebtorStore(firm_store=firms)
 
 
 @pytest.fixture
@@ -459,6 +461,24 @@ def test_a_copy_of_a_case_whose_client_is_archived_is_refused(client):
     )
     response = client.post(f"/v1/cases/{source['id']}/copy", headers=auth(ALICE))
     assert response.status_code == 409
+
+
+def test_a_copy_whose_client_a_merge_claimed_after_the_check_is_refused(
+    client, firms, store, monkeypatch
+):
+    source, client_id = open_case(client)
+    survivor = add_client(client, auth(ALICE), name={"given": "Jordan B."})
+    claim_merge_after_read(
+        monkeypatch, firms, firm_id=FIRM_A, merged_id=client_id, survivor_id=survivor
+    )
+
+    response = client.post(f"/v1/cases/{source['id']}/copy", headers=auth(ALICE))
+
+    assert response.status_code == 409
+    assert response.get_json()["message"] == (
+        "That client is being merged into another client."
+    )
+    assert set(store.cases) == {source["id"]}
 
 
 def test_copying_a_case_the_caller_cannot_see_is_404(client):
