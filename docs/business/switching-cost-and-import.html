@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Insolvia switching-cost &amp; import spike — what a firm can bring from its existing bankruptcy software, and a build recommendation.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+<style>html,body{margin:0;padding:0}body{background:#eef0f4}@media(prefers-color-scheme:dark){body{background:#10131a}}</style>
+</head>
+<body>
+<title>Insolvia — Switching Cost &amp; Import</title>
+<style>
+  :root {
+    --paper: #eef0f4;
+    --surface: #ffffff;
+    --surface-2: #f5f6f9;
+    --ink: #1b2436;
+    --ink-soft: #475166;
+    --ink-faint: #6d7688;
+    --line: #d9dde5;
+    --line-strong: #c3c9d4;
+    --accent: #9a6b2f;
+    --accent-ink: #7c531f;
+    --accent-wash: #f2e8d8;
+
+    --tag-form-bg: #f2e6d1;   --tag-form-fg: #855316;
+    --tag-data-bg: #dcebf7;   --tag-data-fg: #1c5688;
+    --tag-logic-bg: #e7ddf5;  --tag-logic-fg: #573a94;
+    --tag-intg-bg: #d5ebe4;   --tag-intg-fg: #1a6353;
+    --tag-flow-bg: #e3e7ee;   --tag-flow-fg: #505b6c;
+
+    --risk-hi: #b23b3b;
+    --risk-md: #b5852a;
+    --risk-lo: #3f8c5c;
+
+    --shadow: 0 1px 2px rgba(27,36,54,.06), 0 8px 24px rgba(27,36,54,.05);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #10131a; --surface: #171b24; --surface-2: #1c212c;
+      --ink: #e7eaf1; --ink-soft: #aab3c3; --ink-faint: #808a9b;
+      --line: #2a3040; --line-strong: #363d4f;
+      --accent: #cd9c60; --accent-ink: #d9ad74; --accent-wash: #2a2318;
+      --tag-form-bg: #3a2e1a; --tag-form-fg: #e0b878;
+      --tag-data-bg: #16324a; --tag-data-fg: #8fc3ec;
+      --tag-logic-bg: #2c2447; --tag-logic-fg: #bfa8ee;
+      --tag-intg-bg: #143830; --tag-intg-fg: #7fd0bc;
+      --tag-flow-bg: #242a36; --tag-flow-fg: #a2adbe;
+      --risk-hi: #e07a7a; --risk-md: #dab364; --risk-lo: #77c495;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #eef0f4; --surface: #ffffff; --surface-2: #f5f6f9;
+    --ink: #1b2436; --ink-soft: #475166; --ink-faint: #6d7688;
+    --line: #d9dde5; --line-strong: #c3c9d4;
+    --accent: #9a6b2f; --accent-ink: #7c531f; --accent-wash: #f2e8d8;
+    --tag-form-bg: #f2e6d1; --tag-form-fg: #855316;
+    --tag-data-bg: #dcebf7; --tag-data-fg: #1c5688;
+    --tag-logic-bg: #e7ddf5; --tag-logic-fg: #573a94;
+    --tag-intg-bg: #d5ebe4; --tag-intg-fg: #1a6353;
+    --tag-flow-bg: #e3e7ee; --tag-flow-fg: #505b6c;
+    --risk-hi: #b23b3b; --risk-md: #b5852a; --risk-lo: #3f8c5c;
+  }
+  :root[data-theme="dark"] {
+    --paper: #10131a; --surface: #171b24; --surface-2: #1c212c;
+    --ink: #e7eaf1; --ink-soft: #aab3c3; --ink-faint: #808a9b;
+    --line: #2a3040; --line-strong: #363d4f;
+    --accent: #cd9c60; --accent-ink: #d9ad74; --accent-wash: #2a2318;
+    --tag-form-bg: #3a2e1a; --tag-form-fg: #e0b878;
+    --tag-data-bg: #16324a; --tag-data-fg: #8fc3ec;
+    --tag-logic-bg: #2c2447; --tag-logic-fg: #bfa8ee;
+    --tag-intg-bg: #143830; --tag-intg-fg: #7fd0bc;
+    --tag-flow-bg: #242a36; --tag-flow-fg: #a2adbe;
+    --risk-hi: #e07a7a; --risk-md: #dab364; --risk-lo: #77c495;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+
+  .wrap {
+    background: var(--paper); color: var(--ink); font-family: var(--sans);
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+    padding: clamp(20px, 4vw, 56px) clamp(16px, 4vw, 40px) 80px;
+  }
+  .inner { max-width: 1140px; margin: 0 auto; }
+
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; margin-bottom: 8px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(30px, 5vw, 48px); line-height: 1.05; letter-spacing: -.01em; margin: 0 0 14px; text-wrap: balance; }
+  .standfirst { font-size: clamp(16px, 2vw, 19px); color: var(--ink-soft); max-width: 70ch; margin: 0; }
+  .standfirst b { color: var(--ink); font-weight: 600; }
+  .metabar { display: flex; flex-wrap: wrap; gap: 8px 26px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); margin-top: 20px; }
+  .metabar span b { color: var(--ink-soft); font-weight: 600; }
+
+  h2 { font-family: var(--serif); font-weight: 600; font-size: clamp(21px, 3vw, 27px); margin: 52px 0 6px; letter-spacing: -.01em; }
+  .sec-note { color: var(--ink-faint); font-size: 14px; margin: 0 0 18px; max-width: 76ch; }
+  h3 { font-family: var(--sans); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin: 34px 0 12px; }
+  h4 { font-family: var(--serif); font-weight: 600; font-size: 17px; margin: 0 0 6px; color: var(--ink); }
+
+  a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  p { max-width: 76ch; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+  .tag { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 3px 8px; border-radius: 5px; white-space: nowrap; }
+  .tag.form { background: var(--tag-form-bg); color: var(--tag-form-fg); }
+  .tag.data { background: var(--tag-data-bg); color: var(--tag-data-fg); }
+  .tag.logic { background: var(--tag-logic-bg); color: var(--tag-logic-fg); }
+  .tag.intg { background: var(--tag-intg-bg); color: var(--tag-intg-fg); }
+  .tag.flow { background: var(--tag-flow-bg); color: var(--tag-flow-fg); }
+
+  .callout { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 20px 22px; margin: 22px 0 0; box-shadow: var(--shadow); }
+  .callout h3 { margin-top: 0; color: var(--accent-ink); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .tablecard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); margin-top: 4px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 780px; }
+  thead th { text-align: left; font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); background: var(--surface-2); padding: 12px 16px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+  tbody td { padding: 15px 16px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14px; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+
+  .feat { font-weight: 600; color: var(--ink); }
+  .feat small { display: block; font-weight: 400; color: var(--ink-faint); font-size: 12px; margin-top: 3px; font-family: var(--mono); }
+  .auth { color: var(--ink-soft); font-size: 13.5px; }
+  .auth b { color: var(--ink); font-weight: 600; }
+  .src { font-size: 13px; }
+  .cad { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .risk { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .risk::before { content: ""; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .risk.hi { color: var(--risk-hi); } .risk.hi::before { background: var(--risk-hi); }
+  .risk.md { color: var(--risk-md); } .risk.md::before { background: var(--risk-md); }
+  .risk.lo { color: var(--risk-lo); } .risk.lo::before { background: var(--risk-lo); }
+  .risk small { display:block; font-weight: 400; color: var(--ink-faint); font-size: 11.5px; margin-top: 2px; }
+
+  tr.has-desc td { border-bottom: none; }
+  tr.desc-row td { padding: 0 16px 16px; border-bottom: 1px solid var(--line-strong); background: var(--surface-2); }
+  tr.desc-row:hover td { background: var(--surface-2); }
+  tr.desc-row:last-child td { border-bottom: none; }
+  .plain { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; max-width: 96ch; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); padding: 2px 0 2px 14px; }
+  .plain b { color: var(--ink); font-weight: 600; }
+  .plain .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); display: block; margin-bottom: 4px; }
+
+  .paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 18px 0 0; }
+  .path-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; }
+  .path-card .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .path-card p { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+  .path-card p b { color: var(--ink); font-weight: 600; }
+  .path-card .meta { display: flex; gap: 18px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+  .path-card .meta b { color: var(--ink-soft); }
+
+  .notes { margin-top: 54px; border-top: 1px solid var(--line-strong); padding-top: 8px; }
+  .note-item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 14px; box-shadow: var(--shadow); }
+  .note-item h4 { margin: 0 0 6px; }
+  .note-item p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+  .pill { display:inline-block; font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.05em; padding:3px 8px; border-radius:5px; white-space:nowrap; }
+  .pill.verified { background: var(--tag-intg-bg); color: var(--tag-intg-fg); }
+  .pill.context  { background: var(--tag-flow-bg); color: var(--tag-flow-fg); }
+  .pill.check    { background: var(--tag-form-bg); color: var(--tag-form-fg); }
+  .used { color: var(--ink-soft); font-size: 13px; }
+  .used b { color: var(--ink); font-weight: 600; }
+
+  .footer { margin-top: 46px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); line-height: 1.7; }
+  .footer b { color: var(--ink-soft); }
+</style>
+
+<div class="wrap">
+<div class="inner">
+
+  <header class="masthead">
+    <p class="eyebrow">Insolvia · Spike — issue 17.4, milestone &ldquo;Filing and after&rdquo;</p>
+    <h1>Switching Cost &amp; Import</h1>
+    <p class="standfirst">A firm that switches to Insolvia has years of cases in whatever it used before. This spike establishes, from the incumbents&rsquo; own public documentation, <b>what actually comes with them</b> — and recommends what to build, and when.</p>
+    <div class="metabar">
+      <span><b>Scope</b> consumer-bankruptcy prep software, desktop &amp; cloud</span>
+      <span><b>Compiled</b> 2026-09-23</span>
+      <span><b>Status</b> spike — a decision and a sequencing call, no code</span>
+    </div>
+  </header>
+
+  <h2>Why this is a switching-cost question, not a feature</h2>
+  <p class="sec-note">Every path below writes the same place: an <code>extraction_candidate</code> row, reviewed and confirmed by a human before it becomes a case record — the same seam <a href="../reference/case-data-model.md">the case data model</a> gives AI extraction and the MCP surface. Nothing about import needs a new invariant. What differs by path is <b>how much of a firm&rsquo;s history is reachable at all</b>, and that turns out to be the real constraint: the incumbents do not publish enough to make &ldquo;write a file importer&rdquo; the whole answer.</p>
+
+  <h2>What the incumbent products document</h2>
+  <p class="sec-note">Best Case (Stretto) is reported to prepare the large majority of cases filed nationwide; NextChapter is the leading cloud-native alternative. Both are named here only because their own public documentation was read this session — see <a href="#sources">Sources &amp; methodology</a>. No vendor below is named from private knowledge.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>Product</th><th>What it documents as exportable</th><th>Documented schema?</th><th>Provenance carried?</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr class="has-desc">
+        <td class="feat">Best Case<small>Stretto — desktop, market leader</small></td>
+        <td class="auth">No public export or backup documentation found. A user review states Best Case has <em>&ldquo;no internal mechanism to back up&rdquo;</em> within the product. Filed petitions leave the firm only as <b>OneTouch</b> submissions in the court&rsquo;s own CM/ECF XML (IEPD), and as the PDFs every court filing produces.</td>
+        <td class="cad">None published</td>
+        <td class="cad">n/a</td>
+        <td class="src"><a href="https://www.bestcase.com/">bestcase.com</a> · <a href="https://www.capterra.com/p/180363/Best-Case-Bankruptcy/">Capterra reviews</a></td>
+      </tr>
+      <tr class="desc-row"><td colspan="5"><div class="plain"><span class="lbl">Read 2026-09-23</span>The OneTouch/IEPD XML is the <b>court&rsquo;s</b> schema (the same NGRel1.7 package <a href="../reference/case-data-model.md">case-data-model.md</a> already cites for e-filing), not a Best Case export — it exists only at the moment of filing and is shaped for CM/ECF ingestion, not portability. CINcompass, marketed separately as &ldquo;Best Case Cloud,&rdquo; is described by a competitor as offering an &ldquo;easy migration process&rdquo; for switchers; that claim is vendor marketing copy on both sides and was not independently verified.</div></td></tr>
+      <tr class="has-desc">
+        <td class="feat">NextChapter<small>cloud-native</small></td>
+        <td class="auth">Two <b>documented CSV templates</b>: common creditors (<code>Common Creditor, Address 1, Address 2, City, State, Zip</code>) and claims (a downloadable template, fields not published on the help page). Filed documents are downloadable/printable per case. No full-case export or backup is documented.</td>
+        <td class="cad">Partial — 2 of ~25 entity types</td>
+        <td class="cad">No — final values only</td>
+        <td class="src"><a href="https://help.nextchapterbk.com/en/articles/726965-common-creditors">Common Creditors</a> · <a href="https://help.nextchapterbk.com/en/articles/2353123-import-and-export-claims">Import and Export Claims</a></td>
+      </tr>
+      <tr class="desc-row"><td colspan="5"><div class="plain"><span class="lbl">Read 2026-09-23</span>NextChapter&rsquo;s own switching guidance is the most direct evidence in this whole survey: it recommends <b>&ldquo;starting all new cases in NextChapter and finishing existing cases in [the old system]&rdquo;</b> rather than migrating them, and its bulk offering is a paid <b>&ldquo;shell case import&rdquo;</b> concierge service whose scope is not published — &ldquo;shell&rdquo; strongly implies case identifiers (name, number), not populated schedules. Even the vendor most willing to talk about switching does not claim a lossless one.</div></td></tr>
+    </tbody>
+  </table></div></div>
+
+  <div class="callout">
+    <h3>The one pattern every source agrees on</h3>
+    <p>No incumbent — desktop or cloud — publishes a schema for a <em>whole case</em>: debtor identity, assets, exemptions, the SOFA. What is documented is thin and peripheral (a creditor name-and-address list, a claims spreadsheet) or non-existent. The industry&rsquo;s own switching advice is to re-enter, not migrate. That is the finding this spike exists to record: <b>the bottleneck is not our importer code, it is the absence of anything public to import.</b></p>
+  </div>
+
+  <h2>What the courts offer directly</h2>
+  <p class="sec-note">A firm&rsquo;s own filed cases are independently reachable through <b>PACER / CM-ECF</b>, the federal judiciary&rsquo;s public access system, regardless of which prep software produced them.</p>
+  <div class="tablecard"><div class="scroll"><table>
+    <thead><tr><th>What&rsquo;s retrievable</th><th>Cost</th><th>Form</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="auth">Docket reports, the creditor matrix, the claims register, and every filed PDF (petition, schedules, SOFA) — per case, per document, via the firm&rsquo;s own PACER login.</td>
+        <td class="cad">$0.10/page, capped at $3.00 per document (~30 pages); waived under $30/quarter</td>
+        <td class="cad">PDF (imaged/text), plus HTML docket pages</td>
+        <td class="src"><a href="https://pacer.uscourts.gov/help/faqs">pacer.uscourts.gov — FAQ</a></td>
+      </tr>
+    </tbody>
+  </table></div></div>
+  <p class="sec-note" style="margin-top:14px;">This is a per-document retrieval interface, not a bulk-export API — there is no PACER call that hands back &ldquo;every case this firm filed&rdquo; as structured data. But the PDFs it returns are exactly the input shape <code>services/api/src/insolvia_api/core/extraction.py</code> already consumes: that worker turns an uploaded document into candidate records today for credit reports and pay stubs, via one Anthropic call per document constrained to a per-kind structured-output schema, re-validated through the same <code>insolvia_core</code> parse functions every write path uses. A filed schedule is a document like any other to that pipeline; it just doesn&rsquo;t have a <code>parse_&lt;kind&gt;_output</code> schema yet.</p>
+
+  <h2>Three candidate paths</h2>
+  <p class="sec-note">All three write <code>extraction_candidate</code> rows — never confirmed case data — so the confirm-before-entry invariant (<a href="../reference/case-data-model.md">case-data-model.md</a>) holds identically for all three; none needs a new provenance source or a store change. What differs is what each can actually reach, given the finding above.</p>
+  <div class="paths">
+    <div class="path-card">
+      <div class="badges"><span class="tag form">PATH 1</span><span class="tag flow">FILE IMPORTER</span></div>
+      <h4>Per-format file importers</h4>
+      <p>Parse each vendor&rsquo;s documented export directly into candidates — today that means NextChapter&rsquo;s two CSV templates (creditors, claims), written with <code>provenance.source = imported</code> (already in <code>MACHINE_SOURCES</code>, so confirmation is enforced the same as extraction).</p>
+      <p><b>Fidelity:</b> high for the ~2 of 25 entity types a vendor actually documents; zero for everything else, because there is nothing public to build against — Best Case publishes no export at all, and reverse-engineering a closed backup format is a different, open-ended undertaking this spike does not recommend.</p>
+      <div class="meta"><span><b>Effort</b> S per documented format</span><span><b>Coverage</b> narrow</span></div>
+    </div>
+    <div class="path-card">
+      <div class="badges"><span class="tag data">PATH 2</span><span class="tag logic">RE-EXTRACTION</span></div>
+      <h4>Re-extract the firm&rsquo;s own filed PDFs</h4>
+      <p>Treat filed petitions/schedules — supplied by the firm or pulled from PACER — as documents through the existing extraction worker, adding one <code>parse_&lt;form&gt;_output</code> schema+prompt pair per official form, the same shape credit-report and pay-stub extraction already use.</p>
+      <p><b>Fidelity:</b> high for whatever was filed — it is the signed, court-accepted record — but it is a <b>snapshot of final values only</b>: no who-typed-what provenance, nothing for cases still open, and none of the dated pay-period history the means test needs (106I is a monthly estimate on the form; the model stores the dated history separately, per case-data-model.md — a filed 106I can&rsquo;t reconstruct it).</p>
+      <div class="meta"><span><b>Effort</b> M — one schema/prompt per form (~10–15 relevant forms), pipeline exists</span><span><b>Coverage</b> filed cases only</span></div>
+    </div>
+    <div class="path-card">
+      <div class="badges"><span class="tag intg">PATH 3</span><span class="tag flow">MCP HARNESS</span></div>
+      <h4>Harness-driven migration through the MCP</h4>
+      <p>Per <a href="../adr/0013-mcp-server-replaces-direct-pms-integration.md">ADR 0013</a>, the firm&rsquo;s own AI harness — already connected to their old system, however it connects — reads records there and calls <code>propose_case_records</code> on our MCP server like any other candidate write; <code>external_refs</code> names the source system, the origin-pointer seam the data model already carries.</p>
+      <p><b>Fidelity:</b> bounded by the harness&rsquo;s own connector and by how reliably it maps arbitrary content onto our 23 entity shapes — potentially the widest reach (anything the harness can read, proprietary formats included) but the least predictable, and wholly unmeasured until the harness-capability spikes (12.4/12.5) land.</p>
+      <div class="meta"><span><b>Effort</b> S for us — the tool already accepts this shape</span><span><b>Coverage</b> unbounded, unproven</span></div>
+    </div>
+  </div>
+
+  <h2>Recommendation</h2>
+  <p class="sec-note">Build nothing now; sequence a real importer <b>after the client portal</b> (the issue-numbered 15.x work — GitHub milestone &ldquo;Product · Client portal,&rdquo; milestone 13) lands, not before it.</p>
+  <div class="callout">
+    <h3>Why after, not before</h3>
+    <p><b>The plan already orders it this way.</b> <a href="../plan.md">plan.md</a> places this spike in the &ldquo;Filing and after&rdquo; milestone (17.1–17.4) and says plainly that nothing there is scheduled until 13.x lands — which it now has (2026-09-23). This finding does not reopen that ordering; it fills in the reasoning for the step after the spike.</p>
+    <p><b>A case needs a client to import into.</b> Practice management (14.1–14.8, not yet built) is what gives a case a client distinct from itself. Importing cases ahead of that milestone means importing into a data model that has nowhere for &ldquo;whose client is this&rdquo; to live, and redoing the mapping once 14.x ships.</p>
+    <p><b>The design-partner test should run on organic cases first.</b> Two open risks in plan.md — harness capability/adoption (12.4/12.5) and testing web-first &ldquo;explicitly with the design-partner firm, early&rdquo; (risk 3) — are both about whether the product works for a case a firm builds in Insolvia. Spending effort on migrating legacy cases before either is validated risks building the wrong importer for a harness or a workflow that hasn&rsquo;t been proven yet.</p>
+    <p><b>The client portal lands the review-queue volume path first.</b> 15.1–15.4 puts debtor-submitted candidates through the same confirm-before-entry review flow an importer of any of the three paths would need at scale. Building an importer before it means building (or scaling) that review UX twice.</p>
+    <p><b>Path 1&rsquo;s ceiling is too low to justify going first.</b> Even the best-documented vendor format reaches two entity types out of twenty-five. The paths that reach further — 2 and 3 — either lean on machinery practice management/portal will also need, or cost us nothing until a harness is proven (12.4/12.5). There is no version of &ldquo;build the importer early&rdquo; that outruns those dependencies.</p>
+  </div>
+  <p class="sec-note" style="margin-top:18px;">One exception worth naming, not scheduling: if a design-partner firm arrives on NextChapter before 15.x ships, piloting <b>path 1</b> for its two documented CSVs (creditors, claims) is small enough (S) to do opportunistically without moving the milestone — it is additive to nothing else and touches no shared machinery.</p>
+
+  <section class="notes" id="sources">
+    <h2 style="margin-top:20px;">Sources &amp; methodology</h2>
+    <p class="sec-note">Public documentation only — vendor help centres, vendor marketing pages, and one review aggregator — read 2026-09-23. Nothing here is drawn from private research or unpublished vendor material. <span class="pill verified">Primary · vendor-published</span> marks a vendor&rsquo;s own help page or product page; <span class="pill context">Secondary · context</span> marks marketing or third-party commentary treated as unverified claim, not fact.</p>
+    <div class="tablecard"><div class="scroll"><table>
+      <thead><tr><th>Source</th><th>Confidence</th><th>What it established</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="used"><a href="https://help.nextchapterbk.com/en/articles/726965-common-creditors">help.nextchapterbk.com — Common Creditors</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">The exact CSV column list for the common-creditors import template.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://help.nextchapterbk.com/en/articles/2353123-import-and-export-claims">help.nextchapterbk.com — Import and Export Claims</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">That a claims CSV import/export exists, gated to a required template whose field list is not published on the page itself.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://nextchapterlegal.com/bankruptcy/switch-bankruptcy-software">nextchapterlegal.com — Switch Bankruptcy Software</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">The &ldquo;shell case import&rdquo; concierge offering, named but not specified.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://blog.nextchapterbk.com/posts/effectively-transitioning-from-best-case-to-nextchapter">blog.nextchapterbk.com — Effectively Transitioning from Best Case to NextChapter</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">The explicit &ldquo;start new cases here, finish existing cases there&rdquo; switching advice — the strongest evidence in this survey that full migration isn&rsquo;t the intended path even for the vendor most willing to discuss switching.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.bestcase.com/">bestcase.com</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">No export/backup documentation found on the vendor&rsquo;s own site.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://www.capterra.com/p/180363/Best-Case-Bankruptcy/">Capterra — Best Case Bankruptcy reviews</a></td>
+          <td><span class="pill context">Secondary · context</span></td>
+          <td class="used">A single user review stating Best Case has no internal backup mechanism — anecdotal, not vendor-confirmed, included because it is consistent with the absence of any vendor documentation.</td>
+        </tr>
+        <tr>
+          <td class="used">NextChapter competitor-comparison marketing copy (nextchapterlegal.com)</td>
+          <td><span class="pill context">Secondary · context</span></td>
+          <td class="used">CINcompass/&ldquo;Best Case Cloud&rdquo; described as offering an &ldquo;easy migration process&rdquo; — a competitor&rsquo;s characterization, not independently verified against CINcompass&rsquo;s own documentation.</td>
+        </tr>
+        <tr>
+          <td class="used"><a href="https://pacer.uscourts.gov/help/faqs">pacer.uscourts.gov — FAQ</a></td>
+          <td><span class="pill verified">Primary · vendor-published</span></td>
+          <td class="used">The $0.10/page, $3.00-per-document-cap fee structure and the quarterly waiver; that docket reports, the creditor matrix, and the claims register are separate case-specific reports alongside filed PDFs.</td>
+        </tr>
+      </tbody>
+    </table></div></div>
+  </section>
+
+  <p class="footer">
+    <b>Not an engineering spec.</b> This is a research finding and a sequencing recommendation; the tool surface, schemas and store already exist for all three paths and need no change to start any of them. <b>Not legal or vendor-authoritative.</b> Vendor capabilities were read from public pages on 2026-09-23 and may change; confirm against the live page before committing engineering time. See also <a href="../reference/case-data-model.md">case-data-model.md</a> (the entities and the confirm-before-entry invariant), <a href="../reference/mcp-surface.md">mcp-surface.md</a> (the tool surface path 3 uses as-is), and <a href="../adr/0013-mcp-server-replaces-direct-pms-integration.md">ADR 0013</a> (why there is no direct practice-management integration).
+  </p>
+
+</div>
+</div>
+
+</body>
+</html>
