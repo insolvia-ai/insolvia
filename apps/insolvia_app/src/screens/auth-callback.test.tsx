@@ -27,7 +27,7 @@ describe('the /auth/callback route', () => {
   it('is declared at exactly the path infra registers', () => {
     // A drift guard, and the one assertion in this file that is about the
     // filesystem rather than behaviour. `web_callback_urls` in
-    // infra/modules/auth/main.tf is `"${o}/auth/callback"`, and under
+    // insolvia-services' infra/modules/auth/main.tf (ADR 0026) is `"${o}/auth/callback"`, and under
     // file-based routing the path IS the file's location — so the assertion has
     // to be about the file. Changing one side without the other silently breaks
     // the return leg of sign-in.
