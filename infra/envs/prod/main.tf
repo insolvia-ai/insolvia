@@ -5,6 +5,8 @@
 # References the shared zone + wildcard cert by name (not by remote state);
 # both are infra/envs/shared in the insolvia-services repo, as is the mailer
 # (staging-mailer-api / mailer-api.insolvia.ai), which this root's API calls.
+# Auth (the Cognito pool, its domains and app clients) is that repo's too, and
+# found by name the same way — module.auth below is the consumer half (ADR 0026).
 
 locals {
   environment = "prod"
@@ -13,13 +15,7 @@ locals {
     Environment = local.environment
     ManagedBy   = "terraform"
   }
-
-  # The account's SES domain identity, constructed the way modules/mailer
-  # constructs the same ARN — never remote state.
-  ses_identity_arn = "arn:aws:ses:us-east-1:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}"
 }
-
-data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "main" {
   name = var.domain_name
@@ -197,40 +193,18 @@ resource "aws_ssm_parameter" "mailer_api_url" {
   tags  = local.common_tags
 }
 
-# Auth (#65): production Cognito user pool + the web SPA app client.
-# Production registers ONLY the real app origin — no localhost dev callbacks
-# (those live on staging), so nothing running on a laptop can complete a prod
-# sign-in. deletion_protection is the point of the variable: this pool holds
-# the real attorney accounts.
+# Auth (#65): the CONSUMER half of the production pool. The pool (with its
+# deletion protection — it holds the real attorney accounts), its domain and
+# its app clients are insolvia-services' (infra/envs/prod, module.auth) since
+# ADR 0026. This finds them by name, renders this app's managed-login branding
+# onto its two clients, and grants this repo's two Lambda roles their one
+# action on the pool. Prod's custom auth domain, when it comes, is a change
+# there; the auth_domain output here picks it up by itself.
 module "auth" {
   source = "../../modules/auth"
 
   project     = "insolvia"
   environment = local.environment
-
-  web_origins = ["https://${var.subdomain}"]
-
-  # No custom auth domain YET, and no longer because it cannot work: the apex
-  # now resolves (marketing is enabled below), so the prerequisite is met.
-  # It is staged behind staging on purpose — staging-auth.insolvia.ai proves the
-  # module against a real pool first, and the prod apply is 15-20 minutes of
-  # Cognito provisioning its own CloudFront distribution.
-  #
-  # Enable by uncommenting, once staging's has been seen working:
-  #
-  #   custom_domain   = "auth.${var.domain_name}"
-  #   certificate_arn = data.aws_acm_certificate.wildcard.arn
-  #   hosted_zone_id  = data.aws_route53_zone.main.zone_id
-
-  # RESTORED, in the same apply that replaces the pool. The PR below this one
-  # set it to `false` so the OLD pool could be destroyed; this value lands on
-  # the NEW one, which is a separate resource and so takes it at creation
-  # rather than needing a third apply.
-  #
-  # If you are reading this while prod is mid-sequence and the pool is
-  # unprotected, that PR applied and this one has not. Applying this one is the
-  # fix.
-  deletion_protection = true
 
   # Lets POST /v1/firm/users mint a colleague's Cognito account. ONE action on
   # ONE pool — the module's own comment has the argument for why that is the
@@ -240,20 +214,74 @@ module "auth" {
   # Provisioning a firm's first administrator (#213) — same one-action grant
   # on the admin service's own role.
   admin_invite_role_name = module.admin_service.lambda_role_name
+}
 
-  # Branded sender ON, ahead of SES production access (#211) — a deliberate
-  # decision, because "sandbox" is subtler than "cannot send": recipients on
-  # the VERIFIED DOMAIN (@insolvia.ai — every internal test account) deliver
-  # fine even here, and only external recipients fail until #211. Nothing in
-  # prod can attempt a send yet anyway — the pool has no users and no
-  # provisioning path exists (#212 is the first). What this deliberately
-  # accepts, written down so it is chosen rather than discovered: onboarding a
-  # REAL firm before #211 lands would mean their invite silently never
-  # arrives. #211 is a hard prerequisite on the provisioning checklist for
-  # exactly that reason; the mitigation is sequencing, not this file.
-  ses_source_arn = local.ses_identity_arn
+# Auth moved to the insolvia-services repo on 2026-10-11 (ADR 0026): the pool,
+# its domains and its app clients live on in that repo's infra/envs/prod root, under
+# the SAME addresses (module.auth.*), and their state was moved there by its
+# docs/runbooks/auth-state-migration.md — nothing destroyed or recreated.
+#
+# THESE BLOCKS ARE THE SAFETY NET for that move. module.auth is still declared
+# here (it is the consumer half now), but these seven resources are not. Without
+# the blocks, a plan of this root against a state that still held them would
+# DESTROY them — and the pool's users with them. With them, Terraform forgets
+# the objects instead. After the migration the state holds nothing at these
+# addresses and every block is a no-op. Delete them once both staging and prod have
+# applied after the migration; they guard the window, and only the window.
+removed {
+  from = module.auth.aws_cognito_user_pool.main
 
-  tags = local.common_tags
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.main
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.custom
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_route53_record.auth
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.web
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.portal
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.mcp
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Publish the pool's issuer and web app client id into the API's own SSM

@@ -300,8 +300,10 @@ below the `<title>` and why this paragraph is here rather than in the file.
 - **`src/app/+not-found.tsx` is not optional.** CloudFront rewrites 403/404 to
   `/index.html` with HTTP **200**, so nothing at the edge ever 404s and this route
   is the only thing that can tell a user the page does not exist.
-- **`/auth/callback` must stay in step with `infra/modules/auth/main.tf`**, whose
-  web client registers `<origin>/auth/callback` as its only OAuth callback URL.
+- **`/auth/callback` (and `/portal/auth/callback`) must stay in step with
+  insolvia-services' [`infra/modules/auth/main.tf`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/modules/auth/main.tf)**
+  (the pool moved there, ADR 0026), whose web client registers
+  `<origin>/auth/callback` as its only OAuth callback URL — a two-repo change.
   Under file-based routing that path _is_ the file's location, so moving the file
   breaks sign-in's return leg. `auth-callback.test.tsx` guards it.
 - **`src/session/` owns sign-in, and

@@ -44,6 +44,10 @@ destroy_args=(destroy -input=false "${TF_VARS[@]}")
 [[ "$AUTO_APPROVE" -eq 1 ]] && destroy_args+=(-auto-approve)
 terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 
+# Then the pool, which is insolvia-services' (ADR 0026) — after this root,
+# because this root's branding hangs off the pool's clients.
+services_auth destroy
+
 # Unwind the setup script's wiring — a services/api/.env still naming the
 # destroyed table would send dev-up.sh at a table that no longer exists.
 # Removing WAITLIST_TABLE_NAME makes dev-up.sh fail fast with "run

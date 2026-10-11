@@ -16,10 +16,12 @@ before proposing NativeWind, Tailwind-in-the-app, or a UI library.
 and the app's own backend (`api`, `admin`, `mcp`, `filing`, `insolvia_core`)
 with its staging/prod/dev Terraform. The account-wide AWS layer — Route53 zone,
 wildcard cert, SES identity, every service's ECR repository, the CI deploy
-role, the human IAM users — and the **mailer** service live in
+role, the human IAM users — the **mailer** service and **auth** (the Cognito
+user pools and their app clients, dev pools included) live in
 [`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
 (a sibling checkout, `../insolvia-services`), which has its own `CLAUDE.md` ·
-[ADR 0025](docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
+[ADR 0025](docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md) ·
+[ADR 0026](docs/adr/0026-auth-is-a-shared-service.md).
 
 **This file is a catalog.** It says where things live and what to open before
 touching them — read the linked file when your task needs it. Detail lives there,
@@ -117,6 +119,7 @@ before you touch anything:
 | **changing a brand typeface**, or adding a weight | [`brand/fonts.json`](brand/fonts.json) — the companion to `colors.json`, for the same reason: the design system's base theme states no display face on purpose. Naming a family does not load it — the app self-hosts the faces in `apps/insolvia_app/public/fonts` via [`scripts/fetch-brand-fonts.sh`](scripts/fetch-brand-fonts.sh), and marketing/admin receive the names but not yet the faces |
 | **changing the logo or the favicon** | [`brand/wordmark.svg`](brand/wordmark.svg) and [`brand/icon.svg`](brand/icon.svg) — outlines cut from the display face, carrying no colour. `scripts/render-brand-marks.sh` re-cuts them (and the committed `.ico`/PWA rasters); `npm run tokens` writes the coloured copy each consumer needs. **Never hand-edit a mark** — both ends are generated |
 | **changing a brand colour**, or wondering why a surface renders monochrome | [`brand/colors.json`](brand/colors.json) — the design system's base theme is deliberately *unbranded* (tokens 0.5.0+), so Insolvia's navy and brass are overrides layered on top. Four surfaces are generated from this one file; `npm run tokens` regenerates, `npm run tokens:check` gates it. **Never hand-edit a generated output** · [ADR 0020](docs/adr/0020-the-brand-is-a-consumer-owned-override.md) |
+| **the Cognito pool itself** — a callback URL, a new app client or MCP harness, the custom auth domain, password/MFA policy, the invite email | **Not in this repo** — insolvia-services' [`infra/modules/auth`](https://github.com/insolvia-ai/insolvia-services/blob/main/infra/modules/auth/main.tf), released there first; this repo finds the pool and clients by name (`infra/modules/auth` here is the consumer half: lookups, branding, invite grants) · [ADR 0026](docs/adr/0026-auth-is-a-shared-service.md) |
 | **the sign-in page's colours** (`infra/modules/auth/managed-login-settings.json`) | [`tool/reconcile-cognito-branding.ts`](tool/reconcile-cognito-branding.ts) — one of the four outputs above, so it is the row above you want; this is the mapping onto AWS's document |
 | changing branch protection / required PR checks on `main` | `insolvia-branch-protection` skill — run `scripts/update-ruleset.sh`, don't click through settings and **never hard-code a ruleset id** |
 | publishing a package / bumping versions | [`docs/reference/package-publishing.md`](docs/reference/package-publishing.md) |

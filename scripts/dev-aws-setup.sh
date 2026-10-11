@@ -3,9 +3,11 @@
 # Provision this machine's isolated Insolvia development resources in AWS and
 # wire services/api at them. This IS local development's database (no local
 # emulator): the compose stack's API talks to the real
-# per-machine waitlist table this script creates (plus a Cognito pool for
-# upcoming auth work). services/api/scripts/dev-setup.sh chains into this
-# script unconditionally.
+# per-machine waitlist table this script creates. This machine's Cognito
+# pool is insolvia-services' (ADR 0026): this script applies it FIRST, from the
+# sibling checkout, because this repo's dev root finds it by name and cannot
+# plan without it. services/api/scripts/dev-setup.sh chains into this script
+# unconditionally.
 #
 #   ./scripts/dev-aws-setup.sh               # uses the default AWS profile
 #   ./scripts/dev-aws-setup.sh --check       # verify, change nothing
@@ -48,6 +50,7 @@ log "Resource prefix: $RESOURCE_PREFIX"
 log "Terraform state: s3://$STATE_BUCKET/$STATE_KEY"
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
+  services_auth check
   state_json="$(aws_dev s3 cp "s3://$STATE_BUCKET/$STATE_KEY" -)" ||
     die "Terraform state is missing. Run ./scripts/dev-aws-setup.sh --profile $AWS_PROFILE_VALUE."
   [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
@@ -102,6 +105,11 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   ok "Per-machine AWS resources and services/api/.env are ready."
   exit 0
 fi
+
+# The pool first: this root's module.auth looks it up by name at plan time.
+# (On a machine set up before the move, dev-aws-auth.sh stops here and says
+# how to move the existing pool instead of creating a second one.)
+services_auth apply
 
 terraform_init
 apply_args=(apply -input=false "${TF_VARS[@]}")

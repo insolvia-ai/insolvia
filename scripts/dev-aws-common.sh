@@ -142,6 +142,30 @@ terraform_output_json() {
   terraform -chdir="$TF_DIR" output -json
 }
 
+# ── This machine's Cognito pool (insolvia-services) ─────────────
+# Auth is a shared service since ADR 0026: this machine's pool is
+# insolvia-services' per-machine infra/envs/dev root, not this repo's. Its
+# scripts/dev-aws-auth.sh is run from the sibling checkout that
+# scripts/services-checkout.sh finds (the same one dev-up.sh uses for the
+# mailer), with the same machine id and profile.
+#
+# Unlike the mailer, there is no fallback without that checkout: local sign-in
+# needs a real pool, and this repo's dev root looks the pool up by name, so it
+# cannot even plan until the pool exists. Hence `die`, with the fix.
+services_auth() {
+  local action="$1" dir
+  # shellcheck source=services-checkout.sh
+  . "$REPO_ROOT/scripts/services-checkout.sh"
+  dir="$(services_checkout "$REPO_ROOT")"
+  if [[ -z "$dir" || ! -x "$dir/scripts/dev-aws-auth.sh" ]]; then
+    die "This machine's Cognito pool lives in insolvia-ai/insolvia-services, and no checkout of it with scripts/dev-aws-auth.sh was found. Clone it next to this repo (git clone https://github.com/insolvia-ai/insolvia-services.git \"$(dirname "$(dirname "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)")")/insolvia-services\") or set INSOLVIA_SERVICES_DIR, then re-run."
+  fi
+  local args=("$action" --profile "$AWS_PROFILE_VALUE")
+  [[ "$action" != check && "${AUTO_APPROVE:-0}" -eq 1 ]] && args+=(--yes)
+  log "Cognito pool: $dir/scripts/dev-aws-auth.sh ${args[*]}"
+  AWS_REGION="$AWS_REGION_VALUE" "$dir/scripts/dev-aws-auth.sh" "${args[@]}"
+}
+
 # ── Local env-file editing ──────────────────────────────────────
 # upsert/remove helpers hoisted here because dev-aws-destroy.sh also uses
 # remove_env to unwind the wiring.

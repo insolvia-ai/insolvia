@@ -1,6 +1,9 @@
 # ADR 0025 — Shared infrastructure and the mailer move to their own repository, `insolvia-services`
 
-- **Status:** Accepted (2026-10-11, at the maintainer's request)
+- **Status:** Accepted (2026-10-11, at the maintainer's request) — amended by
+  [ADR 0026](0026-auth-is-a-shared-service.md): auth (the Cognito pools and
+  their app clients) moves to insolvia-services too, and rule 1 gains a
+  fourth name lookup.
 - **Date:** 2026-10-11
 - **Relates to:** [ADR 0010](0010-design-system-moves-to-its-own-repository.md)
   (the last time something left this repo, and the reasoning about

@@ -9,11 +9,14 @@ working.
 **The account-wide layer is not here.** `shared` (zone, wildcard cert, SES
 identity, every service's container repository, the fixture bucket),
 `ci-trust` (the OIDC provider and the deploy role), `account-access` (the human
-IAM users) and the mailer's modules live in
+IAM users), the mailer's modules and **auth** (the Cognito pools, domains and
+app clients — per-machine dev pools included) live in
 [`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services),
-with the same state keys they had here; one-time bootstrap is its
+the account-wide roots with the same state keys they had here; one-time
+bootstrap is its
 [`docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) ·
-[ADR 0025](../docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
+[ADR 0025](../docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md) ·
+[ADR 0026](../docs/adr/0026-auth-is-a-shared-service.md).
 
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no
   DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
@@ -119,6 +122,19 @@ with the same state keys they had here; one-time bootstrap is its
   insolvia-services'
   [`docs/runbooks/state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/state-migration.md)
   before deleting it.
+- **`modules/auth` is the consumer half of auth, and its names are a
+  contract.** It finds `insolvia-<env>-users` and its `-app`, `-portal` and
+  `-mcp-*` clients by name (insolvia-services owns and applies them, before
+  this repo's roots), renders this app's managed-login branding onto its two
+  clients, and grants this repo's API/admin roles `AdminCreateUser`. Pool
+  configuration — callback origins, the custom domain, deletion protection,
+  a new client — is a PR there, released first. The seven
+  `removed { from = module.auth.… destroy = false }` blocks in each env root
+  are the cutover's safety net (insolvia-services'
+  [`docs/runbooks/auth-state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/auth-state-migration.md));
+  delete them only as it says. Keep `module "auth"` at that name — the
+  branding and grants never moved in state because their addresses did not
+  change.
 - **A deploy job must declare `environment:`** matching the Terraform env
   (`insolvia-staging|production` here; `insolvia-shared` is insolvia-services')
   — env-scoped secrets are invisible otherwise and resolve to empty strings

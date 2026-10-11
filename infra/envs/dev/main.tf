@@ -26,8 +26,9 @@
 #     an attorney's approval puts a filing job on, so the dev proof
 #     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
 #     per-machine queue;
-#   • a Cognito pool via modules/auth, prepping local auth work (outputs
-#     only — nothing consumes it yet);
+#   • the consumer half of this machine's Cognito pool via modules/auth —
+#     the pool itself is insolvia-services' per-machine dev root (ADR 0026),
+#     applied first by scripts/dev-aws-setup.sh, and found here by name;
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
 #     off by default because a per-developer trail is cost with no evidentiary
 #     value — but standable-up, so modules/audit_trail can be exercised on a
@@ -214,9 +215,9 @@ module "case_documents" {
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = null
 
-  # The origin module.auth below already registers for this machine, and the
-  # one the app is served from locally (`npx expo start --web --port 3000` —
-  # the port is pinned, see that module's note). Without it a local browser
+  # The origin this machine's pool already registers (insolvia-services' dev
+  # root), and the one the app is served from locally (`npx expo start --web
+  # --port 3000` — the port is pinned to match Cognito's exact-match callback). Without it a local browser
   # upload fails its preflight and the whole feature is untestable on a
   # developer's machine, which is the failure mode this repo refuses to defer
   # to staging.
@@ -293,24 +294,92 @@ resource "aws_dynamodb_table" "admin_audit" {
 # ever redirects here. Outputs only for now: this preps local auth work, the
 # app does not consume it yet.
 
+# ── Auth ────────────────────────────────────────────────────────
+# The CONSUMER half of this machine's pool, the same module staging and prod
+# call. The pool itself — insolvia-dev-<machine_short_id>-users, its prefix
+# domain and its clients — is insolvia-services' per-machine dev root since
+# ADR 0026, applied by scripts/dev-aws-setup.sh BEFORE this root (it finds the
+# sibling checkout through scripts/services-checkout.sh), because the lookups
+# here need the pool to exist to plan. That ordering is the point: this
+# machine reaches its pool by name exactly as staging and prod reach theirs,
+# so the cross-repo contract is exercised locally rather than first met on
+# staging.
+#
+# No role grants: dev has no Lambda (the local API runs under the developer's
+# own IAM user). The branding is real, so local sign-in renders the brand.
 module "auth" {
   source = "../../modules/auth"
 
   project     = "insolvia"
   environment = local.environment
+}
 
-  web_origins = ["http://localhost:3000"]
+# Auth moved to the insolvia-services repo on 2026-10-11 (ADR 0026): the pool,
+# its domains and its app clients live on in that repo's infra/envs/dev (per machine) root, under
+# the SAME addresses (module.auth.*), and their state was moved there by its
+# docs/runbooks/auth-state-migration.md — nothing destroyed or recreated.
+#
+# THESE BLOCKS ARE THE SAFETY NET for that move. module.auth is still declared
+# here (it is the consumer half now), but these seven resources are not. Without
+# the blocks, a plan of this root against a state that still held them would
+# DESTROY them — and the pool's users with them. With them, Terraform forgets
+# the objects instead. After the migration the state holds nothing at these
+# addresses and every block is a no-op. Delete them once this machine's dev root has
+# applied after the migration; they guard the window, and only the window.
+removed {
+  from = module.auth.aws_cognito_user_pool.main
 
-  # The MCP inspector's loopback-callback client (#261): connecting
-  # `npx @modelcontextprotocol/inspector` to the locally running
-  # services/mcp server against THIS machine's pool is the local check the
-  # MCP milestone's issues require.
-  mcp_inspector_client = true
+  lifecycle {
+    destroy = false
+  }
+}
 
-  # Throwaway test accounts on a throwaway pool.
-  deletion_protection = false
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.main
 
-  tags = local.common_tags
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.custom
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_route53_record.auth
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.web
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.portal
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.mcp
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # ── API auth configuration ──────────────────────────────────────
