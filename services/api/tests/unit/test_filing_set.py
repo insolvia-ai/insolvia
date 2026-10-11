@@ -398,12 +398,60 @@ def test_a_case_with_no_court_falls_back_to_the_common_defaults():
     assert b121.handling == "restricted"
 
 
-def test_a_filed_case_still_gets_its_checklist(packet):
-    data = in_court(reference_case_data(), "gamb")
-    filed = replace(data, case=replace(data.case, status="filed"))
-    by_id = items(build(filed, (packet,)))
-    assert by_id["filed"].status == "ready"
-    assert "filing_method" in by_id
+def _filed(data, **post_filing):
+    return replace(data, case=replace(data.case, status="filed", **post_filing))
+
+
+def test_a_filed_case_is_one_state_with_its_case_number_and_date(packet):
+    data = _filed(
+        in_court(reference_case_data(), "gamb"),
+        case_number="26-10001",
+        filed_at="2026-10-01",
+    )
+    filing_set = build(data, (packet,))
+    (item,) = filing_set.checklist
+    assert item.id == "filed"
+    assert item.status == "ready"
+    assert item.title == "This case is filed"
+    assert "Case number 26-10001." in item.detail
+    assert "Filed 2026-10-01." in item.detail
+    assert "No further filing is possible" in item.detail
+    assert item.link is None
+    # The documents stay: they are the record of what was prepared.
+    assert [d.key for d in filing_set.documents] == [
+        d.key
+        for d in build(in_court(reference_case_data(), "gamb"), (packet,)).documents
+    ]
+
+
+def test_a_filed_case_has_no_case_data_item(packet):
+    # `completeness_problems` refuses a filed case (its packet is pinned) —
+    # that is not a data gap, and the checklist must not report it as one.
+    data = _filed(in_court(reference_case_data(), "gamb"))
+    by_id = items(build(data, (packet,)))
+    assert not [key for key in by_id if key.startswith("case_data")]
+    assert "filing_method" not in by_id
+    assert "fee" not in by_id
+
+
+def test_a_filed_case_without_its_docket_facts_says_so(packet):
+    (item,) = build(
+        _filed(in_court(reference_case_data(), "gamb")), (packet,)
+    ).checklist
+    assert "No case number is recorded yet." in item.detail
+    assert "No filing date is recorded yet." in item.detail
+
+
+def test_a_filed_case_with_no_court_or_packet_is_still_just_filed():
+    (item,) = build(_filed(reference_case_data())).checklist
+    assert item.id == "filed"
+
+
+def test_the_filed_wire_shape_carries_the_one_item(packet):
+    data = _filed(in_court(reference_case_data(), "gamb"), case_number="26-10001")
+    body = filing_set_json(build(data, (packet,)))
+    assert [i["id"] for i in body["checklist"]] == ["filed"]
+    assert "link" not in body["checklist"][0]
 
 
 # ── A court that records its own order and names ─────────────────────────────

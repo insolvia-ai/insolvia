@@ -397,6 +397,27 @@ def test_a_case_without_a_packet_is_not_ready():
     assert "packet" in basis.blockers
 
 
+def test_a_filed_case_has_one_blocker_and_it_is_filed(world):
+    # No spurious `case_data:case` from the completeness check's filed-case
+    # refusal, and nothing else either — `filed` is what refuses approval.
+    world.deps.case_store.cases[CASE_ID] = replace(
+        world.case(), status="filed", case_number="26-10001", filed_at="2026-10-01"
+    )
+    basis = world.basis()
+    assert basis.blockers == ("filed",)
+    assert [item.id for item in basis.filing_set.checklist] == ["filed"]
+
+
+def test_a_filed_case_without_a_packet_is_still_only_filed():
+    deps = build_deps(in_court(reference_case_data(), "flmb"))
+    case = replace(deps.case_store.cases[CASE_ID], status="filed")
+    data = read_case_data(
+        case, debtor_store=deps.debtor_store, entity_store=deps.entity_store
+    )
+    basis = approval_basis(data, packets=(), release=RELEASE, as_of=AS_OF)
+    assert basis.blockers == ("filed",)
+
+
 # ── 2. Approve, then single use ─────────────────────────────────
 
 

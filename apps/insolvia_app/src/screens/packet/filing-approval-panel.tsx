@@ -197,14 +197,40 @@ function ApprovalBody({
     authenticatedAt !== null &&
     Date.now() / 1000 - authenticatedAt < basis.signInMaxAgeSeconds - FRESH_MARGIN_SECONDS;
   const pending = approval?.status === 'pending';
+  // A filed case has one blocker, `filed`, and nothing to approve: say that
+  // plainly, with the case number and date the filed item carries, and keep
+  // only the filing record (filing_approval._blockers; core/filing_set.py).
+  if (basis.blockers.includes('filed')) {
+    const filedItem = basis.checklist.find((item) => item.id === 'filed');
+    return (
+      <View style={styles.section}>
+        <Heading level={2}>Approve this filing</Heading>
+        {/* No badge of its own: the filing record below, when there is one,
+            carries the "Filed" badge, and the checklist above carries it too. */}
+        <Text style={[styles.body, ink]}>This case is filed. There is nothing to approve.</Text>
+        <Text style={[styles.body, muted]}>
+          {filedItem?.detail ?? 'No further filing is possible from this filing set.'}
+        </Text>
+        {filing !== undefined ? (
+          <FilingRecordPanel
+            caseId={caseId}
+            filing={filing}
+            canResolve={canApprove && user?.subject === filing.attorneyId}
+            onResolved={(view) => {
+              setState({ kind: 'ready', view });
+            }}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
   const blockerTitles = basis.blockers.map(
     (id) =>
       basis.checklist.find((item) => item.id === id)?.title ??
-      (id === 'filed'
-        ? 'The case is already filed'
-        : id === 'file_digests'
-          ? 'The packet was assembled before files were fingerprinted — assemble it again'
-          : id),
+      (id === 'file_digests'
+        ? 'The packet was assembled before files were fingerprinted — assemble it again'
+        : id),
   );
 
   const approve = async () => {
