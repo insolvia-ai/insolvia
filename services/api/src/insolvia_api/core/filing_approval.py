@@ -382,12 +382,15 @@ def basis_document(
 def _blockers(data: CaseData, filing_set: FilingSet) -> tuple[str, ...]:
     """Every checklist item still `missing` — no court, a case-data gap, no
     filing-set packet, a file failing or not yet measured — plus two checks
-    only an approval makes: the case is not already filed, and every packet
-    file carries the digest the approval binds to (a packet assembled before
-    PR 6 did not record one)."""
-    blockers = [item.id for item in filing_set.checklist if item.status == "missing"]
+    only an approval makes: the case is not already filed (then the ONLY
+    blocker), and every packet file carries the digest the approval binds to
+    (a packet assembled before PR 6 did not record one)."""
     if is_filed(data.case.status):
-        blockers.insert(0, "filed")
+        # The one reason, alone: a filed case's checklist is the filed state
+        # and nothing else (`filing_set._filed_item`), and no other gap could
+        # make it approvable again.
+        return ("filed",)
+    blockers = [item.id for item in filing_set.checklist if item.status == "missing"]
     if filing_set.packet is not None and any(
         document.source == "packet"
         and (document.part is None or document.part.sha256 is None)
