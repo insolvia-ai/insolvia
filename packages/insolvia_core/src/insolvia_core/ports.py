@@ -454,6 +454,13 @@ class CaseStore(Protocol):
         `debtors` is empty only for callers with no clients to copy (the seed
         loader, until its fixtures name clients); `POST /v1/cases` always
         passes one or two.
+
+        Each debtor's client is a CONDITION of the same transaction, as
+        `DebtorStore.link`'s is: its row in `case.firm_id` must still be
+        linkable when the write lands. MUST raise
+        `insolvia_core.errors.ClientUnavailableError`, naming the client,
+        when one is not — nothing written. (A composition with no firm
+        store, the seed loader's, states no such condition.)
         """
         ...
 
@@ -786,18 +793,23 @@ class DebtorStore(Protocol):
         """Replace the record for `debtor`'s role outright."""
         ...
 
-    def link(self, debtor: Debtor, *, create: bool) -> LinkOutcome:
+    def link(self, debtor: Debtor, *, create: bool, firm_id: str) -> LinkOutcome:
         """Write `debtor` — which names a `client_id` — ONLY IF no other
         role of its case names the same client (ADR 0022: one client, one
-        role per case), and, with `create`, only if its own role is still
-        empty (`create`'s rule).
+        role per case), with `create` only if its own role is still empty
+        (`create`'s rule), and ONLY IF the client's own row in `firm_id`
+        is still linkable: active, never merged, not being merged away
+        (`FirmClient.refusal_for_new_case`, as a condition).
 
         One CONDITIONAL write, not a read and then a write: two links of
         one client to two roles of one matter, racing, must not both land,
-        or the `by-client` index lists the case twice. Answers `"written"`,
-        `"role_taken"` (the create lost its race — nothing written), or
-        `"client_taken"` (another role holds this client — nothing
-        written)."""
+        or the `by-client` index lists the case twice; and a link racing a
+        merge's claim on its client must not land after the merge's last
+        pass over that index, or the case names a merged client forever
+        (`insolvia_core.client_merge`). Answers `"written"`, `"role_taken"`
+        (the create lost its race), `"client_taken"` (another role holds
+        this client), or `"client_unavailable"` (the client row refused) —
+        nothing written for any but the first."""
         ...
 
     def roles_for_client(self, client_id: str) -> tuple[tuple[str, str], ...]:
