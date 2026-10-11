@@ -145,26 +145,10 @@ module "mcp_service" {
   tags                = local.common_tags
 }
 
-# The mailer moved to the insolvia-services repo on 2026-10-11, together with
-# infra/envs/shared, ci-trust and account-access. Its resources live on, in
-# that repo's infra/envs/prod root under the same address (module.mailer), and
-# its state was moved there by insolvia-services'
-# docs/runbooks/state-migration.md — nothing was destroyed or recreated.
-#
-# THIS BLOCK IS THE SAFETY NET for that move, not for this root's future.
-# Without it, a plan of this root against a state that still held
-# module.mailer would DESTROY the live mailer (the code no longer declares it).
-# With it, Terraform forgets the resources instead. After the migration the
-# state holds nothing at that address and the block is a no-op. Delete it once
-# both staging and prod have applied a release after the migration — it guards
-# the window, and only the window.
-removed {
-  from = module.mailer
-
-  lifecycle {
-    destroy = false
-  }
-}
+# The mailer moved to the insolvia-services repo on 2026-10-11 (ADR 0025): its
+# staging/prod resources are that repo's infra/envs/<env>, under the same
+# module.mailer address, moved there by a state migration. Nothing here
+# declares or references it; MAILER_API_URL below is built from the hostname.
 
 # Publish the mailer's URL into the API's own SSM config namespace (issue
 # 6.4) so the API Lambda can read it as MAILER_API_URL.

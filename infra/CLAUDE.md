@@ -117,11 +117,9 @@ bootstrap is its
 - **The mailer is not in these roots any more.** Its staging/prod resources are
   owned by insolvia-services' `infra/envs/{staging,prod}`; this repo still
   writes the API's `MAILER_API_URL` SSM parameter, built from
-  `var.mailer_subdomain`. The `removed { from = module.mailer … destroy = false }`
-  block in `envs/{staging,prod}/main.tf` is a cutover safety net — see
-  insolvia-services'
-  [`docs/runbooks/state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/state-migration.md)
-  before deleting it.
+  `var.mailer_subdomain` — the hostname is the contract between the repos.
+  Never re-add `module "mailer"` here: the resources exist, owned by the other
+  repo's state, and a second declaration would try to create them again.
 - **`modules/auth` is the consumer half of auth, and its names are a
   contract.** It finds `insolvia-<env>-users` and its `-app`, `-portal` and
   `-mcp-*` clients by name (insolvia-services owns and applies them, before
