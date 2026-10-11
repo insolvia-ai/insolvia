@@ -222,7 +222,12 @@ class FirmClient:
         debtor) right now, or None when it can. An archived client — which
         includes every merged one — must be restored first; a client being
         merged away must not gain a case the merge's listing already missed,
-        or that case would be left naming a merged client."""
+        or that case would be left naming a merged client.
+
+        A READ, for the message. The writes that link a client carry the
+        same rule as a condition on this row
+        (`adapters.aws.firm_store.client_linkable_check`), which is what
+        actually decides when a merge races the link."""
         if self.merged_into is not None:
             return "That client was merged into another client — use that one."
         if self.merging_into is not None:
@@ -230,6 +235,23 @@ class FirmClient:
         if self.archived:
             return "That client is archived — restore them first."
         return None
+
+
+def refusal_for_refused_link(client: FirmClient | None) -> str:
+    """What to tell the caller when a write that links `client` (re-read
+    after the refusal) was refused by its condition on the client row —
+    the same words the read check gives, so a merge that raced the link
+    reads exactly like one that landed first. The last line covers a row
+    that changed and changed back (a merge refused and released) between
+    the write and this read."""
+    if client is None:
+        return "No such client."
+    return client.refusal_for_new_case() or LINK_RACED
+
+
+LINK_RACED: Final = (
+    "That client changed while this was being saved — reload and try again."
+)
 
 
 @dataclass(frozen=True)

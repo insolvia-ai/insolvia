@@ -32,3 +32,26 @@ def with_client(
 ) -> dict[str, Any]:
     """`opening` (a `POST /v1/cases` body) for a freshly added client."""
     return {**opening, "client_ids": [add_client(client, headers)]}
+
+
+def claim_merge_after_read(
+    monkeypatch: Any, firms: Any, *, firm_id: str, merged_id: str, survivor_id: str
+) -> None:
+    """The merge race, made deterministic: the FIRST read of `merged_id`
+    answers the client as it stood — active — and then a merge of it into
+    `survivor_id` claims both rows, before the route's write runs. What the
+    route read is now stale, and only the write's own condition on the
+    client row can refuse it (`insolvia_core.client_merge`)."""
+    read = firms.get_client
+    claimed: list[bool] = []
+
+    def get_client(firm: str, client_id: str) -> Any:
+        found = read(firm, client_id)
+        if client_id == merged_id and not claimed:
+            claimed.append(True)
+            assert firms.claim_client_merge(
+                firm_id, merged_id=merged_id, survivor_id=survivor_id
+            )
+        return found
+
+    monkeypatch.setattr(firms, "get_client", get_client)
