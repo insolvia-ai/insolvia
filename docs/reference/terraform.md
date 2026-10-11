@@ -689,11 +689,10 @@ change; the `insolvia-deploy-role-permissions` skill owns the procedure.
 insolvia-services' own `infra/envs/{staging,prod}`
 (`insolvia-services/<env>/terraform.tfstate`), moved by a human-run
 `scripts/migrate-mailer-state.sh` per its
-[`docs/runbooks/state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/state-migration.md). Until
-both environments here have applied after that migration, their `main.tf`
-carry `removed { from = module.mailer; lifecycle { destroy = false } }` — a
-safety net that forgets the resources rather than destroying them if an apply
-here ever runs against state that still holds them. This repo still writes the
+[`docs/runbooks/state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/state-migration.md),
+executed 2026-10-11. During that window both `main.tf` here carried a
+`removed { from = module.mailer; lifecycle { destroy = false } }` safety net;
+it was deleted once both states were confirmed to hold no `module.mailer`. This repo still writes the
 API's `MAILER_API_URL` SSM parameter, as `https://${var.mailer_subdomain}`.
 
 ## Destruction safety
