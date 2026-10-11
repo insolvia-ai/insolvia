@@ -18,9 +18,10 @@ description: >-
 #
 # A SECOND, NARROWER ROLE than the deploy one. The deploy role is deliberately
 # control-plane only — "manages tables, never their contents" — and a firm-user
-# row IS an access grant. The seed role (infra/envs/ci-trust) can write staging's
-# firm and case tables, copy fixture objects into staging's document bucket,
-# and create the pool's test accounts, and nothing else. Its trust policy only
+# row IS an access grant. The seed role (insolvia-services'
+# infra/envs/ci-trust; it trusts this repo only) can write staging's firm and
+# case tables, copy fixture objects into staging's document bucket, and create
+# the pool's test accounts, and nothing else. Its trust policy only
 # accepts tokens minted for the `insolvia-staging` environment, so THE CALLING
 # JOB MUST DECLARE `environment: insolvia-staging` — that is also what makes the
 # environment-scoped secrets below visible at all. A missing `environment:` key
@@ -31,11 +32,12 @@ description: >-
 # inputs.
 #
 # The fixture's CASES carry sample documents. Those are copied server-side out
-# of the shared fixture bucket (infra/modules/dev_fixtures) into staging's own
-# case-documents bucket; the bytes never touch the runner. If that copy is
-# refused, either ci-trust has not been re-applied with the seed role's case
-# grants (a human apply — the insolvia-deploy-role-permissions skill) or the
-# fixture version has not been published (scripts/dev-fixture.sh publish).
+# of the shared fixture bucket (insolvia-services' infra/envs/shared) into
+# staging's own case-documents bucket; the bytes never touch the runner. If
+# that copy is refused, either ci-trust has not been re-applied with the seed
+# role's case grants (a human apply in insolvia-services — the
+# insolvia-deploy-role-permissions skill) or the fixture version has not been
+# published (scripts/dev-fixture.sh publish).
 
 inputs:
   seed-role-arn:

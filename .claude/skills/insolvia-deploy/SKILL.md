@@ -38,9 +38,9 @@ commit, and an unapproved run ending `cancelled` is normal, not a failure.
 
 | Target | Trigger |
 |---|---|
-| **staging** (infra + mailer, api, admin, mcp, marketing, app) | automatic on merge to `main` — the staging stage of `release.yml` |
+| **staging** (infra + api, admin, mcp, filing, marketing, app) | automatic on merge to `main` — the staging stage of `release.yml` |
 | **prod** (infra + all services) | approving the `promote` gate of a green `release.yml` run |
-| **shared infra** | automatic on merge to `main` — the first leg of `release.yml`'s staging stage (path-filtered on `infra/envs/shared/**` + `infra/modules/**`), ahead of the gate because both envs consume it; `shared-infra-deploy.yml` stays dispatchable out of band |
+| **shared infra + the mailer** | **not from this repo** — they release from [insolvia-services](https://github.com/insolvia-ai/insolvia-services)' own `release.yml`. A new service's ECR repository is added and released there *before* the PR here that deploys it, because the env root's `data "aws_ecr_repository"` hard-fails until it exists |
 | **one prod service, out of band** | dispatch its `*-prod.yml` (emergency path: staging-green check + its own approval) |
 | **prod infra, out of band** | dispatch `infra-prod.yml` — `mode: plan` (default, read-only → job summary) or `mode: apply` |
 
@@ -93,7 +93,8 @@ offline with no credentials).
 
 - **Your own per-machine dev env** — `scripts/dev-aws-*` against `infra/envs/dev`
   (that's your dev database; see the `insolvia-scripts` skill).
-- **The `ci-trust` anchor** — `scripts/apply-ci-trust.sh`, human-gated because CI
-  cannot apply its own permissions (see `insolvia-deploy-role-permissions`).
+- **The `ci-trust` anchor** — insolvia-services' `scripts/apply-ci-trust.sh`,
+  run from that checkout, human-gated because CI cannot apply its own
+  permissions (see `insolvia-deploy-role-permissions`).
 
 Everything else is a merge, an approval, or a dispatch — never a hand-run apply.

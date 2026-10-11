@@ -12,7 +12,8 @@ Every category name and the message_class here MUST match the mailer's
 service-registry allowlist for insolvia_api exactly (allowed_categories =
 ["welcome", "email_verification", "password_reset", "client_invitation"],
 allowed_message_classes =
-["transactional"] — see infra/modules/mailer/main.tf local.insolvia_api_service)
+["transactional"] — see insolvia-services' infra/modules/mailer/main.tf
+local.insolvia_api_service)
 or the mailer rejects the send with a 4xx.
 
 Trigger points for a LATER milestone (auth flows, not this one — see the

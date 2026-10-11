@@ -132,10 +132,11 @@ else:
 
 # The plain development server never sends real mail. Unset MAILER_API_URL
 # records sends in memory — mirroring the memory waitlist store. Set, it
-# posts to THAT mailer: pointed at services/mailer's own local stack
-# (`./services/mailer/scripts/dev-up.sh`, then MAILER_API_URL=
-# http://127.0.0.1:8026 — or http://host.docker.internal:8026 from the API's
-# compose container), every message lands in Mailpit at :8025 and nothing
+# posts to THAT mailer: pointed at the mailer's own local stack (it lives in
+# the insolvia-services repo — `./scripts/dev-up.sh` starts it from a sibling
+# checkout, or run its `services/mailer/scripts/dev-up.sh` there; then
+# MAILER_API_URL=http://127.0.0.1:8026 — or http://host.docker.internal:8026
+# from the API's compose container), every message lands in Mailpit at :8025 and nothing
 # leaves the machine, which is how the client-portal invitation's context
 # mail (ADR 0023) is checked locally. The local mailer ignores the SigV4
 # signature API Gateway would verify, so the client needs only whatever

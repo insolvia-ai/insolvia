@@ -16,8 +16,11 @@
 #     does not exist. Provide a valid source image.
 #
 # The same note lives at the top of infra/modules/{api_service,admin_service,
-# job_pipeline,mailer,marketing_site}/main.tf and in each workflow header. This
+# job_pipeline,marketing_site}/main.tf and in each workflow header. This
 # script is that manual step, done once, for whatever services you name.
+#
+# NOT THE MAILER. It moved to the insolvia-services repo on 2026-10-11, and its
+# bootstrap is that repo's (mailer-staging.yml's header).
 #
 # It is safe to run when the ECR *repositories* already exist (e.g. a failed
 # apply created them before it reached the Lambdas): it only pushes images.
@@ -26,10 +29,9 @@
 #
 # It does not apply Terraform and it does not create the ECR repositories. The
 # repositories are shared across environments and live in infra/envs/shared
-# (one per service, `shared` in the environment slot — insolvia-shared-api and
-# friends); if one is genuinely absent, apply that root first:
-#
-#   terraform -chdir=infra/envs/shared apply
+# IN THE insolvia-services REPO (one per service, `shared` in the environment
+# slot — insolvia-shared-api and friends); if one is genuinely absent, it is
+# missing from that root — add it there and let that repo's release apply it.
 #
 # The images it pushes are placeholders. The deploy workflow immediately builds
 # its own from the merged commit and rolls the Lambda onto it with
@@ -41,8 +43,8 @@
 #   scripts/bootstrap-ecr-images.sh <env> [service ...] [--dispatch] [--yes]
 #
 #   <env>        staging | prod   (matches infra/envs/<env> and the ECR suffix)
-#   service ...  any of: api admin jobs mailer marketing mcp filing
-#                (default: all seven; `jobs` is the pipeline worker image —
+#   service ...  any of: api admin jobs marketing mcp filing
+#                (default: all six; `jobs` is the pipeline worker image —
 #                ADR 0018, `mcp` the remote MCP server — ADR 0016, `filing`
 #                the filing worker — ADR 0024)
 #   --dispatch   after pushing, re-run the matching deploy workflows
@@ -50,7 +52,7 @@
 #   --yes        skip the confirmation prompt
 #
 # Examples:
-#   scripts/bootstrap-ecr-images.sh staging mailer marketing --dispatch
+#   scripts/bootstrap-ecr-images.sh staging api marketing --dispatch
 #   scripts/bootstrap-ecr-images.sh staging            # all four, no dispatch
 #
 set -euo pipefail
@@ -112,7 +114,6 @@ ecr_component() {
     api)       printf 'api' ;;
     admin)     printf 'admin-api' ;;
     jobs)      printf 'jobs' ;;
-    mailer)    printf 'mailer' ;;
     marketing) printf 'marketing' ;;
     mcp)       printf 'mcp' ;;
     filing)    printf 'filing' ;;
@@ -136,7 +137,7 @@ for arg in "$@"; do
     -h|--help)  usage 0 ;;
     --dispatch) DISPATCH=true ;;
     --yes|-y)   ASSUME_YES=true ;;
-    api|admin|jobs|mailer|marketing|mcp|filing) SERVICES+=("$arg") ;;
+    api|admin|jobs|marketing|mcp|filing) SERVICES+=("$arg") ;;
     staging|prod)
       [[ -z "$ENV" ]] || die "environment given twice ('$ENV' and '$arg')"
       ENV="$arg" ;;
@@ -145,7 +146,7 @@ for arg in "$@"; do
 done
 
 [[ -n "$ENV" ]] || { warn "no environment given"; usage 1; }
-[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs mailer marketing mcp filing)
+[[ ${#SERVICES[@]} -gt 0 ]] || SERVICES=(api admin jobs marketing mcp filing)
 
 require_command aws
 require_command docker
@@ -228,11 +229,6 @@ build_jobs() {
     -t "$1:$ENV" "$REPO_ROOT"
 }
 
-build_mailer() {
-  docker build "${BUILD_FLAGS[@]}" --target lambda \
-    -t "$1:$ENV" "$REPO_ROOT/services/mailer"
-}
-
 build_mcp() {
   # Same repo-root-context rule as build_api — the image installs the shared
   # packages/insolvia_core by relative path (ADR 0016).
@@ -266,7 +262,7 @@ build_marketing() {
 
 for svc in "${SERVICES[@]}"; do
   # One repository per SERVICE, shared by every environment
-  # (infra/envs/shared). The image is seeded under this environment's moving
+  # (insolvia-services' infra/envs/shared). The image is seeded under this environment's moving
   # marker tag, which is what the Lambda's Terraform seed points at
   # (var.image_tag) — not `:latest`, which under a shared repository would mean
   # "whatever any environment pushed last".
@@ -275,10 +271,10 @@ for svc in "${SERVICES[@]}"; do
   log "── $svc → $repo ─────────────────────────────"
 
   if ! ecr_repo_exists "$repo"; then
-    die "ECR repository '$repo' does not exist yet. Create it first with:
-      terraform -chdir=infra/envs/shared apply
-    (the repositories are shared across environments — see
-    infra/envs/shared/main.tf), then re-run this script."
+    die "ECR repository '$repo' does not exist yet. The repositories are shared
+    across environments and created by infra/envs/shared in the
+    insolvia-services repo — add it there, let that repo's release apply it,
+    then re-run this script."
   fi
 
   "build_$svc" "$image"

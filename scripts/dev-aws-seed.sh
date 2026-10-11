@@ -61,9 +61,10 @@
 #
 # The fixture also names CASES (seeds/fixtures/<version>/), whose sample
 # documents live in the shared fixture bucket — one bucket for the account,
-# infra/modules/dev_fixtures, applied by CI as part of envs/shared. The loader
-# copies them server-side into this machine's own case-documents bucket; the
-# developer's credentials are what read the shared bucket. If the copy is
+# insolvia-services' infra/modules/dev_fixtures, applied by that repo's CI as
+# part of its infra/envs/shared. The loader copies them server-side into this
+# machine's own case-documents bucket; the developer's credentials are what
+# read the shared bucket. If the copy is
 # refused, the bucket has not been applied yet or the fixture version has not
 # been published (scripts/dev-fixture.sh publish).
 #
@@ -159,8 +160,8 @@ DOCUMENT_BUCKET="$(jq -r '.case_document_bucket.value // empty' <<<"$outputs")"
 [[ "$DOCUMENT_BUCKET" == "$RESOURCE_PREFIX-case-documents-"* ]] ||
   die "Refusing: document bucket '$DOCUMENT_BUCKET' does not carry this machine's prefix."
 # The shared fixture bucket is account-level and named deterministically
-# (infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET overrides it for
-# an account that names it differently.
+# (insolvia-services' infra/modules/dev_fixtures); INSOLVIA_DEV_FIXTURES_BUCKET
+# overrides it for an account that names it differently.
 FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AWS_REGION_VALUE}"
 
 POOL_ID="$(jq -r '.auth_user_pool_id.value // empty' <<<"$outputs")"

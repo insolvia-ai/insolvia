@@ -24,8 +24,9 @@ locals {
   name = "${var.project}-${var.environment}-audit"
 
   # Bucket and trail names must both match the insolvia-*-audit-* patterns the
-  # deploy role is granted in infra/envs/ci-trust — and the bucket must also
-  # match DenyAuditLogErasure there, which is a CONTROL rather than a scope.
+  # deploy role is granted in insolvia-services' infra/envs/ci-trust — and the
+  # bucket must also match DenyAuditLogErasure there, which is a CONTROL rather
+  # than a scope.
   # Renaming this stem without renaming those does not fail the apply; it
   # silently stops the deny matching. That is a human-applied round trip.
   #

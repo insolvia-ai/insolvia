@@ -291,7 +291,7 @@ jobs:
   #
   # THIS JOB IS THE POINT. Until it existed, `app-staging.yml` asserted nothing
   # at all — alone among the staging workflows, it had not even the liveness
-  # curl that api/mailer/marketing each run — and `verified-commit` therefore
+  # curl that api and marketing each run — and `verified-commit` therefore
   # blessed a commit for production on the strength of "the sync command exited
   # zero". It now blesses "a real browser signed in against real staging and saw
   # the user's own identity render".

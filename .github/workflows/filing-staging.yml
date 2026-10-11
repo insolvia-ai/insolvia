@@ -15,7 +15,7 @@ name: Filing · Deploy · Staging
 #
 # The FIRST deploy in a fresh environment needs the image-before-apply
 # bootstrap at the top of infra/modules/filing_worker/main.tf:
-#   1. terraform -chdir=infra/envs/shared apply   (creates insolvia-shared-filing)
+#   1. insolvia-services releases infra/envs/shared   (creates insolvia-shared-filing)
 #   2. scripts/bootstrap-ecr-images.sh staging filing
 #   3. terraform apply   (full)
 

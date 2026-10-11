@@ -111,61 +111,6 @@ output "auth_issuer_url" {
 
 # ── Mailer (issues 6.2, 6.3) — read by the deploy workflow and, in PR4, by
 # the API deploy workflow to derive its MAILER_* env vars ────────────────────
-output "mailer_api_url" {
-  description = "Staging mailer API base URL (SigV4-authenticated)."
-  value       = module.mailer.api_url
-}
-
-output "mailer_ecr_repository_url" {
-  description = "ECR repository the mailer deploy workflow pushes staging images to."
-  value       = module.mailer.ecr_repository_url
-}
-
-output "mailer_lambda_function_names" {
-  description = "Staging mailer Lambda function names keyed by role (ingress/sender/feedback)."
-  value       = module.mailer.lambda_function_names
-}
-
-output "mailer_content_bucket" {
-  description = "Staging mailer content bucket (request manifests, future attachments)."
-  value       = module.mailer.content_bucket
-}
-
-output "mailer_messages_table" {
-  description = "Staging mailer messages DynamoDB table."
-  value       = module.mailer.messages_table
-}
-
-output "mailer_suppressions_table" {
-  description = "Staging mailer suppressions DynamoDB table."
-  value       = module.mailer.suppressions_table
-}
-
-output "mailer_service_registry_json" {
-  description = "Staging MAILER_SERVICE_REGISTRY_JSON value — the insolvia_api tenant config, for PR4's API service to reference."
-  value       = module.mailer.service_registry_json
-}
-
-output "mailer_api_status_queue_url" {
-  description = "Staging SQS queue insolvia_api's send-status events publish to."
-  value       = module.mailer.api_status_queue_url
-}
-
-output "mailer_api_status_queue_arn" {
-  description = "ARN of the above, for PR4's consumer IAM policy / event source mapping."
-  value       = module.mailer.api_status_queue_arn
-}
-
-output "mailer_configuration_set" {
-  description = "Staging SES configuration set the mailer sends through."
-  value       = module.mailer.configuration_set
-}
-
-output "mailer_alarms_topic_arn" {
-  description = "SNS topic for staging mailer alarms — subscribe by hand (Terraform manages no subscriptions)."
-  value       = module.mailer.alarms_topic_arn
-}
-
 # ── Marketing site (issue #45 revisited) — read by marketing-staging.yml ──
 output "marketing_distribution_id" {
   description = "Marketing CloudFront distribution ID (cache invalidation)."
@@ -295,7 +240,7 @@ output "case_document_bucket" {
 }
 
 output "dev_fixtures_bucket" {
-  description = "The account's shared seed-fixture bucket (infra/modules/dev_fixtures, owned by envs/shared), resolved by data lookup like every other shared resource."
+  description = "The account's shared seed-fixture bucket (module dev_fixtures, owned by envs/shared in the insolvia-services repo), resolved by data lookup like every other shared resource."
   value       = data.aws_s3_bucket.dev_fixtures.id
 }
 

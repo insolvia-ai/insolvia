@@ -21,6 +21,12 @@ before: the MCP harness round-trip (12.4–12.5), SES production access, the
 design partner, and the positioning rewrites (12.7/12.8) · Last pruned
 2026-09-30
 
+**2026-10-11:** shared AWS infrastructure (zone, cert, SES, ECR, the CI deploy
+role, human IAM) and the mailer moved to
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
+([ADR 0025](adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md)); this
+repo keeps the product and its own backend.
+
 The 2026-09-01→04 build sprint's decisions live in ADRs 0013–0019: the MCP
 pivot, repo-as-release-registry, async pipelines (no SAM), the MCP's own
 service, SQS+worker over Step Functions, launch states FL/TX/GA, and the
@@ -61,16 +67,16 @@ the linked owner has the detail:
 | Surface / concern | What exists | Owner of the detail |
 |---|---|---|
 | Domain + DNS + TLS | `insolvia.ai` on Route53, shared `*.insolvia.ai` ACM cert | [`terraform.md`](reference/terraform.md) |
-| Human email | Google Workspace inbound, SES outbound `no-reply@` | [`email.md`](reference/email.md) |
+| Human email | Google Workspace inbound, SES outbound `no-reply@` | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | Marketing site | React Router v7 SSR Lambda, `www.insolvia.ai` (+ noindexed staging), Lighthouse-gated in CI | [`apps/insolvia_marketing/CLAUDE.md`](../apps/insolvia_marketing/CLAUDE.md) |
 | Web app | Expo / React Native SPA, `app.insolvia.ai`, S3 + CloudFront | [ADR 0004](adr/0004-react-native-replaces-flutter.md) · [`apps/insolvia_app/CLAUDE.md`](../apps/insolvia_app/CLAUDE.md) |
 | Design system | **One cross-platform package** (`@insolvia-ai/design-system`) serving both surfaces — platform-split leaves, no third-party UI dependency. Lives in [`insolvia-ai/design-system`](https://github.com/insolvia-ai/design-system); consumed here by published version | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) · [ADR 0010](adr/0010-design-system-moves-to-its-own-repository.md) |
 | Tokens | One `tokens.json` → generated `theme.css` (web) + `tokens.ts` (native), drift-gated in CI — in the design-system repo. What is generated *here* is Cognito's sign-in branding, from the installed `@insolvia-ai/tokens` | [`reference/package-publishing.md`](reference/package-publishing.md) |
 | API | Python/Flask on Lambda, `api.insolvia.ai` — health + waitlist; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
-| Mailer | SES-backed transactional service with unsubscribe path | [`services/mailer/CLAUDE.md`](../services/mailer/CLAUDE.md) |
+| Mailer | SES-backed transactional service with unsubscribe path — in insolvia-services since 2026-10-11 | [`services/mailer/CLAUDE.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/services/mailer/CLAUDE.md) |
 | Auth | Cognito pools + hosted UI per env; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · `infra/modules/auth/main.tf` |
-| CI/CD | Per-area PR gates (9 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
+| CI/CD | Per-area PR gates (7 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
 
 The subdomain map (D2) as deployed — flat `staging-*` naming, because one ACM
 wildcard covers exactly one label:
@@ -98,7 +104,7 @@ died in — this plan no longer carries their bodies.
 | D4 | **One owned cross-platform design system**, platform-split leaves, over one token source | [ADR 0006](adr/0006-owned-cross-platform-design-system.md) |
 | D5 | **The API is required for MVP** — GLBA-scope data (SSNs, financials) keeps the trust boundary server-side | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) |
 | D6 | Backend is **Python + Flask + Mangum on Lambda** | house pattern, shipped |
-| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | [`email.md`](reference/email.md) |
+| D7 | Human email and product email are **separate providers** (Workspace in, SES out) | insolvia-services' [`email.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/reference/email.md) |
 | D10 | **A case belongs to a FIRM, not to a user.** Firm, role, admin flag, per-case linking and per-feature permissions live in our own store rather than in Cognito claims — an access token carries a `sub` and nothing else authorization-bearing | [ADR 0009](adr/0009-a-case-belongs-to-a-firm.md) |
 | D9 | **React Native on Expo replaced Flutter**; Expo free tier only, CI-enforced; **desktop deleted**, mobile held open by `expo prebuild` | [ADR 0004](adr/0004-react-native-replaces-flutter.md) |
 | D11 | **No direct PMS integration — Insolvia is an MCP server.** The attorney's AI harness moves data between their practice-management system and us; agent writes land as candidates under confirm-before-entry | [ADR 0013](adr/0013-mcp-server-replaces-direct-pms-integration.md) |
@@ -144,8 +150,8 @@ are most of what a harness would push.
 ## Outstanding foundation item · SES production access
 
 Deliberately deferred until the site and bounce handling were live — **they now
-are**, so this is actionable: submit the request per
-[`ses-production-access.md`](runbooks/ses-production-access.md). Until granted, we
+are**, so this is actionable: submit the request per insolvia-services'
+[`ses-production-access.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md). Until granted, we
 receive at `@insolvia.ai` but cannot reply from it. Set a date rather than
 leaving it open-ended.
 

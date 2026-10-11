@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 #
+# HISTORICAL (2026-10-11): the shared, ci-trust and account-access roots and
+# scripts/apply-ci-trust.sh this script names now live in the insolvia-services
+# repo (https://github.com/insolvia-ai/insolvia-services); paths below are as
+# they were when it ran.
+#
 # ONE-TIME: clear the guards that would make the naming-rename apply fail
 # half-way through an environment.
 #

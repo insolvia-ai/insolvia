@@ -29,7 +29,7 @@ dig +short NS insolvia.ai
 
 Expect four `awsdns` nameservers. Anything else and stop here.
 
-**2. `infra/envs/shared` has applied and the wildcard cert is `ISSUED`.** Both
+**2. `infra/envs/shared` (in insolvia-services) has applied and the wildcard cert is `ISSUED`.** Both
 `staging` and `prod` look it up with `statuses = ["ISSUED"]`, so a pending cert
 fails at plan time with a data-source error that says nothing about certificates.
 
@@ -189,7 +189,7 @@ Worth knowing before you run the checks against `app.insolvia.ai`:
 
 | Symptom | Cause |
 |---|---|
-| Apply fails on the ACM or ECR data source | `infra/envs/shared` has not applied, or the cert is not yet `ISSUED`. Apply order is `ci-trust` → `shared` → `staging`/`prod`. |
+| Apply fails on the ACM or ECR data source | insolvia-services' `infra/envs/shared` has not applied (a new service's ECR repository is released there first), or the cert is not yet `ISSUED`. Apply order is `ci-trust` → `shared` (both insolvia-services) → `staging`/`prod`. |
 | OIDC step fails, `AWS_ROLE_ARN` looks empty | The job's `environment:` does not match the environment holding the secret. Never borrow another env's name. |
 | `AccessDenied` naming a specific IAM action | The deploy role is missing a permission. That change cannot be applied by CI — see the `insolvia-deploy-role-permissions` skill. |
 | TLS name mismatch on a staging host | A nested host (`app.staging.insolvia.ai`) was used somewhere. The wildcard covers one label; the flat map in D2 is load-bearing. |

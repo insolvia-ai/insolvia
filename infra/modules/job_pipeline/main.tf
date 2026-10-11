@@ -18,7 +18,7 @@
 # function cannot be created until an image exists in insolvia-shared-jobs.
 # Once per environment:
 #
-#   1. apply infra/envs/shared            (creates insolvia-shared-jobs)
+#   1. insolvia-services' infra/envs/shared (creates insolvia-shared-jobs)
 #   2. scripts/bootstrap-ecr-images.sh <env> jobs
 #      (builds services/api/Dockerfile --target worker and pushes :<env>)
 #   3. terraform apply                    (full)

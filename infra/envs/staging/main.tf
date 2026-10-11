@@ -1,9 +1,10 @@
 # Staging environment:
 #   • web hosting    -> staging-app.insolvia.ai
 #   • backend API    -> staging-api.insolvia.ai
-#   • mailer API     -> staging-mailer-api.insolvia.ai
 #   • marketing site -> staging-www.insolvia.ai
-# References the shared zone + wildcard cert by name (not by remote state).
+# References the shared zone + wildcard cert by name (not by remote state);
+# both are infra/envs/shared in the insolvia-services repo, as is the mailer
+# (staging-mailer-api / mailer-api.insolvia.ai), which this root's API calls.
 
 locals {
   environment = "staging"
@@ -13,7 +14,7 @@ locals {
     ManagedBy   = "terraform"
   }
 
-  # The account's SES domain identity (owned by infra/envs/shared's email
+  # The account's SES domain identity (owned by insolvia-services' infra/envs/shared email
   # module), CONSTRUCTED rather than read from remote state — the same
   # cross-layer rule modules/mailer applies to the same ARN (#210). Both
   # Cognito pools send invites and reset codes through it.
@@ -33,7 +34,7 @@ data "aws_acm_certificate" "wildcard" {
   most_recent = true
 }
 
-# The shared per-service container repositories, created in infra/envs/shared.
+# The shared per-service container repositories, created in insolvia-services' infra/envs/shared.
 # Looked up rather than read from remote state, matching the zone/cert above
 # (docs/reference/terraform.md: cross-layer references are data sources,
 # never terraform_remote_state).
@@ -42,7 +43,7 @@ data "aws_acm_certificate" "wildcard" {
 # environment — is load-bearing rather than ceremonial: these lookups fail
 # outright until `shared` has applied, exactly as the certificate lookup does.
 data "aws_ecr_repository" "service" {
-  for_each = toset(["api", "admin-api", "jobs", "marketing", "mailer", "mcp", "filing"])
+  for_each = toset(["api", "admin-api", "jobs", "marketing", "mcp", "filing"])
 
   name = "insolvia-shared-${each.key}"
 }
@@ -151,43 +152,38 @@ module "mcp_service" {
   tags                = local.common_tags
 }
 
-# Mailer (issues 6.2, 6.3): the shared transactional-email microservice, with
-# exactly one registered caller — the API Lambda above. caller_role_name feeds
-# module.api_service's own execution role back into the mailer's SigV4
-# allowlist, which is why this module is declared after it. Same cert-lookup
-# reuse rationale as api_service: one REGIONAL wildcard cert, us-east-1,
-# serves every custom domain in this account.
+# The mailer moved to the insolvia-services repo on 2026-10-11, together with
+# infra/envs/shared, ci-trust and account-access. Its resources live on, in
+# that repo's infra/envs/staging root under the same address (module.mailer), and
+# its state was moved there by insolvia-services'
+# docs/runbooks/state-migration.md — nothing was destroyed or recreated.
 #
-# enable_attachment_scanning is false: no category this platform sends today
-# carries attachments, so GuardDuty Malware Protection for S3 would be a real
-# monthly cost with nothing to scan (see modules/mailer/variables.tf).
-#
-# First apply in a fresh account needs the same image-before-apply bootstrap
-# as api_service, documented at the top of modules/mailer/main.tf.
-module "mailer" {
-  source = "../../modules/mailer"
+# THIS BLOCK IS THE SAFETY NET for that move, not for this root's future.
+# Without it, a plan of this root against a state that still held
+# module.mailer would DESTROY the live mailer (the code no longer declares it).
+# With it, Terraform forgets the resources instead. After the migration the
+# state holds nothing at that address and the block is a no-op. Delete it once
+# both staging and prod have applied a release after the migration — it guards
+# the window, and only the window.
+removed {
+  from = module.mailer
 
-  project                    = "insolvia"
-  environment                = local.environment
-  domain_name                = var.mailer_subdomain
-  hosted_zone_id             = data.aws_route53_zone.main.zone_id
-  acm_certificate_arn        = data.aws_acm_certificate.wildcard.arn
-  caller_role_name           = module.api_service.lambda_role_name
-  sender_address             = "no-reply@insolvia.ai"
-  cors_allowed_origin        = "https://${var.subdomain}"
-  enable_attachment_scanning = false
-  ecr_repository_url         = data.aws_ecr_repository.service["mailer"].repository_url
-  image_tag                  = local.environment
-  tags                       = local.common_tags
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Publish the mailer's URL into the API's own SSM config namespace (issue
-# 6.4) so the API Lambda can read it as MAILER_API_URL. This is an env-level
-# resource, deliberately NOT inside module.api_service: module.mailer already
-# depends on module.api_service (it reads api_service's lambda_role_name to
-# build its SigV4 caller allowlist), so having api_service read
-# module.mailer.api_url back would be a dependency cycle. An env-level
-# resource referencing both modules' outputs has no such problem.
+# 6.4) so the API Lambda can read it as MAILER_API_URL.
+#
+# CONSTRUCTED from var.mailer_subdomain, not read from the mailer: the mailer
+# is the insolvia-services repo's (its infra/envs/<env> root), and the two
+# repos reference each other by NAME, never by remote state. The hostname is
+# the contract — that root serves exactly this name from the same variable
+# default, so changing it means changing both. The dependency also only runs
+# one way at deploy time now: the mailer looks up the API's role
+# (insolvia-<env>-api-role); this root no longer waits on anything of the
+# mailer's.
 #
 # Name follows the api_service module's own /insolvia/<env>/api/<kebab-key>
 # convention exactly (see modules/api_service/main.tf's aws_ssm_parameter
@@ -197,7 +193,7 @@ module "mailer" {
 resource "aws_ssm_parameter" "mailer_api_url" {
   name  = "/insolvia/${local.environment}/api/mailer-api-url"
   type  = "String"
-  value = module.mailer.api_url
+  value = "https://${var.mailer_subdomain}"
   tags  = local.common_tags
 }
 
@@ -309,7 +305,7 @@ import {
 # config namespace (issue #79) so the API Lambda can read them as
 # AUTH_ISSUER_URL and AUTH_CLIENT_ID and verify access tokens.
 #
-# Env-level for the same reason mailer_api_url above is: module.api_service
+# Env-level, not inside module.api_service: module.api_service
 # knows nothing about module.auth, and having it read these back would couple
 # two modules that are otherwise independent. An env-level resource
 # referencing module.auth's outputs has no such problem.
@@ -424,8 +420,9 @@ module "job_pipeline" {
   tags               = local.common_tags
 }
 
-# The queue URL, into the API's SSM config namespace — env-level for the same
-# cycle-avoidance reason as mailer_api_url above, and the deploy workflow's
+# The queue URL, into the API's SSM config namespace — env-level like the
+# other parameters in this namespace (module.api_service never reads another
+# module's outputs back, which is what keeps these roots acyclic), and the deploy workflow's
 # get-parameters-by-path step derives it into JOB_QUEUE_URL with no workflow
 # change. The WORKER reads the same namespace: it needs CASE_TABLE_NAME, which
 # is already published below.
@@ -583,7 +580,7 @@ module "filing_worker" {
 }
 
 # Publish the case table name into the API's SSM config namespace, env-level
-# for the same reason mailer_api_url and the auth parameters above are:
+# for the same reason the auth parameters above are:
 # module.case_store already depends on module.api_service, so having
 # api_service read the table name back would be a dependency cycle.
 #
@@ -713,7 +710,7 @@ module "audit_trail" {
 }
 
 # ── The shared seed-fixture bucket ──────────────────────────────
-# Owned by envs/shared (module.dev_fixtures); resolved here the way every
+# Owned by insolvia-services' envs/shared (module.dev_fixtures); resolved here the way every
 # shared resource is — a hard-failing data lookup, never shared's state — so
 # the seed step can read its name from this env's outputs alongside the
 # tables it loads into. Named deterministically by the module, which is why a

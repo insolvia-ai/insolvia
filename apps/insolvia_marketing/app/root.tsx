@@ -79,7 +79,8 @@ export default function App() {
   // The footer is KEPT, minus the Explore group, and that is deliberate rather
   // than an oversight: the privacy policy has to stay reachable site-wide
   // without searching, because AWS reviews exactly that as part of the SES
-  // production-access request (docs/runbooks/ses-production-access.md) and
+  // production-access request (insolvia-services'
+  // docs/runbooks/ses-production-access.md) and
   // every transactional email footer points at the same URL. A holding page
   // that broke the only link to it would quietly undermine issue #28.
   if (placeholder) {
@@ -128,7 +129,8 @@ export default function App() {
           </Footer.Group>
           {/* /privacy is linked from every page on purpose: AWS reviews a
               site-wide, reachable-without-searching privacy policy as part of
-              the SES production-access request (docs/runbooks/ses-production-access.md),
+              the SES production-access request (insolvia-services'
+              docs/runbooks/ses-production-access.md),
               and every transactional email footer points at the same URL. */}
           <Footer.Group title="Legal">
             <Footer.Link href="/privacy">Privacy policy</Footer.Link>

@@ -86,7 +86,7 @@ gh auth status >/dev/null 2>&1 || die "Not logged in to GitHub. Run 'gh auth log
 # `gh secret set` failure whose message does not say which of the two is wrong.
 gh api "repos/$REPO/environments/$ENVIRONMENT" --silent >/dev/null 2>&1 ||
   die "No '$ENVIRONMENT' environment on $REPO. It is created alongside the deploy workflows —
-       see docs/runbooks/aws-bootstrap.md."
+       see insolvia-services' docs/runbooks/aws-bootstrap.md."
 
 existing="$(gh secret list --env "$ENVIRONMENT" --repo "$REPO" --json name --jq '.[].name')"
 

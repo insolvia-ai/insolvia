@@ -18,10 +18,10 @@
 # `publish` and `capture` are here and NOT in CI, deliberately. Curating a
 # fixture is a human act — choosing which case, checking every value is
 # synthetic — and the bucket is written by a developer's own credentials so
-# that CI's seed role stays read-only on it (infra/envs/ci-trust, the
-# DevFixtureObjectsRead statement). Publishing is idempotent by digest, so
-# running it twice costs nothing and running it after a version's PR merged
-# is the whole procedure.
+# that CI's seed role stays read-only on it (insolvia-services'
+# infra/envs/ci-trust, the DevFixtureObjectsRead statement). Publishing is
+# idempotent by digest, so running it twice costs nothing and running it after
+# a version's PR merged is the whole procedure.
 #
 # ## Guards the loader enforces (this wrapper adds none)
 #
@@ -71,14 +71,14 @@ FIXTURE_BUCKET="${INSOLVIA_DEV_FIXTURES_BUCKET:-insolvia-shared-dev-fixtures-$AW
 case "$COMMAND" in
   publish)
     [[ -d "$FOLDER" ]] || die "No fixture at $FOLDER."
-    # The bucket is created by CI's apply of infra/envs/shared (the first
-    # release after the module merged). Before that, boto3 would report a
+    # The bucket is created by insolvia-services' CI applying its
+    # infra/envs/shared (modules/dev_fixtures). Before that, boto3 would report a
     # NoSuchBucket three calls in; this says what is actually missing.
     aws_dev s3api head-bucket --bucket "$FIXTURE_BUCKET" >/dev/null 2>&1 ||
-      die "s3://$FIXTURE_BUCKET does not exist (or is not readable). It is created by the
-       shared infra apply in the first release after infra/modules/dev_fixtures merged —
-       and that apply needs the deploy role's DevFixtureBucket grant, a human ci-trust
-       apply (scripts/apply-ci-trust.sh). Publish once the bucket exists."
+      die "s3://$FIXTURE_BUCKET does not exist (or is not readable). It is created by
+       insolvia-services' shared infra apply (its infra/envs/shared, modules/dev_fixtures)
+       — and that apply needs the deploy role's DevFixtureBucket grant, a human ci-trust
+       apply (insolvia-services' scripts/apply-ci-trust.sh). Publish once the bucket exists."
     log "Publishing $VERSION to s3://$FIXTURE_BUCKET/$VERSION/"
     seed publish --version "$FOLDER" --fixture-bucket "$FIXTURE_BUCKET" "$@"
     ;;

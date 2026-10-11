@@ -100,10 +100,11 @@ bytes (the documents themselves), and the bytes have a home of their own:
 (what each case contains, in the API's own body shapes), `manifest.json`
 (every object's size and digest) and the small synthetic objects themselves —
 and `s3://insolvia-shared-dev-fixtures-<region>/<version>/` holds the copy the
-loader actually reads (`infra/modules/dev_fixtures`). A load is a server-side
-`copy_object` per document into the target's own case-documents bucket, so
-neither a laptop nor a CI runner ever handles the bytes, and the day a fixture
-is a realistic scan rather than a two-kilobyte PDF nothing here changes.
+loader actually reads (insolvia-services' `infra/modules/dev_fixtures`). A load
+is a server-side `copy_object` per document into the target's own
+case-documents bucket, so neither a laptop nor a CI runner ever handles the
+bytes, and the day a fixture is a realistic scan rather than a two-kilobyte PDF
+nothing here changes.
 
 Three commands, and the direction each moves data:
 
@@ -238,7 +239,7 @@ _SEEDABLE_BUCKET: Final = (
 # Only a dev stack may be captured FROM: what a developer typed is synthetic
 # by construction, and nothing else is.
 _CAPTURABLE_TABLE: Final = r"^insolvia-dev-[0-9a-f]{12}-cases\Z"
-# The shared fixture bucket, infra/modules/dev_fixtures.
+# The shared fixture bucket, insolvia-services' infra/modules/dev_fixtures.
 _FIXTURE_BUCKET: Final = r"^insolvia-shared-dev-fixtures-[a-z0-9-]+\Z"
 
 # Derived ids hang off one namespace so a fixture row's id is a pure function

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 #
+# HISTORICAL (2026-10-11): the shared, ci-trust and account-access roots and
+# scripts/apply-ci-trust.sh this script names now live in the insolvia-services
+# repo (https://github.com/insolvia-ai/insolvia-services); paths below are as
+# they were when it ran.
+#
 # ONE-TIME: empty the four PRE-rename container repositories, so the
 # infra/envs/shared apply can destroy them.
 #

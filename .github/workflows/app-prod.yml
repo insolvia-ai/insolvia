@@ -7,8 +7,8 @@ name: App · Deploy · Production
 # inlined into the JS bundle by Metro when it bundles (see
 # apps/insolvia_app and docs/reference/architecture.md § Environment model), so the
 # staging bundle has "staging" baked into it and can never be the production
-# bundle. There is no artifact to promote the way api, mailer and marketing
-# promote an image digest.
+# bundle. There is no artifact to promote the way api and marketing promote
+# an image digest.
 #
 # What this workflow guarantees instead is SOURCE-level promotion, tightened at
 # both ends:
@@ -349,8 +349,8 @@ jobs:
   # is none to pass. No AWS credentials either: everything is HTTP.
   #
   # Runs as the app's leg because the app is the LAST leg of a release
-  # (release.yml orders mailer → api → marketing → app), so by now every
-  # service is at this commit. A hand-dispatched single-service prod deploy
+  # (release.yml runs it after marketing), so by now every service is at this
+  # commit. A hand-dispatched single-service prod deploy
   # of another workflow does not run it; that path keeps its own smoke step.
   smoke:
     needs: [resolve, deploy]

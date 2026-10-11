@@ -26,8 +26,8 @@
 # to assume it in dev only), so every grant below is exercised on a laptop.
 #
 # ── Bootstrap order (the first apply in a fresh account) ────────
-# Like every image Lambda here: apply infra/envs/shared (creates
-# insolvia-shared-filing), run `scripts/bootstrap-ecr-images.sh <env> filing`,
+# Like every image Lambda here: insolvia-services' infra/envs/shared applies
+# first (creates insolvia-shared-filing), run `scripts/bootstrap-ecr-images.sh <env> filing`,
 # then apply the env. Later deploys are filing-<env>.yml pushing an image and
 # calling update-function-code; Terraform ignores the image drift.
 

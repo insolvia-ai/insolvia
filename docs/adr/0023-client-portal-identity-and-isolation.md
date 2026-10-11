@@ -198,7 +198,7 @@ every service (`insolvia_core.access_log`), the client included.
   shows the invite mail locally. **Staging** runs the e2e flow as the seeded
   client. **Prod** is identical in shape, gated by the sequencing below.
 - **Launch sequencing, in order:** SES production access
-  ([runbook](../runbooks/ses-production-access.md)) before the first real
+  ([runbook](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/ses-production-access.md)) before the first real
   invite — the account is in the sandbox, so today an invite reaches only a
   `.test` address; the ZDR item before client uploads are auto-extracted;
   the custom auth domain ([`terraform.md`](../reference/terraform.md)
