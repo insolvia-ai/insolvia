@@ -2,7 +2,8 @@ name: Infra · Terraform · Production
 
 # Terraform for infra/envs/prod — the ONLY thing that applies it.
 #
-# The prod deploy workflows (api-prod, mailer-prod, marketing-prod, app-prod)
+# The prod deploy workflows (api-prod, admin-prod, mcp-prod, filing-prod,
+# marketing-prod, app-prod)
 # deliberately apply no Terraform; they only read outputs. infra/envs/prod is
 # one root module with one state and `terraform apply` reconciles all of it,
 # so coupling an apply to a service deploy would cut both ways: an infra-only

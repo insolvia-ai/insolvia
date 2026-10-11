@@ -18,9 +18,10 @@
 #
 # FIRST APPLY (bootstrap): the Lambda cannot be created until an image exists
 # in the ECR repository. The repository is not created here — it lives in
-# infra/envs/shared and is applied before any environment — so bootstrap is:
+# insolvia-services' infra/envs/shared and is applied before any environment —
+# so bootstrap is:
 #
-#   terraform -chdir=infra/envs/shared apply   # creates insolvia-shared-marketing
+#   (insolvia-services releases infra/envs/shared — creates insolvia-shared-marketing)
 #   # build + docker push <repo_url>:<env>     # this env's marker tag
 #   terraform apply
 #
@@ -58,13 +59,14 @@ locals {
 
 # ── ECR — the SSR Lambda's Docker image ─────────────────────────
 # Not owned here: `insolvia-shared-marketing` is one repository shared by every
-# environment, created in infra/envs/shared and passed in as
+# environment, created in insolvia-services' infra/envs/shared and passed in as
 # `var.ecr_repository_url`, so prod can deploy the exact digest staging
 # validated. The image is environment-agnostic — the only env-specific value,
 # INSOLVIA_API_BASE_URL, is read from process.env at runtime (see the Lambda's
 # environment block below), never baked into a layer.
 #
-# See infra/envs/shared/main.tf for the repository and its retention policy.
+# See insolvia-services' infra/envs/shared/main.tf for the repository and its
+# retention policy.
 
 # ── One-time state migration (transitional) ─────────────────────
 # See the equivalent block in infra/modules/api_service/main.tf for the full

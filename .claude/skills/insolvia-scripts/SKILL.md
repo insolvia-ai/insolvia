@@ -33,7 +33,7 @@ installing).
 
 | Want to… | Run |
 |---|---|
-| Bring the whole system up in one terminal (API + mailer + app + marketing), prefixed logs, one Ctrl-C stops it all | `scripts/dev-up.sh` — **takes no arguments** |
+| Bring the whole system up in one terminal (API + mailer + app + marketing), prefixed logs, one Ctrl-C stops it all | `scripts/dev-up.sh` — **takes no arguments**. The mailer runs from a sibling insolvia-services checkout (or `$INSOLVIA_SERVICES_DIR`) and is skipped without one — the API then records mail in memory |
 | Stop everything after a lost terminal or a killed dev-up, or reclaim ports/containers another **checkout**'s run left held | `scripts/dev-down.sh` (idempotent) |
 | Stop one area only | that area's `scripts/dev-down.sh` (idempotent) |
 
@@ -51,7 +51,7 @@ Each package has a thin `scripts/dev-setup.sh` (bootstrap) + `dev-up.sh` (run):
 | App (Expo/RN web SPA) | `apps/insolvia_app/scripts/dev-setup.sh` → `dev-up.sh` (`expo start --web`, pinned to **:3000** — Cognito registers that exact origin) |
 | Marketing site | `apps/insolvia_marketing/scripts/dev-setup.sh` → `dev-up.sh` (RR7 SSR dev server) |
 | API | `services/api/scripts/dev-setup.sh` → `dev-up.sh` (compose) → `dev-test.sh` (ruff+mypy+pytest, the UNIT tier, matches CI) → `dev-test-integration.sh` (the INTEGRATION tier: the running API over HTTP, signed in as `seeds/dev.json`'s person — needs `dev-up.sh` and `dev-aws-seed.sh`) |
-| Mailer | `services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh` |
+| Mailer | **In insolvia-services now** — `../insolvia-services/services/mailer/scripts/dev-setup.sh` → `dev-up.sh` (compose + Mailpit) → `dev-test.sh`, run in that checkout |
 
 `packages/insolvia_api_client` deliberately has no scripts — the root workspace
 install covers it.
@@ -94,8 +94,8 @@ already working.
 
 | Want to… | Run | Notes |
 |---|---|---|
-| Seed the ECR image an env's Image-package Lambdas need before Terraform can create them | `scripts/bootstrap-ecr-images.sh <env> [api\|mailer\|marketing] [--dispatch] [--yes]` | Breaks the documented first-apply deadlock |
-| Apply `infra/envs/ci-trust` (OIDC provider + deploy role + policy) after a deploy fails on a newly-granted IAM permission | `scripts/apply-ci-trust.sh` | Human-gated; CI **cannot** apply this. See **insolvia-deploy-role-permissions** |
+| Seed the ECR image an env's Image-package Lambdas need before Terraform can create them | `scripts/bootstrap-ecr-images.sh <env> [api\|admin\|jobs\|marketing\|mcp\|filing] [--dispatch] [--yes]` | Breaks the documented first-apply deadlock. Pushes images only — a missing *repository* is added in insolvia-services' `infra/envs/shared` |
+| Apply `ci-trust` (OIDC provider + deploy role + policy) after a deploy fails on a newly-granted IAM permission | **Not here** — insolvia-services' `scripts/apply-ci-trust.sh`, run from that checkout | Human-gated; CI **cannot** apply this. See **insolvia-deploy-role-permissions** |
 | Add / remove / show a required status check on `main`'s `protect-main` ruleset | `scripts/update-ruleset.sh [show\|add\|remove] "<check name>"` | Resolves the ruleset **by name**, never a hard-coded id, and re-PUTs the whole ruleset so it can't drop the other rules. Names must match a workflow job's `name:` exactly. See **insolvia-branch-protection** |
 
 There is no deploy script at all: staging deploys automatically on merge to

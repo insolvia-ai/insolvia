@@ -108,7 +108,8 @@ resource "aws_cognito_user_pool" "main" {
   # #211), and the FIRST DEVELOPER-mode pool in the account needs the Cognito
   # email service-linked role to exist — a one-time human CLI, because the
   # deploy role deliberately cannot create service-linked roles for Cognito
-  # (docs/runbooks/aws-bootstrap.md § "Cognito email service-linked role").
+  # (insolvia-services' docs/runbooks/aws-bootstrap.md § "Cognito email
+  # service-linked role").
   dynamic "email_configuration" {
     for_each = var.ses_source_arn == null ? [] : [var.ses_source_arn]
     content {

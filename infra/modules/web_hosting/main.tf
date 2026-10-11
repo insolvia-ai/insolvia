@@ -21,8 +21,8 @@ locals {
   # suffix. A component name cannot do either.
   #
   # Each component needs its own ARN pattern in the deploy role's S3 grant
-  # (infra/envs/ci-trust: arn:aws:s3:::insolvia-*-app-*, ...-admin-*), and
-  # that root is human-applied — so ADDING a third instantiation is an IAM
+  # (insolvia-services' infra/envs/ci-trust: arn:aws:s3:::insolvia-*-app-*,
+  # ...-admin-*), and that root is human-applied — so ADDING a third instantiation is an IAM
   # change before it is an env change.
   name = "${var.project}-${var.environment}-${var.component}"
 

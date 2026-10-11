@@ -1,8 +1,0 @@
-# Copy to terraform.tfvars and adjust as needed. Defaults are usually fine.
-aws_region  = "us-east-1"
-domain_name = "insolvia.ai"
-
-# Mail knobs (apex MX, SPF includes, apex TXT) have working defaults in
-# infra/modules/email/variables.tf and are wired in infra/envs/shared/main.tf.
-# Inbound mail is Google Workspace, not AWS — there is no forward-to secret to
-# supply at apply time any more.

@@ -22,9 +22,10 @@ variable "insolvia_env" {
 
 variable "ecr_repository_url" {
   description = <<-EOT
-    The shared insolvia-shared-filing repository (infra/envs/shared, looked up
-    by the env root). null means no Lambda at all — infra/envs/dev, where the
-    local poller consumes the real queue as this role.
+    The shared insolvia-shared-filing repository (insolvia-services'
+    infra/envs/shared, looked up by the env root). null means no Lambda at
+    all — infra/envs/dev, where the local poller consumes the real queue as
+    this role.
   EOT
   type        = string
   default     = null

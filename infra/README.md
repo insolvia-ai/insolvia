@@ -1,22 +1,28 @@
 # infra
 
-Terraform for all Insolvia AWS infrastructure. See
+Terraform for this repo's AWS infrastructure — the product's environments. See
 [`../docs/reference/terraform.md`](../docs/reference/terraform.md) for the
-model and [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md) for one-time bootstrap.
+model.
 
 ```
-modules/                 web_hosting, marketing_site, auth, email, api_service, mailer, …
-envs/ci-trust/           OIDC provider + insolvia-shared-deploy-role deploy role + its policy (human-applied only)
-envs/account-access/     human IAM users + groups + their attached policies (human-applied; CI has no IAM user/group permissions at all)
-envs/shared/             Route53 zone insolvia.ai, *.insolvia.ai ACM cert, SES domain identity + mail DNS
+modules/                 web_hosting, marketing_site, auth, api_service, case_store, …
 envs/staging/            staging-app / staging-www + the service stacks
 envs/prod/               app / www + the service stacks (owns the apex)
+envs/dev/                per developer machine (scripts/dev-aws-*)
 ```
 
+The account-wide layer — `shared` (Route53 zone `insolvia.ai`, `*.insolvia.ai`
+ACM cert, SES domain identity, every service's container repository),
+`ci-trust` (OIDC provider + `insolvia-shared-deploy-role` + its policy,
+human-applied only) and `account-access` (human IAM users and groups) — and the
+mailer's modules live in
+[`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services)
+· [ADR 0025](../docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
+One-time bootstrap is its
+[`docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md); CI can't
+apply its own permissions (the **insolvia-deploy-role-permissions** skill).
+
 State: `s3://insolvia-shared-terraform-state-us-east-1`, key `insolvia/<env>/terraform.tfstate`.
-The deploy role lives in **`ci-trust`**, not `shared` — CI can't apply its own
-permissions (see [`../docs/runbooks/aws-bootstrap.md`](../docs/runbooks/aws-bootstrap.md) and the
-**insolvia-deploy-role-permissions** skill).
 
 ## Usage
 
@@ -27,9 +33,7 @@ terraform plan     # offline validate: terraform init -backend=false && terrafor
 terraform apply
 ```
 
-Apply order: `ci-trust` (human) → `shared` → `staging` / `prod`. DNS is live and
-deploys are real; never `destroy` `shared` before the environments that depend on
-its zone/cert. `account-access` sits outside that order — nothing depends on it;
-apply it (`scripts/apply-account-access.sh`) when the people change. Rotating an
-MFA device is not an apply — see
-[`../docs/runbooks/iam-mfa-rotation.md`](../docs/runbooks/iam-mfa-rotation.md).
+Apply order: `ci-trust` (human) → `shared` → `staging` / `prod`, where the
+first two are applied from insolvia-services. DNS is live and deploys are real;
+never `destroy` `shared` before the environments here that depend on its
+zone/cert.

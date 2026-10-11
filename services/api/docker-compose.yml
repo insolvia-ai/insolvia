@@ -51,9 +51,10 @@ services:
       # routes answer 401 and staff routes are untouched.
       AUTH_PORTAL_CLIENT_ID: ${AUTH_PORTAL_CLIENT_ID:-}
       # Unset records mail in memory. Set it to the local mailer
-      # (http://host.docker.internal:8026, after
-      # ./services/mailer/scripts/dev-up.sh) to see the portal invitation's
-      # context mail in Mailpit at http://127.0.0.1:8025.
+      # (http://host.docker.internal:8026) to see the portal invitation's
+      # context mail in Mailpit at http://127.0.0.1:8025. The mailer is the
+      # insolvia-services repo's: ./scripts/dev-up.sh starts it from a sibling
+      # checkout, or run its services/mailer/scripts/dev-up.sh there.
       MAILER_API_URL: ${MAILER_API_URL:-}
       # The pool POST /v1/firm/users CALLS (AUTH_ISSUER_URL is what tokens are
       # verified against); unset means the in-memory directory.

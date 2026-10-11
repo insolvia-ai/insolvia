@@ -121,7 +121,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
 # configuration with 403. The signature is irrelevant at that point; the
 # request never leaves the browser. 100% of uploads fail.
 #
-# This is the same shape modules/mailer gives its own presigned-PUT bucket.
+# This is the same shape modules/mailer (insolvia-services) gives its own
+# presigned-PUT bucket.
 #
 # CORS IS NOT AN ACCESS CONTROL and listing an origin here grants nothing: the
 # only way to reach an object is a URL this API signed after checking case

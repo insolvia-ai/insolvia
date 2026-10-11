@@ -4,7 +4,7 @@ description: >-
   How Insolvia tests — which shape applies where, where a new test file goes,
   and the per-stack conventions that are easy to get subtly wrong. Use this
   BEFORE writing or changing any test in this repo: a pytest test under
-  services/api or services/mailer, a Jest test in apps/insolvia_app, a Vitest
+  services/api (or admin, mcp, filing), a Jest test in apps/insolvia_app, a Vitest
   test in packages/insolvia_api_client, or a
   Playwright spec under e2e/. Reach for it the moment a task says "add a test",
   "write tests for", "improve coverage", "this needs test coverage", or when you
@@ -91,7 +91,7 @@ found online.
 - **Never override `transformIgnorePatterns`.** A hand-copied list silently drops
   `standard-navigation` (pulled in by expo-router) and breaks every route test.
 
-## Python (`services/api`, `services/mailer`) — pytest
+## Python (`services/api` and the other services) — pytest
 
 - **Arrange–Act–Assert, one act per test.** The
   arrange–assert–act–assert–act pattern makes a failure ambiguous about which

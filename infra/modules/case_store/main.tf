@@ -87,7 +87,7 @@ locals {
 # default and reads alarmingly if you have not met it before. It does not mean
 # "everyone can decrypt" — it means "IAM identity policies decide", which is
 # what makes every other grant in this repo work, including the deploy role's
-# explicit deny on the data-plane verbs (infra/envs/ci-trust).
+# explicit deny on the data-plane verbs (insolvia-services' infra/envs/ci-trust).
 #
 # The alternative — omitting root and naming only the API role — is what
 # actually delivers "no human read path" as a property of the key itself, and

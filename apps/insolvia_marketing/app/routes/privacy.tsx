@@ -14,7 +14,8 @@ import type { Route } from "./+types/privacy";
  *      the literal string https://www.insolvia.ai/privacy. Changing this
  *      route's path means changing that constant in the same commit.
  *   2. AWS reviews it as part of the SES production-access request
- *      (docs/runbooks/ses-production-access.md). A 404 here is a rejected request.
+ *      (insolvia-services' docs/runbooks/ses-production-access.md). A 404
+ *      here is a rejected request.
  *
  * The copy describes what Insolvia actually does *today* — a marketing site
  * that captures a waitlist, and transactional email — and says so explicitly,

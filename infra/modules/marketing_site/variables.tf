@@ -52,7 +52,7 @@ variable "api_base_url" {
 }
 
 variable "ecr_repository_url" {
-  description = "URL of the shared insolvia-marketing repository (created in infra/envs/shared, looked up by the env root). Shared across environments so prod can deploy the exact digest staging validated — see the container-repository note in main.tf."
+  description = "URL of the shared insolvia-marketing repository (created in insolvia-services' infra/envs/shared, looked up by the env root). Shared across environments so prod can deploy the exact digest staging validated — see the container-repository note in main.tf."
   type        = string
 }
 

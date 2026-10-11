@@ -1,7 +1,7 @@
 """Structured JSON logging — the same one-line-per-record shape services/api
-uses (issue #69), duplicated here the way services/mailer duplicates it: the
-formatter is fifty lines of stdlib and does not meet the core package's
-admission rule.
+uses (issue #69), duplicated here the way the mailer (now in insolvia-services)
+duplicates it: the formatter is fifty lines of stdlib and does not meet the core
+package's admission rule.
 
 Privacy rule (GLBA Safeguards Rule — see docs/adr/0001): log lines carry
 call metadata only — tool name, ids, durations — never tool arguments, tool

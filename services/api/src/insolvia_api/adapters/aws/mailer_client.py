@@ -1,8 +1,9 @@
 """SigV4-signed HTTP client for the mailer service (issue 6.4).
 
 The mailer's API Gateway endpoint is IAM-authenticated (SigV4, service
-`execute-api`) — only the caller role infra/modules/mailer/main.tf allowlists
-(this Lambda's execution role, granted execute-api:Invoke in PR2) may invoke
+`execute-api`) — only the caller role the mailer allowlists (insolvia-services'
+infra/modules/mailer/main.tf, which finds insolvia-<env>-api-role by name:
+this Lambda's execution role, granted execute-api:Invoke in PR2) may invoke
 it. Credentials come from the default provider chain, which resolves to that
 role's temporary credentials automatically when this runs in Lambda.
 

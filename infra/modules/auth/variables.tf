@@ -78,9 +78,9 @@ variable "deletion_protection" {
 # Null → Cognito's default sender (no-reply@verificationemail.com, 50/day,
 # unaffected by the SES sandbox — the right answer for dev). Set → DEVELOPER
 # mode through the account's SES identity, so invites and reset codes leave as
-# no-reply@insolvia.ai. Constructed by the caller the way modules/mailer
-# builds its identity ARN — arn:aws:ses:<region>:<account>:identity/<domain> —
-# never remote state.
+# no-reply@insolvia.ai. Constructed by the caller the way insolvia-services'
+# modules/mailer builds its identity ARN —
+# arn:aws:ses:<region>:<account>:identity/<domain> — never remote state.
 #
 # The SES sandbox (until #211) is subtler than "cannot send": recipients on
 # the VERIFIED DOMAIN IDENTITY deliver even in the sandbox, so every

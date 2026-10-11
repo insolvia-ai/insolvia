@@ -25,8 +25,8 @@ variable "insolvia_env" {
 variable "ecr_repository_url" {
   description = <<-EOT
     URL of the shared insolvia-shared-jobs repository (created in
-    infra/envs/shared, looked up by the env root). null means "no worker
-    half at all" — infra/envs/dev, where there is no Lambda and jobs run
+    insolvia-services' infra/envs/shared, looked up by the env root). null
+    means "no worker half at all" — infra/envs/dev, where there is no Lambda and jobs run
     through the local worker poller; the queue and DLQ are still created,
     because they are what the local seam runs against.
   EOT

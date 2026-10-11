@@ -67,7 +67,7 @@ die()  { printf '%s[fail]%s %s\n' "$c_red" "$c_reset" "$*" >&2; exit 1; }
 
 # Every area, in the order they run. Python first because a core change is
 # the most common reason for a broad run and its suites are the fastest.
-ALL_AREAS="core api admin mailer mcp filing api-client app portal marketing forms ci-scripts"
+ALL_AREAS="core api admin mcp filing api-client app portal marketing forms ci-scripts"
 
 # ── Which areas a path can break ────────────────────────────────────────────
 # One line per path family; an area listed twice is run once. Kept broad on
@@ -84,7 +84,6 @@ areas_for_path() {
     services/api/src/*|services/api/tests/unit/*)   echo "api filing" ;;
     services/api/*)                                 echo "api" ;;
     services/admin/*)                               echo "admin" ;;
-    services/mailer/*)                              echo "mailer" ;;
     services/mcp/*)                                 echo "mcp" ;;
     services/filing/*)                              echo "filing" ;;
     forms/*)                                        echo "forms api" ;;
@@ -95,7 +94,7 @@ areas_for_path() {
     apps/insolvia_marketing/*)                      echo "marketing" ;;
     package.json|package-lock.json|tsconfig.base.json|eslint.base.js)
                                                     echo "api-client app" ;;
-    ruff.toml)                                      echo "core api admin mailer mcp filing" ;;
+    ruff.toml)                                      echo "core api admin mcp filing" ;;
     # A change to the runner itself is proven by running every suite; a
     # change to the hook config is proven by the hook firing at all.
     scripts/dev-test-unit.sh)                       echo "$ALL_AREAS" ;;
@@ -143,7 +142,6 @@ run_area() {
     core)       python_suite core packages/insolvia_core services/api/.venv services/api/scripts/dev-setup.sh ;;
     api)        python_suite api services/api services/api/.venv services/api/scripts/dev-setup.sh ;;
     admin)      python_suite admin services/admin services/admin/.venv services/admin/scripts/dev-setup.sh ;;
-    mailer)     python_suite mailer services/mailer services/mailer/.venv services/mailer/scripts/dev-setup.sh ;;
     mcp)        python_suite mcp services/mcp services/mcp/.venv services/mcp/scripts/dev-setup.sh ;;
     filing)     python_suite filing services/filing services/filing/.venv services/filing/scripts/dev-setup.sh ;;
     api-client) node_workspace_suite api-client @insolvia-ai/api-client ;;
@@ -161,7 +159,6 @@ describe_area() {
     core)       echo "packages/insolvia_core   ruff check + format --check, pytest (API venv)" ;;
     api)        echo "services/api             ruff check + format --check, pytest" ;;
     admin)      echo "services/admin           ruff check + format --check, pytest" ;;
-    mailer)     echo "services/mailer          ruff check + format --check, pytest" ;;
     mcp)        echo "services/mcp             ruff check + format --check, pytest" ;;
     filing)     echo "services/filing          ruff check + format --check, pytest (the fake court in-process)" ;;
     api-client) echo "packages/insolvia_api_client  npm run test --workspace" ;;
