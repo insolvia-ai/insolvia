@@ -18,9 +18,11 @@ infra/
 │   ├── web_hosting/          # reusable: S3 (private+OAC) + CloudFront + Route53 alias
 │   ├── api_service/          # reusable: Docker Lambda + alias + HTTP API + custom domain
 │   │                         #   + waitlist DynamoDB + SSM config namespace + alarms
-│   ├── auth/                 # reusable: Cognito user pool + hosted domain
-│   │                         #   + public PKCE app clients: the web SPA's,
-│   │                         #   the client portal's (ADR 0023), one per MCP harness
+│   ├── auth/                 # the CONSUMER half of auth (ADR 0026): the contract
+│   │                         #   reader below + this app's branding on its
+│   │                         #   clients + its roles' AdminCreateUser grants
+│   ├── auth_contract/        # reads insolvia-services' SSM contract
+│   │                         #   /insolvia/<env>/auth/* (the pool's identifiers)
 │   ├── case_store/           # GLBA-scope case data: customer-managed KMS key +
 │   │                         #   single-table DynamoDB + the API role's grant
 │   ├── audit_trail/          # CloudTrail data events on the case store, into
@@ -193,67 +195,49 @@ lives in the case table — this module owns no store.
   deadlock: `scripts/bootstrap-ecr-images.sh <env> jobs` seeds
   `insolvia-shared-jobs:<env>` after `shared` applies, then apply the env.
 
-## Auth (`infra/modules/auth/`)
+## Auth (`infra/modules/auth/`) — the consumer half
 
-One Cognito user pool per environment (issue #65): `insolvia-staging-users`
-and `insolvia-prod-users`, fully separate — a staging token can never verify
-against prod. Each owns, per env:
+**The Cognito pools are not in this repo.** The pool for each environment
+(`insolvia-<env>-users`), its hosted domains (the prefix
+`insolvia-<env>-auth.auth.us-east-1.amazoncognito.com`, and on staging
+`staging-auth.insolvia.ai`) and its app clients (`-app`, `-portal`,
+`-mcp-<harness>`) are insolvia-services' `infra/modules/auth`. They are
+applied from its `infra/envs/{staging,prod}`, and — for development — as ONE
+shared pool, `insolvia-dev-users`, from its `infra/envs/dev`
+([ADR 0026](../adr/0026-auth-is-a-shared-service.md)). That module's header
+owns the pool's configuration and the reasons behind it: self-signup off,
+case-insensitive usernames, the password policy, managed login, callback
+origins, the custom domain's apex dependency, token lifetimes. Changing any of
+these, or adding a client, is a PR there, released there, before any PR here
+that reads the result.
 
-- **User pool** `insolvia-<env>-users` — email as username, **self-signup
-  disabled** (attorneys are provisioned via `admin-create-user`), 12+ char
-  password policy, optional TOTP MFA, ESSENTIALS plan (threat protection is a
-  PLUS-plan upsell, deferred). `deletion_protection` is ACTIVE on prod only.
-- **Hosted domain** — Cognito-provided prefix
-  `insolvia-<env>-auth.auth.us-east-1.amazoncognito.com`, serving **managed login**
-  (`managed_login_version = 2`), not the classic hosted UI. AWS calls the
-  classic UI a "first-generation" service; managed login is what carries the
-  branding editor, dark mode, localisation and the Terms/Privacy links at
-  sign-up, and it is available from the ESSENTIALS tier this pool is already on.
-  **The branding style is still not in Terraform**, but the provider is no
-  longer why: `aws_cognito_managed_login_branding` shipped in v6.12.0 and the
-  repo's floor is now well past it (`~> 6.37`; `infra/CLAUDE.md` owns why).
-  What remains is that the authoritative copy of the style lives in the console
-  and has to be exported before it can be codified — the module header records
-  how.
-- **Custom auth domain — supported by the module, not yet enabled, and blocked
-  on the marketing launch.** `modules/auth` takes `custom_domain` +
-  `certificate_arn` + `hosted_zone_id` and builds the domain alongside the
-  prefix one (a pool may hold both, so the cutover costs no downtime — the app
-  moves when its next build picks up `auth_domain`, and `prefix_domain` keeps
-  serving). Every env passes null today.
+`modules/auth` here is still called as `module "auth"` and keeps its output
+names (`user_pool_id`, `user_pool_arn`, `web_client_id`, `portal_client_id`,
+`domain`, `issuer_url`, `mcp_client_ids`, `mcp_client_ids_by_harness`). Every
+env root, SSM parameter and deploy workflow reads it exactly as before. It
+does three things:
 
-  The blocker is Cognito's anti-hijacking check: it will not create a custom
-  domain unless the **parent** domain resolves to an IP. Both
-  `staging-auth.insolvia.ai` and `auth.insolvia.ai` sit one label under the
-  apex, so both depend on `insolvia.ai` resolving — and it does not. The apex A
-  record exists in Route53, but aliases prod's marketing distribution, which is
-  parked (`site_enabled = false`). A disabled distribution serves no DNS.
+- **Reads the pool's identifiers from SSM**, through `modules/auth_contract`:
+  `/insolvia/<env>/auth/{user-pool-id,user-pool-arn,client-id,portal-client-id,domain,issuer-url,mcp-client-ids}`,
+  published by insolvia-services (the pattern humbugg uses for its shared
+  dev pool). A missing parameter fails the plan with its name. `domain` is
+  the custom domain wherever one exists, decided there, so a new one moves the
+  app on its next build with no change here; `mcp-client-ids` is the MCP
+  allowlist, so a harness registered there is allowed here.
+- **Renders this app's managed-login branding** onto its two clients
+  (`aws_cognito_managed_login_branding.web` / `.portal`). Branding is per
+  client and generated from this repo's brand by `npm run tokens`, so it stays
+  with the consumer ([ADR 0020](../adr/0020-the-brand-is-a-consumer-owned-override.md)).
+- **Grants this repo's Lambda roles their one action** on the pool
+  (`aws_iam_role_policy.api_invite` / `.admin_invite`: `AdminCreateUser`,
+  scoped to the pool's ARN). The module header explains why it is one action.
 
-  **Verify with `dig +short insolvia.ai A`, not by reading the Route53 record.**
-  The record existing and the name resolving are different facts; assuming the
-  first implied the second broke a staging apply.
-
-  Names would be flat (`staging-auth`, not `auth.staging`) because the shared
-  wildcard covers one label. Dev would keep the prefix domain regardless: a
-  custom domain is per-pool and takes 15–20 minutes each way, so a per-machine
-  one would add a quarter-hour to every `dev-aws-setup.sh` run.
-- **One public PKCE app client**, authorization-code, no secret, refresh-token
-  rotation enabled: `insolvia-<env>-app` — the SPA; callbacks at
-  `<origin>/auth/callback`, sign-out to the origin. Staging also registers
-  `http://localhost:3000`, so the dev server must serve on that exact port
-  (`apps/insolvia_app/scripts/dev-up.sh` pins it); prod registers no dev
-  origins. Cognito matches redirect URIs **exactly** — a different port is a
-  different URI and Cognito rejects it, which is the whole reason the port is
-  pinned rather than chosen per run. The web client is the only app client —
-  a future native client registers the custom scheme
-  `insolvia://auth/callback`, **not** an RFC 8252 loopback redirect (the
-  header comment of `infra/modules/auth/main.tf` owns why).
-
-The API **does** verify tokens: the env outputs publish `auth_issuer_url` and
-the client id into `/insolvia/<env>/api/`, the deploy workflow derives them into
-`AUTH_ISSUER_URL` / `AUTH_CLIENT_ID`, and `services/api` validates the issuer,
-`token_use == "access"` and `client_id` against the pool's JWKS. Auth fails
-**closed** — missing config is a 401 on every protected route, never a bypass.
+The API **verifies** tokens. The env roots publish `auth_issuer_url` and the
+client ids into `/insolvia/<env>/api/`, the deploy workflow derives them into
+`AUTH_ISSUER_URL` / `AUTH_CLIENT_ID` / `AUTH_PORTAL_CLIENT_ID`, and
+`services/api` validates the issuer, `token_use == "access"` and `client_id`
+against the pool's JWKS. Auth fails **closed**: missing config gives a 401 on
+every protected route, never a bypass.
 
 ## Case data store (`infra/modules/case_store/`)
 
@@ -552,12 +536,15 @@ What it owns is deliberately only what local dev consumes today:
   month-long pending key behind. `api_role_name` is null — there is no Lambda,
   so no grant is created and the developer's own credentials are the
   principal.
-- **Auth** via the same `modules/auth` as staging/prod —
-  `insolvia-dev-<short-id>-users`, hosted-domain prefix
-  `insolvia-dev-<short-id>-auth` (Cognito domain prefixes are globally unique
-  across AWS; the short id is what makes a per-developer pool creatable at
-  all), localhost-only web origin, deletion protection off. Outputs only —
-  preps local auth work, nothing consumes it yet.
+- **Auth is not per machine.** Every machine signs in against the ONE shared
+  development pool, `insolvia-dev-users` (insolvia-services' `infra/envs/dev`,
+  applied there by a human), read through `modules/auth_contract` from
+  `/insolvia/dev/auth/*` — the same seam staging and prod read, so a laptop
+  exercises it. Only identities are shared; every table here stays this
+  machine's. The pool's branding has one owner, `infra/envs/dev-shared` (one
+  state key, `insolvia/dev-shared/terraform.tfstate`), which
+  `scripts/dev-aws-setup.sh` applies before this root on every machine — a
+  client carries one style, so per-machine roots cannot each brand it.
 - **Job queue** via the same `modules/job_pipeline` as staging/prod, worker
   half absent (`ecr_repository_url = null` — dev has no Lambda). The local
   API enqueues onto `insolvia-dev-<short-id>-jobs` (`JOB_QUEUE_URL` in

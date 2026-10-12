@@ -11,7 +11,8 @@ scripts/dev-setup.sh            # once: installs the npm workspace at the repo r
 scripts/dev-up.sh               # expo start --web on http://localhost:3000
 ```
 
-Port 3000 is not arbitrary: `infra/envs/{dev,staging}` register
+Port 3000 is not arbitrary: the dev and staging Cognito pools (insolvia-services'
+`infra/envs/{dev,staging}`) register
 `http://localhost:3000` as an exact-match Cognito allowed origin, and Expo's own
 default is 8081.
 

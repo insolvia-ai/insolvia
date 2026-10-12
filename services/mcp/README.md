@@ -24,7 +24,8 @@ an OAuth 2.1 resource server publishing RFC 9728 protected-resource metadata,
 and every session resolves to a Cognito `sub` with firm permissions looked up
 per call ([ADR 0009](../../docs/adr/0009-a-case-belongs-to-a-firm.md)).
 Because Cognito has no dynamic client registration, each harness gets a
-**pre-registered app client** (Terraform, `infra/modules/auth`): `claude` on
+**pre-registered app client** (Terraform, insolvia-services'
+`infra/modules/auth`, ADR 0026): `claude` on
 every environment, `inspector` on dev and staging only. The set of those
 client ids IS the server's token allowlist (`AUTH_CLIENT_IDS`), disjoint
 from the app's client — an app token presented here fails closed, which is

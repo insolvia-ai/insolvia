@@ -55,7 +55,7 @@ them anyway. **A real mailbox must never appear there.**
 - A `gh` login with write access to the repository's Actions secrets.
 - A password you generate yourself, meeting the pool policy: **12+ characters
   with a lower-case letter, an upper-case letter and a digit** (symbols allowed,
-  not required — `infra/modules/auth/main.tf`). One value, shared by every
+  not required — insolvia-services' `infra/modules/auth/main.tf`). One value, shared by every
   seeded account: they are throwaway identities in an environment with no
   customer data, and one password that rotates cleanly beats one per person
   that rotates by hand.

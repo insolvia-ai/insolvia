@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # Make this machine's dev environment signable-in AND seeded: ensure the dev
-# account exists in THIS MACHINE's Cognito pool, then load seeds/dev.json into
-# this machine's dev data stores.
+# account exists in the SHARED development Cognito pool (insolvia-dev-users —
+# one pool for every machine, insolvia-services', ADR 0026), then load
+# seeds/dev.json into this machine's own dev data stores.
 #
 #   ./scripts/dev-aws-seed.sh
 #   ./scripts/dev-aws-seed.sh --check     # report what is missing, write nothing
@@ -11,7 +12,7 @@
 #
 # There is no sign-up screen, and there is not supposed to be one. Every
 # Insolvia pool sets `allow_admin_create_user_only = true`
-# (infra/modules/auth/main.tf) — a public sign-up form on a bankruptcy-filing
+# (insolvia-services' infra/modules/auth/main.tf) — a public sign-up form on a bankruptcy-filing
 # platform is an invitation to junk accounts, not a growth channel. So the
 # hosted UI offers sign-in and nothing else, and `admin-create-user` is the
 # only way an account comes into existence.
@@ -28,8 +29,10 @@
 #
 # ## The password, and ~/.config/insolvia/dev.env
 #
-# The account step needs a password exactly once per pool lifetime (and again
-# after dev-aws-reset.sh wipes the pool). It comes from, in order:
+# The account step needs a password exactly once per pool lifetime. The pool is
+# SHARED: an account another machine already created exists here too, with the
+# password that machine set — use the same DEV_USER_PASSWORD on every machine
+# you work from. It comes from, in order:
 #
 #   1. DEV_USER_PASSWORD already in the environment,
 #   2. DEV_USER_PASSWORD in ~/.config/insolvia/dev.env (created on request by
@@ -40,8 +43,8 @@
 # in-tree gitignored .env has been committed to a public branch here once
 # already, and a file git never walks cannot repeat that. It is still a
 # plaintext credential on disk — accepted deliberately, because it guards one
-# thing: sign-in to this machine's own dev pool, whose entire contents are
-# this fixture. Nothing here may reach staging or prod (see Scope), whose
+# thing: sign-in to the shared development pool, which holds throwaway test
+# accounts and nothing else. Nothing here may reach staging or prod (see Scope), whose
 # secrets live in GitHub environments, never in files.
 #
 # When the account already exists and is CONFIRMED, no password is needed and
@@ -114,8 +117,8 @@ while [[ $# -gt 0 ]]; do
     printf 'Usage: %s [--check]\n\n' "$0"
     printf '  DEV_USER_PASSWORD  optional — read from %s,\n' "$DEV_ENV_FILE"
     printf '                     or prompted for without echo, when an account must be created\n\n'
-    printf 'Ensures the dev sign-in account(s) named by seeds/dev.json exist in this\n'
-    printf 'machine'"'"'s pool, then loads that fixture into this machine'"'"'s dev tables.\n'
+    printf 'Ensures the dev sign-in account(s) named by seeds/dev.json exist in the\n'
+    printf 'shared dev pool, then loads that fixture into this machine'"'"'s dev tables.\n'
     printf 'Edit the fixture to change WHAT is seeded; this script only says where.\n'
     exit 0
     ;;

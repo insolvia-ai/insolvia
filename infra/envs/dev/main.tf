@@ -26,8 +26,9 @@
 #     an attorney's approval puts a filing job on, so the dev proof
 #     (services/api/scripts/dev-filing-approval-proof.sh) enqueues on a real
 #     per-machine queue;
-#   • a Cognito pool via modules/auth, prepping local auth work (outputs
-#     only — nothing consumes it yet);
+#   • the SHARED development Cognito pool's identifiers, READ from
+#     insolvia-services' SSM contract via modules/auth_contract — the pool is
+#     that repo's and every machine's (ADR 0026), not this machine's;
 #   • OPTIONALLY the case-data audit trail (-var=enable_audit_trail=true),
 #     off by default because a per-developer trail is cost with no evidentiary
 #     value — but standable-up, so modules/audit_trail can be exercised on a
@@ -214,9 +215,9 @@ module "case_documents" {
   kms_key_arn   = module.case_store.kms_key_arn
   api_role_name = null
 
-  # The origin module.auth below already registers for this machine, and the
-  # one the app is served from locally (`npx expo start --web --port 3000` —
-  # the port is pinned, see that module's note). Without it a local browser
+  # The origin this machine's pool already registers (insolvia-services' dev
+  # root), and the one the app is served from locally (`npx expo start --web
+  # --port 3000` — the port is pinned to match Cognito's exact-match callback). Without it a local browser
   # upload fails its preflight and the whole feature is untestable on a
   # developer's machine, which is the failure mode this repo refuses to defer
   # to staging.
@@ -283,34 +284,35 @@ resource "aws_dynamodb_table" "admin_audit" {
 }
 
 # ── Auth ────────────────────────────────────────────────────────
-# The same module staging and prod instantiate, with the machine environment
-# name. The Cognito hosted-domain prefix the module derives
-# (insolvia-dev-<machine_short_id>-auth) is GLOBALLY unique across all of AWS —
-# the machine short id in it is what makes a per-developer pool safe to
-# create at all. Registers only the localhost web origin staging also
-# registers for dev (`npx expo start --web --port 3000` — the port is pinned
-# to match, since Cognito callback URLs are exact-match); nothing deployed
-# ever redirects here. Outputs only for now: this preps local auth work, the
-# app does not consume it yet.
-
+# READ-ONLY. This machine signs in against the ONE shared development pool
+# (insolvia-dev-users), which is insolvia-services' (its infra/envs/dev,
+# ADR 0026) and is shared by every machine — the pattern humbugg uses, for the
+# reason that reaches every product the day sign-in federates: an identity
+# provider registers exact redirect URIs, so one pool is one URI, registered
+# once. Only identities are shared; every table, queue and bucket in this root
+# stays this machine's.
+#
+# Read through the same SSM contract staging and prod read
+# (/insolvia/dev/auth/*, modules/auth_contract), so a developer machine
+# exercises that seam itself. If the parameters do not exist yet, this plan
+# fails naming the missing one: the shared pool has not been applied
+# (insolvia-services' scripts/apply-dev-auth.sh, once).
+#
+# Named module "auth" so every reference below (module.auth.issuer_url, …)
+# reads as it always did. No branding here — the shared pool's two clients
+# are branded ONCE, by infra/envs/dev-shared, which scripts/dev-aws-setup.sh
+# applies before this root — and no role grants (dev has no Lambda).
+#
+# A machine set up before ADR 0026 still holds its own per-machine pool
+# (insolvia-dev-<machine_short_id>-users) under module.auth.* in this state;
+# this code no longer declares it, so the next apply DESTROYS it — on purpose:
+# the shared pool replaces it, and scripts/dev-aws-seed.sh puts your account
+# there.
 module "auth" {
-  source = "../../modules/auth"
+  source = "../../modules/auth_contract"
 
   project     = "insolvia"
-  environment = local.environment
-
-  web_origins = ["http://localhost:3000"]
-
-  # The MCP inspector's loopback-callback client (#261): connecting
-  # `npx @modelcontextprotocol/inspector` to the locally running
-  # services/mcp server against THIS machine's pool is the local check the
-  # MCP milestone's issues require.
-  mcp_inspector_client = true
-
-  # Throwaway test accounts on a throwaway pool.
-  deletion_protection = false
-
-  tags = local.common_tags
+  environment = "dev"
 }
 
 # ── API auth configuration ──────────────────────────────────────

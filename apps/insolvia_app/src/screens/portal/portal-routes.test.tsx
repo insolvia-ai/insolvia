@@ -66,18 +66,14 @@ const PORTAL_QUESTIONNAIRE = {
 };
 
 describe('the portal routes', () => {
-  it('are declared at exactly the paths infra registers', () => {
-    // `portal_callback_urls` and `portal_logout_urls` in
-    // infra/modules/auth/main.tf: <origin>/portal/auth/callback and
-    // <origin>/portal. Under file-based routing the path IS the file.
+  it('are declared at the paths the portal client registers', () => {
+    // <origin>/portal/auth/callback and <origin>/portal — the URLs
+    // insolvia-services' infra/modules/auth registers on the portal client
+    // (the pool moved there, ADR 0026). Under file-based routing the path IS
+    // the file, so these two files are this repo's half of that contract.
+    // The other half is that repository's to keep; nothing here reads it.
     expect(existsSync(path.join(APP_DIR, 'portal', 'auth', 'callback.tsx'))).toBe(true);
     expect(existsSync(path.join(APP_DIR, 'portal', 'index.tsx'))).toBe(true);
-    const infra = readFileSync(
-      path.join(__dirname, '..', '..', '..', '..', '..', 'infra', 'modules', 'auth', 'main.tf'),
-      'utf8',
-    );
-    expect(infra).toContain('"${o}/portal/auth/callback"');
-    expect(infra).toContain('"${o}/portal"');
   });
 
   it('never reach for the staff session, API hook or frame', () => {
