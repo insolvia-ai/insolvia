@@ -52,6 +52,14 @@ Durable decisions that stay expensive to re-litigate. See
 [`adr/README.md`](adr/README.md) for the register and the numbering rule.
 Shorter-lived planning decisions live as `D<n>` entries in [`plan.md`](plan.md).
 
+## [`agents/`](agents/) — config for the engineering skills
+
+Read by the mattpocock skills (`triage`, `to-tickets`, `to-spec`, `wayfinder`, …), not
+by people: [`issue-tracker.md`](agents/issue-tracker.md) (GitHub Issues),
+[`triage-labels.md`](agents/triage-labels.md) (the five defaults),
+[`domain.md`](agents/domain.md) (single-context: root `GLOSSARY.md`, created lazily,
+plus [`adr/`](adr/)). Edit them directly; re-run `/setup-matt-pocock-skills` only to switch trackers.
+
 ## [`business/`](business/) — company artifacts
 
 | Doc | What |
