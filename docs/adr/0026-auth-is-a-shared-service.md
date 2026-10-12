@@ -1,9 +1,10 @@
 # ADR 0026 — Auth is a shared service: the Cognito pools move to `insolvia-services`
 
-- **Status:** Proposed (2026-10-12). The direction is the maintainer's
-  decision. They also chose the SSM contract, the shared development pool and
-  the human-applied dev pool, all on review of the first draft. This
-  record is accepted when the maintainer merges it.
+- **Status:** Accepted (2026-10-12, by the maintainer). The direction, the
+  SSM contract, the shared development pool and the human-applied dev pool
+  are all the maintainer's choices, made on review of the first draft. The
+  cutover ran the same day: staging and prod moved with no resource changes
+  on either side, and the shared dev pool is live on `dev-auth.insolvia.ai`.
 - **Date:** 2026-10-11, revised 2026-10-12
 - **Amends:** [ADR 0025](0025-shared-infra-and-mailer-move-to-insolvia-services.md).
   Auth joins the list of what moves, and rule 1 gains a fourth cross-repo
