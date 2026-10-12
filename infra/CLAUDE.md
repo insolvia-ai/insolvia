@@ -9,11 +9,14 @@ working.
 **The account-wide layer is not here.** `shared` (zone, wildcard cert, SES
 identity, every service's container repository, the fixture bucket),
 `ci-trust` (the OIDC provider and the deploy role), `account-access` (the human
-IAM users) and the mailer's modules live in
+IAM users), the mailer's modules and **auth** (the Cognito pools, domains and
+app clients — per-machine dev pools included) live in
 [`insolvia-ai/insolvia-services`](https://github.com/insolvia-ai/insolvia-services),
-with the same state keys they had here; one-time bootstrap is its
+the account-wide roots with the same state keys they had here; one-time
+bootstrap is its
 [`docs/runbooks/aws-bootstrap.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/aws-bootstrap.md) ·
-[ADR 0025](../docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md).
+[ADR 0025](../docs/adr/0025-shared-infra-and-mailer-move-to-insolvia-services.md) ·
+[ADR 0026](../docs/adr/0026-auth-is-a-shared-service.md).
 
 - **Terraform `>= 1.10`** (native S3 state locking via `use_lockfile`; no
   DynamoDB lock table), AWS provider `~> 6.37` — **6.37 is a deliberate floor,
@@ -117,6 +120,24 @@ with the same state keys they had here; one-time bootstrap is its
   `var.mailer_subdomain` — the hostname is the contract between the repos.
   Never re-add `module "mailer"` here: the resources exist, owned by the other
   repo's state, and a second declaration would try to create them again.
+- **Auth is read, not owned: `modules/auth_contract` reads the SSM contract
+  `/insolvia/<env>/auth/*`** that insolvia-services publishes (pool id/ARN,
+  web and portal client ids, sign-in domain, issuer, MCP client ids). A
+  missing parameter fails the plan by name — the pool's root there has not
+  applied. `modules/auth` is the consumer half staging, prod and
+  `envs/dev-shared` call: the reader, plus this app's managed-login branding
+  on its two clients and `AdminCreateUser` grants on its own roles. A
+  developer machine's `envs/dev` calls the reader alone — it signs in against
+  the ONE shared dev pool (`insolvia-dev-users`), whose branding
+  `envs/dev-shared` owns and `scripts/dev-aws-setup.sh` applies. Pool
+  configuration — callback origins, the custom domain, deletion protection,
+  a new client or contract key — is a PR there, released first. The eight
+  `removed { from = module.auth.… destroy = false }` blocks in staging/prod
+  are the cutover's safety net (insolvia-services'
+  [`docs/runbooks/auth-state-migration.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/docs/runbooks/auth-state-migration.md));
+  delete them only as it says. Keep `module "auth"` at that name — the
+  branding and grants never moved in state because their addresses did not
+  change.
 - **A deploy job must declare `environment:`** matching the Terraform env
   (`insolvia-staging|production` here; `insolvia-shared` is insolvia-services')
   — env-scoped secrets are invisible otherwise and resolve to empty strings

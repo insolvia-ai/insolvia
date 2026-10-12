@@ -75,7 +75,7 @@ the linked owner has the detail:
 | API | Python/Flask on Lambda, `api.insolvia.ai` — health + waitlist; the client-stays-dumb trust boundary | [ADR 0001](adr/0001-client-stays-dumb-trust-boundary.md) · [`services/api/CLAUDE.md`](../services/api/CLAUDE.md) |
 | API client | Hand-written TypeScript, contract-pinned by tests, wired into the app | [`packages/insolvia_api_client/CLAUDE.md`](../packages/insolvia_api_client/CLAUDE.md) |
 | Mailer | SES-backed transactional service with unsubscribe path — in insolvia-services since 2026-10-11 | [`services/mailer/CLAUDE.md`](https://github.com/insolvia-ai/insolvia-services/blob/main/services/mailer/CLAUDE.md) |
-| Auth | Cognito pools + hosted UI per env; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · `infra/modules/auth/main.tf` |
+| Auth | Cognito pools + hosted UI per env; the app signs in with authorization-code + PKCE, keeps access/ID tokens in memory and the refresh token in `localStorage`, and guards its routes | [ADR 0007](adr/0007-hosted-ui-pkce-refresh-token-in-local-storage.md) · insolvia-services' `infra/modules/auth` ([ADR 0026](adr/0026-auth-is-a-shared-service.md)) |
 | CI/CD | Per-area PR gates (7 required checks), staging on merge, prod by dispatch, promote-not-rebuild | [`architecture.md`](reference/architecture.md) |
 
 The subdomain map (D2) as deployed — flat `staging-*` naming, because one ACM

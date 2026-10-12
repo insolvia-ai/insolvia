@@ -44,6 +44,9 @@ destroy_args=(destroy -input=false "${TF_VARS[@]}")
 [[ "$AUTO_APPROVE" -eq 1 ]] && destroy_args+=(-auto-approve)
 terraform -chdir="$TF_DIR" "${destroy_args[@]}"
 
+# The shared development pool and its branding (infra/envs/dev-shared) are
+# NOT this machine's and are left alone: every machine signs in against them.
+
 # Unwind the setup script's wiring — a services/api/.env still naming the
 # destroyed table would send dev-up.sh at a table that no longer exists.
 # Removing WAITLIST_TABLE_NAME makes dev-up.sh fail fast with "run
@@ -56,18 +59,16 @@ remove_env "$api_env" CASE_ACCESS_LOG_TABLE_NAME
 remove_env "$api_env" FIRM_TABLE_NAME
 remove_env "$api_env" CASE_DOCUMENT_BUCKET
 remove_env "$api_env" AWS_PROFILE
-# The Cognito pool is gone too, so an issuer/client id left behind would point
-# token verification at nothing. The API fails closed on absent auth config, so
-# removing these degrades protected routes to a clean 401 rather than to a
-# confusing failure against a destroyed pool.
+# The shared pool survives, but this machine's wiring to it goes with the
+# rest: the API fails closed on absent auth config, so protected routes answer
+# a clean 401 until dev-aws-setup.sh runs again.
 remove_env "$api_env" AUTH_ISSUER_URL
 remove_env "$api_env" AUTH_CLIENT_ID
 remove_env "$api_env" AUTH_PORTAL_CLIENT_ID
 remove_env "$api_env" AUTH_USER_POOL_ID
 
-# Same for the app: a stale domain/client id would send sign-in to a pool that
-# no longer exists. Cleared, the app renders "sign-in is not configured", which
-# is the honest state after a destroy.
+# Same for the app: cleared, it renders "sign-in is not configured", which is
+# the honest state after a destroy.
 app_env="$APP_DIR/.env"
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_DOMAIN
 remove_env "$app_env" EXPO_PUBLIC_COGNITO_CLIENT_ID

@@ -8,9 +8,11 @@
 # machine-id's state key. This script finds the orphan's state object in the
 # state bucket by its 12-char short id (the suffix visible in the leftover
 # resource names), runs `terraform destroy` against THAT state — so the whole
-# environment goes (waitlist table, Cognito pool + domain + clients, whatever
-# else the state tracks), not just the resource that was noticed — and then
-# deletes the state object itself.
+# environment goes (waitlist table, case store, whatever else the state tracks
+# — including, for a machine set up before ADR 0026, its old per-machine
+# Cognito pool, which current code no longer declares), not just the resource
+# that was noticed — and then deletes the state object itself. The SHARED dev
+# pool is never in a machine's state and is never touched.
 #
 # Without --yes, `terraform destroy` shows its plan and asks for interactive
 # confirmation, so a plain run is a safe way to see what would be removed.

@@ -5,6 +5,8 @@
 # References the shared zone + wildcard cert by name (not by remote state);
 # both are infra/envs/shared in the insolvia-services repo, as is the mailer
 # (staging-mailer-api / mailer-api.insolvia.ai), which this root's API calls.
+# Auth (the Cognito pool, its domains and app clients) is that repo's too, and
+# read through its SSM contract (/insolvia/<env>/auth/*) — module.auth below is the consumer half (ADR 0026).
 
 locals {
   environment = "staging"
@@ -13,15 +15,7 @@ locals {
     Environment = local.environment
     ManagedBy   = "terraform"
   }
-
-  # The account's SES domain identity (owned by insolvia-services' infra/envs/shared email
-  # module), CONSTRUCTED rather than read from remote state — the same
-  # cross-layer rule modules/mailer applies to the same ARN (#210). Both
-  # Cognito pools send invites and reset codes through it.
-  ses_identity_arn = "arn:aws:ses:us-east-1:${data.aws_caller_identity.current.account_id}:identity/${var.domain_name}"
 }
-
-data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "main" {
   name = var.domain_name
@@ -181,63 +175,21 @@ resource "aws_ssm_parameter" "mailer_api_url" {
   tags  = local.common_tags
 }
 
-# Auth (#65): staging Cognito user pool + the web SPA app client.
+# Auth (#65): the CONSUMER half of the staging pool. The pool, its domains
+# (staging-auth.insolvia.ai) and its app clients — including the localhost:3000
+# dev origin staging registers for local web dev — are insolvia-services'
+# (infra/envs/staging, module.auth) since ADR 0026. This reads them from its SSM contract
+# (/insolvia/staging/auth/*, modules/auth_contract),
+# renders this app's managed-login branding onto its two clients, and grants
+# this repo's two Lambda roles their one action on the pool.
 #
-# web_origins carries a localhost dev origin ON STAGING ONLY: Cognito callback
-# URLs are exact-match (no wildcard host or port), so local web dev against
-# staging auth must PIN ITS PORT — which is why the Expo dev server is started
-# on 3000 rather than Metro's default 8081:
-#
-#   npx expo start --web --port 3000
-#
-# The port below and that flag are one contract; changing either alone breaks
-# local sign-in. http://localhost is one of Cognito's three permitted
-# plain-HTTP loopback hosts. Prod registers no dev origins — nothing running on
-# a laptop should be able to complete a prod sign-in.
+# The localhost:3000 callback and `npx expo start --web --port 3000` are still
+# one contract — now across two repositories.
 module "auth" {
   source = "../../modules/auth"
 
   project     = "insolvia"
   environment = local.environment
-
-  web_origins = [
-    "https://${var.subdomain}",
-    "http://localhost:3000",
-  ]
-
-  # Sign-in on our own domain: staging-auth.insolvia.ai.
-  #
-  # This depends on something that is NOT visible from here, so it is written
-  # down: Cognito refuses to create a custom domain unless the PARENT domain
-  # resolves to an IP, and the parent of staging-auth.insolvia.ai is the apex.
-  # The apex resolves only because prod's marketing distribution is enabled
-  # (`site_enabled = true` in infra/envs/prod/main.tf) — a DISABLED CloudFront
-  # distribution serves no DNS, which is what previously made this fail with
-  # "Was not able to resolve a DNS A record for the parent domain".
-  #
-  # So parking prod's marketing site again would break STAGING sign-in, which
-  # is not a connection anyone would guess. Verify with `dig +short
-  # insolvia.ai A` — reading the Route53 record is NOT the same check, because
-  # an alias to a disabled distribution is a record that resolves to nothing.
-  #
-  # Added alongside the Cognito prefix domain, not replacing it (see the module):
-  # the app moves to this hostname when its next build reads the `auth_domain`
-  # output, and the prefix keeps serving until then, so there is no window where
-  # sign-in is down.
-  #
-  # First apply takes 15-20 minutes — Cognito provisions its own CloudFront
-  # distribution — and Terraform blocks for it.
-  custom_domain   = "staging-auth.${var.domain_name}"
-  certificate_arn = data.aws_acm_certificate.wildcard.arn
-  hosted_zone_id  = data.aws_route53_zone.main.zone_id
-
-  # Staging pool holds only test accounts; keep it destroyable.
-  deletion_protection = false
-
-  # The MCP inspector's loopback-callback client (#261): 12.5 verifies the
-  # OAuth dance against STAGING with an inspector, so its client must exist
-  # here. Deliberately absent from prod — the flag's default.
-  mcp_inspector_client = true
 
   # Lets POST /v1/firm/users mint a colleague's Cognito account. ONE action on
   # ONE pool — the module's own comment has the argument for why that is the
@@ -247,18 +199,82 @@ module "auth" {
   # Provisioning a firm's first administrator (#213) — same one-action grant
   # on the admin service's own role.
   admin_invite_role_name = module.admin_service.lambda_role_name
+}
 
-  # Invites and reset codes leave as no-reply@insolvia.ai (#210). SES is
-  # sandboxed until #211, which for tests means: recipients on the verified
-  # insolvia.ai domain — any Workspace mailbox or alias, including
-  # plus-addressed variants — deliver fine; external recipients do not. Prod
-  # sets this too (module variables.tf owns the sequencing argument).
-  # ONE-TIME PREREQUISITE for the first apply that carries this: the Cognito
-  # email service-linked role must exist — docs/runbooks/aws-bootstrap.md
-  # § "Cognito email service-linked role".
-  ses_source_arn = local.ses_identity_arn
+# Auth moved to the insolvia-services repo (ADR 0026): the pool, its domains,
+# its app clients and its SSM contract parameters live on in that repo's infra/envs/staging root, under
+# the SAME addresses (module.auth.*), and their state was moved there by its
+# docs/runbooks/auth-state-migration.md — nothing destroyed or recreated.
+#
+# THESE BLOCKS ARE THE SAFETY NET for that move. module.auth is still declared
+# here (it is the consumer half now), but these eight resources are not. Without
+# the blocks, a plan of this root against a state that still held them would
+# DESTROY them — and the pool's users with them. With them, Terraform forgets
+# the objects instead. After the migration the state holds nothing at these
+# addresses and every block is a no-op. Delete them once both staging and prod have
+# applied after the migration; they guard the window, and only the window.
+removed {
+  from = module.auth.aws_cognito_user_pool.main
 
-  tags = local.common_tags
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.main
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_domain.custom
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_route53_record.auth
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.web
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.portal
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_cognito_user_pool_client.mcp
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = module.auth.aws_ssm_parameter.contract
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # One-time adoption of the branding style that already exists in staging.
@@ -518,7 +534,7 @@ module "case_documents" {
   worker_role_name = module.job_pipeline.worker_role_name
 
   # Both origins staging already admits elsewhere: the deployed app, and the
-  # localhost dev server module.auth registers above and the API's own CORS
+  # localhost dev server staging's pool registers (insolvia-services) and the API's own CORS
   # allowlist permits outside production. A developer running the app against
   # staging must be able to complete an upload, or "it works locally" and "it
   # works on staging" stop being the same statement.

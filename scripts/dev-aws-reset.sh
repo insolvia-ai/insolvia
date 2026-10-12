@@ -2,14 +2,16 @@
 #
 # Reset this machine's AWS-backed Insolvia development data: delete and
 # recreate the waitlist, case, access-log and firm tables (cheaper and simpler
-# than item-level scans for throwaway data) and, unless --skip-cognito, delete
-# every user in this machine's Cognito pool. The resources themselves survive;
+# than item-level scans for throwaway data). The resources themselves survive;
 # only data is wiped. Every resource is asserted against this machine's
 # expected names before anything is touched.
 #
-# AFTERWARDS YOU HAVE NEITHER AN ACCOUNT NOR A FIRM. Re-run
-# scripts/dev-aws-seed.sh — it recreates the account (password from
-# ~/.config/insolvia/dev.env, or a prompt) and reseeds the firm.
+# COGNITO USERS ARE NOT DELETED. Sign-in uses the ONE development pool every
+# machine shares (insolvia-services', ADR 0026); its accounts are not this
+# machine's to delete. --skip-cognito is accepted and changes nothing.
+#
+# AFTERWARDS YOUR ACCOUNT STILL EXISTS BUT HAS NO FIRM. Re-run
+# scripts/dev-aws-seed.sh — it reseeds the firm (and converges the account).
 #
 set -euo pipefail
 
@@ -19,14 +21,13 @@ source "$SCRIPT_DIR/dev-aws-common.sh"
 
 AUTO_APPROVE=0
 DRY_RUN=0
-SKIP_COGNITO=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) [[ $# -ge 2 ]] || die "--profile requires a value."; AWS_PROFILE_VALUE="$2"; shift ;;
     --region) [[ $# -ge 2 ]] || die "--region requires a value."; AWS_REGION_VALUE="$2"; shift ;;
     --yes|-y) AUTO_APPROVE=1 ;;
     --dry-run) DRY_RUN=1 ;;
-    --skip-cognito) SKIP_COGNITO=1 ;;
+    --skip-cognito) : ;; # accepted for old habits; users are never deleted now
     --help|-h)
       printf 'Usage: %s [--profile NAME] [--region REGION] [--yes] [--dry-run] [--skip-cognito]\n' "$0"
       exit 0
@@ -71,11 +72,7 @@ printf '  Table:       %s (delete + recreate)\n' "$table"
 printf '  Case table:  %s (delete + recreate)\n' "$case_table"
 printf '  Access log:  %s (delete + recreate)\n' "$access_log_table"
 printf '  Firm table:  %s (delete + recreate)\n' "$firm_table"
-if [[ "$SKIP_COGNITO" -eq 1 ]]; then
-  printf '  Cognito:     skipped\n\n'
-else
-  printf '  Cognito:     %s (users only)\n\n' "$pool_id"
-fi
+printf '  Cognito:     %s — the shared pool; its users are NOT deleted\n\n' "$pool_id"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   ok "Dry run complete; nothing was changed."
@@ -119,29 +116,12 @@ aws_dev dynamodb delete-table --table-name "$access_log_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$access_log_table"
 
 # The firms go too, and this table is the one with a foot in both halves of the
-# reset: its user rows are keyed by a Cognito subject, and its firm rows own the
-# cases deleted just above. Keeping it while deleting the pool's users would
-# leave a firm whose every member is an id that no longer resolves — nobody can
-# sign in to administer it, and the next `dev-aws-seed.sh` meets a
-# subject it has never seen and creates a SECOND firm beside the derelict one.
-#
-# UNCONDITIONAL, including under --skip-cognito. That flag preserves accounts,
-# not their tenancy: the cases above are gone either way, so a surviving firm
-# would be an empty shell, and re-running `dev-aws-seed.sh` for the
-# accounts that still exist is one command. The reverse default — firms
-# outliving the cases they own — is the state with no obvious fix.
+# reset: its firm rows own the cases deleted just above, so a surviving firm
+# would be an empty shell. The accounts survive (shared pool, above), and
+# re-running `dev-aws-seed.sh` gives them their firm back in one command.
 log "Deleting $firm_table..."
 aws_dev dynamodb delete-table --table-name "$firm_table" >/dev/null
 aws_dev dynamodb wait table-not-exists --table-name "$firm_table"
-
-if [[ "$SKIP_COGNITO" -eq 0 ]]; then
-  users_json="$(aws_dev cognito-idp list-users --user-pool-id "$pool_id" --output json)"
-  while IFS= read -r username; do
-    [[ -n "$username" ]] || continue
-    aws_dev cognito-idp admin-delete-user --user-pool-id "$pool_id" --username "$username"
-  done < <(jq -r '.Users[].Username' <<<"$users_json")
-  ok "Removed $(jq '.Users | length' <<<"$users_json") Cognito user(s)."
-fi
 
 log "Recreating the empty DynamoDB tables through Terraform..."
 terraform -chdir="$TF_DIR" apply -input=false -auto-approve "${TF_VARS[@]}"

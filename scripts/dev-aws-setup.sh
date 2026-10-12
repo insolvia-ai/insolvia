@@ -3,9 +3,11 @@
 # Provision this machine's isolated Insolvia development resources in AWS and
 # wire services/api at them. This IS local development's database (no local
 # emulator): the compose stack's API talks to the real
-# per-machine waitlist table this script creates (plus a Cognito pool for
-# upcoming auth work). services/api/scripts/dev-setup.sh chains into this
-# script unconditionally.
+# per-machine waitlist table this script creates. Sign-in uses the ONE shared
+# development pool (insolvia-services', ADR 0026), read through SSM; this
+# script first applies its branding (infra/envs/dev-shared, shared by every
+# machine), then this machine's own stack. services/api/scripts/dev-setup.sh
+# chains into this script unconditionally.
 #
 #   ./scripts/dev-aws-setup.sh               # uses the default AWS profile
 #   ./scripts/dev-aws-setup.sh --check       # verify, change nothing
@@ -48,6 +50,7 @@ log "Resource prefix: $RESOURCE_PREFIX"
 log "Terraform state: s3://$STATE_BUCKET/$STATE_KEY"
 
 if [[ "$CHECK_ONLY" -eq 1 ]]; then
+  require_shared_pool
   state_json="$(aws_dev s3 cp "s3://$STATE_BUCKET/$STATE_KEY" -)" ||
     die "Terraform state is missing. Run ./scripts/dev-aws-setup.sh --profile $AWS_PROFILE_VALUE."
   [[ "$(jq -r '.outputs.machine_id.value // empty' <<<"$state_json")" == "$MACHINE_ID" ]] ||
@@ -102,6 +105,12 @@ if [[ "$CHECK_ONLY" -eq 1 ]]; then
   ok "Per-machine AWS resources and services/api/.env are ready."
   exit 0
 fi
+
+# The shared pool's branding first — once for every machine (dev-shared).
+# This root reads the same pool's contract at plan time; on a machine set up
+# before ADR 0026 its plan also DESTROYS the old per-machine pool, which the
+# shared one replaces (run scripts/dev-aws-seed.sh afterwards).
+apply_dev_shared
 
 terraform_init
 apply_args=(apply -input=false "${TF_VARS[@]}")
